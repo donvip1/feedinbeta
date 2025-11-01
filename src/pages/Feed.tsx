@@ -13,7 +13,7 @@ import { StoriesBar } from '@/components/stories/StoriesBar';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { LogOut, MessageSquare, Settings as SettingsIcon, RefreshCw, Wallet } from 'lucide-react';
+import { Wallet } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -183,56 +183,22 @@ const Feed = () => {
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-gradient-to-r from-purple-900/80 to-blue-900/80 backdrop-blur-lg border-b border-gray-800">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button
-                onClick={() => navigate('/wallet')}
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-white/10"
-              >
-                <Wallet className="w-4 h-4 mr-2" />
-                <div className="text-left">
-                  <p className="text-xs text-gray-300">Credits</p>
-                  <p className="text-sm font-bold">999,999</p>
-                </div>
-              </Button>
-            </div>
-
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 max-w-md mx-4">
-              <TabsList className="grid w-full grid-cols-3 bg-transparent">
-                <TabsTrigger
-                  value="following"
-                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
-                >
-                  Following
-                </TabsTrigger>
-                <TabsTrigger
-                  value="for-you"
-                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
-                >
-                  For You
-                </TabsTrigger>
-                <TabsTrigger
-                  value="my-posts"
-                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
-                >
-                  My Posts
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-3">
+            <Button
+              onClick={() => navigate('/wallet')}
+              variant="ghost"
+              size="sm"
+              className="text-white hover:bg-white/10 p-2"
+            >
+              <Wallet className="w-4 h-4 mr-1.5" />
+              <div className="text-left">
+                <p className="text-xs text-gray-300">Credits</p>
+                <p className="text-xs font-bold">999,999</p>
+              </div>
+            </Button>
 
             <div className="flex items-center space-x-2">
-              <Button
-                onClick={handleRefresh}
-                size="sm"
-                variant="ghost"
-                className="text-white hover:bg-white/10"
-                disabled={refreshing}
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </Button>
               <NotificationBell />
               <Button
                 onClick={() => navigate(`/profile/${user?.id}`)}
@@ -249,11 +215,34 @@ const Feed = () => {
               </Button>
             </div>
           </div>
+
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 bg-transparent h-10">
+              <TabsTrigger
+                value="following"
+                className="text-xs text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent px-2"
+              >
+                Following
+              </TabsTrigger>
+              <TabsTrigger
+                value="for-you"
+                className="text-xs text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent px-2"
+              >
+                For You
+              </TabsTrigger>
+              <TabsTrigger
+                value="my-posts"
+                className="text-xs text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent px-2"
+              >
+                My Posts
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </header>
 
       {/* Stories */}
-      <div className="border-b border-gray-800">
+      <div className="sticky top-[140px] md:top-[100px] z-40 bg-black border-b border-gray-800">
         <div className="container mx-auto max-w-2xl">
           <StoriesBar />
         </div>
