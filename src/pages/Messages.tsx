@@ -80,7 +80,8 @@ export default function Messages() {
 
       if (error) throw error;
 
-      const conversationIds = participantData?.map(p => p.conversation_id) || [];
+      // Deduplicate conversation IDs
+      const conversationIds = [...new Set(participantData?.map(p => p.conversation_id) || [])];
       
       const conversationsWithDetails = await Promise.all(
         conversationIds.map(async (convId) => {
