@@ -764,6 +764,13 @@ export type Database = {
             foreignKeyName: "story_reactions_story_id_fkey"
             columns: ["story_id"]
             isOneToOne: false
+            referencedRelation: "active_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_reactions_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
             referencedRelation: "stories"
             referencedColumns: ["id"]
           },
@@ -796,6 +803,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "story_views_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "active_stories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "story_views_story_id_fkey"
             columns: ["story_id"]
@@ -864,9 +878,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      active_stories: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          expires_at: string | null
+          id: string | null
+          media_type: string | null
+          media_url: string | null
+          user_id: string | null
+          username: string | null
+          view_count: number | null
+          views_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
+      cleanup_expired_stories: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }

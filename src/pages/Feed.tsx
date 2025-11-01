@@ -9,6 +9,7 @@ import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
+import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { LogOut, MessageSquare } from 'lucide-react';
@@ -40,6 +41,7 @@ const Feed = () => {
   const [loading, setLoading] = useState(true);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
+  const [showCreateStory, setShowCreateStory] = useState(false);
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
 
   useEffect(() => {
@@ -99,6 +101,12 @@ const Feed = () => {
       case 'video':
         setDefaultPostTab('video');
         setShowCreatePost(true);
+        break;
+      case 'story':
+        setShowCreateStory(true);
+        break;
+      case 'livestream':
+        navigate('/live');
         break;
       default:
         toast({
@@ -211,6 +219,13 @@ const Feed = () => {
         onClose={() => setShowCreatePost(false)}
         onSuccess={handlePostCreated}
         defaultTab={defaultPostTab}
+      />
+
+      {/* Create Story Modal */}
+      <CreateStoryModal
+        open={showCreateStory}
+        onClose={() => setShowCreateStory(false)}
+        onSuccess={() => setShowCreateStory(false)}
       />
 
       {/* Bottom Navigation */}
