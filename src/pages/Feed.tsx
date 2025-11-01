@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
+import { StoriesBar } from '@/components/stories/StoriesBar';
 import { Plus, LogOut, MessageSquare } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -119,6 +120,13 @@ const Feed = () => {
           </div>
         </div>
       </header>
+
+      {/* Stories */}
+      <div className="border-b border-gray-800">
+        <div className="container mx-auto max-w-2xl">
+          <StoriesBar />
+        </div>
+      </div>
 
       {/* Feed */}
       <main className="container mx-auto px-4 py-6 max-w-2xl">
