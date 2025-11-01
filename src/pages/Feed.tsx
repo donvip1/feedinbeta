@@ -307,7 +307,7 @@ const Feed = () => {
       />
 
       {/* Bottom Navigation */}
-      <BottomNav onQuickActionClick={() => setShowQuickActions(true)} currentPage="feed" />
+      <BottomNav onQuickActionClick={() => setShowQuickActions(prev => !prev)} currentPage="feed" />
     </div>
   );
 };
