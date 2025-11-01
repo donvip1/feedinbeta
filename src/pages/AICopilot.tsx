@@ -323,40 +323,111 @@ const AICopilot = () => {
       <ScrollArea className="flex-1 px-4 py-6">
         <div className="container mx-auto max-w-2xl space-y-6">
           {messages.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="relative inline-block mb-6">
-                <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-30 animate-pulse" />
-                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                  <Sparkles className="w-10 h-10 text-white" />
+            <div className="py-6">
+              <div className="text-center mb-8">
+                <div className="relative inline-block mb-4">
+                  <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl opacity-30 animate-pulse" />
+                  <div className="relative w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                    <Sparkles className="w-8 h-8 text-white" />
+                  </div>
                 </div>
+                <h2 className="text-2xl font-bold mb-2">AI Tools & Assistants</h2>
+                <p className="text-gray-400 text-sm">
+                  Choose a tool below or start a conversation
+                </p>
               </div>
-              <h2 className="text-2xl font-bold mb-3">Hi! I'm your AI Assistant</h2>
-              <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                Ask me anything! I can help you with questions, provide insights, or just chat.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl mx-auto mb-6">
+
+              {/* AI Tools Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                 {[
-                  'What can you help me with?',
-                  'Tell me about FEEDIN features',
-                  'Give me content ideas',
-                  'Suggest trending topics'
-                ].map((suggestion, i) => (
+                  { 
+                    title: 'Image Enhancement', 
+                    desc: 'Enhance photos with Good, Better, or Ultra quality',
+                    icon: '🎨',
+                    prompt: 'I want to enhance an image'
+                  },
+                  { 
+                    title: 'Image Generation', 
+                    desc: 'Create AI-generated images from text descriptions',
+                    icon: '🖼️',
+                    prompt: 'I want to generate an image'
+                  },
+                  { 
+                    title: 'Project Writing', 
+                    desc: 'Help with essays, reports, and academic projects',
+                    icon: '📝',
+                    prompt: 'Help me write a project'
+                  },
+                  { 
+                    title: 'Educational Q&A', 
+                    desc: 'Get help with homework and learning concepts',
+                    icon: '🎓',
+                    prompt: 'I have a question about my studies'
+                  },
+                  { 
+                    title: 'Video Creation', 
+                    desc: 'Generate short videos from text or images',
+                    icon: '🎬',
+                    prompt: 'I want to create a short video'
+                  },
+                  { 
+                    title: 'Thesis Generator', 
+                    desc: 'Structure and develop thesis papers',
+                    icon: '📚',
+                    prompt: 'Help me with my thesis'
+                  },
+                  { 
+                    title: 'App Guide', 
+                    desc: 'Learn how to use FEEDIN features',
+                    icon: '❓',
+                    prompt: 'How does FEEDIN work?'
+                  },
+                  { 
+                    title: 'General Chat', 
+                    desc: 'Ask me anything or have a conversation',
+                    icon: '💬',
+                    prompt: 'Let\'s chat!'
+                  }
+                ].map((tool, i) => (
                   <button
                     key={i}
-                    onClick={() => setInput(suggestion)}
-                    className="text-left bg-gray-900 hover:bg-gray-800 rounded-lg p-4 transition-colors border border-gray-800"
+                    onClick={() => setInput(tool.prompt)}
+                    className="text-left bg-gray-900/50 hover:bg-gray-800 rounded-xl p-5 transition-all border border-gray-800 hover:border-blue-500/50 group"
                   >
-                    <p className="text-sm text-gray-300">{suggestion}</p>
+                    <div className="flex items-start gap-3">
+                      <div className="text-3xl group-hover:scale-110 transition-transform">
+                        {tool.icon}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold mb-1 text-white group-hover:text-blue-400 transition-colors">
+                          {tool.title}
+                        </h3>
+                        <p className="text-xs text-gray-400">{tool.desc}</p>
+                      </div>
+                    </div>
                   </button>
                 ))}
               </div>
-              <Button
-                onClick={() => setShowQuickActions(true)}
-                className="bg-gradient-to-r from-blue-500 to-purple-600"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                AI Tools
-              </Button>
+
+              {/* Quick Suggestions */}
+              <div className="text-center">
+                <p className="text-xs text-gray-500 mb-3">Or try these quick prompts:</p>
+                <div className="flex flex-wrap gap-2 justify-center">
+                  {[
+                    'Trending topics',
+                    'Content ideas',
+                    'Study tips'
+                  ].map((suggestion, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setInput(suggestion)}
+                      className="text-xs bg-gray-900 hover:bg-gray-800 rounded-full px-4 py-2 transition-colors border border-gray-800"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             messages.map((msg, i) => (
