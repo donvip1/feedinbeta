@@ -119,7 +119,8 @@ const AICopilot = () => {
 
         try {
           const parsed = JSON.parse(jsonStr);
-          const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+          // Gemini format: candidates[0].content.parts[0].text
+          const content = parsed.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined;
           if (content) {
             assistantContent += content;
             setMessages(prev => {
