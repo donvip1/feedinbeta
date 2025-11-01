@@ -90,17 +90,10 @@ const Settings = () => {
   const walletOptions = [
     {
       icon: Wallet,
-      title: 'Wallet',
-      description: 'View balance and transactions',
+      title: 'Wallet & Credit',
+      description: 'Balance, credits, subscriptions & transactions',
       route: '/wallet',
       color: 'text-yellow-500'
-    },
-    {
-      icon: Coins,
-      title: 'Buy Credits',
-      description: 'Purchase credit packages',
-      route: '/credits',
-      color: 'text-green-500'
     },
     {
       icon: Layers,
@@ -108,13 +101,6 @@ const Settings = () => {
       description: 'Trade credits with other users',
       route: '/p2p-marketplace',
       color: 'text-cyan-500'
-    },
-    {
-      icon: Crown,
-      title: 'Subscription',
-      description: 'Manage your premium plan',
-      route: '/subscription',
-      color: 'text-purple-500'
     }
   ];
 

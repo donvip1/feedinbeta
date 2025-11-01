@@ -10,13 +10,11 @@ interface QuickActionsModalProps {
 // Feed context actions
 const feedActions = [
   { id: 'thoughts', label: 'Share Thoughts', icon: FileText, color: 'from-blue-500 to-blue-600' },
-  { id: 'photo', label: 'Share Photo', icon: Image, color: 'from-purple-500 to-pink-500' },
-  { id: 'video', label: 'Share Video', icon: Video, color: 'from-orange-500 to-red-500' },
   { id: 'story', label: 'Create Story', icon: Camera, color: 'from-pink-500 to-purple-500' },
   { id: 'group', label: 'Create Group', icon: UsersRound, color: 'from-indigo-500 to-purple-600' },
   { id: 'livestream', label: 'Start Livestream', icon: Radio, color: 'from-red-500 to-pink-600' },
+  { id: 'wallet', label: 'Wallet & Credit', icon: Wallet, color: 'from-yellow-500 to-orange-500' },
   { id: 'p2p', label: 'P2P Trade', icon: Layers, color: 'from-teal-500 to-cyan-500' },
-  { id: 'credits', label: 'Buy Credits', icon: Wallet, color: 'from-yellow-500 to-orange-500' },
   { id: 'ai', label: 'AI Assistant', icon: Zap, color: 'from-blue-400 to-cyan-400' },
   { id: 'marketplace', label: 'Marketplace', icon: ShoppingBag, color: 'from-green-500 to-emerald-600' },
 ];

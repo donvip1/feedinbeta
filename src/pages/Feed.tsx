@@ -94,14 +94,6 @@ const Feed = () => {
         setDefaultPostTab('text');
         setShowCreatePost(true);
         break;
-      case 'photo':
-        setDefaultPostTab('image');
-        setShowCreatePost(true);
-        break;
-      case 'video':
-        setDefaultPostTab('video');
-        setShowCreatePost(true);
-        break;
       case 'story':
         setShowCreateStory(true);
         break;
@@ -111,8 +103,17 @@ const Feed = () => {
       case 'livestream':
         navigate('/live');
         break;
+      case 'wallet':
+        navigate('/wallet');
+        break;
+      case 'p2p':
+        navigate('/p2p-marketplace');
+        break;
       case 'ai':
         navigate('/ai-copilot');
+        break;
+      case 'marketplace':
+        navigate('/p2p-marketplace');
         break;
       default:
         toast({
