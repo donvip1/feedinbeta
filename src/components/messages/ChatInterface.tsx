@@ -59,18 +59,24 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select(`
-          *,
-          profiles!messages_sender_id_fkey (
-            display_name,
-            avatar_url
-          )
-        `)
+        .select('*, sender:profiles!messages_sender_id_fkey(display_name, avatar_url)')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      const formattedMessages = (data || []).map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender_id: msg.sender_id,
+        created_at: msg.created_at,
+        profiles: {
+          display_name: msg.sender?.display_name || null,
+          avatar_url: msg.sender?.avatar_url || null,
+        }
+      }));
+      
+      setMessages(formattedMessages);
     } catch (error: any) {
       console.error('Error loading messages:', error);
     }
@@ -82,13 +88,13 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
     try {
       const { data, error } = await supabase
         .from('conversation_participants')
-        .select('user_id, profiles!inner(*)')
+        .select('user_id, participant:profiles!conversation_participants_user_id_fkey(*)')
         .eq('conversation_id', conversationId)
         .neq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
-      setOtherUser(data?.profiles);
+      setOtherUser(data?.participant);
     } catch (error: any) {
       console.error('Error loading other user:', error);
     }

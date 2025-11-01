@@ -54,13 +54,7 @@ export default function Messages() {
     try {
       const { data: participantData, error } = await supabase
         .from('conversation_participants')
-        .select(`
-          conversation_id,
-          conversations!inner (
-            id,
-            updated_at
-          )
-        `)
+        .select('conversation_id, conversations!inner(id, updated_at)')
         .eq('user_id', user.id);
 
       if (error) throw error;
@@ -71,10 +65,10 @@ export default function Messages() {
         conversationIds.map(async (convId) => {
           const { data: participants } = await supabase
             .from('conversation_participants')
-            .select('user_id, profiles!inner(*)')
+            .select('user_id, participant:profiles!conversation_participants_user_id_fkey(id, display_name, username, avatar_url)')
             .eq('conversation_id', convId)
             .neq('user_id', user.id)
-            .single();
+            .maybeSingle();
 
           const { data: lastMessage } = await supabase
             .from('messages')
@@ -82,18 +76,18 @@ export default function Messages() {
             .eq('conversation_id', convId)
             .order('created_at', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           const conv = participantData?.find(p => p.conversation_id === convId);
 
           return {
             id: convId,
             updated_at: conv?.conversations?.updated_at || '',
-            other_participant: participants?.profiles || {
-              id: '',
-              display_name: 'Unknown',
-              username: null,
-              avatar_url: null,
+            other_participant: {
+              id: participants?.participant?.id || '',
+              display_name: participants?.participant?.display_name || 'Unknown',
+              username: participants?.participant?.username || null,
+              avatar_url: participants?.participant?.avatar_url || null,
             },
             last_message: lastMessage || undefined,
           };

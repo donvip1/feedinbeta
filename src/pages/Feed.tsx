@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
-import { Plus, LogOut } from 'lucide-react';
+import { Plus, LogOut, MessageSquare } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 interface Post {
@@ -98,6 +98,14 @@ const Feed = () => {
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Create Post
+              </Button>
+              <Button
+                onClick={() => navigate('/messages')}
+                size="sm"
+                variant="ghost"
+                className="text-gray-400 hover:text-white"
+              >
+                <MessageSquare className="w-4 h-4" />
               </Button>
               <Button
                 onClick={signOut}
