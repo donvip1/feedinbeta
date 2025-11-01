@@ -1,73 +1,190 @@
-# Welcome to your Lovable project
+# 🚀 FEEDIN - Social Media Platform
 
-## Project info
+**Connect, Share, and Engage with AI-Powered Social Experiences**
 
-**URL**: https://lovable.dev/projects/f7064a33-9a93-46e5-9524-cff96641637c
+FEEDIN is a comprehensive social media platform featuring real-time interactions, AI-powered content curation, live streaming, private messaging, video/voice calling, and premium subscription capabilities.
 
-## How can I edit this code?
+## ✨ Features
 
-There are several ways of editing your application.
+### 🔥 Core Features
+- **Social Feed**: Post text, images, and videos with Facebook-style nested comments
+- **Stories**: 24-hour ephemeral content with views tracking
+- **Real-time Messaging**: Private conversations with typing indicators and read receipts
+- **Video/Voice Calls**: Crystal-clear 1-on-1 and group calls
+- **Live Streaming**: Broadcast live with real-time comments and reactions
+- **Friends System**: Send requests, accept/reject, and manage friendships
+- **Groups**: Create and join communities with admin controls
 
-**Use Lovable**
+### 🤖 AI Features
+- **AI Copilot**: Intelligent chatbot assistant powered by Gemini
+- **AI Image Generation**: Create images using AI
+- **Personalized Feed**: AI-curated content recommendations
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f7064a33-9a93-46e5-9524-cff96641637c) and start prompting.
+### 💰 Monetization
+- **Virtual Credits**: Buy, earn, and spend credits
+- **Premium Subscriptions**: Multiple tiers with exclusive benefits
+- **Stripe & Paystack**: Secure payment processing
 
-Changes made via Lovable will be committed automatically to this repo.
+### 🛡️ Moderation & Safety
+- **Content Reporting**: Flag inappropriate content
+- **Admin Dashboard**: Comprehensive moderation tools
+- **Block & Mute**: Control who can interact with you
+- **Auto-moderation**: AI-assisted content filtering
 
-**Use your preferred IDE**
+### ⚙️ Settings & Privacy
+- **Account Settings**: Manage profile and preferences
+- **Privacy Controls**: Control content visibility
+- **Notification Preferences**: Customize alerts
+- **Blocked Users Management**: View and manage blocks
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🛠️ Tech Stack
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Frontend
+- **Framework**: React 18 + TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **UI Components**: shadcn/ui (Radix UI)
+- **State Management**: React Query (TanStack Query)
+- **Routing**: React Router v6
+- **Forms**: React Hook Form + Zod
 
-Follow these steps:
+### Backend
+- **Backend**: Lovable Cloud (Supabase)
+- **Database**: PostgreSQL 15+
+- **Authentication**: Supabase Auth
+- **Storage**: Supabase Storage
+- **Real-time**: Supabase Subscriptions (WebSocket)
+- **Serverless**: Edge Functions (Deno)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Third-Party Services
+- **Payments**: Stripe
+- **AI**: Lovable AI (Gemini + GPT-5)
+- **Video Calls**: Daily.co (or 100ms)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 📱 Progressive Web App (PWA)
 
-# Step 3: Install the necessary dependencies.
-npm i
+FEEDIN is a full PWA with:
+- ✅ Offline support
+- ✅ Installable on mobile and desktop
+- ✅ App-like experience
+- ✅ Push notifications ready
+- ✅ Fast loading with service worker caching
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+## 🚀 Getting Started
+
+### Prerequisites
+- Node.js 18+ or Bun
+- Lovable account (for deployment)
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone <your-repo-url>
+cd feedin
 ```
 
-**Edit a file directly in GitHub**
+2. Install dependencies:
+```bash
+npm install
+# or
+bun install
+```
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+3. Start development server:
+```bash
+npm run dev
+# or
+bun dev
+```
 
-**Use GitHub Codespaces**
+4. Open [http://localhost:8080](http://localhost:8080)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📦 Project Structure
 
-## What technologies are used for this project?
+```
+feedin/
+├── public/              # Static assets
+├── src/
+│   ├── assets/         # Images, logos
+│   ├── components/     # React components
+│   │   ├── ui/        # shadcn/ui components
+│   │   ├── feed/      # Feed-related components
+│   │   ├── messages/  # Messaging components
+│   │   ├── stories/   # Stories components
+│   │   └── ...
+│   ├── hooks/         # Custom React hooks
+│   ├── lib/           # Utilities and helpers
+│   ├── pages/         # Page components (routes)
+│   └── integrations/  # Supabase integration
+├── supabase/
+│   ├── functions/     # Edge Functions
+│   └── migrations/    # Database migrations
+└── ...
+```
 
-This project is built with:
+## 🔒 Security
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- ✅ Row-Level Security (RLS) on all tables
+- ✅ Server-side validation for payments
+- ✅ Webhook signature verification
+- ✅ Secure authentication flows
+- ✅ XSS and CSRF protection
+- ✅ Input validation and sanitization
 
-## How can I deploy this project?
+## 📊 Database Schema
 
-Simply open [Lovable](https://lovable.dev/projects/f7064a33-9a93-46e5-9524-cff96641637c) and click on Share -> Publish.
+60+ tables covering:
+- Users & profiles
+- Posts, comments, likes
+- Messages & conversations
+- Friends & follows
+- Groups & memberships
+- Live streams & analytics
+- Credits & transactions
+- Subscriptions & payments
+- Notifications & preferences
+- Moderation & reports
 
-## Can I connect a custom domain to my Lovable project?
+## 🎨 Design System
 
-Yes, you can!
+- **Theme**: Dark mode by default
+- **Colors**: HSL-based semantic tokens
+- **Typography**: Clean, readable fonts
+- **Components**: Fully themed shadcn/ui components
+- **Animations**: Smooth transitions and micro-interactions
+- **Responsive**: Mobile-first design approach
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 🧪 Performance Optimizations
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- ✅ Image compression and lazy loading
+- ✅ Code splitting and tree shaking
+- ✅ Caching with expiry
+- ✅ Debounced search and inputs
+- ✅ Optimistic UI updates
+- ✅ Virtual scrolling for long lists
+- ✅ Service worker for offline support
+
+## 📝 License
+
+This project is proprietary and confidential.
+
+## 🤝 Contributing
+
+This is a private project. Contact the maintainers for contribution guidelines.
+
+## 📞 Support
+
+For support, email support@feedin.app or join our Discord community.
+
+## 🙏 Acknowledgments
+
+Built with ❤️ using:
+- [Lovable](https://lovable.dev) - AI-powered development platform
+- [Supabase](https://supabase.com) - Backend infrastructure
+- [shadcn/ui](https://ui.shadcn.com) - UI components
+- [Tailwind CSS](https://tailwindcss.com) - Styling framework
+
+---
+
+**FEEDIN** - Where connections come to life 🌟
