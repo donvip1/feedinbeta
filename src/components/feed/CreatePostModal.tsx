@@ -19,9 +19,10 @@ interface CreatePostModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  defaultTab?: 'text' | 'image' | 'video';
 }
 
-export const CreatePostModal = ({ open, onClose, onSuccess }: CreatePostModalProps) => {
+export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' }: CreatePostModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState('');
@@ -29,7 +30,7 @@ export const CreatePostModal = ({ open, onClose, onSuccess }: CreatePostModalPro
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'video'>('text');
+  const [activeTab, setActiveTab] = useState<'text' | 'image' | 'video'>(defaultTab);
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

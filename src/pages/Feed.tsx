@@ -7,9 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
+import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { Plus, LogOut, MessageSquare } from 'lucide-react';
+import { BottomNav } from '@/components/navigation/BottomNav';
+import { LogOut, MessageSquare } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 interface Post {
@@ -37,6 +39,8 @@ const Feed = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreatePost, setShowCreatePost] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
+  const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
 
   useEffect(() => {
     if (authLoading) return; // Wait for auth to load
@@ -82,6 +86,28 @@ const Feed = () => {
     loadPosts();
   };
 
+  const handleQuickAction = (action: string) => {
+    switch (action) {
+      case 'thoughts':
+        setDefaultPostTab('text');
+        setShowCreatePost(true);
+        break;
+      case 'photo':
+        setDefaultPostTab('image');
+        setShowCreatePost(true);
+        break;
+      case 'video':
+        setDefaultPostTab('video');
+        setShowCreatePost(true);
+        break;
+      default:
+        toast({
+          title: 'Coming Soon',
+          description: `${action} feature is coming soon!`,
+        });
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
@@ -103,14 +129,6 @@ const Feed = () => {
               </span>
             </div>
             <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => setShowCreatePost(true)}
-                size="sm"
-                className="bg-gradient-to-r from-pink-500 to-blue-500 hover:shadow-glow"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create Post
-              </Button>
               <NotificationBell />
               <Button
                 onClick={() => navigate('/messages')}
@@ -141,7 +159,7 @@ const Feed = () => {
       </div>
 
       {/* Feed */}
-      <main className="container mx-auto px-4 py-6 max-w-2xl">
+      <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">{/* Added pb-24 for bottom nav space */}
         {loading ? (
           <div className="space-y-6">
             {[1, 2, 3].map((i) => (
@@ -165,7 +183,7 @@ const Feed = () => {
           <div className="text-center py-20">
             <p className="text-gray-400 text-lg mb-4">No posts yet</p>
             <Button
-              onClick={() => setShowCreatePost(true)}
+              onClick={() => setShowQuickActions(true)}
               className="bg-gradient-to-r from-pink-500 to-blue-500"
             >
               Create the first post
@@ -180,12 +198,23 @@ const Feed = () => {
         )}
       </main>
 
+      {/* Quick Actions Modal */}
+      <QuickActionsModal
+        open={showQuickActions}
+        onClose={() => setShowQuickActions(false)}
+        onActionSelect={handleQuickAction}
+      />
+
       {/* Create Post Modal */}
       <CreatePostModal
         open={showCreatePost}
         onClose={() => setShowCreatePost(false)}
         onSuccess={handlePostCreated}
+        defaultTab={defaultPostTab}
       />
+
+      {/* Bottom Navigation */}
+      <BottomNav onQuickActionClick={() => setShowQuickActions(true)} />
     </div>
   );
 };
