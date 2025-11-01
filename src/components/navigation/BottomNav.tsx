@@ -14,7 +14,7 @@ export const BottomNav = ({ onQuickActionClick }: BottomNavProps) => {
     { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
     { id: 'friends', label: 'Friends', icon: Users, path: '/friends' },
-    { id: 'feedai', label: 'FeedAI', icon: Sparkles, path: '/feedai' },
+    { id: 'ai', label: 'AI', icon: Sparkles, path: '/ai-copilot' },
   ];
 
   const isActive = (path: string) => location.pathname === path;

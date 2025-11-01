@@ -14,6 +14,79 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_chat_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_chat_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_usage: {
+        Row: {
+          cost_credits: number | null
+          created_at: string | null
+          feature: string
+          id: string
+          metadata: Json | null
+          model: string
+          tokens_used: number | null
+          user_id: string
+        }
+        Insert: {
+          cost_credits?: number | null
+          created_at?: string | null
+          feature: string
+          id?: string
+          metadata?: Json | null
+          model: string
+          tokens_used?: number | null
+          user_id: string
+        }
+        Update: {
+          cost_credits?: number | null
+          created_at?: string | null
+          feature?: string
+          id?: string
+          metadata?: Json | null
+          model?: string
+          tokens_used?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_logs: {
         Row: {
           call_type: string

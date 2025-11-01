@@ -108,6 +108,9 @@ const Feed = () => {
       case 'livestream':
         navigate('/live');
         break;
+      case 'ai':
+        navigate('/ai-copilot');
+        break;
       default:
         toast({
           title: 'Coming Soon',
