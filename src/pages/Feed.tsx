@@ -12,7 +12,7 @@ import { StoriesBar } from '@/components/stories/StoriesBar';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { LogOut, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
+import { LogOut, MessageSquare, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 interface Post {
@@ -39,6 +39,7 @@ const Feed = () => {
   const { toast } = useToast();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showCreateStory, setShowCreateStory] = useState(false);
@@ -54,24 +55,61 @@ const Feed = () => {
     loadPosts();
   }, [user, authLoading, navigate]);
 
-  const loadPosts = async () => {
+  const loadPosts = async (isRefresh = false) => {
     try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles (
-            display_name,
-            username,
-            avatar_url
-          )
-        `)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(20);
+      if (isRefresh) {
+        setRefreshing(true);
+      }
 
-      if (error) throw error;
-      setPosts(data || []);
+      // Try to use personalized feed function
+      const { data: personalizedData, error: rpcError } = await supabase
+        .rpc('get_personalized_feed', {
+          p_user_id: user?.id,
+          p_limit: 20,
+          p_offset: 0
+        });
+
+      if (rpcError) {
+        console.warn('Personalized feed error, falling back to standard feed:', rpcError);
+        // Fallback to standard feed with random ordering
+        const { data, error } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles (
+              display_name,
+              username,
+              avatar_url
+            )
+          `)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (error) throw error;
+        
+        // Add some randomization to standard feed
+        const shuffled = (data || []).sort(() => Math.random() - 0.5);
+        setPosts(shuffled);
+      } else {
+        // Fetch profiles for personalized posts
+        const postsWithProfiles = await Promise.all(
+          (personalizedData || []).map(async (post: any) => {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('display_name, username, avatar_url')
+              .eq('id', post.user_id)
+              .single();
+            
+            return {
+              ...post,
+              profiles: profile
+            };
+          })
+        );
+        
+        setPosts(postsWithProfiles);
+      }
     } catch (error: any) {
       toast({
         title: 'Error loading posts',
@@ -80,12 +118,17 @@ const Feed = () => {
       });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   const handlePostCreated = () => {
     setShowCreatePost(false);
-    loadPosts();
+    loadPosts(false);
+  };
+
+  const handleRefresh = () => {
+    loadPosts(true);
   };
 
   const handleQuickAction = (action: string) => {
@@ -144,6 +187,15 @@ const Feed = () => {
               </span>
             </div>
             <div className="flex items-center space-x-2">
+              <Button
+                onClick={handleRefresh}
+                size="sm"
+                variant="ghost"
+                className="text-gray-400 hover:text-white"
+                disabled={refreshing}
+              >
+                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              </Button>
               <NotificationBell />
               <Button
                 onClick={() => navigate('/messages')}
@@ -226,7 +278,7 @@ const Feed = () => {
         ) : (
           <div className="space-y-6">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} onUpdate={loadPosts} />
+              <PostCard key={post.id} post={post} onUpdate={() => loadPosts(false)} />
             ))}
           </div>
         )}

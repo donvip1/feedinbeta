@@ -1669,6 +1669,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          country: string | null
           created_at: string
           daily_ai_image_count: number | null
           daily_ai_prompt_count: number | null
@@ -1676,7 +1677,9 @@ export type Database = {
           followers_count: number | null
           following_count: number | null
           id: string
+          interests: string[] | null
           last_ai_reset_date: string | null
+          location: string | null
           max_friends: number | null
           phone_number: string | null
           stripe_customer_id: string | null
@@ -1686,6 +1689,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          country?: string | null
           created_at?: string
           daily_ai_image_count?: number | null
           daily_ai_prompt_count?: number | null
@@ -1693,7 +1697,9 @@ export type Database = {
           followers_count?: number | null
           following_count?: number | null
           id: string
+          interests?: string[] | null
           last_ai_reset_date?: string | null
+          location?: string | null
           max_friends?: number | null
           phone_number?: string | null
           stripe_customer_id?: string | null
@@ -1703,6 +1709,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          country?: string | null
           created_at?: string
           daily_ai_image_count?: number | null
           daily_ai_prompt_count?: number | null
@@ -1710,7 +1717,9 @@ export type Database = {
           followers_count?: number | null
           following_count?: number | null
           id?: string
+          interests?: string[] | null
           last_ai_reset_date?: string | null
+          location?: string | null
           max_friends?: number | null
           phone_number?: string | null
           stripe_customer_id?: string | null
@@ -2113,6 +2122,22 @@ export type Database = {
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
+      get_personalized_feed: {
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
+        Returns: {
+          comments_count: number
+          content: string
+          created_at: string
+          feed_id: string
+          id: string
+          likes_count: number
+          media_type: string
+          media_url: string
+          relevance_score: number
+          user_id: string
+          views_count: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

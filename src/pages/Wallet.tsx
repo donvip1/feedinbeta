@@ -29,7 +29,7 @@ const Wallet = () => {
     if (!user) {
       navigate('/auth');
     }
-  }, [user]);
+  }, [user, navigate]);
 
   const { data: credits } = useQuery({
     queryKey: ['user-credits', user?.id],
