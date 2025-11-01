@@ -217,26 +217,18 @@ const Profile = () => {
         }
       }
 
-      // Create new conversation
-      const { data: newConv, error: convError } = await supabase
-        .from('conversations')
-        .insert({})
-        .select()
-        .single();
+      // Use secure function to create conversation
+      const { data: conversationId, error } = await supabase.rpc('create_conversation', {
+        other_user_id: userId
+      });
 
-      if (convError) throw convError;
+      if (error) throw error;
 
-      // Add participants
-      await supabase.from('conversation_participants').insert([
-        { conversation_id: newConv.id, user_id: user.id },
-        { conversation_id: newConv.id, user_id: userId },
-      ]);
-
-      navigate(`/messages?conversation=${newConv.id}`);
+      navigate(`/messages?conversation=${conversationId}`);
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'Unable to start conversation',
+        description: 'Please try again later.',
         variant: 'destructive',
       });
     }

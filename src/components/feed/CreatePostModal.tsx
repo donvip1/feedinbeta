@@ -117,9 +117,10 @@ export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' 
       setMediaType(null);
       onSuccess();
     } catch (error: any) {
+      console.error('Error creating post:', error);
       toast({
-        title: 'Error creating post',
-        description: error.message,
+        title: 'Unable to create post',
+        description: 'Please check your content and try again.',
         variant: 'destructive',
       });
     } finally {

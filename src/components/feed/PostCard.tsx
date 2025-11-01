@@ -99,12 +99,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         if (error) throw error;
       }
     } catch (error: any) {
+      console.error('Error updating like:', error);
       // Revert on error
       setIsLiked(!newIsLiked);
       setLocalLikesCount(localLikesCount);
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'Unable to update reaction',
+        description: 'Please try again.',
         variant: 'destructive',
       });
     } finally {

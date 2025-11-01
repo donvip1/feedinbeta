@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { MessageSquarePlus, Search, ArrowLeft } from 'lucide-react';
 import { ChatInterface } from '@/components/messages/ChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
+import { useToast } from '@/hooks/use-toast';
 
 interface Conversation {
   id: string;
@@ -29,6 +30,7 @@ interface Conversation {
 export default function Messages() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,28 +132,23 @@ export default function Messages() {
         }
       }
 
-      const { data: newConv, error: convError } = await supabase
-        .from('conversations')
-        .insert({})
-        .select()
-        .single();
+      // Use secure function to create conversation
+      const { data: conversationId, error } = await supabase.rpc('create_conversation', {
+        other_user_id: userId
+      });
 
-      if (convError) throw convError;
-
-      const { error: participantsError } = await supabase
-        .from('conversation_participants')
-        .insert([
-          { conversation_id: newConv.id, user_id: user.id },
-          { conversation_id: newConv.id, user_id: userId },
-        ]);
-
-      if (participantsError) throw participantsError;
+      if (error) throw error;
 
       await loadConversations();
-      setSelectedConversationId(newConv.id);
+      setSelectedConversationId(conversationId);
       setShowNewConversation(false);
     } catch (error: any) {
       console.error('Error creating conversation:', error);
+      toast({
+        title: 'Unable to create conversation',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
     }
   };
 

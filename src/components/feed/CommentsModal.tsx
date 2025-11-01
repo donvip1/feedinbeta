@@ -121,9 +121,10 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
         title: 'Comment added',
       });
     } catch (error: any) {
+      console.error('Error adding comment:', error);
       toast({
-        title: 'Error adding comment',
-        description: error.message,
+        title: 'Unable to add comment',
+        description: 'Please try again.',
         variant: 'destructive',
       });
     } finally {

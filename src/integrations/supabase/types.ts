@@ -477,19 +477,19 @@ export type Database = {
           created_at: string | null
           id: string
           post_id: string
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
           post_id: string
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
           post_id?: string
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -774,6 +774,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
       has_role: {
