@@ -35,7 +35,57 @@ serve(async (req) => {
 
     const { type, priceId, successUrl, cancelUrl } = await req.json();
 
+    // Validate input type
+    if (!type || !['subscription', 'credits'].includes(type)) {
+      throw new Error('Invalid payment type');
+    }
+
+    if (!priceId || typeof priceId !== 'string') {
+      throw new Error('Invalid price ID');
+    }
+
     console.log('Creating checkout session for:', { type, priceId, userId: user.id });
+
+    // Validate priceId against database and get metadata
+    let metadata: Record<string, string> = {
+      user_id: user.id,
+      type: type,
+    };
+
+    if (type === 'subscription') {
+      const { data: tier, error: tierError } = await supabaseClient
+        .from('subscription_tiers')
+        .select('id, stripe_price_id, name, price')
+        .eq('stripe_price_id', priceId)
+        .eq('is_active', true)
+        .single();
+
+      if (tierError || !tier) {
+        console.error('Invalid subscription price ID:', priceId, tierError);
+        throw new Error('Invalid subscription plan');
+      }
+
+      metadata.tier_id = tier.id;
+      metadata.tier_name = tier.name;
+      metadata.description = `${tier.name} subscription`;
+    } else if (type === 'credits') {
+      const { data: package_, error: packageError } = await supabaseClient
+        .from('credit_packages')
+        .select('id, stripe_price_id, credits, bonus_credits, name, price')
+        .eq('stripe_price_id', priceId)
+        .eq('is_active', true)
+        .single();
+
+      if (packageError || !package_) {
+        console.error('Invalid credit package price ID:', priceId, packageError);
+        throw new Error('Invalid credit package');
+      }
+
+      const totalCredits = package_.credits + (package_.bonus_credits || 0);
+      metadata.package_id = package_.id;
+      metadata.credits = totalCredits.toString();
+      metadata.description = `${package_.name} - ${totalCredits} credits`;
+    }
 
     // Get or create Stripe customer
     const { data: profile } = await supabaseClient
@@ -62,7 +112,7 @@ serve(async (req) => {
         .eq('id', user.id);
     }
 
-    // Create checkout session
+    // Create checkout session with validated metadata
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
@@ -74,10 +124,7 @@ serve(async (req) => {
       mode: type === 'subscription' ? 'subscription' : 'payment',
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: {
-        user_id: user.id,
-        type: type,
-      },
+      metadata: metadata,
     });
 
     console.log('Checkout session created:', session.id);

@@ -12,10 +12,30 @@ const supabaseAdmin = createClient(
 );
 
 serve(async (req) => {
+  // Validate webhook secret is configured
+  const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
+  if (!webhookSecret) {
+    console.error('CRITICAL: STRIPE_WEBHOOK_SECRET not configured');
+    return new Response(
+      JSON.stringify({ error: 'Webhook not configured' }), 
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+
   const signature = req.headers.get('stripe-signature');
   
   if (!signature) {
-    return new Response('No signature', { status: 400 });
+    console.error('Webhook request missing stripe-signature header');
+    return new Response(
+      JSON.stringify({ error: 'No signature' }), 
+      { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
   }
 
   try {
@@ -23,7 +43,7 @@ serve(async (req) => {
     const event = stripe.webhooks.constructEvent(
       body,
       signature,
-      Deno.env.get('STRIPE_WEBHOOK_SECRET') || ''
+      webhookSecret
     );
 
     console.log('Webhook event received:', event.type);
