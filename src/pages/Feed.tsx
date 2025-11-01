@@ -153,20 +153,31 @@ const Feed = () => {
                 <MessageSquare className="w-4 h-4" />
               </Button>
               <Button
+                onClick={() => navigate(`/profile/${user?.id}`)}
+                size="sm"
+                variant="ghost"
+                className="text-gray-400 hover:text-white"
+              >
+                <img
+                  src={user?.user_metadata?.avatar_url || ''}
+                  alt="Profile"
+                  className="w-6 h-6 rounded-full"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                  }}
+                />
+                <div className="w-6 h-6 rounded-full bg-gray-700 hidden flex items-center justify-center text-xs">
+                  {user?.user_metadata?.display_name?.[0] || 'U'}
+                </div>
+              </Button>
+              <Button
                 onClick={() => navigate('/settings')}
                 size="sm"
                 variant="ghost"
                 className="text-gray-400 hover:text-white"
               >
                 <SettingsIcon className="w-4 h-4" />
-              </Button>
-              <Button
-                onClick={signOut}
-                size="sm"
-                variant="ghost"
-                className="text-gray-400 hover:text-white"
-              >
-                <LogOut className="w-4 h-4" />
               </Button>
             </div>
           </div>

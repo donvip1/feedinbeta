@@ -14,7 +14,12 @@ import {
   ChevronRight,
   LogOut,
   TrendingUp,
-  UsersRound
+  UsersRound,
+  Wallet,
+  Coins,
+  Layers,
+  Crown,
+  Bookmark
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -72,6 +77,44 @@ const Settings = () => {
       description: 'Join and manage community groups',
       route: '/groups',
       color: 'text-green-500'
+    },
+    {
+      icon: Bookmark,
+      title: 'Saved Posts',
+      description: 'View your bookmarked content',
+      route: '/saved',
+      color: 'text-blue-500'
+    }
+  ];
+
+  const walletOptions = [
+    {
+      icon: Wallet,
+      title: 'Wallet',
+      description: 'View balance and transactions',
+      route: '/wallet',
+      color: 'text-yellow-500'
+    },
+    {
+      icon: Coins,
+      title: 'Buy Credits',
+      description: 'Purchase credit packages',
+      route: '/credits',
+      color: 'text-green-500'
+    },
+    {
+      icon: Layers,
+      title: 'P2P Marketplace',
+      description: 'Trade credits with other users',
+      route: '/p2p-marketplace',
+      color: 'text-cyan-500'
+    },
+    {
+      icon: Crown,
+      title: 'Subscription',
+      description: 'Manage your premium plan',
+      route: '/subscription',
+      color: 'text-purple-500'
     }
   ];
 
@@ -139,6 +182,30 @@ const Settings = () => {
             <h3 className="text-lg font-semibold mb-4">Content & Discovery</h3>
             <div className="space-y-2">
               {contentOptions.map((option) => (
+                <button
+                  key={option.route}
+                  onClick={() => navigate(option.route)}
+                  className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`${option.color}`}>
+                      <option.icon className="w-6 h-6" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold">{option.title}</h3>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </button>
+              ))}
+            </div>
+
+            <Separator className="my-6" />
+
+            <h3 className="text-lg font-semibold mb-4">Wallet & Credits</h3>
+            <div className="space-y-2">
+              {walletOptions.map((option) => (
                 <button
                   key={option.route}
                   onClick={() => navigate(option.route)}
