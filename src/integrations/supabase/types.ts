@@ -1161,6 +1161,143 @@ export type Database = {
           },
         ]
       }
+      p2p_escrow: {
+        Row: {
+          credits_amount: number
+          id: string
+          locked_at: string
+          released_at: string | null
+          status: string
+          transaction_id: string
+        }
+        Insert: {
+          credits_amount: number
+          id?: string
+          locked_at?: string
+          released_at?: string | null
+          status?: string
+          transaction_id: string
+        }
+        Update: {
+          credits_amount?: number
+          id?: string
+          locked_at?: string
+          released_at?: string | null
+          status?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p2p_escrow_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "p2p_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p2p_listings: {
+        Row: {
+          created_at: string
+          credits_amount: number
+          id: string
+          price_usd: number
+          seller_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          credits_amount: number
+          id?: string
+          price_usd: number
+          seller_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          credits_amount?: number
+          id?: string
+          price_usd?: number
+          seller_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p2p_listings_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      p2p_transactions: {
+        Row: {
+          buyer_id: string
+          created_at: string
+          credits_amount: number
+          escrow_locked: boolean | null
+          id: string
+          listing_id: string
+          price_usd: number
+          proof_url: string | null
+          seller_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          buyer_id: string
+          created_at?: string
+          credits_amount: number
+          escrow_locked?: boolean | null
+          id?: string
+          listing_id: string
+          price_usd: number
+          proof_url?: string | null
+          seller_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          buyer_id?: string
+          created_at?: string
+          credits_amount?: number
+          escrow_locked?: boolean | null
+          id?: string
+          listing_id?: string
+          price_usd?: number
+          proof_url?: string | null
+          seller_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "p2p_transactions_buyer_id_fkey"
+            columns: ["buyer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "p2p_transactions_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "p2p_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "p2p_transactions_seller_id_fkey"
+            columns: ["seller_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_history: {
         Row: {
           amount: number
@@ -1429,10 +1566,14 @@ export type Database = {
           avatar_url: string | null
           bio: string | null
           created_at: string
+          daily_ai_image_count: number | null
+          daily_ai_prompt_count: number | null
           display_name: string | null
           followers_count: number | null
           following_count: number | null
           id: string
+          last_ai_reset_date: string | null
+          max_friends: number | null
           phone_number: string | null
           stripe_customer_id: string | null
           updated_at: string
@@ -1442,10 +1583,14 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          daily_ai_image_count?: number | null
+          daily_ai_prompt_count?: number | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
           id: string
+          last_ai_reset_date?: string | null
+          max_friends?: number | null
           phone_number?: string | null
           stripe_customer_id?: string | null
           updated_at?: string
@@ -1455,10 +1600,14 @@ export type Database = {
           avatar_url?: string | null
           bio?: string | null
           created_at?: string
+          daily_ai_image_count?: number | null
+          daily_ai_prompt_count?: number | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string
+          last_ai_reset_date?: string | null
+          max_friends?: number | null
           phone_number?: string | null
           stripe_customer_id?: string | null
           updated_at?: string
