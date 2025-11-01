@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -26,8 +26,151 @@ import {
   Layers,
   LogOut,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Search,
+  MapPin,
+  Calendar,
+  Heart,
+  Users,
+  Briefcase,
+  Sparkles,
+  Gamepad,
+  GraduationCap,
+  Mic,
+  Palette,
+  Smile
 } from 'lucide-react';
+
+const COUNTRIES = [
+  { code: "US", name: "United States" },
+  { code: "GB", name: "United Kingdom" },
+  { code: "NG", name: "Nigeria" },
+  { code: "IN", name: "India" },
+  { code: "CN", name: "China" },
+  { code: "JP", name: "Japan" },
+  { code: "DE", name: "Germany" },
+  { code: "FR", name: "France" },
+  { code: "IT", name: "Italy" },
+  { code: "RU", name: "Russia" },
+  { code: "CA", name: "Canada" },
+  { code: "AU", name: "Australia" },
+  { code: "BR", name: "Brazil" },
+  { code: "MX", name: "Mexico" },
+  { code: "ZA", name: "South Africa" },
+  { code: "EG", name: "Egypt" },
+  { code: "KE", name: "Kenya" },
+  { code: "GH", name: "Ghana" },
+  { code: "KR", name: "South Korea" },
+  { code: "ES", name: "Spain" },
+  { code: "AR", name: "Argentina" },
+  { code: "CO", name: "Colombia" },
+  { code: "TR", name: "Turkey" },
+  { code: "SA", name: "Saudi Arabia" },
+  { code: "AE", name: "United Arab Emirates" },
+  { code: "ID", name: "Indonesia" },
+  { code: "MY", name: "Malaysia" },
+  { code: "PH", name: "Philippines" },
+  { code: "VN", name: "Vietnam" },
+  { code: "TH", name: "Thailand" },
+  { code: "PK", name: "Pakistan" },
+  { code: "BD", name: "Bangladesh" },
+  { code: "NL", name: "Netherlands" },
+  { code: "BE", name: "Belgium" },
+  { code: "SE", name: "Sweden" },
+  { code: "NO", name: "Norway" },
+  { code: "DK", name: "Denmark" },
+  { code: "FI", name: "Finland" },
+  { code: "PL", name: "Poland" },
+  { code: "UA", name: "Ukraine" },
+].sort((a, b) => a.name.localeCompare(b.name));
+
+const PURPOSE_OPTIONS = [
+  { value: "friends", label: "Make friends", icon: Users },
+  { value: "dating", label: "Dating", icon: Heart },
+  { value: "networking", label: "Networking", icon: Briefcase },
+  { value: "business", label: "Business", icon: Sparkles },
+  { value: "gaming", label: "Gaming", icon: Gamepad },
+  { value: "learning", label: "Learning", icon: GraduationCap },
+  { value: "content", label: "Find content", icon: Palette },
+  { value: "streaming", label: "Live streaming", icon: Mic },
+  { value: "browsing", label: "Just browsing", icon: Smile },
+];
+
+function useDebounce(value: string, delay: number) {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
+
+function SearchableCountrySelect({ value, onChange }: { value: string; onChange: (code: string) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredCountries = useMemo(
+    () => COUNTRIES.filter((country) => country.name.toLowerCase().includes(searchTerm.toLowerCase())),
+    [searchTerm]
+  );
+
+  const selectedCountry = COUNTRIES.find((c) => c.code === value);
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full h-12 pl-12 pr-10 bg-gray-800 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors flex items-center justify-between"
+      >
+        <div className="flex items-center">
+          <MapPin size={18} className="text-gray-500 absolute left-4" />
+          <span className={selectedCountry ? "text-white" : "text-gray-500"}>
+            {selectedCountry ? selectedCountry.name : "Select your country"}
+          </span>
+        </div>
+        <ChevronRight size={18} className={`text-gray-500 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-20 top-full mt-2 w-full bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-2 max-h-60 flex flex-col">
+          <div className="relative m-2">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+            <input
+              type="text"
+              placeholder="Search countries..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full h-10 pl-10 pr-4 bg-gray-900 border border-gray-700 text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+          <div className="overflow-y-auto flex-1">
+            {filteredCountries.length > 0 ? (
+              filteredCountries.map((country) => (
+                <div
+                  key={country.code}
+                  onClick={() => {
+                    onChange(country.code);
+                    setIsOpen(false);
+                    setSearchTerm("");
+                  }}
+                  className="p-3 text-white hover:bg-blue-600 rounded-lg cursor-pointer"
+                >
+                  {country.name}
+                </div>
+              ))
+            ) : (
+              <div className="p-3 text-gray-500 text-center">No countries found.</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ProfileSettingsProps {
   isOpen: boolean;
@@ -51,7 +194,18 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
     about: '',
     purpose: '',
     marital_status: '',
+    age: '',
+    country: '',
   });
+  
+  const [usernameStatus, setUsernameStatus] = useState({
+    loading: false,
+    available: true,
+    message: '',
+    originalUsername: '',
+  });
+  
+  const debouncedUsername = useDebounce(profile.username, 500);
 
   useEffect(() => {
     if (isOpen && user) {
@@ -79,10 +233,61 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
           about: data.about || '',
           purpose: data.purpose || '',
           marital_status: data.marital_status || '',
+          age: data.age?.toString() || '',
+          country: data.country || '',
         });
+        setUsernameStatus(prev => ({ ...prev, originalUsername: data.username || '' }));
       }
     } catch (error: any) {
       console.error('Error loading profile:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (!debouncedUsername || debouncedUsername.length < 3) {
+      setUsernameStatus(prev => ({ ...prev, loading: false, available: true, message: '' }));
+      return;
+    }
+
+    // Don't check if it's the original username
+    if (debouncedUsername === usernameStatus.originalUsername) {
+      setUsernameStatus(prev => ({ ...prev, loading: false, available: true, message: '' }));
+      return;
+    }
+
+    setUsernameStatus(prev => ({ ...prev, loading: true }));
+
+    checkUsernameAvailability(debouncedUsername);
+  }, [debouncedUsername]);
+
+  const checkUsernameAvailability = async (username: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username.toLowerCase())
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+
+      if (data) {
+        setUsernameStatus({
+          loading: false,
+          available: false,
+          message: 'Username is taken',
+          originalUsername: usernameStatus.originalUsername,
+        });
+      } else {
+        setUsernameStatus({
+          loading: false,
+          available: true,
+          message: 'Username is available!',
+          originalUsername: usernameStatus.originalUsername,
+        });
+      }
+    } catch (error) {
+      console.error('Error checking username:', error);
+      setUsernameStatus(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -100,6 +305,24 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
   };
 
   const handleSaveProfile = async () => {
+    if (!usernameStatus.available && profile.username !== usernameStatus.originalUsername) {
+      toast({
+        title: 'Username not available',
+        description: 'Please choose a different username',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (profile.age && (parseInt(profile.age) < 13 || parseInt(profile.age) > 120)) {
+      toast({
+        title: 'Invalid age',
+        description: 'Age must be between 13 and 120',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const updates: any = {
@@ -110,10 +333,12 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
         about: profile.about,
         purpose: profile.purpose,
         marital_status: profile.marital_status || null,
+        age: profile.age ? parseInt(profile.age) : null,
+        country: profile.country || null,
       };
 
-      // Only include username if it can be changed
-      if (canChangeUsername && profile.username !== '') {
+      // Only include username if it can be changed and is different
+      if (canChangeUsername && profile.username !== usernameStatus.originalUsername && profile.username !== '') {
         updates.username = profile.username.toLowerCase();
         updates.last_username_change = new Date().toISOString();
       }
@@ -130,6 +355,7 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
       });
       
       setActiveSection('menu');
+      loadProfile(); // Reload to get updated data
     } catch (error: any) {
       toast({
         title: 'Error updating profile',
@@ -316,12 +542,56 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
                     </span>
                   )}
                 </div>
-                <Input
-                  value={profile.username}
-                  onChange={(e) => setProfile({ ...profile, username: e.target.value.toLowerCase() })}
-                  placeholder="username (lowercase only)"
-                  disabled={!canChangeUsername}
-                  className={!canChangeUsername ? 'opacity-60' : ''}
+                <div className="relative">
+                  <Input
+                    value={profile.username}
+                    onChange={(e) => setProfile({ ...profile, username: e.target.value.toLowerCase() })}
+                    placeholder="username (lowercase only)"
+                    disabled={!canChangeUsername}
+                    className={!canChangeUsername ? 'opacity-60' : ''}
+                  />
+                  {canChangeUsername && profile.username !== usernameStatus.originalUsername && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      {usernameStatus.loading && <Loader2 size={18} className="text-blue-400 animate-spin" />}
+                      {!usernameStatus.loading && usernameStatus.message && usernameStatus.available && (
+                        <CheckCircle size={18} className="text-green-500" />
+                      )}
+                      {!usernameStatus.loading && usernameStatus.message && !usernameStatus.available && (
+                        <XCircle size={18} className="text-red-500" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {canChangeUsername && usernameStatus.message && profile.username !== usernameStatus.originalUsername && (
+                  <p className={`text-xs ${usernameStatus.available ? 'text-green-500' : 'text-red-500'}`}>
+                    {usernameStatus.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Age */}
+              <div className="space-y-2">
+                <Label>Age</Label>
+                <div className="relative">
+                  <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <Input
+                    type="number"
+                    value={profile.age}
+                    onChange={(e) => setProfile({ ...profile, age: e.target.value })}
+                    placeholder="Your age"
+                    min="13"
+                    max="120"
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Country */}
+              <div className="space-y-2">
+                <Label>Country</Label>
+                <SearchableCountrySelect
+                  value={profile.country}
+                  onChange={(code) => setProfile({ ...profile, country: code })}
                 />
               </div>
 
@@ -360,11 +630,26 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
               {/* Purpose */}
               <div className="space-y-2">
                 <Label>Purpose on Platform (Public)</Label>
-                <Input
-                  value={profile.purpose}
-                  onChange={(e) => setProfile({ ...profile, purpose: e.target.value })}
-                  placeholder="Why are you here?"
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  {PURPOSE_OPTIONS.map((opt) => {
+                    const Icon = opt.icon;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setProfile({ ...profile, purpose: opt.value })}
+                        className={`flex items-center p-3 rounded-lg transition-all ${
+                          profile.purpose === opt.value
+                            ? 'bg-blue-600 text-white ring-2 ring-blue-400'
+                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                        }`}
+                      >
+                        <Icon size={16} className="mr-2" />
+                        <span className="text-sm">{opt.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Marital Status */}
