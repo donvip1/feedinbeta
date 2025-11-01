@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 
 const Wallet = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [sendAmount, setSendAmount] = useState('');
   const [recipientUsername, setRecipientUsername] = useState('');
@@ -26,10 +26,19 @@ const Wallet = () => {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate('/auth');
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   const { data: credits } = useQuery({
     queryKey: ['user-credits', user?.id],
@@ -39,10 +48,11 @@ const Wallet = () => {
         .select('*')
         .eq('user_id', user?.id)
         .single();
-      
+        
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
 
   const { data: transactions } = useQuery({
@@ -54,10 +64,11 @@ const Wallet = () => {
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false })
         .limit(50);
-      
+        
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
 
   const { data: subscription } = useQuery({
@@ -69,10 +80,11 @@ const Wallet = () => {
         .eq('user_id', user?.id)
         .eq('status', 'active')
         .single();
-      
+        
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     },
+    enabled: !!user,
   });
 
   const { data: packages } = useQuery({
