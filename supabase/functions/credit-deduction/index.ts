@@ -58,6 +58,14 @@ serve(async (req) => {
       .single();
 
     if (!userCredits || userCredits.balance < Math.abs(amount)) {
+      // For non-blocking actions like profile views, don't return an HTTP error
+      if (action === "profile_view") {
+        return new Response(
+          JSON.stringify({ success: false, error: "Insufficient credits" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       return new Response(
         JSON.stringify({ error: "Insufficient credits" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
