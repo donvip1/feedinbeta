@@ -1,1 +1,25 @@
 project_id = "spsguldyimamulhigloc"
+
+[functions.ai-chat]
+verify_jwt = true
+
+[functions.ai-image-gen]
+verify_jwt = true
+
+[functions.stripe-checkout]
+verify_jwt = true
+
+[functions.stripe-webhook]
+verify_jwt = false
+
+[functions.credit-deduction]
+verify_jwt = true
+
+[functions.moderation-bot]
+verify_jwt = false
+
+[functions.daily-credit-bonus]
+verify_jwt = false
+
+[functions.p2p-escrow]
+verify_jwt = true
