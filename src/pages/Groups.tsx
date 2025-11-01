@@ -18,6 +18,8 @@ interface Group {
   description: string;
   avatar_url: string;
   is_private: boolean;
+  is_premium?: boolean;
+  requires_subscription: boolean;
   member_count: number;
   post_count: number;
   created_by: string;
@@ -149,6 +151,11 @@ const Groups = () => {
                           ) : (
                             <Globe className="w-3 h-3 text-muted-foreground" />
                           )}
+                          {(group.is_premium || group.requires_subscription) && (
+                            <Badge variant="secondary" className="text-xs">
+                              Premium
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
                           {group.description}
@@ -201,6 +208,11 @@ const Groups = () => {
                             <Lock className="w-3 h-3 text-muted-foreground" />
                           ) : (
                             <Globe className="w-3 h-3 text-muted-foreground" />
+                          )}
+                          {(group.is_premium || group.requires_subscription) && (
+                            <Badge variant="secondary" className="text-xs">
+                              Premium
+                            </Badge>
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2 mb-2">

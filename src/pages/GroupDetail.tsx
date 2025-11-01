@@ -15,6 +15,8 @@ interface Group {
   description: string;
   avatar_url: string;
   is_private: boolean;
+  is_premium?: boolean;
+  requires_subscription: boolean;
   member_count: number;
   post_count: number;
   created_by: string;
@@ -73,6 +75,32 @@ const GroupDetail = () => {
   const handleJoinGroup = async () => {
     setActionLoading(true);
     try {
+      // Check if group is premium and user has premium subscription
+      if (group?.is_premium || group?.requires_subscription) {
+        const { data: subscription } = await supabase
+          .from('user_subscriptions')
+          .select('status, subscription_tiers(name)')
+          .eq('user_id', user?.id)
+          .eq('status', 'active')
+          .single();
+
+        const tier = Array.isArray(subscription?.subscription_tiers)
+          ? subscription.subscription_tiers[0]
+          : subscription?.subscription_tiers;
+
+        const isPremium = subscription && (tier?.name === 'Pro' || tier?.name === 'Premium');
+
+        if (!isPremium) {
+          toast({
+            title: 'Premium Required',
+            description: 'This group requires a premium subscription. Upgrade to join!',
+            variant: 'destructive',
+          });
+          setActionLoading(false);
+          return;
+        }
+      }
+
       if (group?.is_private) {
         // Create join request
         const { error } = await supabase.from('group_join_requests').insert({

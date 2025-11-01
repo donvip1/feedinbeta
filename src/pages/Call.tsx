@@ -179,8 +179,10 @@ const Call = () => {
 
   const endCall = async () => {
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    const durationMinutes = Math.max(1, Math.ceil(duration / 60)); // Minimum 1 minute
     
     try {
+      // Update call log
       await supabase
         .from('call_logs')
         .update({
@@ -189,8 +191,37 @@ const Call = () => {
           ended_at: new Date().toISOString(),
         })
         .eq('id', callId);
+
+      // Deduct credits for call duration
+      if (callData && isConnected) {
+        const action = callData.call_type === 'video' ? 'video_call' : 'voice_call';
+        
+        await supabase.functions.invoke('credit-deduction', {
+          body: {
+            action,
+            userId: user?.id,
+            targetUserId: callData.call_type === 'video' ? callData.receiver_id : callData.caller_id,
+            metadata: {
+              minutes: durationMinutes,
+              duration: duration,
+            },
+          },
+        });
+
+        const costPerMinute = callData.call_type === 'video' ? 30 : 20;
+        const totalCost = costPerMinute * durationMinutes;
+        
+        toast({
+          title: 'Call ended',
+          description: `Duration: ${formatDuration(duration)}. ${totalCost} credits deducted.`,
+        });
+      }
     } catch (error) {
       console.error('Error ending call:', error);
+      toast({
+        title: 'Call ended',
+        description: `Duration: ${formatDuration(duration)}`,
+      });
     }
 
     cleanup();
