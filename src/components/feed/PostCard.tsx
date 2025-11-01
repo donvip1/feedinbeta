@@ -188,9 +188,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
               {displayName}
             </p>
             <div className="flex items-center space-x-2 text-sm text-gray-400">
+              {post.profiles?.username && (
+                <>
+                  <span>@{post.profiles.username}</span>
+                  <span>•</span>
+                </>
+              )}
               <span>{timeAgo}</span>
-              <span>•</span>
-              <span>{post.feed_id}</span>
             </div>
           </div>
         </div>
