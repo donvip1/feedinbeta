@@ -12,7 +12,7 @@ import { StoriesBar } from '@/components/stories/StoriesBar';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { LogOut, MessageSquare } from 'lucide-react';
+import { LogOut, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 interface Post {
@@ -151,6 +151,14 @@ const Feed = () => {
                 className="text-gray-400 hover:text-white"
               >
                 <MessageSquare className="w-4 h-4" />
+              </Button>
+              <Button
+                onClick={() => navigate('/settings')}
+                size="sm"
+                variant="ghost"
+                className="text-gray-400 hover:text-white"
+              >
+                <SettingsIcon className="w-4 h-4" />
               </Button>
               <Button
                 onClick={signOut}

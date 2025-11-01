@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Check, Crown, Zap, Star } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { BottomNav } from "@/components/navigation/BottomNav";
 
 const Subscription = () => {
   const navigate = useNavigate();
@@ -164,6 +165,7 @@ const Subscription = () => {
           })}
         </div>
       </div>
+      <BottomNav onQuickActionClick={() => {}} />
     </div>
   );
 };

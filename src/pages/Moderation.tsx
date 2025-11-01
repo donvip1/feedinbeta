@@ -10,6 +10,7 @@ import { Shield, Flag, Eye, Check, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { BottomNav } from "@/components/navigation/BottomNav";
 
 const Moderation = () => {
   const navigate = useNavigate();
@@ -269,6 +270,7 @@ const Moderation = () => {
           </TabsContent>
         </Tabs>
       </div>
+      <BottomNav onQuickActionClick={() => {}} />
     </div>
   );
 };

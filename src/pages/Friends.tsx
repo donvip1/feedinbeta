@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { Search, UserPlus, Check, X, ArrowLeft } from 'lucide-react';
+import { Search, UserPlus, Check, X, ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -240,7 +240,17 @@ const Friends = () => {
                 Friends
               </span>
             </div>
-            <NotificationBell />
+            <div className="flex items-center space-x-2">
+              <Button
+                onClick={() => navigate('/settings')}
+                size="sm"
+                variant="ghost"
+                className="text-gray-400 hover:text-white"
+              >
+                <SettingsIcon className="w-4 h-4" />
+              </Button>
+              <NotificationBell />
+            </div>
           </div>
         </div>
       </header>
