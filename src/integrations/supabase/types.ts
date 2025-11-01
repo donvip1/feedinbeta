@@ -657,11 +657,13 @@ export type Database = {
       groups: {
         Row: {
           avatar_url: string | null
+          category: string | null
           cover_url: string | null
           created_at: string | null
           created_by: string
           description: string | null
           id: string
+          is_premium: boolean | null
           is_private: boolean | null
           member_count: number | null
           name: string
@@ -671,11 +673,13 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          category?: string | null
           cover_url?: string | null
           created_at?: string | null
           created_by: string
           description?: string | null
           id?: string
+          is_premium?: boolean | null
           is_private?: boolean | null
           member_count?: number | null
           name: string
@@ -685,16 +689,42 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          category?: string | null
           cover_url?: string | null
           created_at?: string | null
           created_by?: string
           description?: string | null
           id?: string
+          is_premium?: boolean | null
           is_private?: boolean | null
           member_count?: number | null
           name?: string
           post_count?: number | null
           requires_subscription?: boolean | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      hashtags: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          posts_count: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          posts_count?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          posts_count?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -1334,6 +1364,44 @@ export type Database = {
         }
         Relationships: []
       }
+      post_analytics: {
+        Row: {
+          hourly_comments: number | null
+          hourly_likes: number | null
+          hourly_shares: number | null
+          hourly_views: number | null
+          id: string
+          last_calculated: string | null
+          post_id: string | null
+        }
+        Insert: {
+          hourly_comments?: number | null
+          hourly_likes?: number | null
+          hourly_shares?: number | null
+          hourly_views?: number | null
+          id?: string
+          last_calculated?: string | null
+          post_id?: string | null
+        }
+        Update: {
+          hourly_comments?: number | null
+          hourly_likes?: number | null
+          hourly_shares?: number | null
+          hourly_views?: number | null
+          id?: string
+          last_calculated?: string | null
+          post_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_analytics_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_comments: {
         Row: {
           content: string
@@ -1391,6 +1459,42 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_hashtags: {
+        Row: {
+          created_at: string | null
+          hashtag_id: string | null
+          id: string
+          post_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          hashtag_id?: string | null
+          id?: string
+          post_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          hashtag_id?: string | null
+          id?: string
+          post_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_hashtags_hashtag_id_fkey"
+            columns: ["hashtag_id"]
+            isOneToOne: false
+            referencedRelation: "hashtags"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_hashtags_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
             referencedColumns: ["id"]
           },
         ]
@@ -1813,6 +1917,38 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_posts: {
+        Row: {
+          calculated_at: string | null
+          engagement_score: number | null
+          id: string
+          post_id: string | null
+          trending_rank: number | null
+        }
+        Insert: {
+          calculated_at?: string | null
+          engagement_score?: number | null
+          id?: string
+          post_id?: string | null
+          trending_rank?: number | null
+        }
+        Update: {
+          calculated_at?: string | null
+          engagement_score?: number | null
+          id?: string
+          post_id?: string | null
+          trending_rank?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trending_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       typing_indicators: {
         Row: {
           conversation_id: string
@@ -1971,6 +2107,7 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_trending_posts: { Args: never; Returns: undefined }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }

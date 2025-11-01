@@ -12,7 +12,9 @@ import {
   Lock, 
   Trash2,
   ChevronRight,
-  LogOut
+  LogOut,
+  TrendingUp,
+  UsersRound
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -53,6 +55,23 @@ const Settings = () => {
       description: 'Manage blocked and muted accounts',
       route: '/settings/blocked',
       color: 'text-red-500'
+    }
+  ];
+
+  const contentOptions = [
+    {
+      icon: TrendingUp,
+      title: 'Trending',
+      description: 'Discover trending posts and hashtags',
+      route: '/trending',
+      color: 'text-orange-500'
+    },
+    {
+      icon: UsersRound,
+      title: 'Groups',
+      description: 'Join and manage community groups',
+      route: '/groups',
+      color: 'text-green-500'
     }
   ];
 
@@ -112,6 +131,30 @@ const Settings = () => {
                     <Separator className="my-2" />
                   )}
                 </div>
+              ))}
+            </div>
+
+            <Separator className="my-6" />
+
+            <h3 className="text-lg font-semibold mb-4">Content & Discovery</h3>
+            <div className="space-y-2">
+              {contentOptions.map((option) => (
+                <button
+                  key={option.route}
+                  onClick={() => navigate(option.route)}
+                  className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`${option.color}`}>
+                      <option.icon className="w-6 h-6" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold">{option.title}</h3>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                    </div>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                </button>
               ))}
             </div>
           </div>
