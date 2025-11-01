@@ -18,6 +18,8 @@ import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import Subscription from "./pages/Subscription";
 import Credits from "./pages/Credits";
+import SavedPosts from "./pages/SavedPosts";
+import Moderation from "./pages/Moderation";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,6 +45,8 @@ const App: React.FC = () => (
           <Route path="/groups/:groupId" element={<GroupDetail />} />
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/credits" element={<Credits />} />
+          <Route path="/saved" element={<SavedPosts />} />
+          <Route path="/moderation" element={<Moderation />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

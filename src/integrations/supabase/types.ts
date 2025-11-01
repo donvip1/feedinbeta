@@ -87,6 +87,30 @@ export type Database = {
           },
         ]
       }
+      blocked_users: {
+        Row: {
+          blocked_id: string
+          blocker_id: string
+          created_at: string | null
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          blocked_id: string
+          blocker_id: string
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          blocked_id?: string
+          blocker_id?: string
+          created_at?: string | null
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       call_logs: {
         Row: {
           call_type: string
@@ -254,6 +278,87 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      content_flags: {
+        Row: {
+          auto_action_taken: string | null
+          content_id: string
+          content_type: string
+          created_at: string | null
+          flag_type: string
+          id: string
+          metadata: Json | null
+          reviewed: boolean | null
+          severity: string
+        }
+        Insert: {
+          auto_action_taken?: string | null
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          flag_type: string
+          id?: string
+          metadata?: Json | null
+          reviewed?: boolean | null
+          severity: string
+        }
+        Update: {
+          auto_action_taken?: string | null
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          flag_type?: string
+          id?: string
+          metadata?: Json | null
+          reviewed?: boolean | null
+          severity?: string
+        }
+        Relationships: []
+      }
+      content_reports: {
+        Row: {
+          content_id: string
+          content_type: string
+          created_at: string | null
+          description: string | null
+          id: string
+          reason: string
+          reported_user_id: string | null
+          reporter_id: string
+          resolution_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+        }
+        Insert: {
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reason: string
+          reported_user_id?: string | null
+          reporter_id: string
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+        }
+        Update: {
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          reason?: string
+          reported_user_id?: string | null
+          reporter_id?: string
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+        }
+        Relationships: []
       }
       conversation_participants: {
         Row: {
@@ -889,6 +994,75 @@ export type Database = {
           },
         ]
       }
+      moderation_actions: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          duration: number | null
+          expires_at: string | null
+          id: string
+          moderator_id: string
+          notes: string | null
+          reason: string
+          target_content_id: string | null
+          target_content_type: string | null
+          target_user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          duration?: number | null
+          expires_at?: string | null
+          id?: string
+          moderator_id: string
+          notes?: string | null
+          reason: string
+          target_content_id?: string | null
+          target_content_type?: string | null
+          target_user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          duration?: number | null
+          expires_at?: string | null
+          id?: string
+          moderator_id?: string
+          notes?: string | null
+          reason?: string
+          target_content_id?: string | null
+          target_content_type?: string | null
+          target_user_id?: string | null
+        }
+        Relationships: []
+      }
+      muted_users: {
+        Row: {
+          created_at: string | null
+          duration: number | null
+          expires_at: string | null
+          id: string
+          muted_id: string
+          muter_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration?: number | null
+          expires_at?: string | null
+          id?: string
+          muted_id: string
+          muter_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration?: number | null
+          expires_at?: string | null
+          id?: string
+          muted_id?: string
+          muter_id?: string
+        }
+        Relationships: []
+      }
       notification_preferences: {
         Row: {
           comments_enabled: boolean | null
@@ -1120,6 +1294,41 @@ export type Database = {
           },
         ]
       }
+      post_shares: {
+        Row: {
+          created_at: string | null
+          id: string
+          post_id: string
+          share_type: string
+          shared_to_user_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          post_id: string
+          share_type: string
+          shared_to_user_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          share_type?: string
+          shared_to_user_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_shares_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_views: {
         Row: {
           created_at: string | null
@@ -1256,6 +1465,38 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      saved_posts: {
+        Row: {
+          collection_name: string | null
+          created_at: string | null
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          collection_name?: string | null
+          created_at?: string | null
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          collection_name?: string | null
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stories: {
         Row: {
@@ -1591,6 +1832,14 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_user_blocked: {
+        Args: { user_a: string; user_b: string }
+        Returns: boolean
+      }
+      is_user_muted: {
+        Args: { muted: string; muter: string }
         Returns: boolean
       }
     }
