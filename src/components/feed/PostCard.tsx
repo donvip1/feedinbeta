@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,12 +37,12 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [isLiking, setIsLiking] = useState(false);
 
   // Check if user has liked this post
-  useState(() => {
+  useEffect(() => {
     if (user) {
       checkIfLiked();
       trackView();
     }
-  });
+  }, [user]);
 
   const checkIfLiked = async () => {
     try {
