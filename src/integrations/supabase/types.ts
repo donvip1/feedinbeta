@@ -594,6 +594,218 @@ export type Database = {
         }
         Relationships: []
       }
+      live_stream_analytics: {
+        Row: {
+          average_watch_time: number | null
+          created_at: string | null
+          engagement_rate: number | null
+          id: string
+          peak_concurrent_viewers: number | null
+          stream_id: string
+          total_comments: number | null
+          total_reactions: number | null
+          total_views: number | null
+          unique_viewers: number | null
+        }
+        Insert: {
+          average_watch_time?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          id?: string
+          peak_concurrent_viewers?: number | null
+          stream_id: string
+          total_comments?: number | null
+          total_reactions?: number | null
+          total_views?: number | null
+          unique_viewers?: number | null
+        }
+        Update: {
+          average_watch_time?: number | null
+          created_at?: string | null
+          engagement_rate?: number | null
+          id?: string
+          peak_concurrent_viewers?: number | null
+          stream_id?: string
+          total_comments?: number | null
+          total_reactions?: number | null
+          total_views?: number | null
+          unique_viewers?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_stream_analytics_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_stream_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          stream_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          stream_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          stream_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_stream_comments_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_stream_reactions: {
+        Row: {
+          created_at: string | null
+          id: string
+          reaction_type: string
+          stream_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          reaction_type: string
+          stream_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          reaction_type?: string
+          stream_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_stream_reactions_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_stream_viewers: {
+        Row: {
+          id: string
+          is_active: boolean | null
+          joined_at: string | null
+          left_at: string | null
+          stream_id: string
+          user_id: string | null
+          watch_duration: number | null
+        }
+        Insert: {
+          id?: string
+          is_active?: boolean | null
+          joined_at?: string | null
+          left_at?: string | null
+          stream_id: string
+          user_id?: string | null
+          watch_duration?: number | null
+        }
+        Update: {
+          id?: string
+          is_active?: boolean | null
+          joined_at?: string | null
+          left_at?: string | null
+          stream_id?: string
+          user_id?: string | null
+          watch_duration?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_stream_viewers_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_streams: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          duration: number | null
+          ended_at: string | null
+          id: string
+          is_premium: boolean | null
+          peak_viewers: number | null
+          scheduled_start: string | null
+          started_at: string | null
+          status: string
+          stream_key: string
+          tags: string[] | null
+          thumbnail_url: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+          viewer_count: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration?: number | null
+          ended_at?: string | null
+          id?: string
+          is_premium?: boolean | null
+          peak_viewers?: number | null
+          scheduled_start?: string | null
+          started_at?: string | null
+          status?: string
+          stream_key: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+          viewer_count?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          duration?: number | null
+          ended_at?: string | null
+          id?: string
+          is_premium?: boolean | null
+          peak_viewers?: number | null
+          scheduled_start?: string | null
+          started_at?: string | null
+          status?: string
+          stream_key?: string
+          tags?: string[] | null
+          thumbnail_url?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+          viewer_count?: number | null
+        }
+        Relationships: []
+      }
       message_reactions: {
         Row: {
           created_at: string | null
@@ -1373,6 +1585,7 @@ export type Database = {
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
+      generate_stream_key: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
