@@ -119,9 +119,11 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error('Webhook error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ 
+        error: 'Webhook processing failed',
+        code: 'WEBHOOK_ERROR'
+      }),
       { 
         headers: { 'Content-Type': 'application/json' },
         status: 400 
