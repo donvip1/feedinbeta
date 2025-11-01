@@ -41,11 +41,15 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
     // Navigate based on type
     if (notification.related_type === 'post') {
       navigate('/feed');
-      onClose();
+    } else if (notification.related_type === 'comment') {
+      navigate('/feed');
     } else if (notification.related_type === 'conversation') {
       navigate('/messages');
-      onClose();
+    } else if (notification.related_type === 'profile' && notification.related_id) {
+      navigate(`/profile/${notification.related_id}`);
     }
+    
+    onClose();
   };
 
   const handleDelete = async (e: React.MouseEvent) => {

@@ -1,4 +1,4 @@
-import { Home, MessageCircle, Plus, Users, Sparkles, UsersRound } from 'lucide-react';
+import { Home, MessageCircle, Plus, User, Sparkles, UsersRound } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -15,7 +15,7 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
     { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
     { id: 'ai', label: 'FeedAI', icon: Sparkles, path: '/ai-copilot' },
-    { id: 'live', label: 'Live Feeds', icon: Users, path: '/live' },
+    { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}` },
   ];
 
   const isActive = (path: string) => location.pathname === path;

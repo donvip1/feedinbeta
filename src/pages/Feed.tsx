@@ -3,17 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { LogOut, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import feedinLogo from '@/assets/feedin-logo.png';
+import { Search } from 'lucide-react';
 
 interface Post {
   id: string;
@@ -35,32 +31,32 @@ interface Post {
 
 const Feed = () => {
   const navigate = useNavigate();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
+  const [activeTab, setActiveTab] = useState<'following' | 'forYou' | 'myPosts'>('forYou');
 
   useEffect(() => {
-    if (authLoading) return; // Wait for auth to load
+    if (authLoading) return;
     
     if (!user) {
       navigate('/auth');
       return;
     }
+    
+    // Store user ID for profile navigation
+    localStorage.setItem('currentUserId', user.id);
     loadPosts();
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, activeTab]);
 
-  const loadPosts = async (isRefresh = false) => {
+  const loadPosts = async () => {
     try {
-      if (isRefresh) {
-        setRefreshing(true);
-      }
-
-      const { data, error } = await supabase
+      setLoading(true);
+      let query = supabase
         .from('posts')
         .select(`
           *,
@@ -74,11 +70,36 @@ const Feed = () => {
         .order('created_at', { ascending: false })
         .limit(20);
 
+      // Filter based on active tab
+      if (activeTab === 'myPosts' && user) {
+        query = query.eq('user_id', user.id);
+      } else if (activeTab === 'following' && user) {
+        // Get posts from users the current user follows
+        const { data: following } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+        
+        const followingIds = following?.map(f => f.following_id) || [];
+        if (followingIds.length > 0) {
+          query = query.in('user_id', followingIds);
+        } else {
+          setPosts([]);
+          setLoading(false);
+          return;
+        }
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
 
-      // Add some randomization for variety
-      const shuffled = (data || []).sort(() => Math.random() - 0.5);
-      setPosts(shuffled);
+      // Randomize for "For You" tab
+      const processed = activeTab === 'forYou' 
+        ? (data || []).sort(() => Math.random() - 0.5)
+        : (data || []);
+      
+      setPosts(processed);
     } catch (error: any) {
       toast({
         title: 'Error loading posts',
@@ -87,17 +108,12 @@ const Feed = () => {
       });
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
   const handlePostCreated = () => {
     setShowCreatePost(false);
-    loadPosts(false);
-  };
-
-  const handleRefresh = () => {
-    loadPosts(true);
+    loadPosts();
   };
 
   const handleQuickAction = (action: string) => {
@@ -145,34 +161,43 @@ const Feed = () => {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-gradient-to-r from-purple-900/80 to-blue-900/80 backdrop-blur-lg border-b border-gray-800">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-bold text-white">FeedIn</h1>
-
-            <div className="flex items-center space-x-2">
-              <NotificationBell />
-              <Button
-                onClick={() => navigate(`/profile/${user?.id}`)}
-                size="sm"
-                variant="ghost"
-                className="text-white hover:bg-white/10 p-1"
+      {/* TikTok-style Header with Tabs */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="w-10"></div>
+          
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
+            <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center space-x-6">
+              <TabsTrigger 
+                value="following" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
               >
-                <Avatar className="w-8 h-8">
-                  <AvatarImage src={user?.user_metadata?.avatar_url || ''} />
-                  <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
-                    {user?.user_metadata?.display_name?.[0] || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-              </Button>
-            </div>
-          </div>
+                Following
+              </TabsTrigger>
+              <TabsTrigger 
+                value="forYou" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+              >
+                For You
+              </TabsTrigger>
+              <TabsTrigger 
+                value="myPosts" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+              >
+                My Posts
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <button className="w-10 h-10 flex items-center justify-center">
+            <Search className="w-6 h-6 text-white" />
+          </button>
         </div>
       </header>
 
-      {/* Feed with TikTok-style scrolling */}
-      <main className="h-[calc(100vh-57px-64px)] overflow-y-scroll snap-y snap-mandatory scroll-smooth">
+      {/* Full-screen TikTok-style Feed */}
+      <main className="h-screen overflow-y-scroll snap-y snap-mandatory scroll-smooth pt-14 pb-16">
         {loading ? (
           <div className="space-y-6 p-4">
             {[1, 2, 3].map((i) => (
@@ -184,32 +209,26 @@ const Feed = () => {
                     <Skeleton className="h-3 w-24" />
                   </div>
                 </div>
-                <Skeleton className="h-24 w-full" />
-                <div className="flex items-center space-x-4">
-                  <Skeleton className="h-8 w-20" />
-                  <Skeleton className="h-8 w-20" />
-                </div>
+                <Skeleton className="h-96 w-full" />
               </div>
             ))}
           </div>
         ) : posts.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center h-full px-4">
             <div className="text-center">
-              <p className="text-gray-400 text-lg mb-4">No posts yet</p>
-              <Button
-                onClick={() => setShowQuickActions(true)}
-                className="bg-gradient-to-r from-pink-500 to-blue-500"
-              >
-                Create the first post
-              </Button>
+              <p className="text-gray-400 text-lg mb-4">
+                {activeTab === 'following' ? 'Follow users to see their posts' : 
+                 activeTab === 'myPosts' ? 'Create your first post' : 
+                 'No posts yet'}
+              </p>
             </div>
           </div>
         ) : (
           <>
             {posts.map((post) => (
-              <div key={post.id} className="snap-start min-h-[calc(100vh-57px-64px)] flex items-center justify-center p-4">
-                <div className="w-full max-w-2xl">
-                  <PostCard post={post} onUpdate={() => loadPosts(false)} />
+              <div key={post.id} className="snap-start h-[calc(100vh-7rem)] flex items-center justify-center px-4 py-4">
+                <div className="w-full max-w-2xl h-full flex items-center">
+                  <PostCard post={post} onUpdate={loadPosts} />
                 </div>
               </div>
             ))}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -10,8 +10,11 @@ import {
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, Image as ImageIcon, AtSign } from 'lucide-react';
 import { CommentItem } from './CommentItem';
+import { EmojiPicker } from './EmojiPicker';
+import { UserMentionPicker } from './UserMentionPicker';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface Comment {
   id: string;
@@ -43,6 +46,9 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -101,6 +107,40 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const handleTextChange = (value: string) => {
+    setNewComment(value);
+    
+    // Check for @ mention
+    const lastAtIndex = value.lastIndexOf('@');
+    if (lastAtIndex !== -1) {
+      const textAfterAt = value.substring(lastAtIndex + 1);
+      const hasSpace = textAfterAt.includes(' ');
+      
+      if (!hasSpace && textAfterAt.length > 0) {
+        setMentionSearch(textAfterAt);
+        setShowMentions(true);
+      } else {
+        setShowMentions(false);
+      }
+    } else {
+      setShowMentions(false);
+    }
+  };
+
+  const handleMentionSelect = (username: string) => {
+    const lastAtIndex = newComment.lastIndexOf('@');
+    const newText = newComment.substring(0, lastAtIndex) + '@' + username + ' ';
+    setNewComment(newText);
+    setShowMentions(false);
+    textareaRef.current?.focus();
+  };
+
+  const handleEmojiSelect = (emoji: string) => {
+    const newText = newComment + emoji;
+    setNewComment(newText);
+    textareaRef.current?.focus();
   };
 
   const handleSubmit = async () => {
@@ -164,34 +204,71 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
           )}
         </div>
 
-        {/* Add Comment Input */}
-        <div className="flex items-end space-x-2 pt-4 border-t border-gray-800">
-          <Textarea
-            placeholder="Write a comment..."
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            className="bg-gray-800 border-gray-700 text-white resize-none"
-            rows={2}
-            disabled={submitting}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit();
-              }
-            }}
-          />
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting || !newComment.trim()}
-            size="icon"
-            className="bg-gradient-to-r from-pink-500 to-blue-500"
-          >
-            {submitting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Send className="w-4 h-4" />
-            )}
-          </Button>
+        {/* Enhanced Comment Input */}
+        <div className="pt-4 border-t border-gray-800 space-y-2">
+          <div className="flex items-start space-x-2">
+            <Avatar className="w-8 h-8">
+              <AvatarImage src={user?.user_metadata?.avatar_url || ''} />
+              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
+                {user?.user_metadata?.display_name?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 relative">
+              <UserMentionPicker
+                searchTerm={mentionSearch}
+                onSelect={handleMentionSelect}
+                show={showMentions}
+              />
+              <Textarea
+                ref={textareaRef}
+                placeholder="Add comment..."
+                value={newComment}
+                onChange={(e) => handleTextChange(e.target.value)}
+                className="bg-gray-800 border-gray-700 text-white resize-none min-h-[60px]"
+                disabled={submitting}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between pl-10">
+            <div className="flex items-center space-x-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-gray-400 hover:text-white"
+              >
+                <AtSign className="w-5 h-5" />
+              </Button>
+              <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-gray-400 hover:text-white"
+              >
+                <ImageIcon className="w-5 h-5" />
+              </Button>
+            </div>
+            
+            <Button
+              onClick={handleSubmit}
+              disabled={submitting || !newComment.trim()}
+              className="bg-pink-500 hover:bg-pink-600 text-white rounded-full px-6"
+            >
+              {submitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                'Post'
+              )}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
