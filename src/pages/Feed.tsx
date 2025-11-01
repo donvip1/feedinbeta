@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Plus, LogOut, MessageSquare } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -100,6 +101,7 @@ const Feed = () => {
                 <Plus className="w-4 h-4 mr-2" />
                 Create Post
               </Button>
+              <NotificationBell />
               <Button
                 onClick={() => navigate('/messages')}
                 size="sm"

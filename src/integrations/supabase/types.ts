@@ -229,6 +229,104 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          comments_enabled: boolean | null
+          created_at: string
+          email_enabled: boolean | null
+          id: string
+          likes_enabled: boolean | null
+          messages_enabled: boolean | null
+          stories_enabled: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comments_enabled?: boolean | null
+          created_at?: string
+          email_enabled?: boolean | null
+          id?: string
+          likes_enabled?: boolean | null
+          messages_enabled?: boolean | null
+          stories_enabled?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comments_enabled?: boolean | null
+          created_at?: string
+          email_enabled?: boolean | null
+          id?: string
+          likes_enabled?: boolean | null
+          messages_enabled?: boolean | null
+          stories_enabled?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          from_user_id: string | null
+          id: string
+          is_read: boolean | null
+          message: string | null
+          related_id: string | null
+          related_type: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          from_user_id?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string | null
+          related_id?: string | null
+          related_type?: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          from_user_id?: string | null
+          id?: string
+          is_read?: boolean | null
+          message?: string | null
+          related_id?: string | null
+          related_type?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_comments: {
         Row: {
           content: string
