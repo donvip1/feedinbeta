@@ -312,6 +312,78 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_packages: {
+        Row: {
+          bonus_credits: number | null
+          created_at: string | null
+          credits: number
+          currency: string
+          id: string
+          is_active: boolean | null
+          name: string
+          price: number
+          stripe_price_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          bonus_credits?: number | null
+          created_at?: string | null
+          credits: number
+          currency?: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          price: number
+          stripe_price_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          bonus_credits?: number | null
+          created_at?: string | null
+          credits?: number
+          currency?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          stripe_price_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      credit_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          id: string
+          related_id: string | null
+          stripe_payment_intent_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          related_id?: string | null
+          stripe_payment_intent_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          related_id?: string | null
+          stripe_payment_intent_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           created_at: string
@@ -703,6 +775,42 @@ export type Database = {
           },
         ]
       }
+      payment_history: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string
+          description: string | null
+          id: string
+          status: string
+          stripe_payment_intent_id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency: string
+          description?: string | null
+          id?: string
+          status: string
+          stripe_payment_intent_id: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string
+          description?: string | null
+          id?: string
+          status?: string
+          stripe_payment_intent_id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           content: string
@@ -905,6 +1013,7 @@ export type Database = {
           following_count: number | null
           id: string
           phone_number: string | null
+          stripe_customer_id: string | null
           updated_at: string
           username: string | null
         }
@@ -917,6 +1026,7 @@ export type Database = {
           following_count?: number | null
           id: string
           phone_number?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -929,6 +1039,7 @@ export type Database = {
           following_count?: number | null
           id?: string
           phone_number?: string | null
+          stripe_customer_id?: string | null
           updated_at?: string
           username?: string | null
         }
@@ -1061,6 +1172,45 @@ export type Database = {
           },
         ]
       }
+      subscription_tiers: {
+        Row: {
+          created_at: string | null
+          currency: string
+          features: Json
+          id: string
+          interval: string
+          is_active: boolean | null
+          name: string
+          price: number
+          stripe_price_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          currency?: string
+          features?: Json
+          id?: string
+          interval: string
+          is_active?: boolean | null
+          name: string
+          price: number
+          stripe_price_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          currency?: string
+          features?: Json
+          id?: string
+          interval?: string
+          is_active?: boolean | null
+          name?: string
+          price?: number
+          stripe_price_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       typing_indicators: {
         Row: {
           conversation_id: string
@@ -1093,6 +1243,36 @@ export type Database = {
           },
         ]
       }
+      user_credits: {
+        Row: {
+          balance: number
+          created_at: string | null
+          id: string
+          total_earned: number
+          total_spent: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          total_earned?: number
+          total_spent?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          total_earned?: number
+          total_spent?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -1110,6 +1290,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          created_at: string | null
+          current_period_end: string
+          current_period_start: string
+          id: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          tier_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end: string
+          current_period_start: string
+          id?: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          tier_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          created_at?: string | null
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string
+          tier_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_subscriptions_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
