@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Eye } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { CommentsModal } from './CommentsModal';
 
 interface PostCardProps {
   post: {
@@ -35,6 +36,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [isLiked, setIsLiked] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(post.likes_count);
   const [isLiking, setIsLiking] = useState(false);
+  const [showComments, setShowComments] = useState(false);
 
   // Check if user has liked this post
   useEffect(() => {
@@ -175,6 +177,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </Button>
 
           <Button
+            onClick={() => setShowComments(true)}
             variant="ghost"
             size="sm"
             className="flex items-center space-x-2 text-gray-400 hover:text-blue-500"
@@ -189,6 +192,17 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         </div>
       </div>
+
+      {/* Comments Modal */}
+      <CommentsModal
+        open={showComments}
+        onClose={() => {
+          setShowComments(false);
+          onUpdate();
+        }}
+        postId={post.id}
+        postOwnerId={post.user_id}
+      />
     </Card>
   );
 };
