@@ -12,10 +12,9 @@ export const BottomNav = ({ onQuickActionClick }: BottomNavProps) => {
 
   const navItems = [
     { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
-    { id: 'groups', label: 'Groups', icon: UsersRound, path: '/groups' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
-    { id: 'friends', label: 'Friends', icon: Users, path: '/friends' },
-    { id: 'ai', label: 'AI', icon: Sparkles, path: '/ai-copilot' },
+    { id: 'ai', label: 'FeedAI', icon: Sparkles, path: '/ai-copilot' },
+    { id: 'live', label: 'Live Feeds', icon: Users, path: '/live' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -24,14 +23,14 @@ export const BottomNav = ({ onQuickActionClick }: BottomNavProps) => {
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-lg border-t border-gray-800">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-around py-2 relative">
-          {navItems.slice(0, 2).map((item) => {
+          {navItems.slice(0, 1).map((item) => {
             const Icon = item.icon;
             return (
               <Button
                 key={item.id}
                 onClick={() => navigate(item.path)}
                 variant="ghost"
-                className={`flex flex-col items-center space-y-1 h-auto py-2 px-6 ${
+                className={`flex flex-col items-center space-y-1 h-auto py-2 px-4 ${
                   isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
                 }`}
               >
@@ -49,14 +48,14 @@ export const BottomNav = ({ onQuickActionClick }: BottomNavProps) => {
             <Plus className="w-8 h-8 text-white" />
           </button>
 
-          {navItems.slice(2, 5).map((item) => {
+          {navItems.slice(1).map((item) => {
             const Icon = item.icon;
             return (
               <Button
                 key={item.id}
                 onClick={() => navigate(item.path)}
                 variant="ghost"
-                className={`flex flex-col items-center space-y-1 h-auto py-2 px-6 ${
+                className={`flex flex-col items-center space-y-1 h-auto py-2 px-4 ${
                   isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
                 }`}
               >

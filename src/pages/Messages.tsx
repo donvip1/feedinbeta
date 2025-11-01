@@ -6,9 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquarePlus, Search, ArrowLeft } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus } from 'lucide-react';
 import { ChatInterface } from '@/components/messages/ChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
+import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { useToast } from '@/hooks/use-toast';
 
 interface Conversation {
@@ -27,6 +30,17 @@ interface Conversation {
   };
 }
 
+interface Group {
+  id: string;
+  name: string;
+  description: string;
+  avatar_url: string;
+  is_private: boolean;
+  requires_subscription: boolean;
+  member_count: number;
+  post_count: number;
+}
+
 export default function Messages() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -36,6 +50,10 @@ export default function Messages() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showNewConversation, setShowNewConversation] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [myGroups, setMyGroups] = useState<Group[]>([]);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [activeTab, setActiveTab] = useState('chats');
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -46,6 +64,7 @@ export default function Messages() {
   useEffect(() => {
     if (user) {
       loadConversations();
+      loadGroups();
     }
   }, [user]);
 
@@ -152,9 +171,46 @@ export default function Messages() {
     }
   };
 
+  const loadGroups = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: allGroups, error: allError } = await supabase
+        .from('groups')
+        .select('*')
+        .order('member_count', { ascending: false });
+
+      if (allError) throw allError;
+
+      const { data: memberGroups, error: memberError } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', user.id);
+
+      if (memberError) throw memberError;
+
+      const myGroupIds = memberGroups?.map(m => m.group_id) || [];
+      const userGroups = allGroups?.filter(g => myGroupIds.includes(g.id)) || [];
+      const otherGroups = allGroups?.filter(g => !myGroupIds.includes(g.id)) || [];
+
+      setMyGroups(userGroups);
+      setGroups(otherGroups);
+    } catch (error) {
+      console.error('Error loading groups:', error);
+    }
+  };
+
   const filteredConversations = conversations.filter(conv =>
     conv.other_participant.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.other_participant.username?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredGroups = groups.filter(g =>
+    g.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredMyGroups = myGroups.filter(g =>
+    g.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (authLoading || loading) {
@@ -178,75 +234,159 @@ export default function Messages() {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Messages</h1>
+            <h1 className="text-xl font-bold">Chats & Groups</h1>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setShowNewConversation(true)}
+              onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
             >
-              <MessageSquarePlus className="w-5 h-5" />
+              <Plus className="w-5 h-5" />
             </Button>
           </div>
-          <div className="relative">
+          <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search conversations..."
+              placeholder={`Search ${activeTab}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
             />
           </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="w-full grid grid-cols-2">
+              <TabsTrigger value="chats">Chats</TabsTrigger>
+              <TabsTrigger value="groups">Groups</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         <ScrollArea className="flex-1">
-          {filteredConversations.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-              <MessageSquarePlus className="w-12 h-12 mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">No conversations yet</p>
-              <Button
-                variant="outline"
-                className="mt-4"
-                onClick={() => setShowNewConversation(true)}
-              >
-                Start a conversation
-              </Button>
-            </div>
-          ) : (
-            filteredConversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => setSelectedConversationId(conv.id)}
-                className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors ${
-                  selectedConversationId === conv.id ? 'bg-accent' : ''
-                }`}
-              >
-                <Avatar>
-                  <AvatarImage src={conv.other_participant.avatar_url || ''} />
-                  <AvatarFallback>
-                    {conv.other_participant.display_name?.[0] || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 text-left overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold truncate">
-                      {conv.other_participant.display_name || 'Unknown User'}
-                    </p>
-                    {conv.last_message && (
-                      <span className="text-xs text-muted-foreground">
-                        {new Date(conv.last_message.created_at).toLocaleDateString()}
-                      </span>
-                    )}
-                  </div>
-                  {conv.last_message && (
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
-                      {conv.last_message.content}
-                    </p>
-                  )}
+          <Tabs value={activeTab} className="w-full">
+            <TabsContent value="chats" className="m-0">
+              {filteredConversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                  <MessageSquarePlus className="w-12 h-12 mb-4 text-muted-foreground" />
+                  <p className="text-muted-foreground">No conversations yet</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setShowNewConversation(true)}
+                  >
+                    Start a conversation
+                  </Button>
                 </div>
-              </button>
-            ))
-          )}
+              ) : (
+                filteredConversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => setSelectedConversationId(conv.id)}
+                    className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors ${
+                      selectedConversationId === conv.id ? 'bg-accent' : ''
+                    }`}
+                  >
+                    <Avatar>
+                      <AvatarImage src={conv.other_participant.avatar_url || ''} />
+                      <AvatarFallback>
+                        {conv.other_participant.display_name?.[0] || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 text-left overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold truncate">
+                          {conv.other_participant.display_name || 'Unknown User'}
+                        </p>
+                        {conv.last_message && (
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(conv.last_message.created_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      {conv.last_message && (
+                        <p className="text-sm text-muted-foreground truncate">
+                          {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
+                          {conv.last_message.content}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="groups" className="m-0">
+              {filteredMyGroups.length > 0 && (
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">My Groups</h3>
+                  {filteredMyGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      onClick={() => navigate(`/groups/${group.id}`)}
+                      className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg mb-2"
+                    >
+                      <Avatar>
+                        <AvatarImage src={group.avatar_url} />
+                        <AvatarFallback>{group.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 text-left overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold truncate">{group.name}</p>
+                          {group.is_private ? (
+                            <Lock className="w-3 h-3 text-muted-foreground" />
+                          ) : (
+                            <Globe className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Users className="w-3 h-3" />
+                          <span>{group.member_count} members</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              <div className="p-4">
+                <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Discover</h3>
+                {filteredGroups.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No groups found
+                  </div>
+                ) : (
+                  filteredGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      onClick={() => navigate(`/groups/${group.id}`)}
+                      className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg mb-2"
+                    >
+                      <Avatar>
+                        <AvatarImage src={group.avatar_url} />
+                        <AvatarFallback>{group.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 text-left overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold truncate">{group.name}</p>
+                          {group.requires_subscription && (
+                            <Badge variant="secondary" className="text-xs">Premium</Badge>
+                          )}
+                          {group.is_private ? (
+                            <Lock className="w-3 h-3 text-muted-foreground" />
+                          ) : (
+                            <Globe className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{group.description}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <Users className="w-3 h-3" />
+                          <span>{group.member_count} members</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
         </ScrollArea>
       </div>
 
@@ -271,6 +411,12 @@ export default function Messages() {
         open={showNewConversation}
         onClose={() => setShowNewConversation(false)}
         onSelectUser={handleNewConversation}
+      />
+
+      <CreateGroupModal
+        open={showCreateGroup}
+        onOpenChange={setShowCreateGroup}
+        onSuccess={loadGroups}
       />
     </div>
   );

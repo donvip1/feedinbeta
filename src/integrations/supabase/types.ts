@@ -489,6 +489,7 @@ export type Database = {
           member_count: number | null
           name: string
           post_count: number | null
+          requires_subscription: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -502,6 +503,7 @@ export type Database = {
           member_count?: number | null
           name: string
           post_count?: number | null
+          requires_subscription?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -515,6 +517,7 @@ export type Database = {
           member_count?: number | null
           name?: string
           post_count?: number | null
+          requires_subscription?: boolean | null
           updated_at?: string | null
         }
         Relationships: []
