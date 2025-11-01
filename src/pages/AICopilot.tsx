@@ -282,7 +282,7 @@ const AICopilot = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Button
-                onClick={() => navigate('/feed')}
+                onClick={() => navigate(-1)}
                 variant="ghost"
                 size="icon"
                 className="text-gray-400 hover:text-white"

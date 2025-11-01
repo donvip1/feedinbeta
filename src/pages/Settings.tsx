@@ -112,7 +112,7 @@ const Settings = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Button
-                onClick={() => navigate('/feed')}
+                onClick={() => navigate(`/profile/${user.id}`)}
                 size="sm"
                 variant="ghost"
               >
