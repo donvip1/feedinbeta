@@ -49,7 +49,7 @@ export const QuickActionsModal = ({ open, onClose, onActionSelect, context = 'de
             <div className="w-12 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white text-center mb-6">{title}</h2>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {actions.map((action) => {
                 const Icon = action.icon;
                 return (
@@ -59,12 +59,12 @@ export const QuickActionsModal = ({ open, onClose, onActionSelect, context = 'de
                       onActionSelect(action.id);
                       onClose();
                     }}
-                    className="bg-gray-800/50 hover:bg-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center space-y-3 transition-all hover:scale-105 active:scale-95"
+                    className="bg-gray-800/50 hover:bg-gray-800 rounded-2xl p-4 flex flex-col items-center justify-center space-y-2 transition-all hover:scale-105 active:scale-95"
                   >
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg`}>
-                      <Icon className="w-8 h-8 text-white" />
+                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg`}>
+                      <Icon className="w-5 h-5 text-white" />
                     </div>
-                    <span className="text-white font-medium text-center text-sm">{action.label}</span>
+                    <span className="text-white font-medium text-center text-xs">{action.label}</span>
                   </button>
                 );
               })}
