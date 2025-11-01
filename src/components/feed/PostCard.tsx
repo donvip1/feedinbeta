@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -40,6 +41,7 @@ interface PostCardProps {
 export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(post.likes_count);
   const [isLiking, setIsLiking] = useState(false);
@@ -172,8 +174,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         {/* Header */}
         <div className="flex items-center space-x-3 mb-4">
           <Avatar 
-            className="w-12 h-12 cursor-pointer" 
-            onClick={() => setShowProfilePreview(true)}
+            className="w-12 h-12 cursor-pointer hover:opacity-80" 
+            onClick={() => navigate(`/profile/${post.user_id}`)}
           >
             <AvatarImage src={post.profiles?.avatar_url || ''} />
             <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">
@@ -183,14 +185,19 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           <div className="flex-1">
             <p 
               className="font-semibold text-white cursor-pointer hover:underline"
-              onClick={() => setShowProfilePreview(true)}
+              onClick={() => navigate(`/profile/${post.user_id}`)}
             >
               {displayName}
             </p>
             <div className="flex items-center space-x-2 text-sm text-gray-400">
               {post.profiles?.username && (
                 <>
-                  <span>@{post.profiles.username}</span>
+                  <span 
+                    className="cursor-pointer hover:underline"
+                    onClick={() => navigate(`/profile/${post.user_id}`)}
+                  >
+                    @{post.profiles.username}
+                  </span>
                   <span>•</span>
                 </>
               )}

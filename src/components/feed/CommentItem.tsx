@@ -144,7 +144,10 @@ export const CommentItem = ({
   return (
     <div className={`${level > 0 ? 'ml-8 mt-3' : ''}`}>
       <div className="flex space-x-3">
-        <Avatar className="w-8 h-8 flex-shrink-0">
+        <Avatar 
+          className="w-8 h-8 flex-shrink-0 cursor-pointer hover:opacity-80"
+          onClick={() => window.location.href = `/profile/${comment.user_id}`}
+        >
           <AvatarImage src={comment.profiles?.avatar_url || ''} />
           <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
             {displayName.charAt(0).toUpperCase()}
@@ -154,7 +157,12 @@ export const CommentItem = ({
         <div className="flex-1">
           <div className="bg-gray-800 rounded-2xl px-4 py-2">
             <div className="flex items-center justify-between mb-1">
-              <span className="font-semibold text-sm">{displayName}</span>
+              <span 
+                className="font-semibold text-sm cursor-pointer hover:underline"
+                onClick={() => window.location.href = `/profile/${comment.user_id}`}
+              >
+                {displayName}
+              </span>
               {comment.user_id === postOwnerId && (
                 <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded">
                   Author

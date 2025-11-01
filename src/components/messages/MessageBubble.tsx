@@ -19,7 +19,10 @@ interface MessageBubbleProps {
 export const MessageBubble = ({ message, isOwn }: MessageBubbleProps) => {
   return (
     <div className={`flex gap-2 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-      <Avatar className="w-8 h-8">
+      <Avatar 
+        className="w-8 h-8 cursor-pointer hover:opacity-80"
+        onClick={() => window.location.href = `/profile/${message.sender_id}`}
+      >
         <AvatarImage src={message.profiles.avatar_url || ''} />
         <AvatarFallback>{message.profiles.display_name?.[0] || 'U'}</AvatarFallback>
       </Avatar>

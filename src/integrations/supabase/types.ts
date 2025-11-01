@@ -1667,6 +1667,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          about: string | null
           avatar_url: string | null
           bio: string | null
           country: string | null
@@ -1678,15 +1679,23 @@ export type Database = {
           following_count: number | null
           id: string
           interests: string[] | null
+          is_premium: boolean | null
           last_ai_reset_date: string | null
+          last_username_change: string | null
           location: string | null
+          marital_status: string | null
           max_friends: number | null
           phone_number: string | null
+          purpose: string | null
+          status: string | null
+          status_updated_at: string | null
           stripe_customer_id: string | null
+          total_views: number | null
           updated_at: string
           username: string | null
         }
         Insert: {
+          about?: string | null
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
@@ -1698,15 +1707,23 @@ export type Database = {
           following_count?: number | null
           id: string
           interests?: string[] | null
+          is_premium?: boolean | null
           last_ai_reset_date?: string | null
+          last_username_change?: string | null
           location?: string | null
+          marital_status?: string | null
           max_friends?: number | null
           phone_number?: string | null
+          purpose?: string | null
+          status?: string | null
+          status_updated_at?: string | null
           stripe_customer_id?: string | null
+          total_views?: number | null
           updated_at?: string
           username?: string | null
         }
         Update: {
+          about?: string | null
           avatar_url?: string | null
           bio?: string | null
           country?: string | null
@@ -1718,11 +1735,18 @@ export type Database = {
           following_count?: number | null
           id?: string
           interests?: string[] | null
+          is_premium?: boolean | null
           last_ai_reset_date?: string | null
+          last_username_change?: string | null
           location?: string | null
+          marital_status?: string | null
           max_friends?: number | null
           phone_number?: string | null
+          purpose?: string | null
+          status?: string | null
+          status_updated_at?: string | null
           stripe_customer_id?: string | null
+          total_views?: number | null
           updated_at?: string
           username?: string | null
         }
@@ -2117,6 +2141,7 @@ export type Database = {
     }
     Functions: {
       calculate_trending_posts: { Args: never; Returns: undefined }
+      can_change_username: { Args: { user_id: string }; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }

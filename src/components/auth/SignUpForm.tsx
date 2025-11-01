@@ -13,14 +13,20 @@ const emailSignupSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   displayName: z.string().min(2, 'Display name must be at least 2 characters'),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .regex(/^[a-z0-9]+$/, 'Username must be lowercase letters and numbers only')
+    .transform(val => val.toLowerCase()),
 });
 
 const phoneSignupSchema = z.object({
   phone: z.string().min(10, 'Invalid phone number'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   displayName: z.string().min(2, 'Display name must be at least 2 characters'),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
+  username: z.string()
+    .min(3, 'Username must be at least 3 characters')
+    .regex(/^[a-z0-9]+$/, 'Username must be lowercase letters and numbers only')
+    .transform(val => val.toLowerCase()),
 });
 
 export const SignUpForm = () => {
@@ -145,13 +151,13 @@ export const SignUpForm = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="signup-username">Username</Label>
+            <Label htmlFor="signup-username">Username (lowercase and numbers only)</Label>
             <Input
               id="signup-username"
               type="text"
-              placeholder="johndoe"
+              placeholder="johndoe123"
               value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
               disabled={loading}
             />
           </div>
@@ -209,13 +215,13 @@ export const SignUpForm = () => {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="phone-username">Username</Label>
+            <Label htmlFor="phone-username">Username (lowercase and numbers only)</Label>
             <Input
               id="phone-username"
               type="text"
-              placeholder="johndoe"
+              placeholder="johndoe123"
               value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
               disabled={loading}
             />
           </div>
