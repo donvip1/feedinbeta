@@ -14,6 +14,137 @@ export type Database = {
   }
   public: {
     Tables: {
+      post_likes: {
+        Row: {
+          created_at: string | null
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_likes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_views: {
+        Row: {
+          created_at: string | null
+          id: string
+          post_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          post_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          post_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_views_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          comments_count: number | null
+          content: string | null
+          created_at: string | null
+          feed_id: string
+          id: string
+          likes_count: number | null
+          media_type: string | null
+          media_url: string | null
+          post_type: string | null
+          shares_count: number | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          views_count: number | null
+        }
+        Insert: {
+          comments_count?: number | null
+          content?: string | null
+          created_at?: string | null
+          feed_id: string
+          id?: string
+          likes_count?: number | null
+          media_type?: string | null
+          media_url?: string | null
+          post_type?: string | null
+          shares_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          views_count?: number | null
+        }
+        Update: {
+          comments_count?: number | null
+          content?: string | null
+          created_at?: string | null
+          feed_id?: string
+          id?: string
+          likes_count?: number | null
+          media_type?: string | null
+          media_url?: string | null
+          post_type?: string | null
+          shares_count?: number | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          views_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -70,6 +201,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_feed_id: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
