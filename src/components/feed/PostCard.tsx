@@ -260,83 +260,98 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         </div>
 
-        {/* Media - Full screen background */}
+        {/* Media - Centered and contained */}
         {post.media_url && (
-          <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
             {post.media_type === 'image' && (
               <img
                 src={post.media_url}
                 alt="Post media"
-                className="w-full h-full object-cover"
+                className="max-w-full max-h-full object-contain"
               />
             )}
             {post.media_type === 'video' && (
               <video
                 src={post.media_url}
                 controls
-                className="w-full h-full object-cover"
+                className="max-w-full max-h-full object-contain"
               />
             )}
           </div>
         )}
 
+        {/* Text-only post - Centered */}
+        {!post.media_url && post.content && (
+          <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-8">
+            <p className="text-white text-2xl text-center whitespace-pre-wrap max-w-2xl">
+              {post.content}
+            </p>
+          </div>
+        )}
+
         {/* Content and Actions */}
         <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
-          {/* Content */}
-          {post.content && (
-            <p className="text-white mb-3 whitespace-pre-wrap text-base line-clamp-3">
+          {/* Content - Only show if there's media */}
+          {post.media_url && post.content && (
+            <p className="text-white mb-2 whitespace-pre-wrap text-base line-clamp-3">
               {post.content}
             </p>
           )}
 
           {/* Time */}
-          <p className="text-white/60 text-sm mb-3">{timeAgo}</p>
+          <p className="text-white/60 text-xs mb-1">{timeAgo}</p>
 
-          {/* Promote Button */}
-          <Button
+          {/* Music Title - Placeholder for future implementation */}
+          {post.media_type === 'video' && (
+            <p className="text-white/70 text-xs mb-3 italic">
+              🎵 Original Audio
+            </p>
+          )}
+
+          {/* Promote Link */}
+          <button
             onClick={handlePromote}
-            className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold py-3 rounded-xl shadow-lg"
+            className="text-white/80 hover:text-white text-xs font-medium transition-colors flex items-center"
           >
-            <TrendingUp className="w-5 h-5 mr-2" />
-            Promote this Post
-          </Button>
+            Promote this post
+          </button>
         </div>
 
-        {/* TikTok-style Vertical Action Buttons - Right Side */}
-        <div className="absolute right-4 bottom-32 z-30 flex flex-col items-center space-y-6">
+        {/* TikTok-style Vertical Action Buttons - Right Side (40% smaller) */}
+        <div className="absolute right-3 bottom-32 z-30 flex flex-col items-center space-y-4">
           {/* Like Button */}
           <button
             onClick={handleLike}
             disabled={isLiking}
-            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
+            className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
               isLiked ? 'bg-pink-500' : 'bg-white/10 backdrop-blur-sm'
             } shadow-lg`}>
-              <Heart className={`w-7 h-7 ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
+              <Heart className={`w-5 h-5 ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
             </div>
-            <span className="text-white text-xs font-bold">{localLikesCount}</span>
+            <span className="text-white text-[10px] font-bold">{localLikesCount}</span>
           </button>
 
           {/* Comment Button */}
           <button
             onClick={() => setShowComments(true)}
-            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
+            className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <MessageCircle className="w-7 h-7 text-white" />
+            <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <MessageCircle className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white text-xs font-bold">{post.comments_count}</span>
+            <span className="text-white text-[10px] font-bold">{post.comments_count}</span>
           </button>
 
           {/* Share Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95">
-                <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                  <Share2 className="w-7 h-7 text-white" />
+              <button className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95">
+                <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                  <Share2 className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white text-xs font-bold">Share</span>
+                <span className="text-white text-[10px] font-bold">Share</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="bg-gray-800 border-gray-700" align="end">
@@ -363,22 +378,22 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           {/* Save/Bookmark Button */}
           <button
             onClick={handleSave}
-            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
+            className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
               isSaved ? 'bg-yellow-500' : 'bg-white/10 backdrop-blur-sm'
             } shadow-lg`}>
-              <Bookmark className={`w-7 h-7 ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
+              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
             </div>
-            <span className="text-white text-xs font-bold">Save</span>
+            <span className="text-white text-[10px] font-bold">Save</span>
           </button>
 
           {/* Views Counter */}
-          <div className="flex flex-col items-center space-y-1">
-            <div className="w-14 h-14 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <Eye className="w-7 h-7 text-white" />
+          <div className="flex flex-col items-center space-y-0.5">
+            <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <Eye className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white text-xs font-bold">{post.views_count}</span>
+            <span className="text-white text-[10px] font-bold">{post.views_count}</span>
           </div>
         </div>
       </div>
