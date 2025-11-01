@@ -39,11 +39,10 @@ const AccountSettings = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
       return;
     }
     loadProfile();
-  }, [user, navigate]);
+  }, [user]);
 
   const loadProfile = async () => {
     try {

@@ -19,7 +19,7 @@ interface Message {
 
 const AICopilot = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -29,13 +29,14 @@ const AICopilot = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (loading) return;
     if (!user) {
       navigate('/auth');
       return;
     }
     loadChatHistory();
     loadAIUsage();
-  }, [user]);
+  }, [user, loading]);
 
   const loadAIUsage = async () => {
     try {

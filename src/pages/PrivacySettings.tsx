@@ -25,11 +25,10 @@ const PrivacySettings = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
       return;
     }
     loadSettings();
-  }, [user, navigate]);
+  }, [user]);
 
   const loadSettings = async () => {
     // Load privacy settings from profiles or a dedicated privacy_settings table

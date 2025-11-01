@@ -43,11 +43,10 @@ const BlockedUsers = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
       return;
     }
     loadBlockedAndMuted();
-  }, [user, navigate]);
+  }, [user]);
 
   const loadBlockedAndMuted = async () => {
     try {

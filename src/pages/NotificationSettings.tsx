@@ -26,11 +26,10 @@ const NotificationSettings = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
       return;
     }
     loadPreferences();
-  }, [user, navigate]);
+  }, [user]);
 
   const loadPreferences = async () => {
     try {
