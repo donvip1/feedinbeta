@@ -167,6 +167,24 @@ const Friends = () => {
 
   const sendFriendRequest = async (receiverId: string) => {
     try {
+      // Deduct credits first (5 credits)
+      const { error: creditError } = await supabase.functions.invoke('credit-deduction', {
+        body: {
+          action: 'friend_request',
+          userId: user?.id,
+          targetUserId: receiverId,
+        },
+      });
+
+      if (creditError) {
+        toast({
+          title: 'Insufficient credits',
+          description: 'You need 5 credits to send a friend request',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       const { error } = await supabase.from('friend_requests').insert({
         sender_id: user?.id,
         receiver_id: receiverId,
@@ -176,6 +194,7 @@ const Friends = () => {
 
       toast({
         title: 'Friend request sent',
+        description: '5 credits deducted',
       });
     } catch (error: any) {
       toast({

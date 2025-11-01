@@ -57,8 +57,29 @@ const Profile = () => {
       loadPosts();
       checkFollowStatus();
       checkFriendRequestStatus();
+      
+      // Deduct credits for profile view if not own profile
+      if (!isOwnProfile && user) {
+        deductProfileViewCredits();
+      }
     }
   }, [userId]);
+
+  const deductProfileViewCredits = async () => {
+    try {
+      await supabase.functions.invoke('credit-deduction', {
+        body: {
+          action: 'profile_view',
+          userId: user?.id,
+          targetUserId: userId,
+          metadata: { username: profile?.username },
+        },
+      });
+    } catch (error) {
+      // Silent fail - don't block profile viewing
+      console.error('Credit deduction error:', error);
+    }
+  };
 
   const loadProfile = async () => {
     try {
@@ -174,6 +195,24 @@ const Profile = () => {
     if (!user) return;
 
     try {
+      // Deduct credits first (5 credits)
+      const { error: creditError } = await supabase.functions.invoke('credit-deduction', {
+        body: {
+          action: 'friend_request',
+          userId: user.id,
+          targetUserId: userId,
+        },
+      });
+
+      if (creditError) {
+        toast({
+          title: 'Insufficient credits',
+          description: 'You need 5 credits to send a friend request',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       await supabase.from('friend_requests').insert({
         sender_id: user.id,
         receiver_id: userId,
@@ -181,6 +220,7 @@ const Profile = () => {
       setHasPendingRequest(true);
       toast({
         title: 'Friend request sent',
+        description: '5 credits deducted',
       });
     } catch (error: any) {
       toast({

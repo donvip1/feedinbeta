@@ -23,6 +23,7 @@ const AICopilot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [aiUsage, setAiUsage] = useState({ promptCount: 0, imageCount: 0, isPremium: false });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,7 +32,59 @@ const AICopilot = () => {
       return;
     }
     loadChatHistory();
+    loadAIUsage();
   }, [user]);
+
+  const loadAIUsage = async () => {
+    try {
+      // Get user's profile with AI usage data
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('daily_ai_prompt_count, daily_ai_image_count, last_ai_reset_date')
+        .eq('id', user?.id)
+        .single();
+
+      // Check if user has premium subscription
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('status, subscription_tiers(name)')
+        .eq('user_id', user?.id)
+        .eq('status', 'active')
+        .single();
+
+      const tier = Array.isArray(subscription?.subscription_tiers) 
+        ? subscription.subscription_tiers[0] 
+        : subscription?.subscription_tiers;
+      
+      const isPremium = subscription && (tier?.name === 'Pro' || tier?.name === 'Premium');
+
+      // Check if we need to reset daily counts
+      const today = new Date().toISOString().split('T')[0];
+      const lastReset = profile?.last_ai_reset_date?.split('T')[0];
+      
+      if (lastReset !== today) {
+        // Reset counts for new day
+        await supabase
+          .from('profiles')
+          .update({ 
+            daily_ai_prompt_count: 0, 
+            daily_ai_image_count: 0,
+            last_ai_reset_date: today 
+          })
+          .eq('id', user?.id);
+        
+        setAiUsage({ promptCount: 0, imageCount: 0, isPremium: isPremium || false });
+      } else {
+        setAiUsage({
+          promptCount: profile?.daily_ai_prompt_count || 0,
+          imageCount: profile?.daily_ai_image_count || 0,
+          isPremium: isPremium || false,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading AI usage:', error);
+    }
+  };
 
   useEffect(() => {
     scrollToBottom();
@@ -149,6 +202,16 @@ const AICopilot = () => {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
+    // Check AI usage limits
+    if (!aiUsage.isPremium && aiUsage.promptCount >= 3) {
+      toast({
+        title: 'Daily limit reached',
+        description: 'Free users can send 3 prompts per day. Upgrade to Premium for unlimited access.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const userMessage = input.trim();
     setInput('');
     setIsLoading(true);
@@ -160,6 +223,24 @@ const AICopilot = () => {
 
     try {
       await streamChat(userMessage);
+      
+      // Increment prompt count
+      const newCount = aiUsage.promptCount + 1;
+      await supabase
+        .from('profiles')
+        .update({ daily_ai_prompt_count: newCount })
+        .eq('id', user?.id);
+      
+      setAiUsage(prev => ({ ...prev, promptCount: newCount }));
+      
+      // Track usage
+      await supabase.from('ai_usage').insert({
+        user_id: user?.id,
+        model: 'google/gemini-2.5-flash',
+        feature: 'chat',
+        tokens_used: userMessage.length + 100, // Estimate
+        cost_credits: 0,
+      });
     } catch (error: any) {
       console.error('Chat error:', error);
       toast({
@@ -215,16 +296,23 @@ const AICopilot = () => {
                 </span>
               </div>
             </div>
-            {messages.length > 0 && (
-              <Button
-                onClick={clearChat}
-                size="sm"
-                variant="ghost"
-                className="text-gray-400 hover:text-white"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            )}
+            <div className="flex items-center space-x-2">
+              {!aiUsage.isPremium && (
+                <div className="text-xs bg-gray-800 px-3 py-1 rounded-full">
+                  {aiUsage.promptCount}/3 prompts
+                </div>
+              )}
+              {messages.length > 0 && (
+                <Button
+                  onClick={clearChat}
+                  size="sm"
+                  variant="ghost"
+                  className="text-gray-400 hover:text-white"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>
