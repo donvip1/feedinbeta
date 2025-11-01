@@ -27,6 +27,7 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
@@ -45,6 +46,7 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
         name: name.trim(),
         description: description.trim(),
         is_private: isPrivate,
+        is_premium: isPremium,
         created_by: user?.id,
       });
 
@@ -58,6 +60,7 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
       setName('');
       setDescription('');
       setIsPrivate(false);
+      setIsPremium(false);
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
@@ -110,6 +113,19 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
             <Switch
               checked={isPrivate}
               onCheckedChange={setIsPrivate}
+              disabled={loading}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Premium Group</Label>
+              <p className="text-sm text-muted-foreground">
+                Only premium users can join
+              </p>
+            </div>
+            <Switch
+              checked={isPremium}
+              onCheckedChange={setIsPremium}
               disabled={loading}
             />
           </div>

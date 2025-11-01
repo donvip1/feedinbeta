@@ -181,13 +181,38 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
 
     setSending(true);
     try {
-      const { error } = await supabase.from('messages').insert({
-        conversation_id: conversationId,
-        sender_id: user.id,
-        content: newMessage.trim(),
-      });
+      const { data: newMsg, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: newMessage.trim(),
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Check message with moderation bot
+      if (newMsg) {
+        const { data: modResult } = await supabase.functions.invoke('moderation-bot', {
+          body: {
+            messageId: newMsg.id,
+            content: newMessage.trim(),
+            senderId: user.id,
+          },
+        });
+
+        if (modResult?.deleted) {
+          toast({
+            title: 'Message blocked',
+            description: modResult.reason,
+            variant: 'destructive',
+          });
+          // Reload messages to remove the deleted one
+          loadMessages();
+        }
+      }
 
       await supabase
         .from('typing_indicators')

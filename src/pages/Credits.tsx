@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Coins, Gift, TrendingUp } from "lucide-react";
+import { Coins, Gift, TrendingUp, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { BottomNav } from "@/components/navigation/BottomNav";
 
 const Credits = () => {
   const navigate = useNavigate();
@@ -77,6 +78,21 @@ const Credits = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted pb-20">
+      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-sm border-b border-border/50">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(-1)}
+              className="text-gray-400 hover:text-white"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-xl font-bold">Credits Store</h1>
+          </div>
+        </div>
+      </header>
       <div className="container mx-auto px-4 py-8">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -182,6 +198,7 @@ const Credits = () => {
           })}
         </div>
       </div>
+      <BottomNav onQuickActionClick={() => {}} />
     </div>
   );
 };
