@@ -1,4 +1,4 @@
-import { Home, MessageCircle, Plus, Users, Sparkles } from 'lucide-react';
+import { Home, MessageCircle, Plus, Users, Sparkles, UsersRound } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -12,6 +12,7 @@ export const BottomNav = ({ onQuickActionClick }: BottomNavProps) => {
 
   const navItems = [
     { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
+    { id: 'groups', label: 'Groups', icon: UsersRound, path: '/groups' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
     { id: 'friends', label: 'Friends', icon: Users, path: '/friends' },
     { id: 'ai', label: 'AI', icon: Sparkles, path: '/ai-copilot' },
@@ -48,7 +49,7 @@ export const BottomNav = ({ onQuickActionClick }: BottomNavProps) => {
             <Plus className="w-8 h-8 text-white" />
           </button>
 
-          {navItems.slice(2, 4).map((item) => {
+          {navItems.slice(2, 5).map((item) => {
             const Icon = item.icon;
             return (
               <Button

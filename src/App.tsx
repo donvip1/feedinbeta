@@ -14,6 +14,8 @@ import Call from "./pages/Call";
 import CallHistory from "./pages/CallHistory";
 import Live from "./pages/Live";
 import AICopilot from "./pages/AICopilot";
+import Groups from "./pages/Groups";
+import GroupDetail from "./pages/GroupDetail";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +37,8 @@ const App: React.FC = () => (
           <Route path="/call-history" element={<CallHistory />} />
           <Route path="/live" element={<Live />} />
           <Route path="/ai-copilot" element={<AICopilot />} />
+          <Route path="/groups" element={<Groups />} />
+          <Route path="/groups/:groupId" element={<GroupDetail />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

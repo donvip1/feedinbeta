@@ -105,6 +105,9 @@ const Feed = () => {
       case 'story':
         setShowCreateStory(true);
         break;
+      case 'group':
+        navigate('/groups');
+        break;
       case 'livestream':
         navigate('/live');
         break;
