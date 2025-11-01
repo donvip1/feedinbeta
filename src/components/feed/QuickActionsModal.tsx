@@ -1,4 +1,4 @@
-import { FileText, Image, Video, Radio, Layers, Wallet, Zap, ShoppingBag, Camera, UsersRound, Sparkles, Wand2, BookOpen } from 'lucide-react';
+import { FileText, Image, Video, Radio, Layers, Wallet, Zap, ShoppingBag, Camera, UsersRound, Sparkles, Wand2, BookOpen, X } from 'lucide-react';
 
 interface QuickActionsModalProps {
   open: boolean;
@@ -45,7 +45,14 @@ export const QuickActionsModal = ({ open, onClose, onActionSelect, context = 'de
       {/* Modal positioned above nav bar */}
       <div className="fixed bottom-20 left-0 right-0 z-50 px-4 pb-4 animate-in slide-in-from-bottom duration-300">
         <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-2xl mx-auto shadow-2xl max-h-[70vh] overflow-y-auto">
-          <div className="py-6 px-4">
+          <div className="py-6 px-4 relative">
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
             <div className="w-12 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white text-center mb-6">{title}</h2>
             
