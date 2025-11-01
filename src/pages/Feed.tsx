@@ -56,6 +56,8 @@ const Feed = () => {
   const loadPosts = async () => {
     try {
       setLoading(true);
+      
+      // Get regular posts
       let query = supabase
         .from('posts')
         .select(`
@@ -94,10 +96,45 @@ const Feed = () => {
 
       if (error) throw error;
 
-      // Randomize for "For You" tab
+      // Get refed posts for myPosts tab
+      let refedPosts: Post[] = [];
+      if (activeTab === 'myPosts' && user) {
+        const { data: refeeds } = await supabase
+          .from('refeeds')
+          .select(`
+            created_at,
+            posts!inner (
+              *,
+              profiles (
+                display_name,
+                username,
+                avatar_url
+              )
+            )
+          `)
+          .eq('refed_by_user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        if (refeeds) {
+          refedPosts = refeeds.map((r: any) => ({
+            ...r.posts,
+            is_refeed: true,
+            refeed_date: r.created_at
+          }));
+        }
+      }
+
+      // Combine and sort posts
+      const allPosts = [...(data || []), ...refedPosts];
+      
+      // Randomize for "For You" tab, otherwise sort by date
       const processed = activeTab === 'forYou' 
-        ? (data || []).sort(() => Math.random() - 0.5)
-        : (data || []);
+        ? allPosts.sort(() => Math.random() - 0.5)
+        : allPosts.sort((a, b) => {
+            const dateA = (a as any).refeed_date || a.created_at;
+            const dateB = (b as any).refeed_date || b.created_at;
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
+          });
       
       setPosts(processed);
     } catch (error: any) {

@@ -354,16 +354,14 @@ const Profile = () => {
             <Button
               onClick={hasPendingRequest ? undefined : sendFriendRequest}
               disabled={hasPendingRequest}
-              variant="outline"
-              className="flex-1 border-gray-700"
+              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white disabled:opacity-50"
             >
               <UserPlus className="w-4 h-4 mr-2" />
               {hasPendingRequest ? 'Request Sent' : 'Add Friend'}
             </Button>
             <Button
               onClick={startConversation}
-              variant="outline"
-              className="border-gray-700"
+              className="bg-gray-800 hover:bg-gray-700 text-white"
             >
               <MessageCircle className="w-4 h-4" />
             </Button>

@@ -48,12 +48,14 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [isLiking, setIsLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
+  const [isRefed, setIsRefed] = useState(false);
 
   // Check if user has liked this post and saved it
   useEffect(() => {
     if (user) {
       checkIfLiked();
       checkIfSaved();
+      checkIfRefed();
       trackView();
     }
   }, [user]);
@@ -85,6 +87,21 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       setIsSaved(!!data);
     } catch (error) {
       // Not saved or error
+    }
+  };
+
+  const checkIfRefed = async () => {
+    try {
+      const { data } = await supabase
+        .from('refeeds')
+        .select('id')
+        .eq('original_post_id', post.id)
+        .eq('refed_by_user_id', user?.id)
+        .single();
+
+      setIsRefed(!!data);
+    } catch (error) {
+      // Not refed or error
     }
   };
 
@@ -173,7 +190,44 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     }
   };
 
+  const handleRefeed = async () => {
+    if (!user) return;
+
+    try {
+      if (isRefed) {
+        // Remove refeed
+        await supabase
+          .from('refeeds')
+          .delete()
+          .eq('original_post_id', post.id)
+          .eq('refed_by_user_id', user.id);
+        setIsRefed(false);
+        toast({ title: 'ReFEED removed' });
+      } else {
+        // Add refeed
+        await supabase.from('refeeds').insert({
+          original_post_id: post.id,
+          refed_by_user_id: user.id,
+        });
+        setIsRefed(true);
+        toast({ title: 'Post ReFEEDed to your profile!' });
+      }
+      onUpdate();
+    } catch (error: any) {
+      toast({
+        title: 'Unable to ReFEED',
+        description: 'Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleShare = async (platform: string) => {
+    if (platform === 'refeed') {
+      handleRefeed();
+      return;
+    }
+
     const shareUrl = `${window.location.origin}/post/${post.id}`;
     const shareText = `Check out this post on FeedIn: ${post.content?.substring(0, 100) || ''}`;
 
@@ -354,21 +408,24 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                 <span className="text-white text-[10px] font-bold">Share</span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-gray-800 border-gray-700" align="end">
-              <DropdownMenuItem onClick={() => handleShare('whatsapp')} className="text-white hover:bg-gray-700">
+            <DropdownMenuContent className="bg-gray-800/60 backdrop-blur-md border-gray-700" align="end">
+              <DropdownMenuItem onClick={() => handleShare('refeed')} className="text-white hover:bg-gray-700/80">
+                {isRefed ? '✓ ReFEEDed' : '🔄 ReFEED Post'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('whatsapp')} className="text-white hover:bg-gray-700/80">
                 Share to WhatsApp
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShare('facebook')} className="text-white hover:bg-gray-700">
+              <DropdownMenuItem onClick={() => handleShare('facebook')} className="text-white hover:bg-gray-700/80">
                 Share to Facebook
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShare('twitter')} className="text-white hover:bg-gray-700">
+              <DropdownMenuItem onClick={() => handleShare('twitter')} className="text-white hover:bg-gray-700/80">
                 Share to Twitter
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShare('copy')} className="text-white hover:bg-gray-700">
+              <DropdownMenuItem onClick={() => handleShare('copy')} className="text-white hover:bg-gray-700/80">
                 Copy Link
               </DropdownMenuItem>
               {post.media_url && (
-                <DropdownMenuItem onClick={() => handleShare('download')} className="text-white hover:bg-gray-700">
+                <DropdownMenuItem onClick={() => handleShare('download')} className="text-white hover:bg-gray-700/80">
                   Download Media
                 </DropdownMenuItem>
               )}

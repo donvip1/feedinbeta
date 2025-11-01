@@ -1617,6 +1617,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           post_type: string | null
+          refeeds_count: number | null
           shares_count: number | null
           status: string | null
           updated_at: string | null
@@ -1633,6 +1634,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           post_type?: string | null
+          refeeds_count?: number | null
           shares_count?: number | null
           status?: string | null
           updated_at?: string | null
@@ -1649,6 +1651,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           post_type?: string | null
+          refeeds_count?: number | null
           shares_count?: number | null
           status?: string | null
           updated_at?: string | null
@@ -1754,6 +1757,35 @@ export type Database = {
           username?: string | null
         }
         Relationships: []
+      }
+      refeeds: {
+        Row: {
+          created_at: string
+          id: string
+          original_post_id: string
+          refed_by_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          original_post_id: string
+          refed_by_user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          original_post_id?: string
+          refed_by_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refeeds_original_post_id_fkey"
+            columns: ["original_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_posts: {
         Row: {
