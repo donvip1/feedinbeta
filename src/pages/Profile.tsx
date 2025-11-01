@@ -6,9 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
-import { ArrowLeft, UserPlus, MessageCircle } from 'lucide-react';
+import { ArrowLeft, UserPlus, MessageCircle, Settings } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -299,7 +298,7 @@ const Profile = () => {
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-lg border-b border-gray-800">
-        <div className="container mx-auto px-4 py-3">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Button
             onClick={() => navigate(-1)}
             variant="ghost"
@@ -308,6 +307,17 @@ const Profile = () => {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
+          
+          {isOwnProfile && (
+            <Button
+              onClick={() => navigate('/settings')}
+              variant="ghost"
+              size="icon"
+              className="text-gray-400 hover:text-white"
+            >
+              <Settings className="w-5 h-5" />
+            </Button>
+          )}
         </div>
       </header>
 
@@ -368,55 +378,18 @@ const Profile = () => {
           </div>
         )}
 
-        {/* Posts Tabs */}
-        <Tabs defaultValue="posts" className="w-full">
-          <TabsList className="w-full bg-gray-900">
-            <TabsTrigger value="posts" className="flex-1">
-              Posts
-            </TabsTrigger>
-            <TabsTrigger value="media" className="flex-1">
-              Media
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="posts" className="mt-6 space-y-6">
-            {posts.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-400">No posts yet</p>
-              </div>
-            ) : (
-              posts.map((post) => (
-                <PostCard key={post.id} post={post} onUpdate={loadPosts} />
-              ))
-            )}
-          </TabsContent>
-
-          <TabsContent value="media" className="mt-6">
-            <div className="grid grid-cols-3 gap-2">
-              {posts
-                .filter((post) => post.media_url)
-                .map((post) => (
-                  <div
-                    key={post.id}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-80"
-                  >
-                    {post.media_type === 'image' ? (
-                      <img
-                        src={post.media_url || ''}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <video
-                        src={post.media_url || ''}
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                  </div>
-                ))}
+        {/* Posts Section */}
+        <div className="mt-6 space-y-6">
+          {posts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400">No posts yet</p>
             </div>
-          </TabsContent>
-        </Tabs>
+          ) : (
+            posts.map((post) => (
+              <PostCard key={post.id} post={post} onUpdate={loadPosts} />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

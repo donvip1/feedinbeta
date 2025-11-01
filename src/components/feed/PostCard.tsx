@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
@@ -16,6 +16,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface PostCardProps {
   post: {
@@ -49,6 +59,32 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [showComments, setShowComments] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
   const [isRefed, setIsRefed] = useState(false);
+  const [hasViewed, setHasViewed] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const viewStartTimeRef = useRef<number>(Date.now());
+
+  // Check if user is admin
+  useEffect(() => {
+    if (user) {
+      checkAdminStatus();
+    }
+  }, [user]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id)
+        .single();
+      
+      setIsAdmin(data?.role === 'admin' || data?.role === 'moderator');
+    } catch (error) {
+      // Not admin
+    }
+  };
 
   // Check if user has liked this post and saved it
   useEffect(() => {
@@ -56,8 +92,15 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       checkIfLiked();
       checkIfSaved();
       checkIfRefed();
-      trackView();
+      checkIfViewed();
+      startViewTimer();
     }
+
+    return () => {
+      if (viewTimerRef.current) {
+        clearTimeout(viewTimerRef.current);
+      }
+    };
   }, [user]);
 
   const checkIfLiked = async () => {
@@ -105,14 +148,45 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     }
   };
 
-  const trackView = async () => {
+  const checkIfViewed = async () => {
+    try {
+      const { data } = await supabase
+        .from('post_views')
+        .select('id')
+        .eq('post_id', post.id)
+        .eq('user_id', user?.id)
+        .single();
+
+      setHasViewed(!!data);
+    } catch (error) {
+      // Not viewed or error
+    }
+  };
+
+  const startViewTimer = () => {
+    if (hasViewed) return; // Already viewed this post
+
+    viewStartTimeRef.current = Date.now();
+    
+    // Set timer for 5 seconds
+    viewTimerRef.current = setTimeout(async () => {
+      await trackView(5);
+    }, 5000);
+  };
+
+  const trackView = async (duration: number = 0, engaged: boolean = false) => {
+    if (hasViewed) return; // Don't track duplicate views
+
     try {
       await supabase.from('post_views').insert({
         post_id: post.id,
         user_id: user?.id,
+        view_duration: duration,
+        engaged: engaged,
       });
+      setHasViewed(true);
     } catch (error) {
-      // View tracking is non-critical
+      // View tracking is non-critical, ignore unique constraint errors
     }
   };
 
@@ -126,6 +200,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     // Optimistic update
     setIsLiked(newIsLiked);
     setLocalLikesCount(newLikesCount);
+
+    // Track as engaged view
+    if (!hasViewed) {
+      const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
+      await trackView(elapsed, true);
+      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
+    }
 
     try {
       if (newIsLiked) {
@@ -193,6 +274,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const handleRefeed = async () => {
     if (!user) return;
 
+    // Track as engaged view
+    if (!hasViewed) {
+      const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
+      await trackView(elapsed, true);
+      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
+    }
+
     try {
       if (isRefed) {
         // Remove refeed
@@ -226,6 +314,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     if (platform === 'refeed') {
       handleRefeed();
       return;
+    }
+
+    // Track as engaged view when sharing
+    if (!hasViewed) {
+      const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
+      await trackView(elapsed, true);
+      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
     }
 
     const shareUrl = `${window.location.origin}/post/${post.id}`;
@@ -264,6 +359,27 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       toast({
         title: 'Error sharing',
         description: 'Failed to share post',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .update({ status: 'deleted' })
+        .eq('id', post.id);
+
+      if (error) throw error;
+
+      toast({ title: 'Post deleted successfully' });
+      setShowDeleteDialog(false);
+      onUpdate();
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting post',
+        description: error.message,
         variant: 'destructive',
       });
     }
@@ -311,6 +427,30 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                 )}
               </div>
             </div>
+            
+            {/* Delete Button for Post Owner or Admin */}
+            {(user?.id === post.user_id || isAdmin) && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-white hover:bg-white/20"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="bg-gray-800/60 backdrop-blur-md border-gray-700" align="end">
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-red-400 hover:bg-gray-700/80 hover:text-red-300"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Post
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
 
@@ -389,7 +529,15 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
           {/* Comment Button */}
           <button
-            onClick={() => setShowComments(true)}
+            onClick={() => {
+              setShowComments(true);
+              // Track as engaged view when commenting
+              if (!hasViewed) {
+                const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
+                trackView(elapsed, true);
+                if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
+              }
+            }}
             className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
           >
             <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
@@ -472,6 +620,29 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         onClose={() => setShowProfilePreview(false)}
         userId={post.user_id}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="bg-gray-900 border-gray-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Delete Post?</AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-400">
+              This will permanently delete this post. All likes, comments, views, and shares will be lost. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-gray-800 text-white hover:bg-gray-700 border-gray-700">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 text-white hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
