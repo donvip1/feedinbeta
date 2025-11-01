@@ -67,7 +67,7 @@ const Profile = () => {
 
   const deductProfileViewCredits = async () => {
     try {
-      await supabase.functions.invoke('credit-deduction', {
+      const { error } = await supabase.functions.invoke('credit-deduction', {
         body: {
           action: 'profile_view',
           userId: user?.id,
@@ -75,9 +75,14 @@ const Profile = () => {
           metadata: { username: profile?.username },
         },
       });
+      
+      // Check for specific error and handle gracefully
+      if (error) {
+        console.log('Credit deduction skipped:', error);
+      }
     } catch (error) {
       // Silent fail - don't block profile viewing
-      console.error('Credit deduction error:', error);
+      console.log('Credit deduction error:', error);
     }
   };
 
