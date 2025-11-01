@@ -13,7 +13,7 @@ import { StoriesBar } from '@/components/stories/StoriesBar';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { LogOut, MessageSquare, Settings as SettingsIcon, RefreshCw, Wallet } from 'lucide-react';
+import { LogOut, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -185,22 +185,7 @@ const Feed = () => {
       <header className="sticky top-0 z-50 bg-gradient-to-r from-purple-900/80 to-blue-900/80 backdrop-blur-lg border-b border-gray-800">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button
-                onClick={() => navigate('/wallet')}
-                variant="ghost"
-                size="sm"
-                className="text-white hover:bg-white/10"
-              >
-                <Wallet className="w-4 h-4 mr-2" />
-                <div className="text-left">
-                  <p className="text-xs text-gray-300">Credits</p>
-                  <p className="text-sm font-bold">999,999</p>
-                </div>
-              </Button>
-            </div>
-
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 max-w-md mx-4">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 max-w-md">
               <TabsList className="grid w-full grid-cols-3 bg-transparent">
                 <TabsTrigger
                   value="following"
@@ -224,15 +209,6 @@ const Feed = () => {
             </Tabs>
 
             <div className="flex items-center space-x-2">
-              <Button
-                onClick={handleRefresh}
-                size="sm"
-                variant="ghost"
-                className="text-white hover:bg-white/10"
-                disabled={refreshing}
-              >
-                <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              </Button>
               <NotificationBell />
               <Button
                 onClick={() => navigate(`/profile/${user?.id}`)}
@@ -252,17 +228,17 @@ const Feed = () => {
         </div>
       </header>
 
-      {/* Stories */}
-      <div className="border-b border-gray-800">
+      {/* Stories - Sticky below header */}
+      <div className="sticky top-[57px] z-40 bg-black border-b border-gray-800">
         <div className="container mx-auto max-w-2xl">
           <StoriesBar />
         </div>
       </div>
 
-      {/* Feed */}
-      <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">{/* Added pb-24 for bottom nav space */}
+      {/* Feed with TikTok-style scrolling */}
+      <main className="h-[calc(100vh-57px-80px)] overflow-y-scroll snap-y snap-mandatory scroll-smooth">
         {loading ? (
-          <div className="space-y-6">
+          <div className="space-y-6 p-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-gray-900 rounded-2xl p-6 space-y-4">
                 <div className="flex items-center space-x-3">
@@ -281,21 +257,27 @@ const Feed = () => {
             ))}
           </div>
         ) : posts.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-gray-400 text-lg mb-4">No posts yet</p>
-            <Button
-              onClick={() => setShowQuickActions(true)}
-              className="bg-gradient-to-r from-pink-500 to-blue-500"
-            >
-              Create the first post
-            </Button>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-gray-400 text-lg mb-4">No posts yet</p>
+              <Button
+                onClick={() => setShowQuickActions(true)}
+                className="bg-gradient-to-r from-pink-500 to-blue-500"
+              >
+                Create the first post
+              </Button>
+            </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <>
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} onUpdate={() => loadPosts(false)} />
+              <div key={post.id} className="snap-start min-h-[calc(100vh-57px-80px)] flex items-center justify-center p-4">
+                <div className="w-full max-w-2xl">
+                  <PostCard post={post} onUpdate={() => loadPosts(false)} />
+                </div>
+              </div>
             ))}
-          </div>
+          </>
         )}
       </main>
 
