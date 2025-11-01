@@ -52,10 +52,12 @@ serve(async (req) => {
       type: type,
     };
 
+    let actualPriceId = priceId;
+
     if (type === 'subscription') {
       const { data: tier, error: tierError } = await supabaseClient
         .from('subscription_tiers')
-        .select('id, stripe_price_id, name, price')
+        .select('id, stripe_price_id, name, price, interval')
         .eq('stripe_price_id', priceId)
         .eq('is_active', true)
         .single();
@@ -63,6 +65,44 @@ serve(async (req) => {
       if (tierError || !tier) {
         console.error('Invalid subscription price ID:', priceId, tierError);
         throw new Error('Invalid subscription plan');
+      }
+
+      // Check if this is a temp price ID and create real Stripe product/price
+      if (priceId.includes('_temp')) {
+        console.log('Creating real Stripe product for:', tier.name);
+        
+        // Create product
+        const product = await stripe.products.create({
+          name: `FeedIn ${tier.name} Subscription`,
+          description: `${tier.name} tier subscription for FeedIn`,
+          metadata: {
+            tier_id: tier.id,
+            tier_name: tier.name,
+          },
+        });
+
+        // Create price
+        const price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: Math.round(tier.price * 100), // Convert to cents
+          currency: 'usd',
+          recurring: {
+            interval: tier.interval as 'month' | 'year',
+          },
+          metadata: {
+            tier_id: tier.id,
+          },
+        });
+
+        actualPriceId = price.id;
+
+        // Update database with real Stripe price ID
+        await supabaseClient
+          .from('subscription_tiers')
+          .update({ stripe_price_id: price.id })
+          .eq('id', tier.id);
+
+        console.log('Created Stripe price:', price.id);
       }
 
       metadata.tier_id = tier.id;
@@ -79,6 +119,44 @@ serve(async (req) => {
       if (packageError || !package_) {
         console.error('Invalid credit package price ID:', priceId, packageError);
         throw new Error('Invalid credit package');
+      }
+
+      // Check if this is a temp price ID and create real Stripe product/price
+      if (priceId.includes('_temp')) {
+        console.log('Creating real Stripe product for:', package_.name);
+        
+        const totalCredits = package_.credits + (package_.bonus_credits || 0);
+        
+        // Create product
+        const product = await stripe.products.create({
+          name: package_.name,
+          description: `${totalCredits} FeedIn credits`,
+          metadata: {
+            package_id: package_.id,
+            credits: totalCredits.toString(),
+          },
+        });
+
+        // Create price
+        const price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: Math.round(package_.price * 100), // Convert to cents
+          currency: 'usd',
+          metadata: {
+            package_id: package_.id,
+            credits: totalCredits.toString(),
+          },
+        });
+
+        actualPriceId = price.id;
+
+        // Update database with real Stripe price ID
+        await supabaseClient
+          .from('credit_packages')
+          .update({ stripe_price_id: price.id })
+          .eq('id', package_.id);
+
+        console.log('Created Stripe price:', price.id);
       }
 
       const totalCredits = package_.credits + (package_.bonus_credits || 0);
@@ -117,7 +195,7 @@ serve(async (req) => {
       customer: customerId,
       line_items: [
         {
-          price: priceId,
+          price: actualPriceId,
           quantity: 1,
         },
       ],
