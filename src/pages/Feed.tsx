@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
@@ -12,7 +13,8 @@ import { StoriesBar } from '@/components/stories/StoriesBar';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { LogOut, MessageSquare, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
+import { LogOut, MessageSquare, Settings as SettingsIcon, RefreshCw, Wallet } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 interface Post {
@@ -44,6 +46,7 @@ const Feed = () => {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showCreateStory, setShowCreateStory] = useState(false);
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
+  const [activeTab, setActiveTab] = useState('for-you');
 
   useEffect(() => {
     if (authLoading) return; // Wait for auth to load
@@ -55,60 +58,57 @@ const Feed = () => {
     loadPosts();
   }, [user, authLoading, navigate]);
 
-  const loadPosts = async (isRefresh = false) => {
+  const loadPosts = async (isRefresh = false, tab = activeTab) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
       }
 
-      // Try to use personalized feed function
-      const { data: personalizedData, error: rpcError } = await supabase
-        .rpc('get_personalized_feed', {
-          p_user_id: user?.id,
-          p_limit: 20,
-          p_offset: 0
-        });
+      let query = supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles (
+            display_name,
+            username,
+            avatar_url
+          )
+        `)
+        .eq('status', 'active');
 
-      if (rpcError) {
-        console.warn('Personalized feed error, falling back to standard feed:', rpcError);
-        // Fallback to standard feed with random ordering
-        const { data, error } = await supabase
-          .from('posts')
-          .select(`
-            *,
-            profiles (
-              display_name,
-              username,
-              avatar_url
-            )
-          `)
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(20);
+      // Filter based on active tab
+      if (tab === 'following') {
+        // Get users that current user follows
+        const { data: followingData } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user?.id);
 
-        if (error) throw error;
-        
-        // Add some randomization to standard feed
+        const followingIds = followingData?.map(f => f.following_id) || [];
+        if (followingIds.length > 0) {
+          query = query.in('user_id', followingIds);
+        } else {
+          setPosts([]);
+          setLoading(false);
+          setRefreshing(false);
+          return;
+        }
+      } else if (tab === 'my-posts') {
+        query = query.eq('user_id', user?.id);
+      }
+
+      query = query.order('created_at', { ascending: false }).limit(20);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // For "For You" tab, add some randomization
+      if (tab === 'for-you') {
         const shuffled = (data || []).sort(() => Math.random() - 0.5);
         setPosts(shuffled);
       } else {
-        // Fetch profiles for personalized posts
-        const postsWithProfiles = await Promise.all(
-          (personalizedData || []).map(async (post: any) => {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('display_name, username, avatar_url')
-              .eq('id', post.user_id)
-              .single();
-            
-            return {
-              ...post,
-              profiles: profile
-            };
-          })
-        );
-        
-        setPosts(postsWithProfiles);
+        setPosts(data || []);
       }
     } catch (error: any) {
       toast({
@@ -128,7 +128,12 @@ const Feed = () => {
   };
 
   const handleRefresh = () => {
-    loadPosts(true);
+    loadPosts(true, activeTab);
+  };
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    loadPosts(false, tab);
   };
 
   const handleQuickAction = (action: string) => {
@@ -177,60 +182,70 @@ const Feed = () => {
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-lg border-b border-gray-800">
+      <header className="sticky top-0 z-50 bg-gradient-to-r from-purple-900/80 to-blue-900/80 backdrop-blur-lg border-b border-gray-800">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <img src={feedinLogo} alt="FEEDIN" className="w-10 h-10" />
-              <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                FEEDIN
-              </span>
+              <Button
+                onClick={() => navigate('/wallet')}
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/10"
+              >
+                <Wallet className="w-4 h-4 mr-2" />
+                <div className="text-left">
+                  <p className="text-xs text-gray-300">Credits</p>
+                  <p className="text-sm font-bold">999,999</p>
+                </div>
+              </Button>
             </div>
+
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 max-w-md mx-4">
+              <TabsList className="grid w-full grid-cols-3 bg-transparent">
+                <TabsTrigger
+                  value="following"
+                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
+                >
+                  Following
+                </TabsTrigger>
+                <TabsTrigger
+                  value="for-you"
+                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
+                >
+                  For You
+                </TabsTrigger>
+                <TabsTrigger
+                  value="my-posts"
+                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
+                >
+                  My Posts
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
             <div className="flex items-center space-x-2">
               <Button
                 onClick={handleRefresh}
                 size="sm"
                 variant="ghost"
-                className="text-gray-400 hover:text-white"
+                className="text-white hover:bg-white/10"
                 disabled={refreshing}
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               </Button>
               <NotificationBell />
               <Button
-                onClick={() => navigate('/messages')}
-                size="sm"
-                variant="ghost"
-                className="text-gray-400 hover:text-white"
-              >
-                <MessageSquare className="w-4 h-4" />
-              </Button>
-              <Button
                 onClick={() => navigate(`/profile/${user?.id}`)}
                 size="sm"
                 variant="ghost"
-                className="text-gray-400 hover:text-white"
+                className="text-white hover:bg-white/10 p-1"
               >
-                <img
-                  src={user?.user_metadata?.avatar_url || ''}
-                  alt="Profile"
-                  className="w-6 h-6 rounded-full"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                  }}
-                />
-                <div className="w-6 h-6 rounded-full bg-gray-700 hidden flex items-center justify-center text-xs">
-                  {user?.user_metadata?.display_name?.[0] || 'U'}
-                </div>
-              </Button>
-              <Button
-                onClick={() => navigate('/settings')}
-                size="sm"
-                variant="ghost"
-                className="text-gray-400 hover:text-white"
-              >
-                <SettingsIcon className="w-4 h-4" />
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={user?.user_metadata?.avatar_url || ''} />
+                  <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
+                    {user?.user_metadata?.display_name?.[0] || 'U'}
+                  </AvatarFallback>
+                </Avatar>
               </Button>
             </div>
           </div>

@@ -5,9 +5,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
+import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface PostCardProps {
   post: {
@@ -37,6 +44,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [localLikesCount, setLocalLikesCount] = useState(post.likes_count);
   const [isLiking, setIsLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [showProfilePreview, setShowProfilePreview] = useState(false);
 
   // Check if user has liked this post
   useEffect(() => {
@@ -113,6 +121,48 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     }
   };
 
+  const handleShare = async (platform: string) => {
+    const shareUrl = `${window.location.origin}/post/${post.id}`;
+    const shareText = `Check out this post on FeedIn: ${post.content?.substring(0, 100) || ''}`;
+
+    try {
+      if (platform === 'copy') {
+        await navigator.clipboard.writeText(shareUrl);
+        toast({ title: 'Link copied to clipboard' });
+      } else if (platform === 'download' && post.media_url) {
+        // Download with watermark
+        const response = await fetch(post.media_url);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `feedin-${post.feed_id}.${post.media_type === 'video' ? 'mp4' : 'jpg'}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        toast({ title: 'Media downloaded' });
+      } else {
+        // Share to social platforms
+        const urls: Record<string, string> = {
+          whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
+          facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+          twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
+        };
+
+        if (urls[platform]) {
+          window.open(urls[platform], '_blank');
+        }
+      }
+    } catch (error) {
+      toast({
+        title: 'Error sharing',
+        description: 'Failed to share post',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
 
@@ -121,14 +171,22 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       <div className="p-6">
         {/* Header */}
         <div className="flex items-center space-x-3 mb-4">
-          <Avatar className="w-12 h-12">
+          <Avatar 
+            className="w-12 h-12 cursor-pointer" 
+            onClick={() => setShowProfilePreview(true)}
+          >
             <AvatarImage src={post.profiles?.avatar_url || ''} />
             <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">
               {displayName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <p className="font-semibold text-white">{displayName}</p>
+          <div className="flex-1">
+            <p 
+              className="font-semibold text-white cursor-pointer hover:underline"
+              onClick={() => setShowProfilePreview(true)}
+            >
+              {displayName}
+            </p>
             <div className="flex items-center space-x-2 text-sm text-gray-400">
               <span>{timeAgo}</span>
               <span>•</span>
@@ -187,6 +245,37 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             <span>{post.comments_count}</span>
           </Button>
 
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="flex items-center space-x-2 text-gray-400 hover:text-blue-500"
+              >
+                <Share2 className="w-5 h-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="bg-gray-800 border-gray-700">
+              <DropdownMenuItem onClick={() => handleShare('whatsapp')} className="text-white hover:bg-gray-700">
+                Share to WhatsApp
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('facebook')} className="text-white hover:bg-gray-700">
+                Share to Facebook
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('twitter')} className="text-white hover:bg-gray-700">
+                Share to Twitter
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('copy')} className="text-white hover:bg-gray-700">
+                Copy Link
+              </DropdownMenuItem>
+              {post.media_url && (
+                <DropdownMenuItem onClick={() => handleShare('download')} className="text-white hover:bg-gray-700">
+                  Download Media
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <div className="flex items-center space-x-2 text-gray-400 ml-auto">
             <Eye className="w-5 h-5" />
             <span className="text-sm">{post.views_count}</span>
@@ -203,6 +292,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         }}
         postId={post.id}
         postOwnerId={post.user_id}
+      />
+
+      {/* Profile Preview Modal */}
+      <ProfilePreviewModal
+        open={showProfilePreview}
+        onClose={() => setShowProfilePreview(false)}
+        userId={post.user_id}
       />
     </Card>
   );
