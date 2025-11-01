@@ -1,12 +1,14 @@
-import { FileText, Image, Video, Radio, Layers, Wallet, Zap, ShoppingBag, Camera, UsersRound } from 'lucide-react';
+import { FileText, Image, Video, Radio, Layers, Wallet, Zap, ShoppingBag, Camera, UsersRound, Sparkles, Wand2, BookOpen } from 'lucide-react';
 
 interface QuickActionsModalProps {
   open: boolean;
   onClose: () => void;
   onActionSelect: (action: string) => void;
+  context?: 'feed' | 'ai' | 'default';
 }
 
-const quickActions = [
+// Feed context actions
+const feedActions = [
   { id: 'thoughts', label: 'Share Thoughts', icon: FileText, color: 'from-blue-500 to-blue-600' },
   { id: 'photo', label: 'Share Photo', icon: Image, color: 'from-purple-500 to-pink-500' },
   { id: 'video', label: 'Share Video', icon: Video, color: 'from-orange-500 to-red-500' },
@@ -19,26 +21,42 @@ const quickActions = [
   { id: 'marketplace', label: 'Marketplace', icon: ShoppingBag, color: 'from-green-500 to-emerald-600' },
 ];
 
-export const QuickActionsModal = ({ open, onClose, onActionSelect }: QuickActionsModalProps) => {
+// AI context actions
+const aiActions = [
+  { id: 'ai-enhance-good', label: 'Enhance Image (Good)', icon: Sparkles, color: 'from-blue-500 to-blue-600' },
+  { id: 'ai-enhance-better', label: 'Enhance Image (Better)', icon: Sparkles, color: 'from-purple-500 to-pink-500' },
+  { id: 'ai-enhance-ultra', label: 'Enhance Image (Ultra)', icon: Sparkles, color: 'from-orange-500 to-red-500' },
+  { id: 'ai-generate', label: 'Generate Image', icon: Wand2, color: 'from-pink-500 to-purple-500' },
+  { id: 'ai-write-project', label: 'Write Project', icon: BookOpen, color: 'from-indigo-500 to-purple-600' },
+  { id: 'ai-write-thesis', label: 'Write Thesis', icon: BookOpen, color: 'from-red-500 to-pink-600' },
+  { id: 'ai-video', label: 'Create Video', icon: Video, color: 'from-teal-500 to-cyan-500' },
+  { id: 'ai-help', label: 'App Help', icon: Zap, color: 'from-yellow-500 to-orange-500' },
+];
+
+export const QuickActionsModal = ({ open, onClose, onActionSelect, context = 'default' }: QuickActionsModalProps) => {
   if (!open) return null;
+
+  // Select actions based on context
+  const actions = context === 'ai' ? aiActions : feedActions;
+  const title = context === 'ai' ? 'AI Tools' : 'Quick Actions';
 
   return (
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/50 z-40 transition-opacity"
+        className="fixed inset-0 bg-black/50 z-40 transition-opacity animate-in fade-in"
         onClick={onClose}
       />
       
       {/* Modal positioned above nav bar */}
-      <div className="fixed bottom-20 left-0 right-0 z-50 px-4 pb-4">
+      <div className="fixed bottom-20 left-0 right-0 z-50 px-4 pb-4 animate-in slide-in-from-bottom duration-300">
         <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-2xl mx-auto shadow-2xl max-h-[70vh] overflow-y-auto">
           <div className="py-6 px-4">
             <div className="w-12 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white text-center mb-6">Quick Actions</h2>
+            <h2 className="text-2xl font-bold text-white text-center mb-6">{title}</h2>
             
             <div className="grid grid-cols-2 gap-4">
-              {quickActions.map((action) => {
+              {actions.map((action) => {
                 const Icon = action.icon;
                 return (
                   <button
@@ -47,12 +65,12 @@ export const QuickActionsModal = ({ open, onClose, onActionSelect }: QuickAction
                       onActionSelect(action.id);
                       onClose();
                     }}
-                    className="bg-gray-800/50 hover:bg-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center space-y-3 transition-all hover:scale-105"
+                    className="bg-gray-800/50 hover:bg-gray-800 rounded-2xl p-6 flex flex-col items-center justify-center space-y-3 transition-all hover:scale-105 active:scale-95"
                   >
-                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center`}>
+                    <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg`}>
                       <Icon className="w-8 h-8 text-white" />
                     </div>
-                    <span className="text-white font-medium">{action.label}</span>
+                    <span className="text-white font-medium text-center text-sm">{action.label}</span>
                   </button>
                 );
               })}

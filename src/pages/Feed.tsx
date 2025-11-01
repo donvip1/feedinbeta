@@ -243,7 +243,7 @@ const Feed = () => {
       />
 
       {/* Bottom Navigation */}
-      <BottomNav onQuickActionClick={() => setShowQuickActions(true)} />
+      <BottomNav onQuickActionClick={() => setShowQuickActions(true)} currentPage="feed" />
     </div>
   );
 };

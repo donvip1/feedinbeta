@@ -29,6 +29,7 @@ import BlockedUsers from "./pages/BlockedUsers";
 import P2PMarketplace from "./pages/P2PMarketplace";
 import InitializeGroups from "./pages/InitializeGroups";
 import Trending from "./pages/Trending";
+import Wallet from "./pages/Wallet";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +66,7 @@ const App: React.FC = () => (
           <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
           <Route path="/initialize-groups" element={<InitializeGroups />} />
           <Route path="/trending" element={<Trending />} />
+          <Route path="/wallet" element={<Wallet />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

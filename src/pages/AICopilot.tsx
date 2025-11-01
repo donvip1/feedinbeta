@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { ArrowLeft, Send, Sparkles, Loader2, Trash2 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -24,6 +25,7 @@ const AICopilot = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [aiUsage, setAiUsage] = useState({ promptCount: 0, imageCount: 0, isPremium: false });
+  const [showQuickActions, setShowQuickActions] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -332,7 +334,7 @@ const AICopilot = () => {
               <p className="text-gray-400 mb-6 max-w-md mx-auto">
                 Ask me anything! I can help you with questions, provide insights, or just chat.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl mx-auto mb-6">
                 {[
                   'What can you help me with?',
                   'Tell me about FEEDIN features',
@@ -348,6 +350,13 @@ const AICopilot = () => {
                   </button>
                 ))}
               </div>
+              <Button
+                onClick={() => setShowQuickActions(true)}
+                className="bg-gradient-to-r from-blue-500 to-purple-600"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI Tools
+              </Button>
             </div>
           ) : (
             messages.map((msg, i) => (
@@ -420,7 +429,20 @@ const AICopilot = () => {
         </div>
       </div>
 
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav onQuickActionClick={() => setShowQuickActions(true)} currentPage="ai" />
+
+      {/* AI Tools Modal */}
+      <QuickActionsModal
+        open={showQuickActions}
+        onClose={() => setShowQuickActions(false)}
+        onActionSelect={(action) => {
+          toast({
+            title: 'AI Feature',
+            description: `${action} - Coming Soon! This feature will allow advanced AI operations.`,
+          });
+        }}
+        context="ai"
+      />
     </div>
   );
 };

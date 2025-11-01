@@ -4,9 +4,10 @@ import { Button } from '@/components/ui/button';
 
 interface BottomNavProps {
   onQuickActionClick?: () => void;
+  currentPage?: 'feed' | 'ai' | 'default';
 }
 
-export const BottomNav = ({ onQuickActionClick = () => {} }: BottomNavProps) => {
+export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default' }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
