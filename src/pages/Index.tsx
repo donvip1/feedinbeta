@@ -144,17 +144,18 @@ const Index = () => {
       <main className="container mx-auto px-4 py-20">
         <div className="text-center max-w-4xl mx-auto animate-fade-in">
           <h1 className="text-5xl font-bold mb-6 bg-gradient-primary bg-clip-text text-transparent">
-            Welcome to FEEDIN Dashboard
+            Welcome to FEEDIN
           </h1>
           <p className="text-xl text-muted-foreground mb-8">
-            Your social media intelligence platform is ready. Start tracking conversations and
-            analyzing trends.
+            Your feed is ready. Start creating and sharing posts!
           </p>
-          <div className="p-8 rounded-lg bg-card border border-border shadow-elegant">
-            <p className="text-muted-foreground">
-              Dashboard features coming in Phase 2...
-            </p>
-          </div>
+          <Button
+            onClick={() => navigate('/feed')}
+            size="lg"
+            className="bg-gradient-primary hover:shadow-glow text-lg px-8 py-6"
+          >
+            Go to Feed
+          </Button>
         </div>
       </main>
     </div>
