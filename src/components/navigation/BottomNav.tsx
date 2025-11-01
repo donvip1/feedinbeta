@@ -3,10 +3,10 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 interface BottomNavProps {
-  onQuickActionClick: () => void;
+  onQuickActionClick?: () => void;
 }
 
-export const BottomNav = ({ onQuickActionClick }: BottomNavProps) => {
+export const BottomNav = ({ onQuickActionClick = () => {} }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
