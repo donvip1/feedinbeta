@@ -20,6 +20,7 @@ import GroupDetail from "./pages/GroupDetail";
 import Subscription from "./pages/Subscription";
 import Credits from "./pages/Credits";
 import SavedPosts from "./pages/SavedPosts";
+import Promote from "./pages/Promote";
 import Moderation from "./pages/Moderation";
 import Settings from "./pages/Settings";
 import AccountSettings from "./pages/AccountSettings";
@@ -57,6 +58,7 @@ const App: React.FC = () => (
           <Route path="/subscription" element={<Subscription />} />
           <Route path="/credits" element={<Credits />} />
           <Route path="/saved" element={<SavedPosts />} />
+          <Route path="/promote/:postId" element={<Promote />} />
           <Route path="/moderation" element={<Moderation />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/settings/account" element={<AccountSettings />} />

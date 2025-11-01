@@ -197,7 +197,7 @@ const Feed = () => {
       </header>
 
       {/* Full-screen TikTok-style Feed */}
-      <main className="h-screen overflow-y-scroll snap-y snap-mandatory scroll-smooth pt-14 pb-16">
+      <main className="fixed inset-0 top-14 bottom-16 overflow-y-auto snap-y snap-mandatory scroll-smooth">
         {loading ? (
           <div className="space-y-6 p-4">
             {[1, 2, 3].map((i) => (
@@ -226,8 +226,11 @@ const Feed = () => {
         ) : (
           <>
             {posts.map((post) => (
-              <div key={post.id} className="snap-start h-[calc(100vh-7rem)] flex items-center justify-center px-4 py-4">
-                <div className="w-full max-w-2xl h-full flex items-center">
+              <div 
+                key={post.id} 
+                className="snap-start snap-always h-full w-full flex items-center justify-center px-4 py-4"
+              >
+                <div className="w-full h-full max-w-2xl">
                   <PostCard post={post} onUpdate={loadPosts} />
                 </div>
               </div>
