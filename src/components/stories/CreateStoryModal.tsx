@@ -102,7 +102,7 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="bg-background border-border max-w-md">
+      <DialogContent className="bg-background border-border max-w-md max-h-[85vh] overflow-y-auto my-8">
         <DialogHeader>
           <DialogTitle>Create Story</DialogTitle>
         </DialogHeader>

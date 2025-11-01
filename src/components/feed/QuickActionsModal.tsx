@@ -21,10 +21,10 @@ const quickActions = [
 export const QuickActionsModal = ({ open, onClose, onActionSelect }: QuickActionsModalProps) => {
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl">
-        <div className="py-6">
-          <div className="w-12 h-1 bg-gray-700 rounded-full mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-white text-center mb-8">Quick Actions</h2>
+      <DialogContent className="bg-gray-900 border-gray-800 max-w-2xl max-h-[85vh] overflow-y-auto my-8">
+        <div className="py-4">
+          <div className="w-12 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-white text-center mb-6">Quick Actions</h2>
           
           <div className="grid grid-cols-2 gap-4">
             {quickActions.map((action) => {

@@ -129,7 +129,7 @@ export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-lg">
+      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-lg max-h-[85vh] overflow-y-auto my-8">
         <DialogHeader>
           <DialogTitle>Create Post</DialogTitle>
         </DialogHeader>

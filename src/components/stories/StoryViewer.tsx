@@ -152,7 +152,8 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
   if (!currentStory) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+    <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
+      <div className="relative w-full max-w-md h-[85vh] max-h-[800px] bg-black rounded-2xl overflow-hidden">
       {/* Progress bars */}
       <div className="absolute top-0 left-0 right-0 flex gap-1 p-2 z-10">
         {currentUserStories.stories.map((_, index) => (
@@ -272,6 +273,7 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
           👁️ {currentStory.views_count} views
         </div>
       )}
+      </div>
     </div>
   );
 };

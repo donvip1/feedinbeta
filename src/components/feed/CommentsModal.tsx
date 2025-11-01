@@ -135,7 +135,7 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[80vh] flex flex-col">
+      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[85vh] flex flex-col my-8">
         <DialogHeader>
           <DialogTitle>Comments ({comments.length})</DialogTitle>
         </DialogHeader>
