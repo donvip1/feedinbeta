@@ -10,6 +10,8 @@ import Feed from "./pages/Feed";
 import Messages from "./pages/Messages";
 import Friends from "./pages/Friends";
 import Profile from "./pages/Profile";
+import Call from "./pages/Call";
+import CallHistory from "./pages/CallHistory";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,8 @@ const App: React.FC = () => (
           <Route path="/messages" element={<Messages />} />
           <Route path="/friends" element={<Friends />} />
           <Route path="/profile/:userId" element={<Profile />} />
+          <Route path="/call" element={<Call />} />
+          <Route path="/call-history" element={<CallHistory />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

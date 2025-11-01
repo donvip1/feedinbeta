@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send, Smile } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Phone, Video } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { ReactionPicker } from '@/components/feed/ReactionPicker';
@@ -30,6 +31,7 @@ interface ChatInterfaceProps {
 export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
@@ -207,6 +209,41 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
     }
   };
 
+  const initiateCall = async (callType: 'video' | 'voice') => {
+    if (!user || !otherUser) return;
+
+    try {
+      // Create call log
+      const { data: callLog, error } = await supabase
+        .from('call_logs')
+        .insert({
+          caller_id: user.id,
+          receiver_id: otherUser.id,
+          call_type: callType,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      toast({
+        title: 'Calling...',
+        description: `Starting ${callType} call`,
+      });
+
+      // Navigate to call page
+      navigate(`/call?callId=${callLog.id}&type=${callType}`);
+    } catch (error: any) {
+      console.error('Error initiating call:', error);
+      toast({
+        title: 'Call Failed',
+        description: 'Unable to start call. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <>
       {/* Header */}
@@ -223,11 +260,33 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           <AvatarImage src={otherUser?.avatar_url || ''} />
           <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
         </Avatar>
-        <div>
+        <div className="flex-1">
           <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
           {otherUser?.username && (
             <p className="text-sm text-muted-foreground">@{otherUser.username}</p>
           )}
+        </div>
+        
+        {/* Call Buttons */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => initiateCall('voice')}
+            className="text-primary hover:text-primary/90"
+            title="Voice call"
+          >
+            <Phone className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => initiateCall('video')}
+            className="text-primary hover:text-primary/90"
+            title="Video call"
+          >
+            <Video className="w-5 h-5" />
+          </Button>
         </div>
       </div>
 
