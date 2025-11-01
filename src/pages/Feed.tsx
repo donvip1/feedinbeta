@@ -32,19 +32,21 @@ interface Post {
 
 const Feed = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreatePost, setShowCreatePost] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth to load
+    
     if (!user) {
       navigate('/auth');
       return;
     }
     loadPosts();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   const loadPosts = async () => {
     try {
@@ -79,6 +81,14 @@ const Feed = () => {
     setShowCreatePost(false);
     loadPosts();
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-black">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white">
