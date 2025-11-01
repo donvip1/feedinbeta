@@ -12,6 +12,7 @@ import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus } from '
 import { ChatInterface } from '@/components/messages/ChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
+import { StoriesBar } from '@/components/stories/StoriesBar';
 import { useToast } from '@/hooks/use-toast';
 
 interface Conversation {
@@ -254,9 +255,10 @@ export default function Messages() {
             />
           </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-2">
+            <TabsList className="w-full grid grid-cols-3">
               <TabsTrigger value="chats">Chats</TabsTrigger>
               <TabsTrigger value="groups">Groups</TabsTrigger>
+              <TabsTrigger value="stories">Stories</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -386,6 +388,10 @@ export default function Messages() {
                   ))
                 )}
               </div>
+            </TabsContent>
+
+            <TabsContent value="stories" className="m-0">
+              <StoriesBar />
             </TabsContent>
           </Tabs>
         </ScrollArea>

@@ -9,8 +9,6 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
 import { CreatePostModal } from '@/components/feed/CreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
-import { StoriesBar } from '@/components/stories/StoriesBar';
-import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { LogOut, MessageSquare, Settings as SettingsIcon } from 'lucide-react';
@@ -44,9 +42,7 @@ const Feed = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
-  const [showCreateStory, setShowCreateStory] = useState(false);
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
-  const [activeTab, setActiveTab] = useState('for-you');
 
   useEffect(() => {
     if (authLoading) return; // Wait for auth to load
@@ -58,13 +54,13 @@ const Feed = () => {
     loadPosts();
   }, [user, authLoading, navigate]);
 
-  const loadPosts = async (isRefresh = false, tab = activeTab) => {
+  const loadPosts = async (isRefresh = false) => {
     try {
       if (isRefresh) {
         setRefreshing(true);
       }
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('posts')
         .select(`
           *,
@@ -74,42 +70,15 @@ const Feed = () => {
             avatar_url
           )
         `)
-        .eq('status', 'active');
-
-      // Filter based on active tab
-      if (tab === 'following') {
-        // Get users that current user follows
-        const { data: followingData } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', user?.id);
-
-        const followingIds = followingData?.map(f => f.following_id) || [];
-        if (followingIds.length > 0) {
-          query = query.in('user_id', followingIds);
-        } else {
-          setPosts([]);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        }
-      } else if (tab === 'my-posts') {
-        query = query.eq('user_id', user?.id);
-      }
-
-      query = query.order('created_at', { ascending: false }).limit(20);
-
-      const { data, error } = await query;
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(20);
 
       if (error) throw error;
 
-      // For "For You" tab, add some randomization
-      if (tab === 'for-you') {
-        const shuffled = (data || []).sort(() => Math.random() - 0.5);
-        setPosts(shuffled);
-      } else {
-        setPosts(data || []);
-      }
+      // Add some randomization for variety
+      const shuffled = (data || []).sort(() => Math.random() - 0.5);
+      setPosts(shuffled);
     } catch (error: any) {
       toast({
         title: 'Error loading posts',
@@ -128,12 +97,7 @@ const Feed = () => {
   };
 
   const handleRefresh = () => {
-    loadPosts(true, activeTab);
-  };
-
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab);
-    loadPosts(false, tab);
+    loadPosts(true);
   };
 
   const handleQuickAction = (action: string) => {
@@ -143,7 +107,7 @@ const Feed = () => {
         setShowCreatePost(true);
         break;
       case 'story':
-        setShowCreateStory(true);
+        navigate('/messages');
         break;
       case 'group':
         navigate('/groups');
@@ -185,28 +149,7 @@ const Feed = () => {
       <header className="sticky top-0 z-50 bg-gradient-to-r from-purple-900/80 to-blue-900/80 backdrop-blur-lg border-b border-gray-800">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="flex-1 max-w-md">
-              <TabsList className="grid w-full grid-cols-3 bg-transparent">
-                <TabsTrigger
-                  value="following"
-                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
-                >
-                  Following
-                </TabsTrigger>
-                <TabsTrigger
-                  value="for-you"
-                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
-                >
-                  For You
-                </TabsTrigger>
-                <TabsTrigger
-                  value="my-posts"
-                  className="text-gray-300 data-[state=active]:text-white data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none bg-transparent"
-                >
-                  My Posts
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <h1 className="text-xl font-bold text-white">FeedIn</h1>
 
             <div className="flex items-center space-x-2">
               <NotificationBell />
@@ -228,15 +171,8 @@ const Feed = () => {
         </div>
       </header>
 
-      {/* Stories - Sticky below header */}
-      <div className="sticky top-[57px] z-40 bg-black border-b border-gray-800">
-        <div className="container mx-auto max-w-2xl">
-          <StoriesBar />
-        </div>
-      </div>
-
       {/* Feed with TikTok-style scrolling */}
-      <main className="h-[calc(100vh-57px-80px)] overflow-y-scroll snap-y snap-mandatory scroll-smooth">
+      <main className="h-[calc(100vh-57px-64px)] overflow-y-scroll snap-y snap-mandatory scroll-smooth">
         {loading ? (
           <div className="space-y-6 p-4">
             {[1, 2, 3].map((i) => (
@@ -271,7 +207,7 @@ const Feed = () => {
         ) : (
           <>
             {posts.map((post) => (
-              <div key={post.id} className="snap-start min-h-[calc(100vh-57px-80px)] flex items-center justify-center p-4">
+              <div key={post.id} className="snap-start min-h-[calc(100vh-57px-64px)] flex items-center justify-center p-4">
                 <div className="w-full max-w-2xl">
                   <PostCard post={post} onUpdate={() => loadPosts(false)} />
                 </div>
@@ -294,13 +230,6 @@ const Feed = () => {
         onClose={() => setShowCreatePost(false)}
         onSuccess={handlePostCreated}
         defaultTab={defaultPostTab}
-      />
-
-      {/* Create Story Modal */}
-      <CreateStoryModal
-        open={showCreateStory}
-        onClose={() => setShowCreateStory(false)}
-        onSuccess={() => setShowCreateStory(false)}
       />
 
       {/* Bottom Navigation */}
