@@ -82,9 +82,17 @@ const Credits = () => {
           <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Buy Credits
           </h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
+          <p className="text-muted-foreground max-w-2xl mx-auto mb-4">
             Use credits for AI generations, premium features, and more
           </p>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/p2p-marketplace')}
+            className="gap-2"
+          >
+            <TrendingUp className="w-4 h-4" />
+            Trade Credits on P2P Marketplace
+          </Button>
         </div>
 
         {userCredits && (

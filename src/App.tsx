@@ -26,6 +26,7 @@ import AccountSettings from "./pages/AccountSettings";
 import PrivacySettings from "./pages/PrivacySettings";
 import NotificationSettings from "./pages/NotificationSettings";
 import BlockedUsers from "./pages/BlockedUsers";
+import P2PMarketplace from "./pages/P2PMarketplace";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App: React.FC = () => (
           <Route path="/settings/privacy" element={<PrivacySettings />} />
           <Route path="/settings/notifications" element={<NotificationSettings />} />
           <Route path="/settings/blocked" element={<BlockedUsers />} />
+          <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
