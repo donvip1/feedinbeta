@@ -146,6 +146,54 @@ export type Database = {
         }
         Relationships: []
       }
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      friend_requests: {
+        Row: {
+          created_at: string
+          id: string
+          receiver_id: string
+          sender_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          receiver_id: string
+          sender_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          receiver_id?: string
+          sender_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       message_reactions: {
         Row: {
           created_at: string | null
@@ -525,6 +573,8 @@ export type Database = {
           bio: string | null
           created_at: string
           display_name: string | null
+          followers_count: number | null
+          following_count: number | null
           id: string
           phone_number: string | null
           updated_at: string
@@ -535,6 +585,8 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
+          followers_count?: number | null
+          following_count?: number | null
           id: string
           phone_number?: string | null
           updated_at?: string
@@ -545,6 +597,8 @@ export type Database = {
           bio?: string | null
           created_at?: string
           display_name?: string | null
+          followers_count?: number | null
+          following_count?: number | null
           id?: string
           phone_number?: string | null
           updated_at?: string
