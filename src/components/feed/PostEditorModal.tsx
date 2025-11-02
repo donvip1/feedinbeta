@@ -80,68 +80,70 @@ const handleNext = () => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[92vh] p-0">
+      <DialogContent className="max-w-4xl w-[95vw] h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] p-0">
         <div className="flex flex-col h-full">
-          <DialogHeader className="px-4 py-3 border-b sticky top-0 bg-background z-10">
+          <DialogHeader className="px-3 py-2 border-b sticky top-0 bg-background z-10 shrink-0">
             <div className="flex items-center justify-between">
-              <Button variant="ghost" size="icon" onClick={onBack ?? onClose} aria-label="Back">
+              <Button variant="ghost" size="sm" onClick={onBack ?? onClose} aria-label="Back" className="h-8 w-8 p-0">
                 <ArrowLeft className="w-4 h-4" />
               </Button>
-              <DialogTitle>Edit Your Post</DialogTitle>
-              <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+              <DialogTitle className="text-sm">Edit Your Post</DialogTitle>
+              <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="h-8 w-8 p-0">
                 <X className="w-4 h-4" />
               </Button>
             </div>
           </DialogHeader>
 
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
             {/* Preview Section */}
-            <div className="flex-1 bg-black flex items-center justify-center p-4">
-              {mediaType === 'image' ? (
-                <img 
-                  src={mediaUrl} 
-                  alt="Preview" 
-                  className="max-w-full max-h-full object-contain"
-                  style={getFilterStyle()}
-                />
-              ) : (
-                <video 
-                  src={mediaUrl} 
-                  className="max-w-full max-h-full object-contain"
-                  style={getFilterStyle()}
-                  controls={!isMuted}
-                  muted={isMuted}
-                />
-              )}
+            <div className="flex-1 bg-black flex items-center justify-center p-2 md:p-4 overflow-x-auto min-h-[200px] md:min-h-0">
+              <div className="flex items-center justify-center min-w-full">
+                {mediaType === 'image' ? (
+                  <img 
+                    src={mediaUrl} 
+                    alt="Preview" 
+                    className="max-w-full max-h-[200px] md:max-h-full object-contain"
+                    style={getFilterStyle()}
+                  />
+                ) : (
+                  <video 
+                    src={mediaUrl} 
+                    className="max-w-full max-h-[200px] md:max-h-full object-contain"
+                    style={getFilterStyle()}
+                    controls={!isMuted}
+                    muted={isMuted}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Editor Panel */}
-            <div className="w-80 border-l bg-background">
-              <ScrollArea className="h-full">
-                <div className="p-4 space-y-6">
+            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0">
+              <ScrollArea className="h-full max-h-[calc(100vh-20rem)] md:max-h-full">
+                <div className="p-3 space-y-4">
                   {/* Filters */}
                   <div>
-                    <h3 className="font-semibold mb-3">Filters</h3>
+                    <h3 className="font-semibold mb-2 text-sm">Filters</h3>
                     <Tabs value={filterCategory} onValueChange={(v) => setFilterCategory(v as any)} className="w-full">
-                      <TabsList className="grid w-full grid-cols-3">
-                        <TabsTrigger value="trending">Trend</TabsTrigger>
-                        <TabsTrigger value="portrait">Portrait</TabsTrigger>
-                        <TabsTrigger value="landscape">Land</TabsTrigger>
+                      <TabsList className="grid w-full grid-cols-3 h-8">
+                        <TabsTrigger value="trending" className="text-xs">Trend</TabsTrigger>
+                        <TabsTrigger value="portrait" className="text-xs">Portrait</TabsTrigger>
+                        <TabsTrigger value="landscape" className="text-xs">Land</TabsTrigger>
                       </TabsList>
-                      <TabsList className="grid w-full grid-cols-2 mt-2">
-                        <TabsTrigger value="vibe">Vibe</TabsTrigger>
-                        <TabsTrigger value="bw">B&W</TabsTrigger>
+                      <TabsList className="grid w-full grid-cols-2 mt-1 h-8">
+                        <TabsTrigger value="vibe" className="text-xs">Vibe</TabsTrigger>
+                        <TabsTrigger value="bw" className="text-xs">B&W</TabsTrigger>
                       </TabsList>
                       {Object.entries(FILTERS).map(([category, filters]) => (
-                        <TabsContent key={category} value={category} className="space-y-2 mt-3">
+                        <TabsContent key={category} value={category} className="space-y-1.5 mt-2">
                           {filters.map((filter) => (
                             <Button
                               key={filter.name}
                               variant={selectedFilter === filter.name ? "default" : "outline"}
-                              className="w-full justify-start"
+                              className="w-full justify-start h-8 text-xs"
                               onClick={() => setSelectedFilter(filter.name)}
                             >
-                              <Wand2 className="w-4 h-4 mr-2" />
+                              <Wand2 className="w-3 h-3 mr-2" />
                               {filter.name}
                             </Button>
                           ))}
@@ -151,11 +153,11 @@ const handleNext = () => {
                   </div>
 
                   {/* Adjustments */}
-                  <div className="space-y-4">
-                    <h3 className="font-semibold">Adjustments</h3>
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-sm">Adjustments</h3>
                     
                     <div>
-                      <label className="text-sm mb-2 block">Brightness</label>
+                      <label className="text-xs mb-1 block">Brightness</label>
                       <Slider
                         value={[brightness]}
                         onValueChange={([v]) => setBrightness(v)}
@@ -166,7 +168,7 @@ const handleNext = () => {
                     </div>
 
                     <div>
-                      <label className="text-sm mb-2 block">Contrast</label>
+                      <label className="text-xs mb-1 block">Contrast</label>
                       <Slider
                         value={[contrast]}
                         onValueChange={([v]) => setContrast(v)}
@@ -177,7 +179,7 @@ const handleNext = () => {
                     </div>
 
                     <div>
-                      <label className="text-sm mb-2 block">Saturation</label>
+                      <label className="text-xs mb-1 block">Saturation</label>
                       <Slider
                         value={[saturation]}
                         onValueChange={([v]) => setSaturation(v)}
@@ -189,47 +191,52 @@ const handleNext = () => {
                   </div>
 
                   {/* Quick Tools */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold mb-3">Quick Tools</h3>
+                  <div className="space-y-1.5">
+                    <h3 className="font-semibold mb-2 text-sm">Quick Tools</h3>
                     
                     {mediaType === 'video' && (
                       <Button
                         variant="outline"
-                        className="w-full justify-start"
+                        className="w-full justify-start h-8 text-xs"
                         onClick={() => setIsMuted(!isMuted)}
                       >
-                        {isMuted ? <VolumeX className="w-4 h-4 mr-2" /> : <Volume2 className="w-4 h-4 mr-2" />}
+                        {isMuted ? <VolumeX className="w-3 h-3 mr-2" /> : <Volume2 className="w-3 h-3 mr-2" />}
                         {isMuted ? 'Unmute' : 'Mute'} Audio
                       </Button>
                     )}
 
-                    <Button variant="outline" className="w-full justify-start" disabled>
-                      <Type className="w-4 h-4 mr-2" />
-                      Add Text <Badge className="ml-auto">Soon</Badge>
+                    <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
+                      <Type className="w-3 h-3 mr-2" />
+                      Add Text <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
                     </Button>
 
-                    <Button variant="outline" className="w-full justify-start" disabled>
-                      <Sticker className="w-4 h-4 mr-2" />
-                      Add Stickers <Badge className="ml-auto">Soon</Badge>
+                    <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
+                      <Sticker className="w-3 h-3 mr-2" />
+                      Add Stickers <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
                     </Button>
 
                     {mediaType === 'video' && (
-                      <Button variant="outline" className="w-full justify-start" disabled>
-                        <Scissors className="w-4 h-4 mr-2" />
-                        Auto Cut (60s) <Badge className="ml-auto">Soon</Badge>
+                      <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
+                        <Scissors className="w-3 h-3 mr-2" />
+                        Auto Cut (60s) <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
                       </Button>
                     )}
+
+                    <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
+                      <Music className="w-3 h-3 mr-2" />
+                      Add Music <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
+                    </Button>
                   </div>
                 </div>
               </ScrollArea>
             </div>
           </div>
 
-          <div className="px-6 py-4 border-t flex justify-between">
-            <Button variant="outline" onClick={onClose}>
+          <div className="px-3 py-2 border-t flex justify-between shrink-0">
+            <Button variant="outline" onClick={onClose} size="sm" className="h-8 text-xs">
               Cancel
             </Button>
-            <Button onClick={handleNext} className="bg-gradient-primary">
+            <Button onClick={handleNext} className="bg-gradient-primary h-8 text-xs" size="sm">
               Next
             </Button>
           </div>
