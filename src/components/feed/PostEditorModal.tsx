@@ -5,11 +5,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { ImageIcon, Video, Wand2, Type, Music, Sticker, Scissors, Volume2, VolumeX } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { ImageIcon, Video, Wand2, Type, Music, Sticker, Scissors, Volume2, VolumeX, ArrowLeft, X } from 'lucide-react';
 
 interface PostEditorModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   mediaUrl: string;
   mediaType: 'image' | 'video';
   onNext: (editedMedia: string, effects: any) => void;
@@ -43,15 +45,16 @@ const FILTERS = {
   ],
 };
 
-export function PostEditorModal({ open, onClose, mediaUrl, mediaType, onNext }: PostEditorModalProps) {
+export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, onNext }: PostEditorModalProps) {
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<keyof typeof FILTERS>('trending');
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
-  const [isMuted, setIsMuted] = useState(false);
-  const [showText, setShowText] = useState(false);
-  const [textOverlay, setTextOverlay] = useState('');
+const [isMuted, setIsMuted] = useState(false);
+const [showText, setShowText] = useState(false);
+const [textOverlay, setTextOverlay] = useState('');
+const [overlayAudioFile, setOverlayAudioFile] = useState<File | null>(null);
 
   const getFilterStyle = () => {
     const filterObj = selectedFilter 
@@ -63,23 +66,32 @@ export function PostEditorModal({ open, onClose, mediaUrl, mediaType, onNext }: 
     };
   };
 
-  const handleNext = () => {
-    onNext(mediaUrl, {
-      filter: selectedFilter,
-      brightness,
-      contrast,
-      saturation,
-      muted: isMuted,
-      textOverlay,
-    });
-  };
+const handleNext = () => {
+  onNext(mediaUrl, {
+    filter: selectedFilter,
+    brightness,
+    contrast,
+    saturation,
+    muted: isMuted,
+    textOverlay,
+    overlayAudioFile,
+  });
+};
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl h-[90vh] p-0">
+      <DialogContent className="max-w-4xl w-[95vw] h-[92vh] p-0">
         <div className="flex flex-col h-full">
-          <DialogHeader className="px-6 py-4 border-b">
-            <DialogTitle>Edit Your Post</DialogTitle>
+          <DialogHeader className="px-4 py-3 border-b sticky top-0 bg-background z-10">
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="icon" onClick={onBack ?? onClose} aria-label="Back">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <DialogTitle>Edit Your Post</DialogTitle>
+              <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
           </DialogHeader>
 
           <div className="flex-1 flex overflow-hidden">
