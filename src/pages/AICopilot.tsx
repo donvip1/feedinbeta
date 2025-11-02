@@ -628,22 +628,22 @@ const AICopilot = () => {
         onClose={() => setShowQuickActions(false)}
         onActionSelect={(action) => {
           switch (action) {
-            case "Thesis Writer":
+            case "thesis-writer":
               navigate("/thesis-writer");
               break;
-            case "Video Creation":
+            case "video-creation":
               navigate("/video-creation");
               break;
-            case "Educational Q&A":
+            case "educational-qa":
               navigate("/educational-qa");
               break;
-            case "Project Writing":
+            case "project-writing":
               navigate("/project-writing");
               break;
-            case "Image Generation":
+            case "image-generation":
               navigate("/image-generation");
               break;
-            case "Image Enhancement":
+            case "image-enhancement":
               navigate("/image-enhancement");
               break;
             default:

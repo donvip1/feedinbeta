@@ -17,14 +17,12 @@ const feedActions = [
 
 // AI context actions
 const aiActions = [
-  { id: 'ai-enhance-good', label: 'Enhance Image (Good)', icon: Sparkles, color: 'from-blue-500 to-blue-600' },
-  { id: 'ai-enhance-better', label: 'Enhance Image (Better)', icon: Sparkles, color: 'from-purple-500 to-pink-500' },
-  { id: 'ai-enhance-ultra', label: 'Enhance Image (Ultra)', icon: Sparkles, color: 'from-orange-500 to-red-500' },
-  { id: 'ai-generate', label: 'Generate Image', icon: Wand2, color: 'from-pink-500 to-purple-500' },
-  { id: 'ai-write-project', label: 'Write Project', icon: BookOpen, color: 'from-indigo-500 to-purple-600' },
-  { id: 'ai-write-thesis', label: 'Write Thesis', icon: BookOpen, color: 'from-red-500 to-pink-600' },
-  { id: 'ai-video', label: 'Create Video', icon: Video, color: 'from-teal-500 to-cyan-500' },
-  { id: 'ai-help', label: 'App Help', icon: Zap, color: 'from-yellow-500 to-orange-500' },
+  { id: 'image-enhancement', label: 'Enhance Image', icon: Sparkles, color: 'from-purple-500 to-pink-500' },
+  { id: 'image-generation', label: 'Generate Image', icon: Wand2, color: 'from-pink-500 to-purple-500' },
+  { id: 'project-writing', label: 'Write Project', icon: BookOpen, color: 'from-indigo-500 to-purple-600' },
+  { id: 'thesis-writer', label: 'Write Thesis', icon: BookOpen, color: 'from-red-500 to-pink-600' },
+  { id: 'video-creation', label: 'Create Video', icon: Video, color: 'from-teal-500 to-cyan-500' },
+  { id: 'educational-qa', label: 'Educational Q&A', icon: Zap, color: 'from-yellow-500 to-orange-500' },
 ];
 
 export const QuickActionsModal = ({ open, onClose, onActionSelect, context = 'default' }: QuickActionsModalProps) => {
