@@ -127,7 +127,7 @@ Use simple language and break down complex concepts.`;
           await supabase.from("credit_transactions").insert({
             user_id: user.id,
             amount: -5,
-            transaction_type: "ai_generation",
+            type: "ai_generation",
             description: "Educational Q&A"
           });
         }

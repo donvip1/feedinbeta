@@ -84,12 +84,12 @@ export default function ImageGeneration() {
           const currentCount = lastReset === today ? profile?.daily_ai_image_count || 0 : 0;
 
           if (currentCount >= 1 && credits && credits.balance >= 20) {
-            await supabase.from("credit_transactions").insert({
-              user_id: user.id,
-              amount: -20,
-              transaction_type: "ai_generation",
-              description: "Image generation"
-            });
+          await supabase.from("credit_transactions").insert({
+            user_id: user.id,
+            amount: -20,
+            type: "ai_generation",
+            description: "Image generation"
+          });
           }
 
           await supabase

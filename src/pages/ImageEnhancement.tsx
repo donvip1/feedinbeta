@@ -113,7 +113,7 @@ export default function ImageEnhancement() {
               await supabase.from("credit_transactions").insert({
                 user_id: user.id,
                 amount: -20,
-                transaction_type: "ai_generation",
+                type: "ai_generation",
                 description: "Image enhancement"
               });
             }

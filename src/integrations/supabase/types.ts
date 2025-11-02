@@ -1687,6 +1687,7 @@ export type Database = {
           id: string
           interests: string[] | null
           is_premium: boolean | null
+          last_ai_reset: string | null
           last_ai_reset_date: string | null
           last_username_change: string | null
           location: string | null
@@ -1719,6 +1720,7 @@ export type Database = {
           id: string
           interests?: string[] | null
           is_premium?: boolean | null
+          last_ai_reset?: string | null
           last_ai_reset_date?: string | null
           last_username_change?: string | null
           location?: string | null
@@ -1751,6 +1753,7 @@ export type Database = {
           id?: string
           interests?: string[] | null
           is_premium?: boolean | null
+          last_ai_reset?: string | null
           last_ai_reset_date?: string | null
           last_username_change?: string | null
           location?: string | null

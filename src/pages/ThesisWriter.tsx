@@ -128,7 +128,7 @@ Use formal academic language and proper citations format.`;
           await supabase.from("credit_transactions").insert({
             user_id: user.id,
             amount: -20,
-            transaction_type: "ai_generation",
+            type: "ai_generation",
             description: "Thesis generation"
           });
         }

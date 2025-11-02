@@ -130,7 +130,7 @@ Use professional language and industry best practices.`;
           await supabase.from("credit_transactions").insert({
             user_id: user.id,
             amount: -20,
-            transaction_type: "ai_generation",
+            type: "ai_generation",
             description: "Project writing"
           });
         }

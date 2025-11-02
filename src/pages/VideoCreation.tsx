@@ -128,7 +128,7 @@ Provide practical, actionable guidance for video creation.`;
           await supabase.from("credit_transactions").insert({
             user_id: user.id,
             amount: -50,
-            transaction_type: "ai_generation",
+            type: "ai_generation",
             description: "Video creation plan"
           });
         }
