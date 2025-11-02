@@ -49,12 +49,12 @@ export function EnhancedCreatePostModal({
       return;
     }
 
-    // Check file size (max 100MB for videos, 10MB for images)
-    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024;
+    // Check file size (max 40MB for videos, 10MB for images)
+    const maxSize = isVideo ? 40 * 1024 * 1024 : 10 * 1024 * 1024;
     if (file.size > maxSize) {
       toast({
         title: 'File too large',
-        description: isVideo ? 'Videos must be under 100MB' : 'Images must be under 10MB',
+        description: isVideo ? 'Videos must be under 50MB' : 'Images must be under 10MB',
         variant: 'destructive',
       });
       return;
@@ -166,22 +166,25 @@ export function EnhancedCreatePostModal({
                     </Button>
                   </div>
                 ) : (
-                  <label className="cursor-pointer block py-12 border-2 border-dashed rounded-lg hover:border-primary transition-colors">
+                  <div className="py-12 border-2 border-dashed rounded-lg">
                     <Upload className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-lg font-medium mb-2">Upload an image</p>
                     <p className="text-sm text-muted-foreground mb-4">
-                      JPG, PNG, WEBP up to 10MB
+                      JPG, PNG, WEBP
                     </p>
+                    <label htmlFor="image-upload" className="inline-block">
+                      <Button type="button" className="bg-gradient-primary" onClick={() => document.getElementById('image-upload')?.click()}>
+                        Choose File
+                      </Button>
+                    </label>
                     <Input
+                      id="image-upload"
                       type="file"
                       accept="image/*"
                       onChange={handleMediaChange}
                       className="hidden"
                     />
-                    <Button type="button" className="bg-gradient-primary">
-                      Choose File
-                    </Button>
-                  </label>
+                  </div>
                 )}
               </div>
             </TabsContent>
@@ -208,22 +211,25 @@ export function EnhancedCreatePostModal({
                     </Button>
                   </div>
                 ) : (
-                  <label className="cursor-pointer block py-12 border-2 border-dashed rounded-lg hover:border-primary transition-colors">
+                  <div className="py-12 border-2 border-dashed rounded-lg">
                     <Upload className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
                     <p className="text-lg font-medium mb-2">Upload a video</p>
                     <p className="text-sm text-muted-foreground mb-4">
-                      MP4, MOV up to 100MB
+                      MP4, MOV
                     </p>
+                    <label htmlFor="video-upload" className="inline-block">
+                      <Button type="button" className="bg-gradient-primary" onClick={() => document.getElementById('video-upload')?.click()}>
+                        Choose File
+                      </Button>
+                    </label>
                     <Input
+                      id="video-upload"
                       type="file"
                       accept="video/*"
                       onChange={handleMediaChange}
                       className="hidden"
                     />
-                    <Button type="button" className="bg-gradient-primary">
-                      Choose File
-                    </Button>
-                  </label>
+                  </div>
                 )}
               </div>
             </TabsContent>
