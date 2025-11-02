@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
-import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart } from 'lucide-react';
+import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -37,18 +37,28 @@ const ProfileNew = () => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const isOwnProfile = user?.id === userId;
 
   useEffect(() => {
     if (userId) {
       loadProfile();
+      if (isOwnProfile && user?.email) {
+        checkAdminStatus(user.email);
+      }
       if (!isOwnProfile) {
         checkFollowStatus();
         checkFriendRequestStatus();
       }
     }
   }, [userId]);
+
+  const checkAdminStatus = async (email: string) => {
+    const adminEmails = ['viplearn4free@gmail.com', 'cryptosvip@gmail.com', 'myconnectmate@gmail.com'];
+    setIsAdmin(adminEmails.includes(email.toLowerCase()));
+  };
 
   const loadProfile = async () => {
     try {
@@ -194,6 +204,49 @@ const ProfileNew = () => {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('posts')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: data.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // Reload profile to show new avatar
+      await loadProfile();
+      
+      toast({
+        title: 'Avatar updated',
+        description: 'Your profile picture has been changed',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error uploading avatar',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
@@ -241,12 +294,30 @@ const ProfileNew = () => {
       <div className="container mx-auto px-4 py-6 max-w-2xl">
         {/* Avatar & Basic Info */}
         <div className="flex flex-col items-center mb-6">
-          <Avatar className="w-32 h-32 mb-4">
-            <AvatarImage src={profile.avatar_url || ''} />
-            <AvatarFallback className="text-4xl">
-              {profile.display_name?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="w-32 h-32 mb-4">
+              <AvatarImage src={profile.avatar_url || ''} />
+              <AvatarFallback className="text-4xl">
+                {profile.display_name?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            {isOwnProfile && (
+              <label
+                htmlFor="profile-avatar-upload"
+                className="absolute bottom-4 right-0 bg-primary rounded-full p-3 cursor-pointer hover:bg-primary/80 transition-colors"
+              >
+                <Camera className="w-5 h-5 text-primary-foreground" />
+                <input
+                  id="profile-avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={uploading}
+                />
+              </label>
+            )}
+          </div>
           
           <h1 className="text-2xl font-bold mb-1">{profile.display_name || 'Unknown'}</h1>
           <p className="text-gray-400 mb-2">@{profile.username || 'user'}</p>
@@ -268,8 +339,12 @@ const ProfileNew = () => {
           {isOwnProfile && (
             <Card className="bg-gray-900 border-gray-800 p-4 text-center">
               <Coins className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold">{profile.credits_balance}</p>
-              <p className="text-xs text-gray-400">Credits</p>
+              <p className="text-2xl font-bold">
+                {isAdmin ? '∞' : profile.credits_balance}
+              </p>
+              <p className="text-xs text-gray-400">
+                {isAdmin ? 'Unlimited Credits' : 'Credits'}
+              </p>
             </Card>
           )}
           

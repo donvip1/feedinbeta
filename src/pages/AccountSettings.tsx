@@ -36,6 +36,7 @@ const AccountSettings = () => {
     bio: '',
     avatar_url: '',
   });
+  const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
     if (!user) {
@@ -54,6 +55,11 @@ const AccountSettings = () => {
 
       if (error) throw error;
       setProfile(data);
+      
+      // Get user email from auth
+      if (user?.email) {
+        setUserEmail(user.email);
+      }
     } catch (error: any) {
       toast({
         title: 'Error loading profile',
@@ -100,7 +106,7 @@ const AccountSettings = () => {
       setLoading(true);
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
+      const filePath = `avatars/${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('posts')
@@ -206,6 +212,19 @@ const AccountSettings = () => {
 
           {/* Profile Form */}
           <div className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email Address</Label>
+              <Input
+                id="email"
+                value={userEmail}
+                disabled
+                className="bg-muted cursor-not-allowed"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Email cannot be changed
+              </p>
+            </div>
+
             <div>
               <Label htmlFor="display_name">Display Name</Label>
               <Input
