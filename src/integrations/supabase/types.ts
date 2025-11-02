@@ -1608,16 +1608,21 @@ export type Database = {
       }
       posts: {
         Row: {
+          allow_comments: boolean | null
+          allow_refeed: boolean | null
           comments_count: number | null
           content: string | null
           created_at: string | null
           feed_id: string
           id: string
           likes_count: number | null
+          location: string | null
           media_type: string | null
           media_url: string | null
           post_type: string | null
+          privacy: string | null
           refeeds_count: number | null
+          scheduled_at: string | null
           shares_count: number | null
           status: string | null
           updated_at: string | null
@@ -1625,16 +1630,21 @@ export type Database = {
           views_count: number | null
         }
         Insert: {
+          allow_comments?: boolean | null
+          allow_refeed?: boolean | null
           comments_count?: number | null
           content?: string | null
           created_at?: string | null
           feed_id: string
           id?: string
           likes_count?: number | null
+          location?: string | null
           media_type?: string | null
           media_url?: string | null
           post_type?: string | null
+          privacy?: string | null
           refeeds_count?: number | null
+          scheduled_at?: string | null
           shares_count?: number | null
           status?: string | null
           updated_at?: string | null
@@ -1642,16 +1652,21 @@ export type Database = {
           views_count?: number | null
         }
         Update: {
+          allow_comments?: boolean | null
+          allow_refeed?: boolean | null
           comments_count?: number | null
           content?: string | null
           created_at?: string | null
           feed_id?: string
           id?: string
           likes_count?: number | null
+          location?: string | null
           media_type?: string | null
           media_url?: string | null
           post_type?: string | null
+          privacy?: string | null
           refeeds_count?: number | null
+          scheduled_at?: string | null
           shares_count?: number | null
           status?: string | null
           updated_at?: string | null
