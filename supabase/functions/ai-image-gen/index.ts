@@ -81,11 +81,13 @@ serve(async (req) => {
     }
 
     const data = await response.json();
+    console.log("AI response:", JSON.stringify(data));
     
-    // Extract image URL from response
-    const imageUrl = data.choices?.[0]?.message?.content;
+    // Extract image URL from response - images are returned in the images array
+    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!imageUrl) {
+      console.error("No image in response:", data);
       throw new Error("No image generated");
     }
 
