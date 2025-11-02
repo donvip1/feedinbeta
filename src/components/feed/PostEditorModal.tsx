@@ -54,7 +54,12 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
 const [isMuted, setIsMuted] = useState(false);
 const [showText, setShowText] = useState(false);
 const [textOverlay, setTextOverlay] = useState('');
+const [textPosition, setTextPosition] = useState<'top' | 'center' | 'bottom'>('center');
+const [showStickers, setShowStickers] = useState(false);
+const [selectedSticker, setSelectedSticker] = useState<string>('');
 const [overlayAudioFile, setOverlayAudioFile] = useState<File | null>(null);
+
+const STICKERS = ['❤️', '🔥', '✨', '🎉', '😍', '👍', '💯', '⭐', '🌟', '💖', '🎵', '🎨', '📸', '🌈', '💫'];
 
   const getFilterStyle = () => {
     const filterObj = selectedFilter 
@@ -74,6 +79,8 @@ const handleNext = () => {
     saturation,
     muted: isMuted,
     textOverlay,
+    textPosition,
+    selectedSticker,
     overlayAudioFile,
   });
 };
@@ -87,9 +94,7 @@ const handleNext = () => {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <DialogTitle className="text-sm">Edit Your Post</DialogTitle>
-            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="h-8 w-8 p-0">
-              <X className="w-4 h-4" />
-            </Button>
+            <div className="w-8" />
           </div>
         </DialogHeader>
 
@@ -203,27 +208,78 @@ const handleNext = () => {
                       </Button>
                     )}
 
-                    <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-8 text-xs"
+                      onClick={() => setShowText(!showText)}
+                    >
                       <Type className="w-3 h-3 mr-2" />
-                      Add Text <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
+                      {showText ? 'Hide' : 'Add'} Text
                     </Button>
 
-                    <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
-                      <Sticker className="w-3 h-3 mr-2" />
-                      Add Stickers <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
-                    </Button>
-
-                    {mediaType === 'video' && (
-                      <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
-                        <Scissors className="w-3 h-3 mr-2" />
-                        Auto Cut (60s) <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
-                      </Button>
+                    {showText && (
+                      <div className="space-y-2 pl-2">
+                        <Input
+                          placeholder="Enter text..."
+                          value={textOverlay}
+                          onChange={(e) => setTextOverlay(e.target.value)}
+                          className="h-8 text-xs"
+                        />
+                        <div className="flex gap-1">
+                          {(['top', 'center', 'bottom'] as const).map((pos) => (
+                            <Button
+                              key={pos}
+                              variant={textPosition === pos ? 'default' : 'outline'}
+                              size="sm"
+                              className="h-6 text-xs flex-1"
+                              onClick={() => setTextPosition(pos)}
+                            >
+                              {pos}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
                     )}
 
-                    <Button variant="outline" className="w-full justify-start h-8 text-xs" disabled>
-                      <Music className="w-3 h-3 mr-2" />
-                      Add Music <Badge className="ml-auto text-[10px] h-4">Soon</Badge>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-8 text-xs"
+                      onClick={() => setShowStickers(!showStickers)}
+                    >
+                      <Sticker className="w-3 h-3 mr-2" />
+                      {showStickers ? 'Hide' : 'Add'} Stickers
                     </Button>
+
+                    {showStickers && (
+                      <div className="grid grid-cols-5 gap-1 pl-2">
+                        {STICKERS.map((sticker) => (
+                          <Button
+                            key={sticker}
+                            variant={selectedSticker === sticker ? 'default' : 'outline'}
+                            className="h-8 text-lg p-0"
+                            onClick={() => setSelectedSticker(selectedSticker === sticker ? '' : sticker)}
+                          >
+                            {sticker}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start h-8 text-xs"
+                      onClick={() => document.getElementById('music-upload')?.click()}
+                    >
+                      <Music className="w-3 h-3 mr-2" />
+                      {overlayAudioFile ? overlayAudioFile.name.slice(0, 15) + '...' : 'Add Music'}
+                    </Button>
+                    <input
+                      id="music-upload"
+                      type="file"
+                      accept="audio/*"
+                      className="hidden"
+                      onChange={(e) => setOverlayAudioFile(e.target.files?.[0] || null)}
+                    />
                   </div>
                 </div>
               </div>

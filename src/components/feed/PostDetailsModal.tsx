@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2, ArrowLeft } from 'lucide-react';
+import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2, ArrowLeft, Navigation } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { extractHashtags } from '@/lib/hashtag-utils';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface PostDetailsModalProps {
   open: boolean;
@@ -32,6 +34,50 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
   const [allowComments, setAllowComments] = useState(true);
   const [allowRefeed, setAllowRefeed] = useState(true);
   const [scheduleTime, setScheduleTime] = useState<string>('');
+  const [locationOpen, setLocationOpen] = useState(false);
+  const [gettingLocation, setGettingLocation] = useState(false);
+
+  const POPULAR_LOCATIONS = [
+    'New York, USA', 'London, UK', 'Paris, France', 'Tokyo, Japan', 'Dubai, UAE',
+    'Los Angeles, USA', 'Sydney, Australia', 'Berlin, Germany', 'Singapore',
+    'Toronto, Canada', 'Mumbai, India', 'Barcelona, Spain', 'Amsterdam, Netherlands',
+    'Hong Kong', 'Istanbul, Turkey', 'Bangkok, Thailand', 'Rome, Italy', 'Seoul, South Korea'
+  ];
+
+  const filteredLocations = location
+    ? POPULAR_LOCATIONS.filter(loc => loc.toLowerCase().includes(location.toLowerCase()))
+    : POPULAR_LOCATIONS;
+
+  const getCurrentLocation = () => {
+    setGettingLocation(true);
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${position.coords.latitude}&lon=${position.coords.longitude}&format=json`
+            );
+            const data = await response.json();
+            const locationStr = data.address.city || data.address.town || data.address.village;
+            const country = data.address.country;
+            setLocation(`${locationStr}, ${country}`);
+            toast({ title: 'Location detected', description: `${locationStr}, ${country}` });
+          } catch (error) {
+            toast({ title: 'Error', description: 'Could not fetch location name', variant: 'destructive' });
+          } finally {
+            setGettingLocation(false);
+          }
+        },
+        (error) => {
+          toast({ title: 'Error', description: 'Could not get your location', variant: 'destructive' });
+          setGettingLocation(false);
+        }
+      );
+    } else {
+      toast({ title: 'Error', description: 'Geolocation not supported', variant: 'destructive' });
+      setGettingLocation(false);
+    }
+  };
 
   const handlePost = async (action: 'post' | 'draft' | 'schedule') => {
     if (!user) return;
@@ -166,15 +212,59 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
               {/* Location */}
               <div>
                 <Label htmlFor="location">Location</Label>
-                <div className="relative mt-2">
-                  <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="location"
-                    placeholder="Add location"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="pl-10"
-                  />
+                <div className="flex gap-2 mt-2">
+                  <Popover open={locationOpen} onOpenChange={setLocationOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={locationOpen}
+                        className="flex-1 justify-start"
+                      >
+                        <MapPin className="mr-2 h-4 w-4 shrink-0" />
+                        {location || "Select location..."}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Search location..." 
+                          value={location}
+                          onValueChange={setLocation}
+                        />
+                        <CommandList>
+                          <CommandEmpty>No location found.</CommandEmpty>
+                          <CommandGroup>
+                            {filteredLocations.map((loc) => (
+                              <CommandItem
+                                key={loc}
+                                value={loc}
+                                onSelect={(value) => {
+                                  setLocation(value);
+                                  setLocationOpen(false);
+                                }}
+                              >
+                                <MapPin className="mr-2 h-4 w-4" />
+                                {loc}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={getCurrentLocation}
+                    disabled={gettingLocation}
+                  >
+                    {gettingLocation ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Navigation className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               </div>
 
