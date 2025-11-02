@@ -80,7 +80,7 @@ const handleNext = () => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] p-0">
+      <DialogContent className="max-w-4xl w-[95vw] h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] p-0 mb-16">
         <div className="flex flex-col h-full">
           <DialogHeader className="px-3 py-2 border-b sticky top-0 bg-background z-10 shrink-0">
             <div className="flex items-center justify-between">
