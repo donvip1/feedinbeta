@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -31,6 +31,7 @@ interface Post {
 
 const Feed = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [posts, setPosts] = useState<Post[]>([]);
@@ -39,6 +40,7 @@ const Feed = () => {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
   const [activeTab, setActiveTab] = useState<'following' | 'forYou' | 'myPosts'>('forYou');
+  const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -50,6 +52,17 @@ const Feed = () => {
     
     // Store user ID for profile navigation
     localStorage.setItem('currentUserId', user.id);
+    
+    // Check if there's a shared image in location state
+    const state = location.state as { sharedImage?: string } | null;
+    if (state?.sharedImage) {
+      setSharedImageUrl(state.sharedImage);
+      setDefaultPostTab('image');
+      setShowCreatePost(true);
+      // Clear the state
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    
     loadPosts();
   }, [user, authLoading, navigate, activeTab]);
 
@@ -286,9 +299,13 @@ const Feed = () => {
       {/* Create Post Modal */}
       <CreatePostModal
         open={showCreatePost}
-        onClose={() => setShowCreatePost(false)}
+        onClose={() => {
+          setShowCreatePost(false);
+          setSharedImageUrl(null);
+        }}
         onSuccess={handlePostCreated}
         defaultTab={defaultPostTab}
+        initialImageUrl={sharedImageUrl}
       />
 
       {/* Bottom Navigation */}

@@ -1,12 +1,15 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sparkles, Loader2, Upload } from "lucide-react";
+import { ArrowLeft, Sparkles, Loader2, Upload, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ImageShareModal } from "@/components/shared/ImageShareModal";
 
 export default function ImageEnhancement() {
   const navigate = useNavigate();
@@ -18,6 +21,8 @@ export default function ImageEnhancement() {
   const [enhancedUrl, setEnhancedUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<"good" | "better" | "best">("good");
+  const [editPrompt, setEditPrompt] = useState("");
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,10 +96,17 @@ export default function ImageEnhancement() {
           best: "Ultra enhance this image with maximum quality improvements: professional color grading, detail enhancement, noise reduction, sharpening, and overall quality optimization"
         };
 
-        // Use AI to enhance image
+        let finalPrompt = enhancementPrompts[selectedLevel];
+        if (editPrompt.trim()) {
+          finalPrompt += `. Additionally: ${editPrompt}`;
+        }
+
+        // Use AI to enhance/edit image
         const { data, error } = await supabase.functions.invoke("ai-image-gen", {
           body: { 
-            prompt: `${enhancementPrompts[selectedLevel]}. Original image: ${base64Image}`
+            prompt: finalPrompt,
+            imageUrl: base64Image,
+            mode: "edit"
           }
         });
 
@@ -195,7 +207,7 @@ export default function ImageEnhancement() {
           )}
         </div>
 
-        {previewUrl && (
+        {previewUrl && !enhancedUrl && (
           <div className="bg-card rounded-lg p-4 border space-y-4">
             <h3 className="font-semibold">Enhancement Level:</h3>
             <Tabs value={selectedLevel} onValueChange={(v) => setSelectedLevel(v as any)}>
@@ -215,6 +227,19 @@ export default function ImageEnhancement() {
               </TabsContent>
             </Tabs>
 
+            <div className="space-y-2">
+              <Label htmlFor="editPrompt">Optional AI Edits (e.g., add cap, change background, etc.)</Label>
+              <Input
+                id="editPrompt"
+                placeholder="e.g., add a baseball cap, change background to beach, make wearing sunglasses"
+                value={editPrompt}
+                onChange={(e) => setEditPrompt(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave empty for enhancement only, or add specific edits you want to apply
+              </p>
+            </div>
+
             <Button onClick={handleEnhance} disabled={loading} className="w-full">
               {loading ? (
                 <>
@@ -222,19 +247,61 @@ export default function ImageEnhancement() {
                   Enhancing...
                 </>
               ) : (
-                "Enhance Image"
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Enhance Image
+                </>
               )}
             </Button>
           </div>
         )}
 
         {enhancedUrl && (
-          <div className="bg-card rounded-lg p-4 border">
-            <h3 className="font-semibold mb-3">Enhanced Image:</h3>
-            <img src={enhancedUrl} alt="Enhanced" className="w-full rounded-lg" />
+          <div className="space-y-4">
+            <div className="bg-card rounded-lg p-4 border">
+              <h3 className="font-semibold mb-3">Before & After Comparison:</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Before</p>
+                  <img src={previewUrl} alt="Before" className="w-full rounded-lg border" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">After</p>
+                  <img src={enhancedUrl} alt="After" className="w-full rounded-lg border" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setShowShareModal(true)} 
+                className="flex-1"
+                variant="default"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button 
+                onClick={() => {
+                  setEnhancedUrl("");
+                  setEditPrompt("");
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Enhance Again
+              </Button>
+            </div>
           </div>
         )}
       </div>
+
+      <ImageShareModal
+        open={showShareModal}
+        onOpenChange={setShowShareModal}
+        imageUrl={enhancedUrl}
+        imageType="enhanced"
+      />
 
       <BottomNav />
     </div>

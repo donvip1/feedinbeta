@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt } = await req.json();
+    const { prompt, imageUrl: inputImageUrl, mode } = await req.json();
     
     if (!prompt || typeof prompt !== "string") {
       return new Response(
@@ -28,7 +28,28 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating image with prompt:", prompt);
+    console.log("Generating/Editing image with prompt:", prompt, "Mode:", mode);
+
+    // Build the message content based on whether we're editing or generating
+    let messageContent;
+    if (mode === "edit" && inputImageUrl) {
+      // For image editing, send both the image and the prompt
+      messageContent = [
+        {
+          type: "text",
+          text: prompt
+        },
+        {
+          type: "image_url",
+          image_url: {
+            url: inputImageUrl
+          }
+        }
+      ];
+    } else {
+      // For pure generation, just send the prompt
+      messageContent = prompt;
+    }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -41,9 +62,10 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: prompt
+            content: messageContent
           },
         ],
+        modalities: ["image", "text"]
       }),
     });
 

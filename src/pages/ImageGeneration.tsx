@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Image as ImageIcon, Loader2 } from "lucide-react";
+import { ArrowLeft, Image as ImageIcon, Loader2, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/navigation/BottomNav";
+import { ImageShareModal } from "@/components/shared/ImageShareModal";
 
 export default function ImageGeneration() {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function ImageGeneration() {
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   const handleGenerate = async () => {
     if (!user) {
@@ -69,7 +71,7 @@ export default function ImageGeneration() {
 
       // Generate image
       const { data, error } = await supabase.functions.invoke("ai-image-gen", {
-        body: { prompt }
+        body: { prompt, mode: "generate" }
       });
 
       if (error) throw error;
@@ -149,12 +151,42 @@ export default function ImageGeneration() {
         </div>
 
         {imageUrl && (
-          <div className="bg-card rounded-lg p-4 border">
-            <h3 className="font-semibold mb-3">Generated Image:</h3>
-            <img src={imageUrl} alt="Generated" className="w-full rounded-lg" />
+          <div className="space-y-4">
+            <div className="bg-card rounded-lg p-4 border">
+              <h3 className="font-semibold mb-3">Generated Image:</h3>
+              <img src={imageUrl} alt="Generated" className="w-full rounded-lg" />
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setShowShareModal(true)} 
+                className="flex-1"
+                variant="default"
+              >
+                <Share2 className="h-4 w-4 mr-2" />
+                Share
+              </Button>
+              <Button 
+                onClick={() => {
+                  setImageUrl("");
+                  setPrompt("");
+                }}
+                variant="outline"
+                className="flex-1"
+              >
+                Generate New
+              </Button>
+            </div>
           </div>
         )}
       </div>
+
+      <ImageShareModal
+        open={showShareModal}
+        onOpenChange={setShowShareModal}
+        imageUrl={imageUrl}
+        imageType="generated"
+      />
 
       <BottomNav />
     </div>

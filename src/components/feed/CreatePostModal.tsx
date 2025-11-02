@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -22,9 +22,16 @@ interface CreatePostModalProps {
   onClose: () => void;
   onSuccess: () => void;
   defaultTab?: 'text' | 'image' | 'video';
+  initialImageUrl?: string | null;
 }
 
-export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' }: CreatePostModalProps) => {
+export const CreatePostModal = ({ 
+  open, 
+  onClose, 
+  onSuccess, 
+  defaultTab = 'text',
+  initialImageUrl = null 
+}: CreatePostModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [content, setContent] = useState('');
@@ -33,6 +40,15 @@ export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' 
   const [mediaType, setMediaType] = useState<'image' | 'video' | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'video'>(defaultTab);
+
+  // Handle initial image URL
+  useEffect(() => {
+    if (initialImageUrl && open) {
+      setMediaPreview(initialImageUrl);
+      setMediaType('image');
+      setActiveTab('image');
+    }
+  }, [initialImageUrl, open]);
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -62,7 +78,14 @@ export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' 
   };
 
   const uploadMedia = async (): Promise<string | null> => {
-    if (!mediaFile || !user) return null;
+    if (!user) return null;
+
+    // If we have an initial image URL (from enhancement/generation), use it directly
+    if (initialImageUrl && !mediaFile) {
+      return initialImageUrl;
+    }
+
+    if (!mediaFile) return null;
 
     const fileExt = mediaFile.name.split('.').pop();
     const fileName = `${user.id}/${Date.now()}.${fileExt}`;
@@ -82,7 +105,7 @@ export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' 
 
   const handleSubmit = async () => {
     if (!user) return;
-    if (!content.trim() && !mediaFile) {
+    if (!content.trim() && !mediaFile && !initialImageUrl) {
       toast({
         title: 'Empty post',
         description: 'Please add some content or media',
@@ -94,7 +117,7 @@ export const CreatePostModal = ({ open, onClose, onSuccess, defaultTab = 'text' 
     setLoading(true);
     try {
       let mediaUrl = null;
-      if (mediaFile) {
+      if (mediaFile || initialImageUrl) {
         mediaUrl = await uploadMedia();
       }
 
