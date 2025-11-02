@@ -15,6 +15,12 @@ import Call from "./pages/Call";
 import CallHistory from "./pages/CallHistory";
 import Live from "./pages/Live";
 import AICopilot from "./pages/AICopilot";
+import ThesisWriter from "./pages/ThesisWriter";
+import VideoCreation from "./pages/VideoCreation";
+import EducationalQA from "./pages/EducationalQA";
+import ProjectWriting from "./pages/ProjectWriting";
+import ImageGeneration from "./pages/ImageGeneration";
+import ImageEnhancement from "./pages/ImageEnhancement";
 import Groups from "./pages/Groups";
 import GroupDetail from "./pages/GroupDetail";
 import Subscription from "./pages/Subscription";
@@ -53,6 +59,12 @@ const App: React.FC = () => (
           <Route path="/call-history" element={<CallHistory />} />
           <Route path="/live" element={<Live />} />
           <Route path="/ai-copilot" element={<AICopilot />} />
+          <Route path="/thesis-writer" element={<ThesisWriter />} />
+          <Route path="/video-creation" element={<VideoCreation />} />
+          <Route path="/educational-qa" element={<EducationalQA />} />
+          <Route path="/project-writing" element={<ProjectWriting />} />
+          <Route path="/image-generation" element={<ImageGeneration />} />
+          <Route path="/image-enhancement" element={<ImageEnhancement />} />
           <Route path="/groups" element={<Groups />} />
           <Route path="/groups/:groupId" element={<GroupDetail />} />
           <Route path="/subscription" element={<Subscription />} />

@@ -627,10 +627,32 @@ const AICopilot = () => {
         open={showQuickActions}
         onClose={() => setShowQuickActions(false)}
         onActionSelect={(action) => {
-          toast({
-            title: 'AI Feature',
-            description: `${action} - Coming Soon! This feature will allow advanced AI operations.`,
-          });
+          switch (action) {
+            case "Thesis Writer":
+              navigate("/thesis-writer");
+              break;
+            case "Video Creation":
+              navigate("/video-creation");
+              break;
+            case "Educational Q&A":
+              navigate("/educational-qa");
+              break;
+            case "Project Writing":
+              navigate("/project-writing");
+              break;
+            case "Image Generation":
+              navigate("/image-generation");
+              break;
+            case "Image Enhancement":
+              navigate("/image-enhancement");
+              break;
+            default:
+              toast({
+                title: 'AI Feature',
+                description: `${action} - Coming Soon! This feature will allow advanced AI operations.`,
+              });
+          }
+          setShowQuickActions(false);
         }}
         context="ai"
       />
