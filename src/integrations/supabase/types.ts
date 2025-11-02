@@ -1676,8 +1676,11 @@ export type Database = {
           bio: string | null
           country: string | null
           created_at: string
+          daily_ai_chat_count: number | null
+          daily_ai_eduqa_count: number | null
           daily_ai_image_count: number | null
-          daily_ai_prompt_count: number | null
+          daily_ai_thesis_count: number | null
+          daily_ai_video_count: number | null
           display_name: string | null
           followers_count: number | null
           following_count: number | null
@@ -1705,8 +1708,11 @@ export type Database = {
           bio?: string | null
           country?: string | null
           created_at?: string
+          daily_ai_chat_count?: number | null
+          daily_ai_eduqa_count?: number | null
           daily_ai_image_count?: number | null
-          daily_ai_prompt_count?: number | null
+          daily_ai_thesis_count?: number | null
+          daily_ai_video_count?: number | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
@@ -1734,8 +1740,11 @@ export type Database = {
           bio?: string | null
           country?: string | null
           created_at?: string
+          daily_ai_chat_count?: number | null
+          daily_ai_eduqa_count?: number | null
           daily_ai_image_count?: number | null
-          daily_ai_prompt_count?: number | null
+          daily_ai_thesis_count?: number | null
+          daily_ai_video_count?: number | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null

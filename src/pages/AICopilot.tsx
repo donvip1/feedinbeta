@@ -24,7 +24,16 @@ const AICopilot = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [aiUsage, setAiUsage] = useState({ promptCount: 0, imageCount: 0, isPremium: false });
+  const [aiUsage, setAiUsage] = useState({ 
+    chatCount: 0, 
+    thesisCount: 0, 
+    videoCount: 0, 
+    eduQaCount: 0, 
+    imageCount: 0, 
+    isPremium: false 
+  });
+  const [userCredits, setUserCredits] = useState(0);
+  const [selectedTool, setSelectedTool] = useState<string>('chat');
   const [showQuickActions, setShowQuickActions] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -43,9 +52,18 @@ const AICopilot = () => {
       // Get user's profile with AI usage data
       const { data: profile } = await supabase
         .from('profiles')
-        .select('daily_ai_prompt_count, daily_ai_image_count, last_ai_reset_date')
+        .select('daily_ai_chat_count, daily_ai_thesis_count, daily_ai_video_count, daily_ai_eduqa_count, daily_ai_image_count, last_ai_reset_date')
         .eq('id', user?.id)
         .single();
+
+      // Get user credits
+      const { data: credits } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user?.id)
+        .single();
+
+      setUserCredits(credits?.balance || 0);
 
       // Check if user has premium subscription
       const { data: subscription } = await supabase
@@ -70,16 +88,29 @@ const AICopilot = () => {
         await supabase
           .from('profiles')
           .update({ 
-            daily_ai_prompt_count: 0, 
+            daily_ai_chat_count: 0,
+            daily_ai_thesis_count: 0,
+            daily_ai_video_count: 0,
+            daily_ai_eduqa_count: 0,
             daily_ai_image_count: 0,
             last_ai_reset_date: today 
           })
           .eq('id', user?.id);
         
-        setAiUsage({ promptCount: 0, imageCount: 0, isPremium: isPremium || false });
+        setAiUsage({ 
+          chatCount: 0, 
+          thesisCount: 0, 
+          videoCount: 0, 
+          eduQaCount: 0, 
+          imageCount: 0, 
+          isPremium: isPremium || false 
+        });
       } else {
         setAiUsage({
-          promptCount: profile?.daily_ai_prompt_count || 0,
+          chatCount: profile?.daily_ai_chat_count || 0,
+          thesisCount: profile?.daily_ai_thesis_count || 0,
+          videoCount: profile?.daily_ai_video_count || 0,
+          eduQaCount: profile?.daily_ai_eduqa_count || 0,
           imageCount: profile?.daily_ai_image_count || 0,
           isPremium: isPremium || false,
         });
@@ -205,44 +236,119 @@ const AICopilot = () => {
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
 
-    // Check AI usage limits
-    if (!aiUsage.isPremium && aiUsage.promptCount >= 3) {
-      toast({
-        title: 'Daily limit reached',
-        description: 'Free users can send 3 prompts per day. Upgrade to Premium for unlimited access.',
-        variant: 'destructive',
-      });
-      return;
+    const userMessage = input.trim().toLowerCase();
+    
+    // Detect tool type based on message
+    let toolType = 'chat';
+    let creditCost = 0;
+    let dailyLimit = 0;
+    let currentCount = 0;
+    let countField = '';
+
+    if (userMessage.includes('thesis') || userMessage.includes('research paper')) {
+      toolType = 'thesis';
+      creditCost = 20;
+      dailyLimit = 1;
+      currentCount = aiUsage.thesisCount;
+      countField = 'daily_ai_thesis_count';
+    } else if (userMessage.includes('video') || userMessage.includes('video creation')) {
+      toolType = 'video';
+      creditCost = 50;
+      dailyLimit = 1;
+      currentCount = aiUsage.videoCount;
+      countField = 'daily_ai_video_count';
+    } else if (userMessage.includes('homework') || userMessage.includes('studies') || userMessage.includes('educational') || userMessage.includes('learn')) {
+      toolType = 'eduqa';
+      creditCost = 5;
+      dailyLimit = 5;
+      currentCount = aiUsage.eduQaCount;
+      countField = 'daily_ai_eduqa_count';
+    } else if (userMessage.includes('image') || userMessage.includes('photo') || userMessage.includes('enhance') || userMessage.includes('generate')) {
+      toolType = 'image';
+      creditCost = 20;
+      dailyLimit = 1;
+      currentCount = aiUsage.imageCount;
+      countField = 'daily_ai_image_count';
+    } else {
+      // General chat and app guide are free unlimited
+      toolType = 'chat';
+      creditCost = 0;
+      dailyLimit = 0;
+      currentCount = aiUsage.chatCount;
+      countField = 'daily_ai_chat_count';
     }
 
-    const userMessage = input.trim();
+    // Check limits for paid features
+    if (dailyLimit > 0 && currentCount >= dailyLimit) {
+      // Check if user has enough credits
+      if (userCredits < creditCost) {
+        toast({
+          title: 'Insufficient credits',
+          description: `You need ${creditCost} credits to use this feature. Purchase credits or wait until tomorrow for your free usage to reset.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Deduct credits
+      const { error: deductError } = await supabase
+        .from('user_credits')
+        .update({ balance: userCredits - creditCost })
+        .eq('user_id', user?.id);
+
+      if (deductError) {
+        toast({
+          title: 'Error',
+          description: 'Failed to deduct credits. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Log credit transaction
+      await supabase.from('credit_transactions').insert({
+        user_id: user?.id,
+        amount: -creditCost,
+        type: 'deduction',
+        description: `AI ${toolType} usage`,
+      });
+
+      setUserCredits(prev => prev - creditCost);
+    }
+
+    const fullMessage = input.trim();
     setInput('');
     setIsLoading(true);
 
     // Add user message
-    const userMsg: Message = { role: 'user', content: userMessage };
+    const userMsg: Message = { role: 'user', content: fullMessage };
     setMessages(prev => [...prev, userMsg]);
-    await saveChatMessage('user', userMessage);
+    await saveChatMessage('user', fullMessage);
 
     try {
-      await streamChat(userMessage);
+      await streamChat(fullMessage);
       
-      // Increment prompt count
-      const newCount = aiUsage.promptCount + 1;
-      await supabase
-        .from('profiles')
-        .update({ daily_ai_prompt_count: newCount })
-        .eq('id', user?.id);
-      
-      setAiUsage(prev => ({ ...prev, promptCount: newCount }));
+      // Increment count
+      if (countField) {
+        const newCount = currentCount + 1;
+        await supabase
+          .from('profiles')
+          .update({ [countField]: newCount })
+          .eq('id', user?.id);
+        
+        setAiUsage(prev => ({ 
+          ...prev, 
+          [`${toolType}Count`]: newCount 
+        }));
+      }
       
       // Track usage
       await supabase.from('ai_usage').insert({
         user_id: user?.id,
         model: 'google/gemini-2.5-flash',
-        feature: 'chat',
-        tokens_used: userMessage.length + 100, // Estimate
-        cost_credits: 0,
+        feature: toolType,
+        tokens_used: fullMessage.length + 100,
+        cost_credits: creditCost,
       });
     } catch (error: any) {
       console.error('Chat error:', error);
@@ -251,7 +357,6 @@ const AICopilot = () => {
         description: error.message || 'Failed to get response from AI',
         variant: 'destructive',
       });
-      // Remove the user message if AI failed
       setMessages(prev => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
@@ -295,16 +400,14 @@ const AICopilot = () => {
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                  AI Copilot
+                  FEED AI
                 </span>
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              {!aiUsage.isPremium && (
-                <div className="text-xs bg-gray-800 px-3 py-1 rounded-full">
-                  {aiUsage.promptCount}/3 prompts
-                </div>
-              )}
+              <div className="text-xs bg-gray-800 px-3 py-1 rounded-full">
+                {userCredits} credits
+              </div>
               {messages.length > 0 && (
                 <Button
                   onClick={clearChat}
@@ -343,51 +446,67 @@ const AICopilot = () => {
                 {[
                   { 
                     title: 'Image Enhancement', 
-                    desc: 'Enhance photos with Good, Better, or Ultra quality',
+                    desc: '1 free/day then 20 credits per use',
                     icon: '🎨',
-                    prompt: 'I want to enhance an image'
+                    prompt: 'I want to enhance an image',
+                    cost: 20,
+                    limit: '1/day'
                   },
                   { 
                     title: 'Image Generation', 
-                    desc: 'Create AI-generated images from text descriptions',
+                    desc: '1 free/day then 20 credits per use',
                     icon: '🖼️',
-                    prompt: 'I want to generate an image'
+                    prompt: 'I want to generate an image',
+                    cost: 20,
+                    limit: '1/day'
                   },
                   { 
                     title: 'Project Writing', 
-                    desc: 'Help with essays, reports, and academic projects',
+                    desc: '1 free/day then 20 credits per use',
                     icon: '📝',
-                    prompt: 'Help me write a project'
+                    prompt: 'Help me write a project',
+                    cost: 20,
+                    limit: '1/day'
                   },
                   { 
                     title: 'Educational Q&A', 
-                    desc: 'Get help with homework and learning concepts',
+                    desc: '5 free/day then 5 credits per use',
                     icon: '🎓',
-                    prompt: 'I have a question about my studies'
+                    prompt: 'I have a question about my studies',
+                    cost: 5,
+                    limit: '5/day'
                   },
                   { 
                     title: 'Video Creation', 
-                    desc: 'Generate short videos from text or images',
+                    desc: '1 free/day then 50 credits per use',
                     icon: '🎬',
-                    prompt: 'I want to create a short video'
+                    prompt: 'I want to create a short video',
+                    cost: 50,
+                    limit: '1/day'
                   },
                   { 
                     title: 'Thesis Generator', 
-                    desc: 'Structure and develop thesis papers',
+                    desc: '1 free/day then 20 credits per use',
                     icon: '📚',
-                    prompt: 'Help me with my thesis'
+                    prompt: 'Help me with my thesis',
+                    cost: 20,
+                    limit: '1/day'
                   },
                   { 
                     title: 'App Guide', 
-                    desc: 'Learn how to use FEEDIN features',
+                    desc: 'Free unlimited - Learn FEEDIN features',
                     icon: '❓',
-                    prompt: 'How does FEEDIN work?'
+                    prompt: 'How does FEEDIN work?',
+                    cost: 0,
+                    limit: 'Unlimited'
                   },
                   { 
                     title: 'General Chat', 
-                    desc: 'Ask me anything or have a conversation',
+                    desc: 'Free unlimited - Ask anything',
                     icon: '💬',
-                    prompt: 'Let\'s chat!'
+                    prompt: 'Let\'s chat!',
+                    cost: 0,
+                    limit: 'Unlimited'
                   }
                 ].map((tool, i) => (
                   <button
