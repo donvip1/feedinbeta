@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2 } from 'lucide-react';
+import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -15,13 +15,14 @@ import { extractHashtags } from '@/lib/hashtag-utils';
 interface PostDetailsModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   mediaUrl: string;
   mediaType: 'text' | 'image' | 'video';
   effects: any;
   onSuccess: () => void;
 }
 
-export function PostDetailsModal({ open, onClose, mediaUrl, mediaType, effects, onSuccess }: PostDetailsModalProps) {
+export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, effects, onSuccess }: PostDetailsModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -115,146 +116,162 @@ export function PostDetailsModal({ open, onClose, mediaUrl, mediaType, effects, 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Post Details</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-6">
-          {/* Media Preview */}
-          {mediaUrl && (
-            <div className="rounded-lg overflow-hidden border">
-              {mediaType === 'image' ? (
-                <img src={mediaUrl} alt="Post" className="w-full max-h-60 object-cover" />
-              ) : mediaType === 'video' ? (
-                <video src={mediaUrl} className="w-full max-h-60" controls />
-              ) : null}
-            </div>
-          )}
-
-          {/* Description */}
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="What's on your mind? Use #hashtags and @mentions"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className="mt-2"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Use # for hashtags and @ to mention friends
-            </p>
-          </div>
-
-          {/* Location */}
-          <div>
-            <Label htmlFor="location">Location</Label>
-            <div className="relative mt-2">
-              <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="location"
-                placeholder="Add location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          {/* Privacy */}
-          <div>
-            <Label>Who can view this post?</Label>
-            <Select value={privacy} onValueChange={(v: any) => setPrivacy(v)}>
-              <SelectTrigger className="mt-2">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="everyone">
-                  <div className="flex items-center">
-                    <Globe className="w-4 h-4 mr-2" />
-                    Everyone
-                  </div>
-                </SelectItem>
-                <SelectItem value="friends">
-                  <div className="flex items-center">
-                    <Users className="w-4 h-4 mr-2" />
-                    Friends Only
-                  </div>
-                </SelectItem>
-                <SelectItem value="followers">
-                  <div className="flex items-center">
-                    <UserCheck className="w-4 h-4 mr-2" />
-                    Followers
-                  </div>
-                </SelectItem>
-                <SelectItem value="only_me">
-                  <div className="flex items-center">
-                    <Lock className="w-4 h-4 mr-2" />
-                    Only Me
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Settings */}
-          <div className="space-y-4">
+      <DialogContent className="fixed left-1/2 top-2 bottom-16 -translate-x-1/2 translate-y-0 max-w-2xl w-[95vw] p-0 z-[55] overflow-hidden">
+        <div className="flex flex-col h-full">
+          <DialogHeader className="px-6 py-4 border-b sticky top-0 bg-background z-10 shrink-0">
             <div className="flex items-center justify-between">
-              <Label htmlFor="comments">Allow Comments</Label>
-              <Switch
-                id="comments"
-                checked={allowComments}
-                onCheckedChange={setAllowComments}
-              />
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={onBack ?? onClose} 
+                className="h-8 w-8 p-0"
+                aria-label="Back"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <DialogTitle>Post Details</DialogTitle>
+              <div className="w-8" />
             </div>
+          </DialogHeader>
 
-            <div className="flex items-center justify-between">
-              <Label htmlFor="refeed">Allow Refeed (Repost)</Label>
-              <Switch
-                id="refeed"
-                checked={allowRefeed}
-                onCheckedChange={setAllowRefeed}
-              />
-            </div>
-          </div>
+          <div className="flex-1 overflow-y-auto px-6">
+            <div className="space-y-6 py-6">
+              {/* Media Preview */}
+              {mediaUrl && (
+                <div className="rounded-lg overflow-hidden border">
+                  {mediaType === 'image' ? (
+                    <img src={mediaUrl} alt="Post" className="w-full max-h-60 object-cover" />
+                  ) : mediaType === 'video' ? (
+                    <video src={mediaUrl} className="w-full max-h-60" controls />
+                  ) : null}
+                </div>
+              )}
 
-          {/* Schedule Options */}
-          <div className="space-y-3">
-            <Label>Quick Schedule</Label>
-            <div className="grid grid-cols-3 gap-2">
-              <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(10))}>
-                10 min
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(60))}>
-                1 hour
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(360))}>
-                6 hours
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(720))}>
-                12 hours
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(1440))}>
-                24 hours
-              </Button>
-            </div>
-            
-            <div className="mt-3">
-              <Label htmlFor="custom-schedule">Custom Schedule</Label>
-              <Input
-                id="custom-schedule"
-                type="datetime-local"
-                value={scheduleTime}
-                onChange={(e) => setScheduleTime(e.target.value)}
-                className="mt-2"
-              />
+              {/* Description */}
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  placeholder="What's on your mind? Use #hashtags and @mentions"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                  className="mt-2"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use # for hashtags and @ to mention friends
+                </p>
+              </div>
+
+              {/* Location */}
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <div className="relative mt-2">
+                  <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="location"
+                    placeholder="Add location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              {/* Privacy */}
+              <div>
+                <Label>Who can view this post?</Label>
+                <Select value={privacy} onValueChange={(v: any) => setPrivacy(v)}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="everyone">
+                      <div className="flex items-center">
+                        <Globe className="w-4 h-4 mr-2" />
+                        Everyone
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="friends">
+                      <div className="flex items-center">
+                        <Users className="w-4 h-4 mr-2" />
+                        Friends Only
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="followers">
+                      <div className="flex items-center">
+                        <UserCheck className="w-4 h-4 mr-2" />
+                        Followers
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="only_me">
+                      <div className="flex items-center">
+                        <Lock className="w-4 h-4 mr-2" />
+                        Only Me
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Settings */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="comments">Allow Comments</Label>
+                  <Switch
+                    id="comments"
+                    checked={allowComments}
+                    onCheckedChange={setAllowComments}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="refeed">Allow Refeed (Repost)</Label>
+                  <Switch
+                    id="refeed"
+                    checked={allowRefeed}
+                    onCheckedChange={setAllowRefeed}
+                  />
+                </div>
+              </div>
+
+              {/* Schedule Options */}
+              <div className="space-y-3">
+                <Label>Quick Schedule</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(10))}>
+                    10 min
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(60))}>
+                    1 hour
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(360))}>
+                    6 hours
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(720))}>
+                    12 hours
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setScheduleTime(getQuickScheduleTime(1440))}>
+                    24 hours
+                  </Button>
+                </div>
+                
+                <div className="mt-3">
+                  <Label htmlFor="custom-schedule">Custom Schedule</Label>
+                  <Input
+                    id="custom-schedule"
+                    type="datetime-local"
+                    value={scheduleTime}
+                    onChange={(e) => setScheduleTime(e.target.value)}
+                    className="mt-2"
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-4">
+          <div className="sticky bottom-0 px-6 py-4 border-t bg-background flex gap-2">
             <Button variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>

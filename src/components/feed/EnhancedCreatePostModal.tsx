@@ -242,6 +242,7 @@ export function EnhancedCreatePostModal({
         <PostEditorModal
           open={step === 'edit'}
           onClose={handleClose}
+          onBack={() => setStep('upload')}
           mediaUrl={mediaPreview}
           mediaType={mediaType as 'image' | 'video'}
           onNext={handleEditorNext}
@@ -252,6 +253,7 @@ export function EnhancedCreatePostModal({
       <PostDetailsModal
         open={step === 'details'}
         onClose={handleClose}
+        onBack={() => setStep(mediaType === 'text' ? 'upload' : 'edit')}
         mediaUrl={mediaPreview || ''}
         mediaType={mediaType}
         effects={effects}

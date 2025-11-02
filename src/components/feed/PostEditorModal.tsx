@@ -94,7 +94,7 @@ const handleNext = () => {
             </div>
           </DialogHeader>
 
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-y-auto overflow-x-hidden">
             {/* Preview Section */}
             <div className="flex-1 bg-black flex items-center justify-center p-2 md:p-4 overflow-x-auto min-h-[200px] md:min-h-0">
               <div className="flex items-center justify-center min-w-full">
@@ -118,7 +118,7 @@ const handleNext = () => {
             </div>
 
             {/* Editor Panel */}
-            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0 overflow-y-auto">
+            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0 overflow-y-auto min-h-0 pb-28">
               <div className="p-3 space-y-4 pb-6">
                   {/* Filters */}
                   <div>
