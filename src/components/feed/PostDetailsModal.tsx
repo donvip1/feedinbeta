@@ -271,38 +271,38 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
           </div>
 
           {/* Action Buttons */}
-          <div className="sticky bottom-0 px-6 py-4 border-t bg-background flex gap-2">
-            <Button variant="outline" onClick={onClose} className="flex-1">
-              Cancel
-            </Button>
+          <div className="sticky bottom-0 px-6 py-4 border-t bg-background flex gap-2 shrink-0">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handlePost('draft')}
+            disabled={loading}
+            className="flex-1"
+          >
+            Save Draft
+          </Button>
+          {scheduleTime && (
             <Button
-              variant="outline"
-              onClick={() => handlePost('draft')}
+              onClick={handleSchedule}
               disabled={loading}
-              className="flex-1"
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
             >
-              Save Draft
+              <Clock className="w-4 h-4 mr-2" />
+              Schedule
             </Button>
-            {scheduleTime && (
-              <Button
-                onClick={handleSchedule}
-                disabled={loading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-              >
-                <Clock className="w-4 h-4 mr-2" />
-                Schedule
-              </Button>
-            )}
-            <Button
-              onClick={() => handlePost('post')}
-              disabled={loading}
-              className="flex-1 bg-gradient-primary"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Post Now'}
-            </Button>
-          </div>
+          )}
+          <Button
+            onClick={() => handlePost('post')}
+            disabled={loading}
+            className="flex-1 bg-gradient-primary"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Post Now'}
+          </Button>
         </div>
-      </DialogContent>
+      </div>
+    </DialogContent>
     </Dialog>
   );
 }

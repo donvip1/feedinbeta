@@ -80,46 +80,45 @@ const handleNext = () => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="fixed left-1/2 top-2 bottom-16 -translate-x-1/2 translate-y-0 max-w-4xl w-[95vw] p-0 z-[55] overflow-hidden data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-top-[48%]">
-        <div className="flex flex-col h-full">
-          <DialogHeader className="px-3 py-2 border-b sticky top-0 bg-background z-10 shrink-0">
-            <div className="flex items-center justify-between">
-              <Button variant="ghost" size="sm" onClick={onBack ?? onClose} aria-label="Back" className="h-8 w-8 p-0">
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <DialogTitle className="text-sm">Edit Your Post</DialogTitle>
-              <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="h-8 w-8 p-0">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          </DialogHeader>
+      <DialogContent className="fixed left-1/2 top-2 bottom-16 -translate-x-1/2 translate-y-0 max-w-4xl w-[95vw] p-0 z-[55] overflow-hidden flex flex-col">
+        <DialogHeader className="px-3 py-2 border-b bg-background shrink-0">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" onClick={onBack ?? onClose} aria-label="Back" className="h-8 w-8 p-0">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <DialogTitle className="text-sm">Edit Your Post</DialogTitle>
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close" className="h-8 w-8 p-0">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+        </DialogHeader>
 
-          <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-y-auto overflow-x-hidden">
-            {/* Preview Section */}
-            <div className="flex-1 bg-black flex items-center justify-center p-2 md:p-4 overflow-x-auto min-h-[200px] md:min-h-0">
-              <div className="flex items-center justify-center min-w-full">
-                {mediaType === 'image' ? (
-                  <img 
-                    src={mediaUrl} 
-                    alt="Preview" 
-                    className="max-w-full max-h-[200px] md:max-h-full object-contain"
-                    style={getFilterStyle()}
-                  />
-                ) : (
-                  <video 
-                    src={mediaUrl} 
-                    className="max-w-full max-h-[200px] md:max-h-full object-contain"
-                    style={getFilterStyle()}
-                    controls={!isMuted}
-                    muted={isMuted}
-                  />
-                )}
-              </div>
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+          {/* Preview Section */}
+          <div className="flex-shrink-0 bg-black flex items-center justify-center p-2 md:p-4 overflow-x-auto min-h-[200px] md:min-h-0 md:flex-1">
+            <div className="flex items-center justify-center min-w-full">
+              {mediaType === 'image' ? (
+                <img 
+                  src={mediaUrl} 
+                  alt="Preview" 
+                  className="max-w-full max-h-[200px] md:max-h-full object-contain"
+                  style={getFilterStyle()}
+                />
+              ) : (
+                <video 
+                  src={mediaUrl} 
+                  className="max-w-full max-h-[200px] md:max-h-full object-contain"
+                  style={getFilterStyle()}
+                  controls={!isMuted}
+                  muted={isMuted}
+                />
+              )}
             </div>
+          </div>
 
-            {/* Editor Panel */}
-            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0 overflow-y-auto min-h-0 pb-28">
-              <div className="p-3 space-y-4 pb-6">
+          {/* Editor Panel - Scrollable */}
+          <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0 overflow-y-auto">
+            <div className="p-3 space-y-4 pb-20">
                   {/* Filters */}
                   <div>
                     <h3 className="font-semibold mb-2 text-sm">Filters</h3>
@@ -228,16 +227,15 @@ const handleNext = () => {
                   </div>
                 </div>
               </div>
-          </div>
+            </div>
 
-          <div className="sticky bottom-0 px-3 py-2 border-t bg-background flex justify-between shrink-0">
-            <Button variant="outline" onClick={onClose} size="sm" className="h-8 text-xs">
-              Cancel
-            </Button>
-            <Button onClick={handleNext} className="bg-gradient-primary h-8 text-xs" size="sm">
-              Next
-            </Button>
-          </div>
+            <div className="sticky bottom-0 px-3 py-2 border-t bg-background flex justify-between shrink-0">
+          <Button variant="outline" onClick={onClose} size="sm" className="h-8 text-xs">
+            Cancel
+          </Button>
+          <Button onClick={handleNext} className="bg-gradient-primary h-8 text-xs" size="sm">
+            Next
+          </Button>
         </div>
       </DialogContent>
     </Dialog>
