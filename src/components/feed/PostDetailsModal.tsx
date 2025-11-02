@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,8 +11,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { extractHashtags } from '@/lib/hashtag-utils';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface PostDetailsModalProps {
   open: boolean;
@@ -47,6 +45,17 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
   const filteredLocations = location
     ? POPULAR_LOCATIONS.filter(loc => loc.toLowerCase().includes(location.toLowerCase()))
     : POPULAR_LOCATIONS;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('#location') && !target.closest('.location-suggestions')) {
+        setLocationOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const getCurrentLocation = () => {
     setGettingLocation(true);
@@ -213,47 +222,40 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
               <div>
                 <Label htmlFor="location">Location</Label>
                 <div className="flex gap-2 mt-2">
-                  <Popover open={locationOpen} onOpenChange={setLocationOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={locationOpen}
-                        className="flex-1 justify-start"
-                      >
-                        <MapPin className="mr-2 h-4 w-4 shrink-0" />
-                        {location || "Select location..."}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0" align="start">
-                      <Command>
-                        <CommandInput 
-                          placeholder="Search location..." 
-                          value={location}
-                          onValueChange={setLocation}
-                        />
-                        <CommandList>
-                          <CommandEmpty>No location found.</CommandEmpty>
-                          <CommandGroup>
-                            {filteredLocations.map((loc) => (
-                              <CommandItem
-                                key={loc}
-                                value={loc}
-                                onSelect={(value) => {
-                                  setLocation(value);
-                                  setLocationOpen(false);
-                                }}
-                              >
-                                <MapPin className="mr-2 h-4 w-4" />
-                                {loc}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <div className="relative flex-1">
+                    <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground z-10" />
+                    <Input
+                      id="location"
+                      placeholder="Enter or select location"
+                      value={location}
+                      onChange={(e) => {
+                        setLocation(e.target.value);
+                        if (e.target.value) setLocationOpen(true);
+                      }}
+                      onFocus={() => setLocationOpen(true)}
+                      className="pl-10"
+                    />
+                    {locationOpen && filteredLocations.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto z-50">
+                        {filteredLocations.map((loc) => (
+                          <button
+                            key={loc}
+                            type="button"
+                            className="w-full px-3 py-2 text-left hover:bg-accent flex items-center gap-2 text-sm"
+                            onClick={() => {
+                              setLocation(loc);
+                              setLocationOpen(false);
+                            }}
+                          >
+                            <MapPin className="w-4 h-4 text-muted-foreground" />
+                            {loc}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <Button
+                    type="button"
                     variant="outline"
                     size="icon"
                     onClick={getCurrentLocation}
