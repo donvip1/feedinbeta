@@ -445,52 +445,20 @@ const AICopilot = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                 {[
                   { 
-                    title: 'Image Enhancement', 
-                    desc: '1 free/day then 20 credits per use',
-                    icon: '🎨',
-                    prompt: 'I want to enhance an image',
-                    cost: 20,
-                    limit: '1/day'
+                    title: 'General Chat', 
+                    desc: 'Free unlimited - Chat about anything',
+                    icon: '💬',
+                    prompt: 'Let\'s have a conversation',
+                    cost: 0,
+                    limit: 'Unlimited'
                   },
                   { 
-                    title: 'Image Generation', 
-                    desc: '1 free/day then 20 credits per use',
-                    icon: '🖼️',
-                    prompt: 'I want to generate an image',
-                    cost: 20,
-                    limit: '1/day'
-                  },
-                  { 
-                    title: 'Project Writing', 
-                    desc: '1 free/day then 20 credits per use',
-                    icon: '📝',
-                    prompt: 'Help me write a project',
-                    cost: 20,
-                    limit: '1/day'
-                  },
-                  { 
-                    title: 'Educational Q&A', 
-                    desc: '5 free/day then 5 credits per use',
-                    icon: '🎓',
-                    prompt: 'I have a question about my studies',
-                    cost: 5,
-                    limit: '5/day'
-                  },
-                  { 
-                    title: 'Video Creation', 
-                    desc: '1 free/day then 50 credits per use',
-                    icon: '🎬',
-                    prompt: 'I want to create a short video',
-                    cost: 50,
-                    limit: '1/day'
-                  },
-                  { 
-                    title: 'Thesis Generator', 
-                    desc: '1 free/day then 20 credits per use',
-                    icon: '📚',
-                    prompt: 'Help me with my thesis',
-                    cost: 20,
-                    limit: '1/day'
+                    title: 'Chat with AI Friend', 
+                    desc: 'Free unlimited - Casual, fun conversations',
+                    icon: '👋',
+                    prompt: 'Hey friend! Let\'s chat and have some fun',
+                    cost: 0,
+                    limit: 'Unlimited'
                   },
                   { 
                     title: 'App Guide', 
@@ -501,13 +469,29 @@ const AICopilot = () => {
                     limit: 'Unlimited'
                   },
                   { 
-                    title: 'General Chat', 
-                    desc: 'Free unlimited - Ask anything',
-                    icon: '💬',
-                    prompt: 'Let\'s chat!',
+                    title: 'Word to PDF', 
+                    desc: 'Free unlimited - Convert documents',
+                    icon: '📄',
+                    prompt: 'I want to convert a Word document to PDF',
                     cost: 0,
                     limit: 'Unlimited'
-                  }
+                  },
+                  { 
+                    title: 'Image to PDF', 
+                    desc: 'Free unlimited - Convert images',
+                    icon: '🖼️',
+                    prompt: 'I want to convert images to PDF',
+                    cost: 0,
+                    limit: 'Unlimited'
+                  },
+                  { 
+                    title: 'Text to PDF', 
+                    desc: 'Free unlimited - Create PDF from text',
+                    icon: '📝',
+                    prompt: 'I want to create a PDF from text',
+                    cost: 0,
+                    limit: 'Unlimited'
+                  },
                 ].map((tool, i) => (
                   <button
                     key={i}

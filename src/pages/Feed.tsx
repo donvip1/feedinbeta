@@ -6,10 +6,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
-import { CreatePostModal } from '@/components/feed/CreatePostModal';
+import { EnhancedCreatePostModal } from '@/components/feed/EnhancedCreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface Post {
   id: string;
@@ -41,6 +43,8 @@ const Feed = () => {
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
   const [activeTab, setActiveTab] = useState<'following' | 'forYou' | 'myPosts'>('forYou');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -64,7 +68,7 @@ const Feed = () => {
     }
     
     loadPosts();
-  }, [user, authLoading, navigate, activeTab]);
+  }, [user, authLoading, navigate, activeTab, searchQuery]);
 
   const loadPosts = async () => {
     try {
@@ -85,23 +89,28 @@ const Feed = () => {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      // Filter based on active tab
-      if (activeTab === 'myPosts' && user) {
-        query = query.eq('user_id', user.id);
-      } else if (activeTab === 'following' && user) {
-        // Get posts from users the current user follows
-        const { data: following } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', user.id);
-        
-        const followingIds = following?.map(f => f.following_id) || [];
-        if (followingIds.length > 0) {
-          query = query.in('user_id', followingIds);
-        } else {
-          setPosts([]);
-          setLoading(false);
-          return;
+      // Search filter
+      if (searchQuery) {
+        query = query.or(`content.ilike.%${searchQuery}%,profiles.username.ilike.%${searchQuery}%,profiles.display_name.ilike.%${searchQuery}%`);
+      } else {
+        // Filter based on active tab only when not searching
+        if (activeTab === 'myPosts' && user) {
+          query = query.eq('user_id', user.id);
+        } else if (activeTab === 'following' && user) {
+          // Get posts from users the current user follows
+          const { data: following } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', user.id);
+          
+          const followingIds = following?.map(f => f.following_id) || [];
+          if (followingIds.length > 0) {
+            query = query.in('user_id', followingIds);
+          } else {
+            setPosts([]);
+            setLoading(false);
+            return;
+          }
         }
       }
 
@@ -240,10 +249,25 @@ const Feed = () => {
             </TabsList>
           </Tabs>
 
-          <button className="w-10 h-10 flex items-center justify-center">
-            <Search className="w-6 h-6 text-white" />
+          <button 
+            onClick={() => setShowSearch(!showSearch)}
+            className="w-10 h-10 flex items-center justify-center"
+          >
+            {showSearch ? <X className="w-6 h-6 text-white" /> : <Search className="w-6 h-6 text-white" />}
           </button>
         </div>
+        
+        {showSearch && (
+          <div className="px-4 pb-3">
+            <Input
+              placeholder="Search posts, users, hashtags..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && loadPosts()}
+              className="bg-gray-900 border-gray-800 text-white placeholder:text-gray-500"
+            />
+          </div>
+        )}
       </header>
 
       {/* Full-screen TikTok-style Feed */}
@@ -297,7 +321,7 @@ const Feed = () => {
       />
 
       {/* Create Post Modal */}
-      <CreatePostModal
+      <EnhancedCreatePostModal
         open={showCreatePost}
         onClose={() => {
           setShowCreatePost(false);

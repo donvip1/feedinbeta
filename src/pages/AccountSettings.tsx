@@ -104,17 +104,26 @@ const AccountSettings = () => {
 
     try {
       setLoading(true);
+      
+      // Delete old avatar if exists
+      if (profile.avatar_url) {
+        const oldPath = profile.avatar_url.split('/avatars/')[1];
+        if (oldPath) {
+          await supabase.storage.from('avatars').remove([oldPath]);
+        }
+      }
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `avatars/${user.id}/${fileName}`;
+      const filePath = `${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
-        .from('posts')
+        .from('avatars')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
       const { error: updateError } = await supabase
         .from('profiles')
@@ -203,9 +212,32 @@ const AccountSettings = () => {
                 />
               </label>
             </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              Click camera to change avatar
-            </p>
+            <div className="flex gap-2 mt-2">
+              <p className="text-sm text-muted-foreground">
+                Click camera to change
+              </p>
+              {profile.avatar_url && (
+                <button
+                  onClick={async () => {
+                    try {
+                      setLoading(true);
+                      const oldPath = profile.avatar_url.split('/avatars/')[1];
+                      if (oldPath) await supabase.storage.from('avatars').remove([oldPath]);
+                      await supabase.from('profiles').update({ avatar_url: null }).eq('id', user?.id);
+                      setProfile({ ...profile, avatar_url: '' });
+                      toast({ title: 'Avatar removed' });
+                    } catch (error: any) {
+                      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                  className="text-sm text-destructive hover:underline"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
           </div>
 
           <Separator className="my-6" />
