@@ -21,7 +21,7 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-gray-900/95 backdrop-blur-lg border-t border-gray-800">
+    <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-gray-900/95 backdrop-blur-lg border-t border-gray-800">
       <div className="container mx-auto px-2">
         <div className="flex items-center justify-around py-1 relative">
           {navItems.slice(0, 2).map((item) => {

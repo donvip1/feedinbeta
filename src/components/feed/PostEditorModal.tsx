@@ -80,7 +80,7 @@ const handleNext = () => {
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl w-[95vw] h-[calc(100vh-8rem)] max-h-[calc(100vh-8rem)] p-0 mb-16">
+      <DialogContent className="relative max-w-4xl w-[95vw] h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)] p-0 z-[55]">
         <div className="flex flex-col h-full">
           <DialogHeader className="px-3 py-2 border-b sticky top-0 bg-background z-10 shrink-0">
             <div className="flex items-center justify-between">
@@ -94,7 +94,7 @@ const handleNext = () => {
             </div>
           </DialogHeader>
 
-          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden pb-24">
             {/* Preview Section */}
             <div className="flex-1 bg-black flex items-center justify-center p-2 md:p-4 overflow-x-auto min-h-[200px] md:min-h-0">
               <div className="flex items-center justify-center min-w-full">
@@ -118,9 +118,9 @@ const handleNext = () => {
             </div>
 
             {/* Editor Panel */}
-            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0">
-              <ScrollArea className="h-full max-h-[calc(100vh-20rem)] md:max-h-full">
-                <div className="p-3 space-y-4">
+            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0 flex flex-col overflow-hidden">
+              <ScrollArea className="flex-1">
+                <div className="p-3 space-y-4 pb-24">
                   {/* Filters */}
                   <div>
                     <h3 className="font-semibold mb-2 text-sm">Filters</h3>
@@ -232,7 +232,7 @@ const handleNext = () => {
             </div>
           </div>
 
-          <div className="px-3 py-2 border-t flex justify-between shrink-0">
+          <div className="absolute bottom-16 left-0 right-0 px-3 py-2 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 flex justify-between z-[56]">
             <Button variant="outline" onClick={onClose} size="sm" className="h-8 text-xs">
               Cancel
             </Button>
