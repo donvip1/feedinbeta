@@ -23,9 +23,10 @@ interface NewConversationModalProps {
   open: boolean;
   onClose: () => void;
   onSelectUser: (userId: string) => void;
+  initialImageUrl?: string | null;
 }
 
-export const NewConversationModal = ({ open, onClose, onSelectUser }: NewConversationModalProps) => {
+export const NewConversationModal = ({ open, onClose, onSelectUser, initialImageUrl }: NewConversationModalProps) => {
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,8 +73,15 @@ export const NewConversationModal = ({ open, onClose, onSelectUser }: NewConvers
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="bg-background border-border max-w-md">
         <DialogHeader>
-          <DialogTitle>New Conversation</DialogTitle>
+          <DialogTitle>{initialImageUrl ? 'Share Image With...' : 'New Conversation'}</DialogTitle>
         </DialogHeader>
+
+        {initialImageUrl && (
+          <div className="mb-4 p-2 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground mb-2">Sharing image:</p>
+            <img src={initialImageUrl} alt="Shared" className="w-full max-h-32 object-contain rounded" />
+          </div>
+        )}
 
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

@@ -67,7 +67,7 @@ export function ImageShareModal({ open, onOpenChange, imageUrl, imageType = "enh
     }
   };
 
-  const shareAsPost = async () => {
+  const shareAsFeed = async () => {
     setLoading(true);
     try {
       const response = await fetch(imageUrl);
@@ -83,9 +83,10 @@ export function ImageShareModal({ open, onOpenChange, imageUrl, imageType = "enh
       // Navigate to feed with the image URL in state
       navigate('/feed', { state: { sharedImage: uploadedUrl } });
       onOpenChange(false);
-      toast({ title: "Redirecting to create post..." });
+      toast({ title: "Redirecting to create feed post..." });
     } catch (error) {
-      toast({ title: "Failed to share as post", variant: "destructive" });
+      console.error("Share as feed error:", error);
+      toast({ title: "Failed to share as feed", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -131,20 +132,24 @@ export function ImageShareModal({ open, onOpenChange, imageUrl, imageType = "enh
     try {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
-      const file = new File([blob], "story.png", { type: "image/png" });
-      const compressed = await compressImage(file);
       
-      const uploadedUrl = await uploadToStorage(compressed);
-      if (!uploadedUrl) {
-        throw new Error("Failed to upload image");
-      }
+      const fileName = `${user?.id}/${Date.now()}.png`;
+      const { error: uploadError } = await supabase.storage
+        .from('story-images')
+        .upload(fileName, blob);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('story-images')
+        .getPublicUrl(fileName);
 
       // Create story
       const { error } = await supabase
         .from('stories')
         .insert({
           user_id: user?.id,
-          media_url: uploadedUrl,
+          media_url: publicUrl,
           media_type: 'image'
         });
 
@@ -154,6 +159,7 @@ export function ImageShareModal({ open, onOpenChange, imageUrl, imageType = "enh
       onOpenChange(false);
       navigate('/feed');
     } catch (error) {
+      console.error("Add to story error:", error);
       toast({ title: "Failed to add to story", variant: "destructive" });
     } finally {
       setLoading(false);
@@ -161,7 +167,10 @@ export function ImageShareModal({ open, onOpenChange, imageUrl, imageType = "enh
   };
 
   const shareViaDM = () => {
-    toast({ title: "Coming soon", description: "Share via DM will be available soon" });
+    // Navigate to messages page with the image to share
+    navigate('/messages', { state: { sharedImage: imageUrl } });
+    onOpenChange(false);
+    toast({ title: "Opening messages...", description: "Select a friend to share with" });
   };
 
   const shareExternal = async (platform: 'whatsapp' | 'facebook' | 'twitter') => {
@@ -197,13 +206,13 @@ export function ImageShareModal({ open, onOpenChange, imageUrl, imageType = "enh
           </Button>
 
           <Button
-            onClick={shareAsPost}
+            onClick={shareAsFeed}
             variant="outline"
             className="w-full justify-start"
             disabled={loading}
           >
             {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageIcon className="h-4 w-4 mr-2" />}
-            Share as Post
+            Share as Feed
           </Button>
 
           <Button

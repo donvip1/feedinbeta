@@ -1681,6 +1681,7 @@ export type Database = {
           daily_ai_image_count: number | null
           daily_ai_thesis_count: number | null
           daily_ai_video_count: number | null
+          daily_enhancement_count: number | null
           display_name: string | null
           followers_count: number | null
           following_count: number | null
@@ -1689,6 +1690,8 @@ export type Database = {
           is_premium: boolean | null
           last_ai_reset: string | null
           last_ai_reset_date: string | null
+          last_enhancement_reset: string | null
+          last_free_enhancement: string | null
           last_username_change: string | null
           location: string | null
           marital_status: string | null
@@ -1714,6 +1717,7 @@ export type Database = {
           daily_ai_image_count?: number | null
           daily_ai_thesis_count?: number | null
           daily_ai_video_count?: number | null
+          daily_enhancement_count?: number | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
@@ -1722,6 +1726,8 @@ export type Database = {
           is_premium?: boolean | null
           last_ai_reset?: string | null
           last_ai_reset_date?: string | null
+          last_enhancement_reset?: string | null
+          last_free_enhancement?: string | null
           last_username_change?: string | null
           location?: string | null
           marital_status?: string | null
@@ -1747,6 +1753,7 @@ export type Database = {
           daily_ai_image_count?: number | null
           daily_ai_thesis_count?: number | null
           daily_ai_video_count?: number | null
+          daily_enhancement_count?: number | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
@@ -1755,6 +1762,8 @@ export type Database = {
           is_premium?: boolean | null
           last_ai_reset?: string | null
           last_ai_reset_date?: string | null
+          last_enhancement_reset?: string | null
+          last_free_enhancement?: string | null
           last_username_change?: string | null
           location?: string | null
           marital_status?: string | null

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -45,6 +45,7 @@ interface Group {
 export default function Messages() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
@@ -55,6 +56,18 @@ export default function Messages() {
   const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
+  const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
+
+  // Handle shared image from location state
+  useEffect(() => {
+    const state = location.state as { sharedImage?: string };
+    if (state?.sharedImage) {
+      setSharedImageUrl(state.sharedImage);
+      setShowNewConversation(true);
+      // Clear the state
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -416,8 +429,12 @@ export default function Messages() {
 
       <NewConversationModal
         open={showNewConversation}
-        onClose={() => setShowNewConversation(false)}
+        onClose={() => {
+          setShowNewConversation(false);
+          setSharedImageUrl(null);
+        }}
         onSelectUser={handleNewConversation}
+        initialImageUrl={sharedImageUrl}
       />
 
       <CreateGroupModal
