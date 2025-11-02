@@ -116,8 +116,8 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="fixed left-1/2 top-2 bottom-16 -translate-x-1/2 translate-y-0 max-w-2xl w-[95vw] p-0 z-[55] overflow-hidden">
-        <div className="flex flex-col h-full">
+      <DialogContent className="fixed left-1/2 top-2 bottom-16 -translate-x-1/2 translate-y-0 max-w-2xl w-[95vw] p-0 z-[55] overflow-hidden flex flex-col">
+        <div className="flex flex-col flex-1 min-h-0">
           <DialogHeader className="px-6 py-4 border-b sticky top-0 bg-background z-10 shrink-0">
             <div className="flex items-center justify-between">
               <Button 
@@ -134,8 +134,8 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
             </div>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto px-6">
-            <div className="space-y-6 py-6">
+          <div className="flex-1 overflow-y-auto px-6 min-h-0">
+            <div className="space-y-6 py-6 pb-6">
               {/* Media Preview */}
               {mediaUrl && (
                 <div className="rounded-lg overflow-hidden border">

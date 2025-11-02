@@ -117,8 +117,8 @@ const handleNext = () => {
           </div>
 
           {/* Editor Panel - Scrollable */}
-          <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background flex-shrink-0 overflow-y-auto">
-            <div className="p-3 space-y-4 pb-20">
+          <div className="w-full md:w-80 border-t md:border-t-0 md:border-l bg-background overflow-y-auto flex-1 md:flex-initial min-h-0">
+            <div className="p-3 space-y-4 pb-24">
                   {/* Filters */}
                   <div>
                     <h3 className="font-semibold mb-2 text-sm">Filters</h3>
