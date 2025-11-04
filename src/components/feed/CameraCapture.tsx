@@ -691,17 +691,45 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                   {stickers.map((sticker, index) => (
                     <div
                       key={index}
-                      className="absolute pointer-events-auto"
+                      className="absolute pointer-events-auto cursor-move"
                       style={{
                         left: `${sticker.x}%`,
                         top: `${sticker.y}%`,
                         transform: `translate(-50%, -50%) scale(${sticker.scale})`,
                         touchAction: 'none',
+                        zIndex: draggedStickerIndex === index ? 50 : 10,
                       }}
                       onTouchStart={(e) => handleStickerTouchStart(e, index)}
+                      onTouchMove={(e) => {
+                        if (!previewRef.current || draggedStickerIndex !== index) return;
+                        e.preventDefault();
+                        const touch = e.touches[0];
+                        const rect = previewRef.current.getBoundingClientRect();
+                        const x = ((touch.clientX - rect.left) / rect.width) * 100;
+                        const y = ((touch.clientY - rect.top) / rect.height) * 100;
+                        setStickers(stickers.map((s, i) => 
+                          i === index ? { ...s, x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) } : s
+                        ));
+                      }}
+                      onTouchEnd={handleStickerTouchEnd}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        setDraggedStickerIndex(index);
+                      }}
+                      onMouseMove={(e) => {
+                        if (!previewRef.current || draggedStickerIndex !== index || e.buttons !== 1) return;
+                        e.preventDefault();
+                        const rect = previewRef.current.getBoundingClientRect();
+                        const x = ((e.clientX - rect.left) / rect.width) * 100;
+                        const y = ((e.clientY - rect.top) / rect.height) * 100;
+                        setStickers(stickers.map((s, i) => 
+                          i === index ? { ...s, x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) } : s
+                        ));
+                      }}
+                      onMouseUp={handleStickerTouchEnd}
                     >
                       <div className="relative">
-                        <span className="text-6xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] select-none">
+                        <span className="text-6xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.6)] select-none pointer-events-none">
                           {sticker.emoji}
                         </span>
                         <button
@@ -709,7 +737,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                             e.stopPropagation();
                             removeSticker(index);
                           }}
-                          className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center shadow-lg"
+                          className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 rounded-full flex items-center justify-center shadow-lg hover:bg-red-600 transition-colors"
                         >
                           <X className="w-4 h-4 text-white" />
                         </button>

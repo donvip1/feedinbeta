@@ -465,21 +465,21 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         </div>
 
-        {/* Media - Centered and contained */}
+        {/* Media - Full screen like TikTok/Reels */}
         {post.media_url && (
-          <div className="absolute inset-0 z-0 flex items-center justify-center bg-black">
+          <div className="absolute inset-0 z-0 bg-black">
             {post.media_type === 'image' && (
               <img
                 src={post.media_url}
                 alt="Post media"
-                className="max-w-full max-h-full object-contain"
+                className="w-full h-full object-cover"
               />
             )}
             {post.media_type === 'video' && (
               <video
                 src={post.media_url}
                 controls
-                className="max-w-full max-h-full object-contain"
+                className="w-full h-full object-cover"
               />
             )}
           </div>
