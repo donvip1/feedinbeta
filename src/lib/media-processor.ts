@@ -18,7 +18,8 @@ export async function applyImageEffects(
     contrast?: number;
     saturation?: number;
     textOverlay?: string;
-    textPosition?: 'top' | 'center' | 'bottom';
+    textPosition?: number; // 0-100 percentage
+    textSize?: number; // Font size in px
     stickers?: StickerData[];
     rotation?: number;
   },
@@ -76,15 +77,16 @@ export async function applyImageEffects(
 
       // Add text overlay if specified
       if (effects.textOverlay && effects.textOverlay.trim()) {
-        ctx.font = 'bold 48px Arial';
+        const fontSize = effects.textSize || 48;
+        ctx.font = `bold ${fontSize}px Arial`;
         ctx.fillStyle = 'white';
         ctx.strokeStyle = 'black';
         ctx.lineWidth = 3;
         ctx.textAlign = 'center';
 
-        let y = canvas.height / 2;
-        if (effects.textPosition === 'top') y = 80;
-        if (effects.textPosition === 'bottom') y = canvas.height - 80;
+        // Calculate Y position based on percentage (default 50% for center)
+        const positionPercent = effects.textPosition !== undefined ? effects.textPosition : 50;
+        const y = (positionPercent / 100) * canvas.height;
 
         ctx.strokeText(effects.textOverlay, canvas.width / 2, y);
         ctx.fillText(effects.textOverlay, canvas.width / 2, y);

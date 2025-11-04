@@ -69,7 +69,8 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
   const [saturation, setSaturation] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
   const [textOverlay, setTextOverlay] = useState('');
-  const [textPosition, setTextPosition] = useState<'top' | 'center' | 'bottom'>('center');
+  const [textPosition, setTextPosition] = useState(50); // 0-100 percentage
+  const [textSize, setTextSize] = useState(48); // Font size in px
   const [stickers, setStickers] = useState<StickerData[]>([]);
   const [draggedStickerIndex, setDraggedStickerIndex] = useState<number | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
@@ -158,12 +159,11 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
     };
   };
 
-  const getTextPositionClass = () => {
-    switch (textPosition) {
-      case 'top': return 'top-8';
-      case 'bottom': return 'bottom-8';
-      default: return 'top-1/2 -translate-y-1/2';
-    }
+  const getTextPositionStyle = () => {
+    return {
+      top: `${textPosition}%`,
+      transform: 'translateY(-50%)',
+    };
   };
 
   const addSticker = (emoji: string) => {
@@ -223,18 +223,19 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
             saturation,
             textOverlay,
             textPosition,
+            textSize,
             stickers,
           }
         );
         const processedUrl = URL.createObjectURL(processedBlob);
-        onNext(processedUrl, { processedBlob, filter: selectedFilter, brightness, contrast, saturation, textOverlay, stickers, overlayAudioFile, voiceOverBlob });
+        onNext(processedUrl, { processedBlob, filter: selectedFilter, brightness, contrast, saturation, textOverlay, textPosition, textSize, stickers, overlayAudioFile, voiceOverBlob });
       } catch (error) {
         toast({ title: 'Processing failed', variant: 'destructive' });
       } finally {
         setProcessing(false);
       }
     } else {
-      onNext(mediaUrl, { filter: selectedFilter, brightness, contrast, saturation, textOverlay, stickers, overlayAudioFile, voiceOverBlob });
+      onNext(mediaUrl, { filter: selectedFilter, brightness, contrast, saturation, textOverlay, textPosition, textSize, stickers, overlayAudioFile, voiceOverBlob });
     }
   };
 
@@ -270,8 +271,11 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
               <div className="relative w-full h-full flex items-center justify-center">
                 {/* Text Overlay */}
                 {textOverlay && (
-                  <div className={`absolute ${getTextPositionClass()} left-0 right-0 flex justify-center px-4`}>
-                    <p className="text-white text-2xl md:text-4xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-center px-4 py-2 bg-black/30 rounded-lg backdrop-blur-sm">
+                  <div className="absolute left-0 right-0 flex justify-center px-4" style={getTextPositionStyle()}>
+                    <p 
+                      className="text-white font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-center px-4 py-2 bg-black/30 rounded-lg backdrop-blur-sm"
+                      style={{ fontSize: `${textSize}px` }}
+                    >
                       {textOverlay}
                     </p>
                   </div>
@@ -412,7 +416,7 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
 
             {mediaType === 'image' && (
               <>
-                <div className="space-y-2">
+                <div className="space-y-3 p-3 border rounded-lg">
                   <label className="text-xs font-medium flex items-center gap-2">
                     <Type className="w-4 h-4" />
                     Text Overlay
@@ -423,18 +427,55 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
                     onChange={(e) => setTextOverlay(e.target.value)}
                     className="text-sm"
                   />
-                  <div className="flex gap-2">
-                    {(['top', 'center', 'bottom'] as const).map((pos) => (
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Text Size</label>
+                    <Slider 
+                      value={[textSize]} 
+                      onValueChange={([v]) => setTextSize(v)} 
+                      min={20} 
+                      max={100} 
+                      step={2}
+                    />
+                    <p className="text-xs text-muted-foreground text-right">{textSize}px</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Text Position</label>
+                    <div className="flex gap-2 mb-2">
                       <Button
-                        key={pos}
                         size="sm"
-                        variant={textPosition === pos ? "default" : "outline"}
-                        onClick={() => setTextPosition(pos)}
-                        className="flex-1 text-xs capitalize"
+                        variant="outline"
+                        onClick={() => setTextPosition(10)}
+                        className="flex-1 text-xs"
                       >
-                        {pos}
+                        Top
                       </Button>
-                    ))}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setTextPosition(50)}
+                        className="flex-1 text-xs"
+                      >
+                        Center
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setTextPosition(90)}
+                        className="flex-1 text-xs"
+                      >
+                        Bottom
+                      </Button>
+                    </div>
+                    <Slider 
+                      value={[textPosition]} 
+                      onValueChange={([v]) => setTextPosition(v)} 
+                      min={5} 
+                      max={95} 
+                      step={1}
+                    />
+                    <p className="text-xs text-muted-foreground text-right">{textPosition}% from top</p>
                   </div>
                 </div>
 
