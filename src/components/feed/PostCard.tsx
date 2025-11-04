@@ -400,16 +400,16 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
 
-  // Dynamic font sizing based on text length (similar to WhatsApp/Facebook statuses)
+  // Dynamic font sizing based on text length (reduced by 40% for better fit)
   // Responsive: mobile -> tablet -> desktop -> large desktop
   const getTextSize = (text: string) => {
     const length = text.length;
-    if (length <= 30) return 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl';
-    if (length <= 60) return 'text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl';
-    if (length <= 100) return 'text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl';
-    if (length <= 150) return 'text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl';
-    if (length <= 250) return 'text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl';
-    return 'text-sm sm:text-base md:text-lg lg:text-xl';
+    if (length <= 30) return 'text-lg sm:text-xl md:text-2xl lg:text-2xl xl:text-3xl';
+    if (length <= 60) return 'text-base sm:text-lg md:text-xl lg:text-xl xl:text-2xl';
+    if (length <= 100) return 'text-sm sm:text-base md:text-lg lg:text-lg xl:text-xl';
+    if (length <= 150) return 'text-xs sm:text-sm md:text-base lg:text-base xl:text-lg';
+    if (length <= 250) return 'text-xs sm:text-xs md:text-sm lg:text-sm xl:text-base';
+    return 'text-xs sm:text-xs md:text-sm lg:text-sm xl:text-base';
   };
 
   const getGradientBackground = () => {
