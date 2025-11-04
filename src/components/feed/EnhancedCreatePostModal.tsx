@@ -12,7 +12,7 @@ import { MediaGalleryPicker } from './MediaGalleryPicker';
 import { TextToImageCreator } from './TextToImageCreator';
 import { AIImageGenerator } from './AIImageGenerator';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 
 interface EnhancedCreatePostModalProps {
   open: boolean;
@@ -30,7 +30,7 @@ export function EnhancedCreatePostModal({
   initialImageUrl = null,
 }: EnhancedCreatePostModalProps) {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { isPremium } = usePremiumStatus();
   const [step, setStep] = useState<'method' | 'upload' | 'edit' | 'details'>('method');
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'video'>(defaultTab);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -89,10 +89,11 @@ export function EnhancedCreatePostModal({
   };
 
   const handleDetailsSuccess = () => {
-    setStep('upload');
+    setStep('method');
     setMediaFile(null);
     setMediaPreview(null);
     setEffects(null);
+    setShowMethodSelector(false);
     onSuccess();
   };
 
@@ -169,31 +170,19 @@ export function EnhancedCreatePostModal({
     setStep('details');
   };
 
-  // Upload media to storage and get URL
-  const uploadMedia = async (): Promise<string> => {
-    if (initialImageUrl && !mediaFile) return initialImageUrl;
-    if (!mediaFile) return '';
-
-    // This will be handled in PostDetailsModal
-    return mediaPreview || '';
-  };
-
-  // Show method selector when modal first opens
-  const shouldShowMethodSelector = open && step === 'method';
-  
-  if (shouldShowMethodSelector && !showMethodSelector) {
-    setShowMethodSelector(true);
-    setStep('method');
+  // Show method selector when modal opens
+  if (open && step === 'method' && !showMethodSelector) {
+    setTimeout(() => setShowMethodSelector(true), 0);
   }
 
   return (
     <>
       {/* Method Selector */}
       <CreatePostMethodSelector
-        open={showMethodSelector}
+        open={open && showMethodSelector}
         onClose={handleClose}
         onSelectMethod={handleMethodSelect}
-        isPremium={user?.user_metadata?.subscription_tier === 'premium'}
+        isPremium={isPremium}
       />
 
       {/* Camera Capture */}
