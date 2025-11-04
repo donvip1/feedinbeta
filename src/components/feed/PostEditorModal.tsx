@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { Wand2, Type, Music, Sticker, Scissors, Volume2, VolumeX, ArrowLeft, Mic } from 'lucide-react';
+import { Wand2, Type, Music, Sticker, Scissors, Volume2, VolumeX, ArrowLeft, Mic, Play, Pause, X } from 'lucide-react';
 import { ImageCropper } from './ImageCropper';
 import { VoiceOverRecorder } from './VoiceOverRecorder';
 import { AIMusicSuggester } from './AIMusicSuggester';
@@ -52,6 +52,8 @@ const FILTERS = {
 
 export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, onNext }: PostEditorModalProps) {
   const { toast } = useToast();
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<keyof typeof FILTERS>('hotVibes');
   const [brightness, setBrightness] = useState(100);
@@ -67,6 +69,70 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
   const [voiceOverBlob, setVoiceOverBlob] = useState<Blob | null>(null);
   const [showMusicSuggester, setShowMusicSuggester] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [isPlayingVoiceOver, setIsPlayingVoiceOver] = useState(false);
+  const [voiceOverDuration, setVoiceOverDuration] = useState(0);
+  const [videoDuration, setVideoDuration] = useState(0);
+
+  // Load audio when voiceOverBlob changes
+  useEffect(() => {
+    if (voiceOverBlob && audioRef.current) {
+      const url = URL.createObjectURL(voiceOverBlob);
+      audioRef.current.src = url;
+      
+      audioRef.current.onloadedmetadata = () => {
+        const duration = audioRef.current?.duration || 0;
+        setVoiceOverDuration(duration);
+        
+        // Validate voice over length
+        if (mediaType === 'image' && duration > 60) {
+          toast({
+            title: 'Voice over too long',
+            description: 'Voice over for images must be 60 seconds or less',
+            variant: 'destructive',
+          });
+          setVoiceOverBlob(null);
+        } else if (mediaType === 'video' && videoDuration > 0 && duration > videoDuration) {
+          toast({
+            title: 'Voice over too long',
+            description: 'Voice over cannot be longer than the video',
+            variant: 'destructive',
+          });
+          setVoiceOverBlob(null);
+        }
+      };
+      
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [voiceOverBlob, mediaType, videoDuration, toast]);
+
+  // Get video duration
+  useEffect(() => {
+    if (mediaType === 'video' && videoRef.current) {
+      videoRef.current.onloadedmetadata = () => {
+        setVideoDuration(videoRef.current?.duration || 0);
+      };
+    }
+  }, [mediaType]);
+
+  const toggleVoiceOverPlayback = () => {
+    if (!audioRef.current) return;
+    
+    if (isPlayingVoiceOver) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlayingVoiceOver(false);
+    } else {
+      audioRef.current.play();
+      setIsPlayingVoiceOver(true);
+      audioRef.current.onended = () => setIsPlayingVoiceOver(false);
+    }
+  };
+
+  const removeVoiceOver = () => {
+    setVoiceOverBlob(null);
+    setIsPlayingVoiceOver(false);
+    setVoiceOverDuration(0);
+  };
 
   const STICKERS = ['❤️', '🔥', '✨', '🎉', '😍', '👍', '💯', '⭐'];
 
@@ -75,6 +141,14 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
     return {
       filter: `${filterObj?.filter || ''} brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
     };
+  };
+
+  const getTextPositionClass = () => {
+    switch (textPosition) {
+      case 'top': return 'top-8';
+      case 'bottom': return 'bottom-8';
+      default: return 'top-1/2 -translate-y-1/2';
+    }
   };
 
   const handleNext = async () => {
@@ -118,12 +192,38 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
 
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Image/Video Preview - Top on mobile, left on desktop */}
-          <div className="w-full md:flex-1 bg-black flex items-center justify-center p-2 md:p-4 h-48 md:h-auto shrink-0">
+          <div className="w-full md:flex-1 bg-black flex items-center justify-center p-2 md:p-4 h-48 md:h-auto shrink-0 relative">
             {mediaType === 'image' ? (
               <img src={croppedImageUrl} alt="Preview" className="max-h-full max-w-full object-contain" style={getFilterStyle()} />
             ) : (
-              <video src={mediaUrl} className="max-h-full max-w-full object-contain" style={getFilterStyle()} controls muted={isMuted} />
+              <video ref={videoRef} src={mediaUrl} className="max-h-full max-w-full object-contain" style={getFilterStyle()} controls muted={isMuted} />
             )}
+            
+            {/* Overlay for text, stickers and effects */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="relative w-full h-full flex items-center justify-center">
+                {/* Text Overlay */}
+                {textOverlay && (
+                  <div className={`absolute ${getTextPositionClass()} left-0 right-0 flex justify-center px-4`}>
+                    <p className="text-white text-2xl md:text-4xl font-bold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] text-center px-4 py-2 bg-black/30 rounded-lg backdrop-blur-sm">
+                      {textOverlay}
+                    </p>
+                  </div>
+                )}
+                
+                {/* Sticker Overlay */}
+                {selectedSticker && (
+                  <div className="absolute top-4 right-4">
+                    <span className="text-6xl md:text-8xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
+                      {selectedSticker}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            {/* Hidden audio element for voice over playback */}
+            {voiceOverBlob && <audio ref={audioRef} className="hidden" />}
           </div>
 
           {/* Editing Tools - Scrollable below preview on mobile, sidebar on desktop */}
@@ -143,8 +243,51 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
               <ImageCropper imageUrl={croppedImageUrl} onCropComplete={(url) => { setCroppedImageUrl(url); setShowCropper(false); }} onClose={() => setShowCropper(false)} />
             )}
 
-            {!voiceOverBlob && (
-              <VoiceOverRecorder onRecordingComplete={(blob) => setVoiceOverBlob(blob)} />
+            {!voiceOverBlob ? (
+              <div className="space-y-2 p-3 border rounded-lg">
+                <label className="text-xs font-medium flex items-center gap-2">
+                  <Mic className="w-4 h-4" />
+                  Add Voice Over (Max: {mediaType === 'image' ? '60' : Math.round(videoDuration || 120)}s)
+                </label>
+                <VoiceOverRecorder 
+                  onRecordingComplete={(blob) => setVoiceOverBlob(blob)} 
+                  maxDuration={mediaType === 'image' ? 60 : Math.round(videoDuration || 120)}
+                />
+              </div>
+            ) : (
+              <div className="space-y-2 p-3 border rounded-lg bg-muted/50">
+                <label className="text-xs font-medium flex items-center gap-2">
+                  <Mic className="w-4 h-4" />
+                  Voice Over ({voiceOverDuration.toFixed(1)}s)
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={toggleVoiceOverPlayback}
+                    className="flex-1"
+                  >
+                    {isPlayingVoiceOver ? (
+                      <>
+                        <Pause className="w-4 h-4 mr-2" />
+                        Pause
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 mr-2" />
+                        Play
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={removeVoiceOver}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
             )}
 
             <Tabs value={filterCategory} onValueChange={(v) => setFilterCategory(v as any)} className="w-full">
@@ -239,6 +382,50 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
                 {isMuted ? 'Unmute' : 'Mute'}
               </Button>
             )}
+
+            {/* Music Upload Section */}
+            <div className="space-y-2 p-3 border rounded-lg">
+              <label className="text-xs font-medium flex items-center gap-2">
+                <Music className="w-4 h-4" />
+                Background Music
+              </label>
+              {!overlayAudioFile ? (
+                <div className="space-y-2">
+                  <Input
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        // Validate file size (max 10MB)
+                        if (file.size > 10 * 1024 * 1024) {
+                          toast({
+                            title: 'File too large',
+                            description: 'Audio file must be less than 10MB',
+                            variant: 'destructive',
+                          });
+                          return;
+                        }
+                        setOverlayAudioFile(file);
+                      }
+                    }}
+                    className="text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">Upload your own music (max 10MB)</p>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                  <p className="text-xs truncate flex-1">{overlayAudioFile.name}</p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setOverlayAudioFile(null)}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
