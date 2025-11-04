@@ -9,6 +9,7 @@ import { PostCard } from '@/components/feed/PostCard';
 import { EnhancedCreatePostModal } from '@/components/feed/EnhancedCreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,9 @@ interface Post {
   content: string | null;
   media_url: string | null;
   media_type: string | null;
+  aspect_ratio?: string;
+  has_blur_background?: boolean;
+  moderation_status?: string;
   likes_count: number;
   comments_count: number;
   views_count: number;
@@ -75,7 +79,7 @@ const Feed = () => {
     try {
       setLoading(true);
       
-      // Get regular posts
+      // Get regular posts - only show approved content
       let query = supabase
         .from('posts')
         .select(`
@@ -87,8 +91,9 @@ const Feed = () => {
           )
         `)
         .eq('status', 'active')
+        .in('moderation_status', ['approved', 'pending'])
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50);
 
       // Search filter
       if (searchQuery) {
@@ -234,7 +239,7 @@ const Feed = () => {
       {/* TikTok-style Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg">
         <div className="flex items-center justify-between px-4 py-3">
-          <div className="w-10"></div>
+          <NotificationBadge />
           
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">

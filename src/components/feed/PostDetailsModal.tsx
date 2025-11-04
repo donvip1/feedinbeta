@@ -140,16 +140,57 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
         finalMediaUrl = publicUrl;
       }
 
+      // Detect aspect ratio for media
+      let aspectRatio = '9:16';
+      let hasBlurBackground = false;
+
+      if (mediaType === 'image' && mediaFile) {
+        const img = new Image();
+        img.src = URL.createObjectURL(mediaFile);
+        await new Promise((resolve) => { img.onload = resolve; });
+        const ratio = img.width / img.height;
+        
+        if (ratio > 1.5) {
+          aspectRatio = '16:9';
+          hasBlurBackground = true;
+        } else if (ratio < 0.6) {
+          aspectRatio = '9:16';
+        } else {
+          aspectRatio = '1:1';
+          hasBlurBackground = true;
+        }
+        URL.revokeObjectURL(img.src);
+      } else if (mediaType === 'video' && mediaFile) {
+        const video = document.createElement('video');
+        video.src = URL.createObjectURL(mediaFile);
+        await new Promise((resolve) => { video.onloadedmetadata = resolve; });
+        const ratio = video.videoWidth / video.videoHeight;
+        
+        if (ratio > 1.5) {
+          aspectRatio = '16:9';
+          hasBlurBackground = true;
+        } else if (ratio < 0.6) {
+          aspectRatio = '9:16';
+        } else {
+          aspectRatio = '1:1';
+          hasBlurBackground = true;
+        }
+        URL.revokeObjectURL(video.src);
+      }
+
       const postData = {
         user_id: user.id,
         content: description.trim() || null,
         media_url: finalMediaUrl || null,
         media_type: mediaType,
+        aspect_ratio: aspectRatio,
+        has_blur_background: hasBlurBackground,
         location: location || null,
         privacy,
         allow_comments: allowComments,
         allow_refeed: allowRefeed,
         status: action === 'draft' ? 'draft' : 'active',
+        moderation_status: 'pending',
         scheduled_at: action === 'schedule' && scheduleTime ? new Date(scheduleTime).toISOString() : null,
         feed_id: '',
       };
@@ -161,6 +202,20 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
         .single();
 
       if (error) throw error;
+
+      // Trigger AI moderation in background
+      if (action !== 'draft') {
+        supabase.functions.invoke('moderate-content', {
+          body: {
+            contentType: 'post',
+            contentId: postResult.id,
+            content: description.trim(),
+            mediaUrl: finalMediaUrl
+          }
+        }).then(({ error: modError }) => {
+          if (modError) console.error('Moderation error:', modError);
+        });
+      }
 
       // Process hashtags
       if (description && extractHashtags(description).length > 0) {

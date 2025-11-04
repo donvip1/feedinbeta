@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,8 @@ interface PostCardProps {
     content: string | null;
     media_url: string | null;
     media_type: string | null;
+    aspect_ratio?: string;
+    has_blur_background?: boolean;
     likes_count: number;
     comments_count: number;
     views_count: number;
@@ -52,12 +55,16 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const videoRef = useRef<HTMLVideoElement>(null);
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(post.likes_count);
   const [isLiking, setIsLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
+  
+  // Auto-play/pause videos based on visibility
+  useVideoAutoplay(videoRef, post.media_type === 'video');
   const [isRefed, setIsRefed] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -481,23 +488,57 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         </div>
 
-        {/* Media - Full screen like TikTok/Reels */}
+        {/* Media - Full screen like TikTok/Reels with optional blur background */}
         {post.media_url && (
           <div className="absolute inset-0 z-0 bg-black">
-            {post.media_type === 'image' && (
-              <img
-                src={post.media_url}
-                alt="Post media"
-                className="w-full h-full object-cover"
-              />
+            {post.has_blur_background && (
+              <div className="absolute inset-0 z-0">
+                {post.media_type === 'image' && (
+                  <img
+                    src={post.media_url}
+                    alt=""
+                    className="w-full h-full object-cover blur-3xl opacity-30 scale-110"
+                  />
+                )}
+                {post.media_type === 'video' && (
+                  <video
+                    src={post.media_url}
+                    className="w-full h-full object-cover blur-3xl opacity-30 scale-110"
+                    muted
+                    loop
+                    autoPlay
+                  />
+                )}
+              </div>
             )}
-            {post.media_type === 'video' && (
-              <video
-                src={post.media_url}
-                controls
-                className="w-full h-full object-cover"
-              />
-            )}
+            
+            <div className="relative z-10 w-full h-full flex items-center justify-center">
+              {post.media_type === 'image' && (
+                <img
+                  src={post.media_url}
+                  alt="Post media"
+                  className={`${
+                    post.aspect_ratio === '9:16' ? 'w-full h-full object-cover' :
+                    post.aspect_ratio === '16:9' ? 'w-full h-auto max-h-full object-contain' :
+                    'w-auto h-full max-w-full object-contain'
+                  }`}
+                />
+              )}
+              {post.media_type === 'video' && (
+                <video
+                  ref={videoRef}
+                  src={post.media_url}
+                  controls
+                  className={`${
+                    post.aspect_ratio === '9:16' ? 'w-full h-full object-cover' :
+                    post.aspect_ratio === '16:9' ? 'w-full h-auto max-h-full object-contain' :
+                    'w-auto h-full max-w-full object-contain'
+                  }`}
+                  playsInline
+                  loop
+                />
+              )}
+            </div>
           </div>
         )}
 
