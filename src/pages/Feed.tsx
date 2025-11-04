@@ -333,7 +333,11 @@ const Feed = () => {
       />
 
       {/* Bottom Navigation */}
-      <BottomNav onQuickActionClick={() => setShowQuickActions(prev => !prev)} currentPage="feed" />
+      <BottomNav 
+        onQuickActionClick={() => setShowQuickActions(prev => !prev)} 
+        currentPage="feed"
+        minimized={showQuickActions}
+      />
     </div>
   );
 };

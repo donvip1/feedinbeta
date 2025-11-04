@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 interface BottomNavProps {
   onQuickActionClick?: () => void;
   currentPage?: 'feed' | 'ai' | 'default';
+  minimized?: boolean;
 }
 
-export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default' }: BottomNavProps) => {
+export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default', minimized = false }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,8 +21,22 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
 
   const isActive = (path: string) => location.pathname === path;
 
+  // When minimized, only show the + button
+  if (minimized) {
+    return (
+      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70]">
+        <button
+          onClick={onQuickActionClick}
+          className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-glow hover:scale-110 transition-transform"
+        >
+          <Plus className="w-7 h-7 text-white" />
+        </button>
+      </nav>
+    );
+  }
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-gray-900/95 backdrop-blur-lg border-t border-gray-800">
+    <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-gray-900/95 backdrop-blur-lg border-t border-gray-800 transition-all">
       <div className="container mx-auto px-2">
         <div className="flex items-center justify-around py-1 relative">
           {navItems.slice(0, 2).map((item) => {
