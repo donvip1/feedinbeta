@@ -401,14 +401,15 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
 
   // Dynamic font sizing based on text length (similar to WhatsApp/Facebook statuses)
+  // Responsive: mobile -> tablet -> desktop -> large desktop
   const getTextSize = (text: string) => {
     const length = text.length;
-    if (length <= 30) return 'text-5xl md:text-6xl';
-    if (length <= 60) return 'text-4xl md:text-5xl';
-    if (length <= 100) return 'text-3xl md:text-4xl';
-    if (length <= 150) return 'text-2xl md:text-3xl';
-    if (length <= 250) return 'text-xl md:text-2xl';
-    return 'text-lg md:text-xl';
+    if (length <= 30) return 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl';
+    if (length <= 60) return 'text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl';
+    if (length <= 100) return 'text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl';
+    if (length <= 150) return 'text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl';
+    if (length <= 250) return 'text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl';
+    return 'text-sm sm:text-base md:text-lg lg:text-xl';
   };
 
   const getGradientBackground = () => {
@@ -544,8 +545,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
         {/* Text-only post - Full-screen gradient style */}
         {isTextOnly && post.content && post.content.length <= 150 && (
-          <div className={`absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br ${getGradientBackground()} p-6 pr-24`}>
-            <p className={`text-white ${getTextSize(post.content)} font-bold text-center leading-relaxed break-words max-w-3xl px-4`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+          <div className={`absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br ${getGradientBackground()} p-4 pr-16 sm:p-6 sm:pr-20 md:pr-24`}>
+            <p className={`text-white ${getTextSize(post.content)} font-bold text-center leading-relaxed break-words max-w-3xl px-2 sm:px-4`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
               {post.content}
             </p>
           </div>
@@ -553,9 +554,9 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
         {/* Text-only post - Compact card style for longer text */}
         {isTextOnly && post.content && post.content.length > 150 && (
-          <div className="absolute inset-0 z-0 flex items-start justify-center bg-gray-900 p-6 pt-24">
-            <div className="w-full max-w-2xl bg-gray-800/90 backdrop-blur-md rounded-2xl p-6 border border-gray-700/50">
-              <p className="text-white text-xl md:text-2xl font-medium leading-relaxed break-words whitespace-pre-wrap">
+          <div className="absolute inset-0 z-0 flex items-start justify-center bg-gray-900 p-4 pt-20 sm:p-6 sm:pt-24">
+            <div className="w-full max-w-2xl bg-gray-800/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-gray-700/50">
+              <p className="text-white text-base sm:text-lg md:text-xl lg:text-2xl font-medium leading-relaxed break-words whitespace-pre-wrap">
                 {post.content}
               </p>
             </div>
