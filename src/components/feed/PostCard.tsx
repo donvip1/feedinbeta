@@ -404,6 +404,22 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     return 'text-lg md:text-xl';
   };
 
+  const getGradientBackground = () => {
+    const gradients = [
+      'from-purple-600 via-purple-500 to-blue-500',
+      'from-pink-500 via-red-500 to-yellow-500',
+      'from-green-500 via-teal-500 to-blue-500',
+      'from-indigo-600 via-purple-600 to-pink-500',
+      'from-orange-500 via-red-500 to-pink-500',
+      'from-blue-600 via-indigo-600 to-purple-600',
+    ];
+    // Use post ID to consistently select same gradient for same post
+    const index = parseInt(post.id.slice(0, 8), 16) % gradients.length;
+    return gradients[index];
+  };
+
+  const isTextOnly = !post.media_url && post.content;
+
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden">
       {/* Main Content Area */}
@@ -485,17 +501,28 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         )}
 
-        {/* Text-only post - Centered with dynamic sizing */}
-        {!post.media_url && post.content && (
-          <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6 pr-28 md:pr-32">
+        {/* Text-only post - Full-screen gradient style */}
+        {isTextOnly && post.content && post.content.length <= 150 && (
+          <div className={`absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br ${getGradientBackground()} p-6 pr-24`}>
             <p className={`text-white ${getTextSize(post.content)} font-bold text-center leading-relaxed break-words max-w-3xl px-4`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
               {post.content}
             </p>
           </div>
         )}
 
-        {/* Content and Actions */}
-        <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
+        {/* Text-only post - Compact card style for longer text */}
+        {isTextOnly && post.content && post.content.length > 150 && (
+          <div className="absolute inset-0 z-0 flex items-start justify-center bg-gray-900 p-6 pt-24">
+            <div className="w-full max-w-2xl bg-gray-800/90 backdrop-blur-md rounded-2xl p-6 border border-gray-700/50">
+              <p className="text-white text-xl md:text-2xl font-medium leading-relaxed break-words whitespace-pre-wrap">
+                {post.content}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Content and Actions - Adjusted for text-only posts */}
+        <div className={`absolute bottom-0 left-0 right-0 z-20 p-4 ${isTextOnly ? 'bg-black/40 backdrop-blur-sm' : 'bg-gradient-to-t from-black/80 via-black/50 to-transparent'}`}>
           {/* Content - Only show if there's media */}
           {post.media_url && post.content && (
             <p className="text-white mb-2 whitespace-pre-wrap text-base line-clamp-3">
