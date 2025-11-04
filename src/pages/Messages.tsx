@@ -14,6 +14,8 @@ import { EnhancedChatInterface } from '@/components/messages/EnhancedChatInterfa
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
+import { InboxList } from '@/components/messages/InboxList';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 import { useToast } from '@/hooks/use-toast';
 
 interface Conversation {
@@ -251,13 +253,16 @@ export default function Messages() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-bold">Chats & Groups</h1>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
-            >
-              <Plus className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <NotificationBadge />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -280,54 +285,7 @@ export default function Messages() {
         <ScrollArea className="flex-1">
           <Tabs value={activeTab} className="w-full">
             <TabsContent value="chats" className="m-0">
-              {filteredConversations.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                  <MessageSquarePlus className="w-12 h-12 mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">No conversations yet</p>
-                  <Button
-                    variant="outline"
-                    className="mt-4"
-                    onClick={() => setShowNewConversation(true)}
-                  >
-                    Start a conversation
-                  </Button>
-                </div>
-              ) : (
-                filteredConversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    onClick={() => setSelectedConversationId(conv.id)}
-                    className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors ${
-                      selectedConversationId === conv.id ? 'bg-accent' : ''
-                    }`}
-                  >
-                    <Avatar>
-                      <AvatarImage src={conv.other_participant.avatar_url || ''} />
-                      <AvatarFallback>
-                        {conv.other_participant.display_name?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 text-left overflow-hidden">
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold truncate">
-                          {conv.other_participant.display_name || 'Unknown User'}
-                        </p>
-                        {conv.last_message && (
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(conv.last_message.created_at).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                      {conv.last_message && (
-                        <p className="text-sm text-muted-foreground truncate">
-                          {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
-                          {conv.last_message.content}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                ))
-              )}
+              <InboxList />
             </TabsContent>
 
             <TabsContent value="groups" className="m-0">

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
+import { Check, CheckCheck } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: {
@@ -8,6 +9,8 @@ interface MessageBubbleProps {
     content: string;
     sender_id: string;
     created_at: string;
+    is_read?: boolean;
+    read_at?: string;
     profiles: {
       display_name: string | null;
       avatar_url: string | null;
@@ -36,9 +39,16 @@ export const MessageBubble = ({ message, isOwn }: MessageBubbleProps) => {
         >
           <p className="text-sm break-words">{message.content}</p>
         </div>
-        <span className="text-xs text-muted-foreground mt-1">
-          {format(new Date(message.created_at), 'HH:mm')}
-        </span>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+          <span>{format(new Date(message.created_at), 'HH:mm')}</span>
+          {isOwn && (
+            message.is_read ? (
+              <CheckCheck className="w-3 h-3 text-blue-500" />
+            ) : (
+              <Check className="w-3 h-3" />
+            )
+          )}
+        </div>
       </div>
     </div>
   );

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2 } from 'lucide-react';
+import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,6 +17,8 @@ interface MessageBubbleProps {
     content: string;
     sender_id: string;
     created_at: string;
+    is_read?: boolean;
+    read_at?: string;
     media_url?: string | null;
     media_type?: string | null;
     reply_to_id?: string | null;
@@ -265,9 +267,16 @@ export const EnhancedMessageBubble = ({
           )}
         </div>
 
-        <span className="text-xs text-muted-foreground mt-1 px-1">
-          {format(new Date(message.created_at), 'HH:mm')}
-        </span>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 px-1">
+          <span>{format(new Date(message.created_at), 'HH:mm')}</span>
+          {isOwn && (
+            message.is_read ? (
+              <CheckCheck className="w-3 h-3 text-blue-500" />
+            ) : (
+              <Check className="w-3 h-3" />
+            )
+          )}
+        </div>
       </div>
     </div>
   );

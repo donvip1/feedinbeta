@@ -45,6 +45,7 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
     loadOtherUser();
     subscribeToMessages();
     subscribeToTyping();
+    markMessagesAsRead();
   }, [conversationId]);
 
   useEffect(() => {
@@ -72,6 +73,8 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
         content: msg.content,
         sender_id: msg.sender_id,
         created_at: msg.created_at,
+        is_read: msg.is_read,
+        read_at: msg.read_at,
         profiles: {
           display_name: msg.sender?.display_name || null,
           avatar_url: msg.sender?.avatar_url || null,
@@ -81,6 +84,22 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
       setMessages(formattedMessages);
     } catch (error: any) {
       console.error('Error loading messages:', error);
+    }
+  };
+
+  const markMessagesAsRead = async () => {
+    if (!user) return;
+
+    try {
+      // Mark all unread messages from other users as read
+      await supabase
+        .from('messages')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', user.id)
+        .eq('is_read', false);
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
     }
   };
 
@@ -109,6 +128,19 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
         'postgres_changes',
         {
           event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        () => {
+          loadMessages();
+          markMessagesAsRead();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
           schema: 'public',
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,

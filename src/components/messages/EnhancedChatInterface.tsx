@@ -18,6 +18,8 @@ interface Message {
   content: string;
   sender_id: string;
   created_at: string;
+  is_read?: boolean;
+  read_at?: string;
   media_url?: string | null;
   media_type?: string | null;
   reply_to_id?: string | null;
@@ -69,6 +71,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     subscribeToMessages();
     subscribeToTyping();
     subscribeToReactions();
+    markMessagesAsRead();
   }, [conversationId]);
 
   useEffect(() => {
@@ -108,6 +111,8 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         content: msg.content,
         sender_id: msg.sender_id,
         created_at: msg.created_at,
+        is_read: msg.is_read,
+        read_at: msg.read_at,
         media_url: msg.media_url || null,
         media_type: msg.media_type || null,
         reply_to_id: msg.reply_to_id || null,
@@ -122,6 +127,22 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       setMessages(formattedMessages);
     } catch (error: any) {
       console.error('Error loading messages:', error);
+    }
+  };
+
+  const markMessagesAsRead = async () => {
+    if (!user) return;
+
+    try {
+      // Mark all unread messages from other users as read
+      await supabase
+        .from('messages')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', user.id)
+        .eq('is_read', false);
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
     }
   };
 
@@ -150,6 +171,19 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         'postgres_changes',
         {
           event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        () => {
+          loadMessages();
+          markMessagesAsRead();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
           schema: 'public',
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,
