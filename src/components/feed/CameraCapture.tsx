@@ -87,12 +87,18 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
   const [showDrawing, setShowDrawing] = useState(false);
   const [showBlur, setShowBlur] = useState(false);
   const [draggedStickerIndex, setDraggedStickerIndex] = useState<number | null>(null);
+  const [stickerPinchStart, setStickerPinchStart] = useState<{ distance: number; scale: number } | null>(null);
   const [blurAmount, setBlurAmount] = useState(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPaths, setDrawingPaths] = useState<Array<{x: number, y: number}[]>>([]);
   const [currentPath, setCurrentPath] = useState<Array<{x: number, y: number}>>([]);
   const [drawColor, setDrawColor] = useState('#ffffff');
   const [drawSize, setDrawSize] = useState(3);
+  const [videoTrimStart, setVideoTrimStart] = useState(0);
+  const [videoTrimEnd, setVideoTrimEnd] = useState(0);
+  const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const trimVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -293,25 +299,56 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
 
   const handleStickerTouchStart = (e: React.TouchEvent, index: number) => {
     e.stopPropagation();
-    setDraggedStickerIndex(index);
+    
+    // Check for pinch gesture (two fingers)
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      setStickerPinchStart({ distance, scale: stickers[index].scale });
+      setDraggedStickerIndex(index);
+    } else if (e.touches.length === 1) {
+      setDraggedStickerIndex(index);
+    }
   };
 
-  const handleStickerTouchMove = (e: React.TouchEvent) => {
-    if (draggedStickerIndex === null || !previewRef.current) return;
+  const handleStickerTouchMove = (e: React.TouchEvent, index: number) => {
+    if (draggedStickerIndex !== index || !previewRef.current) return;
     e.preventDefault();
-    
-    const touch = e.touches[0];
-    const rect = previewRef.current.getBoundingClientRect();
-    const x = ((touch.clientX - rect.left) / rect.width) * 100;
-    const y = ((touch.clientY - rect.top) / rect.height) * 100;
-    
-    setStickers(stickers.map((sticker, i) => 
-      i === draggedStickerIndex ? { ...sticker, x: Math.max(0, Math.min(95, x)), y: Math.max(0, Math.min(95, y)) } : sticker
-    ));
+
+    // Handle pinch-to-zoom (two fingers)
+    if (e.touches.length === 2 && stickerPinchStart) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const scale = stickerPinchStart.scale * (currentDistance / stickerPinchStart.distance);
+      const clampedScale = Math.max(0.5, Math.min(3, scale));
+      
+      setStickers(stickers.map((s, i) => 
+        i === index ? { ...s, scale: clampedScale } : s
+      ));
+    } 
+    // Handle drag (one finger)
+    else if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const rect = previewRef.current.getBoundingClientRect();
+      const x = ((touch.clientX - rect.left) / rect.width) * 100;
+      const y = ((touch.clientY - rect.top) / rect.height) * 100;
+      setStickers(stickers.map((s, i) => 
+        i === index ? { ...s, x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) } : s
+      ));
+    }
   };
 
   const handleStickerTouchEnd = () => {
     setDraggedStickerIndex(null);
+    setStickerPinchStart(null);
   };
 
   const handleNext = async (postToStory: boolean = false) => {
@@ -320,22 +357,51 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
     if (capturedMediaType === 'image') {
       try {
         const filterObj = selectedFilter !== 'None' ? FILTERS[filterCategory].find(f => f.name === selectedFilter) : null;
-        const processedBlob = await applyImageEffects(croppedImageUrl, {
-          filter: filterObj?.filter,
-          brightness,
-          contrast,
-          saturation,
-          textOverlay,
-          textPosition,
-          textSize,
-          stickers,
-          blur: blurAmount,
-          drawingPaths,
-          drawColor,
-          drawSize,
-        });
-        const file = new File([processedBlob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        onCapture(file, 'image', { voiceOverBlob }, postToStory);
+        
+        // If has voiceover, convert to video
+        const hasAudio = voiceOverBlob !== null;
+        let finalFile: File;
+        
+        if (hasAudio && voiceOverBlob) {
+          // Convert image + audio to video
+          const processedBlob = await applyImageEffects(croppedImageUrl, {
+            filter: filterObj?.filter,
+            brightness,
+            contrast,
+            saturation,
+            textOverlay,
+            textPosition,
+            textSize,
+            stickers,
+            blur: blurAmount,
+            drawingPaths,
+            drawColor,
+            drawSize,
+          });
+          
+          const videoBlob = await convertImageWithAudioToVideo(processedBlob, voiceOverBlob);
+          finalFile = new File([videoBlob], `video-${Date.now()}.mp4`, { type: 'video/mp4' });
+          onCapture(finalFile, 'video', undefined, postToStory);
+        } else {
+          // Regular image processing
+          const processedBlob = await applyImageEffects(croppedImageUrl, {
+            filter: filterObj?.filter,
+            brightness,
+            contrast,
+            saturation,
+            textOverlay,
+            textPosition,
+            textSize,
+            stickers,
+            blur: blurAmount,
+            drawingPaths,
+            drawColor,
+            drawSize,
+          });
+          finalFile = new File([processedBlob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          onCapture(finalFile, 'image', undefined, postToStory);
+        }
+        
         handleClose();
       } catch (error) {
         toast({ title: 'Processing failed', variant: 'destructive' });
@@ -344,9 +410,95 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
       const response = await fetch(capturedMediaUrl);
       const blob = await response.blob();
       const file = new File([blob], `video-${Date.now()}.webm`, { type: 'video/webm' });
-      onCapture(file, 'video', { voiceOverBlob }, postToStory);
+      onCapture(file, 'video', undefined, postToStory);
       handleClose();
     }
+  };
+
+  const convertImageWithAudioToVideo = async (imageBlob: Blob, audioBlob: Blob): Promise<Blob> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const img = new Image();
+        const imageUrl = URL.createObjectURL(imageBlob);
+        
+        img.onload = async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+          
+          // Draw image
+          ctx.drawImage(img, 0, 0);
+          
+          // Get audio duration
+          const audioContext = new AudioContext();
+          const audioArrayBuffer = await audioBlob.arrayBuffer();
+          const audioBuffer = await audioContext.decodeAudioData(audioArrayBuffer);
+          const duration = audioBuffer.duration * 1000; // Convert to ms
+          
+          // Create video stream from canvas
+          const canvasStream = canvas.captureStream(30);
+          
+          // Create audio stream from blob
+          const audioElement = new Audio(URL.createObjectURL(audioBlob));
+          const audioDestination = audioContext.createMediaStreamDestination();
+          const audioSource = audioContext.createMediaElementSource(audioElement);
+          audioSource.connect(audioDestination);
+          
+          // Combine streams
+          const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...audioDestination.stream.getAudioTracks()
+          ]);
+          
+          // Record combined stream
+          const mediaRecorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm' });
+          const chunks: Blob[] = [];
+          
+          mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+          };
+          
+          mediaRecorder.onstop = () => {
+            const videoBlob = new Blob(chunks, { type: 'video/webm' });
+            audioElement.pause();
+            resolve(videoBlob);
+          };
+          
+          // Start recording
+          mediaRecorder.start();
+          audioElement.play();
+          
+          // Stop after audio duration
+          setTimeout(() => {
+            mediaRecorder.stop();
+          }, duration);
+        };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = imageUrl;
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+
+  const handleVideoTrim = () => {
+    if (!capturedMediaUrl || !capturedMediaType || capturedMediaType !== 'video') return;
+    setShowVideoTrimmer(true);
+    
+    // Load video to get duration
+    const video = document.createElement('video');
+    video.src = capturedMediaUrl;
+    video.onloadedmetadata = () => {
+      setVideoDuration(video.duration);
+      setVideoTrimEnd(video.duration);
+    };
   };
 
   const handleClose = () => {
@@ -600,7 +752,33 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                       showVoiceoverOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
-                    <Mic className="w-6 h-6 drop-shadow-lg" />
+                    <button
+                      onClick={() => {
+                        if (capturedMediaType === 'video') {
+                          handleVideoTrim();
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowDrawing(false);
+                          setShowBlur(false);
+                          setShowCropper(false);
+                        } else {
+                          setShowCropper(true);
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowDrawing(false);
+                          setShowBlur(false);
+                        }
+                      }}
+                      className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                        (capturedMediaType === 'video' ? showVideoTrimmer : showCropper) ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                      }`}
+                    >
+                      <Scissors className="w-6 h-6 drop-shadow-lg" />
+                    </button>
                   </button>
                   {capturedMediaType === 'image' && (
                     <>
@@ -656,8 +834,6 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                 <div 
                   ref={previewRef}
                   className={`relative ${getAspectRatioClass()} w-full max-h-full bg-black touch-none overflow-hidden`}
-                  onTouchMove={handleStickerTouchMove}
-                  onTouchEnd={handleStickerTouchEnd}
                 >
                   {capturedMediaType === 'image' ? (
                     <img 
@@ -699,17 +875,11 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                         touchAction: 'none',
                         zIndex: draggedStickerIndex === index ? 50 : 10,
                       }}
-                      onTouchStart={(e) => handleStickerTouchStart(e, index)}
+                      onTouchStart={(e) => {
+                        handleStickerTouchStart(e, index);
+                      }}
                       onTouchMove={(e) => {
-                        if (!previewRef.current || draggedStickerIndex !== index) return;
-                        e.preventDefault();
-                        const touch = e.touches[0];
-                        const rect = previewRef.current.getBoundingClientRect();
-                        const x = ((touch.clientX - rect.left) / rect.width) * 100;
-                        const y = ((touch.clientY - rect.top) / rect.height) * 100;
-                        setStickers(stickers.map((s, i) => 
-                          i === index ? { ...s, x: Math.max(5, Math.min(95, x)), y: Math.max(5, Math.min(95, y)) } : s
-                        ));
+                        handleStickerTouchMove(e, index);
                       }}
                       onTouchEnd={handleStickerTouchEnd}
                       onMouseDown={(e) => {
@@ -1087,6 +1257,77 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                         className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30 drop-shadow-lg"
                       >
                         Remove Blur
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Video Trimmer */}
+                {showVideoTrimmer && capturedMediaUrl && capturedMediaType === 'video' && (
+                  <div className="absolute bottom-24 left-4 right-20 bg-black/40 backdrop-blur-sm rounded-2xl p-4 space-y-3 max-h-[45vh] overflow-y-auto z-[120]">
+                    <div className="flex items-center justify-between text-white mb-2">
+                      <span className="text-sm font-semibold drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Trim Video</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowVideoTrimmer(false)}
+                        className="h-6 w-6 text-white/70 hover:text-white hover:bg-white/10"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <video
+                        ref={trimVideoRef}
+                        src={capturedMediaUrl}
+                        className="w-full rounded-lg"
+                        controls
+                      />
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-white text-xs">
+                          <span>Start: {videoTrimStart.toFixed(1)}s</span>
+                          <span>End: {videoTrimEnd.toFixed(1)}s</span>
+                          <span>Duration: {(videoTrimEnd - videoTrimStart).toFixed(1)}s</span>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <label className="text-white text-xs font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Start Point</label>
+                          <Slider
+                            value={[videoTrimStart]}
+                            onValueChange={([value]) => setVideoTrimStart(Math.min(value, videoTrimEnd - 0.1))}
+                            max={videoDuration}
+                            step={0.1}
+                            className="w-full [&_[role=slider]]:bg-white [&_[role=slider]]:border-2 [&_[role=slider]]:border-black"
+                          />
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <label className="text-white text-xs font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">End Point</label>
+                          <Slider
+                            value={[videoTrimEnd]}
+                            onValueChange={([value]) => setVideoTrimEnd(Math.max(value, videoTrimStart + 0.1))}
+                            max={videoDuration}
+                            step={0.1}
+                            className="w-full [&_[role=slider]]:bg-white [&_[role=slider]]:border-2 [&_[role=slider]]:border-black"
+                          />
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={() => {
+                          if (trimVideoRef.current) {
+                            trimVideoRef.current.currentTime = videoTrimStart;
+                            trimVideoRef.current.play();
+                            setTimeout(() => {
+                              trimVideoRef.current?.pause();
+                            }, (videoTrimEnd - videoTrimStart) * 1000);
+                          }
+                        }}
+                        className="w-full bg-white/10 hover:bg-white/20 text-white drop-shadow-lg"
+                      >
+                        Preview Trim
                       </Button>
                     </div>
                   </div>

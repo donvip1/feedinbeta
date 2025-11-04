@@ -48,8 +48,12 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessage, setChatMessage] = useState('');
   const progressInterval = useRef<NodeJS.Timeout>();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
 
   const currentUserStories = allUserStories[currentUserIndex];
   const currentStory = currentUserStories?.stories[currentStoryIndex];
@@ -149,6 +153,95 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+    setIsPaused(true);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
+    const diffX = touchStartX.current - touchEndX;
+    const diffY = touchStartY.current - touchEndY;
+
+    // Check if horizontal swipe is more significant than vertical
+    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+      if (diffX > 0) {
+        // Swiped left - next story
+        nextStory();
+      } else {
+        // Swiped right - previous story
+        previousStory();
+      }
+    }
+    
+    setIsPaused(false);
+  };
+
+  const handleSendMessage = async () => {
+    if (!chatMessage.trim() || !user || !currentStory) return;
+
+    try {
+      // Find or create conversation with participants
+      const { data: participants } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      let conversationId: string | null = null;
+
+      if (participants && participants.length > 0) {
+        // Check if any conversation includes both users
+        for (const p of participants) {
+          const { data: otherParticipant } = await supabase
+            .from('conversation_participants')
+            .select('*')
+            .eq('conversation_id', p.conversation_id)
+            .eq('user_id', currentStory.user_id)
+            .single();
+
+          if (otherParticipant) {
+            conversationId = p.conversation_id;
+            break;
+          }
+        }
+      }
+
+      if (!conversationId) {
+        // Create new conversation
+        const { data: newConv } = await supabase
+          .from('conversations')
+          .insert({})
+          .select('id')
+          .single();
+
+        if (newConv) {
+          conversationId = newConv.id;
+          // Add both participants
+          await supabase.from('conversation_participants').insert([
+            { conversation_id: conversationId, user_id: user.id },
+            { conversation_id: conversationId, user_id: currentStory.user_id },
+          ]);
+        }
+      }
+
+      if (conversationId) {
+        await supabase.from('messages').insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: chatMessage,
+          media_type: 'text',
+        });
+      }
+      
+      setChatMessage('');
+      setShowChat(false);
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
   if (!currentStory) return null;
 
   return (
@@ -217,8 +310,8 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
         className="relative w-full max-w-md h-full flex items-center justify-center"
         onMouseDown={() => setIsPaused(true)}
         onMouseUp={() => setIsPaused(false)}
-        onTouchStart={() => setIsPaused(true)}
-        onTouchEnd={() => setIsPaused(false)}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {currentStory.media_type === 'image' ? (
           <img
@@ -253,17 +346,46 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
         </button>
       </div>
 
-      {/* Reaction bar */}
+      {/* Reaction and Chat bar */}
       {!isOwn && (
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2">
-          <ReactionPicker onSelect={handleReaction}>
-            <Button
-              variant="outline"
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-            >
-              React
-            </Button>
-          </ReactionPicker>
+        <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
+          {showChat ? (
+            <div className="flex gap-2 bg-black/50 backdrop-blur-sm rounded-full p-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Send message..."
+                className="flex-1 bg-transparent text-white placeholder-white/50 outline-none px-3"
+              />
+              <Button
+                onClick={handleSendMessage}
+                size="sm"
+                className="bg-gradient-to-r from-pink-500 to-blue-500 rounded-full"
+              >
+                Send
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2 justify-center">
+              <ReactionPicker onSelect={handleReaction}>
+                <Button
+                  variant="outline"
+                  className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+                >
+                  React
+                </Button>
+              </ReactionPicker>
+              <Button
+                onClick={() => setShowChat(true)}
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              >
+                Message
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
