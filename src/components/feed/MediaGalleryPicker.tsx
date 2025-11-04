@@ -16,13 +16,14 @@ export function MediaGalleryPicker({
   open,
   onClose,
   onSelect,
-  multiSelect = false,
+  multiSelect = true,
 }: MediaGalleryPickerProps) {
   const { toast } = useToast();
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<{ file: File; url: string; type: 'image' | 'video' }[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'videos' | 'photos'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isMultiSelect, setIsMultiSelect] = useState(multiSelect);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -38,10 +39,23 @@ export function MediaGalleryPicker({
   };
 
   const toggleFileSelection = (file: File) => {
-    if (multiSelect) {
-      setSelectedFiles((prev) =>
-        prev.includes(file) ? prev.filter((f) => f !== file) : [...prev, file]
-      );
+    if (isMultiSelect) {
+      setSelectedFiles((prev) => {
+        const newSelection = prev.includes(file) 
+          ? prev.filter((f) => f !== file) 
+          : [...prev, file];
+        
+        // Limit to 10 images for carousel
+        if (newSelection.length > 10) {
+          toast({
+            title: 'Maximum 10 images',
+            description: 'You can select up to 10 images for a carousel post',
+            variant: 'destructive',
+          });
+          return prev;
+        }
+        return newSelection;
+      });
     } else {
       setSelectedFiles([file]);
     }
@@ -161,26 +175,36 @@ export function MediaGalleryPicker({
         </Tabs>
 
         <div className="flex items-center justify-between pt-4 border-t">
-          {multiSelect && (
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
                 id="select-multiple"
                 className="w-4 h-4"
-                checked={multiSelect}
-                readOnly
+                checked={isMultiSelect}
+                onChange={(e) => {
+                  setIsMultiSelect(e.target.checked);
+                  if (!e.target.checked && selectedFiles.length > 1) {
+                    setSelectedFiles([selectedFiles[0]]);
+                  }
+                }}
               />
               <label htmlFor="select-multiple" className="text-sm">
-                Select multiple
+                Multi-select
               </label>
             </div>
-          )}
+            {selectedFiles.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {selectedFiles.length} selected {isMultiSelect && '(max 10)'}
+              </p>
+            )}
+          </div>
           <Button
             onClick={handleNext}
             disabled={selectedFiles.length === 0}
             className="ml-auto bg-gradient-primary"
           >
-            Next
+            Next {selectedFiles.length > 1 && `(${selectedFiles.length})`}
           </Button>
         </div>
       </DialogContent>

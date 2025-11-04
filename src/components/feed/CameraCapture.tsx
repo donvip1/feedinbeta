@@ -3,10 +3,12 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, Mic, RotateCcw, ArrowRight, Scissors, ZoomIn, RefreshCw, Check, Pencil, Droplet } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, Mic, RotateCcw, ArrowRight, Scissors, ZoomIn, RefreshCw, Check, Pencil, Droplet, Music, Gauge, Rewind } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { VoiceOverRecorder } from './VoiceOverRecorder';
 import { ImageCropper } from './ImageCropper';
+import { MusicLibrary } from './MusicLibrary';
 import { applyImageEffects } from '@/lib/media-processor';
 
 interface CameraCaptureProps {
@@ -99,6 +101,12 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
   const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const trimVideoRef = useRef<HTMLVideoElement>(null);
+  const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState(1);
+  const [videoReversed, setVideoReversed] = useState(false);
+  const [showMusicLibrary, setShowMusicLibrary] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<{ name: string; artist: string; url: string; duration: number } | null>(null);
+  const [showPreCaptureFilters, setShowPreCaptureFilters] = useState(false);
+  const [preCaptureFilter, setPreCaptureFilter] = useState<string>('None');
 
   useEffect(() => {
     if (open) {
@@ -265,6 +273,9 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
     setCurrentPath([]);
     setDrawColor('#ffffff');
     setDrawSize(3);
+    setVideoPlaybackSpeed(1);
+    setVideoReversed(false);
+    setSelectedMusic(null);
   };
 
   const getFilterStyle = () => {
@@ -510,6 +521,9 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
     setShowVoiceoverOverlay(false);
     setShowDrawing(false);
     setShowBlur(false);
+    setShowMusicLibrary(false);
+    setShowPreCaptureFilters(false);
+    setPreCaptureFilter('None');
     setZoom(1);
     setShowZoomControl(false);
     resetAllEdits();
@@ -579,8 +593,33 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                     playsInline
                     muted
                     className="w-full h-full object-cover"
-                    style={{ transform: `scale(${zoom})` }}
+                    style={{ 
+                      transform: `scale(${zoom})`,
+                      filter: preCaptureFilter !== 'None' ? FILTERS[filterCategory].find(f => f.name === preCaptureFilter)?.filter || '' : ''
+                    }}
                   />
+                  
+                  {/* Pre-Capture Filter Preview */}
+                  {showPreCaptureFilters && (
+                    <div className="absolute bottom-4 left-0 right-0 z-[115] px-4">
+                      <div className="flex gap-3 pb-2 overflow-x-auto">
+                        {FILTERS[filterCategory].map((filter) => (
+                          <button
+                            key={filter.name}
+                            onClick={() => setPreCaptureFilter(filter.name)}
+                            className="flex-shrink-0 flex flex-col items-center gap-2"
+                          >
+                            <div className={`w-16 h-16 rounded-xl border-2 bg-black/40 backdrop-blur-sm flex items-center justify-center ${
+                              preCaptureFilter === filter.name ? 'border-white scale-110' : 'border-white/30'
+                            }`}>
+                              <span className="text-white text-2xl">🎨</span>
+                            </div>
+                            <span className="text-white text-xs font-medium drop-shadow-lg">{filter.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Zoom Control */}
@@ -607,14 +646,14 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                 {/* Bottom Controls */}
                 <div className="absolute bottom-0 left-0 right-0 z-[110] bg-gradient-to-t from-black/80 to-transparent p-6">
                   <div className="flex items-center justify-around">
-                    {/* Zoom Toggle */}
+                    {/* Pre-Capture Filters Toggle */}
                     <button
-                      onClick={() => setShowZoomControl(!showZoomControl)}
+                      onClick={() => setShowPreCaptureFilters(!showPreCaptureFilters)}
                       className={`w-14 h-14 rounded-full flex items-center justify-center transition-all backdrop-blur-md border ${
-                        showZoomControl ? 'bg-white text-black border-white shadow-2xl' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                        showPreCaptureFilters ? 'bg-white text-black border-white shadow-2xl' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                       }`}
                     >
-                      <ZoomIn className="w-6 h-6" />
+                      <Wand2 className="w-6 h-6" />
                     </button>
 
                     {/* Mode Selector */}
@@ -827,6 +866,38 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                         <Scissors className="w-6 h-6 drop-shadow-lg" />
                       </button>
                     </>
+                  )}
+                  
+                  {/* Music Library - Available for both image and video */}
+                  <button
+                    onClick={() => setShowMusicLibrary(true)}
+                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                      selectedMusic ? 'bg-gradient-primary text-white border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                    }`}
+                  >
+                    <Music className="w-6 h-6 drop-shadow-lg" />
+                  </button>
+                  
+                  {/* Video Speed Controls - Only for videos */}
+                  {capturedMediaType === 'video' && (
+                    <button
+                      onClick={() => {
+                        const speeds = [0.5, 1, 1.5, 2];
+                        const currentIndex = speeds.indexOf(videoPlaybackSpeed);
+                        const nextSpeed = speeds[(currentIndex + 1) % speeds.length];
+                        setVideoPlaybackSpeed(nextSpeed);
+                        toast({
+                          title: 'Playback speed',
+                          description: `${nextSpeed}x speed`,
+                        });
+                      }}
+                      className="w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 bg-black/60 text-white hover:bg-black/80 border-white/10"
+                    >
+                      <div className="flex flex-col items-center">
+                        <Gauge className="w-5 h-5 drop-shadow-lg" />
+                        <span className="text-[10px] font-bold drop-shadow-lg">{videoPlaybackSpeed}x</span>
+                      </div>
+                    </button>
                   )}
                 </div>
 
@@ -1369,6 +1440,19 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
           onClose={() => setShowCropper(false)} 
         />
       )}
+      
+      {/* Music Library */}
+      <MusicLibrary
+        open={showMusicLibrary}
+        onClose={() => setShowMusicLibrary(false)}
+        onSelectMusic={(music) => {
+          setSelectedMusic(music);
+          toast({
+            title: 'Music added',
+            description: `${music.name} by ${music.artist}`,
+          });
+        }}
+      />
     </>
   );
 }

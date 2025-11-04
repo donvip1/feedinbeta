@@ -150,7 +150,18 @@ export function EnhancedCreatePostModal({
     setMediaType(isVideo ? 'video' : 'image');
     setMediaPreview(URL.createObjectURL(file));
     setShowGallery(false);
-    setStep('edit');
+    
+    // Check if multiple images for carousel
+    if (files.length > 1 && files.every(f => f.type.startsWith('image/'))) {
+      // Handle carousel - skip editor and go to details
+      setStep('details');
+      toast({
+        title: 'Carousel post',
+        description: `${files.length} images selected for carousel`,
+      });
+    } else {
+      setStep('edit');
+    }
   };
 
   const handleTextToImageCreate = (file: File) => {
