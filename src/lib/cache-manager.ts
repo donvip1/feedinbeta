@@ -21,9 +21,9 @@ export const CacheManager = {
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New version available - auto-update silently
-                console.log('[Cache] New version available - auto-updating...');
-                this.updateToNewVersionSilently(registration);
+                // New version available
+                console.log('[Cache] New version available');
+                this.notifyNewVersion();
               }
             });
           }
@@ -107,29 +107,7 @@ export const CacheManager = {
   },
 
   /**
-   * Update to new version silently (automatic)
-   */
-  async updateToNewVersionSilently(registration: ServiceWorkerRegistration): Promise<void> {
-    if (registration.waiting) {
-      // Set up the listener BEFORE sending the message
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        console.log('[Cache] Controller changed, reloading silently...');
-        // Delay reload slightly to ensure smooth transition
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
-      });
-
-      // Tell the service worker to skip waiting
-      registration.waiting.postMessage({ action: 'skipWaiting' });
-    }
-  },
-
-  /**
-   * Update to new version (manual)
+   * Update to new version
    */
   async updateToNewVersion(): Promise<void> {
     if ('serviceWorker' in navigator) {

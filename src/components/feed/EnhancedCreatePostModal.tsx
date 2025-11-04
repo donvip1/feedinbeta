@@ -129,14 +129,12 @@ export function EnhancedCreatePostModal({
     }
   };
 
-  const handleCameraCapture = (file: File, type: 'image' | 'video', appliedEffects?: any) => {
+  const handleCameraCapture = (file: File, type: 'image' | 'video') => {
     setMediaFile(file);
     setMediaType(type);
     setMediaPreview(URL.createObjectURL(file));
-    setEffects(appliedEffects || null);
     setShowCamera(false);
-    // Skip editor since editing is done in camera
-    setStep('details');
+    setStep('edit');
   };
 
   const handleGallerySelect = (files: File[]) => {
