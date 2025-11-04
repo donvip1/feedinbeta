@@ -170,3 +170,84 @@ self.addEventListener('message', (event) => {
     );
   }
 });
+
+// Push Notification Support
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push notification received');
+  
+  if (!event.data) {
+    console.log('[SW] Push event but no data');
+    return;
+  }
+
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body,
+      icon: data.icon || '/favicon.png',
+      badge: data.badge || '/favicon.png',
+      data: data.data || {},
+      vibrate: [200, 100, 200],
+      actions: [
+        { action: 'open', title: 'Open' },
+        { action: 'close', title: 'Close' }
+      ],
+      tag: data.tag || 'default',
+      requireInteraction: false,
+    };
+
+    event.waitUntil(
+      self.registration.showNotification(data.title, options)
+    );
+  } catch (error) {
+    console.error('[SW] Error handling push:', error);
+  }
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked');
+  event.notification.close();
+
+  if (event.action === 'close') {
+    return;
+  }
+
+  // Open or focus the app
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Check if there's already a window open
+      for (const client of clientList) {
+        if (client.url === '/' && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // If no window is open, open a new one
+      if (clients.openWindow) {
+        return clients.openWindow('/');
+      }
+    })
+  );
+});
+
+// Handle push subscription changes
+self.addEventListener('pushsubscriptionchange', (event) => {
+  console.log('[SW] Push subscription changed');
+  event.waitUntil(
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: event.oldSubscription.options.applicationServerKey
+    }).then((subscription) => {
+      console.log('[SW] Resubscribed with new subscription');
+      // Update subscription on the server
+      return fetch('/api/push/update-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          oldEndpoint: event.oldSubscription.endpoint,
+          newSubscription: subscription.toJSON()
+        })
+      });
+    })
+  );
+});
