@@ -25,6 +25,7 @@ export default function ImageEnhancement() {
   const [selectedLevel, setSelectedLevel] = useState<"good" | "better" | "best">("good");
   const [editPrompt, setEditPrompt] = useState("");
   const [showShareModal, setShowShareModal] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -49,6 +50,26 @@ export default function ImageEnhancement() {
     }
 
     setLoading(true);
+    setLoadingStage(0);
+    
+    // Progress messages
+    const progressMessages = [
+      "Analyzing your image...",
+      "Touching up details...",
+      "Fixing the lighting...",
+      "Enhancing colors...",
+      "Smoothing textures...",
+      "Removing blur...",
+      "Sharpening edges...",
+      "Optimizing quality...",
+      "Finalizing enhancements..."
+    ];
+    
+    // Cycle through progress messages every 3 seconds
+    const progressInterval = setInterval(() => {
+      setLoadingStage(prev => (prev + 1) % progressMessages.length);
+    }, 3000);
+
     try {
       // Check credits and limits
       const { data: profile } = await supabase
@@ -121,8 +142,14 @@ export default function ImageEnhancement() {
           finalPrompt += `. Additionally: ${editPrompt}`;
         }
 
-        // Generate TWO different enhancement results
-        const [result1, result2] = await Promise.all([
+        // Generate TWO different enhancement results with timeout
+        const TIMEOUT = 60000; // 60 seconds timeout
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("Enhancement is taking longer than expected. Please try again.")), TIMEOUT)
+        );
+
+        const enhancementPromise = Promise.all([
           supabase.functions.invoke("ai-image-gen", {
             body: { 
               prompt: finalPrompt + " (variation 1)",
@@ -139,8 +166,25 @@ export default function ImageEnhancement() {
           })
         ]);
 
+        const [result1, result2] = await Promise.race([enhancementPromise, timeoutPromise]) as any[];
+
+        clearInterval(progressInterval);
+
         if (result1.error || result2.error) {
-          throw new Error(result1.error?.message || result2.error?.message || "Enhancement failed");
+          const errorMsg = result1.error?.message || result2.error?.message || "Enhancement failed";
+          
+          // Provide specific guidance based on error type
+          if (errorMsg.includes("Rate limit")) {
+            throw new Error("Too many requests. Please wait a moment and try again.");
+          } else if (errorMsg.includes("credits exhausted")) {
+            throw new Error("AI service temporarily unavailable. Please try again later.");
+          } else {
+            throw new Error(errorMsg);
+          }
+        }
+
+        if (!result1.data?.imageUrl || !result2.data?.imageUrl) {
+          throw new Error("Failed to generate enhanced images. Please try again.");
         }
 
         if (result1.data?.imageUrl && result2.data?.imageUrl) {
@@ -180,10 +224,27 @@ export default function ImageEnhancement() {
         }
       };
     } catch (error: any) {
-      console.error("Error:", error);
-      toast({ title: "Enhancement failed", description: error.message, variant: "destructive" });
+      clearInterval(progressInterval);
+      console.error("Enhancement error:", error);
+      
+      let errorTitle = "Enhancement failed";
+      let errorDescription = error.message || "Please try again";
+      
+      // Provide helpful context based on error
+      if (error.message?.includes("timeout") || error.message?.includes("taking longer")) {
+        errorTitle = "Request timeout";
+        errorDescription = "The enhancement is taking too long. This might be due to high demand. Please try again.";
+      }
+      
+      toast({ 
+        title: errorTitle, 
+        description: errorDescription, 
+        variant: "destructive" 
+      });
     } finally {
+      clearInterval(progressInterval);
       setLoading(false);
+      setLoadingStage(0);
     }
   };
 
@@ -289,8 +350,30 @@ export default function ImageEnhancement() {
         {loading && (
           <div className="bg-card rounded-lg p-12 border flex flex-col items-center justify-center gap-4">
             <Loader2 className="h-12 w-12 animate-spin text-primary" />
-            <p className="text-lg font-medium">Enhancing your image...</p>
+            <p className="text-lg font-medium">
+              {[
+                "Analyzing your image...",
+                "Touching up details...",
+                "Fixing the lighting...",
+                "Enhancing colors...",
+                "Smoothing textures...",
+                "Removing blur...",
+                "Sharpening edges...",
+                "Optimizing quality...",
+                "Finalizing enhancements..."
+              ][loadingStage]}
+            </p>
             <p className="text-sm text-muted-foreground">Generating two variations for you to choose from</p>
+            <div className="flex gap-1 mt-2">
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div 
+                  key={i} 
+                  className={`h-1.5 w-8 rounded-full transition-all ${
+                    i === loadingStage ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
+            </div>
           </div>
         )}
 
