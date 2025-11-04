@@ -3,7 +3,7 @@ import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, Mic, RotateCcw, ArrowRight, Scissors, ZoomIn, RefreshCw, Check } from 'lucide-react';
+import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, Mic, RotateCcw, ArrowRight, Scissors, ZoomIn, RefreshCw, Check, Pencil, Droplet } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { VoiceOverRecorder } from './VoiceOverRecorder';
 import { ImageCropper } from './ImageCropper';
@@ -12,7 +12,7 @@ import { applyImageEffects } from '@/lib/media-processor';
 interface CameraCaptureProps {
   open: boolean;
   onClose: () => void;
-  onCapture: (file: File, mediaType: 'image' | 'video', effects?: any) => void;
+  onCapture: (file: File, mediaType: 'image' | 'video', effects?: any, postToStory?: boolean) => void;
 }
 
 interface StickerData {
@@ -84,7 +84,15 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
   const [showStickersOverlay, setShowStickersOverlay] = useState(false);
   const [showVoiceoverOverlay, setShowVoiceoverOverlay] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
+  const [showBlur, setShowBlur] = useState(false);
   const [draggedStickerIndex, setDraggedStickerIndex] = useState<number | null>(null);
+  const [blurAmount, setBlurAmount] = useState(0);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawingPaths, setDrawingPaths] = useState<Array<{x: number, y: number}[]>>([]);
+  const [currentPath, setCurrentPath] = useState<Array<{x: number, y: number}>>([]);
+  const [drawColor, setDrawColor] = useState('#ffffff');
+  const [drawSize, setDrawSize] = useState(3);
 
   useEffect(() => {
     if (open) {
@@ -140,13 +148,44 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
   const capturePhoto = () => {
     if (!videoRef.current) return;
 
+    const video = videoRef.current;
     const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth;
-    canvas.height = videoRef.current.videoHeight;
+    
+    // Calculate dimensions based on selected aspect ratio
+    let targetWidth = video.videoWidth;
+    let targetHeight = video.videoHeight;
+    
+    const aspectRatios = {
+      '9:16': 9/16,
+      '1:1': 1,
+      '4:3': 4/3,
+      '16:9': 16/9
+    };
+    
+    const targetRatio = aspectRatios[aspectRatio];
+    const currentRatio = targetWidth / targetHeight;
+    
+    // Crop to match selected aspect ratio
+    if (currentRatio > targetRatio) {
+      // Video is wider than target - crop width
+      targetWidth = targetHeight * targetRatio;
+    } else if (currentRatio < targetRatio) {
+      // Video is taller than target - crop height
+      targetHeight = targetWidth / targetRatio;
+    }
+    
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+    
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.drawImage(videoRef.current, 0, 0);
+    // Center the crop
+    const sx = (video.videoWidth - targetWidth) / 2;
+    const sy = (video.videoHeight - targetHeight) / 2;
+    
+    ctx.drawImage(video, sx, sy, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight);
+    
     canvas.toBlob((blob) => {
       if (blob) {
         const url = URL.createObjectURL(blob);
@@ -155,7 +194,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
         setCroppedImageUrl(url);
         stopCamera();
       }
-    }, 'image/jpeg');
+    }, 'image/jpeg', 0.95);
   };
 
   const startRecording = () => {
@@ -215,12 +254,18 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
     setStickers([]);
     setVoiceOverBlob(null);
     setCroppedImageUrl(capturedMediaUrl || '');
+    setBlurAmount(0);
+    setDrawingPaths([]);
+    setCurrentPath([]);
+    setDrawColor('#ffffff');
+    setDrawSize(3);
   };
 
   const getFilterStyle = () => {
     const filterObj = selectedFilter !== 'None' ? FILTERS[filterCategory].find(f => f.name === selectedFilter) : null;
+    const blurFilter = blurAmount > 0 ? `blur(${blurAmount}px)` : '';
     return {
-      filter: `${filterObj?.filter || ''} brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`,
+      filter: `${filterObj?.filter || ''} brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) ${blurFilter}`,
     };
   };
 
@@ -269,7 +314,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
     setDraggedStickerIndex(null);
   };
 
-  const handleNext = async () => {
+  const handleNext = async (postToStory: boolean = false) => {
     if (!capturedMediaUrl) return;
     
     if (capturedMediaType === 'image') {
@@ -284,9 +329,13 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
           textPosition,
           textSize,
           stickers,
+          blur: blurAmount,
+          drawingPaths,
+          drawColor,
+          drawSize,
         });
         const file = new File([processedBlob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-        onCapture(file, 'image', { voiceOverBlob });
+        onCapture(file, 'image', { voiceOverBlob }, postToStory);
         handleClose();
       } catch (error) {
         toast({ title: 'Processing failed', variant: 'destructive' });
@@ -295,7 +344,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
       const response = await fetch(capturedMediaUrl);
       const blob = await response.blob();
       const file = new File([blob], `video-${Date.now()}.webm`, { type: 'video/webm' });
-      onCapture(file, 'video', { voiceOverBlob });
+      onCapture(file, 'video', { voiceOverBlob }, postToStory);
       handleClose();
     }
   };
@@ -307,6 +356,8 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
     setShowTextOverlay(false);
     setShowStickersOverlay(false);
     setShowVoiceoverOverlay(false);
+    setShowDrawing(false);
+    setShowBlur(false);
     setZoom(1);
     setShowZoomControl(false);
     resetAllEdits();
@@ -552,18 +603,52 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                     <Mic className="w-6 h-6 drop-shadow-lg" />
                   </button>
                   {capturedMediaType === 'image' && (
-                    <button
-                      onClick={() => {
-                        setShowCropper(true);
-                        setShowFiltersOverlay(false);
-                        setShowTextOverlay(false);
-                        setShowStickersOverlay(false);
-                        setShowVoiceoverOverlay(false);
-                      }}
-                      className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-black/80 transition-all border-2 border-white/10"
-                    >
-                      <Scissors className="w-6 h-6 drop-shadow-lg" />
-                    </button>
+                    <>
+                      <button
+                        onClick={() => {
+                          setShowDrawing(!showDrawing);
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowBlur(false);
+                        }}
+                        className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                          showDrawing ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                        }`}
+                      >
+                        <Pencil className="w-6 h-6 drop-shadow-lg" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowBlur(!showBlur);
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowDrawing(false);
+                        }}
+                        className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                          showBlur ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                        }`}
+                      >
+                        <Droplet className="w-6 h-6 drop-shadow-lg" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setShowCropper(true);
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowDrawing(false);
+                          setShowBlur(false);
+                        }}
+                        className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-black/80 transition-all border-2 border-white/10"
+                      >
+                        <Scissors className="w-6 h-6 drop-shadow-lg" />
+                      </button>
+                    </>
                   )}
                 </div>
 
@@ -631,6 +716,64 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Drawing Canvas Overlay */}
+                  {showDrawing && (
+                    <svg 
+                      className="absolute inset-0 w-full h-full pointer-events-auto"
+                      style={{ touchAction: 'none' }}
+                      onTouchStart={(e) => {
+                        if (!previewRef.current) return;
+                        e.preventDefault();
+                        const touch = e.touches[0];
+                        const rect = previewRef.current.getBoundingClientRect();
+                        const x = ((touch.clientX - rect.left) / rect.width) * 100;
+                        const y = ((touch.clientY - rect.top) / rect.height) * 100;
+                        setCurrentPath([{ x, y }]);
+                        setIsDrawing(true);
+                      }}
+                      onTouchMove={(e) => {
+                        if (!isDrawing || !previewRef.current) return;
+                        e.preventDefault();
+                        const touch = e.touches[0];
+                        const rect = previewRef.current.getBoundingClientRect();
+                        const x = ((touch.clientX - rect.left) / rect.width) * 100;
+                        const y = ((touch.clientY - rect.top) / rect.height) * 100;
+                        setCurrentPath([...currentPath, { x, y }]);
+                      }}
+                      onTouchEnd={() => {
+                        if (isDrawing && currentPath.length > 0) {
+                          setDrawingPaths([...drawingPaths, currentPath]);
+                          setCurrentPath([]);
+                          setIsDrawing(false);
+                        }
+                      }}
+                    >
+                      {/* Render completed paths */}
+                      {drawingPaths.map((path, pathIndex) => (
+                        <polyline
+                          key={pathIndex}
+                          points={path.map(p => `${p.x},${p.y}`).join(' ')}
+                          fill="none"
+                          stroke={drawColor}
+                          strokeWidth={drawSize / 2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      ))}
+                      {/* Render current path being drawn */}
+                      {currentPath.length > 0 && (
+                        <polyline
+                          points={currentPath.map(p => `${p.x},${p.y}`).join(' ')}
+                          fill="none"
+                          stroke={drawColor}
+                          strokeWidth={drawSize / 2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
+                    </svg>
+                  )}
                 </div>
 
                 {/* Filters Overlay - Bottom Transparent */}
@@ -818,11 +961,122 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                   </div>
                 )}
 
-                {/* Next Button */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[130]">
+                {/* Drawing Overlay - Bottom Transparent */}
+                {showDrawing && (
+                  <div className="absolute bottom-24 left-4 right-20 z-[120] bg-black/40 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-white/20 max-h-[45vh] overflow-y-auto">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-white font-bold text-sm drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Draw</h3>
+                      <button onClick={() => setShowDrawing(false)} className="text-white/80 hover:text-white">
+                        <X className="w-5 h-5 drop-shadow-lg" />
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-white text-xs font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Color</label>
+                        <div className="flex gap-2">
+                          {['#ffffff', '#000000', '#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'].map((color) => (
+                            <button
+                              key={color}
+                              onClick={() => setDrawColor(color)}
+                              className={`w-10 h-10 rounded-full border-2 transition-all ${
+                                drawColor === color ? 'border-white scale-110' : 'border-white/30'
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1.5">
+                        <label className="text-white text-xs font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Size: {drawSize}px</label>
+                        <Slider 
+                          value={[drawSize]} 
+                          onValueChange={([v]) => setDrawSize(v)} 
+                          min={1} 
+                          max={20}
+                          className="[&_[role=slider]]:bg-white [&_[role=slider]]:border-2 [&_[role=slider]]:border-black"
+                        />
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setDrawingPaths([]);
+                            setCurrentPath([]);
+                          }}
+                          className="flex-1 bg-white/20 border-white/30 text-white hover:bg-white/30 drop-shadow-lg"
+                        >
+                          Clear All
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            if (drawingPaths.length > 0) {
+                              setDrawingPaths(drawingPaths.slice(0, -1));
+                            }
+                          }}
+                          className="flex-1 bg-white/20 border-white/30 text-white hover:bg-white/30 drop-shadow-lg"
+                        >
+                          Undo
+                        </Button>
+                      </div>
+
+                      <p className="text-white/70 text-xs drop-shadow-lg">Touch and drag on the image to draw</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Blur Overlay - Bottom Transparent */}
+                {showBlur && (
+                  <div className="absolute bottom-24 left-4 right-20 z-[120] bg-black/40 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-white/20">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-white font-bold text-sm drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Blur</h3>
+                      <button onClick={() => setShowBlur(false)} className="text-white/80 hover:text-white">
+                        <X className="w-5 h-5 drop-shadow-lg" />
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <label className="text-white text-xs font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Blur Amount: {blurAmount}px</label>
+                        <Slider 
+                          value={[blurAmount]} 
+                          onValueChange={([v]) => setBlurAmount(v)} 
+                          min={0} 
+                          max={20}
+                          className="[&_[role=slider]]:bg-white [&_[role=slider]]:border-2 [&_[role=slider]]:border-black"
+                        />
+                      </div>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setBlurAmount(0)}
+                        className="w-full bg-white/20 border-white/30 text-white hover:bg-white/30 drop-shadow-lg"
+                      >
+                        Remove Blur
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Post/Story Buttons */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[130] flex gap-3">
                   <Button
                     size="lg"
-                    onClick={handleNext}
+                    onClick={() => handleNext(true)}
+                    variant="outline"
+                    className="bg-black/60 backdrop-blur-md text-white hover:bg-black/80 rounded-full px-8 py-7 text-base font-bold shadow-2xl border-2 border-white/30"
+                  >
+                    Story
+                  </Button>
+                  <Button
+                    size="lg"
+                    onClick={() => handleNext(false)}
                     className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90 rounded-full px-12 py-7 text-lg font-bold shadow-2xl border-2 border-white/20"
                   >
                     Next

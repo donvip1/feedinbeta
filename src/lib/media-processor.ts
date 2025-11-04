@@ -7,6 +7,11 @@ interface StickerData {
   scale: number;
 }
 
+interface DrawingPath {
+  x: number;
+  y: number;
+}
+
 /**
  * Apply effects to an image using Canvas API
  */
@@ -22,6 +27,10 @@ export async function applyImageEffects(
     textSize?: number; // Font size in px
     stickers?: StickerData[];
     rotation?: number;
+    blur?: number; // Blur amount in px
+    drawingPaths?: DrawingPath[][]; // Array of paths
+    drawColor?: string; // Drawing color
+    drawSize?: number; // Drawing line width
   },
   username?: string
 ): Promise<Blob> {
@@ -53,6 +62,7 @@ export async function applyImageEffects(
       const brightness = effects.brightness || 100;
       const contrast = effects.contrast || 100;
       const saturation = effects.saturation || 100;
+      const blur = effects.blur || 0;
       
       const filterParts = [];
       if (effects.filter) {
@@ -62,6 +72,9 @@ export async function applyImageEffects(
       filterParts.push(`brightness(${brightness}%)`);
       filterParts.push(`contrast(${contrast}%)`);
       filterParts.push(`saturate(${saturation}%)`);
+      if (blur > 0) {
+        filterParts.push(`blur(${blur}px)`);
+      }
       
       ctx.filter = filterParts.join(' ');
 
@@ -116,6 +129,29 @@ export async function applyImageEffects(
           ctx.shadowBlur = 0;
           ctx.shadowOffsetX = 0;
           ctx.shadowOffsetY = 0;
+        });
+      }
+
+      // Add drawing paths if specified
+      if (effects.drawingPaths && effects.drawingPaths.length > 0) {
+        ctx.strokeStyle = effects.drawColor || '#ffffff';
+        ctx.lineWidth = effects.drawSize || 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        effects.drawingPaths.forEach((path) => {
+          if (path.length < 2) return;
+          
+          ctx.beginPath();
+          const firstPoint = path[0];
+          ctx.moveTo((firstPoint.x / 100) * canvas.width, (firstPoint.y / 100) * canvas.height);
+          
+          for (let i = 1; i < path.length; i++) {
+            const point = path[i];
+            ctx.lineTo((point.x / 100) * canvas.width, (point.y / 100) * canvas.height);
+          }
+          
+          ctx.stroke();
         });
       }
 
