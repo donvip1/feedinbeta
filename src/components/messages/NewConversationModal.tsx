@@ -43,11 +43,31 @@ export const NewConversationModal = ({ open, onClose, onSelectUser, initialImage
 
     setLoading(true);
     try {
+      // Get accepted friend requests where user is either sender or receiver
+      const { data: acceptedRequests, error: friendsError } = await supabase
+        .from('friend_requests')
+        .select('sender_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      if (friendsError) throw friendsError;
+
+      // Extract friend IDs
+      const friendIds = acceptedRequests?.map((req) =>
+        req.sender_id === user.id ? req.receiver_id : req.sender_id
+      ) || [];
+
+      if (friendIds.length === 0) {
+        setUsers([]);
+        setLoading(false);
+        return;
+      }
+
+      // Load friend profiles
       const { data, error } = await supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url')
-        .neq('id', user.id)
-        .limit(50);
+        .in('id', friendIds);
 
       if (error) throw error;
       setUsers(data || []);
@@ -100,7 +120,7 @@ export const NewConversationModal = ({ open, onClose, onSelectUser, initialImage
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No users found
+              {searchQuery ? 'No friends found' : 'No friends yet. Add friends to start chatting!'}
             </div>
           ) : (
             <div className="space-y-2">

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,7 +35,6 @@ interface FriendRequest {
 const Friends = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
@@ -155,10 +154,8 @@ const Friends = () => {
       if (error) throw error;
       setSearchResults(data || []);
     } catch (error: any) {
-      toast({
-        title: 'Error searching users',
-        description: error.message,
-        variant: 'destructive',
+      toast.error('Error searching users', {
+        description: error.message
       });
     } finally {
       setSearching(false);
@@ -177,10 +174,8 @@ const Friends = () => {
       });
 
       if (creditError) {
-        toast({
-          title: 'Insufficient credits',
-          description: 'You need 5 credits to send a friend request',
-          variant: 'destructive',
+        toast.error('Insufficient credits', {
+          description: 'You need 5 credits to send a friend request'
         });
         return;
       }
@@ -192,15 +187,12 @@ const Friends = () => {
 
       if (error) throw error;
 
-      toast({
-        title: 'Friend request sent',
-        description: '5 credits deducted',
+      toast.success('Friend request sent', {
+        description: '5 credits deducted'
       });
     } catch (error: any) {
-      toast({
-        title: 'Error sending friend request',
-        description: error.message,
-        variant: 'destructive',
+      toast.error('Error sending friend request', {
+        description: error.message
       });
     }
   };
@@ -214,19 +206,15 @@ const Friends = () => {
 
       if (error) throw error;
 
-      toast({
-        title: status === 'accepted' ? 'Friend request accepted' : 'Friend request rejected',
-      });
+      toast.success(status === 'accepted' ? 'Friend request accepted' : 'Friend request rejected');
 
       loadFriendRequests();
       if (status === 'accepted') {
         loadFriends();
       }
     } catch (error: any) {
-      toast({
-        title: 'Error responding to request',
-        description: error.message,
-        variant: 'destructive',
+      toast.error('Error responding to request', {
+        description: error.message
       });
     }
   };

@@ -2530,6 +2530,10 @@ export type Database = {
       }
     }
     Functions: {
+      are_mutual_friends: {
+        Args: { user_a: string; user_b: string }
+        Returns: boolean
+      }
       calculate_trending_posts: { Args: never; Returns: undefined }
       can_change_username: { Args: { user_id: string }; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
