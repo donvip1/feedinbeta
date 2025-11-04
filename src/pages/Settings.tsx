@@ -20,7 +20,8 @@ import {
   Coins,
   Layers,
   Crown,
-  Bookmark
+  Bookmark,
+  HardDrive
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -62,6 +63,13 @@ const Settings = () => {
       description: 'Manage blocked and muted accounts',
       route: '/settings/blocked',
       color: 'text-red-500'
+    },
+    {
+      icon: HardDrive,
+      title: 'Cache & Storage',
+      description: 'Manage app cache and cookies',
+      route: '/settings/cache',
+      color: 'text-cyan-500'
     }
   ];
 

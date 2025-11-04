@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { UpdateNotification } from "@/components/shared/UpdateNotification";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -32,6 +33,7 @@ import Settings from "./pages/Settings";
 import AccountSettings from "./pages/AccountSettings";
 import PrivacySettings from "./pages/PrivacySettings";
 import NotificationSettings from "./pages/NotificationSettings";
+import CacheSettingsPage from "./pages/CacheSettingsPage";
 import BlockedUsers from "./pages/BlockedUsers";
 import P2PMarketplace from "./pages/P2PMarketplace";
 import InitializeGroups from "./pages/InitializeGroups";
@@ -47,6 +49,7 @@ const App: React.FC = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <UpdateNotification />
         <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -76,6 +79,7 @@ const App: React.FC = () => (
           <Route path="/settings/account" element={<AccountSettings />} />
           <Route path="/settings/privacy" element={<PrivacySettings />} />
           <Route path="/settings/notifications" element={<NotificationSettings />} />
+          <Route path="/settings/cache" element={<CacheSettingsPage />} />
           <Route path="/settings/blocked" element={<BlockedUsers />} />
           <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
           <Route path="/initialize-groups" element={<InitializeGroups />} />
