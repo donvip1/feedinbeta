@@ -136,7 +136,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
           </div>
 
           {/* Video Preview */}
-          <div className="flex-1 flex items-center justify-center">
+          <div className="flex-1 flex items-center justify-center overflow-hidden">
             <video
               ref={videoRef}
               autoPlay
@@ -146,13 +146,13 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
             />
           </div>
 
-          {/* Controls */}
-          <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-4">
+          {/* Controls - Fixed with safe area padding */}
+          <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-4 pb-safe" style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}>
             {/* Mode Selector */}
-            <div className="flex gap-4 bg-black/50 rounded-full px-6 py-2">
+            <div className="flex gap-4 bg-black/70 backdrop-blur-sm rounded-full px-6 py-2">
               <button
                 onClick={() => setMode('photo')}
-                className={`px-4 py-2 rounded-full font-semibold transition-colors ${
+                className={`px-4 py-2 rounded-full font-semibold transition-colors text-sm ${
                   mode === 'photo' ? 'bg-white text-black' : 'text-white'
                 }`}
               >
@@ -160,7 +160,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
               </button>
               <button
                 onClick={() => setMode('video')}
-                className={`px-4 py-2 rounded-full font-semibold transition-colors ${
+                className={`px-4 py-2 rounded-full font-semibold transition-colors text-sm ${
                   mode === 'video' ? 'bg-white text-black' : 'text-white'
                 }`}
               >
@@ -168,23 +168,21 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
               </button>
             </div>
 
-            {/* Capture Button */}
-            <Button
-              size="icon"
-              variant="ghost"
+            {/* Capture Button - Larger and more visible */}
+            <button
               onClick={mode === 'photo' ? capturePhoto : isRecording ? stopRecording : startRecording}
-              className={`w-20 h-20 rounded-full ${
+              className={`w-24 h-24 rounded-full flex items-center justify-center shadow-2xl border-4 border-white transition-all hover:scale-105 active:scale-95 ${
                 isRecording ? 'bg-red-500' : 'bg-white'
-              } hover:scale-110 transition-transform`}
+              }`}
             >
               {mode === 'photo' ? (
-                <Circle className="w-16 h-16 fill-current" />
+                <div className="w-20 h-20 rounded-full border-4 border-black" />
               ) : isRecording ? (
-                <Square className="w-8 h-8 fill-current text-white" />
+                <Square className="w-10 h-10 fill-white" />
               ) : (
-                <Circle className="w-16 h-16 fill-current text-red-500" />
+                <div className="w-20 h-20 rounded-full bg-red-500" />
               )}
-            </Button>
+            </button>
           </div>
         </div>
       </DialogContent>
