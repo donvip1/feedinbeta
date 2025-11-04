@@ -393,6 +393,17 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
 
+  // Dynamic font sizing based on text length (similar to WhatsApp/Facebook statuses)
+  const getTextSize = (text: string) => {
+    const length = text.length;
+    if (length <= 30) return 'text-5xl md:text-6xl';
+    if (length <= 60) return 'text-4xl md:text-5xl';
+    if (length <= 100) return 'text-3xl md:text-4xl';
+    if (length <= 150) return 'text-2xl md:text-3xl';
+    if (length <= 250) return 'text-xl md:text-2xl';
+    return 'text-lg md:text-xl';
+  };
+
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden">
       {/* Main Content Area */}
@@ -474,10 +485,10 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         )}
 
-        {/* Text-only post - Centered */}
+        {/* Text-only post - Centered with dynamic sizing */}
         {!post.media_url && post.content && (
-          <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-8">
-            <p className="text-white text-2xl text-center whitespace-pre-wrap max-w-2xl">
+          <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6 pr-20 md:pr-24">
+            <p className={`text-white ${getTextSize(post.content)} font-bold text-center leading-relaxed break-words max-w-3xl px-4`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
               {post.content}
             </p>
           </div>
