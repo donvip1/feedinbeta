@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => ({
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
+  optimizeDeps: {
+    include: ["react", "react-dom", "react/jsx-runtime"],
+    force: true,
+  },
   build: {
     // Generate unique build hashes for cache busting
     rollupOptions: {
@@ -27,5 +31,9 @@ export default defineConfig(({ mode }) => ({
     },
     // Source maps for debugging
     sourcemap: mode === 'development',
+    // Ensure single React instance
+    commonjsOptions: {
+      include: [/node_modules/],
+    },
   },
 }));
