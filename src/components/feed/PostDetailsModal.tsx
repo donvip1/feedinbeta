@@ -18,11 +18,12 @@ interface PostDetailsModalProps {
   onBack?: () => void;
   mediaUrl: string;
   mediaType: 'text' | 'image' | 'video';
-  effects: any;
+  effects: any; // Contains processedBlob for images
   onSuccess: () => void;
+  mediaFile?: File | null; // Original media file for fallback
 }
 
-export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, effects, onSuccess }: PostDetailsModalProps) {
+export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, effects, onSuccess, mediaFile }: PostDetailsModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -93,10 +94,54 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
 
     setLoading(true);
     try {
+      let finalMediaUrl = mediaUrl;
+
+      // Upload processed media if we have a blob from effects
+      if (mediaType !== 'text' && effects?.processedBlob) {
+        const fileExt = mediaType === 'image' ? 'jpg' : 'mp4';
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const bucketName = mediaType === 'image' ? 'post-images' : 'posts';
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from(bucketName)
+          .upload(fileName, effects.processedBlob, {
+            contentType: mediaType === 'image' ? 'image/jpeg' : 'video/mp4',
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(uploadData.path);
+
+        finalMediaUrl = publicUrl;
+      } else if (mediaType !== 'text' && mediaFile) {
+        // Fallback: upload original file if no processed blob
+        const fileExt = mediaFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const bucketName = mediaType === 'image' ? 'post-images' : 'posts';
+
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from(bucketName)
+          .upload(fileName, mediaFile, {
+            contentType: mediaFile.type,
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(uploadData.path);
+
+        finalMediaUrl = publicUrl;
+      }
+
       const postData = {
         user_id: user.id,
         content: description.trim() || null,
-        media_url: mediaUrl || null,
+        media_url: finalMediaUrl || null,
         media_type: mediaType,
         location: location || null,
         privacy,

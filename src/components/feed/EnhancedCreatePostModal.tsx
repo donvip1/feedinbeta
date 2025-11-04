@@ -71,6 +71,7 @@ export function EnhancedCreatePostModal({
   };
 
   const handleEditorNext = (editedUrl: string, appliedEffects: any) => {
+    setMediaPreview(editedUrl); // Update preview to show processed image
     setEffects(appliedEffects);
     setStep('details');
   };
@@ -258,6 +259,7 @@ export function EnhancedCreatePostModal({
         mediaType={mediaType}
         effects={effects}
         onSuccess={handleDetailsSuccess}
+        mediaFile={mediaFile}
       />
     </>
   );
