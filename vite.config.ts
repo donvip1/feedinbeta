@@ -20,14 +20,18 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
   optimizeDeps: {
-    exclude: [
+    exclude: ["lucide-react"],
+    include: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
       "@tanstack/react-query",
+      "react-router-dom",
+      "next-themes",
       "@radix-ui/react-tooltip",
       "@radix-ui/react-popover",
       "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-dialog",
-      "react-router-dom",
-      "next-themes"
+      "@radix-ui/react-dialog"
     ],
   },
   build: {
