@@ -322,42 +322,49 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
               // Camera View
               <>
                 {/* Top Controls */}
-                <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/60 to-transparent p-4">
-                  <div className="flex items-center justify-between">
+                <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 via-black/50 to-transparent pt-4 pb-6">
+                  <div className="flex items-center justify-between px-4">
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={handleClose}
-                      className="text-white hover:bg-white/20 bg-transparent"
+                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
                     >
-                      <X className="w-6 h-6" />
+                      <X className="w-6 h-6 drop-shadow-lg" />
                     </Button>
                     
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={toggleFacingMode}
-                      className="text-white hover:bg-white/20 bg-transparent"
+                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
                     >
-                      <RefreshCw className="w-6 h-6" />
+                      <RefreshCw className="w-6 h-6 drop-shadow-lg" />
                     </Button>
                   </div>
 
-                  {/* Aspect Ratio Selector */}
-                  <div className="flex justify-center mt-3 gap-2">
+                  {/* Aspect Ratio Selector - More Prominent */}
+                  <div className="flex justify-center mt-4 gap-3 px-4">
                     {(['9:16', '1:1', '4:3', '16:9'] as const).map((ratio) => (
                       <button
                         key={ratio}
                         onClick={() => setAspectRatio(ratio)}
-                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                        className={`px-5 py-2.5 rounded-full text-sm font-black transition-all shadow-lg ${
                           aspectRatio === ratio 
-                            ? 'bg-white text-black' 
-                            : 'bg-white/20 text-white hover:bg-white/30'
+                            ? 'bg-white text-black scale-110' 
+                            : 'bg-black/50 backdrop-blur-md text-white border-2 border-white/30 hover:bg-white/20 hover:scale-105'
                         }`}
                       >
                         {ratio}
                       </button>
                     ))}
+                  </div>
+                  
+                  {/* Ratio Label */}
+                  <div className="text-center mt-2">
+                    <span className="text-white/80 text-xs font-medium drop-shadow-lg">
+                      Screen Ratio: {aspectRatio}
+                    </span>
                   </div>
                 </div>
 
@@ -455,9 +462,9 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
             ) : (
               // Preview & Edit View with Transparent Overlays
               <>
-                {/* Top Controls */}
-                <div className="absolute top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/70 to-transparent p-4">
-                  <div className="flex items-center justify-between">
+                {/* Top Controls - Keep Aspect Ratio Visible */}
+                <div className="absolute top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/50 to-transparent pt-4 pb-6">
+                  <div className="flex items-center justify-between px-4">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -465,7 +472,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                         setCapturedMediaUrl(null);
                         startCamera();
                       }}
-                      className="text-white hover:bg-white/20 bg-transparent"
+                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
                     >
                       <X className="w-6 h-6 drop-shadow-lg" />
                     </Button>
@@ -474,11 +481,19 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                       size="sm"
                       variant="ghost"
                       onClick={resetAllEdits}
-                      className="text-white hover:bg-white/20 bg-transparent"
+                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
                     >
                       <RotateCcw className="w-5 h-5 mr-2 drop-shadow-lg" />
                       Reset
                     </Button>
+                  </div>
+
+                  {/* Show Selected Aspect Ratio */}
+                  <div className="text-center mt-3">
+                    <div className="inline-flex items-center gap-2 bg-black/50 backdrop-blur-md px-4 py-2 rounded-full border-2 border-white/30">
+                      <span className="text-white/80 text-xs font-medium">Ratio:</span>
+                      <span className="text-white text-sm font-black">{aspectRatio}</span>
+                    </div>
                   </div>
                 </div>
 
