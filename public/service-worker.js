@@ -145,7 +145,13 @@ async function limitCacheSize(cacheName, maxItems) {
 // Handle messages from clients
 self.addEventListener('message', (event) => {
   if (event.data.action === 'skipWaiting') {
-    self.skipWaiting();
+    console.log('[SW] Received skipWaiting message');
+    self.skipWaiting().then(() => {
+      // Take control of all clients immediately
+      return self.clients.claim();
+    }).then(() => {
+      console.log('[SW] Claimed all clients');
+    });
   }
   
   if (event.data.action === 'clearCache') {

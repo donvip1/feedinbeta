@@ -110,13 +110,22 @@ export const CacheManager = {
    * Update to new version
    */
   async updateToNewVersion(): Promise<void> {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.controller.postMessage({ action: 'skipWaiting' });
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.ready;
       
-      // Reload page after service worker is activated
+      // Set up the listener BEFORE sending the message
+      let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return;
+        refreshing = true;
+        console.log('[Cache] Controller changed, reloading...');
         window.location.reload();
       });
+
+      // Tell the service worker to skip waiting
+      if (registration.waiting) {
+        registration.waiting.postMessage({ action: 'skipWaiting' });
+      }
     }
   },
 
