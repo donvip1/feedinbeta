@@ -10,6 +10,7 @@ interface Props {
 interface State {
   hasError: boolean;
   error?: Error;
+  errorInfo?: React.ErrorInfo;
 }
 
 export class ErrorBoundary extends React.Component<Props, State> {
@@ -24,6 +25,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Error caught by boundary:', error, errorInfo);
+    this.setState({ errorInfo });
   }
 
   render() {
@@ -43,9 +45,21 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 <summary className="cursor-pointer text-sm font-medium mb-2">
                   Error details
                 </summary>
-                <code className="text-xs text-muted-foreground">
-                  {this.state.error.toString()}
-                </code>
+                <div className="space-y-2">
+                  <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                    {this.state.error.toString()}
+                  </code>
+                  {this.state.error?.stack && (
+                    <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                      {this.state.error.stack}
+                    </code>
+                  )}
+                  {this.state.errorInfo?.componentStack && (
+                    <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                      {this.state.errorInfo.componentStack}
+                    </code>
+                  )}
+                </div>
               </details>
             )}
             <div className="space-y-2">

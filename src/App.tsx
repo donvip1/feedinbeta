@@ -44,10 +44,11 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
+    {/* Temporarily render without QueryClientProvider to isolate hook crash */}
+    {/* <QueryClientProvider client={queryClient}> */}
       {/* <TooltipProvider> */}
-        <Toaster />
-        <Sonner />
+        {/* <Toaster /> */}
+        {/* <Sonner /> */}
         <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -88,7 +89,7 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     {/* </TooltipProvider> */}
-  </QueryClientProvider>
+  {/* </QueryClientProvider> */}
   </ErrorBoundary>
 );
 
