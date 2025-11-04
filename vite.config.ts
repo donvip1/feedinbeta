@@ -17,9 +17,13 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "react/jsx-runtime"],
-    exclude: ["@tanstack/react-query"],
-    force: true,
+    exclude: [
+      "@tanstack/react-query",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-dialog"
+    ],
   },
   build: {
     // Generate unique build hashes for cache busting
