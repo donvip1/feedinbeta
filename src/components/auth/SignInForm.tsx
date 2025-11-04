@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,7 +30,6 @@ interface SignInFormProps {
 
 export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -61,25 +60,20 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
         usernameSchema.parse({ username: formData.username, password: formData.password });
         // Query profiles to find user with this username - note: this requires email to be stored
         // For now, we'll show a helpful message
-        toast({
-          title: "Username sign-in coming soon",
-          description: "Please use your email or phone number to sign in",
-          variant: "destructive",
+        toast.error('Username sign-in coming soon', {
+          description: 'Please use your email or phone number to sign in'
         });
         setLoading(false);
         return;
       }
 
-      toast({
-        title: "Welcome back!",
-        description: "Successfully signed in",
+      toast.success('Welcome back!', {
+        description: 'Successfully signed in'
       });
       navigate('/');
     } catch (error: any) {
-      toast({
-        title: "Sign in failed",
-        description: error.message || 'Invalid credentials',
-        variant: "destructive",
+      toast.error('Sign in failed', {
+        description: error.message || 'Invalid credentials'
       });
     } finally {
       setLoading(false);

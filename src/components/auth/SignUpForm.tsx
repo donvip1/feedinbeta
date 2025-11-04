@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,7 +31,6 @@ const phoneSignupSchema = z.object({
 
 export const SignUpForm = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -44,10 +43,7 @@ export const SignUpForm = () => {
 
   const handleSignUp = async (method: 'email' | 'phone') => {
     if (formData.password !== formData.confirmPassword) {
-      toast({
-        title: "Passwords don't match",
-        variant: "destructive",
-      });
+      toast.error("Passwords don't match");
       return;
     }
 
@@ -97,16 +93,13 @@ export const SignUpForm = () => {
         if (error) throw error;
       }
 
-      toast({
-        title: "Account created!",
-        description: "Welcome to FEEDIN",
+      toast.success('Account created!', {
+        description: 'Welcome to FEEDIN'
       });
       navigate('/');
     } catch (error: any) {
-      toast({
-        title: "Sign up failed",
-        description: error.message || 'Unable to create account',
-        variant: "destructive",
+      toast.error('Sign up failed', {
+        description: error.message || 'Unable to create account'
       });
     } finally {
       setLoading(false);
