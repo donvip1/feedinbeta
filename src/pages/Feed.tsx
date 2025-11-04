@@ -302,7 +302,7 @@ const Feed = () => {
             {posts.map((post) => (
               <div 
                 key={post.id} 
-                className="snap-start snap-always h-full w-full flex items-center justify-center px-4 py-4"
+                className="snap-start snap-always h-full w-full flex items-center justify-center px-4 py-2"
               >
                 <div className="w-full h-full max-w-2xl">
                   <PostCard post={post} onUpdate={loadPosts} />

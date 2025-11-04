@@ -1,3 +1,12 @@
+import watermarkImage from '@/assets/feedin-watermark.png';
+
+interface StickerData {
+  emoji: string;
+  x: number;
+  y: number;
+  scale: number;
+}
+
 /**
  * Apply effects to an image using Canvas API
  */
@@ -10,9 +19,10 @@ export async function applyImageEffects(
     saturation?: number;
     textOverlay?: string;
     textPosition?: 'top' | 'center' | 'bottom';
-    selectedSticker?: string;
+    stickers?: StickerData[];
     rotation?: number;
-  }
+  },
+  username?: string
 ): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const canvas = document.createElement('canvas');
@@ -80,21 +90,94 @@ export async function applyImageEffects(
         ctx.fillText(effects.textOverlay, canvas.width / 2, y);
       }
 
-      // Add sticker if specified
-      if (effects.selectedSticker) {
-        ctx.font = 'bold 80px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText(effects.selectedSticker, canvas.width / 2, canvas.height / 2);
+      // Add stickers if specified
+      if (effects.stickers && effects.stickers.length > 0) {
+        effects.stickers.forEach((sticker) => {
+          const fontSize = 80 * sticker.scale;
+          ctx.font = `bold ${fontSize}px Arial`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          
+          const x = (sticker.x / 100) * canvas.width;
+          const y = (sticker.y / 100) * canvas.height;
+          
+          // Add shadow for better visibility
+          ctx.shadowColor = 'rgba(0,0,0,0.5)';
+          ctx.shadowBlur = 10;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+          
+          ctx.fillText(sticker.emoji, x, y);
+          
+          // Reset shadow
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+        });
       }
 
-      // Convert canvas to blob
-      canvas.toBlob((blob) => {
-        if (blob) {
-          resolve(blob);
-        } else {
-          reject(new Error('Failed to create blob'));
+      // Add watermark with username (TikTok style)
+      const watermark = new Image();
+      watermark.crossOrigin = 'anonymous';
+      watermark.onload = () => {
+        // Random position for watermark
+        const positions = [
+          { x: 20, y: 20, align: 'left' }, // top left
+          { x: canvas.width - 20, y: 20, align: 'right' }, // top right
+          { x: 20, y: canvas.height / 2, align: 'left' }, // center left
+          { x: canvas.width - 20, y: canvas.height / 2, align: 'right' }, // center right
+          { x: 20, y: canvas.height - 60, align: 'left' }, // bottom left
+          { x: canvas.width - 20, y: canvas.height - 60, align: 'right' }, // bottom right
+        ];
+        const randomPos = positions[Math.floor(Math.random() * positions.length)];
+
+        // Draw watermark logo (40px height)
+        const logoHeight = 40;
+        const logoWidth = (watermark.width / watermark.height) * logoHeight;
+        
+        let logoX = randomPos.x;
+        if (randomPos.align === 'right') {
+          logoX = randomPos.x - logoWidth;
         }
-      }, 'image/jpeg', 0.95);
+        
+        ctx.drawImage(watermark, logoX, randomPos.y, logoWidth, logoHeight);
+
+        // Draw username below watermark
+        if (username) {
+          ctx.font = 'bold 16px Arial';
+          ctx.fillStyle = 'white';
+          ctx.strokeStyle = 'black';
+          ctx.lineWidth = 2;
+          ctx.textAlign = randomPos.align as CanvasTextAlign;
+          
+          const textY = randomPos.y + logoHeight + 18;
+          ctx.strokeText(`@${username}`, randomPos.x, textY);
+          ctx.fillText(`@${username}`, randomPos.x, textY);
+        }
+
+        // Convert canvas to blob
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create blob'));
+          }
+        }, 'image/jpeg', 0.95);
+      };
+
+      watermark.onerror = () => {
+        // If watermark fails to load, proceed without it
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create blob'));
+          }
+        }, 'image/jpeg', 0.95);
+      };
+
+      watermark.src = watermarkImage;
     };
 
     img.onerror = () => {

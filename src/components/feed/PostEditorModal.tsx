@@ -20,6 +20,13 @@ interface PostEditorModalProps {
   onNext: (editedMedia: string, effects: any) => void;
 }
 
+interface StickerData {
+  emoji: string;
+  x: number;
+  y: number;
+  scale: number;
+}
+
 const FILTERS = {
   hotVibes: [
     { name: 'Fire', filter: 'contrast(1.3) saturate(1.5) hue-rotate(350deg)' },
@@ -54,6 +61,7 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
   const { toast } = useToast();
   const audioRef = useRef<HTMLAudioElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<keyof typeof FILTERS>('hotVibes');
   const [brightness, setBrightness] = useState(100);
@@ -62,7 +70,9 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
   const [isMuted, setIsMuted] = useState(false);
   const [textOverlay, setTextOverlay] = useState('');
   const [textPosition, setTextPosition] = useState<'top' | 'center' | 'bottom'>('center');
-  const [selectedSticker, setSelectedSticker] = useState<string>('');
+  const [stickers, setStickers] = useState<StickerData[]>([]);
+  const [draggedStickerIndex, setDraggedStickerIndex] = useState<number | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const [overlayAudioFile, setOverlayAudioFile] = useState<File | null>(null);
   const [croppedImageUrl, setCroppedImageUrl] = useState<string>(mediaUrl);
   const [showCropper, setShowCropper] = useState(false);
@@ -100,16 +110,22 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
           setVoiceOverBlob(null);
         }
       };
-      
-      return () => URL.revokeObjectURL(url);
+
+      return () => {
+        URL.revokeObjectURL(url);
+      };
     }
   }, [voiceOverBlob, mediaType, videoDuration, toast]);
 
   // Get video duration
   useEffect(() => {
     if (mediaType === 'video' && videoRef.current) {
-      videoRef.current.onloadedmetadata = () => {
+      const handleLoadedMetadata = () => {
         setVideoDuration(videoRef.current?.duration || 0);
+      };
+      videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
+      return () => {
+        videoRef.current?.removeEventListener('loadedmetadata', handleLoadedMetadata);
       };
     }
   }, [mediaType]);
@@ -119,7 +135,6 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
     
     if (isPlayingVoiceOver) {
       audioRef.current.pause();
-      audioRef.current.currentTime = 0;
       setIsPlayingVoiceOver(false);
     } else {
       audioRef.current.play();
@@ -151,29 +166,75 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
     }
   };
 
+  const addSticker = (emoji: string) => {
+    // Default positions in corners without covering content
+    const positions = [
+      { x: 10, y: 10 }, // top left
+      { x: 85, y: 10 }, // top right
+      { x: 10, y: 85 }, // bottom left
+      { x: 85, y: 85 }, // bottom right
+    ];
+    const randomPos = positions[Math.floor(Math.random() * positions.length)];
+    
+    setStickers([...stickers, { emoji, x: randomPos.x, y: randomPos.y, scale: 1 }]);
+  };
+
+  const removeSticker = (index: number) => {
+    setStickers(stickers.filter((_, i) => i !== index));
+  };
+
+  const handleStickerTouchStart = (e: React.TouchEvent, index: number) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    setDraggedStickerIndex(index);
+    setDragStart({ x: touch.clientX, y: touch.clientY });
+  };
+
+  const handleStickerTouchMove = (e: React.TouchEvent) => {
+    if (draggedStickerIndex === null || !dragStart || !previewRef.current) return;
+    e.preventDefault();
+    
+    const touch = e.touches[0];
+    const rect = previewRef.current.getBoundingClientRect();
+    const x = ((touch.clientX - rect.left) / rect.width) * 100;
+    const y = ((touch.clientY - rect.top) / rect.height) * 100;
+    
+    setStickers(stickers.map((sticker, i) => 
+      i === draggedStickerIndex ? { ...sticker, x: Math.max(0, Math.min(95, x)), y: Math.max(0, Math.min(95, y)) } : sticker
+    ));
+  };
+
+  const handleStickerTouchEnd = () => {
+    setDraggedStickerIndex(null);
+    setDragStart(null);
+  };
+
   const handleNext = async () => {
     if (mediaType === 'image') {
       setProcessing(true);
       try {
         const filterObj = selectedFilter ? FILTERS[filterCategory].find(f => f.name === selectedFilter) : null;
-        const processedBlob = await applyImageEffects(croppedImageUrl, {
-          filter: filterObj?.filter,
-          brightness,
-          contrast,
-          saturation,
-          textOverlay,
-          textPosition,
-          selectedSticker,
-        });
+        const processedBlob = await applyImageEffects(
+          croppedImageUrl, 
+          {
+            filter: filterObj?.filter,
+            brightness,
+            contrast,
+            saturation,
+            textOverlay,
+            textPosition,
+            stickers,
+          }
+        );
         const processedUrl = URL.createObjectURL(processedBlob);
-        onNext(processedUrl, { processedBlob, filter: selectedFilter, brightness, contrast, saturation, textOverlay, selectedSticker, overlayAudioFile, voiceOverBlob });
+        onNext(processedUrl, { processedBlob, filter: selectedFilter, brightness, contrast, saturation, textOverlay, stickers, overlayAudioFile, voiceOverBlob });
       } catch (error) {
         toast({ title: 'Processing failed', variant: 'destructive' });
       } finally {
         setProcessing(false);
       }
     } else {
-      onNext(mediaUrl, { filter: selectedFilter, brightness, contrast, saturation, textOverlay, selectedSticker, overlayAudioFile, voiceOverBlob });
+      onNext(mediaUrl, { filter: selectedFilter, brightness, contrast, saturation, textOverlay, stickers, overlayAudioFile, voiceOverBlob });
     }
   };
 
@@ -192,7 +253,12 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
 
         <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
           {/* Image/Video Preview - Top on mobile, left on desktop */}
-          <div className="w-full md:flex-1 bg-black flex items-center justify-center p-2 md:p-4 h-48 md:h-auto shrink-0 relative">
+          <div 
+            ref={previewRef}
+            className="w-full md:flex-1 bg-black flex items-center justify-center p-2 md:p-4 h-48 md:h-auto shrink-0 relative touch-none"
+            onTouchMove={handleStickerTouchMove}
+            onTouchEnd={handleStickerTouchEnd}
+          >
             {mediaType === 'image' ? (
               <img src={croppedImageUrl} alt="Preview" className="max-h-full max-w-full object-contain" style={getFilterStyle()} />
             ) : (
@@ -211,14 +277,35 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
                   </div>
                 )}
                 
-                {/* Sticker Overlay */}
-                {selectedSticker && (
-                  <div className="absolute top-4 right-4">
-                    <span className="text-6xl md:text-8xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)]">
-                      {selectedSticker}
-                    </span>
+                {/* Sticker Overlays - Draggable */}
+                {stickers.map((sticker, index) => (
+                  <div
+                    key={index}
+                    className="absolute pointer-events-auto"
+                    style={{
+                      left: `${sticker.x}%`,
+                      top: `${sticker.y}%`,
+                      transform: `translate(-50%, -50%) scale(${sticker.scale})`,
+                      touchAction: 'none',
+                    }}
+                    onTouchStart={(e) => handleStickerTouchStart(e, index)}
+                  >
+                    <div className="relative">
+                      <span className="text-6xl md:text-8xl drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] select-none">
+                        {sticker.emoji}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeSticker(index);
+                        }}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center pointer-events-auto"
+                      >
+                        <X className="w-4 h-4 text-white" />
+                      </button>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
             
@@ -354,20 +441,25 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
                 <div className="space-y-2">
                   <label className="text-xs font-medium flex items-center gap-2">
                     <Sticker className="w-4 h-4" />
-                    Add Sticker
+                    Add Sticker (Drag to move)
                   </label>
                   <div className="grid grid-cols-4 gap-2">
                     {STICKERS.map((sticker) => (
                       <Button
                         key={sticker}
-                        variant={selectedSticker === sticker ? "default" : "outline"}
-                        onClick={() => setSelectedSticker(selectedSticker === sticker ? '' : sticker)}
+                        variant="outline"
+                        onClick={() => addSticker(sticker)}
                         className="text-2xl h-12"
                       >
                         {sticker}
                       </Button>
                     ))}
                   </div>
+                  {stickers.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Tip: Drag stickers on the preview to reposition. Tap X to remove.
+                    </p>
+                  )}
                 </div>
               </>
             )}
