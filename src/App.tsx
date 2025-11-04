@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { UpdateNotification } from "@/components/shared/UpdateNotification";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -49,7 +48,6 @@ const App: React.FC = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <UpdateNotification />
         <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
