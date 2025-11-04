@@ -2362,6 +2362,51 @@ export type Database = {
         }
         Relationships: []
       }
+      user_strikes: {
+        Row: {
+          expires_at: string | null
+          id: string
+          is_active: boolean | null
+          issued_at: string | null
+          issued_by: string
+          notes: string | null
+          reason: string
+          related_content_id: string | null
+          related_content_type: string | null
+          severity: string
+          strike_type: string
+          user_id: string
+        }
+        Insert: {
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          issued_at?: string | null
+          issued_by: string
+          notes?: string | null
+          reason: string
+          related_content_id?: string | null
+          related_content_type?: string | null
+          severity?: string
+          strike_type: string
+          user_id: string
+        }
+        Update: {
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          issued_at?: string | null
+          issued_by?: string
+          notes?: string | null
+          reason?: string
+          related_content_id?: string | null
+          related_content_type?: string | null
+          severity?: string
+          strike_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_subscriptions: {
         Row: {
           cancel_at_period_end: boolean | null
@@ -2437,6 +2482,16 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_strike_summary: {
+        Row: {
+          active_strikes: number | null
+          high_severity_strikes: number | null
+          last_strike_date: string | null
+          total_strikes: number | null
+          user_id: string | null
+        }
+        Relationships: []
       }
     }
     Functions: {
