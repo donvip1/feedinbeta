@@ -45,6 +45,7 @@ const Feed = () => {
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [isCreatingContent, setIsCreatingContent] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -172,10 +173,12 @@ const Feed = () => {
 
   const handlePostCreated = () => {
     setShowCreatePost(false);
+    setIsCreatingContent(false);
     loadPosts();
   };
 
   const handleQuickAction = (action: string) => {
+    setIsCreatingContent(true);
     switch (action) {
       case 'thoughts':
         setDefaultPostTab('text');
@@ -183,30 +186,38 @@ const Feed = () => {
         break;
       case 'story':
         navigate('/messages');
+        setIsCreatingContent(false);
         break;
       case 'group':
         navigate('/groups');
+        setIsCreatingContent(false);
         break;
       case 'livestream':
         navigate('/live');
+        setIsCreatingContent(false);
         break;
       case 'wallet':
         navigate('/wallet');
+        setIsCreatingContent(false);
         break;
       case 'p2p':
         navigate('/p2p-marketplace');
+        setIsCreatingContent(false);
         break;
       case 'ai':
         navigate('/ai-copilot');
+        setIsCreatingContent(false);
         break;
       case 'marketplace':
         navigate('/p2p-marketplace');
+        setIsCreatingContent(false);
         break;
       default:
         toast({
           title: 'Coming Soon',
           description: `${action} feature is coming soon!`,
         });
+        setIsCreatingContent(false);
     }
   };
 
@@ -326,6 +337,7 @@ const Feed = () => {
         onClose={() => {
           setShowCreatePost(false);
           setSharedImageUrl(null);
+          setIsCreatingContent(false);
         }}
         onSuccess={handlePostCreated}
         defaultTab={defaultPostTab}
@@ -336,7 +348,7 @@ const Feed = () => {
       <BottomNav 
         onQuickActionClick={() => setShowQuickActions(prev => !prev)} 
         currentPage="feed"
-        minimized={showQuickActions}
+        minimized={showQuickActions || isCreatingContent}
       />
     </div>
   );

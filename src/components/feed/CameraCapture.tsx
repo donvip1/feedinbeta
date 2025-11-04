@@ -316,19 +316,19 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-full h-screen p-0 bg-black">
-          <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+        <DialogContent className="max-w-full h-screen p-0 bg-black z-[100]">
+          <div className="relative w-full h-full flex items-center justify-center overflow-hidden z-[100]">
             {!capturedMediaUrl ? (
               // Camera View
               <>
                 {/* Top Controls */}
-                <div className="absolute top-0 left-0 right-0 z-30 bg-gradient-to-b from-black/80 via-black/50 to-transparent pt-4 pb-6">
+                <div className="absolute top-0 left-0 right-0 z-[110] bg-gradient-to-b from-black/80 via-black/50 to-transparent pt-4 pb-6">
                   <div className="flex items-center justify-between px-4">
                     <Button
                       size="icon"
                       variant="ghost"
                       onClick={handleClose}
-                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
+                      className="text-white hover:bg-white/20 bg-black/60 backdrop-blur-md"
                     >
                       <X className="w-6 h-6 drop-shadow-lg" />
                     </Button>
@@ -337,7 +337,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                       size="icon"
                       variant="ghost"
                       onClick={toggleFacingMode}
-                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
+                      className="text-white hover:bg-white/20 bg-black/60 backdrop-blur-md"
                     >
                       <RefreshCw className="w-6 h-6 drop-shadow-lg" />
                     </Button>
@@ -382,8 +382,8 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
 
                 {/* Zoom Control */}
                 {showZoomControl && (
-                  <div className="absolute left-8 top-1/2 -translate-y-1/2 z-30">
-                    <div className="bg-black/60 backdrop-blur-md rounded-full p-3 flex flex-col items-center space-y-2">
+                  <div className="absolute left-8 top-1/2 -translate-y-1/2 z-[120]">
+                    <div className="bg-black/80 backdrop-blur-xl rounded-full p-3 flex flex-col items-center space-y-2 border border-white/10">
                       <button
                         onClick={() => setZoom(Math.min(3, zoom + 0.2))}
                         className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30"
@@ -402,13 +402,13 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                 )}
 
                 {/* Bottom Controls */}
-                <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/80 to-transparent p-6">
+                <div className="absolute bottom-0 left-0 right-0 z-[110] bg-gradient-to-t from-black/80 to-transparent p-6">
                   <div className="flex items-center justify-around">
                     {/* Zoom Toggle */}
                     <button
                       onClick={() => setShowZoomControl(!showZoomControl)}
-                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all ${
-                        showZoomControl ? 'bg-white text-black' : 'bg-white/20 text-white hover:bg-white/30'
+                      className={`w-14 h-14 rounded-full flex items-center justify-center transition-all backdrop-blur-md border ${
+                        showZoomControl ? 'bg-white text-black border-white shadow-2xl' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                       }`}
                     >
                       <ZoomIn className="w-6 h-6" />
@@ -416,19 +416,19 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
 
                     {/* Mode Selector */}
                     <div className="flex flex-col items-center gap-3">
-                      <div className="flex gap-2 bg-black/50 rounded-full px-3 py-1.5">
+                      <div className="flex gap-2 bg-black/60 backdrop-blur-md rounded-full px-3 py-1.5 border border-white/10">
                         <button
                           onClick={() => setMode('photo')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            mode === 'photo' ? 'bg-white text-black' : 'text-white hover:bg-white/20'
+                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                            mode === 'photo' ? 'bg-white text-black shadow-xl' : 'text-white hover:bg-white/20'
                           }`}
                         >
                           PHOTO
                         </button>
                         <button
                           onClick={() => setMode('video')}
-                          className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
-                            mode === 'video' ? 'bg-white text-black' : 'text-white hover:bg-white/20'
+                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                            mode === 'video' ? 'bg-white text-black shadow-xl' : 'text-white hover:bg-white/20'
                           }`}
                         >
                           VIDEO
@@ -463,7 +463,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
               // Preview & Edit View with Transparent Overlays
               <>
                 {/* Top Controls - Keep Aspect Ratio Visible */}
-                <div className="absolute top-0 left-0 right-0 z-40 bg-gradient-to-b from-black/80 via-black/50 to-transparent pt-4 pb-6">
+                <div className="absolute top-0 left-0 right-0 z-[110] bg-gradient-to-b from-black/80 via-black/50 to-transparent pt-4 pb-6">
                   <div className="flex items-center justify-between px-4">
                     <Button
                       size="icon"
@@ -472,7 +472,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                         setCapturedMediaUrl(null);
                         startCamera();
                       }}
-                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
+                      className="text-white hover:bg-white/20 bg-black/60 backdrop-blur-md"
                     >
                       <X className="w-6 h-6 drop-shadow-lg" />
                     </Button>
@@ -481,7 +481,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                       size="sm"
                       variant="ghost"
                       onClick={resetAllEdits}
-                      className="text-white hover:bg-white/20 bg-black/40 backdrop-blur-sm"
+                      className="text-white hover:bg-white/20 bg-black/60 backdrop-blur-md"
                     >
                       <RotateCcw className="w-5 h-5 mr-2 drop-shadow-lg" />
                       Reset
@@ -498,35 +498,35 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                 </div>
 
                 {/* Right-side Tool Icons */}
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4">
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[110] flex flex-col gap-4">
                   <button
                     onClick={() => setShowFiltersOverlay(!showFiltersOverlay)}
-                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all ${
-                      showFiltersOverlay ? 'bg-white text-black' : 'bg-white/20 text-white hover:bg-white/30'
+                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                      showFiltersOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
                     <Wand2 className="w-6 h-6 drop-shadow-lg" />
                   </button>
                   <button
                     onClick={() => setShowTextOverlay(!showTextOverlay)}
-                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all ${
-                      showTextOverlay ? 'bg-white text-black' : 'bg-white/20 text-white hover:bg-white/30'
+                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                      showTextOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
                     <Type className="w-6 h-6 drop-shadow-lg" />
                   </button>
                   <button
                     onClick={() => setShowStickersOverlay(!showStickersOverlay)}
-                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all ${
-                      showStickersOverlay ? 'bg-white text-black' : 'bg-white/20 text-white hover:bg-white/30'
+                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                      showStickersOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
                     <StickerIcon className="w-6 h-6 drop-shadow-lg" />
                   </button>
                   <button
                     onClick={() => setShowVoiceoverOverlay(!showVoiceoverOverlay)}
-                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all ${
-                      showVoiceoverOverlay ? 'bg-white text-black' : 'bg-white/20 text-white hover:bg-white/30'
+                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                      showVoiceoverOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
                     <Mic className="w-6 h-6 drop-shadow-lg" />
@@ -534,7 +534,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                   {capturedMediaType === 'image' && (
                     <button
                       onClick={() => setShowCropper(true)}
-                      className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-white/30 transition-all"
+                      className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-black/80 transition-all border-2 border-white/10"
                     >
                       <Scissors className="w-6 h-6 drop-shadow-lg" />
                     </button>
@@ -609,7 +609,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
 
                 {/* Filters Overlay - Bottom Left */}
                 {showFiltersOverlay && (
-                  <div className="absolute bottom-20 left-4 z-50 bg-black/80 backdrop-blur-xl rounded-2xl p-4 max-w-xs shadow-2xl border border-white/10">
+                  <div className="absolute bottom-24 left-4 z-[120] bg-black/90 backdrop-blur-xl rounded-2xl p-4 max-w-xs shadow-2xl border border-white/10">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-white font-bold text-sm drop-shadow-lg">Filters</h3>
                       <button onClick={() => setShowFiltersOverlay(false)} className="text-white/70 hover:text-white">
@@ -688,7 +688,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
 
                 {/* Text Overlay Control - Bottom Left */}
                 {showTextOverlay && (
-                  <div className="absolute bottom-20 left-4 z-50 bg-black/80 backdrop-blur-xl rounded-2xl p-4 w-72 shadow-2xl border border-white/10">
+                  <div className="absolute bottom-24 left-4 z-[120] bg-black/90 backdrop-blur-xl rounded-2xl p-4 w-72 shadow-2xl border border-white/10">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-white font-bold text-sm drop-shadow-lg">Text Overlay</h3>
                       <button onClick={() => setShowTextOverlay(false)} className="text-white/70 hover:text-white">
@@ -736,7 +736,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
 
                 {/* Stickers Overlay - Bottom Left */}
                 {showStickersOverlay && (
-                  <div className="absolute bottom-20 left-4 z-50 bg-black/80 backdrop-blur-xl rounded-2xl p-4 max-w-xs shadow-2xl border border-white/10">
+                  <div className="absolute bottom-24 left-4 z-[120] bg-black/90 backdrop-blur-xl rounded-2xl p-4 max-w-xs shadow-2xl border border-white/10">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-white font-bold text-sm drop-shadow-lg">Stickers</h3>
                       <button onClick={() => setShowStickersOverlay(false)} className="text-white/70 hover:text-white">
@@ -761,7 +761,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
 
                 {/* Voiceover Overlay - Bottom Left */}
                 {showVoiceoverOverlay && (
-                  <div className="absolute bottom-20 left-4 z-50 bg-black/80 backdrop-blur-xl rounded-2xl p-4 w-72 shadow-2xl border border-white/10">
+                  <div className="absolute bottom-24 left-4 z-[120] bg-black/90 backdrop-blur-xl rounded-2xl p-4 w-72 shadow-2xl border border-white/10">
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-white font-bold text-sm drop-shadow-lg">Voice Over</h3>
                       <button onClick={() => setShowVoiceoverOverlay(false)} className="text-white/70 hover:text-white">
@@ -793,11 +793,11 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                 )}
 
                 {/* Next Button */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40">
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[130]">
                   <Button
                     size="lg"
                     onClick={handleNext}
-                    className="bg-white text-black hover:bg-white/90 rounded-full px-10 py-6 text-lg font-bold shadow-2xl"
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90 rounded-full px-12 py-7 text-lg font-bold shadow-2xl border-2 border-white/20"
                   >
                     Next
                     <ArrowRight className="w-6 h-6 ml-2" />
