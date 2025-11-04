@@ -120,7 +120,9 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
         // Fallback: upload original file if no processed blob
         const fileExt = mediaFile.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        const bucketName = mediaType === 'image' ? 'post-images' : 'posts';
+        // Determine bucket based on actual file type
+        const isVideoFile = mediaFile.type.startsWith('video/');
+        const bucketName = isVideoFile ? 'posts' : 'post-images';
 
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from(bucketName)

@@ -1139,7 +1139,7 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                     {!voiceOverBlob ? (
                       <VoiceOverRecorder 
                         onRecordingComplete={(blob) => setVoiceOverBlob(blob)} 
-                        maxDuration={capturedMediaType === 'image' ? 60 : 120}
+                        maxDuration={60}
                       />
                     ) : (
                       <div className="space-y-3">

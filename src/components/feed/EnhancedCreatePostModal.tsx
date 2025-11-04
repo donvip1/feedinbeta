@@ -110,7 +110,7 @@ export function EnhancedCreatePostModal({
     onClose();
   };
 
-  const handleMethodSelect = (method: 'camera' | 'gallery' | 'text-to-image' | 'ai-generate') => {
+  const handleMethodSelect = (method: 'camera' | 'gallery' | 'text-to-image' | 'text-only' | 'ai-generate') => {
     setShowMethodSelector(false);
     
     switch (method) {
@@ -119,6 +119,9 @@ export function EnhancedCreatePostModal({
         break;
       case 'gallery':
         setShowGallery(true);
+        break;
+      case 'text-only':
+        handleTextPost();
         break;
       case 'text-to-image':
         setShowTextToImage(true);

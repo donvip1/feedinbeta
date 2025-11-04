@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 interface CreatePostMethodSelectorProps {
   open: boolean;
   onClose: () => void;
-  onSelectMethod: (method: 'camera' | 'gallery' | 'text-to-image' | 'ai-generate') => void;
+  onSelectMethod: (method: 'camera' | 'gallery' | 'text-to-image' | 'text-only' | 'ai-generate') => void;
   isPremium?: boolean;
 }
 
@@ -29,6 +29,13 @@ export function CreatePostMethodSelector({
       title: 'Gallery',
       description: 'Choose from your media',
       color: 'from-purple-500 to-pink-500',
+    },
+    {
+      id: 'text-only' as const,
+      icon: Type,
+      title: 'Text Post',
+      description: 'Share your thoughts',
+      color: 'from-indigo-500 to-purple-500',
     },
     {
       id: 'text-to-image' as const,
