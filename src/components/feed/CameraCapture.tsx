@@ -122,6 +122,23 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
   const [hdrMode, setHdrMode] = useState(false);
   const [showGrid, setShowGrid] = useState<'off' | 'thirds' | 'golden'>('off');
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  
+  // Beauty mode and portrait effects
+  const [beautyMode, setBeautyMode] = useState(false);
+  const [skinSmoothing, setSkinSmoothing] = useState(50);
+  const [eyeEnhancement, setEyeEnhancement] = useState(30);
+  const [backgroundBlur, setBackgroundBlur] = useState(0);
+  
+  // Manual focus and exposure
+  const [manualFocus, setManualFocus] = useState(false);
+  const [focusX, setFocusX] = useState(0.5);
+  const [focusY, setFocusY] = useState(0.5);
+  const [exposure, setExposure] = useState(0);
+  
+  // Custom filter presets
+  const [customPresets, setCustomPresets] = useState<Array<{name: string, settings: any}>>([]);
+  const [showPresetManager, setShowPresetManager] = useState(false);
+  const [presetName, setPresetName] = useState('');
 
   // Handle initial media from gallery
   useEffect(() => {
@@ -1075,38 +1092,35 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                       setShowFiltersOverlay(false);
                       setShowTextOverlay(false);
                       setShowStickersOverlay(false);
+                      setShowDrawing(false);
+                      setShowBlur(false);
+                      setShowCropper(false);
                     }}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                       showVoiceoverOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
-                    <button
-                      onClick={() => {
-                        if (capturedMediaType === 'video') {
-                          handleVideoTrim();
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
-                          setShowDrawing(false);
-                          setShowBlur(false);
-                          setShowCropper(false);
-                        } else {
-                          setShowCropper(true);
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
-                          setShowDrawing(false);
-                          setShowBlur(false);
-                        }
-                      }}
-                      className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
-                        (capturedMediaType === 'video' ? showVideoTrimmer : showCropper) ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
-                      }`}
-                    >
-                      <Scissors className="w-6 h-6 drop-shadow-lg" />
-                    </button>
+                    <Mic className="w-6 h-6 drop-shadow-lg" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (capturedMediaType === 'video') {
+                        handleVideoTrim();
+                      } else {
+                        setShowCropper(true);
+                      }
+                      setShowFiltersOverlay(false);
+                      setShowTextOverlay(false);
+                      setShowStickersOverlay(false);
+                      setShowVoiceoverOverlay(false);
+                      setShowDrawing(false);
+                      setShowBlur(false);
+                    }}
+                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                      (capturedMediaType === 'video' ? showVideoTrimmer : showCropper) ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                    }`}
+                  >
+                    <Scissors className="w-6 h-6 drop-shadow-lg" />
                   </button>
                   {capturedMediaType === 'image' && (
                     <>
@@ -1118,6 +1132,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                           setShowStickersOverlay(false);
                           setShowVoiceoverOverlay(false);
                           setShowBlur(false);
+                          setShowCropper(false);
                         }}
                         className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                           showDrawing ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
@@ -1133,6 +1148,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                           setShowStickersOverlay(false);
                           setShowVoiceoverOverlay(false);
                           setShowDrawing(false);
+                          setShowCropper(false);
                         }}
                         className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                           showBlur ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
@@ -1140,26 +1156,21 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                       >
                         <Droplet className="w-6 h-6 drop-shadow-lg" />
                       </button>
-                      <button
-                        onClick={() => {
-                          setShowCropper(true);
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
-                          setShowDrawing(false);
-                          setShowBlur(false);
-                        }}
-                        className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-black/80 transition-all border-2 border-white/10"
-                      >
-                        <Scissors className="w-6 h-6 drop-shadow-lg" />
-                      </button>
                     </>
                   )}
                   
                   {/* Music Library - Available for both image and video */}
                   <button
-                    onClick={() => setShowMusicLibrary(true)}
+                    onClick={() => {
+                      setShowMusicLibrary(true);
+                      setShowFiltersOverlay(false);
+                      setShowTextOverlay(false);
+                      setShowStickersOverlay(false);
+                      setShowVoiceoverOverlay(false);
+                      setShowDrawing(false);
+                      setShowBlur(false);
+                      setShowCropper(false);
+                    }}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                       selectedMusic ? 'bg-gradient-primary text-white border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
