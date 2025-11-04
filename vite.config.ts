@@ -25,7 +25,9 @@ export default defineConfig(({ mode }) => ({
       "@radix-ui/react-tooltip",
       "@radix-ui/react-popover",
       "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-dialog"
+      "@radix-ui/react-dialog",
+      "react-router-dom",
+      "next-themes"
     ],
   },
   build: {
