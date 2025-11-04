@@ -6,17 +6,69 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation schema
+const validateInput = (data: any) => {
+  const validActions = ['friend_request', 'profile_view', 'voice_call', 'video_call'];
+  
+  if (!data.action || !validActions.includes(data.action)) {
+    throw new Error('Invalid action type');
+  }
+  
+  if (data.targetUserId && !isValidUUID(data.targetUserId)) {
+    throw new Error('Invalid target user ID');
+  }
+  
+  if (data.metadata?.minutes && (!Number.isInteger(data.metadata.minutes) || data.metadata.minutes <= 0)) {
+    throw new Error('Invalid minutes value');
+  }
+  
+  if (data.metadata?.username && (typeof data.metadata.username !== 'string' || data.metadata.username.length > 100)) {
+    throw new Error('Invalid username');
+  }
+  
+  return data;
+};
+
+const isValidUUID = (uuid: string) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Get authenticated user from JWT
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const { action, userId, targetUserId, metadata } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const userId = user.id;
+    const requestData = await req.json();
+    
+    // Validate input
+    const { action, targetUserId, metadata } = validateInput(requestData);
 
     // Define credit costs
     const COSTS = {
