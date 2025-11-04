@@ -8,6 +8,7 @@ import { Wand2, Type, Music, Sticker, Scissors, Volume2, VolumeX, ArrowLeft, Mic
 import { ImageCropper } from './ImageCropper';
 import { VoiceOverRecorder } from './VoiceOverRecorder';
 import { AIMusicSuggester } from './AIMusicSuggester';
+import { VideoEditor } from './VideoEditor';
 import { applyImageEffects } from '@/lib/media-processor';
 import { useToast } from '@/hooks/use-toast';
 
@@ -77,6 +78,9 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
   const [overlayAudioFile, setOverlayAudioFile] = useState<File | null>(null);
   const [croppedImageUrl, setCroppedImageUrl] = useState<string>(mediaUrl);
   const [showCropper, setShowCropper] = useState(false);
+  const [showVideoEditor, setShowVideoEditor] = useState(false);
+  const [editedVideoUrl, setEditedVideoUrl] = useState<string>(mediaUrl);
+  const [videoThumbnail, setVideoThumbnail] = useState<string>('');
   const [voiceOverBlob, setVoiceOverBlob] = useState<Blob | null>(null);
   const [showMusicSuggester, setShowMusicSuggester] = useState(true);
   const [processing, setProcessing] = useState(false);
@@ -235,7 +239,8 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
         setProcessing(false);
       }
     } else {
-      onNext(mediaUrl, { filter: selectedFilter, brightness, contrast, saturation, textOverlay, textPosition, textSize, stickers, overlayAudioFile, voiceOverBlob });
+      // For video, use editedVideoUrl if available
+      onNext(editedVideoUrl, { filter: selectedFilter, brightness, contrast, saturation, textOverlay, textPosition, textSize, stickers, overlayAudioFile, voiceOverBlob, videoThumbnail });
     }
   };
 
@@ -263,7 +268,7 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
             {mediaType === 'image' ? (
               <img src={croppedImageUrl} alt="Preview" className="max-h-full max-w-full object-contain" style={getFilterStyle()} />
             ) : (
-              <video ref={videoRef} src={mediaUrl} className="max-h-full max-w-full object-contain" style={getFilterStyle()} controls muted={isMuted} />
+              <video ref={videoRef} src={editedVideoUrl} className="max-h-full max-w-full object-contain" style={getFilterStyle()} controls muted={isMuted} onLoadedMetadata={() => setVideoDuration(videoRef.current?.duration || 0)} />
             )}
             
             {/* Overlay for text, stickers and effects */}
@@ -327,6 +332,13 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
               <Button variant="outline" className="w-full" onClick={() => setShowCropper(true)}>
                 <Scissors className="w-4 h-4 mr-2" />
                 Crop Image
+              </Button>
+            )}
+
+            {mediaType === 'video' && !showVideoEditor && (
+              <Button variant="outline" className="w-full" onClick={() => setShowVideoEditor(true)}>
+                <Scissors className="w-4 h-4 mr-2" />
+                Edit Video
               </Button>
             )}
 
@@ -567,6 +579,25 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
           <Button onClick={handleNext} className="flex-1" disabled={processing}>{processing ? 'Processing...' : 'Next'}</Button>
         </div>
       </DialogContent>
+
+      {/* Video Editor Modal */}
+      {showVideoEditor && (
+        <VideoEditor
+          videoUrl={editedVideoUrl}
+          open={showVideoEditor}
+          onClose={() => setShowVideoEditor(false)}
+          onSave={(editedBlob, thumbnail) => {
+            const url = URL.createObjectURL(editedBlob);
+            setEditedVideoUrl(url);
+            setVideoThumbnail(thumbnail);
+            setShowVideoEditor(false);
+            toast({
+              title: 'Video edited',
+              description: 'Your video has been updated.',
+            });
+          }}
+        />
+      )}
     </Dialog>
   );
 }
