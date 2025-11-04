@@ -6,7 +6,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ImageIcon, Video, Type, X, Upload } from 'lucide-react';
 import { PostEditorModal } from './PostEditorModal';
 import { PostDetailsModal } from './PostDetailsModal';
+import { CreatePostMethodSelector } from './CreatePostMethodSelector';
+import { CameraCapture } from './CameraCapture';
+import { MediaGalleryPicker } from './MediaGalleryPicker';
+import { TextToImageCreator } from './TextToImageCreator';
+import { AIImageGenerator } from './AIImageGenerator';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface EnhancedCreatePostModalProps {
   open: boolean;
@@ -24,7 +30,8 @@ export function EnhancedCreatePostModal({
   initialImageUrl = null,
 }: EnhancedCreatePostModalProps) {
   const { toast } = useToast();
-  const [step, setStep] = useState<'upload' | 'edit' | 'details'>('upload');
+  const { user } = useAuth();
+  const [step, setStep] = useState<'method' | 'upload' | 'edit' | 'details'>('method');
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'video'>(defaultTab);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(initialImageUrl);
@@ -32,6 +39,11 @@ export function EnhancedCreatePostModal({
     initialImageUrl ? 'image' : 'text'
   );
   const [effects, setEffects] = useState<any>(null);
+  const [showMethodSelector, setShowMethodSelector] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showGallery, setShowGallery] = useState(false);
+  const [showTextToImage, setShowTextToImage] = useState(false);
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -85,11 +97,70 @@ export function EnhancedCreatePostModal({
   };
 
   const handleClose = () => {
-    setStep('upload');
+    setStep('method');
     setMediaFile(null);
     setMediaPreview(null);
     setEffects(null);
+    setShowMethodSelector(false);
+    setShowCamera(false);
+    setShowGallery(false);
+    setShowTextToImage(false);
+    setShowAIGenerator(false);
     onClose();
+  };
+
+  const handleMethodSelect = (method: 'camera' | 'gallery' | 'text-to-image' | 'ai-generate') => {
+    setShowMethodSelector(false);
+    
+    switch (method) {
+      case 'camera':
+        setShowCamera(true);
+        break;
+      case 'gallery':
+        setShowGallery(true);
+        break;
+      case 'text-to-image':
+        setShowTextToImage(true);
+        break;
+      case 'ai-generate':
+        setShowAIGenerator(true);
+        break;
+    }
+  };
+
+  const handleCameraCapture = (file: File, type: 'image' | 'video') => {
+    setMediaFile(file);
+    setMediaType(type);
+    setMediaPreview(URL.createObjectURL(file));
+    setShowCamera(false);
+    setStep('edit');
+  };
+
+  const handleGallerySelect = (files: File[]) => {
+    // For now, use first file. Later can support multiple
+    const file = files[0];
+    const isVideo = file.type.startsWith('video/');
+    setMediaFile(file);
+    setMediaType(isVideo ? 'video' : 'image');
+    setMediaPreview(URL.createObjectURL(file));
+    setShowGallery(false);
+    setStep('edit');
+  };
+
+  const handleTextToImageCreate = (file: File) => {
+    setMediaFile(file);
+    setMediaType('image');
+    setMediaPreview(URL.createObjectURL(file));
+    setShowTextToImage(false);
+    setStep('edit');
+  };
+
+  const handleAIImageCreate = (file: File) => {
+    setMediaFile(file);
+    setMediaType('image');
+    setMediaPreview(URL.createObjectURL(file));
+    setShowAIGenerator(false);
+    setStep('edit');
   };
 
   // For text-only posts, skip editor
@@ -107,9 +178,66 @@ export function EnhancedCreatePostModal({
     return mediaPreview || '';
   };
 
+  // Show method selector when modal first opens
+  const shouldShowMethodSelector = open && step === 'method';
+  
+  if (shouldShowMethodSelector && !showMethodSelector) {
+    setShowMethodSelector(true);
+    setStep('method');
+  }
+
   return (
     <>
-      {/* Step 1: Upload */}
+      {/* Method Selector */}
+      <CreatePostMethodSelector
+        open={showMethodSelector}
+        onClose={handleClose}
+        onSelectMethod={handleMethodSelect}
+        isPremium={user?.user_metadata?.subscription_tier === 'premium'}
+      />
+
+      {/* Camera Capture */}
+      <CameraCapture
+        open={showCamera}
+        onClose={() => {
+          setShowCamera(false);
+          setShowMethodSelector(true);
+        }}
+        onCapture={handleCameraCapture}
+      />
+
+      {/* Gallery Picker */}
+      <MediaGalleryPicker
+        open={showGallery}
+        onClose={() => {
+          setShowGallery(false);
+          setShowMethodSelector(true);
+        }}
+        onSelect={handleGallerySelect}
+        multiSelect={false}
+      />
+
+      {/* Text to Image */}
+      <TextToImageCreator
+        open={showTextToImage}
+        onClose={() => {
+          setShowTextToImage(false);
+          setShowMethodSelector(true);
+        }}
+        onCreate={handleTextToImageCreate}
+      />
+
+      {/* AI Generator */}
+      <AIImageGenerator
+        open={showAIGenerator}
+        onClose={() => {
+          setShowAIGenerator(false);
+          setShowMethodSelector(true);
+        }}
+        onCreate={handleAIImageCreate}
+      />
+
+      {/* Step 1: Upload (Legacy - keeping for backward compatibility) */}
       <Dialog open={open && step === 'upload'} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
