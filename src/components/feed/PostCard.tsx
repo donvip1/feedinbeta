@@ -487,12 +487,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
         {/* Text-only post - Centered with dynamic sizing */}
         {!post.media_url && post.content && (
-          <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6 pr-20 md:pr-24">
+          <div className="absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6 pr-24 md:pr-32">
             <p className={`text-white ${getTextSize(post.content)} font-bold text-center leading-relaxed break-words max-w-3xl px-4`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
               {post.content}
             </p>
           </div>
         )}
+
 
         {/* Content and Actions */}
         <div className="absolute bottom-0 left-0 right-0 z-20 p-4 bg-gradient-to-t from-black/80 via-black/50 to-transparent">
@@ -523,17 +524,17 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         </div>
 
         {/* TikTok-style Vertical Action Buttons - Right Side (40% smaller) */}
-        <div className="absolute right-3 bottom-32 z-30 flex flex-col items-center space-y-4">
+        <div className="absolute right-4 bottom-32 z-30 flex flex-col items-center space-y-4">
           {/* Like Button */}
           <button
             onClick={handleLike}
             disabled={isLiking}
             className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
               isLiked ? 'bg-pink-500' : 'bg-white/10 backdrop-blur-sm'
             } shadow-lg`}>
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
+              <Heart className={`w-[18px] h-[18px] ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
             </div>
             <span className="text-white text-[10px] font-bold">{localLikesCount}</span>
           </button>
@@ -551,8 +552,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             }}
             className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <MessageCircle className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <MessageCircle className="w-[18px] h-[18px] text-white" />
             </div>
             <span className="text-white text-[10px] font-bold">{post.comments_count}</span>
           </button>
@@ -561,8 +562,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95">
-                <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                  <Share2 className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                  <Share2 className="w-[18px] h-[18px] text-white" />
                 </div>
                 <span className="text-white text-[10px] font-bold">Share</span>
               </button>
@@ -596,18 +597,18 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             onClick={handleSave}
             className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center ${
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
               isSaved ? 'bg-yellow-500' : 'bg-white/10 backdrop-blur-sm'
             } shadow-lg`}>
-              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
+              <Bookmark className={`w-[18px] h-[18px] ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
             </div>
             <span className="text-white text-[10px] font-bold">Save</span>
           </button>
 
           {/* Views Counter */}
           <div className="flex flex-col items-center space-y-0.5">
-            <div className="w-11 h-11 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <Eye className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <Eye className="w-[18px] h-[18px] text-white" />
             </div>
             <span className="text-white text-[10px] font-bold">{post.views_count}</span>
           </div>
