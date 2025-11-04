@@ -110,15 +110,12 @@ export function EnhancedCreatePostModal({
     onClose();
   };
 
-  const handleMethodSelect = (method: 'camera' | 'gallery' | 'text-to-image' | 'text-only' | 'ai-generate') => {
+  const handleMethodSelect = (method: 'camera' | 'text-to-image' | 'text-only' | 'ai-generate') => {
     setShowMethodSelector(false);
     
     switch (method) {
       case 'camera':
         setShowCamera(true);
-        break;
-      case 'gallery':
-        setShowGallery(true);
         break;
       case 'text-only':
         handleTextPost();
@@ -209,6 +206,10 @@ export function EnhancedCreatePostModal({
           setShowMethodSelector(true);
         }}
         onCapture={handleCameraCapture}
+        onSwitchToGallery={() => {
+          setShowCamera(false);
+          setShowGallery(true);
+        }}
       />
 
       {/* Gallery Picker */}
@@ -216,7 +217,7 @@ export function EnhancedCreatePostModal({
         open={showGallery}
         onClose={() => {
           setShowGallery(false);
-          setShowMethodSelector(true);
+          setShowCamera(true);
         }}
         onSelect={handleGallerySelect}
         multiSelect={false}

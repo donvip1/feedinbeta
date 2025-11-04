@@ -15,6 +15,7 @@ interface CameraCaptureProps {
   open: boolean;
   onClose: () => void;
   onCapture: (file: File, mediaType: 'image' | 'video', effects?: any, postToStory?: boolean) => void;
+  onSwitchToGallery?: () => void;
 }
 
 interface StickerData {
@@ -48,7 +49,7 @@ const FILTERS = {
 
 const STICKERS = ['❤️', '🔥', '✨', '🎉', '😍', '👍', '💯', '⭐', '💪', '😂', '🎵', '🌟'];
 
-export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) {
+export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: CameraCaptureProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -107,15 +108,32 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
   const [selectedMusic, setSelectedMusic] = useState<{ name: string; artist: string; url: string; duration: number } | null>(null);
   const [showPreCaptureFilters, setShowPreCaptureFilters] = useState(false);
   const [preCaptureFilter, setPreCaptureFilter] = useState<string>('None');
+  const [galleryThumbnail, setGalleryThumbnail] = useState<string | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       startCamera();
+      loadGalleryThumbnail();
     } else {
       stopCamera();
     }
     return () => stopCamera();
   }, [open, facingMode]);
+
+  const loadGalleryThumbnail = () => {
+    // Try to get a sample image for thumbnail preview
+    // In a real app, this would access the device's gallery
+    // For demo, we'll show a placeholder
+    setGalleryThumbnail('https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=100&h=100&fit=crop');
+  };
+
+  const handleGalleryClick = () => {
+    if (onSwitchToGallery) {
+      stopCamera();
+      onSwitchToGallery();
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -696,8 +714,23 @@ export function CameraCapture({ open, onClose, onCapture }: CameraCaptureProps) 
                       </button>
                     </div>
 
-                    {/* Placeholder for alignment */}
-                    <div className="w-14"></div>
+                    {/* Gallery Quick Access with Thumbnail */}
+                    <button
+                      onClick={handleGalleryClick}
+                      className="w-14 h-14 rounded-xl overflow-hidden border-2 border-white/30 hover:border-white transition-all backdrop-blur-md bg-black/40"
+                    >
+                      {galleryThumbnail ? (
+                        <img 
+                          src={galleryThumbnail} 
+                          alt="Gallery" 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                          <span className="text-white text-2xl">🖼️</span>
+                        </div>
+                      )}
+                    </button>
                   </div>
                 </div>
               </>
