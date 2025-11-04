@@ -242,7 +242,7 @@ export function PostEditorModal({ open, onClose, onBack, mediaUrl, mediaType, on
           </div>
         </div>
 
-        <div className="border-t p-3 flex gap-2 shrink-0">
+        <div className="border-t p-3 pb-20 md:pb-3 flex gap-2 shrink-0 bg-background">
           <Button variant="outline" onClick={onClose} disabled={processing} className="flex-1 md:flex-initial">Cancel</Button>
           <Button onClick={handleNext} className="flex-1" disabled={processing}>{processing ? 'Processing...' : 'Next'}</Button>
         </div>
