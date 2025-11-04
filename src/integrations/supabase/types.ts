@@ -204,6 +204,38 @@ export type Database = {
           },
         ]
       }
+      comment_emoji_reactions: {
+        Row: {
+          comment_id: string
+          created_at: string | null
+          emoji: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string | null
+          emoji: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string | null
+          emoji?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_emoji_reactions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "post_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comment_likes: {
         Row: {
           comment_id: string
@@ -980,14 +1012,45 @@ export type Database = {
           },
         ]
       }
+      message_read_receipts: {
+        Row: {
+          id: string
+          message_id: string
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          message_id: string
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          message_id?: string
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_read_receipts_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
           conversation_id: string
           created_at: string
           id: string
+          is_read: boolean | null
           media_type: string | null
           media_url: string | null
+          read_at: string | null
           reply_to_id: string | null
           sender_id: string
           status: string | null
@@ -998,8 +1061,10 @@ export type Database = {
           conversation_id: string
           created_at?: string
           id?: string
+          is_read?: boolean | null
           media_type?: string | null
           media_url?: string | null
+          read_at?: string | null
           reply_to_id?: string | null
           sender_id: string
           status?: string | null
@@ -1010,8 +1075,10 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           id?: string
+          is_read?: boolean | null
           media_type?: string | null
           media_url?: string | null
+          read_at?: string | null
           reply_to_id?: string | null
           sender_id?: string
           status?: string | null
@@ -1083,6 +1150,121 @@ export type Database = {
         }
         Relationships: []
       }
+      moderation_appeals: {
+        Row: {
+          appeal_text: string
+          attachments: Json | null
+          content_id: string
+          content_type: string
+          created_at: string | null
+          id: string
+          moderation_event_id: string | null
+          resolution_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          appeal_text: string
+          attachments?: Json | null
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          id?: string
+          moderation_event_id?: string | null
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          appeal_text?: string
+          attachments?: Json | null
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          moderation_event_id?: string | null
+          resolution_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_appeals_moderation_event_id_fkey"
+            columns: ["moderation_event_id"]
+            isOneToOne: false
+            referencedRelation: "moderation_actions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      moderation_queue: {
+        Row: {
+          auto_labels: Json | null
+          confidence_scores: Json | null
+          content_id: string
+          content_type: string
+          created_at: string | null
+          id: string
+          moderator_notes: string | null
+          post_id: string | null
+          priority: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
+          suggested_action: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_labels?: Json | null
+          confidence_scores?: Json | null
+          content_id: string
+          content_type: string
+          created_at?: string | null
+          id?: string
+          moderator_notes?: string | null
+          post_id?: string | null
+          priority?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          suggested_action?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_labels?: Json | null
+          confidence_scores?: Json | null
+          content_id?: string
+          content_type?: string
+          created_at?: string | null
+          id?: string
+          moderator_notes?: string | null
+          post_id?: string | null
+          priority?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
+          suggested_action?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moderation_queue_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       muted_users: {
         Row: {
           created_at: string | null
@@ -1107,6 +1289,27 @@ export type Database = {
           id?: string
           muted_id?: string
           muter_id?: string
+        }
+        Relationships: []
+      }
+      notification_badges: {
+        Row: {
+          last_checked: string | null
+          unread_count: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          last_checked?: string | null
+          unread_count?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          last_checked?: string | null
+          unread_count?: number | null
+          updated_at?: string | null
+          user_id?: string
         }
         Relationships: []
       }
@@ -1627,15 +1830,18 @@ export type Database = {
         Row: {
           allow_comments: boolean | null
           allow_refeed: boolean | null
+          aspect_ratio: string | null
           comments_count: number | null
           content: string | null
           created_at: string | null
           feed_id: string
+          has_blur_background: boolean | null
           id: string
           likes_count: number | null
           location: string | null
           media_type: string | null
           media_url: string | null
+          moderation_status: string | null
           post_type: string | null
           privacy: string | null
           refeeds_count: number | null
@@ -1649,15 +1855,18 @@ export type Database = {
         Insert: {
           allow_comments?: boolean | null
           allow_refeed?: boolean | null
+          aspect_ratio?: string | null
           comments_count?: number | null
           content?: string | null
           created_at?: string | null
           feed_id: string
+          has_blur_background?: boolean | null
           id?: string
           likes_count?: number | null
           location?: string | null
           media_type?: string | null
           media_url?: string | null
+          moderation_status?: string | null
           post_type?: string | null
           privacy?: string | null
           refeeds_count?: number | null
@@ -1671,15 +1880,18 @@ export type Database = {
         Update: {
           allow_comments?: boolean | null
           allow_refeed?: boolean | null
+          aspect_ratio?: string | null
           comments_count?: number | null
           content?: string | null
           created_at?: string | null
           feed_id?: string
+          has_blur_background?: boolean | null
           id?: string
           likes_count?: number | null
           location?: string | null
           media_type?: string | null
           media_url?: string | null
+          moderation_status?: string | null
           post_type?: string | null
           privacy?: string | null
           refeeds_count?: number | null
