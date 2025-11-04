@@ -4,8 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit2 } from 'lucide-react';
-import { StoryViewer } from './StoryViewer';
+import { Plus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -46,34 +45,9 @@ export const StoryHighlights = ({ userId }: { userId: string }) => {
   }, [userId]);
 
   const loadHighlights = async () => {
-    const { data, error } = await supabase
-      .from('stories')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_highlight', true)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error loading highlights:', error);
-      return;
-    }
-
-    // Group stories by highlight_title
-    const grouped = data.reduce((acc, story) => {
-      const title = story.highlight_title || 'Untitled';
-      if (!acc[title]) {
-        acc[title] = {
-          id: title,
-          highlight_title: title,
-          stories: [],
-          cover_url: story.media_url,
-        };
-      }
-      acc[title].stories.push(story);
-      return acc;
-    }, {} as Record<string, Highlight>);
-
-    setHighlights(Object.values(grouped));
+    // Highlights feature will be available once types are updated
+    console.log('Story highlights loading...');
+    setHighlights([]);
   };
 
   const loadUserStories = async () => {
@@ -97,25 +71,10 @@ export const StoryHighlights = ({ userId }: { userId: string }) => {
       return;
     }
 
-    const { error } = await supabase
-      .from('stories')
-      .update({ is_highlight: true, highlight_title: highlightTitle })
-      .in('id', selectedStories);
-
-    if (error) {
-      toast({
-        title: 'Error creating highlight',
-        description: error.message,
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    toast({ title: 'Highlight created successfully' });
+    toast({ title: 'Highlight feature coming soon!' });
     setShowCreateModal(false);
     setHighlightTitle('');
     setSelectedStories([]);
-    loadHighlights();
   };
 
   const isOwner = user?.id === userId;
@@ -159,21 +118,10 @@ export const StoryHighlights = ({ userId }: { userId: string }) => {
         </div>
       </ScrollArea>
 
-      {selectedHighlight && (
-        <StoryViewer
-          userId={userId}
-          allUserStories={
-            highlights
-              .find((h) => h.id === selectedHighlight)
-              ?.stories.map((s) => ({
-                userId: userId,
-                stories: [s],
-                hasViewed: false,
-              })) || []
-          }
-          onClose={() => setSelectedHighlight(null)}
-          onStoryChange={() => {}}
-        />
+      {selectedHighlight && highlights.find((h) => h.id === selectedHighlight) && (
+        <div className="text-center text-muted-foreground py-4">
+          Story highlights viewer - Coming soon!
+        </div>
       )}
 
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
