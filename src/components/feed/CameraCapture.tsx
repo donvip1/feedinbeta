@@ -16,6 +16,7 @@ interface CameraCaptureProps {
   onClose: () => void;
   onCapture: (file: File, mediaType: 'image' | 'video', effects?: any, postToStory?: boolean) => void;
   onSwitchToGallery?: () => void;
+  initialMedia?: File | null;
 }
 
 interface StickerData {
@@ -49,7 +50,7 @@ const FILTERS = {
 
 const STICKERS = ['❤️', '🔥', '✨', '🎉', '😍', '👍', '💯', '⭐', '💪', '😂', '🎵', '🌟'];
 
-export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: CameraCaptureProps) {
+export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, initialMedia }: CameraCaptureProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -111,15 +112,34 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
   const [galleryThumbnail, setGalleryThumbnail] = useState<string | null>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
 
+  // Handle initial media from gallery
   useEffect(() => {
-    if (open) {
+    if (initialMedia && open) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        if (initialMedia.type.startsWith('video/')) {
+          setCapturedMediaUrl(result);
+          setCapturedMediaType('video');
+        } else {
+          setCapturedMediaUrl(result);
+          setCapturedMediaType('image');
+          setCroppedImageUrl(result);
+        }
+      };
+      reader.readAsDataURL(initialMedia);
+    }
+  }, [initialMedia, open]);
+
+  useEffect(() => {
+    if (open && !initialMedia) {
       startCamera();
       loadGalleryThumbnail();
-    } else {
+    } else if (!open) {
       stopCamera();
     }
     return () => stopCamera();
-  }, [open, facingMode]);
+  }, [open, facingMode, initialMedia]);
 
   const loadGalleryThumbnail = () => {
     // Try to get a sample image for thumbnail preview
