@@ -1,11 +1,10 @@
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-// TooltipProvider removed to fix invalid hook call
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { UpdateNotification } from "@/components/shared/UpdateNotification";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -46,10 +45,9 @@ const queryClient = new QueryClient();
 const App: React.FC = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <>
+      <TooltipProvider>
         <Toaster />
         <Sonner />
-        <UpdateNotification />
         <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
@@ -89,7 +87,7 @@ const App: React.FC = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
-    </>
+    </TooltipProvider>
   </QueryClientProvider>
   </ErrorBoundary>
 );
