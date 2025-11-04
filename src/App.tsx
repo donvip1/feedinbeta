@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { DevHealthCheck } from "@/components/shared/DevHealthCheck";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -46,6 +47,7 @@ const App: React.FC = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
       <>
+        <DevHealthCheck />
         <Toaster />
         <Sonner />
         <BrowserRouter>
