@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Heart, MessageCircle, Trash2, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ReactionPicker } from './ReactionPicker';
+import { CommentEmojiPicker } from './CommentEmojiPicker';
+import { CommentReactions } from './CommentReactions';
 
 interface Comment {
   id: string;
@@ -83,6 +85,49 @@ export const CommentItem = ({
       toast({
         title: 'Error',
         description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleEmojiReact = async (emoji: string) => {
+    if (!user) return;
+
+    try {
+      // Check if user already reacted with this emoji
+      const { data: existing } = await supabase
+        .from('comment_emoji_reactions')
+        .select('id')
+        .eq('comment_id', comment.id)
+        .eq('user_id', user.id)
+        .eq('emoji', emoji)
+        .single();
+
+      if (existing) {
+        // Remove reaction if already exists
+        await supabase
+          .from('comment_emoji_reactions')
+          .delete()
+          .eq('comment_id', comment.id)
+          .eq('user_id', user.id)
+          .eq('emoji', emoji);
+      } else {
+        // Add new reaction
+        await supabase
+          .from('comment_emoji_reactions')
+          .insert({
+            comment_id: comment.id,
+            user_id: user.id,
+            emoji: emoji
+          });
+      }
+      
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error adding reaction:', error);
+      toast({
+        title: 'Unable to add reaction',
+        description: 'Please try again.',
         variant: 'destructive',
       });
     }
@@ -195,6 +240,8 @@ export const CommentItem = ({
               Reply
             </Button>
 
+            <CommentEmojiPicker onEmojiSelect={handleEmojiReact} />
+
             <span className="text-xs text-gray-500">{timeAgo}</span>
 
             {isOwnComment && (
@@ -208,6 +255,9 @@ export const CommentItem = ({
               </Button>
             )}
           </div>
+
+          {/* Emoji Reactions Display */}
+          <CommentReactions commentId={comment.id} onReactionChange={onUpdate} />
 
           {/* Reply Input */}
           {showReply && (
