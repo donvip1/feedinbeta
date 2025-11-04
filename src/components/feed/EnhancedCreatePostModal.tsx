@@ -195,7 +195,6 @@ export function EnhancedCreatePostModal({
           setShowMethodSelector(true);
         }}
         onCapture={handleCameraCapture}
-        onNavigationVisibilityChange={() => {}}
       />
 
       {/* Gallery Picker */}
