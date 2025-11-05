@@ -38,6 +38,8 @@ import BlockedUsers from "./pages/BlockedUsers";
 import P2PMarketplace from "./pages/P2PMarketplace";
 import InitializeGroups from "./pages/InitializeGroups";
 import Trending from "./pages/Trending";
+import Dashboard from "./pages/Dashboard";
+import AdminPanel from "./pages/AdminPanel";
 import Wallet from "./pages/Wallet";
 import NotFound from "./pages/NotFound";
 
@@ -84,6 +86,8 @@ const App = () => (
               <Route path="/initialize-groups" element={<InitializeGroups />} />
               <Route path="/trending" element={<Trending />} />
               <Route path="/wallet" element={<Wallet />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin" element={<AdminPanel />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

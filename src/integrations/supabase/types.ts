@@ -490,10 +490,15 @@ export type Database = {
           created_at: string | null
           credits: number
           currency: string
+          discount_percentage: number | null
           id: string
           is_active: boolean | null
           name: string
           price: number
+          promotion_active: boolean | null
+          promotion_end: string | null
+          promotion_label: string | null
+          promotion_start: string | null
           stripe_price_id: string
           updated_at: string | null
         }
@@ -502,10 +507,15 @@ export type Database = {
           created_at?: string | null
           credits: number
           currency?: string
+          discount_percentage?: number | null
           id?: string
           is_active?: boolean | null
           name: string
           price: number
+          promotion_active?: boolean | null
+          promotion_end?: string | null
+          promotion_label?: string | null
+          promotion_start?: string | null
           stripe_price_id: string
           updated_at?: string | null
         }
@@ -514,10 +524,15 @@ export type Database = {
           created_at?: string | null
           credits?: number
           currency?: string
+          discount_percentage?: number | null
           id?: string
           is_active?: boolean | null
           name?: string
           price?: number
+          promotion_active?: boolean | null
+          promotion_end?: string | null
+          promotion_label?: string | null
+          promotion_start?: string | null
           stripe_price_id?: string
           updated_at?: string | null
         }
@@ -2349,6 +2364,39 @@ export type Database = {
           },
         ]
       }
+      user_analytics: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_purchase_at: string | null
+          total_credits_purchased: number | null
+          total_credits_spent: number | null
+          total_subscriptions: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_purchase_at?: string | null
+          total_credits_purchased?: number | null
+          total_credits_spent?: number | null
+          total_subscriptions?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_purchase_at?: string | null
+          total_credits_purchased?: number | null
+          total_credits_spent?: number | null
+          total_subscriptions?: number | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_credits: {
         Row: {
           balance: number
@@ -2530,6 +2578,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_grant_credits: {
+        Args: { credit_amount: number; reason?: string; target_user_id: string }
+        Returns: Json
+      }
       are_mutual_friends: {
         Args: { user_a: string; user_b: string }
         Returns: boolean
