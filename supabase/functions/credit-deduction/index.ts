@@ -129,7 +129,7 @@ serve(async (req) => {
       .from("credit_transactions")
       .insert({
         user_id: userId,
-        type: "deduction",
+        type: "spent",
         amount,
         description,
         related_id: targetUserId,
