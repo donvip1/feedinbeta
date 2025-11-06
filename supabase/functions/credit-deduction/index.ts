@@ -122,23 +122,34 @@ serve(async (req) => {
     }
 
     // Check if user has enough credits
-    const { data: userCredits } = await supabase
+    const { data: userCredits, error: creditsError } = await supabase
       .from("user_credits")
       .select("balance")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
-    if (!userCredits || userCredits.balance < Math.abs(amount)) {
+    // If user has no credits record yet, initialize with 0 balance
+    const currentBalance = userCredits?.balance ?? 0;
+    
+    console.log(`User ${userId} current balance: ${currentBalance}, attempting to deduct: ${Math.abs(amount)}`);
+
+    if (currentBalance < Math.abs(amount)) {
+      console.log(`Insufficient credits for user ${userId}. Balance: ${currentBalance}, Required: ${Math.abs(amount)}`);
+      
       // For non-blocking actions like profile views, don't return an HTTP error
       if (action === "profile_view") {
         return new Response(
-          JSON.stringify({ success: false, error: "Insufficient credits" }),
+          JSON.stringify({ success: false, error: "Insufficient credits", balance: currentBalance }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       return new Response(
-        JSON.stringify({ error: "Insufficient credits" }),
+        JSON.stringify({ 
+          error: "Insufficient credits", 
+          balance: currentBalance,
+          required: Math.abs(amount)
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
