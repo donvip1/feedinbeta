@@ -96,6 +96,41 @@ serve(async (req) => {
           type: type,
         });
 
+        // Referral bonus on first purchase
+        try {
+          const { data: refRow } = await supabaseAdmin
+            .from('referrals')
+            .select('id, referrer_id, bonus_awarded')
+            .eq('referred_user_id', userId as string)
+            .maybeSingle();
+          if (refRow && !refRow.bonus_awarded) {
+            const referrerBonus = parseInt(Deno.env.get('REFERRAL_REFERRER_BONUS') || '50');
+            const referredBonus = parseInt(Deno.env.get('REFERRAL_REFERRED_BONUS') || '20');
+
+            await supabaseAdmin.from('credit_transactions').insert([
+              {
+                user_id: refRow.referrer_id,
+                amount: referrerBonus,
+                type: 'bonus',
+                description: 'Referral bonus (friend purchase)'
+              },
+              {
+                user_id: userId,
+                amount: referredBonus,
+                type: 'bonus',
+                description: 'Welcome bonus (first purchase via referral)'
+              }
+            ]);
+
+            await supabaseAdmin
+              .from('referrals')
+              .update({ status: 'purchased', purchased_at: new Date().toISOString(), bonus_awarded: true })
+              .eq('referred_user_id', userId as string);
+          }
+        } catch (e) {
+          console.error('Referral awarding failed:', e);
+        }
+
         break;
       }
 

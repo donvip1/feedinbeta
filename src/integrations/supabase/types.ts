@@ -2102,6 +2102,60 @@ export type Database = {
           },
         ]
       }
+      referral_codes: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      referrals: {
+        Row: {
+          bonus_awarded: boolean
+          code: string
+          created_at: string
+          id: string
+          purchased_at: string | null
+          referred_user_id: string
+          referrer_id: string
+          status: string
+        }
+        Insert: {
+          bonus_awarded?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          purchased_at?: string | null
+          referred_user_id: string
+          referrer_id: string
+          status?: string
+        }
+        Update: {
+          bonus_awarded?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          purchased_at?: string | null
+          referred_user_id?: string
+          referrer_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       saved_posts: {
         Row: {
           collection_name: string | null

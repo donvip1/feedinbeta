@@ -42,6 +42,7 @@ import Dashboard from "./pages/Dashboard";
 import AdminPanel from "./pages/AdminPanel";
 import Wallet from "./pages/Wallet";
 import NotFound from "./pages/NotFound";
+import CreditNotifications from "@/components/credits/CreditNotifications";
 
 const queryClient = new QueryClient();
 
@@ -50,7 +51,8 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <Sonner />
+           <Sonner />
+           <CreditNotifications />
           <BrowserRouter>
             <Routes>
               <Route path="/" element={<Index />} />

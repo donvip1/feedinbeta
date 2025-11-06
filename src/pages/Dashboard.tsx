@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { ArrowLeft, Coins, CreditCard, TrendingUp, Search, Filter } from "lucide-react";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import CreditUsageChart from "@/components/credits/CreditUsageChart";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -195,9 +196,12 @@ export default function Dashboard() {
                   View and filter all your credit transactions
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Filters */}
-                <div className="flex flex-col sm:flex-row gap-4">
+               <CardContent className="space-y-4">
+                 {/* Usage Chart */}
+                 <CreditUsageChart transactions={filteredTransactions as any} />
+
+                 {/* Filters */}
+                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
