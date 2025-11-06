@@ -97,9 +97,9 @@ export const SignUpForm = () => {
         description: 'Welcome to FEEDIN'
       });
       navigate('/');
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Sign up failed', {
-        description: error.message || 'Unable to create account'
+        description: error instanceof Error ? error.message : 'Unable to create account'
       });
     } finally {
       setLoading(false);
@@ -203,7 +203,7 @@ export const SignUpForm = () => {
               type="text"
               placeholder="John Doe"
               value={formData.displayName}
-              onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, displayName: e.g. target.value })}
               disabled={loading}
             />
           </div>

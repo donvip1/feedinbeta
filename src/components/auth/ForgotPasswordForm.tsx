@@ -40,9 +40,9 @@ export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
           description: 'Check your phone for the verification code'
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Reset failed', {
-        description: error.message || 'Unable to send reset instructions'
+        description: error instanceof Error ? error.message : 'Unable to send reset instructions'
       });
     } finally {
       setLoading(false);

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Legend } from "recharts";
 
 export type CreditTransaction = {
@@ -28,14 +28,16 @@ function bucketCategory(t: CreditTransaction): string {
 }
 
 export function CreditUsageChart({ transactions }: { transactions?: CreditTransaction[] }) {
-  const daily: Record<string, any> = {};
+  const daily: Record<string, { day: string } & Record<string, number>> = {};
   (transactions || []).forEach((tx) => {
     const day = formatDay(tx.created_at);
     const cat = bucketCategory(tx);
-    if (!daily[day]) daily[day] = { day };
+    if (!daily[day]) {
+      daily[day] = { day };
+    }
     daily[day][cat] = (daily[day][cat] || 0) + Math.abs(tx.amount);
   });
-  const data = Object.values(daily).sort((a: any, b: any) => (a.day > b.day ? 1 : -1));
+  const data = Object.values(daily).sort((a, b) => (a.day > b.day ? 1 : -1));
 
   const chartConfig = {
     friend_requests: { label: 'Friend Requests', color: 'hsl(var(--primary))' },
@@ -56,14 +58,14 @@ export function CreditUsageChart({ transactions }: { transactions?: CreditTransa
         <CardTitle>Credit Usage Over Time</CardTitle>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig as any} className="h-64 w-full">
+        <ChartContainer config={chartConfig as ChartConfig} className="h-64 w-full">
           <ResponsiveContainer>
             <AreaChart data={data} margin={{ left: 12, right: 12 }}>
               <defs>
                 {keys.map((k) => (
                   <linearGradient id={`grad-${k}`} key={k} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={(chartConfig as any)[k].color} stopOpacity={0.7} />
-                    <stop offset="95%" stopColor={(chartConfig as any)[k].color} stopOpacity={0.1} />
+                    <stop offset="5%" stopColor={chartConfig[k].color} stopOpacity={0.7} />
+                    <stop offset="95%" stopColor={chartConfig[k].color} stopOpacity={0.1} />
                   </linearGradient>
                 ))}
               </defs>
@@ -71,7 +73,7 @@ export function CreditUsageChart({ transactions }: { transactions?: CreditTransa
               <YAxis stroke="currentColor" fontSize={12} tickLine={false} axisLine={false} />
               <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
               {keys.map((k) => (
-                <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={(chartConfig as any)[k].color} fill={`url(#grad-${k})`} />
+                <Area key={k} type="monotone" dataKey={k} stackId="1" stroke={chartConfig[k].color} fill={`url(#grad-${k})`} />
               ))}
               <Legend />
             </AreaChart>

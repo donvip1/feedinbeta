@@ -71,9 +71,9 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
         description: 'Successfully signed in'
       });
       navigate('/');
-    } catch (error: any) {
+    } catch (error) {
       toast.error('Sign in failed', {
-        description: error.message || 'Invalid credentials'
+        description: error instanceof Error ? error.message : 'Invalid credentials'
       });
     } finally {
       setLoading(false);

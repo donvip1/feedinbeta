@@ -47,16 +47,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 </summary>
                 <div className="space-y-2">
                   <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                    {this.state.error.toString()}
+                    {JSON.stringify(this.state.error, null, 2)}
                   </code>
-                  {this.state.error?.stack && (
+                  {this.state.errorInfo && (
                     <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                      {this.state.error.stack}
-                    </code>
-                  )}
-                  {this.state.errorInfo?.componentStack && (
-                    <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                      {this.state.errorInfo.componentStack}
+                      {JSON.stringify(this.state.errorInfo, null, 2)}
                     </code>
                   )}
                 </div>

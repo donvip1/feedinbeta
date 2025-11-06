@@ -53,7 +53,7 @@ const App = () => (
         <TooltipProvider>
            <Sonner />
            <CreditNotifications />
-          <BrowserRouter>
+          <BrowserRouter future={{ v7_startTransition: true }}>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />

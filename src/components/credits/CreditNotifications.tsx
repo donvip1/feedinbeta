@@ -3,6 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
 
+interface CreditTransaction {
+  id: number;
+  user_id: string;
+  amount: number;
+  type: 'refund' | 'admin_grant' | 'bonus';
+  description: string;
+  created_at: string;
+}
+
 export default function CreditNotifications() {
   const { user } = useAuth();
 
@@ -14,7 +23,7 @@ export default function CreditNotifications() {
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'credit_transactions' },
-        (payload: any) => {
+        (payload: { new: CreditTransaction }) => {
           const tx = payload.new;
           if (tx.user_id !== user.id) return;
           if (tx.type === 'refund') {

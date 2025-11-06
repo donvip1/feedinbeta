@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Heart, MessageCircle, Trash2, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { ReactionPicker } from './ReactionPicker';
 import { CommentEmojiPicker } from './CommentEmojiPicker';
 import { CommentReactions } from './CommentReactions';
+import { useNavigate } from 'react-router-dom';
 
 interface Comment {
   id: string;
@@ -35,6 +35,10 @@ interface CommentItemProps {
   level?: number;
 }
 
+interface ApiError extends Error {
+  message: string;
+}
+
 export const CommentItem = ({
   comment,
   allComments,
@@ -44,6 +48,7 @@ export const CommentItem = ({
 }: CommentItemProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(comment.likes_count);
   const [showReply, setShowReply] = useState(false);
@@ -79,12 +84,12 @@ export const CommentItem = ({
           .eq('comment_id', comment.id)
           .eq('user_id', user.id);
       }
-    } catch (error: any) {
+    } catch (error) {
       setIsLiked(!newIsLiked);
       setLocalLikesCount(localLikesCount);
       toast({
         title: 'Error',
-        description: error.message,
+        description: (error as ApiError).message,
         variant: 'destructive',
       });
     }
@@ -123,7 +128,7 @@ export const CommentItem = ({
       }
       
       onUpdate();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error adding reaction:', error);
       toast({
         title: 'Unable to add reaction',
@@ -151,10 +156,10 @@ export const CommentItem = ({
       setShowReply(false);
       setShowReplies(true);
       onUpdate();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message,
+        description: (error as ApiError).message,
         variant: 'destructive',
       });
     } finally {
@@ -177,10 +182,10 @@ export const CommentItem = ({
         title: 'Comment deleted',
       });
       onUpdate();
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Error',
-        description: error.message,
+        description: (error as ApiError).message,
         variant: 'destructive',
       });
     }
@@ -191,7 +196,7 @@ export const CommentItem = ({
       <div className="flex space-x-3">
         <Avatar 
           className="w-8 h-8 flex-shrink-0 cursor-pointer hover:opacity-80"
-          onClick={() => window.location.href = `/profile/${comment.user_id}`}
+          onClick={() => navigate(`/profile/${comment.user_id}`)}
         >
           <AvatarImage src={comment.profiles?.avatar_url || ''} />
           <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
@@ -204,7 +209,7 @@ export const CommentItem = ({
             <div className="flex items-center justify-between mb-1">
               <span 
                 className="font-semibold text-sm cursor-pointer hover:underline"
-                onClick={() => window.location.href = `/profile/${comment.user_id}`}
+                onClick={() => navigate(`/profile/${comment.user_id}`)}
               >
                 {displayName}
               </span>

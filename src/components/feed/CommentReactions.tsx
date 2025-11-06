@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar } from "@/components/ui/avatar";
@@ -22,6 +22,15 @@ interface Reaction {
   hasReacted: boolean;
 }
 
+interface ReactionData {
+  emoji: string;
+  user_id: string;
+  profiles: {
+    username: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
 interface CommentReactionsProps {
   commentId: string;
   onReactionChange?: () => void;
@@ -32,32 +41,7 @@ export const CommentReactions = ({ commentId, onReactionChange }: CommentReactio
   const [reactions, setReactions] = useState<Reaction[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    loadReactions();
-
-    // Subscribe to reaction changes
-    const channel = supabase
-      .channel(`comment-reactions-${commentId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'comment_emoji_reactions',
-          filter: `comment_id=eq.${commentId}`
-        },
-        () => {
-          loadReactions();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [commentId, user]);
-
-  const loadReactions = async () => {
+  const loadReactions = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('comment_emoji_reactions')
@@ -74,7 +58,7 @@ export const CommentReactions = ({ commentId, onReactionChange }: CommentReactio
       if (error) throw error;
 
       // Group reactions by emoji
-      const grouped = (data || []).reduce((acc: Record<string, Reaction>, curr: any) => {
+      const grouped = (data || []).reduce((acc: Record<string, Reaction>, curr: ReactionData) => {
         if (!acc[curr.emoji]) {
           acc[curr.emoji] = {
             emoji: curr.emoji,
@@ -102,7 +86,32 @@ export const CommentReactions = ({ commentId, onReactionChange }: CommentReactio
     } catch (error) {
       console.error('Error loading reactions:', error);
     }
-  };
+  }, [commentId, user]);
+
+  useEffect(() => {
+    loadReactions();
+
+    // Subscribe to reaction changes
+    const channel = supabase
+      .channel(`comment-reactions-${commentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'comment_emoji_reactions',
+          filter: `comment_id=eq.${commentId}`
+        },
+        () => {
+          loadReactions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [commentId, loadReactions]);
 
   const handleReactionToggle = async (emoji: string, hasReacted: boolean) => {
     if (!user || loading) return;

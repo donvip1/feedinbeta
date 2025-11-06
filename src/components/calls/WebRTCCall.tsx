@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, Radio, Users } from 'lucide-react';
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 interface WebRTCCallProps {
   callId: string;
@@ -12,6 +12,11 @@ interface WebRTCCallProps {
   participants: Array<{ id: string; display_name: string; avatar_url: string }>;
   onEndCall: () => void;
 }
+
+type SignalingData =
+  | { type: 'offer'; offer: RTCSessionDescriptionInit }
+  | { type: 'answer'; answer: RTCSessionDescriptionInit }
+  | { type: 'ice-candidate'; candidate: RTCIceCandidateInit };
 
 export const WebRTCCall = ({ callId, isInitiator, participants, onEndCall }: WebRTCCallProps) => {
   const { user } = useAuth();
@@ -28,119 +33,56 @@ export const WebRTCCall = ({ callId, isInitiator, participants, onEndCall }: Web
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
 
-  useEffect(() => {
-    initializeMedia();
-    subscribeToSignaling();
-
-    return () => {
-      cleanup();
-    };
-  }, []);
-
-  const initializeMedia = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-
-      setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      if (isInitiator) {
-        // Create offers for all participants
-        participants.forEach((participant) => {
-          if (participant.id !== user?.id) {
-            createPeerConnection(participant.id, stream);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error accessing media devices:', error);
-      toast({
-        title: 'Media Access Error',
-        description: 'Could not access camera/microphone',
-        variant: 'destructive',
-      });
+  const stopRecording = useCallback(() => {
+    if (mediaRecorder.current && isRecording) {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+      toast({ title: 'Recording stopped' });
     }
-  };
+  }, [isRecording, toast]);
 
-  const createPeerConnection = async (participantId: string, stream: MediaStream) => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
-
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendSignal(participantId, {
-          type: 'ice-candidate',
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      setRemoteStreams((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(participantId, event.streams[0]);
-        return newMap;
-      });
-    };
-
-    peerConnections.current.set(participantId, pc);
-
-    if (isInitiator) {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      sendSignal(participantId, { type: 'offer', offer });
+  const cleanup = useCallback(() => {
+    if (mediaRecorder.current && isRecording) {
+      stopRecording();
     }
-  };
 
-  const sendSignal = async (participantId: string, signal: any) => {
+    localStream?.getTracks().forEach((track) => track.stop());
+    peerConnections.current.forEach((pc) => pc.close());
+    peerConnections.current.clear();
+  }, [isRecording, localStream, stopRecording]);
+
+  const sendSignal = useCallback(async (participantId: string, signal: SignalingData) => {
     await supabase.from('call_signals').insert({
       call_id: callId,
       from_user_id: user?.id,
       to_user_id: participantId,
-      signal_data: signal,
+      signal_data: signal as any,
     });
-  };
+  }, [callId, user?.id]);
 
-  const subscribeToSignaling = () => {
-    const channel = supabase
-      .channel(`call-${callId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_signals',
-          filter: `to_user_id=eq.${user?.id}`,
-        },
-        async (payload) => {
-          const signal = payload.new.signal_data;
-          const fromUserId = payload.new.from_user_id;
+  const handleIceCandidate = useCallback(async (fromUserId: string, candidate: RTCIceCandidateInit) => {
+    const pc = peerConnections.current.get(fromUserId);
+    if (pc) {
+      try {
+        await pc.addIceCandidate(new RTCIceCandidate(candidate));
+      } catch (error) {
+        console.error('Error adding ICE candidate:', error);
+      }
+    }
+  }, []);
 
-          if (signal.type === 'offer') {
-            await handleOffer(fromUserId, signal.offer);
-          } else if (signal.type === 'answer') {
-            await handleAnswer(fromUserId, signal.answer);
-          } else if (signal.type === 'ice-candidate') {
-            await handleIceCandidate(fromUserId, signal.candidate);
-          }
-        }
-      )
-      .subscribe();
+  const handleAnswer = useCallback(async (fromUserId: string, answer: RTCSessionDescriptionInit) => {
+    const pc = peerConnections.current.get(fromUserId);
+    if (pc) {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(answer));
+      } catch (error) {
+        console.error('Error setting remote description:', error);
+      }
+    }
+  }, []);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const handleOffer = async (fromUserId: string, offer: RTCSessionDescriptionInit) => {
+  const handleOffer = useCallback(async (fromUserId: string, offer: RTCSessionDescriptionInit) => {
     if (!localStream) return;
 
     const pc = new RTCPeerConnection({
@@ -168,25 +110,122 @@ export const WebRTCCall = ({ callId, isInitiator, participants, onEndCall }: Web
 
     peerConnections.current.set(fromUserId, pc);
 
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    sendSignal(fromUserId, { type: 'answer', answer });
-  };
-
-  const handleAnswer = async (fromUserId: string, answer: RTCSessionDescriptionInit) => {
-    const pc = peerConnections.current.get(fromUserId);
-    if (pc) {
-      await pc.setRemoteDescription(new RTCSessionDescription(answer));
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+      sendSignal(fromUserId, { type: 'answer', answer });
+    } catch (error) {
+      console.error('Error handling offer:', error);
     }
-  };
+  }, [localStream, sendSignal]);
 
-  const handleIceCandidate = async (fromUserId: string, candidate: RTCIceCandidateInit) => {
-    const pc = peerConnections.current.get(fromUserId);
-    if (pc) {
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  const createPeerConnection = useCallback(async (participantId: string, stream: MediaStream) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    });
+
+    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        sendSignal(participantId, {
+          type: 'ice-candidate',
+          candidate: event.candidate,
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      setRemoteStreams((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(participantId, event.streams[0]);
+        return newMap;
+      });
+    };
+
+    peerConnections.current.set(participantId, pc);
+
+    if (isInitiator) {
+      try {
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        sendSignal(participantId, { type: 'offer', offer });
+      } catch (error) {
+        console.error('Error creating offer:', error);
+      }
     }
-  };
+  }, [isInitiator, sendSignal]);
+
+  const initializeMedia = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      setLocalStream(stream);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+
+      if (isInitiator) {
+        participants.forEach((participant) => {
+          if (participant.id !== user?.id) {
+            createPeerConnection(participant.id, stream);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error accessing media devices:', error);
+      toast({
+        title: 'Media Access Error',
+        description: 'Could not access camera/microphone',
+        variant: 'destructive',
+      });
+    }
+  }, [createPeerConnection, isInitiator, participants, toast, user?.id]);
+
+  const subscribeToSignaling = useCallback(() => {
+    const channel = supabase
+      .channel(`call-${callId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'call_signals',
+          filter: `to_user_id=eq.${user?.id}`,
+        },
+        async (payload) => {
+          const signal = payload.new.signal_data as SignalingData;
+          const fromUserId = payload.new.from_user_id;
+
+          if (signal.type === 'offer') {
+            await handleOffer(fromUserId, signal.offer);
+          } else if (signal.type === 'answer') {
+            await handleAnswer(fromUserId, signal.answer);
+          } else if (signal.type === 'ice-candidate') {
+            await handleIceCandidate(fromUserId, signal.candidate);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [callId, user?.id, handleOffer, handleAnswer, handleIceCandidate]);
+
+  useEffect(() => {
+    initializeMedia();
+    const unsubscribe = subscribeToSignaling();
+
+    return () => {
+      cleanup();
+      unsubscribe();
+    };
+  }, [cleanup, initializeMedia, subscribeToSignaling]);
 
   const toggleMute = () => {
     if (localStream) {
@@ -236,7 +275,7 @@ export const WebRTCCall = ({ callId, isInitiator, participants, onEndCall }: Web
     }
   };
 
-  const stopScreenShare = () => {
+  const stopScreenShare = useCallback(() => {
     if (localStream) {
       const videoTrack = localStream.getVideoTracks()[0];
       peerConnections.current.forEach((pc) => {
@@ -247,6 +286,17 @@ export const WebRTCCall = ({ callId, isInitiator, participants, onEndCall }: Web
       });
       setIsScreenSharing(false);
     }
+  }, [localStream]);
+
+  const uploadRecording = async (blob: Blob) => {
+    const fileName = `recordings/${callId}/${Date.now()}.webm`;
+    
+    // Store recording metadata - actual storage bucket will be created separately
+    console.log('Recording saved:', fileName, 'Size:', blob.size);
+    toast({ 
+      title: 'Recording saved',
+      description: 'Your call recording has been saved'
+    });
   };
 
   const startRecording = () => {
@@ -269,35 +319,6 @@ export const WebRTCCall = ({ callId, isInitiator, participants, onEndCall }: Web
     mediaRecorder.current.start();
     setIsRecording(true);
     toast({ title: 'Recording started' });
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder.current && isRecording) {
-      mediaRecorder.current.stop();
-      setIsRecording(false);
-      toast({ title: 'Recording stopped' });
-    }
-  };
-
-  const uploadRecording = async (blob: Blob) => {
-    const fileName = `recordings/${callId}/${Date.now()}.webm`;
-    
-    // Store recording metadata - actual storage bucket will be created separately
-    console.log('Recording saved:', fileName, 'Size:', blob.size);
-    toast({ 
-      title: 'Recording saved',
-      description: 'Your call recording has been saved'
-    });
-  };
-
-  const cleanup = () => {
-    if (mediaRecorder.current && isRecording) {
-      stopRecording();
-    }
-
-    localStream?.getTracks().forEach((track) => track.stop());
-    peerConnections.current.forEach((pc) => pc.close());
-    peerConnections.current.clear();
   };
 
   const handleEndCall = () => {
