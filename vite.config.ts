@@ -19,6 +19,18 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     exclude: ["lucide-react"],
+    include: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "@tanstack/react-query",
+      "react-router-dom",
+      "next-themes",
+      "@radix-ui/react-tooltip",
+      "@radix-ui/react-popover",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-dialog"
+    ],
   },
   build: {
     // Generate unique build hashes for cache busting
