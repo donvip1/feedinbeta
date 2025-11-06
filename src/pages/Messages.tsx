@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -8,32 +8,25 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, Check, X } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus } from 'lucide-react';
+import { ChatInterface } from '@/components/messages/ChatInterface';
 import { EnhancedChatInterface } from '@/components/messages/EnhancedChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { InboxList } from '@/components/messages/InboxList';
+import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 import { useToast } from '@/hooks/use-toast';
 
-// Types
-interface Profile {
+interface Conversation {
   id: string;
-  display_name: string | null;
-  username: string | null;
-  avatar_url: string | null;
-}
-
-interface FriendRequest {
-  id: string;
-  sender: Profile;
-}
-
-interface ChatListItem {
-  id: string; // This can be conversationId or userId for friends without a convo
-  type: 'conversation' | 'friend';
-  updated_at?: string;
-  participant: Profile;
+  updated_at: string;
+  other_participant: {
+    id: string;
+    display_name: string | null;
+    username: string | null;
+    avatar_url: string | null;
+  };
   last_message?: {
     content: string;
     created_at: string;
@@ -57,9 +50,7 @@ export default function Messages() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-
-  const [chatList, setChatList] = useState<ChatListItem[]>([]);
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -70,223 +61,316 @@ export default function Messages() {
   const [activeTab, setActiveTab] = useState('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
 
+  // Handle shared image from location state
   useEffect(() => {
     const state = location.state as { sharedImage?: string };
     if (state?.sharedImage) {
       setSharedImageUrl(state.sharedImage);
       setShowNewConversation(true);
+      // Clear the state
       navigate(location.pathname, { replace: true });
     }
   }, [location, navigate]);
 
   useEffect(() => {
-    if (!authLoading && !user) navigate('/auth');
-  }, [user, authLoading, navigate]);
-
-  const loadData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      await Promise.all([
-        loadFriendRequests(),
-        loadChatList(),
-        loadGroups()
-      ]);
-    } catch (error) {
-      console.error("Error loading page data:", error);
-      toast({ title: "Error", description: "Could not load your data. Please refresh the page.", variant: "destructive" });
-    } finally {
-      setLoading(false);
+    if (!authLoading && !user) {
+      navigate('/auth');
     }
-  }, [user]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (user) {
-      loadData();
+      loadConversations();
+      loadGroups();
     }
-  }, [user, loadData]);
+  }, [user]);
 
-  const loadFriendRequests = async () => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('friend_requests')
-      .select('id, sender:profiles!friend_requests_sender_id_fkey(id, display_name, username, avatar_url)')
-      .eq('receiver_id', user.id)
-      .eq('status', 'pending');
-    if (error) throw error;
-    setFriendRequests(data as FriendRequest[] || []);
-  };
-
-  const loadChatList = async () => {
+  const loadConversations = async () => {
     if (!user) return;
 
-    // 1. Get all friends
-    const { data: friendData, error: friendError } = await supabase.rpc('get_friends', { p_user_id: user.id });
-    if (friendError) throw friendError;
-    const friends = friendData || [];
-
-    // 2. Get all conversations
-    const { data: convoData, error: convoError } = await supabase.rpc('get_conversations', { p_user_id: user.id });
-    if (convoError) throw convoError;
-    const conversations = convoData || [];
-
-    // 3. Merge friends and conversations
-    const chatMap = new Map<string, ChatListItem>();
-
-    // Add conversations to the map
-    conversations.forEach(c => {
-      chatMap.set(c.other_participant.id, {
-        id: c.conversation_id,
-        type: 'conversation',
-        updated_at: c.last_message_created_at,
-        participant: c.other_participant,
-        last_message: c.last_message_content ? {
-          content: c.last_message_content,
-          created_at: c.last_message_created_at,
-          sender_id: c.last_message_sender_id,
-        } : undefined,
-      });
-    });
-
-    // Add friends who don't have a conversation yet
-    friends.forEach(f => {
-      if (!chatMap.has(f.id)) {
-        chatMap.set(f.id, {
-          id: f.id, // Use friend's user ID as the key for starting a new chat
-          type: 'friend',
-          participant: f,
-        });
-      }
-    });
-    
-    const combinedList = Array.from(chatMap.values());
-
-    // Sort: conversations with messages first, then friends. Sort by date.
-    combinedList.sort((a, b) => {
-        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-        return dateB - dateA;
-    });
-
-    setChatList(combinedList);
-  };
-
-  const respondToRequest = async (requestId: string, accepted: boolean) => {
+    setLoading(true);
     try {
-      const { error } = await supabase
-        .from('friend_requests')
-        .update({ status: accepted ? 'accepted' : 'rejected' })
-        .eq('id', requestId);
+      const { data: participantData, error } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id, conversations!inner(id, updated_at)')
+        .eq('user_id', user.id);
+
       if (error) throw error;
 
-      if(accepted) {
-         const request = friendRequests.find(r => r.id === requestId);
-         if(request && user) {
-            await supabase.from('notifications').insert({
-                user_id: request.sender.id,
-                type: 'info',
-                message: `${user.user_metadata.display_name} accepted your friend request.`,
-            });
-         }
+      // Deduplicate conversation IDs
+      const conversationIds = [...new Set(participantData?.map(p => p.conversation_id) || [])];
+      
+      const conversationsWithDetails = await Promise.all(
+        conversationIds.map(async (convId) => {
+          const { data: participants } = await supabase
+            .from('conversation_participants')
+            .select('user_id, participant:profiles!conversation_participants_user_id_fkey(id, display_name, username, avatar_url)')
+            .eq('conversation_id', convId)
+            .neq('user_id', user.id)
+            .maybeSingle();
+
+          const { data: lastMessage } = await supabase
+            .from('messages')
+            .select('content, created_at, sender_id')
+            .eq('conversation_id', convId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const conv = participantData?.find(p => p.conversation_id === convId);
+
+          return {
+            id: convId,
+            updated_at: conv?.conversations?.updated_at || '',
+            other_participant: {
+              id: participants?.participant?.id || '',
+              display_name: participants?.participant?.display_name || 'Unknown',
+              username: participants?.participant?.username || null,
+              avatar_url: participants?.participant?.avatar_url || null,
+            },
+            last_message: lastMessage || undefined,
+          };
+        })
+      );
+
+      setConversations(conversationsWithDetails.sort((a, b) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      ));
+    } catch (error: any) {
+      console.error('Error loading conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNewConversation = async (userId: string) => {
+    if (!user) return;
+
+    try {
+      const { data: existingParticipants } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .in('user_id', [user.id, userId]);
+
+      if (existingParticipants && existingParticipants.length > 0) {
+        const conversationCounts: { [key: string]: number } = {};
+        existingParticipants.forEach(p => {
+          conversationCounts[p.conversation_id] = (conversationCounts[p.conversation_id] || 0) + 1;
+        });
+
+        const existingConvId = Object.keys(conversationCounts).find(
+          convId => conversationCounts[convId] === 2
+        );
+
+        if (existingConvId) {
+          setSelectedConversationId(existingConvId);
+          setShowNewConversation(false);
+          return;
+        }
       }
 
-      toast({ title: accepted ? "Friend request accepted" : "Friend request declined" });
-      loadData(); // Reload all data
+      // Use secure function to create conversation
+      const { data: conversationId, error } = await supabase.rpc('create_conversation', {
+        other_user_id: userId
+      });
+
+      if (error) throw error;
+
+      await loadConversations();
+      setSelectedConversationId(conversationId);
+      setShowNewConversation(false);
+    } catch (error: any) {
+      console.error('Error creating conversation:', error);
+      toast({
+        title: 'Unable to create conversation',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const loadGroups = async () => {
+    if (!user) return;
+    
+    try {
+      const { data: allGroups, error: allError } = await supabase
+        .from('groups')
+        .select('*')
+        .order('member_count', { ascending: false });
+
+      if (allError) throw allError;
+
+      const { data: memberGroups, error: memberError } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', user.id);
+
+      if (memberError) throw memberError;
+
+      const myGroupIds = memberGroups?.map(m => m.group_id) || [];
+      const userGroups = allGroups?.filter(g => myGroupIds.includes(g.id)) || [];
+      const otherGroups = allGroups?.filter(g => !myGroupIds.includes(g.id)) || [];
+
+      setMyGroups(userGroups);
+      setGroups(otherGroups);
     } catch (error) {
-      console.error("Error responding to request:", error);
-      toast({ title: "Error", description: "Could not process your response.", variant: "destructive" });
+      console.error('Error loading groups:', error);
     }
   };
 
-  const handleItemClick = async (item: ChatListItem) => {
-    if (item.type === 'conversation') {
-      setSelectedConversationId(item.id);
-    } else {
-      // It's a friend without a conversation, so create one.
-      if (!user) return;
-      try {
-        const { data, error } = await supabase.rpc('create_conversation', { other_user_id: item.participant.id });
-        if (error) throw error;
-        await loadData(); // Refresh the list
-        setSelectedConversationId(data);
-      } catch (e) {
-        console.error("Error starting new conversation:", e);
-        toast({ title: "Error", description: "Could not start a conversation.", variant: "destructive" });
-      }
-    }
-  };
+  const filteredConversations = conversations.filter(conv =>
+    conv.other_participant.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.other_participant.username?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const loadGroups = async () => { /* ... existing loadGroups logic ... */ };
+  const filteredGroups = groups.filter(g =>
+    g.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const filteredChatList = chatList.filter(item =>
-    item.participant.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.participant.username?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredMyGroups = myGroups.filter(g =>
+    g.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (authLoading || loading) {
-      /* ... existing loading UI ... */
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Sidebar */}
       <div className={`${selectedConversationId ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 border-r border-border`}>
-         {/* ... existing header ... */}
+        <div className="p-4 border-b border-border">
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/feed')}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h1 className="text-xl font-bold">Chats & Groups</h1>
+            <div className="flex items-center gap-2">
+              <NotificationBadge />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </div>
+          </div>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder={`Search ${activeTab}...`}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="w-full grid grid-cols-3">
+              <TabsTrigger value="chats">Chats</TabsTrigger>
+              <TabsTrigger value="groups">Groups</TabsTrigger>
+              <TabsTrigger value="stories">Stories</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
         <ScrollArea className="flex-1">
           <Tabs value={activeTab} className="w-full">
             <TabsContent value="chats" className="m-0">
-              {/* Friend Requests Section */}
-              {friendRequests.length > 0 && (
-                <div className="p-4 border-b border-border">
-                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Friend Requests</h3>
-                  {friendRequests.map(req => (
-                    <div key={req.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent">
-                       <Avatar onClick={() => navigate(`/profile/${req.sender.id}`)} className="cursor-pointer">
-                        <AvatarImage src={req.sender.avatar_url || undefined} />
-                        <AvatarFallback>{req.sender.display_name?.[0] || 'U'}</AvatarFallback>
+              <InboxList />
+            </TabsContent>
+
+            <TabsContent value="groups" className="m-0">
+              {filteredMyGroups.length > 0 && (
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">My Groups</h3>
+                  {filteredMyGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      onClick={() => navigate(`/groups/${group.id}`)}
+                      className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg mb-2"
+                    >
+                      <Avatar>
+                        <AvatarImage src={group.avatar_url} />
+                        <AvatarFallback>{group.name[0]}</AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 text-left overflow-hidden" onClick={() => navigate(`/profile/${req.sender.id}`)}>
-                        <p className="font-semibold truncate">{req.sender.display_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">@{req.sender.username}</p>
+                      <div className="flex-1 text-left overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold truncate">{group.name}</p>
+                          {group.is_private ? (
+                            <Lock className="w-3 h-3 text-muted-foreground" />
+                          ) : (
+                            <Globe className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Users className="w-3 h-3" />
+                          <span>{group.member_count} members</span>
+                        </div>
                       </div>
-                      <div className="flex gap-2 ml-auto">
-                        <Button size="icon" className="h-8 w-8 bg-green-500 hover:bg-green-600" onClick={() => respondToRequest(req.id, true)}><Check className="h-4 w-4" /></Button>
-                        <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => respondToRequest(req.id, false)}><X className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
-
-              {/* Chat List Section */}
-              {filteredChatList.map(item => (
-                <button key={item.id} onClick={() => handleItemClick(item)} className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg">
-                  <Avatar>
-                    <AvatarImage src={item.participant.avatar_url || undefined} />
-                    <AvatarFallback>{item.participant.display_name?.[0] || 'U'}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 text-left overflow-hidden">
-                    <p className="font-semibold truncate">{item.participant.display_name}</p>
-                    {item.last_message ? (
-                      <p className="text-xs text-muted-foreground truncate">{item.last_message.content}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground truncate">@{item.participant.username}</p>
-                    )}
+              
+              <div className="p-4">
+                <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Discover</h3>
+                {filteredGroups.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No groups found
                   </div>
-                  {item.last_message && <time className="text-xs text-muted-foreground self-start">{new Date(item.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>}
-                </button>
-              ))}
-              {filteredChatList.length === 0 && friendRequests.length === 0 && (
-                 <div className="text-center py-12 text-muted-foreground">No chats or requests.</div>
-              )}
+                ) : (
+                  filteredGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      onClick={() => navigate(`/groups/${group.id}`)}
+                      className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg mb-2"
+                    >
+                      <Avatar>
+                        <AvatarImage src={group.avatar_url} />
+                        <AvatarFallback>{group.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 text-left overflow-hidden">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold truncate">{group.name}</p>
+                          {group.requires_subscription && (
+                            <Badge variant="secondary" className="text-xs">Premium</Badge>
+                          )}
+                          {group.is_private ? (
+                            <Lock className="w-3 h-3 text-muted-foreground" />
+                          ) : (
+                            <Globe className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{group.description}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                          <Users className="w-3 h-3" />
+                          <span>{group.member_count} members</span>
+                        </div>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
             </TabsContent>
 
-            {/* ... other tabs (groups, stories) ... */}
+            <TabsContent value="stories" className="m-0">
+              <StoriesBar />
+            </TabsContent>
           </Tabs>
         </ScrollArea>
       </div>
-      
-      {/* ... rest of the component ... */}
-       <div className="flex-1 flex flex-col">
+
+      {/* Chat Area */}
+      <div className="flex-1 flex flex-col">
         {selectedConversationId ? (
           <EnhancedChatInterface
             conversationId={selectedConversationId}
@@ -296,11 +380,27 @@ export default function Messages() {
           <div className="hidden md:flex items-center justify-center h-full">
             <div className="text-center">
               <MessageSquarePlus className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-              <p className="text-muted-foreground">Select a conversation or a friend to start messaging</p>
+              <p className="text-muted-foreground">Select a conversation to start messaging</p>
             </div>
           </div>
         )}
       </div>
+
+      <NewConversationModal
+        open={showNewConversation}
+        onClose={() => {
+          setShowNewConversation(false);
+          setSharedImageUrl(null);
+        }}
+        onSelectUser={handleNewConversation}
+        initialImageUrl={sharedImageUrl}
+      />
+
+      <CreateGroupModal
+        open={showCreateGroup}
+        onOpenChange={setShowCreateGroup}
+        onSuccess={loadGroups}
+      />
     </div>
   );
 }
