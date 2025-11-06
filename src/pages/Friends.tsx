@@ -163,39 +163,44 @@ const Friends = () => {
   };
 
   const sendFriendRequest = async (receiverId: string) => {
+    if (!user) return;
+
     try {
-      // Deduct credits first (5 credits)
-      const { error: creditError } = await supabase.functions.invoke('credit-deduction', {
-        body: {
-          action: 'friend_request',
-          userId: user?.id,
-          targetUserId: receiverId,
-        },
+      // 1. Create a friend request
+      const { data: request, error: requestError } = await supabase
+        .from('friend_requests')
+        .insert({
+          sender_id: user.id,
+          receiver_id: receiverId,
+        })
+        .select();
+
+      if (requestError) throw requestError;
+
+      // 2. Create a notification for the receiver
+      const { error: notificationError } = await supabase.from('notifications').insert({
+        user_id: receiverId,
+        type: 'friend_request',
+        message: `You have a new friend request from ${user.user_metadata.display_name || 'a user'}`,
+        reference_id: request[0].id,
+        is_read: false
       });
 
-      if (creditError) {
-        toast.error('Insufficient credits', {
-          description: 'You need 5 credits to send a friend request'
-        });
-        return;
+      if (notificationError) {
+        // Even if notification fails, the request was created. 
+        // You might want to handle this case, e.g., by logging it.
+        console.error("Failed to create notification:", notificationError);
       }
 
-      const { error } = await supabase.from('friend_requests').insert({
-        sender_id: user?.id,
-        receiver_id: receiverId,
-      });
+      toast.success('Friend request sent!');
 
-      if (error) throw error;
-
-      toast.success('Friend request sent', {
-        description: '5 credits deducted'
-      });
     } catch (error: any) {
       toast.error('Error sending friend request', {
-        description: error.message
+        description: error.message,
       });
     }
   };
+
 
   const respondToRequest = async (requestId: string, status: 'accepted' | 'rejected') => {
     try {
