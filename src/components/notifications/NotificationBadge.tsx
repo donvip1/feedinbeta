@@ -50,7 +50,7 @@ export const NotificationBadge = () => {
 
   return (
     <button
-      onClick={() => navigate('/settings/notifications')}
+      onClick={() => navigate('/notifications')}
       className="relative p-2 hover:bg-accent rounded-full transition-colors"
     >
       <Bell className="w-6 h-6" />

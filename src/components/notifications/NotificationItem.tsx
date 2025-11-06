@@ -39,14 +39,19 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
     }
 
     // Navigate based on type
-    if (notification.related_type === 'post') {
-      navigate('/feed');
-    } else if (notification.related_type === 'comment') {
-      navigate('/feed');
-    } else if (notification.related_type === 'conversation') {
-      navigate('/messages');
+    if (notification.related_type === 'post' && notification.related_id) {
+      navigate(`/feed?post=${notification.related_id}`);
+    } else if (notification.related_type === 'comment' && notification.related_id) {
+      navigate(`/feed?post=${notification.related_id}`);
+    } else if (notification.related_type === 'conversation' && notification.related_id) {
+      navigate(`/messages?conversation=${notification.related_id}`);
     } else if (notification.related_type === 'profile' && notification.related_id) {
       navigate(`/profile/${notification.related_id}`);
+    } else if (notification.related_type === 'friend_request' && notification.from_user_id) {
+      navigate(`/profile/${notification.from_user_id}`);
+    } else {
+      // Fallback for unknown types
+      navigate('/feed');
     }
     
     onClose();

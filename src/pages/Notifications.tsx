@@ -5,9 +5,9 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Settings, CheckCheck, Bell } from 'lucide-react';
-import { NotificationItem } from './NotificationItem';
-import { NotificationPreferences } from './NotificationPreferences';
+import { Settings, CheckCheck, Bell, Trash2 } from 'lucide-react';
+import { NotificationItem } from '@/components/notifications/NotificationItem';
+import { Link } from 'react-router-dom';
 
 interface Notification {
   id: string;
@@ -25,17 +25,11 @@ interface Notification {
   } | null;
 }
 
-interface NotificationsPanelProps {
-  onClose: () => void;
-  onUpdate: () => void;
-}
-
-export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProps) => {
+export const NotificationsPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showPreferences, setShowPreferences] = useState(false);
 
   useEffect(() => {
     loadNotifications();
@@ -82,7 +76,6 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
       if (error) throw error;
 
       await loadNotifications();
-      onUpdate();
       
       toast({
         title: 'All notifications marked as read',
@@ -95,18 +88,34 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
       });
     }
   };
+  
+  const deleteAllNotifications = async () => {
+    if (!user) return;
 
-  if (showPreferences) {
-    return (
-      <NotificationPreferences
-        onClose={() => setShowPreferences(false)}
-        onBack={() => setShowPreferences(false)}
-      />
-    );
-  }
+    try {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      setNotifications([]);
+      
+      toast({
+        title: 'All notifications deleted',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error deleting notifications',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
-    <div className="fixed right-4 top-16 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
+    <div className="max-w-2xl mx-auto py-8">
       {/* Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
@@ -121,18 +130,27 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
               <CheckCheck className="w-4 h-4" />
             </Button>
             <Button
-              variant="ghost"
+              variant="destructive"
               size="icon"
-              onClick={() => setShowPreferences(true)}
+              onClick={deleteAllNotifications}
+              disabled={notifications.length === 0}
             >
-              <Settings className="w-4 h-4" />
+              <Trash2 className="w-4 h-4" />
             </Button>
+            <Link to="/notification-settings">
+              <Button
+                variant="ghost"
+                size="icon"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
 
       {/* Notifications List */}
-      <ScrollArea className="h-[500px]">
+      <ScrollArea className="h-[calc(100vh-200px)]">
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -148,11 +166,8 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
               <React.Fragment key={notification.id}>
                 <NotificationItem
                   notification={notification}
-                  onUpdate={() => {
-                    loadNotifications();
-                    onUpdate();
-                  }}
-                  onClose={onClose}
+                  onUpdate={loadNotifications}
+                  onClose={() => {}}
                 />
                 {index < notifications.length - 1 && <Separator />}
               </React.Fragment>

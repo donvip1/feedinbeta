@@ -33,6 +33,7 @@ import Settings from "./pages/Settings";
 import AccountSettings from "./pages/AccountSettings";
 import PrivacySettings from "./pages/PrivacySettings";
 import NotificationSettings from "./pages/NotificationSettings";
+import { NotificationsPage } from "./pages/Notifications";
 import CacheSettingsPage from "./pages/CacheSettingsPage";
 import BlockedUsers from "./pages/BlockedUsers";
 import P2PMarketplace from "./pages/P2PMarketplace";
@@ -78,6 +79,7 @@ const App = () => (
               <Route path="/saved" element={<SavedPosts />} />
               <Route path="/promote/:postId" element={<Promote />} />
               <Route path="/moderation" element={<Moderation />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/settings/account" element={<AccountSettings />} />
               <Route path="/settings/privacy" element={<PrivacySettings />} />

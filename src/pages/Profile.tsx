@@ -5,9 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Skeleton } from '@/components/ui/skeleton';
-import { PostCard } from '@/components/feed/PostCard';
-import { ArrowLeft, UserPlus, MessageCircle, Settings } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ProfileSettings } from '@/components/profile/ProfileSettings';
+import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Users } from 'lucide-react';
+import { BottomNav } from '@/components/navigation/BottomNav';
 
 interface Profile {
   id: string;
@@ -15,26 +17,15 @@ interface Profile {
   username: string | null;
   avatar_url: string | null;
   bio: string | null;
+  status: string | null;
+  about: string | null;
+  purpose: string | null;
+  marital_status: string | null;
+  total_views: number;
+  is_premium: boolean;
+  credits_balance: number;
   followers_count: number;
   following_count: number;
-}
-
-interface Post {
-  id: string;
-  feed_id: string;
-  user_id: string;
-  content: string | null;
-  media_url: string | null;
-  media_type: string | null;
-  likes_count: number;
-  comments_count: number;
-  views_count: number;
-  created_at: string;
-  profiles: {
-    display_name: string | null;
-    username: string | null;
-    avatar_url: string | null;
-  };
 }
 
 const Profile = () => {
@@ -43,58 +34,66 @@ const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const isOwnProfile = user?.id === userId;
 
   useEffect(() => {
     if (userId) {
       loadProfile();
-      loadPosts();
-      checkFollowStatus();
-      checkFriendRequestStatus();
-      
-      // Deduct credits for profile view if not own profile
-      if (!isOwnProfile && user) {
-        deductProfileViewCredits();
-      }
     }
   }, [userId]);
 
-  const deductProfileViewCredits = async () => {
-    try {
-      const { error } = await supabase.functions.invoke('credit-deduction', {
-        body: {
-          action: 'profile_view',
-          userId: user?.id,
-          targetUserId: userId,
-          metadata: { username: profile?.username },
-        },
-      });
-      
-      // Check for specific error and handle gracefully
-      if (error) {
-        console.log('Credit deduction skipped:', error);
+  useEffect(() => {
+    if (userId && user) {
+      if (isOwnProfile) {
+        if (user.email) {
+          checkAdminStatus(user.email);
+        }
+      } else {
+        checkFollowStatus();
+        checkFriendRequestStatus();
       }
-    } catch (error) {
-      // Silent fail - don't block profile viewing
-      console.log('Credit deduction error:', error);
     }
+  }, [userId, user, isOwnProfile]);
+
+  const checkAdminStatus = async (email: string) => {
+    const adminEmails = ['viplearn4free@gmail.com', 'cryptosvip@gmail.com', 'myconnectmate@gmail.com'];
+    setIsAdmin(adminEmails.includes(email.toLowerCase()));
   };
 
   const loadProfile = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) throw error;
-      setProfile(data);
+      if (profileError) throw profileError;
+
+      let creditsBalance = 0;
+      if (isOwnProfile) {
+        const { data: transactions } = await supabase
+          .from('credit_transactions')
+          .select('amount, type')
+          .eq('user_id', userId);
+        
+        if (transactions) {
+          creditsBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
+        }
+      }
+
+      setProfile({
+        ...profileData,
+        credits_balance: creditsBalance,
+      } as Profile);
     } catch (error: any) {
       toast({
         title: 'Error loading profile',
@@ -106,32 +105,8 @@ const Profile = () => {
     }
   };
 
-  const loadPosts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles (
-            display_name,
-            username,
-            avatar_url
-          )
-        `)
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (error) throw error;
-      setPosts(data || []);
-    } catch (error: any) {
-      console.error('Error loading posts:', error);
-    }
-  };
-
   const checkFollowStatus = async () => {
-    if (!user || isOwnProfile) return;
+    if (!user || !userId) return;
 
     try {
       const { data, error } = await supabase
@@ -149,7 +124,7 @@ const Profile = () => {
   };
 
   const checkFriendRequestStatus = async () => {
-    if (!user || isOwnProfile) return;
+    if (!user || !userId) return;
 
     try {
       const { data, error } = await supabase
@@ -168,7 +143,7 @@ const Profile = () => {
   };
 
   const toggleFollow = async () => {
-    if (!user) return;
+    if (!user || !userId) return;
 
     try {
       if (isFollowing) {
@@ -185,7 +160,7 @@ const Profile = () => {
         });
         setIsFollowing(true);
       }
-      loadProfile();
+      loadProfile(); // Refresh profile to update counts
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -196,27 +171,9 @@ const Profile = () => {
   };
 
   const sendFriendRequest = async () => {
-    if (!user) return;
+    if (!user || !userId) return;
 
     try {
-      // Deduct credits first (5 credits)
-      const { error: creditError } = await supabase.functions.invoke('credit-deduction', {
-        body: {
-          action: 'friend_request',
-          userId: user.id,
-          targetUserId: userId,
-        },
-      });
-
-      if (creditError) {
-        toast({
-          title: 'Insufficient credits',
-          description: 'You need 5 credits to send a friend request',
-          variant: 'destructive',
-        });
-        return;
-      }
-
       await supabase.from('friend_requests').insert({
         sender_id: user.id,
         receiver_id: userId,
@@ -224,7 +181,6 @@ const Profile = () => {
       setHasPendingRequest(true);
       toast({
         title: 'Friend request sent',
-        description: '5 credits deducted',
       });
     } catch (error: any) {
       toast({
@@ -239,29 +195,6 @@ const Profile = () => {
     if (!user || !userId) return;
 
     try {
-      // Check if conversation already exists
-      const { data: existingConv } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id')
-        .eq('user_id', user.id);
-
-      if (existingConv) {
-        for (const conv of existingConv) {
-          const { data: otherParticipant } = await supabase
-            .from('conversation_participants')
-            .select('user_id')
-            .eq('conversation_id', conv.conversation_id)
-            .eq('user_id', userId)
-            .single();
-
-          if (otherParticipant) {
-            navigate(`/messages?conversation=${conv.conversation_id}`);
-            return;
-          }
-        }
-      }
-
-      // Use secure function to create conversation
       const { data: conversationId, error } = await supabase.rpc('create_conversation', {
         other_user_id: userId
       });
@@ -275,6 +208,48 @@ const Profile = () => {
         description: 'Please try again later.',
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: data.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      await loadProfile();
+      
+      toast({
+        title: 'Avatar updated',
+        description: 'Your profile picture has been changed',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error uploading image',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -295,9 +270,8 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-lg border-b border-gray-800">
+    <div className="min-h-screen bg-black text-white pb-20">
+      <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-lg border-b border-gray-800">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Button
             onClick={() => navigate(-1)}
@@ -310,7 +284,7 @@ const Profile = () => {
           
           {isOwnProfile && (
             <Button
-              onClick={() => navigate('/settings')}
+              onClick={() => setShowSettings(true)}
               variant="ghost"
               size="icon"
               className="text-gray-400 hover:text-white"
@@ -321,42 +295,88 @@ const Profile = () => {
         </div>
       </header>
 
-      {/* Profile Header */}
       <div className="container mx-auto px-4 py-6 max-w-2xl">
-        <div className="flex items-start space-x-4 mb-6">
-          <Avatar className="w-24 h-24">
-            <AvatarImage src={profile.avatar_url || ''} />
-            <AvatarFallback className="text-2xl">
-              {profile.display_name?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <h1 className="text-2xl font-bold">{profile.display_name || 'Unknown'}</h1>
-            <p className="text-gray-400">@{profile.username || 'user'}</p>
-            {profile.bio && <p className="mt-2 text-gray-300">{profile.bio}</p>}
-
-            <div className="flex space-x-6 mt-4 text-sm">
-              <div>
-                <span className="font-bold text-white">{profile.followers_count}</span>{' '}
-                <span className="text-gray-400">Followers</span>
-              </div>
-              <div>
-                <span className="font-bold text-white">{profile.following_count}</span>{' '}
-                <span className="text-gray-400">Following</span>
-              </div>
-            </div>
+        <div className="flex flex-col items-center mb-6">
+          <div className="relative">
+            <Avatar className="w-32 h-32 mb-4">
+              <AvatarImage src={profile.avatar_url || ''} />
+              <AvatarFallback className="text-4xl">
+                {profile.display_name?.[0] || 'U'}
+              </AvatarFallback>
+            </Avatar>
+            {isOwnProfile && (
+              <label
+                htmlFor="profile-avatar-upload"
+                className="absolute bottom-4 right-0 bg-primary rounded-full p-3 cursor-pointer hover:bg-primary/80 transition-colors"
+              >
+                <Camera className="w-5 h-5 text-primary-foreground" />
+                <input
+                  id="profile-avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                  disabled={uploading}
+                />
+              </label>
+            )}
           </div>
+          
+          <h1 className="text-2xl font-bold mb-1">{profile.display_name || 'Unknown'}</h1>
+          <p className="text-gray-400 mb-2">@{profile.username || 'user'}</p>
+          
+          {profile.is_premium && (
+            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 mb-2">
+              <Crown className="w-3 h-3 mr-1" />
+              Premium Member
+            </Badge>
+          )}
+
+          {profile.bio && (
+            <p className="text-center text-gray-300 mt-2 max-w-md">{profile.bio}</p>
+          )}
         </div>
 
-        {/* Action Buttons */}
+        <div className={`grid gap-3 mb-6 grid-cols-2 ${isOwnProfile ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+          {isOwnProfile && (
+            <Card className="bg-gray-900 border-gray-800 p-4 text-center">
+              <Coins className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
+              <p className="text-2xl font-bold">
+                {isAdmin ? '∞' : profile.credits_balance}
+              </p>
+              <p className="text-xs text-gray-400">
+                {isAdmin ? 'Unlimited Credits' : 'Credits'}
+              </p>
+            </Card>
+          )}
+          
+          <Card className="bg-gray-900 border-gray-800 p-4 text-center">
+            <Eye className="w-6 h-6 text-blue-500 mx-auto mb-2" />
+            <p className="text-2xl font-bold">{profile.total_views}</p>
+            <p className="text-xs text-gray-400">Total Views</p>
+          </Card>
+          
+          <Card className="bg-gray-900 border-gray-800 p-4 text-center">
+            <Heart className="w-6 h-6 text-pink-500 mx-auto mb-2" />
+            <p className="text-2xl font-bold">{profile.followers_count}</p>
+            <p className="text-xs text-gray-400">Followers</p>
+          </Card>
+          
+          <Card className="bg-gray-900 border-gray-800 p-4 text-center">
+            <Users className="w-6 h-6 text-green-500 mx-auto mb-2" />
+            <p className="text-2xl font-bold">{profile.following_count}</p>
+            <p className="text-xs text-gray-400">Following</p>
+          </Card>
+        </div>
+
         {!isOwnProfile && (
           <div className="flex space-x-2 mb-6">
             <Button
               onClick={toggleFollow}
               className={
                 isFollowing
-                  ? 'flex-1 bg-gray-800 hover:bg-gray-700'
-                  : 'flex-1 bg-primary hover:bg-primary/90'
+                  ? 'flex-1 bg-gray-800 hover:bg-gray-700 text-white'
+                  : 'flex-1 bg-gradient-to-r from-pink-500 to-blue-500 text-white'
               }
             >
               {isFollowing ? 'Following' : 'Follow'}
@@ -378,19 +398,30 @@ const Profile = () => {
           </div>
         )}
 
-        {/* Posts Section */}
-        <div className="mt-6 space-y-6">
-          {posts.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400">No posts yet</p>
-            </div>
-          ) : (
-            posts.map((post) => (
-              <PostCard key={post.id} post={post} onUpdate={loadPosts} />
-            ))
-          )}
-        </div>
+        {profile.about && (
+          <Card className="bg-gray-900 border-gray-800 p-4 mb-4">
+            <h3 className="font-semibold mb-2">About</h3>
+            <p className="text-gray-300 text-sm">{profile.about}</p>
+          </Card>
+        )}
+
+        {profile.purpose && (
+          <Card className="bg-gray-900 border-gray-800 p-4 mb-4">
+            <h3 className="font-semibold mb-2">Purpose</h3>
+            <p className="text-gray-300 text-sm">{profile.purpose}</p>
+          </Card>
+        )}
+
+        {profile.marital_status && (
+          <Card className="bg-gray-900 border-gray-800 p-4 mb-4">
+            <h3 className="font-semibold mb-2">Marital Status</h3>
+            <p className="text-gray-300 text-sm capitalize">{profile.marital_status}</p>
+          </Card>
+        )}
       </div>
+
+      <ProfileSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      <BottomNav />
     </div>
   );
 };
