@@ -70,6 +70,25 @@ serve(async (req) => {
     // Validate input
     const { action, targetUserId, metadata } = validateInput(requestData);
 
+    // Check if user is admin - admins get unlimited access
+    const { data: isAdmin } = await supabase.rpc('has_role', {
+      _user_id: userId,
+      _role: 'admin'
+    });
+
+    if (isAdmin) {
+      console.log(`Admin user ${userId} bypassing credit deduction for action: ${action}`);
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          amount: 0, 
+          description: `${action} - Admin unlimited access`,
+          admin_bypass: true 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Define credit costs
     const COSTS = {
       friend_request: 5,
