@@ -43,6 +43,7 @@ import AdminPanel from "./pages/AdminPanel";
 import Wallet from "./pages/Wallet";
 import NotFound from "./pages/NotFound";
 import SafeCreditNotifications from "@/components/credits/SafeCreditNotifications";
+import { NotificationToastManager } from "@/components/notifications/NotificationToastManager";
 
 const queryClient = new QueryClient();
 
@@ -93,6 +94,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <SafeCreditNotifications />
+            <NotificationToastManager />
             <Sonner />
           </BrowserRouter>
       </QueryClientProvider>
