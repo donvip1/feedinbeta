@@ -109,9 +109,12 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
   const loadMessages = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       const { data, error } = await supabase
         .from('messages')
-        .select('id, content, sender_id, created_at, edited_at, is_read, read_at, media_url, media_type, reply_to_id, is_pinned')
+        .select('id, content, sender_id, created_at, edited_at, is_read, read_at, media_url, media_type, reply_to_id, is_pinned, deleted_for_sender, deleted_for_receiver')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
@@ -153,6 +156,8 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         media_type: msg.media_type || null,
         reply_to_id: msg.reply_to_id || null,
         is_pinned: (msg as any).is_pinned || false,
+        deleted_for_sender: (msg as any).deleted_for_sender || false,
+        deleted_for_receiver: (msg as any).deleted_for_receiver || false,
         reply_to_message: msg.reply_to_id ? repliedMessages.get(msg.reply_to_id) || null : null,
         profiles: {
           display_name: null,
@@ -160,6 +165,16 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         },
         reactions: [],
       }));
+
+      // Filter out deleted messages based on who deleted them
+      const visibleMessages = formattedMessages.filter(msg => {
+        const isOwnMessage = msg.sender_id === user.id;
+        if (isOwnMessage) {
+          return !msg.deleted_for_sender;
+        } else {
+          return !msg.deleted_for_receiver;
+        }
+      });
 
       // Enrich with sender profiles
       const senderIds = Array.from(new Set((data || []).map((m: any) => m.sender_id)));
@@ -169,7 +184,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           .select('id, display_name, avatar_url')
           .in('id', senderIds);
         const map = new Map((profileRows || []).map((p: any) => [p.id, p]));
-        const enriched = formattedMessages.map(m => ({
+        const enriched = visibleMessages.map(m => ({
           ...m,
           profiles: {
             display_name: map.get(m.sender_id)?.display_name ?? 'User',
@@ -179,8 +194,8 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         setMessages(enriched);
         setPinnedMessages(enriched.filter(m => m.is_pinned));
       } else {
-        setMessages(formattedMessages);
-        setPinnedMessages(formattedMessages.filter(m => (m as any).is_pinned));
+        setMessages(visibleMessages);
+        setPinnedMessages(visibleMessages.filter(m => (m as any).is_pinned));
       }
 
       // Load read receipts for each message
@@ -665,17 +680,59 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
+  const handleDeleteMessage = async (messageId: string, deleteForEveryone: boolean = false) => {
     try {
-      await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId)
-        .eq('sender_id', user!.id);
+      const message = messages.find(m => m.id === messageId);
+      if (!message) return;
 
-      toast({
-        title: 'Message deleted',
-      });
+      const isOwnMessage = message.sender_id === user?.id;
+
+      if (deleteForEveryone && isOwnMessage) {
+        // Check if can delete for everyone
+        const { data: canDelete } = await supabase.rpc('can_delete_for_everyone', {
+          message_id: messageId,
+          user_id: user!.id
+        });
+
+        if (canDelete) {
+          // Mark as deleted for both
+          await supabase
+            .from('messages')
+            .update({ 
+              deleted_for_sender: true, 
+              deleted_for_receiver: true,
+              deleted_at: new Date().toISOString()
+            })
+            .eq('id', messageId);
+
+          toast({
+            title: 'Message deleted for everyone',
+          });
+        } else {
+          toast({
+            title: 'Cannot delete for everyone',
+            description: '48 hours have passed since message was read',
+            variant: 'destructive',
+          });
+          return;
+        }
+      } else {
+        // Delete for me only
+        const updateField = isOwnMessage ? 'deleted_for_sender' : 'deleted_for_receiver';
+        await supabase
+          .from('messages')
+          .update({ 
+            [updateField]: true,
+            deleted_at: new Date().toISOString()
+          })
+          .eq('id', messageId);
+
+        toast({
+          title: 'Message deleted for you',
+        });
+      }
+
+      loadMessages();
     } catch (error: any) {
       toast({
         title: 'Error deleting message',

@@ -1140,6 +1140,9 @@ export type Database = {
           content: string
           conversation_id: string
           created_at: string
+          deleted_at: string | null
+          deleted_for_receiver: boolean | null
+          deleted_for_sender: boolean | null
           edited_at: string | null
           id: string
           is_pinned: boolean | null
@@ -1156,6 +1159,9 @@ export type Database = {
           content: string
           conversation_id: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_for_receiver?: boolean | null
+          deleted_for_sender?: boolean | null
           edited_at?: string | null
           id?: string
           is_pinned?: boolean | null
@@ -1172,6 +1178,9 @@ export type Database = {
           content?: string
           conversation_id?: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_for_receiver?: boolean | null
+          deleted_for_sender?: boolean | null
           edited_at?: string | null
           id?: string
           is_pinned?: boolean | null
@@ -2707,6 +2716,10 @@ export type Database = {
       }
       calculate_trending_posts: { Args: never; Returns: undefined }
       can_change_username: { Args: { user_id: string }; Returns: boolean }
+      can_delete_for_everyone: {
+        Args: { message_id: string; user_id: string }
+        Returns: boolean
+      }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }

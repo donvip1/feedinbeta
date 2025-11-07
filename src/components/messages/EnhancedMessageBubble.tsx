@@ -24,6 +24,8 @@ interface MessageBubbleProps {
     media_type?: string | null;
     reply_to_id?: string | null;
     is_pinned?: boolean;
+    deleted_for_sender?: boolean;
+    deleted_for_receiver?: boolean;
     reply_to_message?: {
       content: string;
       sender: {
@@ -49,7 +51,7 @@ interface MessageBubbleProps {
   isOwn: boolean;
   onReply: (messageId: string, content: string) => void;
   onReact: (messageId: string, emoji: string) => void;
-  onDelete?: (messageId: string) => void;
+  onDelete?: (messageId: string, deleteForEveryone?: boolean) => void;
   onEdit?: (messageId: string, content: string) => void;
   onForward?: (message: any) => void;
   onImageClick?: (imageUrl: string) => void;
@@ -338,13 +340,24 @@ export const EnhancedMessageBubble = ({
                   </DropdownMenuItem>
                 )}
                 {isOwn && onDelete && (
-                  <DropdownMenuItem 
-                    onClick={() => onDelete(message.id)}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
+                  <>
+                    {(!message.is_read || (message.read_at && new Date().getTime() - new Date(message.read_at).getTime() < 48 * 60 * 60 * 1000)) && (
+                      <DropdownMenuItem 
+                        onClick={() => onDelete(message.id, true)}
+                        className="text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete for Everyone
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem 
+                      onClick={() => onDelete(message.id, false)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete for Me
+                    </DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
