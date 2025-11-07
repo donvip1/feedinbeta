@@ -7,7 +7,7 @@ import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical, Volume2, VolumeX, Maximize } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Music } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
@@ -42,6 +42,10 @@ interface PostCardProps {
     comments_count: number;
     views_count: number;
     created_at: string;
+    music_title?: string | null;
+    music_artist?: string | null;
+    music_url?: string | null;
+    is_original_audio?: boolean;
     profiles: {
       display_name: string | null;
       username: string | null;
@@ -479,7 +483,35 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                     @{post.profiles.username}
                   </span>
                 )}
+                <span className="text-white/60">•</span>
+                <span className="text-white/60">
+                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                </span>
               </div>
+              
+              {/* Music Info - TikTok/YouTube Style */}
+              {(post.music_title || post.music_artist) && (
+                <div 
+                  className="flex items-center gap-1.5 mt-1 cursor-pointer hover:underline group"
+                  onClick={() => {
+                    if (!post.is_original_audio) {
+                      toast({
+                        title: "Music",
+                        description: `${post.music_title} by ${post.music_artist}`,
+                      });
+                    } else {
+                      navigate(`/profile/${post.user_id}`);
+                    }
+                  }}
+                >
+                  <Music className="h-3.5 w-3.5 text-white" />
+                  <span className="text-white text-sm font-medium">
+                    {post.is_original_audio 
+                      ? 'Original Audio' 
+                      : `${post.music_title} - ${post.music_artist}`}
+                  </span>
+                </div>
+              )}
             </div>
             
             {(user?.id === post.user_id || isAdmin) && (

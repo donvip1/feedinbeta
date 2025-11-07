@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2, ArrowLeft, Navigation } from 'lucide-react';
+import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2, ArrowLeft, Navigation, Music, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { extractHashtags } from '@/lib/hashtag-utils';
+import { MusicLibrary } from './MusicLibrary';
 
 interface PostDetailsModalProps {
   open: boolean;
@@ -35,6 +36,13 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
   const [scheduleTime, setScheduleTime] = useState<string>('');
   const [locationOpen, setLocationOpen] = useState(false);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<{
+    title: string;
+    artist: string;
+    url: string;
+    isOriginal: boolean;
+  } | null>(null);
+  const [showMusicLibrary, setShowMusicLibrary] = useState(false);
 
   const POPULAR_LOCATIONS = [
     'New York, USA', 'London, UK', 'Paris, France', 'Tokyo, Japan', 'Dubai, UAE',
@@ -193,6 +201,10 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
         moderation_status: 'pending',
         scheduled_at: action === 'schedule' && scheduleTime ? new Date(scheduleTime).toISOString() : null,
         feed_id: '',
+        music_title: selectedMusic?.title || null,
+        music_artist: selectedMusic?.artist || null,
+        music_url: selectedMusic?.url || null,
+        is_original_audio: selectedMusic ? !selectedMusic.isOriginal : true,
       };
 
       const { data: postResult, error } = await supabase
@@ -272,6 +284,7 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="fixed left-1/2 top-2 bottom-16 -translate-x-1/2 translate-y-0 max-w-2xl w-[95vw] p-0 z-[55] overflow-hidden flex flex-col">
         <div className="flex flex-col flex-1 min-h-0">
@@ -429,6 +442,39 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
                 </div>
               </div>
 
+              {/* Music Selection */}
+              <div>
+                <Label>Add Music</Label>
+                {selectedMusic ? (
+                  <div className="mt-2 p-3 bg-muted rounded-lg flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Music className="h-4 w-4" />
+                      <div>
+                        <p className="font-medium text-sm">{selectedMusic.title}</p>
+                        <p className="text-xs text-muted-foreground">{selectedMusic.artist}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedMusic(null)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full mt-2"
+                    onClick={() => setShowMusicLibrary(true)}
+                  >
+                    <Music className="h-4 w-4 mr-2" />
+                    Browse Music Library
+                  </Button>
+                )}
+              </div>
+
               {/* Schedule Options */}
               <div className="space-y-3">
                 <Label>Quick Schedule</Label>
@@ -498,5 +544,21 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
       </div>
     </DialogContent>
     </Dialog>
+    
+    {/* Music Library Modal */}
+    <MusicLibrary
+      open={showMusicLibrary}
+      onClose={() => setShowMusicLibrary(false)}
+      onSelectMusic={(music) => {
+        setSelectedMusic({
+          title: music.name,
+          artist: music.artist,
+          url: music.url,
+          isOriginal: false
+        });
+        setShowMusicLibrary(false);
+      }}
+    />
+  </>
   );
 }

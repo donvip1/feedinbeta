@@ -1887,11 +1887,15 @@ export type Database = {
           feed_id: string
           has_blur_background: boolean | null
           id: string
+          is_original_audio: boolean | null
           likes_count: number | null
           location: string | null
           media_type: string | null
           media_url: string | null
           moderation_status: string | null
+          music_artist: string | null
+          music_title: string | null
+          music_url: string | null
           post_type: string | null
           privacy: string | null
           refeeds_count: number | null
@@ -1912,11 +1916,15 @@ export type Database = {
           feed_id: string
           has_blur_background?: boolean | null
           id?: string
+          is_original_audio?: boolean | null
           likes_count?: number | null
           location?: string | null
           media_type?: string | null
           media_url?: string | null
           moderation_status?: string | null
+          music_artist?: string | null
+          music_title?: string | null
+          music_url?: string | null
           post_type?: string | null
           privacy?: string | null
           refeeds_count?: number | null
@@ -1937,11 +1945,15 @@ export type Database = {
           feed_id?: string
           has_blur_background?: boolean | null
           id?: string
+          is_original_audio?: boolean | null
           likes_count?: number | null
           location?: string | null
           media_type?: string | null
           media_url?: string | null
           moderation_status?: string | null
+          music_artist?: string | null
+          music_title?: string | null
+          music_url?: string | null
           post_type?: string | null
           privacy?: string | null
           refeeds_count?: number | null
