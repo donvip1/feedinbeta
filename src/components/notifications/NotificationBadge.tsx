@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 
 export const NotificationBadge = () => {
   const [unreadCount, setUnreadCount] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,7 +23,9 @@ export const NotificationBadge = () => {
         },
         (payload) => {
           if (payload.new && 'unread_count' in payload.new) {
-            setUnreadCount(payload.new.unread_count as number);
+            const row = payload.new as any;
+            if (!userId || row.user_id !== userId) return;
+            setUnreadCount(row.unread_count as number);
           }
         }
       )
@@ -31,11 +34,13 @@ export const NotificationBadge = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [userId]);
 
   const loadUnreadCount = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    setUserId(user.id);
 
     const { data } = await supabase
       .from('notification_badges')

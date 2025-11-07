@@ -40,6 +40,26 @@ export const NotificationsPage = () => {
     loadNotifications();
   }, [user]);
 
+  // Realtime updates: keep the list in sync for this user
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`notifications:${user.id}:page`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        () => {
+          loadNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   const loadNotifications = async () => {
     if (!user) return;
 
