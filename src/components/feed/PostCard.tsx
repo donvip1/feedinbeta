@@ -490,25 +490,33 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
               </div>
               
               {/* Music Info - TikTok/YouTube Style */}
-              {(post.music_title || post.music_artist) && (
+              {(post.music_title && post.music_artist) ? (
                 <div 
                   className="flex items-center gap-1.5 mt-1 cursor-pointer hover:underline group"
                   onClick={() => {
-                    if (!post.is_original_audio) {
+                    if (post.is_original_audio) {
+                      navigate(`/profile/${post.user_id}`);
+                    } else {
                       toast({
                         title: "Music",
                         description: `${post.music_title} by ${post.music_artist}`,
                       });
-                    } else {
-                      navigate(`/profile/${post.user_id}`);
                     }
                   }}
                 >
                   <Music className="h-3.5 w-3.5 text-white" />
+                  <span className="text-white text-sm font-medium truncate max-w-[250px]">
+                    {post.music_title} - {post.music_artist}
+                  </span>
+                </div>
+              ) : (post.media_type === 'video' || post.media_type === 'audio') && (
+                <div 
+                  className="flex items-center gap-1.5 mt-1 cursor-pointer hover:underline group"
+                  onClick={() => navigate(`/profile/${post.user_id}`)}
+                >
+                  <Music className="h-3.5 w-3.5 text-white" />
                   <span className="text-white text-sm font-medium">
-                    {post.is_original_audio 
-                      ? 'Original Audio' 
-                      : `${post.music_title} - ${post.music_artist}`}
+                    Original Audio
                   </span>
                 </div>
               )}
