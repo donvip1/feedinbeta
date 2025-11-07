@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 
 interface Notification {
   id: string;
+  user_id: string;
   type: string;
   title: string;
   message: string | null;
@@ -19,9 +20,12 @@ interface Notification {
   from_user_id: string | null;
   is_read: boolean;
   created_at: string;
+  reference_id: string | null;
   from_user: {
+    id: string;
     display_name: string | null;
     avatar_url: string | null;
+    username: string | null;
   } | null;
 }
 
@@ -44,14 +48,19 @@ export const NotificationsPage = () => {
         .from('notifications')
         .select(`
           *,
-          from_user:profiles!notifications_from_user_id_fkey(display_name, avatar_url)
+          from_user:profiles!notifications_from_user_id_fkey(id, display_name, avatar_url, username)
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      setNotifications(data as any || []);
+      // Map related_id to reference_id for compatibility
+      const mappedData = (data || []).map(notif => ({
+        ...notif,
+        reference_id: notif.related_id
+      }));
+      setNotifications(mappedData as any || []);
     } catch (error: any) {
       toast({
         title: 'Error loading notifications',
@@ -167,7 +176,6 @@ export const NotificationsPage = () => {
                 <NotificationItem
                   notification={notification}
                   onUpdate={loadNotifications}
-                  onClose={() => {}}
                 />
                 {index < notifications.length - 1 && <Separator />}
               </React.Fragment>

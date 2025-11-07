@@ -48,7 +48,7 @@ export const CommentReactions = ({ commentId, onReactionChange }: CommentReactio
         .select(`
           emoji,
           user_id,
-          profiles:user_id (
+          profiles!comment_emoji_reactions_user_id_fkey (
             username,
             avatar_url
           )
@@ -58,7 +58,7 @@ export const CommentReactions = ({ commentId, onReactionChange }: CommentReactio
       if (error) throw error;
 
       // Group reactions by emoji
-      const grouped = (data || []).reduce((acc: Record<string, Reaction>, curr: ReactionData) => {
+      const grouped = (data || []).reduce((acc: Record<string, Reaction>, curr: any) => {
         if (!acc[curr.emoji]) {
           acc[curr.emoji] = {
             emoji: curr.emoji,
@@ -71,8 +71,8 @@ export const CommentReactions = ({ commentId, onReactionChange }: CommentReactio
         acc[curr.emoji].count++;
         acc[curr.emoji].users.push({
           user_id: curr.user_id,
-          username: curr.profiles?.username,
-          avatar_url: curr.profiles?.avatar_url
+          username: curr.profiles?.username || undefined,
+          avatar_url: curr.profiles?.avatar_url || undefined
         });
         
         if (user && curr.user_id === user.id) {

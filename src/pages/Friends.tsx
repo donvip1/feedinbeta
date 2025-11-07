@@ -178,13 +178,15 @@ const Friends = () => {
       if (requestError) throw requestError;
 
       // 2. Create a notification for the receiver
-      const { error: notificationError } = await supabase.from('notifications').insert({
+      const { error: notificationError } = await supabase.from('notifications').insert([{
         user_id: receiverId,
+        from_user_id: user.id,
         type: 'friend_request',
-        message: `You have a new friend request from ${user.user_metadata.display_name || 'a user'}`,
-        reference_id: request[0].id,
+        title: 'New Message Request',
+        message: `You have a new message request from ${user.user_metadata.display_name || 'a user'}`,
+        related_id: request[0].id,
         is_read: false
-      });
+      }]);
 
       if (notificationError) {
         // Even if notification fails, the request was created. 

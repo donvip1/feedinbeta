@@ -33,7 +33,7 @@ export function CreditUsageChart({ transactions }: { transactions?: CreditTransa
     const day = formatDay(tx.created_at);
     const cat = bucketCategory(tx);
     if (!daily[day]) {
-      daily[day] = { day };
+      daily[day] = { day } as { day: string } & Record<string, number>;
     }
     daily[day][cat] = (daily[day][cat] || 0) + Math.abs(tx.amount);
   });

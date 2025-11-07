@@ -66,12 +66,13 @@ export const NotificationItem = ({ notification, onUpdate }: NotificationItemPro
       if (accept) {
         setHandledMessage(`You can now message ${notification.from_user.display_name}.`);
         // Notify the sender
-        await supabase.from('notifications').insert({
+        await supabase.from('notifications').insert([{
           user_id: notification.from_user.id,
           from_user_id: user.id,
           type: 'info',
+          title: 'Message Request Accepted',
           message: `${user.user_metadata.display_name || 'A user'} accepted your message request.`,
-        });
+        }]);
       } else {
         setHandledMessage('Message request declined.');
       }

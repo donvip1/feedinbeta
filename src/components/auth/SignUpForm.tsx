@@ -203,7 +203,7 @@ export const SignUpForm = () => {
               type="text"
               placeholder="John Doe"
               value={formData.displayName}
-              onChange={(e) => setFormData({ ...formData, displayName: e.g. target.value })}
+              onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
               disabled={loading}
             />
           </div>

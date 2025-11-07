@@ -206,9 +206,13 @@ export default function Messages() {
       if(accepted) {
          const request = friendRequests.find(r => r.id === requestId);
          if(request && user) {
-            await supabase.from('notifications').insert({
-                user_id: request.sender.id, type: 'info', from_user_id: user.id, message: `${user.user_metadata.display_name} accepted your friend request.`,
-            });
+            await supabase.from('notifications').insert([{
+                user_id: request.sender.id, 
+                from_user_id: user.id, 
+                type: 'info', 
+                title: 'Message Request Accepted',
+                message: `${user.user_metadata.display_name} accepted your message request.`,
+            }]);
          }
       }
       toast({ title: accepted ? "Message request accepted" : "Message request declined" });
