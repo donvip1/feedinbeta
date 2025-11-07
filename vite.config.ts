@@ -13,13 +13,10 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      react: path.resolve(__dirname, "./node_modules/react"),
-      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
     dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    exclude: ["lucide-react"],
     include: [
       "react",
       "react-dom",
@@ -27,26 +24,25 @@ export default defineConfig(({ mode }) => ({
       "@tanstack/react-query",
       "react-router-dom",
       "next-themes",
-      "@radix-ui/react-tooltip",
-      "@radix-ui/react-popover",
-      "@radix-ui/react-dropdown-menu",
-      "@radix-ui/react-dialog"
     ],
+    force: true, // Force re-optimization to clear cache
   },
   build: {
-    // Generate unique build hashes for cache busting
     rollupOptions: {
       output: {
         entryFileNames: `assets/[name].[hash].js`,
         chunkFileNames: `assets/[name].[hash].js`,
         assetFileNames: `assets/[name].[hash].[ext]`,
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['@tanstack/react-query', 'next-themes'],
+        },
       },
     },
-    // Source maps for debugging
     sourcemap: mode === 'development',
-    // Ensure single React instance
     commonjsOptions: {
       include: [/node_modules/],
+      transformMixedEsModules: true,
     },
   },
 }));
