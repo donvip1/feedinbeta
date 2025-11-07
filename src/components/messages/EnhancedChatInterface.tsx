@@ -99,19 +99,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select(`
-          *,
-          sender:profiles!messages_sender_id_fkey(display_name, avatar_url),
-          reply_to:messages!messages_reply_to_id_fkey(
-            content,
-            sender:profiles!messages_sender_id_fkey(display_name)
-          ),
-          reactions:message_reactions(
-            emoji,
-            user_id,
-            user:profiles(display_name)
-          )
-        `)
+        .select('id, content, sender_id, created_at, is_read, read_at, media_url, media_type, reply_to_id')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
@@ -127,15 +115,32 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         media_url: msg.media_url || null,
         media_type: msg.media_type || null,
         reply_to_id: msg.reply_to_id || null,
-        reply_to_message: Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to,
+        reply_to_message: null,
         profiles: {
-          display_name: msg.sender?.display_name || null,
-          avatar_url: msg.sender?.avatar_url || null,
+          display_name: null,
+          avatar_url: null,
         },
-        reactions: msg.reactions || [],
+        reactions: [],
       }));
-      
-      setMessages(formattedMessages);
+
+      // Enrich with sender profiles
+      const senderIds = Array.from(new Set((data || []).map((m: any) => m.sender_id)));
+      if (senderIds.length) {
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', senderIds);
+        const map = new Map((profileRows || []).map((p: any) => [p.id, p]));
+        setMessages(formattedMessages.map(m => ({
+          ...m,
+          profiles: {
+            display_name: map.get(m.sender_id)?.display_name ?? null,
+            avatar_url: map.get(m.sender_id)?.avatar_url ?? null,
+          }
+        })));
+      } else {
+        setMessages(formattedMessages);
+      }
     } catch (error: any) {
       console.error('Error loading messages:', error);
     }
