@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send, Smile, Phone, Video, Paperclip, Mic, X, Image as ImageIcon, File } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Phone, Video, Paperclip, Mic, X, Image as ImageIcon, File, Search } from 'lucide-react';
 import { EnhancedMessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { UserMentionInput } from './UserMentionInput';
@@ -61,6 +61,9 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string } | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -494,6 +497,28 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
+  const handleQuickReply = (text: string) => {
+    setNewMessage(text);
+    setShowQuickReplies(false);
+  };
+
+  const quickReplies = [
+    { emoji: '👍', text: 'Thanks!' },
+    { emoji: '😊', text: 'Sure!' },
+    { emoji: '✅', text: 'Okay' },
+    { emoji: '❤️', text: 'Love it!' },
+    { emoji: '🎉', text: 'Great!' },
+    { emoji: '🤔', text: 'Let me think...' },
+    { emoji: '👋', text: 'Hi!' },
+    { emoji: '🙏', text: 'Please' },
+  ];
+
+  const filteredMessages = searchQuery 
+    ? messages.filter(msg => 
+        msg.content.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : messages;
+
   const initiateCall = async (callType: 'video' | 'voice') => {
     if (!user || !otherUser) return;
 
@@ -530,86 +555,152 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   return (
     <>
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border bg-background sticky top-0 z-10">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="md:hidden"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="relative">
-          <Avatar>
-            <AvatarImage src={otherUser?.avatar_url || ''} />
-            <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
-          </Avatar>
-          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
-        </div>
-        <div className="flex-1">
-          <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
-          <p className="text-xs text-muted-foreground">{isOnline ? 'online' : 'offline'}</p>
+      <div className="flex flex-col border-b border-border bg-background sticky top-0 z-10">
+        <div className="flex items-center gap-3 p-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="md:hidden"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="relative">
+            <Avatar>
+              <AvatarImage src={otherUser?.avatar_url || ''} />
+              <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
+            </Avatar>
+            <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+          </div>
+          <div className="flex-1">
+            <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
+            <p className="text-xs text-muted-foreground">{isOnline ? 'online' : 'offline'}</p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowSearch(!showSearch)}
+              className="text-primary hover:text-primary/90"
+              title="Search messages"
+            >
+              <Search className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => initiateCall('voice')}
+              className="text-primary hover:text-primary/90"
+              title="Voice call"
+            >
+              <Phone className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => initiateCall('video')}
+              className="text-primary hover:text-primary/90"
+              title="Video call"
+            >
+              <Video className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => initiateCall('voice')}
-            className="text-primary hover:text-primary/90"
-            title="Voice call"
-          >
-            <Phone className="w-5 h-5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => initiateCall('video')}
-            className="text-primary hover:text-primary/90"
-            title="Video call"
-          >
-            <Video className="w-5 h-5" />
-          </Button>
-        </div>
+        {/* Search Bar */}
+        {showSearch && (
+          <div className="px-4 pb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search messages..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-accent rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {messages.map((message) => (
-            <EnhancedMessageBubble
-              key={message.id}
-              message={message}
-              isOwn={message.sender_id === user?.id}
-              onReply={(id, content) => setReplyingTo({ id, content })}
-              onReact={handleReaction}
-              onDelete={message.sender_id === user?.id ? handleDeleteMessage : undefined}
-            />
-          ))}
+          {searchQuery && filteredMessages.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No messages found matching "{searchQuery}"
+            </div>
+          ) : (
+            <>
+              {filteredMessages.map((message) => (
+                <EnhancedMessageBubble
+                  key={message.id}
+                  message={message}
+                  isOwn={message.sender_id === user?.id}
+                  onReply={(id, content) => setReplyingTo({ id, content })}
+                  onReact={handleReaction}
+                  onDelete={message.sender_id === user?.id ? handleDeleteMessage : undefined}
+                />
+              ))}
+            </>
+          )}
           {isTyping && <TypingIndicator />}
           <div ref={scrollRef} />
         </div>
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-4 border-t border-border bg-background">
-        {/* Reply Preview */}
-        {replyingTo && (
-          <div className="mb-2 p-2 bg-accent rounded-lg flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">Replying to</p>
-              <p className="text-sm truncate">{replyingTo.content}</p>
+      <div className="border-t border-border bg-background">
+        {/* Quick Replies */}
+        {showQuickReplies && (
+          <div className="px-4 pt-4 pb-2">
+            <div className="flex flex-wrap gap-2">
+              {quickReplies.map((reply, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleQuickReply(reply.text)}
+                  className="text-xs"
+                >
+                  <span className="mr-1">{reply.emoji}</span>
+                  {reply.text}
+                </Button>
+              ))}
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setReplyingTo(null)}
-              className="h-6 w-6"
-            >
-              <X className="w-4 h-4" />
-            </Button>
           </div>
         )}
+        
+        <div className="p-4">
+          {/* Reply Preview */}
+          {replyingTo && (
+            <div className="mb-2 p-2 bg-accent rounded-lg flex items-center justify-between">
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground">Replying to</p>
+                <p className="text-sm truncate">{replyingTo.content}</p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setReplyingTo(null)}
+                className="h-6 w-6"
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
 
         {showVoiceRecorder ? (
           <VoiceRecorder
@@ -618,6 +709,14 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           />
         ) : (
           <div className="flex items-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowQuickReplies(!showQuickReplies)}
+              title="Quick replies"
+            >
+              <Smile className="w-5 h-5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -687,6 +786,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           className="hidden"
           onChange={handleFileSelect}
         />
+        </div>
       </div>
 
       {/* Media Preview Dialog */}
