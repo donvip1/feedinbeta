@@ -17,6 +17,7 @@ interface MessageBubbleProps {
     content: string;
     sender_id: string;
     created_at: string;
+    edited_at?: string | null;
     is_read?: boolean;
     read_at?: string;
     media_url?: string | null;
@@ -48,6 +49,9 @@ interface MessageBubbleProps {
   onReply: (messageId: string, content: string) => void;
   onReact: (messageId: string, emoji: string) => void;
   onDelete?: (messageId: string) => void;
+  onEdit?: (messageId: string, content: string) => void;
+  onForward?: (message: any) => void;
+  onImageClick?: (imageUrl: string) => void;
   onSwipeStart?: () => void;
   onSwipeEnd?: () => void;
 }
@@ -60,12 +64,17 @@ export const EnhancedMessageBubble = ({
   onReply, 
   onReact, 
   onDelete,
+  onEdit,
+  onForward,
+  onImageClick,
   onSwipeStart,
   onSwipeEnd
 }: MessageBubbleProps) => {
   const [showReactions, setShowReactions] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
@@ -95,6 +104,18 @@ export const EnhancedMessageBubble = ({
     navigator.clipboard.writeText(message.content);
   };
 
+  const handleEditSave = () => {
+    if (editContent.trim() && onEdit) {
+      onEdit(message.id, editContent.trim());
+      setIsEditing(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditContent(message.content);
+    setIsEditing(false);
+  };
+
   const renderMedia = () => {
     if (!message.media_url) return null;
 
@@ -103,7 +124,11 @@ export const EnhancedMessageBubble = ({
         <img 
           src={message.media_url} 
           alt="Shared" 
-          className="rounded-lg max-w-xs max-h-64 object-cover mb-2"
+          className="rounded-lg max-w-xs max-h-64 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            onImageClick?.(message.media_url!);
+          }}
         />
       );
     }
@@ -183,7 +208,38 @@ export const EnhancedMessageBubble = ({
             }`}
           >
             {renderMedia()}
-            <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+            {isEditing ? (
+              <div className="space-y-2">
+                <textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full p-2 rounded bg-background/20 text-sm resize-none"
+                  rows={3}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleEditSave}
+                    className="px-3 py-1 bg-background/30 rounded text-xs hover:bg-background/40"
+                  >
+                    Save
+                  </button>
+                  <button
+                    onClick={handleEditCancel}
+                    className="px-3 py-1 bg-background/30 rounded text-xs hover:bg-background/40"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+                {message.edited_at && (
+                  <p className="text-xs opacity-70 mt-1">edited</p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -236,10 +292,18 @@ export const EnhancedMessageBubble = ({
                   <Copy className="w-4 h-4 mr-2" />
                   Copy
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Forward className="w-4 h-4 mr-2" />
-                  Forward
-                </DropdownMenuItem>
+                {isOwn && onEdit && !message.media_url && (
+                  <DropdownMenuItem onClick={() => setIsEditing(true)}>
+                    <Copy className="w-4 h-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {onForward && (
+                  <DropdownMenuItem onClick={() => onForward(message)}>
+                    <Forward className="w-4 h-4 mr-2" />
+                    Forward
+                  </DropdownMenuItem>
+                )}
                 {isOwn && onDelete && (
                   <DropdownMenuItem 
                     onClick={() => onDelete(message.id)}

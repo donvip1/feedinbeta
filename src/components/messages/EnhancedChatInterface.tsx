@@ -12,12 +12,16 @@ import { TypingIndicator } from './TypingIndicator';
 import { UserMentionInput } from './UserMentionInput';
 import { VoiceRecorder } from './VoiceRecorder';
 import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog';
+import { ImageViewerModal } from './ImageViewerModal';
+import { MessageForwardModal } from './MessageForwardModal';
+import { CompactNotification } from './CompactNotification';
 
 interface Message {
   id: string;
   content: string;
   sender_id: string;
   created_at: string;
+  edited_at?: string | null;
   is_read?: boolean;
   read_at?: string;
   media_url?: string | null;
@@ -68,6 +72,9 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [viewingImage, setViewingImage] = useState<string | null>(null);
+  const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
+  const [compactNotif, setCompactNotif] = useState<{ sender: string; avatar: string | null; message: string; convId: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +110,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select('id, content, sender_id, created_at, is_read, read_at, media_url, media_type, reply_to_id')
+        .select('id, content, sender_id, created_at, edited_at, is_read, read_at, media_url, media_type, reply_to_id')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
@@ -114,6 +121,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         content: msg.content,
         sender_id: msg.sender_id,
         created_at: msg.created_at,
+        edited_at: msg.edited_at || null,
         is_read: msg.is_read,
         read_at: msg.read_at,
         media_url: msg.media_url || null,
@@ -645,6 +653,51 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!user) return;
+
+    try {
+      // Get old content for history
+      const { data: oldMsg } = await supabase
+        .from('messages')
+        .select('content')
+        .eq('id', messageId)
+        .single();
+
+      if (oldMsg) {
+        // Save edit history
+        await supabase
+          .from('message_edit_history')
+          .insert({
+            message_id: messageId,
+            old_content: oldMsg.content,
+          });
+      }
+
+      // Update message
+      await supabase
+        .from('messages')
+        .update({
+          content: newContent,
+          edited_at: new Date().toISOString(),
+        })
+        .eq('id', messageId)
+        .eq('sender_id', user.id);
+
+      toast({
+        title: 'Message edited',
+      });
+      
+      loadMessages();
+    } catch (error: any) {
+      toast({
+        title: 'Error editing message',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleQuickReply = (text: string) => {
     setNewMessage(text);
     setShowQuickReplies(false);
@@ -800,6 +853,9 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
                   onReply={(id, content) => setReplyingTo({ id, content })}
                   onReact={handleReaction}
                   onDelete={message.sender_id === user?.id ? handleDeleteMessage : undefined}
+                  onEdit={message.sender_id === user?.id ? handleEditMessage : undefined}
+                  onForward={(msg) => setForwardingMessage(msg)}
+                  onImageClick={(url) => setViewingImage(url)}
                 />
               ))}
             </>
@@ -968,6 +1024,36 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Image Viewer */}
+      <ImageViewerModal
+        open={!!viewingImage}
+        onOpenChange={(open) => !open && setViewingImage(null)}
+        imageUrl={viewingImage || ''}
+      />
+
+      {/* Forward Message */}
+      {forwardingMessage && (
+        <MessageForwardModal
+          open={!!forwardingMessage}
+          onOpenChange={(open) => !open && setForwardingMessage(null)}
+          message={forwardingMessage}
+        />
+      )}
+
+      {/* Compact Notification */}
+      {compactNotif && (
+        <CompactNotification
+          senderName={compactNotif.sender}
+          senderAvatar={compactNotif.avatar}
+          message={compactNotif.message}
+          onOpen={() => {
+            window.location.href = `/messages?conversation=${compactNotif.convId}`;
+            setCompactNotif(null);
+          }}
+          onDismiss={() => setCompactNotif(null)}
+        />
+      )}
     </>
   );
 };

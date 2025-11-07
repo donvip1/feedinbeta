@@ -1038,6 +1038,35 @@ export type Database = {
         }
         Relationships: []
       }
+      message_edit_history: {
+        Row: {
+          edited_at: string | null
+          id: string
+          message_id: string
+          old_content: string
+        }
+        Insert: {
+          edited_at?: string | null
+          id?: string
+          message_id: string
+          old_content: string
+        }
+        Update: {
+          edited_at?: string | null
+          id?: string
+          message_id?: string
+          old_content?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_edit_history_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_reactions: {
         Row: {
           created_at: string | null
@@ -1111,6 +1140,7 @@ export type Database = {
           content: string
           conversation_id: string
           created_at: string
+          edited_at: string | null
           id: string
           is_read: boolean | null
           media_type: string | null
@@ -1125,6 +1155,7 @@ export type Database = {
           content: string
           conversation_id: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           is_read?: boolean | null
           media_type?: string | null
@@ -1139,6 +1170,7 @@ export type Database = {
           content?: string
           conversation_id?: string
           created_at?: string
+          edited_at?: string | null
           id?: string
           is_read?: boolean | null
           media_type?: string | null

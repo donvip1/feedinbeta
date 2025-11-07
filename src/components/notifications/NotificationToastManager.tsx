@@ -60,16 +60,28 @@ export const NotificationToastManager = () => {
             return '🔔';
           };
 
-          // Show toast
-          toast({
-            title: notification.title || 'New Notification',
-            description: notification.message || `${senderName} interacted with your content`,
-            duration: 5000,
-            action: {
-              label: 'View',
-              onClick: () => handleNotificationClick(notification)
+          // For message notifications, don't show full toast
+          if (notification.type.includes('message')) {
+            // Direct navigation without showing notification
+            if (notification.related_id) {
+              // Mark as read silently
+              supabase
+                .from('notifications')
+                .update({ is_read: true })
+                .eq('id', notification.id);
             }
-          });
+          } else {
+            // Show toast for non-message notifications
+            toast({
+              title: notification.title || 'New Notification',
+              description: notification.message || `${senderName} interacted with your content`,
+              duration: 5000,
+              action: {
+                label: 'View',
+                onClick: () => handleNotificationClick(notification)
+              }
+            });
+          }
         }
       )
       .subscribe();

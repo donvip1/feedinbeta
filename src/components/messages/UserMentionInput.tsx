@@ -146,7 +146,7 @@ export const UserMentionInput = ({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full min-h-[40px] max-h-[120px] px-4 py-2 bg-background border rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+        className="w-full min-h-[40px] max-h-[200px] px-4 py-2 bg-background border rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-primary overflow-y-auto whitespace-pre-wrap break-words"
         rows={1}
       />
 
