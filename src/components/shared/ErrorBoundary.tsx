@@ -1,7 +1,4 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { AlertTriangle } from 'lucide-react';
 
 interface Props {
   children: React.ReactNode;
@@ -31,48 +28,127 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <Card className="max-w-md w-full p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="w-8 h-8 text-destructive" />
+        <div style={{
+          minHeight: '100vh',
+          background: 'hsl(var(--background))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '1rem'
+        }}>
+          <div style={{
+            maxWidth: '28rem',
+            width: '100%',
+            background: 'hsl(var(--card))',
+            border: '1px solid hsl(var(--border))',
+            borderRadius: '0.5rem',
+            padding: '2rem',
+            textAlign: 'center'
+          }}>
+            <div style={{
+              width: '4rem',
+              height: '4rem',
+              borderRadius: '50%',
+              background: 'hsl(var(--destructive) / 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 1rem'
+            }}>
+              <svg style={{ width: '2rem', height: '2rem', color: 'hsl(var(--destructive))' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
             </div>
-            <h2 className="text-2xl font-bold mb-2">Something went wrong</h2>
-            <p className="text-muted-foreground mb-6">
+            <h2 style={{
+              fontSize: '1.5rem',
+              fontWeight: 'bold',
+              marginBottom: '0.5rem',
+              color: 'hsl(var(--foreground))'
+            }}>Something went wrong</h2>
+            <p style={{
+              color: 'hsl(var(--muted-foreground))',
+              marginBottom: '1.5rem'
+            }}>
               We're sorry, but something unexpected happened. Please try refreshing the page.
             </p>
             {this.state.error && (
-              <details className="text-left mb-4 p-3 bg-accent rounded-lg">
-                <summary className="cursor-pointer text-sm font-medium mb-2">
+              <details style={{
+                textAlign: 'left',
+                marginBottom: '1rem',
+                padding: '0.75rem',
+                background: 'hsl(var(--accent))',
+                borderRadius: '0.5rem'
+              }}>
+                <summary style={{
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  marginBottom: '0.5rem'
+                }}>
                   Error details
                 </summary>
-                <div className="space-y-2">
-                  <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                    {JSON.stringify(this.state.error, null, 2)}
+                <div>
+                  <code style={{
+                    display: 'block',
+                    fontSize: '0.75rem',
+                    color: 'hsl(var(--muted-foreground))',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word'
+                  }}>
+                    {this.state.error.message}
                   </code>
                   {this.state.errorInfo && (
-                    <code className="block text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                      {JSON.stringify(this.state.errorInfo, null, 2)}
+                    <code style={{
+                      display: 'block',
+                      fontSize: '0.75rem',
+                      color: 'hsl(var(--muted-foreground))',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      marginTop: '0.5rem'
+                    }}>
+                      {this.state.errorInfo.componentStack}
                     </code>
                   )}
                 </div>
               </details>
             )}
-            <div className="space-y-2">
-              <Button
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
                 onClick={() => window.location.reload()}
-                className="w-full bg-gradient-primary"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 1rem',
+                  background: 'linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)))',
+                  color: 'hsl(var(--primary-foreground))',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
               >
                 Refresh Page
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={() => (window.location.href = '/')}
-                variant="outline"
-                className="w-full"
+                style={{
+                  width: '100%',
+                  padding: '0.5rem 1rem',
+                  background: 'transparent',
+                  color: 'hsl(var(--foreground))',
+                  border: '1px solid hsl(var(--border))',
+                  borderRadius: '0.375rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  cursor: 'pointer'
+                }}
               >
                 Go to Home
-              </Button>
+              </button>
             </div>
-          </Card>
+          </div>
         </div>
       );
     }
