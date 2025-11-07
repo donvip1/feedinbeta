@@ -1,11 +1,11 @@
-import { useNavigate } from 'react-router-dom';
+
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Users, Phone, Coins, Shield, Sparkles, LogOut } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 const Index = () => {
-  const navigate = useNavigate();
+  
   const { user, loading, signOut } = useAuth();
 
   if (loading) {
@@ -92,14 +92,14 @@ const Index = () => {
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
             <Button
-              onClick={() => navigate('/auth')}
+              onClick={() => (window.location.href = '/auth')}
               size="lg"
               className="bg-gradient-to-r from-pink-500 to-blue-500 hover:shadow-[0_0_30px_rgba(236,72,153,0.5)] text-white text-lg px-12 py-6 rounded-full font-semibold"
             >
               Get Started
             </Button>
             <Button
-              onClick={() => navigate('/auth')}
+              onClick={() => (window.location.href = '/auth')}
               size="lg"
               variant="outline"
               className="border-2 border-gray-700 bg-transparent hover:bg-gray-900 text-white text-lg px-12 py-6 rounded-full font-semibold"
@@ -150,7 +150,7 @@ const Index = () => {
             Your feed is ready. Start creating and sharing posts!
           </p>
           <Button
-            onClick={() => navigate('/feed')}
+            onClick={() => (window.location.href = '/feed')}
             size="lg"
             className="bg-gradient-primary hover:shadow-glow text-lg px-8 py-6"
           >
