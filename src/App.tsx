@@ -1,7 +1,6 @@
 import React from "react";
 
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
@@ -51,7 +50,7 @@ const App = () => (
   <ErrorBoundary>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
+        
            <Sonner />
            <CreditNotifications />
           <BrowserRouter future={{ v7_startTransition: true }}>
@@ -96,7 +95,6 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-        </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </ErrorBoundary>
