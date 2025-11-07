@@ -1,11 +1,27 @@
-import { Toaster as Sonner, toast } from "sonner";
+import React, { useEffect, useState } from "react";
 
-type ToasterProps = React.ComponentProps<typeof Sonner>;
+// Re-export toast from the new shadcn location
+export { toast } from "@/hooks/use-toast";
 
-const Toaster = ({ ...props }: ToasterProps) => {
+// Lazy-load Sonner's Toaster on client to avoid provider/context timing issues
+const Toaster = (props: React.ComponentProps<any>) => {
+  const [SonnerToaster, setSonnerToaster] = useState<React.ComponentType<any> | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    import("sonner").then((mod) => {
+      if (mounted) setSonnerToaster(() => mod.Toaster);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (!SonnerToaster) return null;
+
   return (
-    <Sonner
-      theme={"system"}
+    <SonnerToaster
+      theme="system"
       className="toaster group"
       toastOptions={{
         classNames: {
@@ -21,4 +37,4 @@ const Toaster = ({ ...props }: ToasterProps) => {
   );
 };
 
-export { Toaster, toast };
+export { Toaster };
