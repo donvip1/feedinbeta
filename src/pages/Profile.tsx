@@ -408,9 +408,9 @@ const Profile = () => {
           {profile.bio && <p className="text-center text-gray-300 mt-2 max-w-md">{profile.bio}</p>}
 
           {isFollowingMe && !isOwnProfile && (
-            <Badge variant="secondary" className="mt-2">
-              Follows you
-            </Badge>
+            <p className="text-gray-400 text-sm mt-2">
+              @{profile.username || "user"} is following you
+            </p>
           )}
         </div>
 
