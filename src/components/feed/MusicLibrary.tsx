@@ -14,34 +14,13 @@ interface MusicLibraryProps {
   onSelectMusic: (music: { name: string; artist: string; url: string; duration: number }) => void;
 }
 
-// Trending songs library (would connect to real API in production)
-const TRENDING_SONGS = [
-  { id: 1, name: 'Summer Vibes', artist: 'DJ Mix', genre: 'Electronic', duration: 45, url: 'https://example.com/music/summer.mp3' },
-  { id: 2, name: 'Chill Beats', artist: 'Lo-Fi King', genre: 'Lo-Fi', duration: 60, url: 'https://example.com/music/chill.mp3' },
-  { id: 3, name: 'Epic Moments', artist: 'Orchestra Pro', genre: 'Cinematic', duration: 50, url: 'https://example.com/music/epic.mp3' },
-  { id: 4, name: 'Happy Day', artist: 'Sunny Smith', genre: 'Pop', duration: 55, url: 'https://example.com/music/happy.mp3' },
-  { id: 5, name: 'Urban Flow', artist: 'Street Beats', genre: 'Hip Hop', duration: 48, url: 'https://example.com/music/urban.mp3' },
-  { id: 6, name: 'Love Story', artist: 'Romance Band', genre: 'Romantic', duration: 52, url: 'https://example.com/music/love.mp3' },
-  { id: 7, name: 'Energy Boost', artist: 'Workout Mix', genre: 'EDM', duration: 60, url: 'https://example.com/music/energy.mp3' },
-  { id: 8, name: 'Nature Sounds', artist: 'Ambient Zen', genre: 'Ambient', duration: 60, url: 'https://example.com/music/nature.mp3' },
-  { id: 9, name: 'Party Time', artist: 'Dance Master', genre: 'Dance', duration: 55, url: 'https://example.com/music/party.mp3' },
-  { id: 10, name: 'Smooth Jazz', artist: 'Jazz Legends', genre: 'Jazz', duration: 58, url: 'https://example.com/music/jazz.mp3' },
-];
-
-const RECENT_SONGS = [
-  { id: 11, name: 'Midnight Drive', artist: 'Night Rider', genre: 'Synthwave', duration: 47, url: 'https://example.com/music/midnight.mp3' },
-  { id: 12, name: 'Beach Sunset', artist: 'Coastal Waves', genre: 'Acoustic', duration: 53, url: 'https://example.com/music/beach.mp3' },
-];
-
-const FAVORITE_SONGS = [
-  { id: 13, name: 'My Favorite', artist: 'Best Artist', genre: 'Pop', duration: 50, url: 'https://example.com/music/favorite.mp3' },
-];
 
 export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'trending' | 'upload'>('trending');
   const [selectedContinent, setSelectedContinent] = useState('worldwide');
+  const [selectedGenre, setSelectedGenre] = useState<string>('all');
   const [trendingSongs, setTrendingSongs] = useState<TrendingSong[]>([]);
   const [loading, setLoading] = useState(false);
   const [playingId, setPlayingId] = useState<string | null>(null);
@@ -73,11 +52,20 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
     }
   };
 
+  // Get unique genres from trending songs
+  const availableGenres = ['all', ...new Set(trendingSongs.map(song => song.genre))];
+
   const filteredSongs = trendingSongs.filter(
-    (song) =>
-      song.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      song.artist.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      song.genre.toLowerCase().includes(searchQuery.toLowerCase())
+    (song) => {
+      const matchesSearch = 
+        song.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        song.artist.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        song.genre.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesGenre = selectedGenre === 'all' || song.genre === selectedGenre;
+      
+      return matchesSearch && matchesGenre;
+    }
   );
 
   const togglePlayPause = (songId: string, url: string) => {
@@ -242,22 +230,48 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
 
           <TabsContent value="trending" className="flex-1 mt-0">
             {/* Continent Selector */}
-            <div className="px-6 py-3 border-b">
-              <ScrollArea className="w-full">
-                <div className="flex gap-2">
-                  {continents.map((continent) => (
-                    <Button
-                      key={continent}
-                      size="sm"
-                      variant={selectedContinent === continent.toLowerCase() ? 'default' : 'outline'}
-                      onClick={() => setSelectedContinent(continent.toLowerCase())}
-                      className="whitespace-nowrap"
-                    >
-                      {continent}
-                    </Button>
-                  ))}
-                </div>
-              </ScrollArea>
+            <div className="px-6 py-3 border-b space-y-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Region</p>
+                <ScrollArea className="w-full">
+                  <div className="flex gap-2">
+                    {continents.map((continent) => (
+                      <Button
+                        key={continent}
+                        size="sm"
+                        variant={selectedContinent === continent.toLowerCase() ? 'default' : 'outline'}
+                        onClick={() => {
+                          setSelectedContinent(continent.toLowerCase());
+                          setSelectedGenre('all');
+                        }}
+                        className="whitespace-nowrap"
+                      >
+                        {continent}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+              
+              {/* Genre Filter */}
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-2">Genre</p>
+                <ScrollArea className="w-full">
+                  <div className="flex gap-2">
+                    {availableGenres.map((genre) => (
+                      <Button
+                        key={genre}
+                        size="sm"
+                        variant={selectedGenre === genre ? 'default' : 'outline'}
+                        onClick={() => setSelectedGenre(genre)}
+                        className="whitespace-nowrap capitalize"
+                      >
+                        {genre}
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
             </div>
 
             <ScrollArea className="h-[50vh] px-6 py-4">
