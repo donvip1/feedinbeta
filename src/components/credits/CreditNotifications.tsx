@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/sonner";
@@ -13,6 +13,11 @@ interface CreditTransaction {
 }
 
 export default function CreditNotifications() {
+  // Safety check
+  if (!React || typeof React.useState !== 'function') {
+    return null;
+  }
+
   const { user } = useAuth();
 
   useEffect(() => {

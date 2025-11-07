@@ -42,7 +42,7 @@ import Dashboard from "./pages/Dashboard";
 import AdminPanel from "./pages/AdminPanel";
 import Wallet from "./pages/Wallet";
 import NotFound from "./pages/NotFound";
-import CreditNotifications from "@/components/credits/CreditNotifications";
+import SafeCreditNotifications from "@/components/credits/SafeCreditNotifications";
 
 const queryClient = new QueryClient();
 
@@ -52,7 +52,7 @@ const App = () => (
       <QueryClientProvider client={queryClient}>
         
            <Sonner />
-           <CreditNotifications />
+           <SafeCreditNotifications />
           <BrowserRouter future={{ v7_startTransition: true }}>
             <Routes>
               <Route path="/" element={<Index />} />
