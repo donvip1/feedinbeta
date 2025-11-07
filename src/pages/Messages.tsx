@@ -69,6 +69,7 @@ export default function Messages() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
+  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const state = location.state as { sharedImage?: string };
@@ -106,8 +107,41 @@ export default function Messages() {
       const subscription = supabase.channel('public:friend_requests')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'friend_requests' }, loadData)
         .subscribe();
+      
+      // Subscribe to presence for all friends
+      const presenceChannel = supabase.channel('online-users', {
+        config: {
+          presence: {
+            key: user.id,
+          },
+        },
+      });
+
+      presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+          const state = presenceChannel.presenceState();
+          const online = new Set(Object.keys(state));
+          setOnlineUsers(online);
+        })
+        .on('presence', { event: 'join' }, ({ key }) => {
+          setOnlineUsers(prev => new Set([...prev, key]));
+        })
+        .on('presence', { event: 'leave' }, ({ key }) => {
+          setOnlineUsers(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(key);
+            return newSet;
+          });
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await presenceChannel.track({ online_at: new Date().toISOString() });
+          }
+        });
+
       return () => {
         supabase.removeChannel(subscription);
+        supabase.removeChannel(presenceChannel);
       };
     }
   }, [user, loadData]);
@@ -326,10 +360,13 @@ export default function Messages() {
 
               {filteredChatList.map(item => (
                 <button key={item.id} onClick={() => handleItemClick(item)} className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg">
-                  <Avatar>
-                    <AvatarImage src={item.participant?.avatar_url || undefined} />
-                    <AvatarFallback>{item.participant?.display_name?.[0] || 'U'}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar>
+                      <AvatarImage src={item.participant?.avatar_url || undefined} />
+                      <AvatarFallback>{item.participant?.display_name?.[0] || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${onlineUsers.has(item.participant?.id || '') ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  </div>
                   <div className="flex-1 text-left overflow-hidden">
                     <p className="font-semibold truncate">{item.participant?.display_name}</p>
                     {item.last_message ? (

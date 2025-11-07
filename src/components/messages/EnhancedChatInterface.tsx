@@ -56,6 +56,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [sending, setSending] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -73,6 +74,13 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     subscribeToReactions();
     markMessagesAsRead();
   }, [conversationId]);
+
+  useEffect(() => {
+    if (otherUser?.id) {
+      const cleanup = subscribeToPresence();
+      return cleanup;
+    }
+  }, [otherUser?.id]);
 
   useEffect(() => {
     scrollToBottom();
@@ -150,15 +158,27 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      // Get the other participant's user_id first
+      const { data: participantData, error: participantError } = await supabase
         .from('conversation_participants')
-        .select('user_id, participant:profiles!conversation_participants_user_id_fkey(*)')
+        .select('user_id')
         .eq('conversation_id', conversationId)
         .neq('user_id', user.id)
         .maybeSingle();
 
-      if (error) throw error;
-      setOtherUser(data?.participant);
+      if (participantError) throw participantError;
+      
+      if (participantData?.user_id) {
+        // Now fetch the profile data
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', participantData.user_id)
+          .single();
+
+        if (profileError) throw profileError;
+        setOtherUser(profileData);
+      }
     } catch (error: any) {
       console.error('Error loading other user:', error);
     }
@@ -238,6 +258,44 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         }
       )
       .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const subscribeToPresence = () => {
+    if (!otherUser?.id || !user?.id) return;
+
+    const channel = supabase.channel(`presence:${conversationId}`, {
+      config: {
+        presence: {
+          key: user.id,
+        },
+      },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const otherUserPresent = Object.keys(state).some(key => key === otherUser.id);
+        setIsOnline(otherUserPresent);
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        if (key === otherUser.id) {
+          setIsOnline(true);
+        }
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        if (key === otherUser.id) {
+          setIsOnline(false);
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ online_at: new Date().toISOString() });
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -481,15 +539,16 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <Avatar>
-          <AvatarImage src={otherUser?.avatar_url || ''} />
-          <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar>
+            <AvatarImage src={otherUser?.avatar_url || ''} />
+            <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
+          </Avatar>
+          <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+        </div>
         <div className="flex-1">
           <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
-          {otherUser?.username && (
-            <p className="text-sm text-muted-foreground">@{otherUser.username}</p>
-          )}
+          <p className="text-xs text-muted-foreground">{isOnline ? 'online' : 'offline'}</p>
         </div>
         
         <div className="flex items-center gap-2">
