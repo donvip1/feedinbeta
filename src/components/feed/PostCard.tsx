@@ -577,18 +577,18 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      onClick={toggleMute} 
-                      className="text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg"
-                    >
-                      {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
-                    </Button>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
                       onClick={toggleFullScreen} 
                       className="text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg"
                     >
                       <Maximize className="w-6 h-6" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={toggleMute} 
+                      className="text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg"
+                    >
+                      {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
                     </Button>
                   </div>
                 </>
