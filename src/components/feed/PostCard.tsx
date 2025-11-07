@@ -573,7 +573,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                   )}
                   
                   {/* Video Controls - Mute and Fullscreen */}
-                  <div className="absolute top-1/2 right-4 -translate-y-1/2 z-20 flex flex-col gap-3">
+                  <div className="absolute bottom-[420px] right-4 z-20 flex flex-col gap-3">
                     <Button 
                       variant="ghost" 
                       size="icon" 
