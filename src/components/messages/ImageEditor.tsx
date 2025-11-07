@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { RotateCw, Crop, X } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { RotateCw, Save, X } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/hooks/use-toast';
 
@@ -96,90 +96,103 @@ export const ImageEditor = ({ open, onClose, imageFile, onSave }: ImageEditorPro
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Edit Image</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="h-screen w-screen max-w-none m-0 p-0 bg-black border-0 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 text-white shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="text-white hover:bg-white/10"
+          >
+            <X className="w-6 h-6" />
+          </Button>
+          <Button
+            onClick={handleSave}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            Done
+          </Button>
+        </div>
 
-        <div className="space-y-4">
-          {/* Preview */}
-          <div className="relative bg-muted rounded-lg overflow-hidden flex items-center justify-center" style={{ minHeight: '400px' }}>
-            <img
-              ref={imageRef}
-              src={imageUrl}
-              alt="Preview"
-              className="max-w-full max-h-[400px] object-contain"
-              style={{
-                transform: `rotate(${rotation}deg)`,
-                filter: applyFilters(),
-              }}
-            />
-            <canvas ref={canvasRef} className="hidden" />
-          </div>
+        {/* Image preview - takes most of the screen */}
+        <div className="flex-1 flex items-center justify-center overflow-hidden p-4 min-h-0">
+          <img
+            ref={imageRef}
+            src={imageUrl}
+            alt="Preview"
+            className="max-w-full max-h-full object-contain"
+            style={{
+              transform: `rotate(${rotation}deg)`,
+              filter: applyFilters(),
+              touchAction: 'none',
+            }}
+          />
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
 
+        {/* Controls - fixed at bottom */}
+        <div className="bg-background/95 backdrop-blur p-4 space-y-4 border-t border-border shrink-0 max-h-[50vh] overflow-y-auto">
           {/* Filters */}
           <div>
-            <p className="text-sm font-medium mb-2">Filters</p>
-            <div className="flex gap-2 overflow-x-auto pb-2">
+            <p className="text-xs mb-2 font-medium">Filters</p>
+            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
               {FILTERS.map((filter) => (
-                <button
+                <Button
                   key={filter.name}
+                  variant={selectedFilter === filter.filter ? 'default' : 'outline'}
+                  size="sm"
+                  className="whitespace-nowrap"
                   onClick={() => setSelectedFilter(filter.filter)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-lg text-xs font-medium transition-colors ${
-                    selectedFilter === filter.filter
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-accent hover:bg-accent/80'
-                  }`}
                 >
                   {filter.name}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
 
-          {/* Adjustments */}
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Brightness: {brightness}%</label>
-              <Slider
-                value={[brightness]}
-                onValueChange={(value) => setBrightness(value[0])}
-                min={50}
-                max={150}
-                step={1}
-                className="mt-2"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Contrast: {contrast}%</label>
-              <Slider
-                value={[contrast]}
-                onValueChange={(value) => setContrast(value[0])}
-                min={50}
-                max={150}
-                step={1}
-                className="mt-2"
-              />
-            </div>
+          {/* Brightness */}
+          <div>
+            <label className="text-xs mb-2 block font-medium">
+              Brightness: {brightness}%
+            </label>
+            <Slider
+              value={[brightness]}
+              onValueChange={(value) => setBrightness(value[0])}
+              min={50}
+              max={150}
+              step={1}
+              className="touch-none"
+            />
           </div>
 
-          {/* Tools */}
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleRotate}>
-              <RotateCw className="w-4 h-4 mr-2" />
-              Rotate
-            </Button>
+          {/* Contrast */}
+          <div>
+            <label className="text-xs mb-2 block font-medium">
+              Contrast: {contrast}%
+            </label>
+            <Slider
+              value={[contrast]}
+              onValueChange={(value) => setContrast(value[0])}
+              min={50}
+              max={150}
+              step={1}
+              className="touch-none"
+            />
           </div>
+
+          {/* Rotate */}
+          <Button
+            variant="outline"
+            onClick={handleRotate}
+            className="w-full"
+            size="lg"
+          >
+            <RotateCw className="w-5 h-5 mr-2" />
+            Rotate 90°
+          </Button>
         </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSave}>
-            Save Changes
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
