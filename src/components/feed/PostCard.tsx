@@ -465,7 +465,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             </Avatar>
             <div className="flex-1 min-w-0">
               <p 
-                className="font-bold text-white cursor-pointer hover:underline truncate text-lg"
+                className="font-bold text-white cursor-pointer hover:underline truncate text-lg inline-block max-w-fit"
                 onClick={() => navigate(`/profile/${post.user_id}`)}
               >
                 {displayName}
@@ -473,7 +473,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
               <div className="flex items-center space-x-2 text-sm">
                 {post.profiles?.username && (
                   <span 
-                    className="cursor-pointer hover:underline text-white/80 truncate"
+                    className="cursor-pointer hover:underline text-white/80 truncate inline-block max-w-fit"
                     onClick={() => navigate(`/profile/${post.user_id}`)}
                   >
                     @{post.profiles.username}
@@ -573,7 +573,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                   )}
                   
                   {/* Video Controls - Mute and Fullscreen */}
-                  <div className="absolute bottom-[420px] right-4 z-20 flex flex-col gap-3">
+                  <div className="absolute bottom-[480px] right-4 z-20 flex flex-col gap-3">
                     <Button 
                       variant="ghost" 
                       size="icon" 
