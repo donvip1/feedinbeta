@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck } from 'lucide-react';
+import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck, Pin } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +23,7 @@ interface MessageBubbleProps {
     media_url?: string | null;
     media_type?: string | null;
     reply_to_id?: string | null;
+    is_pinned?: boolean;
     reply_to_message?: {
       content: string;
       sender: {
@@ -52,6 +53,8 @@ interface MessageBubbleProps {
   onEdit?: (messageId: string, content: string) => void;
   onForward?: (message: any) => void;
   onImageClick?: (imageUrl: string) => void;
+  onPin?: (messageId: string, isPinned: boolean) => void;
+  highlightQuery?: string;
   onSwipeStart?: () => void;
   onSwipeEnd?: () => void;
 }
@@ -67,6 +70,8 @@ export const EnhancedMessageBubble = ({
   onEdit,
   onForward,
   onImageClick,
+  onPin,
+  highlightQuery,
   onSwipeStart,
   onSwipeEnd
 }: MessageBubbleProps) => {
@@ -114,6 +119,23 @@ export const EnhancedMessageBubble = ({
   const handleEditCancel = () => {
     setEditContent(message.content);
     setIsEditing(false);
+  };
+
+  const highlightText = (text: string) => {
+    if (!highlightQuery) return text;
+    
+    const parts = text.split(new RegExp(`(${highlightQuery})`, 'gi'));
+    return (
+      <>
+        {parts.map((part, i) =>
+          part.toLowerCase() === highlightQuery.toLowerCase() ? (
+            <mark key={i} className="bg-yellow-300 dark:bg-yellow-600 px-1 rounded">{part}</mark>
+          ) : (
+            <React.Fragment key={i}>{part}</React.Fragment>
+          )
+        )}
+      </>
+    );
   };
 
   const renderMedia = () => {
@@ -234,9 +256,12 @@ export const EnhancedMessageBubble = ({
               </div>
             ) : (
               <>
-                <p className="text-sm break-words whitespace-pre-wrap">{message.content}</p>
+                <p className="text-sm break-words whitespace-pre-wrap">{highlightText(message.content)}</p>
                 {message.edited_at && (
                   <p className="text-xs opacity-70 mt-1">edited</p>
+                )}
+                {message.is_pinned && (
+                  <p className="text-xs opacity-70 mt-1">📌 pinned</p>
                 )}
               </>
             )}
@@ -292,6 +317,12 @@ export const EnhancedMessageBubble = ({
                   <Copy className="w-4 h-4 mr-2" />
                   Copy
                 </DropdownMenuItem>
+                {onPin && (
+                  <DropdownMenuItem onClick={() => onPin(message.id, message.is_pinned || false)}>
+                    <Pin className="w-4 h-4 mr-2" />
+                    {message.is_pinned ? 'Unpin' : 'Pin'}
+                  </DropdownMenuItem>
+                )}
                 {isOwn && onEdit && !message.media_url && (
                   <DropdownMenuItem onClick={() => setIsEditing(true)}>
                     <Copy className="w-4 h-4 mr-2" />

@@ -75,6 +75,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [viewingImage, setViewingImage] = useState<string | null>(null);
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const [compactNotif, setCompactNotif] = useState<{ sender: string; avatar: string | null; message: string; convId: string } | null>(null);
+  const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -110,7 +111,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     try {
       const { data, error } = await supabase
         .from('messages')
-        .select('id, content, sender_id, created_at, edited_at, is_read, read_at, media_url, media_type, reply_to_id')
+        .select('id, content, sender_id, created_at, edited_at, is_read, read_at, media_url, media_type, reply_to_id, is_pinned')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: true });
 
@@ -127,6 +128,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         media_url: msg.media_url || null,
         media_type: msg.media_type || null,
         reply_to_id: msg.reply_to_id || null,
+        is_pinned: (msg as any).is_pinned || false,
         reply_to_message: null,
         profiles: {
           display_name: null,
@@ -143,15 +145,18 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           .select('id, display_name, avatar_url')
           .in('id', senderIds);
         const map = new Map((profileRows || []).map((p: any) => [p.id, p]));
-        setMessages(formattedMessages.map(m => ({
+        const enriched = formattedMessages.map(m => ({
           ...m,
           profiles: {
             display_name: map.get(m.sender_id)?.display_name ?? 'User',
             avatar_url: map.get(m.sender_id)?.avatar_url ?? null,
           }
-        })));
+        }));
+        setMessages(enriched);
+        setPinnedMessages(enriched.filter(m => m.is_pinned));
       } else {
         setMessages(formattedMessages);
+        setPinnedMessages(formattedMessages.filter(m => (m as any).is_pinned));
       }
 
       // Load read receipts for each message
@@ -276,9 +281,10 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,
         },
-        () => {
-          loadMessages();
-          markMessagesAsRead();
+        async (payload) => {
+          console.log('New message received:', payload);
+          await loadMessages();
+          await markMessagesAsRead();
         }
       )
       .on(
@@ -289,11 +295,13 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,
         },
-        () => {
-          loadMessages();
+        async () => {
+          await loadMessages();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Message subscription status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -698,6 +706,42 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
+  const handlePinMessage = async (messageId: string, isPinned: boolean) => {
+    if (!user) return;
+
+    try {
+      await supabase
+        .from('messages')
+        .update({ is_pinned: !isPinned })
+        .eq('id', messageId);
+
+      toast({
+        title: isPinned ? 'Message unpinned' : 'Message pinned',
+      });
+      
+      loadMessages();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const highlightText = (text: string, query: string) => {
+    if (!query) return text;
+    
+    const parts = text.split(new RegExp(`(${query})`, 'gi'));
+    return parts.map((part, i) =>
+      part.toLowerCase() === query.toLowerCase() ? (
+        <mark key={i} className="bg-yellow-300 dark:bg-yellow-600">{part}</mark>
+      ) : (
+        part
+      )
+    );
+  };
+
   const handleQuickReply = (text: string) => {
     setNewMessage(text);
     setShowQuickReplies(false);
@@ -839,6 +883,30 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
+          {/* Pinned Messages */}
+          {pinnedMessages.length > 0 && !searchQuery && (
+            <div className="bg-accent/50 rounded-lg p-3 border border-border mb-4">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">📌 PINNED MESSAGES</p>
+              <div className="space-y-2">
+                {pinnedMessages.map((message) => (
+                  <EnhancedMessageBubble
+                    key={message.id}
+                    message={message}
+                    isOwn={message.sender_id === user?.id}
+                    onReply={(id, content) => setReplyingTo({ id, content })}
+                    onReact={handleReaction}
+                    onDelete={message.sender_id === user?.id ? handleDeleteMessage : undefined}
+                    onEdit={message.sender_id === user?.id ? handleEditMessage : undefined}
+                    onForward={(msg) => setForwardingMessage(msg)}
+                    onImageClick={(url) => setViewingImage(url)}
+                    onPin={handlePinMessage}
+                    highlightQuery={searchQuery}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          
           {searchQuery && filteredMessages.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No messages found matching "{searchQuery}"
@@ -856,6 +924,8 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
                   onEdit={message.sender_id === user?.id ? handleEditMessage : undefined}
                   onForward={(msg) => setForwardingMessage(msg)}
                   onImageClick={(url) => setViewingImage(url)}
+                  onPin={handlePinMessage}
+                  highlightQuery={searchQuery}
                 />
               ))}
             </>
@@ -912,68 +982,80 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
             onCancel={() => setShowVoiceRecorder(false)}
           />
         ) : (
-          <div className="flex items-end gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowQuickReplies(!showQuickReplies)}
-              title="Quick replies"
-            >
-              <Smile className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => imageInputRef.current?.click()}
-              disabled={uploadingFile}
-            >
-              <ImageIcon className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile}
-            >
-              <Paperclip className="w-5 h-5" />
-            </Button>
-
-            <UserMentionInput
-              value={newMessage}
-              onChange={(val) => {
-                setNewMessage(val);
-                handleTyping();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              disabled={sending || uploadingFile}
-              placeholder="Type a message..."
-              conversationId={conversationId}
-            />
-
-            {newMessage.trim() ? (
-              <Button
-                onClick={() => handleSend()}
+          <div className="space-y-2">
+            {/* Main input row */}
+            <div className="flex items-end gap-2">
+              <UserMentionInput
+                value={newMessage}
+                onChange={(val) => {
+                  setNewMessage(val);
+                  handleTyping();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
                 disabled={sending || uploadingFile}
-                size="icon"
-                className="bg-gradient-primary flex-shrink-0"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            ) : (
+                placeholder="Type a message..."
+                conversationId={conversationId}
+              />
+
+              {newMessage.trim() ? (
+                <Button
+                  onClick={() => handleSend()}
+                  disabled={sending || uploadingFile}
+                  size="icon"
+                  className="bg-gradient-primary flex-shrink-0 h-11 w-11"
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => setShowVoiceRecorder(true)}
+                  disabled={uploadingFile}
+                  size="icon"
+                  className="bg-gradient-primary flex-shrink-0 h-11 w-11"
+                >
+                  <Mic className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
+            
+            {/* Action buttons below */}
+            <div className="flex items-center gap-2 px-1">
               <Button
-                onClick={() => setShowVoiceRecorder(true)}
-                disabled={uploadingFile}
-                size="icon"
-                className="bg-gradient-primary flex-shrink-0"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowQuickReplies(!showQuickReplies)}
+                title="Quick replies"
+                className="h-8"
               >
-                <Mic className="w-4 h-4" />
+                <Smile className="w-4 h-4 mr-1" />
+                <span className="text-xs">Quick</span>
               </Button>
-            )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={uploadingFile}
+                className="h-8"
+              >
+                <ImageIcon className="w-4 h-4 mr-1" />
+                <span className="text-xs">Photo</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingFile}
+                className="h-8"
+              >
+                <Paperclip className="w-4 h-4 mr-1" />
+                <span className="text-xs">File</span>
+              </Button>
+            </div>
           </div>
         )}
 
