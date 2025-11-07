@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Play, Pause, Video } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { toast } from '@/hooks/use-toast';
+import { extractVideoThumbnails } from '@/lib/media-compression';
 
 interface VideoTrimmerProps {
   open: boolean;
@@ -19,15 +20,31 @@ export const VideoTrimmer = ({ open, onClose, videoFile, onSave }: VideoTrimmerP
   const [startTime, setStartTime] = useState(0);
   const [endTime, setEndTime] = useState(0);
   const [videoUrl, setVideoUrl] = useState<string>('');
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
+  const [loadingThumbnails, setLoadingThumbnails] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     if (videoFile) {
       const url = URL.createObjectURL(videoFile);
       setVideoUrl(url);
+      loadThumbnails();
       return () => URL.revokeObjectURL(url);
     }
   }, [videoFile]);
+
+  const loadThumbnails = async () => {
+    if (!videoFile) return;
+    setLoadingThumbnails(true);
+    try {
+      const thumbs = await extractVideoThumbnails(videoFile, 10);
+      setThumbnails(thumbs);
+    } catch (error) {
+      console.error('Error loading thumbnails:', error);
+    } finally {
+      setLoadingThumbnails(false);
+    }
+  };
 
   useEffect(() => {
     const video = videoRef.current;
@@ -139,17 +156,42 @@ export const VideoTrimmer = ({ open, onClose, videoFile, onSave }: VideoTrimmerP
               </div>
             </div>
 
-            {/* Timeline thumbnails placeholder */}
+            {/* Timeline thumbnails */}
             <div className="bg-muted rounded-lg p-4">
               <div className="flex gap-1 overflow-x-auto">
-                {Array.from({ length: 10 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-shrink-0 w-16 h-16 bg-accent rounded flex items-center justify-center"
-                  >
-                    <Video className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                ))}
+                {loadingThumbnails ? (
+                  Array.from({ length: 10 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex-shrink-0 w-16 h-16 bg-accent rounded flex items-center justify-center animate-pulse"
+                    >
+                      <Video className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  ))
+                ) : thumbnails.length > 0 ? (
+                  thumbnails.map((thumb, i) => (
+                    <img
+                      key={i}
+                      src={thumb}
+                      alt={`Frame ${i + 1}`}
+                      className="flex-shrink-0 w-16 h-16 rounded object-cover cursor-pointer hover:ring-2 hover:ring-primary"
+                      onClick={() => {
+                        if (videoRef.current && duration) {
+                          videoRef.current.currentTime = ((i + 1) / (thumbnails.length + 1)) * duration;
+                        }
+                      }}
+                    />
+                  ))
+                ) : (
+                  Array.from({ length: 10 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="flex-shrink-0 w-16 h-16 bg-accent rounded flex items-center justify-center"
+                    >
+                      <Video className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 

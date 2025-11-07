@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send, Smile, Phone, Video, Paperclip, Mic, X, Image as ImageIcon, File, Search } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Phone, Video, Paperclip, Mic, X, Image as ImageIcon, File, Search, Upload } from 'lucide-react';
 import { EnhancedMessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { UserMentionInput } from './UserMentionInput';
@@ -58,7 +58,6 @@ interface ChatInterfaceProps {
 
 export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -76,6 +75,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [forwardingMessage, setForwardingMessage] = useState<Message | null>(null);
   const [compactNotif, setCompactNotif] = useState<{ sender: string; avatar: string | null; message: string; convId: string } | null>(null);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
@@ -766,6 +766,50 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
+  // Drag and drop handlers
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget === e.target) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const maxSize = 45 * 1024 * 1024; // 45MB
+
+    if (file.size > maxSize) {
+      toast({
+        title: 'File too large',
+        description: 'Maximum file size is 45MB',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Open the upload modal
+    setShowMediaUpload(true);
+  };
+
   const highlightText = (text: string, query: string) => {
     if (!query) return text;
     
@@ -918,7 +962,24 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea 
+        className="flex-1 p-4 relative"
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+      >
+        {/* Drag overlay */}
+        {isDragging && (
+          <div className="absolute inset-0 z-50 bg-primary/10 backdrop-blur-sm flex items-center justify-center border-2 border-dashed border-primary rounded-lg">
+            <div className="text-center">
+              <Upload className="w-16 h-16 mx-auto mb-4 text-primary" />
+              <p className="text-lg font-semibold">Drop files here to send</p>
+              <p className="text-sm text-muted-foreground">Maximum 45MB</p>
+            </div>
+          </div>
+        )}
+
         <div className="space-y-4">
           {/* Pinned Messages */}
           {pinnedMessages.length > 0 && !searchQuery && (
@@ -1125,6 +1186,17 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           onDismiss={() => setCompactNotif(null)}
         />
       )}
+
+      {/* Media Upload Modal */}
+      <MediaUploadModal
+        open={showMediaUpload}
+        onClose={() => setShowMediaUpload(false)}
+        conversationId={conversationId}
+        onUploadComplete={() => {
+          loadMessages();
+          setShowMediaUpload(false);
+        }}
+      />
     </>
   );
 };

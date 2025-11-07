@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { ImageEditor } from './ImageEditor';
 import { AudioTrimmer } from './AudioTrimmer';
 import { VideoTrimmer } from './VideoTrimmer';
+import { compressImage, shouldCompressImage, formatFileSize as formatSize } from '@/lib/media-compression';
 
 interface MediaUploadModalProps {
   open: boolean;
@@ -33,11 +34,6 @@ const getFileIcon = (type: string) => {
   return <FileText className="w-8 h-8" />;
 };
 
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-};
 
 export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComplete }: MediaUploadModalProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -48,8 +44,9 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
   const [showAudioTrimmer, setShowAudioTrimmer] = useState(false);
   const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
   const [editedFile, setEditedFile] = useState<File | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -57,7 +54,7 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
     if (file.size > MAX_FILE_SIZE) {
       toast({
         title: 'File too large',
-        description: `Maximum file size is ${formatFileSize(MAX_FILE_SIZE)}`,
+        description: `Maximum file size is ${formatSize(MAX_FILE_SIZE)}`,
         variant: 'destructive',
       });
       return;
@@ -65,6 +62,24 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
 
     setSelectedFile(file);
     setEditedFile(null);
+
+    // Auto-compress large images
+    if (shouldCompressImage(file)) {
+      setIsCompressing(true);
+      try {
+        const compressed = await compressImage(file);
+        const compressedFile = new File([compressed], file.name, { type: file.type });
+        setEditedFile(compressedFile);
+        toast({
+          title: 'Image compressed',
+          description: `Reduced from ${formatSize(file.size)} to ${formatSize(compressedFile.size)}`,
+        });
+      } catch (error) {
+        console.error('Compression error:', error);
+      } finally {
+        setIsCompressing(false);
+      }
+    }
 
     // Auto-open editor/trimmer for supported types
     if (file.type.startsWith('image/')) {
@@ -197,7 +212,7 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
                   <FileText className="w-12 h-12 text-muted-foreground" />
                   <p className="text-sm font-medium">Click to select a file</p>
                   <p className="text-xs text-muted-foreground">
-                    Max {formatFileSize(MAX_FILE_SIZE)}
+                    Max {formatSize(MAX_FILE_SIZE)}
                   </p>
                 </label>
               </div>
@@ -212,7 +227,7 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{fileToDisplay?.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {formatFileSize(fileToDisplay?.size || 0)}
+                        {formatSize(fileToDisplay?.size || 0)}
                       </p>
                       {editedFile && (
                         <p className="text-xs text-primary mt-1">✓ Edited</p>
@@ -272,6 +287,14 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
                     rows={3}
                   />
                 </div>
+
+                {/* Compression status */}
+                {isCompressing && (
+                  <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-lg">
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
+                    <span className="text-sm">Compressing image...</span>
+                  </div>
+                )}
 
                 {/* Upload progress */}
                 {isUploading && (
