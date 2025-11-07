@@ -211,7 +211,7 @@ export default function Messages() {
             });
          }
       }
-      toast({ title: accepted ? "Friend request accepted" : "Friend request declined" });
+      toast({ title: accepted ? "Message request accepted" : "Message request declined" });
       loadData();
     } catch (error) {
       console.error("Error responding to request:", error);

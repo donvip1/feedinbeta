@@ -192,10 +192,10 @@ const Friends = () => {
         console.error("Failed to create notification:", notificationError);
       }
 
-      toast.success('Friend request sent!');
+      toast.success('Message request sent!');
 
     } catch (error: any) {
-      toast.error('Error sending friend request', {
+      toast.error('Error sending message request', {
         description: error.message,
       });
     }
@@ -211,7 +211,7 @@ const Friends = () => {
 
       if (error) throw error;
 
-      toast.success(status === 'accepted' ? 'Friend request accepted' : 'Friend request rejected');
+      toast.success(status === 'accepted' ? 'Message request accepted' : 'Message request rejected');
 
       loadFriendRequests();
       if (status === 'accepted') {
@@ -299,7 +299,7 @@ const Friends = () => {
             ) : friends.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-400 mb-4">No friends yet</p>
-                <p className="text-sm text-gray-500">Search for users to send friend requests</p>
+                <p className="text-sm text-gray-500">Search for users to send message requests</p>
               </div>
             ) : (
               friends.map((friend) => (
@@ -339,7 +339,7 @@ const Friends = () => {
               </div>
             ) : friendRequests.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-400">No pending friend requests</p>
+                <p className="text-gray-400">No pending message requests</p>
               </div>
             ) : (
               friendRequests.map((request) => (

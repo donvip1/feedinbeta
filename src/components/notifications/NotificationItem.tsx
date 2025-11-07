@@ -51,31 +51,39 @@ export const NotificationItem = ({ notification, onUpdate }: NotificationItemPro
     if (!notification.reference_id || !user || !notification.from_user) return;
 
     try {
+      // Update the friend request status
       const { error: reqErr } = await supabase
         .from('friend_requests')
-        .update({ status: accept ? 'accepted' : 'rejected' })
-        .eq('id', notification.reference_id);
+        .update({ 
+          status: accept ? 'accepted' : 'rejected',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', notification.reference_id)
+        .eq('receiver_id', user.id);
 
       if (reqErr) throw reqErr;
 
       if (accept) {
-        setHandledMessage(`You are now friends with ${notification.from_user.display_name}.`);
+        setHandledMessage(`You can now message ${notification.from_user.display_name}.`);
+        // Notify the sender
         await supabase.from('notifications').insert({
           user_id: notification.from_user.id,
           from_user_id: user.id,
           type: 'info',
-          message: `${user.user_metadata.display_name || 'A user'} accepted your friend request.`,
+          message: `${user.user_metadata.display_name || 'A user'} accepted your message request.`,
         });
       } else {
-        setHandledMessage('Friend request declined.');
+        setHandledMessage('Message request declined.');
       }
       setIsHandled(true);
 
+      // Mark notification as read
       await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
-      toast({ title: `Friend request ${accept ? 'accepted' : 'declined'}.` });
+      toast({ title: `Message request ${accept ? 'accepted' : 'declined'}.` });
       onUpdate();
 
     } catch (error: any) {
+      console.error('Error handling request:', error);
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       setIsHandled(false);
     }
@@ -101,7 +109,7 @@ export const NotificationItem = ({ notification, onUpdate }: NotificationItemPro
             <p className="text-sm text-muted-foreground">
                 {isHandled 
                     ? handledMessage 
-                    : `You responded to the friend request from ${notification.from_user?.display_name}.`
+                    : `You responded to the message request from ${notification.from_user?.display_name}.`
                 }
             </p>
              <p className="text-xs text-muted-foreground mt-1">

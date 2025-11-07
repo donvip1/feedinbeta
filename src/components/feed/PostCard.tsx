@@ -71,6 +71,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const viewStartTimeRef = useRef<number>(Date.now());
   const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -386,6 +387,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     if (videoRef.current) {
       videoRef.current.muted = !videoRef.current.muted;
       setIsMuted(videoRef.current.muted);
@@ -394,6 +396,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
   const toggleFullScreen = (e: React.MouseEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     if (videoRef.current) {
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen();
@@ -401,6 +404,19 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         (videoRef.current as any).webkitRequestFullscreen();
       } else if ((videoRef.current as any).msRequestFullscreen) { /* IE11 */
         (videoRef.current as any).msRequestFullscreen();
+      }
+    }
+  };
+
+  const togglePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
       }
     }
   };
@@ -531,7 +547,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                   <video
                     ref={videoRef}
                     src={post.media_url}
-                    onClick={toggleMute}
+                    onClick={togglePlayPause}
                     className={`${
                       post.aspect_ratio === '9:16' ? 'w-full h-full object-cover' :
                       post.aspect_ratio === '16:9' ? 'w-full h-auto max-h-full object-contain' :
@@ -540,12 +556,27 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                     playsInline
                     loop
                     muted={isMuted}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
                   />
+                  
+                  {/* Play/Pause Button in Center */}
+                  {!isPlaying && (
+                    <div 
+                      onClick={togglePlayPause}
+                      className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer"
+                    >
+                      <div className="w-20 h-20 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center hover:bg-white/40 transition-all">
+                        <div className="w-0 h-0 border-t-[20px] border-t-transparent border-l-[30px] border-l-white border-b-[20px] border-b-transparent ml-2"></div>
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="absolute top-4 right-4 z-20 flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={toggleMute} className="text-white bg-black/30 hover:bg-black/50">
+                    <Button variant="ghost" size="icon" onClick={toggleMute} className="text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm">
                       {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                     </Button>
-                     <Button variant="ghost" size="icon" onClick={toggleFullScreen} className="text-white bg-black/30 hover:bg-black/50">
+                     <Button variant="ghost" size="icon" onClick={toggleFullScreen} className="text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm">
                       <Maximize className="w-5 h-5" />
                     </Button>
                   </div>
