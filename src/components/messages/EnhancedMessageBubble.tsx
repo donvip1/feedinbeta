@@ -39,6 +39,10 @@ interface MessageBubbleProps {
         display_name: string;
       };
     }>;
+    read_receipts?: Array<{
+      user_id: string;
+      read_at: string;
+    }>;
   };
   isOwn: boolean;
   onReply: (messageId: string, content: string) => void;
@@ -270,7 +274,9 @@ export const EnhancedMessageBubble = ({
         <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1 px-1">
           <span>{format(new Date(message.created_at), 'HH:mm')}</span>
           {isOwn && (
-            message.is_read ? (
+            message.read_receipts && message.read_receipts.length > 0 ? (
+              <CheckCheck className="w-3 h-3 text-blue-500" />
+            ) : message.is_read ? (
               <CheckCheck className="w-3 h-3 text-blue-500" />
             ) : (
               <Check className="w-3 h-3" />

@@ -40,6 +40,10 @@ interface Message {
       display_name: string;
     };
   }>;
+  read_receipts?: Array<{
+    user_id: string;
+    read_at: string;
+  }>;
 }
 
 interface ChatInterfaceProps {
@@ -134,12 +138,29 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         setMessages(formattedMessages.map(m => ({
           ...m,
           profiles: {
-            display_name: map.get(m.sender_id)?.display_name ?? null,
+            display_name: map.get(m.sender_id)?.display_name ?? 'User',
             avatar_url: map.get(m.sender_id)?.avatar_url ?? null,
           }
         })));
       } else {
         setMessages(formattedMessages);
+      }
+
+      // Load read receipts for each message
+      if (data && data.length > 0) {
+        const messageIds = data.map(m => m.id);
+        const { data: receipts } = await supabase
+          .from('message_read_receipts')
+          .select('message_id, user_id, read_at')
+          .in('message_id', messageIds);
+        
+        if (receipts) {
+          // Update messages with read receipt info
+          setMessages(prev => prev.map(msg => ({
+            ...msg,
+            read_receipts: receipts.filter(r => r.message_id === msg.id),
+          })));
+        }
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -150,13 +171,34 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     if (!user) return;
 
     try {
-      // Mark all unread messages from other users as read
+      // Get unread messages from other users
+      const { data: unreadMessages } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .neq('sender_id', user.id)
+        .eq('is_read', false);
+
+      if (!unreadMessages || unreadMessages.length === 0) return;
+
+      // Mark messages as read
       await supabase
         .from('messages')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('conversation_id', conversationId)
         .neq('sender_id', user.id)
         .eq('is_read', false);
+
+      // Insert read receipts for each message
+      const receipts = unreadMessages.map(msg => ({
+        message_id: msg.id,
+        user_id: user.id,
+        read_at: new Date().toISOString(),
+      }));
+
+      await supabase
+        .from('message_read_receipts')
+        .insert(receipts);
     } catch (error) {
       console.error('Error marking messages as read:', error);
     }
@@ -182,10 +224,33 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           .from('profiles')
           .select('*')
           .eq('id', participantData.user_id)
-          .single();
+          .maybeSingle();
 
-        if (profileError) throw profileError;
-        setOtherUser(profileData);
+        if (profileError) {
+          console.error('Error loading profile:', profileError);
+          // Set a fallback user object
+          setOtherUser({
+            id: participantData.user_id,
+            display_name: 'User',
+            username: null,
+            avatar_url: null,
+          });
+          return;
+        }
+        
+        if (profileData) {
+          setOtherUser(profileData);
+        } else {
+          // Profile doesn't exist, set fallback
+          setOtherUser({
+            id: participantData.user_id,
+            display_name: 'User',
+            username: null,
+            avatar_url: null,
+          });
+        }
+      } else {
+        console.warn('No other participant found in conversation');
       }
     } catch (error: any) {
       console.error('Error loading other user:', error);
@@ -252,7 +317,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   };
 
   const subscribeToReactions = () => {
-    const channel = supabase
+    const reactionsChannel = supabase
       .channel(`reactions:${conversationId}`)
       .on(
         'postgres_changes',
@@ -267,8 +332,25 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       )
       .subscribe();
 
+    // Subscribe to read receipts
+    const receiptsChannel = supabase
+      .channel(`read-receipts:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_read_receipts',
+        },
+        () => {
+          loadMessages();
+        }
+      )
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(reactionsChannel);
+      supabase.removeChannel(receiptsChannel);
     };
   };
 
@@ -356,11 +438,57 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     return publicUrl;
   };
 
+  const ensureParticipantExists = async (participantUserId: string): Promise<boolean> => {
+    try {
+      // Check if participant already exists
+      const { data: existing } = await supabase
+        .from('conversation_participants')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', participantUserId)
+        .maybeSingle();
+
+      if (existing) return true;
+
+      // Add participant if missing
+      const { error } = await supabase
+        .from('conversation_participants')
+        .insert({
+          conversation_id: conversationId,
+          user_id: participantUserId,
+        });
+
+      if (error) {
+        console.error('Error adding participant:', error);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error ensuring participant exists:', error);
+      return false;
+    }
+  };
+
   const handleSend = async (mediaUrl?: string, mediaType?: string) => {
     if (!user || (!newMessage.trim() && !mediaUrl)) return;
 
     setSending(true);
     try {
+      // Ensure both participants exist in conversation_participants
+      const currentUserExists = await ensureParticipantExists(user.id);
+      
+      if (otherUser?.id) {
+        const otherUserExists = await ensureParticipantExists(otherUser.id);
+        if (!otherUserExists) {
+          throw new Error('Could not add recipient to conversation');
+        }
+      }
+
+      if (!currentUserExists) {
+        throw new Error('Could not add you to conversation');
+      }
+
       const { data: newMsg, error } = await supabase
         .from('messages')
         .insert({
@@ -376,6 +504,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
       if (error) throw error;
 
+      // Update typing indicator
       await supabase
         .from('typing_indicators')
         .upsert({
@@ -384,13 +513,27 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           is_typing: false,
         });
 
+      // Create notification for the other user if they exist
+      if (otherUser?.id && newMsg) {
+        await supabase.from('notifications').insert({
+          user_id: otherUser.id,
+          from_user_id: user.id,
+          type: 'message',
+          title: 'New Message',
+          message: `${user.user_metadata?.display_name || 'Someone'} sent you a message`,
+          related_id: conversationId,
+          related_type: 'conversation',
+        });
+      }
+
       setNewMessage('');
       setReplyingTo(null);
       setPreviewMedia(null);
     } catch (error: any) {
+      console.error('Error sending message:', error);
       toast({
         title: 'Error sending message',
-        description: error.message,
+        description: error.message || 'Could not send message. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -578,7 +721,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
             <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-background ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
           </div>
           <div className="flex-1">
-            <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
+            <h2 className="font-semibold">{otherUser?.display_name || 'Loading...'}</h2>
             <p className="text-xs text-muted-foreground">{isOnline ? 'online' : 'offline'}</p>
           </div>
           
