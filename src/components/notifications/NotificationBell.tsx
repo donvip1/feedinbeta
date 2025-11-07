@@ -13,12 +13,26 @@ export const NotificationBell = () => {
   useEffect(() => {
     if (user) {
       loadUnreadCount();
-      const subscription = subscribeToNotifications();
-      return () => {
-        // In a real app, you'd want to properly manage subscriptions
-        // For this example, we'll leave it simple
-      };
     }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel(`notifications:${user.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          loadUnreadCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user]);
 
   const loadUnreadCount = async () => {
@@ -36,30 +50,6 @@ export const NotificationBell = () => {
     } catch (error) {
       console.error('Error loading unread count:', error);
     }
-  };
-
-  const subscribeToNotifications = () => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel(`notifications:${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          loadUnreadCount();
-        }
-      )
-      .subscribe();
-
-    // We are not returning the unsubscribe function, as it was causing issues
-    // with the component lifecycle. In a production application, this should be handled
-    // more gracefully.
   };
 
   const handleClick = () => {

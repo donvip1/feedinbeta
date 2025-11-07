@@ -7,7 +7,7 @@ import { useVideoAutoplay } from '@/hooks/useVideoAutoplay';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical, Volume2, VolumeX, Maximize } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
@@ -63,7 +63,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [showComments, setShowComments] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
   
-  // Auto-play/pause videos based on visibility
   useVideoAutoplay(videoRef, post.media_type === 'video');
   const [isRefed, setIsRefed] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
@@ -71,8 +70,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const viewStartTimeRef = useRef<number>(Date.now());
+  const [isMuted, setIsMuted] = useState(true);
 
-  // Check if user is admin
   useEffect(() => {
     if (user) {
       checkAdminStatus();
@@ -93,7 +92,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     }
   };
 
-  // Check if user has liked this post and saved it
   useEffect(() => {
     if (user) {
       checkIfLiked();
@@ -171,18 +169,17 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   };
 
   const startViewTimer = () => {
-    if (hasViewed) return; // Already viewed this post
+    if (hasViewed) return;
 
     viewStartTimeRef.current = Date.now();
     
-    // Set timer for 5 seconds
     viewTimerRef.current = setTimeout(async () => {
       await trackView(5);
     }, 5000);
   };
 
   const trackView = async (duration: number = 0, engaged: boolean = false) => {
-    if (hasViewed) return; // Don't track duplicate views
+    if (hasViewed) return;
 
     try {
       await supabase.from('post_views').insert({
@@ -204,11 +201,9 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     const newIsLiked = !isLiked;
     const newLikesCount = newIsLiked ? localLikesCount + 1 : localLikesCount - 1;
 
-    // Optimistic update
     setIsLiked(newIsLiked);
     setLocalLikesCount(newLikesCount);
 
-    // Track as engaged view
     if (!hasViewed) {
       const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
       await trackView(elapsed, true);
@@ -232,7 +227,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       }
     } catch (error: any) {
       console.error('Error updating like:', error);
-      // Revert on error
       setIsLiked(!newIsLiked);
       setLocalLikesCount(localLikesCount);
       toast({
@@ -281,7 +275,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const handleRefeed = async () => {
     if (!user) return;
 
-    // Track as engaged view
     if (!hasViewed) {
       const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
       await trackView(elapsed, true);
@@ -290,7 +283,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
     try {
       if (isRefed) {
-        // Remove refeed
         await supabase
           .from('refeeds')
           .delete()
@@ -299,7 +291,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         setIsRefed(false);
         toast({ title: 'ReFEED removed' });
       } else {
-        // Add refeed
         await supabase.from('refeeds').insert({
           original_post_id: post.id,
           refed_by_user_id: user.id,
@@ -323,7 +314,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       return;
     }
 
-    // Track as engaged view when sharing
     if (!hasViewed) {
       const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
       await trackView(elapsed, true);
@@ -338,7 +328,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         await navigator.clipboard.writeText(shareUrl);
         toast({ title: 'Link copied to clipboard' });
       } else if (platform === 'download' && post.media_url) {
-        // Download with watermark
         const response = await fetch(post.media_url);
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -351,7 +340,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         window.URL.revokeObjectURL(url);
         toast({ title: 'Media downloaded' });
       } else {
-        // Share to social platforms
         const urls: Record<string, string> = {
           whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
           facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
@@ -393,15 +381,33 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   };
 
   const handlePromote = () => {
-    // Navigate to promotion page with post ID
     navigate(`/promote/${post.id}`);
+  };
+
+  const toggleMute = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+    }
+  };
+
+  const toggleFullScreen = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      } else if ((videoRef.current as any).webkitRequestFullscreen) { /* Safari */
+        (videoRef.current as any).webkitRequestFullscreen();
+      } else if ((videoRef.current as any).msRequestFullscreen) { /* IE11 */
+        (videoRef.current as any).msRequestFullscreen();
+      }
+    }
   };
 
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
 
-  // Dynamic font sizing based on text length (reduced by 40% for better fit)
-  // Responsive: mobile -> tablet -> desktop -> large desktop
   const getTextSize = (text: string) => {
     const length = text.length;
     if (length <= 30) return 'text-lg sm:text-xl md:text-2xl lg:text-2xl xl:text-3xl';
@@ -421,7 +427,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       'from-orange-500 via-red-500 to-pink-500',
       'from-blue-600 via-indigo-600 to-purple-600',
     ];
-    // Use post ID to consistently select same gradient for same post
     const index = parseInt(post.id.slice(0, 8), 16) % gradients.length;
     return gradients[index];
   };
@@ -430,9 +435,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden">
-      {/* Main Content Area */}
       <div className="relative h-full flex flex-col">
-        {/* Header - Always visible at top */}
         <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/60 to-transparent">
           <div className="flex items-center space-x-3">
             <Avatar 
@@ -463,7 +466,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
               </div>
             </div>
             
-            {/* Delete Button for Post Owner or Admin */}
             {(user?.id === post.user_id || isAdmin) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -489,7 +491,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         </div>
 
-        {/* Media - Full screen like TikTok/Reels with optional blur background */}
         {post.media_url && (
           <div className="absolute inset-0 z-0 bg-black">
             {post.has_blur_background && (
@@ -526,24 +527,34 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                 />
               )}
               {post.media_type === 'video' && (
-                <video
-                  ref={videoRef}
-                  src={post.media_url}
-                  controls
-                  className={`${
-                    post.aspect_ratio === '9:16' ? 'w-full h-full object-cover' :
-                    post.aspect_ratio === '16:9' ? 'w-full h-auto max-h-full object-contain' :
-                    'w-auto h-full max-w-full object-contain'
-                  }`}
-                  playsInline
-                  loop
-                />
+                <>
+                  <video
+                    ref={videoRef}
+                    src={post.media_url}
+                    onClick={toggleMute}
+                    className={`${
+                      post.aspect_ratio === '9:16' ? 'w-full h-full object-cover' :
+                      post.aspect_ratio === '16:9' ? 'w-full h-auto max-h-full object-contain' :
+                      'w-auto h-full max-w-full object-contain'
+                    }`}
+                    playsInline
+                    loop
+                    muted={isMuted}
+                  />
+                  <div className="absolute top-4 right-4 z-20 flex gap-2">
+                    <Button variant="ghost" size="icon" onClick={toggleMute} className="text-white bg-black/30 hover:bg-black/50">
+                      {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    </Button>
+                     <Button variant="ghost" size="icon" onClick={toggleFullScreen} className="text-white bg-black/30 hover:bg-black/50">
+                      <Maximize className="w-5 h-5" />
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           </div>
         )}
 
-        {/* Text-only post - Full-screen gradient style */}
         {isTextOnly && post.content && post.content.length <= 150 && (
           <div className={`absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br ${getGradientBackground()} p-4 pr-16 sm:p-6 sm:pr-20 md:pr-24`}>
             <p className={`text-white ${getTextSize(post.content)} font-bold text-center leading-relaxed break-words max-w-3xl px-2 sm:px-4`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
@@ -552,7 +563,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         )}
 
-        {/* Text-only post - Compact card style for longer text */}
         {isTextOnly && post.content && post.content.length > 150 && (
           <div className="absolute inset-0 z-0 flex items-start justify-center bg-gray-900 p-4 pt-20 sm:p-6 sm:pt-24">
             <div className="w-full max-w-2xl bg-gray-800/90 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-gray-700/50">
@@ -563,26 +573,21 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         )}
 
-        {/* Content and Actions - Adjusted for text-only posts */}
         <div className={`absolute bottom-0 left-0 right-0 z-20 p-4 ${isTextOnly ? 'bg-black/40 backdrop-blur-sm' : 'bg-gradient-to-t from-black/80 via-black/50 to-transparent'}`}>
-          {/* Content - Only show if there's media */}
           {post.media_url && post.content && (
             <p className="text-white mb-2 whitespace-pre-wrap text-base line-clamp-3">
               {post.content}
             </p>
           )}
 
-          {/* Time */}
           <p className="text-white/60 text-xs mb-1">{timeAgo}</p>
 
-          {/* Music Title - Placeholder for future implementation */}
           {post.media_type === 'video' && (
             <p className="text-white/70 text-xs mb-3 italic">
               🎵 Original Audio
             </p>
           )}
 
-          {/* Promote Link */}
           <button
             onClick={handlePromote}
             className="text-white/80 hover:text-white text-xs font-medium transition-colors flex items-center"
@@ -591,9 +596,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </button>
         </div>
 
-        {/* TikTok-style Vertical Action Buttons - Right Side (5% smaller) */}
         <div className="absolute right-4 bottom-32 z-30 flex flex-col items-center space-y-4">
-          {/* Like Button */}
           <button
             onClick={handleLike}
             disabled={isLiking}
@@ -607,11 +610,9 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             <span className="text-white text-[9px] font-bold">{localLikesCount}</span>
           </button>
 
-          {/* Comment Button */}
           <button
             onClick={() => {
               setShowComments(true);
-              // Track as engaged view when commenting
               if (!hasViewed) {
                 const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
                 trackView(elapsed, true);
@@ -626,7 +627,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             <span className="text-white text-[9px] font-bold">{post.comments_count}</span>
           </button>
 
-          {/* Share Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95">
@@ -660,7 +660,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          {/* Save/Bookmark Button */}
           <button
             onClick={handleSave}
             className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
@@ -673,7 +672,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             <span className="text-white text-[9px] font-bold">Save</span>
           </button>
 
-          {/* Views Counter */}
           <div className="flex flex-col items-center space-y-0.5">
             <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
               <Eye className="w-[18px] h-[18px] text-white" />
@@ -683,7 +681,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         </div>
       </div>
 
-      {/* Comments Modal */}
       <CommentsModal
         open={showComments}
         onClose={() => {
@@ -694,14 +691,12 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         postOwnerId={post.user_id}
       />
 
-      {/* Profile Preview Modal */}
       <ProfilePreviewModal
         open={showProfilePreview}
         onClose={() => setShowProfilePreview(false)}
         userId={post.user_id}
       />
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent className="bg-gray-900 border-gray-800">
           <AlertDialogHeader>

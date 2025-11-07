@@ -1,113 +1,149 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Check, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 interface NotificationItemProps {
   notification: {
     id: string;
+    user_id: string;
     type: string;
-    title: string;
     message: string | null;
-    related_id: string | null;
-    related_type: string | null;
+    reference_id: string | null; 
     is_read: boolean;
     created_at: string;
     from_user: {
+      id: string;
       display_name: string | null;
       avatar_url: string | null;
+      username: string | null;
     } | null;
   };
   onUpdate: () => void;
-  onClose: () => void;
 }
 
-export const NotificationItem = ({ notification, onUpdate, onClose }: NotificationItemProps) => {
+export const NotificationItem = ({ notification, onUpdate }: NotificationItemProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isHandled, setIsHandled] = useState(false);
+  const [handledMessage, setHandledMessage] = useState('');
 
-  const handleClick = async () => {
-    // Mark as read
+  const handleGeneralClick = async () => {
     if (!notification.is_read) {
-      await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notification.id);
+      await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
       onUpdate();
     }
-
-    // Navigate based on type
-    if (notification.related_type === 'post' && notification.related_id) {
-      navigate(`/feed?post=${notification.related_id}`);
-    } else if (notification.related_type === 'comment' && notification.related_id) {
-      navigate(`/feed?post=${notification.related_id}`);
-    } else if (notification.related_type === 'conversation' && notification.related_id) {
-      navigate(`/messages?conversation=${notification.related_id}`);
-    } else if (notification.related_type === 'profile' && notification.related_id) {
-      navigate(`/profile/${notification.related_id}`);
-    } else if (notification.related_type === 'friend_request' && notification.from_user_id) {
-      navigate(`/profile/${notification.from_user_id}`);
-    } else {
-      // Fallback for unknown types
-      navigate('/feed');
+    if (notification.type === 'new_post' && notification.reference_id) {
+      navigate(`/feed?post=${notification.reference_id}`);
+    } else if ((notification.type === 'info' || notification.type === 'friend_request') && notification.from_user) {
+      navigate(`/profile/${notification.from_user.id}`);
     }
-    
-    onClose();
+  };
+
+  const handleFriendRequest = async (e: React.MouseEvent, accept: boolean) => {
+    e.stopPropagation();
+    if (!notification.reference_id || !user || !notification.from_user) return;
+
+    try {
+      const { error: reqErr } = await supabase
+        .from('friend_requests')
+        .update({ status: accept ? 'accepted' : 'rejected' })
+        .eq('id', notification.reference_id);
+
+      if (reqErr) throw reqErr;
+
+      if (accept) {
+        setHandledMessage(`You are now friends with ${notification.from_user.display_name}.`);
+        await supabase.from('notifications').insert({
+          user_id: notification.from_user.id,
+          from_user_id: user.id,
+          type: 'info',
+          message: `${user.user_metadata.display_name || 'A user'} accepted your friend request.`,
+        });
+      } else {
+        setHandledMessage('Friend request declined.');
+      }
+      setIsHandled(true);
+
+      await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
+      toast({ title: `Friend request ${accept ? 'accepted' : 'declined'}.` });
+      onUpdate();
+
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+      setIsHandled(false);
+    }
   };
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await supabase
-        .from('notifications')
-        .delete()
-        .eq('id', notification.id);
+      await supabase.from('notifications').delete().eq('id', notification.id);
       onUpdate();
     } catch (error) {
       console.error('Error deleting notification:', error);
     }
   };
 
-  return (
-    <button
-      onClick={handleClick}
-      className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors text-left ${
-        !notification.is_read ? 'bg-accent/50' : ''
-      }`}
-    >
-      <Avatar className="w-10 h-10">
-        <AvatarImage src={notification.from_user?.avatar_url || ''} />
-        <AvatarFallback>
-          {notification.from_user?.display_name?.[0] || '?'}
-        </AvatarFallback>
-      </Avatar>
+  const isFriendRequest = notification.type === 'friend_request';
 
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm">{notification.title}</p>
-        {notification.message && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {notification.message}
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-        </p>
+  if (isHandled || (isFriendRequest && notification.is_read)) {
+    return (
+      <div className="p-4 flex items-center gap-3 bg-accent/50" onClick={handleGeneralClick}>
+        <Info className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+            <p className="text-sm text-muted-foreground">
+                {isHandled 
+                    ? handledMessage 
+                    : `You responded to the friend request from ${notification.from_user?.display_name}.`
+                }
+            </p>
+             <p className="text-xs text-muted-foreground mt-1">
+                {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+            </p>
+        </div>
       </div>
+    );
+  }
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 flex-shrink-0"
-        onClick={handleDelete}
-      >
-        <X className="w-4 h-4" />
-      </Button>
-
-      {!notification.is_read && (
-        <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
-      )}
-    </button>
+  return (
+    <div className={`p-4 hover:bg-accent transition-colors ${!notification.is_read ? 'bg-accent/50' : ''}`}>
+        <div className="flex items-start gap-3 cursor-pointer" onClick={handleGeneralClick}>
+            <Avatar className="w-10 h-10">
+                <AvatarImage src={notification.from_user?.avatar_url || ''} />
+                <AvatarFallback>{notification.from_user?.display_name?.[0] || '?'}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground" dangerouslySetInnerHTML={{ __html: notification.message || '' }}></p>
+                <p className="text-xs text-muted-foreground mt-1">
+                    {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                </p>
+            </div>
+            {!isFriendRequest && (
+                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={handleDelete}>
+                    <X className="w-4 h-4" />
+                </Button>
+            )}
+            {!notification.is_read && (
+                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
+            )}
+        </div>
+        {isFriendRequest && !notification.is_read && (
+            <div className="flex items-center gap-2 mt-2 pl-12">
+                <Button size="sm" onClick={(e) => handleFriendRequest(e, true)} className="bg-green-500 hover:bg-green-600">
+                    <Check className="w-4 h-4 mr-1" /> Accept
+                </Button>
+                <Button size="sm" variant="outline" onClick={(e) => handleFriendRequest(e, false)}>
+                    <X className="w-4 h-4 mr-1" /> Decline
+                </Button>
+            </div>
+        )}
+    </div>
   );
 };
