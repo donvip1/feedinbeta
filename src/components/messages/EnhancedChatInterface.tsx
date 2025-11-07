@@ -117,6 +117,30 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
       if (error) throw error;
       
+      // Get all unique message IDs that are being replied to
+      const replyToIds = [...new Set((data || []).map(m => m.reply_to_id).filter(Boolean))];
+      
+      // Fetch replied-to messages
+      let repliedMessages = new Map();
+      if (replyToIds.length > 0) {
+        const { data: repliedData } = await supabase
+          .from('messages')
+          .select('id, content, sender_id, profiles!messages_sender_id_fkey(display_name)')
+          .in('id', replyToIds);
+        
+        if (repliedData) {
+          repliedMessages = new Map(repliedData.map(m => [
+            m.id, 
+            { 
+              content: m.content,
+              sender: { 
+                display_name: (m.profiles as any)?.display_name || 'User' 
+              }
+            }
+          ]));
+        }
+      }
+      
       const formattedMessages = (data || []).map(msg => ({
         id: msg.id,
         content: msg.content,
@@ -129,7 +153,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         media_type: msg.media_type || null,
         reply_to_id: msg.reply_to_id || null,
         is_pinned: (msg as any).is_pinned || false,
-        reply_to_message: null,
+        reply_to_message: msg.reply_to_id ? repliedMessages.get(msg.reply_to_id) || null : null,
         profiles: {
           display_name: null,
           avatar_url: null,
@@ -960,16 +984,16 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         <div className="p-4">
           {/* Reply Preview */}
           {replyingTo && (
-            <div className="mb-2 p-2 bg-accent rounded-lg flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">Replying to</p>
+            <div className="mb-3 p-3 bg-accent/80 rounded-lg flex items-start justify-between border-l-4 border-primary">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-primary mb-1">Replying to</p>
                 <p className="text-sm truncate">{replyingTo.content}</p>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setReplyingTo(null)}
-                className="h-6 w-6"
+                className="h-8 w-8 flex-shrink-0 ml-2"
               >
                 <X className="w-4 h-4" />
               </Button>

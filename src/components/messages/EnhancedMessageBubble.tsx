@@ -213,11 +213,13 @@ export const EnhancedMessageBubble = ({
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%] relative`}>
         {/* Reply Indicator */}
         {message.reply_to_message && (
-          <div className={`text-xs p-2 mb-1 rounded border-l-2 ${
-            isOwn ? 'bg-white/10 border-white/30' : 'bg-accent/50 border-primary/30'
+          <div className={`text-xs p-2 mb-1 rounded-lg border-l-4 max-w-full ${
+            isOwn 
+              ? 'bg-white/10 border-white/50 text-white/90' 
+              : 'bg-primary/10 border-primary/50'
           }`}>
-            <p className="font-semibold">{message.reply_to_message.sender.display_name}</p>
-            <p className="truncate">{message.reply_to_message.content}</p>
+            <p className="font-semibold text-primary">{message.reply_to_message.sender.display_name}</p>
+            <p className="truncate opacity-80 text-xs">{message.reply_to_message.content}</p>
           </div>
         )}
 
