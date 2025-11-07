@@ -1967,6 +1967,7 @@ export type Database = {
           about: string | null
           age: number | null
           avatar_url: string | null
+          banner_url: string | null
           bio: string | null
           country: string | null
           created_at: string
@@ -2003,6 +2004,7 @@ export type Database = {
           about?: string | null
           age?: number | null
           avatar_url?: string | null
+          banner_url?: string | null
           bio?: string | null
           country?: string | null
           created_at?: string
@@ -2039,6 +2041,7 @@ export type Database = {
           about?: string | null
           age?: number | null
           avatar_url?: string | null
+          banner_url?: string | null
           bio?: string | null
           country?: string | null
           created_at?: string

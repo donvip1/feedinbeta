@@ -5,9 +5,9 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Settings, CheckCheck, Bell, Trash2 } from 'lucide-react';
+import { Settings, CheckCheck, Bell, Trash2, ArrowLeft } from 'lucide-react';
 import { NotificationItem } from '@/components/notifications/NotificationItem';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface Notification {
   id: string;
@@ -32,6 +32,7 @@ interface Notification {
 export const NotificationsPage = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -128,7 +129,16 @@ export const NotificationsPage = () => {
       {/* Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-semibold">Notifications</h3>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate(-1)}
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
+            <h3 className="text-lg font-semibold">Notifications</h3>
+          </div>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"

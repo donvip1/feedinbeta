@@ -16,6 +16,7 @@ interface Profile {
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
+  banner_url: string | null;
   bio: string | null;
   status: string | null;
   about: string | null;
@@ -36,6 +37,7 @@ const Profile = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowingMe, setIsFollowingMe] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -57,6 +59,7 @@ const Profile = () => {
         }
       } else {
         checkFollowStatus();
+        checkIfFollowingMe();
         checkFriendRequestStatus();
       }
     }
@@ -120,6 +123,24 @@ const Profile = () => {
       setIsFollowing(!!data);
     } catch (error: any) {
       console.error('Error checking follow status:', error);
+    }
+  };
+
+  const checkIfFollowingMe = async () => {
+    if (!user || !userId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', userId)
+        .eq('following_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setIsFollowingMe(!!data);
+    } catch (error: any) {
+      console.error('Error checking if following me:', error);
     }
   };
 
@@ -253,6 +274,48 @@ const Profile = () => {
     }
   };
 
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `banner-${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ banner_url: data.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      await loadProfile();
+      
+      toast({
+        title: 'Banner updated',
+        description: 'Your profile banner has been changed',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error uploading banner',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
@@ -295,12 +358,41 @@ const Profile = () => {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-2xl">
+      {/* Banner Image */}
+      <div className="relative w-full h-48 bg-gradient-to-br from-gray-900 to-gray-800">
+        {profile?.banner_url ? (
+          <img 
+            src={profile.banner_url} 
+            alt="Profile banner" 
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5" />
+        )}
+        {isOwnProfile && (
+          <label
+            htmlFor="banner-upload"
+            className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm rounded-full p-3 cursor-pointer hover:bg-black/80 transition-colors"
+          >
+            <Camera className="w-5 h-5 text-white" />
+            <input
+              id="banner-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleBannerUpload}
+              disabled={uploading}
+            />
+          </label>
+        )}
+      </div>
+
+      <div className="container mx-auto px-4 -mt-16 max-w-2xl relative z-10">
         <div className="flex flex-col items-center mb-6">
           <div className="relative">
-            <Avatar className="w-32 h-32 mb-4">
+            <Avatar className="w-32 h-32 mb-4 border-4 border-black">
               <AvatarImage src={profile.avatar_url || ''} />
-              <AvatarFallback className="text-4xl">
+              <AvatarFallback className="text-4xl bg-gray-800">
                 {profile.display_name?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
@@ -334,6 +426,12 @@ const Profile = () => {
 
           {profile.bio && (
             <p className="text-center text-gray-300 mt-2 max-w-md">{profile.bio}</p>
+          )}
+          
+          {isFollowingMe && !isOwnProfile && (
+            <Badge variant="secondary" className="mt-2">
+              Follows you
+            </Badge>
           )}
         </div>
 
@@ -379,7 +477,7 @@ const Profile = () => {
                   : 'flex-1 bg-gradient-to-r from-pink-500 to-blue-500 text-white'
               }
             >
-              {isFollowing ? 'Following' : 'Follow'}
+              {isFollowingMe && isFollowing ? 'Unfollow' : isFollowing ? 'Following' : 'Follow'}
             </Button>
             <Button
               onClick={hasPendingRequest ? undefined : sendFriendRequest}
