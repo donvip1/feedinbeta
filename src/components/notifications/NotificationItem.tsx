@@ -35,10 +35,27 @@ export const NotificationItem = ({ notification, onUpdate }: NotificationItemPro
   const [handledMessage, setHandledMessage] = useState('');
 
   const handleGeneralClick = async () => {
+    // Mark as read first
     if (!notification.is_read) {
       await supabase.from('notifications').update({ is_read: true }).eq('id', notification.id);
       onUpdate();
     }
+
+    // Direct-to-DM deep links for message notifications
+    if (
+      ['message', 'new_message', 'chat', 'dm'].includes(notification.type) ||
+      (notification.reference_id && notification.type?.includes('message'))
+    ) {
+      if (notification.reference_id) {
+        navigate(`/messages?conversation=${notification.reference_id}`);
+        return;
+      }
+      if (notification.from_user) {
+        navigate(`/messages?user=${notification.from_user.id}`);
+        return;
+      }
+    }
+
     if (notification.type === 'new_post' && notification.reference_id) {
       navigate(`/feed?post=${notification.reference_id}`);
     } else if ((notification.type === 'info' || notification.type === 'friend_request') && notification.from_user) {

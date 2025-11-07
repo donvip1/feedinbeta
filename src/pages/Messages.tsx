@@ -84,6 +84,27 @@ export default function Messages() {
     if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
 
+  // Open conversation from URL (e.g., notifications deep link)
+  useEffect(() => {
+    if (!user) return;
+    const params = new URLSearchParams(location.search);
+    const convoId = params.get('conversation');
+    const userId = params.get('user');
+
+    const openFromParams = async () => {
+      if (convoId) {
+        setSelectedConversationId(convoId);
+        return;
+      }
+      if (userId) {
+        const conv = await openOrCreateConversationWithUser(userId);
+        if (conv) setSelectedConversationId(conv);
+      }
+    };
+
+    openFromParams();
+  }, [location.search, user]);
+
   const loadData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
@@ -95,7 +116,7 @@ export default function Messages() {
       ]);
     } catch (error: any) {
       console.error("Error loading page data:", error);
-      toast({ title: "Error", description: `Could not load your data: ${error.message}`, variant: "destructive" });
+      toast({ title: "Error", description: `Could not load your data: ${error.message}` , variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -232,6 +253,44 @@ export default function Messages() {
     setChatList(combinedList);
   };
   
+  const findExistingConversationWithUser = async (otherUserId: string): Promise<string | null> => {
+    if (!user) return null;
+    const { data: myConvos } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', user.id);
+    const ids = myConvos?.map((r: any) => r.conversation_id) || [];
+    if (ids.length === 0) return null;
+    const { data: rows } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .in('conversation_id', ids)
+      .eq('user_id', otherUserId)
+      .limit(1);
+    return rows && rows.length ? rows[0].conversation_id : null;
+  };
+
+  const openOrCreateConversationWithUser = async (otherUserId: string): Promise<string | null> => {
+    if (!user) return null;
+    // Try existing
+    const existing = await findExistingConversationWithUser(otherUserId);
+    if (existing) return existing;
+
+    // Try RPC helper if available
+    const { data: rpcId, error: rpcErr } = await supabase.rpc('create_conversation', { other_user_id: otherUserId });
+    if (!rpcErr && rpcId) return rpcId as string;
+
+    // Fallback: create convo and add current user as participant (other user will be added on first message or by backend job)
+    const { data: conv, error: convErr } = await supabase.from('conversations').insert({}).select('id').single();
+    if (convErr) {
+      console.error('Failed to create conversation:', convErr);
+      toast({ title: 'Error', description: 'Could not start a conversation.', variant: 'destructive' });
+      return null;
+    }
+    await supabase.from('conversation_participants').insert({ conversation_id: conv.id, user_id: user.id });
+    return conv.id as string;
+  };
+
   const respondToRequest = async (requestId: string, accepted: boolean) => {
     try {
       const { error } = await supabase.from('friend_requests').update({ status: accepted ? 'accepted' : 'rejected' }).eq('id', requestId);
