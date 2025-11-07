@@ -572,12 +572,23 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                     </div>
                   )}
                   
-                  <div className="absolute top-4 right-4 z-20 flex gap-2">
-                    <Button variant="ghost" size="icon" onClick={toggleMute} className="text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm">
-                      {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                  {/* Video Controls - Mute and Fullscreen */}
+                  <div className="absolute top-1/2 right-4 -translate-y-1/2 z-20 flex flex-col gap-3">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={toggleMute} 
+                      className="text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg"
+                    >
+                      {isMuted ? <VolumeX className="w-6 h-6" /> : <Volume2 className="w-6 h-6" />}
                     </Button>
-                     <Button variant="ghost" size="icon" onClick={toggleFullScreen} className="text-white bg-black/30 hover:bg-black/50 backdrop-blur-sm">
-                      <Maximize className="w-5 h-5" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={toggleFullScreen} 
+                      className="text-white bg-black/40 hover:bg-black/60 backdrop-blur-sm w-12 h-12 rounded-full shadow-lg"
+                    >
+                      <Maximize className="w-6 h-6" />
                     </Button>
                   </div>
                 </>
