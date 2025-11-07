@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog
 import { ImageViewerModal } from './ImageViewerModal';
 import { MessageForwardModal } from './MessageForwardModal';
 import { CompactNotification } from './CompactNotification';
+import { MediaUploadModal } from './MediaUploadModal';
 
 interface Message {
   id: string;
@@ -67,8 +68,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [isOnline, setIsOnline] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-  const [uploadingFile, setUploadingFile] = useState(false);
-  const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string } | null>(null);
+  const [showMediaUpload, setShowMediaUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showQuickReplies, setShowQuickReplies] = useState(false);
@@ -77,8 +77,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [compactNotif, setCompactNotif] = useState<{ sender: string; avatar: string | null; message: string; convId: string } | null>(null);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -475,24 +473,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }, 2000);
   };
 
-  const uploadFile = async (file: File): Promise<string> => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${user!.id}/${fileName}`;
-
-    const { error: uploadError, data } = await supabase.storage
-      .from('chat-media')
-      .upload(filePath, file);
-
-    if (uploadError) throw uploadError;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('chat-media')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
-  };
-
   const ensureParticipantExists = async (participantUserId: string): Promise<boolean> => {
     try {
       // Check if participant already exists
@@ -583,7 +563,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
       setNewMessage('');
       setReplyingTo(null);
-      setPreviewMedia(null);
     } catch (error: any) {
       console.error('Error sending message:', error);
       toast({
@@ -596,44 +575,23 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadingFile(true);
-    try {
-      const url = await uploadFile(file);
-      const type = file.type;
-      
-      if (type.startsWith('image') || type.startsWith('video')) {
-        setPreviewMedia({ url, type });
-      } else {
-        await handleSend(url, type);
-      }
-    } catch (error: any) {
-      toast({
-        title: 'Upload failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setUploadingFile(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      if (imageInputRef.current) imageInputRef.current.value = '';
-    }
-  };
-
   const handleVoiceNote = async (audioBlob: Blob, duration: number) => {
-    setUploadingFile(true);
     try {
-      // Create a proper File object from the Blob
-      const file = Object.assign(audioBlob, {
-        name: `voice-${Date.now()}.webm`,
-        lastModified: Date.now(),
-      }) as File;
-      
-      const url = await uploadFile(file);
-      await handleSend(url, 'audio/webm');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fileName = `${user.id}/${Date.now()}-voice.webm`;
+      const { data, error: uploadError } = await supabase.storage
+        .from('chat-audio')
+        .upload(fileName, audioBlob);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-audio')
+        .getPublicUrl(fileName);
+
+      await handleSend(publicUrl, 'audio/webm');
       setShowVoiceRecorder(false);
     } catch (error: any) {
       toast({
@@ -641,8 +599,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         description: error.message,
         variant: 'destructive',
       });
-    } finally {
-      setUploadingFile(false);
     }
   };
 
@@ -1078,7 +1034,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
                     handleSend();
                   }
                 }}
-                disabled={sending || uploadingFile}
+                disabled={sending}
                 placeholder="Type a message..."
                 conversationId={conversationId}
               />
@@ -1086,7 +1042,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
               {newMessage.trim() ? (
                 <Button
                   onClick={() => handleSend()}
-                  disabled={sending || uploadingFile}
+                  disabled={sending}
                   size="icon"
                   className="bg-gradient-primary flex-shrink-0 h-11 w-11"
                 >
@@ -1095,7 +1051,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
               ) : (
                 <Button
                   onClick={() => setShowVoiceRecorder(true)}
-                  disabled={uploadingFile}
                   size="icon"
                   className="bg-gradient-primary flex-shrink-0 h-11 w-11"
                 >
@@ -1119,8 +1074,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => imageInputRef.current?.click()}
-                disabled={uploadingFile}
+                onClick={() => setShowMediaUpload(true)}
                 className="h-8"
               >
                 <ImageIcon className="w-4 h-4 mr-1" />
@@ -1129,8 +1083,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingFile}
+                onClick={() => setShowMediaUpload(true)}
                 className="h-8"
               >
                 <Paperclip className="w-4 h-4 mr-1" />
@@ -1140,53 +1093,8 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           </div>
         )}
 
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*,video/*"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
         </div>
       </div>
-
-      {/* Media Preview Dialog */}
-      <Dialog open={!!previewMedia} onOpenChange={() => setPreviewMedia(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogDescription className="sr-only">Preview and send media</DialogDescription>
-          {previewMedia && (
-            <div className="space-y-4">
-              {previewMedia.type.startsWith('image') ? (
-                <img src={previewMedia.url} alt="Preview" className="w-full rounded-lg" />
-              ) : (
-                <video src={previewMedia.url} controls className="w-full rounded-lg" />
-              )}
-              <div className="flex gap-2">
-                <UserMentionInput
-                  value={newMessage}
-                  onChange={setNewMessage}
-                  placeholder="Add a caption..."
-                  conversationId={conversationId}
-                />
-                <Button
-                  onClick={() => handleSend(previewMedia.url, previewMedia.type)}
-                  disabled={sending}
-                  className="bg-gradient-primary"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Send
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       {/* Image Viewer */}
       <ImageViewerModal
