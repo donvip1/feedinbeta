@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
-import { X, Image as ImageIcon, Video, Music, FileText, AlertCircle } from 'lucide-react';
+import { X, Image as ImageIcon, Video, Music, FileText, AlertCircle, Sparkles } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ImageEditor } from './ImageEditor';
@@ -11,6 +11,7 @@ import { AudioTrimmer } from './AudioTrimmer';
 import { VideoTrimmer } from './VideoTrimmer';
 import { ImageDrawingTools } from './ImageDrawingTools';
 import { EnhancedImageCropper } from './EnhancedImageCropper';
+import { AIImageEnhancer } from './AIImageEnhancer';
 import { compressImage, shouldCompressImage, formatFileSize as formatSize } from '@/lib/media-compression';
 
 interface MediaUploadModalProps {
@@ -47,6 +48,7 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
   const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
   const [showDrawingTools, setShowDrawingTools] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
+  const [showAIEnhancer, setShowAIEnhancer] = useState(false);
   const [editedFile, setEditedFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
 
@@ -273,6 +275,15 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
                           >
                             Draw
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAIEnhancer(true)}
+                            className="gap-1"
+                          >
+                            <Sparkles className="w-3 h-3" />
+                            AI Enhance
+                          </Button>
                         </>
                       )}
                       {selectedFile.type.startsWith('audio/') && (
@@ -385,6 +396,14 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
         <EnhancedImageCropper
           open={showCropper}
           onClose={() => setShowCropper(false)}
+          imageFile={selectedFile}
+          onSave={handleImageEdit}
+        />
+      )}
+      {selectedFile && showAIEnhancer && (
+        <AIImageEnhancer
+          open={showAIEnhancer}
+          onClose={() => setShowAIEnhancer(false)}
           imageFile={selectedFile}
           onSave={handleImageEdit}
         />

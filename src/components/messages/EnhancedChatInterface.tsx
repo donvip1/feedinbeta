@@ -11,6 +11,8 @@ import { EnhancedMessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { UserMentionInput } from './UserMentionInput';
 import { VoiceRecorder } from './VoiceRecorder';
+import { EnhancedVoiceRecorder } from './EnhancedVoiceRecorder';
+import { VideoRecorder } from './VideoRecorder';
 import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog';
 import { ImageViewerModal } from './ImageViewerModal';
 import { MessageForwardModal } from './MessageForwardModal';
@@ -67,6 +69,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [isOnline, setIsOnline] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+  const [showVideoRecorder, setShowVideoRecorder] = useState(false);
   const [showMediaUpload, setShowMediaUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -575,7 +578,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
-  const handleVoiceNote = async (audioBlob: Blob, duration: number) => {
+  const handleVoiceNote = async (audioBlob: Blob) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -591,11 +594,63 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         .from('chat-audio')
         .getPublicUrl(fileName);
 
-      await handleSend(publicUrl, 'audio/webm');
+      const { error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: 'Voice message',
+          media_url: publicUrl,
+          media_type: 'audio/webm',
+        });
+
+      if (messageError) throw messageError;
+
       setShowVoiceRecorder(false);
+      toast({ title: 'Voice message sent' });
     } catch (error: any) {
       toast({
         title: 'Failed to send voice note',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleVideoMessage = async (videoBlob: Blob) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const fileName = `${user.id}/${Date.now()}-video.webm`;
+      const { data, error: uploadError } = await supabase.storage
+        .from('chat-videos')
+        .upload(fileName, videoBlob);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat-videos')
+        .getPublicUrl(fileName);
+
+      const { error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: user.id,
+          content: 'Video message',
+          media_url: publicUrl,
+          media_type: 'video/webm',
+        });
+
+      if (messageError) throw messageError;
+
+      setShowVideoRecorder(false);
+      toast({ title: 'Video sent successfully' });
+    } catch (error: any) {
+      console.error('Error sending video:', error);
+      toast({
+        title: 'Error sending video',
         description: error.message,
         variant: 'destructive',
       });
@@ -1076,7 +1131,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           )}
 
         {showVoiceRecorder ? (
-          <VoiceRecorder
+          <EnhancedVoiceRecorder
             onSend={handleVoiceNote}
             onCancel={() => setShowVoiceRecorder(false)}
           />
@@ -1145,6 +1200,15 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={() => setShowVideoRecorder(true)}
+                className="h-8"
+              >
+                <Video className="w-4 h-4 mr-1" />
+                <span className="text-xs">Video</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowMediaUpload(true)}
                 className="h-8"
               >
@@ -1197,6 +1261,13 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           loadMessages();
           setShowMediaUpload(false);
         }}
+      />
+
+      {/* Video Recorder */}
+      <VideoRecorder
+        open={showVideoRecorder}
+        onClose={() => setShowVideoRecorder(false)}
+        onSave={handleVideoMessage}
       />
     </>
   );
