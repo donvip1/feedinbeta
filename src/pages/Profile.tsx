@@ -1,15 +1,15 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ProfileSettings } from '@/components/profile/ProfileSettings';
-import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Users } from 'lucide-react';
-import { BottomNav } from '@/components/navigation/BottomNav';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ProfileSettings } from "@/components/profile/ProfileSettings";
+import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Users } from "lucide-react";
+import { BottomNav } from "@/components/navigation/BottomNav";
 
 interface Profile {
   id: string;
@@ -66,7 +66,7 @@ const Profile = () => {
   }, [userId, user, isOwnProfile]);
 
   const checkAdminStatus = async (email: string) => {
-    const adminEmails = ['viplearn4free@gmail.com', 'cryptosvip@gmail.com', 'myconnectmate@gmail.com'];
+    const adminEmails = ["viplearn4free@gmail.com", "cryptosvip@gmail.com", "myconnectmate@gmail.com"];
     setIsAdmin(adminEmails.includes(email.toLowerCase()));
   };
 
@@ -74,9 +74,9 @@ const Profile = () => {
     setLoading(true);
     try {
       const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
         .single();
 
       if (profileError) throw profileError;
@@ -84,10 +84,10 @@ const Profile = () => {
       let creditsBalance = 0;
       if (isOwnProfile) {
         const { data: transactions } = await supabase
-          .from('credit_transactions')
-          .select('amount, type')
-          .eq('user_id', userId);
-        
+          .from("credit_transactions")
+          .select("amount, type")
+          .eq("user_id", userId);
+
         if (transactions) {
           creditsBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
         }
@@ -99,9 +99,9 @@ const Profile = () => {
       } as Profile);
     } catch (error: any) {
       toast({
-        title: 'Error loading profile',
+        title: "Error loading profile",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -113,16 +113,16 @@ const Profile = () => {
 
     try {
       const { data, error } = await supabase
-        .from('follows')
-        .select('id')
-        .eq('follower_id', user.id)
-        .eq('following_id', userId)
+        .from("follows")
+        .select("id")
+        .eq("follower_id", user.id)
+        .eq("following_id", userId)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== "PGRST116") throw error;
       setIsFollowing(!!data);
     } catch (error: any) {
-      console.error('Error checking follow status:', error);
+      console.error("Error checking follow status:", error);
     }
   };
 
@@ -131,16 +131,16 @@ const Profile = () => {
 
     try {
       const { data, error } = await supabase
-        .from('follows')
-        .select('id')
-        .eq('follower_id', userId)
-        .eq('following_id', user.id)
+        .from("follows")
+        .select("id")
+        .eq("follower_id", userId)
+        .eq("following_id", user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== "PGRST116") throw error;
       setIsFollowingMe(!!data);
     } catch (error: any) {
-      console.error('Error checking if following me:', error);
+      console.error("Error checking if following me:", error);
     }
   };
 
@@ -149,17 +149,17 @@ const Profile = () => {
 
     try {
       const { data, error } = await supabase
-        .from('friend_requests')
-        .select('id')
-        .eq('sender_id', user.id)
-        .eq('receiver_id', userId)
-        .eq('status', 'pending')
+        .from("friend_requests")
+        .select("id")
+        .eq("sender_id", user.id)
+        .eq("receiver_id", userId)
+        .eq("status", "pending")
         .single();
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error && error.code !== "PGRST116") throw error;
       setHasPendingRequest(!!data);
     } catch (error: any) {
-      console.error('Error checking friend request status:', error);
+      console.error("Error checking friend request status:", error);
     }
   };
 
@@ -168,14 +168,10 @@ const Profile = () => {
 
     try {
       if (isFollowing) {
-        await supabase
-          .from('follows')
-          .delete()
-          .eq('follower_id', user.id)
-          .eq('following_id', userId);
+        await supabase.from("follows").delete().eq("follower_id", user.id).eq("following_id", userId);
         setIsFollowing(false);
       } else {
-        await supabase.from('follows').insert({
+        await supabase.from("follows").insert({
           follower_id: user.id,
           following_id: userId,
         });
@@ -184,9 +180,9 @@ const Profile = () => {
       loadProfile(); // Refresh profile to update counts
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
@@ -195,19 +191,19 @@ const Profile = () => {
     if (!user || !userId) return;
 
     try {
-      await supabase.from('friend_requests').insert({
+      await supabase.from("friend_requests").insert({
         sender_id: user.id,
         receiver_id: userId,
       });
       setHasPendingRequest(true);
       toast({
-        title: 'Friend request sent',
+        title: "Friend request sent",
       });
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: "Error",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     }
   };
@@ -216,8 +212,8 @@ const Profile = () => {
     if (!user || !userId) return;
 
     try {
-      const { data: conversationId, error } = await supabase.rpc('create_conversation', {
-        other_user_id: userId
+      const { data: conversationId, error } = await supabase.rpc("create_conversation", {
+        other_user_id: userId,
       });
 
       if (error) throw error;
@@ -225,9 +221,9 @@ const Profile = () => {
       navigate(`/messages?conversation=${conversationId}`);
     } catch (error: any) {
       toast({
-        title: 'Unable to start conversation',
-        description: 'Please try again later.',
-        variant: 'destructive',
+        title: "Unable to start conversation",
+        description: "Please try again later.",
+        variant: "destructive",
       });
     }
   };
@@ -238,36 +234,34 @@ const Profile = () => {
 
     try {
       setUploading(true);
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split(".").pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
       const { error: updateError } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({ avatar_url: data.publicUrl })
-        .eq('id', user.id);
+        .eq("id", user.id);
 
       if (updateError) throw updateError;
 
       await loadProfile();
-      
+
       toast({
-        title: 'Avatar updated',
-        description: 'Your profile picture has been changed',
+        title: "Avatar updated",
+        description: "Your profile picture has been changed",
       });
     } catch (error: any) {
       toast({
-        title: 'Error uploading image',
+        title: "Error uploading image",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setUploading(false);
@@ -280,36 +274,34 @@ const Profile = () => {
 
     try {
       setUploading(true);
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split(".").pop();
       const fileName = `banner-${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file);
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
       const { error: updateError } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({ banner_url: data.publicUrl })
-        .eq('id', user.id);
+        .eq("id", user.id);
 
       if (updateError) throw updateError;
 
       await loadProfile();
-      
+
       toast({
-        title: 'Banner updated',
-        description: 'Your profile banner has been changed',
+        title: "Banner updated",
+        description: "Your profile banner has been changed",
       });
     } catch (error: any) {
       toast({
-        title: 'Error uploading banner',
+        title: "Error uploading banner",
         description: error.message,
-        variant: 'destructive',
+        variant: "destructive",
       });
     } finally {
       setUploading(false);
@@ -336,15 +328,10 @@ const Profile = () => {
     <div className="min-h-screen bg-black text-white pb-20">
       <header className="sticky top-0 z-40 bg-black/80 backdrop-blur-lg border-b border-gray-800">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Button
-            onClick={() => navigate(-1)}
-            variant="ghost"
-            size="icon"
-            className="text-gray-400 hover:text-white"
-          >
+          <Button onClick={() => navigate(-1)} variant="ghost" size="icon" className="text-gray-400 hover:text-white">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          
+
           {isOwnProfile && (
             <Button
               onClick={() => setShowSettings(true)}
@@ -361,11 +348,7 @@ const Profile = () => {
       {/* Banner Image */}
       <div className="relative w-full h-48 bg-gradient-to-br from-gray-900 to-gray-800">
         {profile?.banner_url ? (
-          <img 
-            src={profile.banner_url} 
-            alt="Profile banner" 
-            className="w-full h-full object-cover"
-          />
+          <img src={profile.banner_url} alt="Profile banner" className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/5" />
         )}
@@ -391,10 +374,8 @@ const Profile = () => {
         <div className="flex flex-col items-center mb-6">
           <div className="relative">
             <Avatar className="w-32 h-32 mb-4 border-4 border-black">
-              <AvatarImage src={profile.avatar_url || ''} />
-              <AvatarFallback className="text-4xl bg-gray-800">
-                {profile.display_name?.[0] || 'U'}
-              </AvatarFallback>
+              <AvatarImage src={profile.avatar_url || ""} />
+              <AvatarFallback className="text-4xl bg-gray-800">{profile.display_name?.[0] || "U"}</AvatarFallback>
             </Avatar>
             {isOwnProfile && (
               <label
@@ -413,10 +394,10 @@ const Profile = () => {
               </label>
             )}
           </div>
-          
-          <h1 className="text-2xl font-bold mb-1">{profile.display_name || 'Unknown'}</h1>
-          <p className="text-gray-400 mb-2">@{profile.username || 'user'}</p>
-          
+
+          <h1 className="text-2xl font-bold mb-1">{profile.display_name || "Unknown"}</h1>
+          <p className="text-gray-400 mb-2">@{profile.username || "user"}</p>
+
           {profile.is_premium && (
             <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 mb-2">
               <Crown className="w-3 h-3 mr-1" />
@@ -424,42 +405,36 @@ const Profile = () => {
             </Badge>
           )}
 
-          {profile.bio && (
-            <p className="text-center text-gray-300 mt-2 max-w-md">{profile.bio}</p>
-          )}
-          
+          {profile.bio && <p className="text-center text-gray-300 mt-2 max-w-md">{profile.bio}</p>}
+
           {isFollowingMe && !isOwnProfile && (
-            <Badge variant="secondary" className="mt-2">
+            <Badge variant="username" className="mt-2">
               Follows you
             </Badge>
           )}
         </div>
 
-        <div className={`grid gap-3 mb-6 grid-cols-2 ${isOwnProfile ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+        <div className={`grid gap-3 mb-6 grid-cols-2 ${isOwnProfile ? "md:grid-cols-4" : "md:grid-cols-3"}`}>
           {isOwnProfile && (
             <Card className="bg-gray-900 border-gray-800 p-4 text-center">
               <Coins className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold">
-                {isAdmin ? '∞' : profile.credits_balance}
-              </p>
-              <p className="text-xs text-gray-400">
-                {isAdmin ? 'Unlimited Credits' : 'Credits'}
-              </p>
+              <p className="text-2xl font-bold">{isAdmin ? "∞" : profile.credits_balance}</p>
+              <p className="text-xs text-gray-400">{isAdmin ? "Unlimited Credits" : "Credits"}</p>
             </Card>
           )}
-          
+
           <Card className="bg-gray-900 border-gray-800 p-4 text-center">
             <Eye className="w-6 h-6 text-blue-500 mx-auto mb-2" />
             <p className="text-2xl font-bold">{profile.total_views}</p>
             <p className="text-xs text-gray-400">Total Views</p>
           </Card>
-          
+
           <Card className="bg-gray-900 border-gray-800 p-4 text-center">
             <Heart className="w-6 h-6 text-pink-500 mx-auto mb-2" />
             <p className="text-2xl font-bold">{profile.followers_count}</p>
             <p className="text-xs text-gray-400">Followers</p>
           </Card>
-          
+
           <Card className="bg-gray-900 border-gray-800 p-4 text-center">
             <Users className="w-6 h-6 text-green-500 mx-auto mb-2" />
             <p className="text-2xl font-bold">{profile.following_count}</p>
@@ -473,11 +448,11 @@ const Profile = () => {
               onClick={toggleFollow}
               className={
                 isFollowing
-                  ? 'flex-1 bg-gray-800 hover:bg-gray-700 text-white'
-                  : 'flex-1 bg-gradient-to-r from-pink-500 to-blue-500 text-white'
+                  ? "flex-1 bg-gray-800 hover:bg-gray-700 text-white"
+                  : "flex-1 bg-gradient-to-r from-pink-500 to-blue-500 text-white"
               }
             >
-              {isFollowingMe && isFollowing ? 'Unfollow' : isFollowing ? 'Following' : 'Follow'}
+              {isFollowingMe && isFollowing ? "Unfollow" : isFollowing ? "Following" : "Follow"}
             </Button>
             <Button
               onClick={hasPendingRequest ? undefined : sendFriendRequest}
@@ -485,12 +460,9 @@ const Profile = () => {
               className="flex-1 bg-gray-800 hover:bg-gray-700 text-white disabled:opacity-50"
             >
               <UserPlus className="w-4 h-4 mr-2" />
-              {hasPendingRequest ? 'Request Sent' : 'Add Friend'}
+              {hasPendingRequest ? "Request Sent" : "Add Friend"}
             </Button>
-            <Button
-              onClick={startConversation}
-              className="bg-gray-800 hover:bg-gray-700 text-white"
-            >
+            <Button onClick={startConversation} className="bg-gray-800 hover:bg-gray-700 text-white">
               <MessageCircle className="w-4 h-4" />
             </Button>
           </div>
