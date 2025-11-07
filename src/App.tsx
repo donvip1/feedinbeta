@@ -51,7 +51,6 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         
-           <Sonner />
           <BrowserRouter future={{ v7_startTransition: true }}>
             <Routes>
               <Route path="/" element={<Index />} />
@@ -94,6 +93,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             <SafeCreditNotifications />
+            <Sonner />
           </BrowserRouter>
       </QueryClientProvider>
     </ThemeProvider>
