@@ -1,4 +1,4 @@
-import { FC, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -7,31 +7,27 @@ interface ThemeProviderProps {
   enableSystem?: boolean;
 }
 
-// Ultra-light ThemeProvider without React hooks to avoid multi-React issues
-export const ThemeProvider: FC<ThemeProviderProps> = ({
+// Ultra-light ThemeProvider without React hooks or runtime React import
+export const ThemeProvider = ({
   children,
   attribute = 'class',
   defaultTheme = 'system',
   enableSystem = true,
-}) => {
+}: ThemeProviderProps) => {
   try {
-    const systemDark = enableSystem && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = defaultTheme === 'system' ? (systemDark ? 'dark' : 'light') : defaultTheme;
-    const root = typeof document !== 'undefined' ? document.documentElement : null;
+    if (typeof document !== 'undefined') {
+      const systemDark = enableSystem && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+      const theme = defaultTheme === 'system' ? (systemDark ? 'dark' : 'light') : defaultTheme;
+      const root = document.documentElement;
 
-    if (root) {
       if (attribute === 'class') {
-        if (theme === 'dark') {
-          root.classList.add('dark');
-        } else {
-          root.classList.remove('dark');
-        }
+        root.classList.toggle('dark', theme === 'dark');
       } else {
         root.setAttribute(attribute, theme);
       }
     }
-  } catch (e) {
-    // no-op
+  } catch {
+    // no-op: theming should never break rendering
   }
 
   return <>{children}</>;
