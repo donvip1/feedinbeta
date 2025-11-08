@@ -33,10 +33,14 @@ interface UseFeedOptions {
 
 export const useFeed = ({ userId, activeTab, searchQuery = '' }: UseFeedOptions) => {
   const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const { toast } = useToast();
 
-  const loadPosts = useCallback(async () => {
+  const PAGE_SIZE = 20;
+
+  const loadPosts = useCallback(async (pageNum: number = 0, append: boolean = false) => {
     if (!userId) return;
 
     try {
@@ -55,7 +59,7 @@ export const useFeed = ({ userId, activeTab, searchQuery = '' }: UseFeedOptions)
         .eq('status', 'active')
         .in('moderation_status', ['approved', 'pending'])
         .order('created_at', { ascending: false })
-        .limit(50);
+        .range(pageNum * PAGE_SIZE, (pageNum + 1) * PAGE_SIZE - 1);
 
       // Search filter
       if (searchQuery) {
@@ -74,6 +78,7 @@ export const useFeed = ({ userId, activeTab, searchQuery = '' }: UseFeedOptions)
           query = query.in('user_id', followingIds);
         } else {
           setPosts([]);
+          setHasMore(false);
           setLoading(false);
           return;
         }
@@ -84,7 +89,15 @@ export const useFeed = ({ userId, activeTab, searchQuery = '' }: UseFeedOptions)
       const { data, error } = await query;
 
       if (error) throw error;
-      setPosts(data || []);
+
+      const newPosts = data || [];
+      setHasMore(newPosts.length === PAGE_SIZE);
+      
+      if (append) {
+        setPosts(prev => [...prev, ...newPosts]);
+      } else {
+        setPosts(newPosts);
+      }
     } catch (error: any) {
       console.error('Error loading feed:', error);
       toast({
@@ -98,16 +111,30 @@ export const useFeed = ({ userId, activeTab, searchQuery = '' }: UseFeedOptions)
   }, [userId, activeTab, searchQuery, toast]);
 
   useEffect(() => {
-    loadPosts();
-  }, [loadPosts]);
+    setPage(0);
+    setHasMore(true);
+    loadPosts(0, false);
+  }, [userId, activeTab, searchQuery]);
+
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadPosts(nextPage, true);
+    }
+  }, [page, loading, hasMore, loadPosts]);
 
   const refreshPosts = useCallback(() => {
-    loadPosts();
+    setPage(0);
+    setHasMore(true);
+    loadPosts(0, false);
   }, [loadPosts]);
 
   return {
     posts,
     loading,
+    hasMore,
+    loadMore,
     refreshPosts,
     setPosts,
   };

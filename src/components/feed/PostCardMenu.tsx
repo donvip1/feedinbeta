@@ -1,4 +1,4 @@
-import { MoreVertical, Trash2, Share2 } from 'lucide-react';
+import { MoreVertical, Trash2, Share2, Edit } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,11 +9,13 @@ import { Button } from '@/components/ui/button';
 
 interface PostCardMenuProps {
   canDelete: boolean;
+  canEdit: boolean;
   onDelete: () => void;
+  onEdit: () => void;
   onShare: (platform: string) => void;
 }
 
-export const PostCardMenu = ({ canDelete, onDelete, onShare }: PostCardMenuProps) => {
+export const PostCardMenu = ({ canDelete, canEdit, onDelete, onEdit, onShare }: PostCardMenuProps) => {
   return (
     <div className="absolute top-4 right-4 z-20">
       <DropdownMenu>
@@ -27,6 +29,12 @@ export const PostCardMenu = ({ canDelete, onDelete, onShare }: PostCardMenuProps
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
+          {canEdit && (
+            <DropdownMenuItem onClick={onEdit}>
+              <Edit className="w-4 h-4 mr-2" />
+              Edit Post
+            </DropdownMenuItem>
+          )}
           {canDelete && (
             <DropdownMenuItem onClick={onDelete} className="text-red-600">
               <Trash2 className="w-4 h-4 mr-2" />

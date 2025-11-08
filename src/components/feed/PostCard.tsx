@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { CommentsModal } from './CommentsModal';
+import { EditPostModal } from './EditPostModal';
 import { PostCardHeader } from './PostCardHeader';
 import { PostCardMedia } from './PostCardMedia';
 import { PostCardActions } from './PostCardActions';
@@ -64,6 +65,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [isLiking, setIsLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
 
@@ -431,6 +433,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
 
   const canDelete = user?.id === post.user_id || isAdmin;
+  const canEdit = user?.id === post.user_id;
 
   return (
     <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden">
@@ -497,7 +500,9 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
         <PostCardMenu
           canDelete={canDelete}
+          canEdit={canEdit}
           onDelete={() => setShowDeleteDialog(true)}
+          onEdit={() => setShowEditModal(true)}
           onShare={handleShare}
         />
       </div>
@@ -533,6 +538,19 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {post.content && (
+        <EditPostModal
+          open={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          postId={post.id}
+          currentContent={post.content}
+          onSuccess={() => {
+            setShowEditModal(false);
+            onUpdate();
+          }}
+        />
+      )}
     </div>
   );
 };
