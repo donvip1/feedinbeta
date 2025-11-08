@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export const useVideoAutoplay = (videoRef: React.RefObject<HTMLVideoElement>, shouldPlay: boolean = true) => {
   const observerRef = useRef<IntersectionObserver | null>(null);

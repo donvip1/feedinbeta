@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PreferenceManager } from '@/lib/cookie-manager';
 
 export interface UserPreferences {
