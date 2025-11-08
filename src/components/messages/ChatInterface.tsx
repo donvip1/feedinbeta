@@ -9,17 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Send, Phone, Video } from 'lucide-react';
 import { EnhancedMessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
-
-interface Message {
-  id: string;
-  content: string;
-  sender_id: string;
-  created_at: string;
-  profiles: {
-    display_name: string | null;
-    avatar_url: string | null;
-  };
-}
+import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
 
 interface ChatInterfaceProps {
   conversationId: string;
@@ -30,26 +20,18 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
-  const [isTyping, setIsTyping] = useState(false);
   const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
+  // Use optimized real-time messages hook
+  const { messages, isTyping, loading, addOptimisticMessage, replaceOptimisticMessage } = 
+    useRealtimeMessages(conversationId, user?.id);
+
   useEffect(() => {
-    const initializeChat = async () => {
-      setLoading(true);
-      await loadOtherUser();
-      await loadMessages();
-      setLoading(false);
-      subscribeToMessages();
-      subscribeToTyping();
-      markMessagesAsRead();
-    };
-    initializeChat();
+    loadOtherUser();
   }, [conversationId, user]);
 
   useEffect(() => {
@@ -62,126 +44,23 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
     }
   };
 
-  const loadMessages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*, sender:profiles!messages_sender_id_fkey(display_name, avatar_url)')
-        .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      
-      const formattedMessages = (data || []).map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        sender_id: msg.sender_id,
-        created_at: msg.created_at,
-        is_read: msg.is_read,
-        read_at: msg.read_at,
-        profiles: {
-          display_name: msg.sender?.display_name || null,
-          avatar_url: msg.sender?.avatar_url || null,
-        }
-      }));
-      
-      setMessages(formattedMessages);
-    } catch (error: any) {
-      console.error('Error loading messages:', error);
-    }
-  };
-
-  const markMessagesAsRead = async () => {
-    if (!user) return;
-
-    try {
-      // Mark all unread messages from other users as read
-      await supabase
-        .from('messages')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('conversation_id', conversationId)
-        .neq('sender_id', user.id)
-        .eq('is_read', false);
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-    }
-  };
-
   const loadOtherUser = async () => {
     if (!user) return;
 
     try {
       const { data, error } = await supabase
         .from('conversation_participants')
-        .select('user_id, participant:profiles!conversation_participants_user_id_fkey(*)')
+        .select('profiles:user_id (id, display_name, username, avatar_url)')
         .eq('conversation_id', conversationId)
         .neq('user_id', user.id)
         .maybeSingle();
 
       if (error) throw error;
-      setOtherUser(data?.participant);
-    } catch (error: any) {
+      const profile = Array.isArray(data?.profiles) ? data.profiles[0] : data?.profiles;
+      setOtherUser(profile);
+    } catch (error) {
       console.error('Error loading other user:', error);
     }
-  };
-
-  const subscribeToMessages = () => {
-    const channel = supabase
-      .channel(`messages:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        () => {
-          loadMessages();
-          markMessagesAsRead();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        () => {
-          loadMessages();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToTyping = () => {
-    const channel = supabase
-      .channel(`typing:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'typing_indicators',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        async (payload: any) => {
-          if (payload.new?.user_id !== user?.id) {
-            setIsTyping(payload.new?.is_typing || false);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   const handleTyping = async () => {
@@ -219,41 +98,45 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
   const handleSend = async () => {
     if (!user || !newMessage.trim()) return;
 
+    const messageContent = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    
+    // Optimistic update
+    addOptimisticMessage(messageContent, tempId);
+    setNewMessage('');
     setSending(true);
+
     try {
       const { data: newMsg, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
           sender_id: user.id,
-          content: newMessage.trim(),
+          content: messageContent,
         })
-        .select()
+        .select(`
+          id,
+          content,
+          sender_id,
+          created_at,
+          is_read,
+          read_at,
+          profiles:sender_id (display_name, avatar_url)
+        `)
         .single();
 
       if (error) throw error;
 
-      // Check message with moderation bot
+      // Replace optimistic message with real one
       if (newMsg) {
-        const { data: modResult } = await supabase.functions.invoke('moderation-bot', {
-          body: {
-            messageId: newMsg.id,
-            content: newMessage.trim(),
-            senderId: user.id,
-          },
-        });
-
-        if (modResult?.deleted) {
-          toast({
-            title: 'Message blocked',
-            description: modResult.reason,
-            variant: 'destructive',
-          });
-          // Reload messages to remove the deleted one
-          loadMessages();
-        }
+        const formatted = {
+          ...newMsg,
+          profiles: Array.isArray(newMsg.profiles) ? newMsg.profiles[0] : newMsg.profiles,
+        };
+        replaceOptimisticMessage(tempId, formatted);
       }
 
+      // Clear typing indicator
       await supabase
         .from('typing_indicators')
         .upsert({
@@ -265,7 +148,6 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           onConflict: 'conversation_id,user_id'
         });
 
-      setNewMessage('');
     } catch (error: any) {
       toast({
         title: 'Error sending message',

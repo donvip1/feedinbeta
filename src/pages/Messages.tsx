@@ -7,15 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, Check, X } from 'lucide-react';
+import { ArrowLeft, Users, Lock, Globe, Plus, Check, X, Search, MessageSquarePlus } from 'lucide-react';
 import { ChatInterface } from '@/components/messages/ChatInterface';
+import { ConversationList } from '@/components/messages/ConversationList';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useToast } from '@/hooks/use-toast';
-import { useRealtimePresence } from '@/hooks/useRealtimePresence';
 import { useRealtimeChannel } from '@/hooks/useRealtimeChannel';
 
 // Types
@@ -71,9 +70,6 @@ export default function Messages() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
-  
-  // Use realtime presence hook for online users
-  const { onlineUsers } = useRealtimePresence('online-users', user?.id);
 
   // Subscribe to friend request changes
   useRealtimeChannel({
@@ -125,7 +121,7 @@ export default function Messages() {
     try {
       await Promise.all([
         loadFriendRequests().catch(err => console.error("Friend requests error:", err)),
-        loadChatListAndFriends().catch(err => console.error("Chat list error:", err)),
+        loadFriends().catch(err => console.error("Friends error:", err)),
         loadGroups().catch(err => console.error("Groups error:", err))
       ]);
     } catch (error: any) {
@@ -157,75 +153,34 @@ export default function Messages() {
     setFriendRequests(data as any[] || []);
   };
 
-  const loadChatListAndFriends = async () => {
+  // Simplified - conversations now handled by ConversationList component
+  const loadFriends = async () => {
     if (!user) return;
 
-    const { data: convosData, error: convosError } = await supabase
-      .from('conversation_participants')
-      .select('conversations!inner(*)')
-      .eq('user_id', user.id);
-
-    if (convosError) throw new Error(`Failed to load conversations: ${convosError.message}`);
-
-    const conversations = convosData.map((c: any) => c.conversations);
-
-    const chatListItems = await Promise.all(conversations.map(async (convo: any) => {
-        const { data: otherParticipantData } = await supabase
-            .from('conversation_participants')
-            .select(`
-              participant:user_id (id, display_name, username, avatar_url)
-            `)
-            .eq('conversation_id', convo.id)
-            .neq('user_id', user.id)
-            .maybeSingle();
-
-        const { data: lastMessage } = await supabase
-            .from('messages')
-            .select('content, created_at, sender_id')
-            .eq('conversation_id', convo.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-        if (!otherParticipantData?.participant) return null;
-
-        return {
-            id: convo.id,
-            type: 'conversation',
-            updated_at: convo.updated_at,
-            participant: otherParticipantData.participant,
-            last_message: lastMessage,
-        } as ChatListItem;
-    }));
+    const { data: sentRequests } = await supabase
+      .from('friend_requests')
+      .select('receiver:receiver_id(id, display_name, username, avatar_url)')
+      .eq('sender_id', user.id)
+      .eq('status', 'accepted');
     
-    const validChatListItems = chatListItems.filter(Boolean) as ChatListItem[];
+    const { data: receivedRequests } = await supabase
+      .from('friend_requests')
+      .select('sender:sender_id(id, display_name, username, avatar_url)')
+      .eq('receiver_id', user.id)
+      .eq('status', 'accepted');
 
-    const { data: sentRequests, error: sentError } = await supabase.from('friend_requests').select('receiver:receiver_id(id, display_name, username, avatar_url)').eq('sender_id', user.id).eq('status', 'accepted');
-    const { data: receivedRequests, error: receivedError } = await supabase.from('friend_requests').select('sender:sender_id(id, display_name, username, avatar_url)').eq('receiver_id', user.id).eq('status', 'accepted');
-
-    if(sentError || receivedError) throw new Error('Could not retrieve friends list');
-    
     const friends = [
-        ...(sentRequests?.map((r: any) => r.receiver) || []),
-        ...(receivedRequests?.map((r: any) => r.sender) || [])
+      ...(sentRequests?.map((r: any) => r.receiver) || []),
+      ...(receivedRequests?.map((r: any) => r.sender) || [])
     ].filter(Boolean) as Profile[];
 
-    const chatMap = new Map<string, ChatListItem>();
-    validChatListItems.forEach(item => chatMap.set(item.participant.id, item));
-    friends.forEach(friend => {
-        if (!chatMap.has(friend.id)) {
-            chatMap.set(friend.id, { id: friend.id, type: 'friend', participant: friend });
-        }
-    });
-    
-    const combinedList = Array.from(chatMap.values());
-    combinedList.sort((a, b) => {
-        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-        return dateB - dateA;
-    });
+    const friendsList = friends.map(friend => ({
+      id: friend.id,
+      type: 'friend' as const,
+      participant: friend,
+    }));
 
-    setChatList(combinedList);
+    setChatList(friendsList);
   };
   
   const findExistingConversationWithUser = async (otherUserId: string): Promise<string | null> => {
@@ -392,26 +347,14 @@ export default function Messages() {
                 </div>
               )}
 
-              {filteredChatList.map(item => (
-                <button key={item.id} onClick={() => handleItemClick(item)} className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg">
-                  <div className="relative">
-                    <Avatar>
-                      <AvatarImage src={item.participant?.avatar_url || undefined} />
-                      <AvatarFallback>{item.participant?.display_name?.[0] || 'U'}</AvatarFallback>
-                    </Avatar>
-                    <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-background ${onlineUsers.has(item.participant?.id || '') ? 'bg-green-500' : 'bg-gray-400'}`} />
-                  </div>
-                  <div className="flex-1 text-left overflow-hidden">
-                    <p className="font-semibold truncate">{item.participant?.display_name}</p>
-                    {item.last_message ? (
-                      <p className="text-xs text-muted-foreground truncate">{item.last_message.content}</p>
-                    ) : (
-                      <p className="text-xs text-muted-foreground truncate">@{item.participant?.username}</p>
-                    )}
-                  </div>
-                  {item.last_message && <time className="text-xs text-muted-foreground self-start">{new Date(item.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>}
-                </button>
-              ))}
+              {user && (
+                <ConversationList 
+                  userId={user.id}
+                  searchQuery={searchQuery}
+                  onSelectConversation={setSelectedConversationId}
+                />
+              )}
+
               {filteredChatList.length === 0 && friendRequests.length === 0 && (
                  <div className="text-center py-12 text-muted-foreground">No chats or requests. Start a new conversation!</div>
               )}
