@@ -6,11 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send, Smile, Phone, Video } from 'lucide-react';
-import { MessageBubble } from './MessageBubble';
+import { ArrowLeft, Send, Phone, Video } from 'lucide-react';
+import { MessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
-import { ReactionPicker } from '@/components/feed/ReactionPicker';
 
 interface Message {
   id: string;
@@ -302,15 +300,10 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
   };
 
   return (
-    <>
+    <div className="flex flex-col h-screen w-full overflow-hidden bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-border">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onBack}
-          className="md:hidden"
-        >
+      <div className="px-4 py-2 border-b flex items-center gap-3">
+        <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <Avatar>
@@ -318,79 +311,61 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
+          <h2 className="font-semibold text-card-foreground">{otherUser?.display_name || 'Unknown User'}</h2>
           {otherUser?.username && (
             <p className="text-sm text-muted-foreground">@{otherUser.username}</p>
           )}
         </div>
-        
-        {/* Call Buttons */}
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => initiateCall('voice')}
-            className="text-primary hover:text-primary/90"
-            title="Voice call"
-          >
-            <Phone className="w-5 h-5" />
+          <Button variant="ghost" size="icon" onClick={() => initiateCall('voice')} title="Voice call">
+            <Phone className="w-5 h-5 text-primary" />
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => initiateCall('video')}
-            className="text-primary hover:text-primary/90"
-            title="Video call"
-          >
-            <Video className="w-5 h-5" />
+          <Button variant="ghost" size="icon" onClick={() => initiateCall('video')} title="Video call">
+            <Video className="w-5 h-5 text-primary" />
           </Button>
         </div>
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4">
+      {/* Message List */}
+      <div className="flex-1 overflow-y-auto px-4 py-2 w-full">
         <div className="space-y-4">
-          {messages.map((message) => (
+          {messages.map((msg) => (
             <MessageBubble
-              key={message.id}
-              message={message}
-              isOwn={message.sender_id === user?.id}
+              key={msg.id}
+              message={msg}
+              isOwn={msg.sender_id === user?.id}
             />
           ))}
           {isTyping && <TypingIndicator />}
           <div ref={scrollRef} />
         </div>
-      </ScrollArea>
+      </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-end gap-2">
+      {/* Input & Send Button */}
+      <div className="px-4 py-3 border-t w-full bg-background">
+        <form
+          className="flex items-center gap-2 w-full"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+        >
           <Input
+            type="text"
+            className="flex-1 px-4 py-2 rounded-full bg-muted text-sm"
             placeholder="Type a message..."
             value={newMessage}
             onChange={(e) => {
               setNewMessage(e.target.value);
               handleTyping();
             }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
             disabled={sending}
-            className="flex-1"
           />
-          <Button
-            onClick={handleSend}
-            disabled={sending || !newMessage.trim()}
-            size="icon"
-            className="bg-gradient-to-r from-pink-500 to-blue-500"
-          >
-            <Send className="w-4 h-4" />
+          <Button type="submit" size="icon" className="rounded-full bg-primary text-primary-foreground" disabled={sending || !newMessage.trim()}>
+            <Send className="w-5 h-5" />
           </Button>
-        </div>
+        </form>
       </div>
-    </>
+    </div>
   );
 };

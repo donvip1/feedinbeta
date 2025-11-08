@@ -148,7 +148,7 @@ export const EnhancedMessageBubble = ({
         <img 
           src={message.media_url} 
           alt="Shared" 
-          className="rounded-lg max-w-xs max-h-64 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+          className="rounded-lg max-w-full max-h-64 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
           onClick={(e) => {
             e.stopPropagation();
             onImageClick?.(message.media_url!);
@@ -162,7 +162,7 @@ export const EnhancedMessageBubble = ({
         <video 
           src={message.media_url} 
           controls 
-          className="rounded-lg max-w-xs max-h-64 mb-2"
+          className="rounded-lg max-w-full max-h-64 mb-2"
         />
       );
     }
@@ -212,7 +212,7 @@ export const EnhancedMessageBubble = ({
         <AvatarFallback>{message.profiles.display_name?.[0] || 'U'}</AvatarFallback>
       </Avatar>
 
-      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%] relative`}>
+      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%] min-w-0 relative`}>
         {/* Reply Indicator */}
         {message.reply_to_message && (
           <div className={`text-xs p-2 mb-1 rounded-lg border-l-4 max-w-full ${
@@ -260,7 +260,7 @@ export const EnhancedMessageBubble = ({
               </div>
             ) : (
               <>
-                <p className="text-sm break-words whitespace-pre-wrap">{highlightText(message.content)}</p>
+                <p className="text-sm break-all whitespace-pre-wrap">{highlightText(message.content)}</p>
                 {message.edited_at && (
                   <p className="text-xs opacity-70 mt-1">edited</p>
                 )}

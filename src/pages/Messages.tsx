@@ -369,7 +369,7 @@ export default function Messages() {
 
   return (
     <div className="flex h-screen bg-background">
-      <div className={`${selectedConversationId ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 border-r border-border`}>
+      <div className={`flex flex-col w-full md:w-96 border-r border-border ${selectedConversationId ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b border-border">
           <div className="flex items-center justify-between mb-4">
             <Button variant="ghost" size="icon" onClick={() => navigate('/feed')}><ArrowLeft className="w-5 h-5" /></Button>
