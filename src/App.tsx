@@ -6,6 +6,8 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ThemeProvider } from "@/components/ui/ThemeProviderShim";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ClientToaster } from "@/components/ui/ClientToaster";
+import { ScrollRestoration } from "@/components/routing/ScrollRestoration";
+import { NavigationProgress } from "@/components/routing/NavigationProgress";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -53,7 +55,9 @@ const App = () => (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <BrowserRouter future={{ v7_startTransition: true }}>
+          <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <ScrollRestoration />
+            <NavigationProgress />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
