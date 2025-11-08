@@ -545,20 +545,22 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
     </DialogContent>
     </Dialog>
     
-    {/* Music Library Modal */}
-    <MusicLibrary
-      open={showMusicLibrary}
-      onClose={() => setShowMusicLibrary(false)}
-      onSelectMusic={(music) => {
-        setSelectedMusic({
-          title: music.name,
-          artist: music.artist,
-          url: music.url,
-          isOriginal: false
-        });
-        setShowMusicLibrary(false);
-      }}
-    />
+    {/* Music Library Modal - mount only when open to avoid hook conflicts */}
+    {showMusicLibrary && (
+      <MusicLibrary
+        open={showMusicLibrary}
+        onClose={() => setShowMusicLibrary(false)}
+        onSelectMusic={(music) => {
+          setSelectedMusic({
+            title: music.name,
+            artist: music.artist,
+            url: music.url,
+            isOriginal: false
+          });
+          setShowMusicLibrary(false);
+        }}
+      />
+    )}
   </>
   );
 }

@@ -1742,17 +1742,19 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
       )}
       
       {/* Music Library */}
-      <MusicLibrary
-        open={showMusicLibrary}
-        onClose={() => setShowMusicLibrary(false)}
-        onSelectMusic={(music) => {
-          setSelectedMusic(music);
-          toast({
-            title: 'Music added',
-            description: `${music.name} by ${music.artist}`,
-          });
-        }}
-      />
+      {showMusicLibrary && (
+        <MusicLibrary
+          open={showMusicLibrary}
+          onClose={() => setShowMusicLibrary(false)}
+          onSelectMusic={(music) => {
+            setSelectedMusic(music);
+            toast({
+              title: 'Music added',
+              description: `${music.name} by ${music.artist}`,
+            });
+          }}
+        />
+      )}
     </>
   );
 }
