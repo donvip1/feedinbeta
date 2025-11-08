@@ -1,18 +1,16 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
-// Re-export toast from shadcn location  
+// Re-export toast from the new shadcn location
 export { toast } from "@/hooks/use-toast";
 
-// Lazy-load Sonner Toaster to avoid context issues
-const Toaster = (props: any) => {
-  const [SonnerToaster, setSonnerToaster] = useState<any>(null);
+// Lazy-load Sonner's Toaster on client to avoid provider/context timing issues
+const Toaster = (props: React.ComponentProps<any>) => {
+  const [SonnerToaster, setSonnerToaster] = useState<React.ComponentType<any> | null>(null);
 
   useEffect(() => {
     let mounted = true;
     import("sonner").then((mod) => {
       if (mounted) setSonnerToaster(() => mod.Toaster);
-    }).catch(() => {
-      // Silently fail if sonner can't load
     });
     return () => {
       mounted = false;

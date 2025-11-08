@@ -11,8 +11,6 @@ import { EnhancedMessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { UserMentionInput } from './UserMentionInput';
 import { VoiceRecorder } from './VoiceRecorder';
-import { EnhancedVoiceRecorder } from './EnhancedVoiceRecorder';
-import { VideoRecorder } from './VideoRecorder';
 import { Dialog, DialogContent, DialogDescription } from '@/components/ui/dialog';
 import { ImageViewerModal } from './ImageViewerModal';
 import { MessageForwardModal } from './MessageForwardModal';
@@ -58,8 +56,6 @@ interface ChatInterfaceProps {
   onBack: () => void;
 }
 
-// Force cache invalidation - React hooks dependency
-// Force cache invalidation - React hooks dependency
 export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -71,7 +67,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [isOnline, setIsOnline] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
-  const [showVideoRecorder, setShowVideoRecorder] = useState(false);
   const [showMediaUpload, setShowMediaUpload] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -580,7 +575,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
-  const handleVoiceNote = async (audioBlob: Blob) => {
+  const handleVoiceNote = async (audioBlob: Blob, duration: number) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -596,63 +591,11 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         .from('chat-audio')
         .getPublicUrl(fileName);
 
-      const { error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: 'Voice message',
-          media_url: publicUrl,
-          media_type: 'audio/webm',
-        });
-
-      if (messageError) throw messageError;
-
+      await handleSend(publicUrl, 'audio/webm');
       setShowVoiceRecorder(false);
-      toast({ title: 'Voice message sent' });
     } catch (error: any) {
       toast({
         title: 'Failed to send voice note',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleVideoMessage = async (videoBlob: Blob) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const fileName = `${user.id}/${Date.now()}-video.webm`;
-      const { data, error: uploadError } = await supabase.storage
-        .from('chat-videos')
-        .upload(fileName, videoBlob);
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('chat-videos')
-        .getPublicUrl(fileName);
-
-      const { error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: 'Video message',
-          media_url: publicUrl,
-          media_type: 'video/webm',
-        });
-
-      if (messageError) throw messageError;
-
-      setShowVideoRecorder(false);
-      toast({ title: 'Video sent successfully' });
-    } catch (error: any) {
-      console.error('Error sending video:', error);
-      toast({
-        title: 'Error sending video',
         description: error.message,
         variant: 'destructive',
       });
@@ -936,9 +879,9 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   };
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden">
+    <>
       {/* Header */}
-      <div className="flex flex-col border-b border-border bg-background sticky top-0 z-10 w-full">
+      <div className="flex flex-col border-b border-border bg-background sticky top-0 z-10">
         <div className="flex items-center gap-3 p-4">
           <Button
             variant="ghost"
@@ -1020,7 +963,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
       {/* Messages */}
       <div 
-        className="flex-1 overflow-y-auto p-4 relative min-h-0 w-full"
+        className="flex-1 overflow-y-auto p-4 relative min-h-0"
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -1092,7 +1035,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-background w-full flex-shrink-0">
+      <div className="border-t border-border bg-background">
         {/* Quick Replies */}
         {showQuickReplies && (
           <div className="px-4 pt-4 pb-2">
@@ -1133,14 +1076,14 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           )}
 
         {showVoiceRecorder ? (
-          <EnhancedVoiceRecorder
+          <VoiceRecorder
             onSend={handleVoiceNote}
             onCancel={() => setShowVoiceRecorder(false)}
           />
         ) : (
-          <div className="space-y-2 w-full">
+          <div className="space-y-2">
             {/* Main input row */}
-            <div className="flex items-end gap-2 w-full">
+            <div className="flex items-end gap-2">
               <UserMentionInput
                 value={newMessage}
                 onChange={(val) => {
@@ -1179,43 +1122,34 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
             </div>
             
             {/* Action buttons below */}
-            <div className="flex items-center gap-2 px-1 w-full overflow-x-auto">
+            <div className="flex items-center gap-2 px-1">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowQuickReplies(!showQuickReplies)}
                 title="Quick replies"
-                className="h-8 flex-shrink-0"
+                className="h-8"
               >
-                <Smile className="w-4 h-4 sm:mr-1" />
-                <span className="text-xs hidden sm:inline">Quick</span>
+                <Smile className="w-4 h-4 mr-1" />
+                <span className="text-xs">Quick</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowMediaUpload(true)}
-                className="h-8 flex-shrink-0"
+                className="h-8"
               >
-                <ImageIcon className="w-4 h-4 sm:mr-1" />
-                <span className="text-xs hidden sm:inline">Photo</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowVideoRecorder(true)}
-                className="h-8 flex-shrink-0"
-              >
-                <Video className="w-4 h-4 sm:mr-1" />
-                <span className="text-xs hidden sm:inline">Video</span>
+                <ImageIcon className="w-4 h-4 mr-1" />
+                <span className="text-xs">Photo</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowMediaUpload(true)}
-                className="h-8 flex-shrink-0"
+                className="h-8"
               >
-                <Paperclip className="w-4 h-4 sm:mr-1" />
-                <span className="text-xs hidden sm:inline">File</span>
+                <Paperclip className="w-4 h-4 mr-1" />
+                <span className="text-xs">File</span>
               </Button>
             </div>
           </div>
@@ -1264,13 +1198,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           setShowMediaUpload(false);
         }}
       />
-
-      {/* Video Recorder */}
-      <VideoRecorder
-        open={showVideoRecorder}
-        onClose={() => setShowVideoRecorder(false)}
-        onSave={handleVideoMessage}
-      />
-    </div>
+    </>
   );
 };

@@ -10,7 +10,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { VoiceMessagePlayer } from './VoiceMessagePlayer';
 
 interface MessageBubbleProps {
   message: {
@@ -149,14 +148,13 @@ export const EnhancedMessageBubble = ({
         <img 
           src={message.media_url} 
           alt="Shared" 
-          className="max-w-xs rounded cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={() => onImageClick?.(message.media_url!)}
+          className="rounded-lg max-w-xs max-h-64 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={(e) => {
+            e.stopPropagation();
+            onImageClick?.(message.media_url!);
+          }}
         />
       );
-    }
-
-    if (message.media_type?.startsWith('audio')) {
-      return <VoiceMessagePlayer audioUrl={message.media_url} />;
     }
 
     if (message.media_type?.startsWith('video')) {
@@ -164,7 +162,17 @@ export const EnhancedMessageBubble = ({
         <video 
           src={message.media_url} 
           controls 
-          className="max-w-xs rounded"
+          className="rounded-lg max-w-xs max-h-64 mb-2"
+        />
+      );
+    }
+
+    if (message.media_type?.startsWith('audio')) {
+      return (
+        <audio 
+          src={message.media_url} 
+          controls 
+          className="mb-2"
         />
       );
     }
@@ -172,12 +180,11 @@ export const EnhancedMessageBubble = ({
     return (
       <a 
         href={message.media_url} 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="flex items-center gap-2 text-primary hover:underline"
+        download 
+        className="flex items-center gap-2 p-2 border rounded-lg mb-2 hover:bg-accent"
       >
         <Download className="w-4 h-4" />
-        Download file
+        <span className="text-sm">Download File</span>
       </a>
     );
   };

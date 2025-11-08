@@ -4,9 +4,7 @@ import App from "./App.tsx";
 import "./index.css";
 import { CacheManager } from "./lib/cache-manager";
 
-// Build timestamp: Force rebuild to clear stale Vite cache
 console.log("React version:", React.version);
-console.log("Build time:", new Date().toISOString());
 
 // Register service worker for caching
 if ('serviceWorker' in navigator) {

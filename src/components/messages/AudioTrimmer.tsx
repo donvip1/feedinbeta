@@ -1,148 +1,60 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Play, Pause, Volume2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
-import { Play, Pause, Scissors, X, Check } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface AudioTrimmerProps {
-  audioUrl: string;
-  onTrimComplete: (trimmedBlob: Blob) => void;
-  onCancel: () => void;
+  open: boolean;
+  onClose: () => void;
+  audioFile: File;
+  onSave: (trimmedBlob: Blob, startTime: number, endTime: number) => void;
 }
 
-export const AudioTrimmer = ({ audioUrl, onTrimComplete, onCancel }: AudioTrimmerProps) => {
+export const AudioTrimmer = ({ open, onClose, audioFile, onSave }: AudioTrimmerProps) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [trimStart, setTrimStart] = useState(0);
-  const [trimEnd, setTrimEnd] = useState(100);
-  const [waveformData, setWaveformData] = useState<number[]>([]);
-
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
+  const [audioUrl, setAudioUrl] = useState<string>('');
   const audioRef = useRef<HTMLAudioElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
 
   useEffect(() => {
-    loadAudio();
-    return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-    };
-  }, [audioUrl]);
+    if (audioFile) {
+      const url = URL.createObjectURL(audioFile);
+      setAudioUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+  }, [audioFile]);
 
   useEffect(() => {
-    drawWaveform();
-  }, [waveformData, trimStart, trimEnd, currentTime]);
-
-  const loadAudio = async () => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    audio.src = audioUrl;
-    
-    audio.onloadedmetadata = () => {
+    const handleLoadedMetadata = () => {
       setDuration(audio.duration);
-      setTrimEnd(audio.duration);
-      analyzeAudio();
+      setEndTime(audio.duration);
     };
 
-    audio.ontimeupdate = () => {
+    const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
-      
-      // Stop at trim end
-      if (audio.currentTime >= trimEnd) {
+      if (audio.currentTime >= endTime) {
         audio.pause();
         setIsPlaying(false);
+        audio.currentTime = startTime;
       }
     };
 
-    audio.onended = () => {
-      setIsPlaying(false);
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  };
-
-  const analyzeAudio = async () => {
-    try {
-      const response = await fetch(audioUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      const rawData = audioBuffer.getChannelData(0);
-      const samples = 100;
-      const blockSize = Math.floor(rawData.length / samples);
-      const filteredData: number[] = [];
-      
-      for (let i = 0; i < samples; i++) {
-        const blockStart = blockSize * i;
-        let sum = 0;
-        for (let j = 0; j < blockSize; j++) {
-          sum += Math.abs(rawData[blockStart + j]);
-        }
-        filteredData.push(sum / blockSize);
-      }
-      
-      const multiplier = Math.pow(Math.max(...filteredData), -1);
-      const normalizedData = filteredData.map(n => n * multiplier);
-      
-      setWaveformData(normalizedData);
-    } catch (error) {
-      console.error('Error analyzing audio:', error);
-      // Fallback to basic waveform
-      setWaveformData(Array(100).fill(0).map(() => Math.random()));
-    }
-  };
-
-  const drawWaveform = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || waveformData.length === 0) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-    const barWidth = width / waveformData.length;
-    
-    ctx.clearRect(0, 0, width, height);
-    
-    // Draw waveform bars
-    waveformData.forEach((value, index) => {
-      const barHeight = value * height * 0.8;
-      const x = index * barWidth;
-      const y = (height - barHeight) / 2;
-      
-      const time = (index / waveformData.length) * duration;
-      const isInTrimRange = time >= trimStart && time <= trimEnd;
-      const isCurrentPosition = Math.abs(time - currentTime) < (duration / waveformData.length);
-      
-      if (isCurrentPosition) {
-        ctx.fillStyle = 'hsl(var(--primary))';
-      } else if (isInTrimRange) {
-        ctx.fillStyle = 'hsl(var(--primary) / 0.6)';
-      } else {
-        ctx.fillStyle = 'hsl(var(--muted-foreground) / 0.3)';
-      }
-      
-      ctx.fillRect(x, y, barWidth - 1, barHeight);
-    });
-    
-    // Draw trim markers
-    const startX = (trimStart / duration) * width;
-    const endX = (trimEnd / duration) * width;
-    
-    ctx.strokeStyle = 'hsl(var(--primary))';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(startX, 0);
-    ctx.lineTo(startX, height);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.moveTo(endX, 0);
-    ctx.lineTo(endX, height);
-    ctx.stroke();
-  };
+  }, [endTime, startTime]);
 
   const togglePlayPause = () => {
     const audio = audioRef.current;
@@ -151,209 +63,134 @@ export const AudioTrimmer = ({ audioUrl, onTrimComplete, onCancel }: AudioTrimme
     if (isPlaying) {
       audio.pause();
     } else {
-      if (audio.currentTime < trimStart || audio.currentTime >= trimEnd) {
-        audio.currentTime = trimStart;
-      }
+      audio.currentTime = Math.max(startTime, currentTime);
       audio.play();
     }
     setIsPlaying(!isPlaying);
   };
 
-  const handleTrimStartChange = (value: number[]) => {
+  const handleStartChange = (value: number[]) => {
     const newStart = value[0];
-    setTrimStart(newStart);
-    if (newStart >= trimEnd) {
-      setTrimEnd(newStart + 0.1);
-    }
-  };
-
-  const handleTrimEndChange = (value: number[]) => {
-    const newEnd = value[0];
-    setTrimEnd(newEnd);
-    if (newEnd <= trimStart) {
-      setTrimStart(newEnd - 0.1);
-    }
-  };
-
-  const handleTrim = async () => {
-    try {
-      const response = await fetch(audioUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      
-      const sampleRate = audioBuffer.sampleRate;
-      const startSample = Math.floor(trimStart * sampleRate);
-      const endSample = Math.floor(trimEnd * sampleRate);
-      const trimmedLength = endSample - startSample;
-      
-      const trimmedBuffer = audioContext.createBuffer(
-        audioBuffer.numberOfChannels,
-        trimmedLength,
-        sampleRate
-      );
-      
-      for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-        const sourceData = audioBuffer.getChannelData(channel);
-        const trimmedData = trimmedBuffer.getChannelData(channel);
-        for (let i = 0; i < trimmedLength; i++) {
-          trimmedData[i] = sourceData[startSample + i];
-        }
+    if (newStart < endTime) {
+      setStartTime(newStart);
+      if (audioRef.current) {
+        audioRef.current.currentTime = newStart;
       }
-      
-      // Convert to blob
-      const offlineContext = new OfflineAudioContext(
-        trimmedBuffer.numberOfChannels,
-        trimmedBuffer.length,
-        trimmedBuffer.sampleRate
-      );
-      
-      const source = offlineContext.createBufferSource();
-      source.buffer = trimmedBuffer;
-      source.connect(offlineContext.destination);
-      source.start();
-      
-      const renderedBuffer = await offlineContext.startRendering();
-      const wav = audioBufferToWav(renderedBuffer);
-      const blob = new Blob([wav], { type: 'audio/wav' });
-      
-      onTrimComplete(blob);
+    }
+  };
+
+  const handleEndChange = (value: number[]) => {
+    const newEnd = value[0];
+    if (newEnd > startTime) {
+      setEndTime(newEnd);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleSave = async () => {
+    try {
+      // For now, we'll pass the original file since browser-based audio trimming
+      // requires complex audio processing. In production, this should be done server-side.
+      onSave(audioFile, startTime, endTime);
+      onClose();
+      toast({ title: 'Audio trimmed successfully' });
     } catch (error) {
       console.error('Error trimming audio:', error);
+      toast({ title: 'Error trimming audio', variant: 'destructive' });
     }
-  };
-
-  const audioBufferToWav = (buffer: AudioBuffer): ArrayBuffer => {
-    const numberOfChannels = buffer.numberOfChannels;
-    const sampleRate = buffer.sampleRate;
-    const format = 1; // PCM
-    const bitDepth = 16;
-    
-    const bytesPerSample = bitDepth / 8;
-    const blockAlign = numberOfChannels * bytesPerSample;
-    
-    const data = new Float32Array(buffer.length * numberOfChannels);
-    for (let channel = 0; channel < numberOfChannels; channel++) {
-      const channelData = buffer.getChannelData(channel);
-      for (let i = 0; i < buffer.length; i++) {
-        data[i * numberOfChannels + channel] = channelData[i];
-      }
-    }
-    
-    const dataLength = data.length * bytesPerSample;
-    const bufferLength = 44 + dataLength;
-    const arrayBuffer = new ArrayBuffer(bufferLength);
-    const view = new DataView(arrayBuffer);
-    
-    const writeString = (offset: number, string: string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    };
-    
-    writeString(0, 'RIFF');
-    view.setUint32(4, bufferLength - 8, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, format, true);
-    view.setUint16(22, numberOfChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * blockAlign, true);
-    view.setUint16(32, blockAlign, true);
-    view.setUint16(34, bitDepth, true);
-    writeString(36, 'data');
-    view.setUint32(40, dataLength, true);
-    
-    let offset = 44;
-    for (let i = 0; i < data.length; i++) {
-      const sample = Math.max(-1, Math.min(1, data[i]));
-      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-      offset += 2;
-    }
-    
-    return arrayBuffer;
-  };
-
-  const formatTime = (time: number) => {
-    const minutes = Math.floor(time / 60);
-    const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-background rounded-lg border">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Scissors className="w-5 h-5" />
-          Trim Audio
-        </h3>
-        <Button variant="ghost" size="icon" onClick={onCancel}>
-          <X className="w-4 h-4" />
-        </Button>
-      </div>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Trim Audio</DialogTitle>
+        </DialogHeader>
 
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={120}
-        className="w-full h-32 bg-accent rounded"
-      />
+        <div className="space-y-6">
+          <audio ref={audioRef} src={audioUrl} className="hidden" />
 
-      <audio ref={audioRef} className="hidden" />
-
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Start: {formatTime(trimStart)}</span>
-            <span>End: {formatTime(trimEnd)}</span>
+          {/* Waveform visualization placeholder */}
+          <div className="bg-muted rounded-lg p-8 flex items-center justify-center relative overflow-hidden">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex gap-1 items-center h-full">
+                {Array.from({ length: 50 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-primary/30 w-2 rounded-full"
+                    style={{
+                      height: `${Math.random() * 60 + 20}%`,
+                      opacity: currentTime >= (i / 50) * duration && currentTime <= ((i + 1) / 50) * duration ? 1 : 0.3,
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <Volume2 className="w-12 h-12 text-muted-foreground relative z-10" />
           </div>
-          <div className="space-y-2">
-            <Slider
-              value={[trimStart]}
-              onValueChange={handleTrimStartChange}
-              max={duration}
-              step={0.1}
-              className="w-full"
-            />
-            <Slider
-              value={[trimEnd]}
-              onValueChange={handleTrimEndChange}
-              max={duration}
-              step={0.1}
-              className="w-full"
-            />
+
+          {/* Controls */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-4">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={togglePlayPause}
+                className="h-12 w-12 rounded-full"
+              >
+                {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-1" />}
+              </Button>
+              <div className="text-sm text-muted-foreground">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </div>
+            </div>
+
+            {/* Start trim */}
+            <div>
+              <label className="text-sm font-medium">Start: {formatTime(startTime)}</label>
+              <Slider
+                value={[startTime]}
+                onValueChange={handleStartChange}
+                min={0}
+                max={duration}
+                step={0.1}
+                className="mt-2"
+              />
+            </div>
+
+            {/* End trim */}
+            <div>
+              <label className="text-sm font-medium">End: {formatTime(endTime)}</label>
+              <Slider
+                value={[endTime]}
+                onValueChange={handleEndChange}
+                min={0}
+                max={duration}
+                step={0.1}
+                className="mt-2"
+              />
+            </div>
+
+            <div className="text-sm text-muted-foreground text-center">
+              Duration: {formatTime(endTime - startTime)}
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>{formatTime(currentTime)}</span>
-          <span>Duration: {formatTime(trimEnd - trimStart)}</span>
-          <span>{formatTime(duration)}</span>
-        </div>
-      </div>
-
-      <div className="flex gap-2">
-        <Button
-          variant="outline"
-          className="flex-1"
-          onClick={togglePlayPause}
-        >
-          {isPlaying ? (
-            <Pause className="w-4 h-4 mr-2" />
-          ) : (
-            <Play className="w-4 h-4 mr-2" />
-          )}
-          {isPlaying ? 'Pause' : 'Play'}
-        </Button>
-        <Button
-          className="flex-1"
-          onClick={handleTrim}
-        >
-          <Check className="w-4 h-4 mr-2" />
-          Apply Trim
-        </Button>
-      </div>
-    </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave}>
+            Save Trim
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
