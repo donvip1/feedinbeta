@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, Check, X } from 'lucide-react';
-import { EnhancedChatInterface } from '@/components/messages/EnhancedChatInterface';
+import { ChatInterface } from '@/components/messages/ChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
@@ -456,7 +456,7 @@ export default function Messages() {
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {selectedConversationId ? (
-          <EnhancedChatInterface conversationId={selectedConversationId} onBack={() => setSelectedConversationId(null)} />
+          <ChatInterface conversationId={selectedConversationId} onBack={() => setSelectedConversationId(null)} />
         ) : (
           <div className="hidden md:flex items-center justify-center h-full">
             <div className="text-center">
