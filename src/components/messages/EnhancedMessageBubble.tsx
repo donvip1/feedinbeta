@@ -260,7 +260,7 @@ export const EnhancedMessageBubble = ({
               </div>
             ) : (
               <>
-                <p className="text-sm break-all whitespace-pre-wrap">{highlightText(message.content)}</p>
+                <p className="text-sm break-word whitespace-pre-wrap">{highlightText(message.content)}</p>
                 {message.edited_at && (
                   <p className="text-xs opacity-70 mt-1">edited</p>
                 )}
