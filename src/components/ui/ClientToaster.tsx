@@ -1,9 +1,9 @@
-import React from "react";
+import { useState, useEffect } from "react";
 import { Toaster as SonnerToaster } from "sonner";
 
-export const ClientToaster: React.FC = () => {
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
+export const ClientToaster = () => {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   if (!mounted) return null;
   return (
     <SonnerToaster

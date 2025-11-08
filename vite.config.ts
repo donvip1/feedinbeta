@@ -20,12 +20,14 @@ export default defineConfig(({ mode }) => ({
       "react": path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
-    dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    include: ["react", "react-dom"],
-    force: true,
+    include: ["react", "react-dom", "react-router-dom"],
+    esbuildOptions: {
+      resolveExtensions: ['.tsx', '.ts', '.jsx', '.js'],
+    },
   },
+  cacheDir: "./node_modules/.vite",
   build: {
     rollupOptions: {
       output: {

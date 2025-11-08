@@ -1,4 +1,4 @@
-import * as React from "react";
+import { useState, useCallback, createContext, useContext, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
 // Lightweight Tabs implementation to avoid Radix/React hook collisions
@@ -8,7 +8,7 @@ type TabsContextValue = {
   setValue: (v: string) => void;
 };
 
-const TabsContext = React.createContext<TabsContextValue | null>(null);
+const TabsContext = createContext<TabsContextValue | null>(null);
 
 type TabsProps = {
   value?: string;
@@ -20,10 +20,10 @@ type TabsProps = {
 
 const Tabs: React.FC<TabsProps> = ({ value, defaultValue, onValueChange, className, children }) => {
   const isControlled = value !== undefined;
-  const [internal, setInternal] = React.useState<string>(defaultValue || "");
+  const [internal, setInternal] = useState<string>(defaultValue || "");
   const current = isControlled ? (value as string) : internal;
 
-  const setValue = React.useCallback((v: string) => {
+  const setValue = useCallback((v: string) => {
     if (!isControlled) setInternal(v);
     onValueChange?.(v);
   }, [isControlled, onValueChange]);
@@ -37,7 +37,7 @@ const Tabs: React.FC<TabsProps> = ({ value, defaultValue, onValueChange, classNa
   );
 };
 
-const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+const TabsList = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div ref={ref} className={cn("inline-flex h-10 items-center justify-center rounded-md bg-muted p-1 text-muted-foreground", className)} {...props} />
   )
@@ -45,8 +45,8 @@ const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 TabsList.displayName = "TabsList";
 
 type TabsTriggerProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { value: string };
-const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ className, value, ...props }, ref) => {
-  const ctx = React.useContext(TabsContext);
+const TabsTrigger = forwardRef<HTMLButtonElement, TabsTriggerProps>(({ className, value, ...props }, ref) => {
+  const ctx = useContext(TabsContext);
   const active = ctx?.value === value;
   return (
     <button
@@ -67,8 +67,8 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ cla
 TabsTrigger.displayName = "TabsTrigger";
 
 type TabsContentProps = React.HTMLAttributes<HTMLDivElement> & { value: string };
-const TabsContent = React.forwardRef<HTMLDivElement, TabsContentProps>(({ className, value, ...props }, ref) => {
-  const ctx = React.useContext(TabsContext);
+const TabsContent = forwardRef<HTMLDivElement, TabsContentProps>(({ className, value, ...props }, ref) => {
+  const ctx = useContext(TabsContext);
   if (ctx?.value !== value) return null;
   return (
     <div
