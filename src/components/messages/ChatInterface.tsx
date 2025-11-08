@@ -198,6 +198,8 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
         user_id: user.id,
         is_typing: true,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'conversation_id,user_id'
       });
 
     typingTimeoutRef.current = setTimeout(async () => {
@@ -208,6 +210,8 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           user_id: user.id,
           is_typing: false,
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'conversation_id,user_id'
         });
     }, 2000);
   };
@@ -256,6 +260,9 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           conversation_id: conversationId,
           user_id: user.id,
           is_typing: false,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'conversation_id,user_id'
         });
 
       setNewMessage('');
