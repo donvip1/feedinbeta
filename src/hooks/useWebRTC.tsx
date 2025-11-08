@@ -28,6 +28,12 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     packetLoss: number;
     bandwidth: number;
   } | null>(null);
+  const [statsHistory, setStatsHistory] = useState<Array<{
+    timestamp: number;
+    latency: number;
+    packetLoss: number;
+    bandwidth: number;
+  }>>([]);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
   const originalVideoTrack = useRef<MediaStreamTrack | null>(null);
@@ -230,6 +236,12 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
 
         const currentStats = { latency, packetLoss, bandwidth };
         setCallStats(currentStats);
+        
+        // Store historical stats (keep last 30 data points)
+        setStatsHistory(prev => {
+          const newHistory = [...prev, { ...currentStats, timestamp: Date.now() }];
+          return newHistory.slice(-30);
+        });
         
         // Auto-adjust quality based on stats
         adjustQualityBasedOnStats({ latency, packetLoss });
@@ -445,6 +457,7 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     connectionState,
     isScreenSharing,
     callStats,
+    statsHistory,
     toggleScreenShare,
     cleanup,
   };

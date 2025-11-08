@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff, Volume2, VolumeX, Circle } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff, Volume2, VolumeX, Circle, PictureInPicture, BarChart3 } from 'lucide-react';
 
 interface CallControlsProps {
   isMuted: boolean;
@@ -8,11 +8,14 @@ interface CallControlsProps {
   isScreenSharing?: boolean;
   isSpeakerOn?: boolean;
   isRecording?: boolean;
+  isPipEnabled?: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onToggleScreenShare?: () => void;
   onToggleSpeaker?: () => void;
   onToggleRecording?: () => void;
+  onTogglePip?: () => void;
+  onShowStats?: () => void;
   onEndCall: () => void;
 }
 
@@ -23,11 +26,14 @@ export const CallControls = ({
   isScreenSharing = false,
   isSpeakerOn = true,
   isRecording = false,
+  isPipEnabled = false,
   onToggleMute,
   onToggleVideo,
   onToggleScreenShare,
   onToggleSpeaker,
   onToggleRecording,
+  onTogglePip,
+  onShowStats,
   onEndCall,
 }: CallControlsProps) => {
   return (
@@ -106,6 +112,32 @@ export const CallControls = ({
           title={isRecording ? 'Stop recording' : 'Start recording'}
         >
           <Circle className={`w-6 h-6 ${isRecording ? 'fill-current animate-pulse' : ''}`} />
+        </Button>
+      )}
+
+      {/* Picture-in-Picture Toggle */}
+      {isVideoCall && onTogglePip && (
+        <Button
+          onClick={onTogglePip}
+          size="lg"
+          variant={isPipEnabled ? 'default' : 'secondary'}
+          className="rounded-full w-14 h-14 p-0"
+          title="Picture-in-Picture"
+        >
+          <PictureInPicture className="w-6 h-6" />
+        </Button>
+      )}
+
+      {/* Stats Dashboard */}
+      {onShowStats && (
+        <Button
+          onClick={onShowStats}
+          size="lg"
+          variant="secondary"
+          className="rounded-full w-14 h-14 p-0"
+          title="View call statistics"
+        >
+          <BarChart3 className="w-6 h-6" />
         </Button>
       )}
 

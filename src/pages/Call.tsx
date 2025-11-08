@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CallControls } from '@/components/calls/CallControls';
 import { CallQualityIndicator } from '@/components/calls/CallQualityIndicator';
+import { CallStatsDashboard } from '@/components/calls/CallStatsDashboard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useWebRTC } from '@/hooks/useWebRTC';
 
@@ -36,6 +37,8 @@ const Call = () => {
   const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'failed'>('connecting');
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
+  const [isPipEnabled, setIsPipEnabled] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -52,6 +55,7 @@ const Call = () => {
     connectionState: rtcState, 
     isScreenSharing,
     callStats,
+    statsHistory,
     toggleScreenShare,
     cleanup: cleanupWebRTC 
   } = useWebRTC({
@@ -267,6 +271,58 @@ const Call = () => {
       });
     }
   };
+
+  const togglePip = async () => {
+    if (!remoteVideoRef.current) return;
+
+    try {
+      if (!isPipEnabled) {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        }
+        await remoteVideoRef.current.requestPictureInPicture();
+        setIsPipEnabled(true);
+        toast({
+          title: 'Picture-in-Picture enabled',
+          description: 'Video moved to floating window',
+        });
+      } else {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
+        }
+        setIsPipEnabled(false);
+        toast({
+          title: 'Picture-in-Picture disabled',
+          description: 'Video returned to main window',
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling PiP:', error);
+      toast({
+        title: 'PiP Error',
+        description: 'Could not enable Picture-in-Picture mode',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Handle PiP state changes
+  useEffect(() => {
+    const videoElement = remoteVideoRef.current;
+    if (!videoElement) return;
+
+    const handlePipChange = () => {
+      setIsPipEnabled(document.pictureInPictureElement === videoElement);
+    };
+
+    videoElement.addEventListener('enterpictureinpicture', handlePipChange);
+    videoElement.addEventListener('leavepictureinpicture', handlePipChange);
+
+    return () => {
+      videoElement.removeEventListener('enterpictureinpicture', handlePipChange);
+      videoElement.removeEventListener('leavepictureinpicture', handlePipChange);
+    };
+  }, []);
 
   const startRecording = async () => {
     if (!localStream) return;
@@ -567,15 +623,25 @@ const Call = () => {
             isScreenSharing={isScreenSharing}
             isSpeakerOn={isSpeakerOn}
             isRecording={isRecording}
+            isPipEnabled={isPipEnabled}
             onToggleMute={toggleMute}
             onToggleVideo={toggleVideo}
             onToggleScreenShare={toggleScreenShare}
             onToggleSpeaker={toggleSpeaker}
             onToggleRecording={isRecording ? stopRecording : startRecording}
+            onTogglePip={isVideo ? togglePip : undefined}
+            onShowStats={() => setShowStats(true)}
             onEndCall={endCall}
           />
         </div>
       </div>
+
+      <CallStatsDashboard
+        open={showStats}
+        onOpenChange={setShowStats}
+        statsHistory={statsHistory}
+        currentStats={callStats}
+      />
 
       <style>{`
         .mirror {
