@@ -1,3 +1,4 @@
+import React from 'react';
 import { Home, MessageCircle, Plus, User, Sparkles, UsersRound } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
