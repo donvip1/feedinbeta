@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Home, MessageCircle, Plus, User, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -10,8 +10,7 @@ interface BottomNavProps {
 }
 
 export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default', minimized = false }: BottomNavProps) => {
-  const location = useLocation();
-  const currentPath = location.pathname;
+  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
 
   const navItems = [
     { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
