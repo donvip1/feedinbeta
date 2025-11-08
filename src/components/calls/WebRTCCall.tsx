@@ -1,417 +1,174 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useWebRTC } from '@/hooks/useWebRTC';
 import { Button } from '@/components/ui/button';
-import { Video, VideoOff, Mic, MicOff, PhoneOff, Monitor, Radio } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Video, VideoOff, Mic, MicOff, PhoneOff, Monitor } from 'lucide-react';
+import { ConnectionIndicator } from './ConnectionIndicator';
 
 interface WebRTCCallProps {
   callId: string;
   isInitiator: boolean;
-  participants: Array<{ id: string; display_name: string; avatar_url: string }>;
+  otherUser: { id: string; display_name: string; avatar_url: string };
+  isVideo: boolean;
   onEndCall: () => void;
 }
 
-type SignalingData =
-  | { type: 'offer'; offer: RTCSessionDescriptionInit }
-  | { type: 'answer'; answer: RTCSessionDescriptionInit }
-  | { type: 'ice-candidate'; candidate: RTCIceCandidateInit };
+export const WebRTCCall = ({ callId, isInitiator, otherUser, isVideo, onEndCall }: WebRTCCallProps) => {
+  const {
+    localStream,
+    remoteStream,
+    connectionState,
+    isScreenSharing,
+    callStats,
+    toggleScreenShare,
+    cleanup,
+  } = useWebRTC({
+    callId,
+    isInitiator,
+    otherUserId: otherUser.id,
+    isVideo,
+    onConnectionStateChange: (state) => {
+      if (['disconnected', 'failed', 'closed'].includes(state)) {
+        onEndCall();
+      }
+    },
+  });
 
-export const WebRTCCall = ({ callId, isInitiator, participants, onEndCall }: WebRTCCallProps) => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(!isVideo);
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const remoteVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
-  const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const mediaRecorder = useRef<MediaRecorder | null>(null);
-  const recordedChunks = useRef<Blob[]>([]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorder.current && isRecording) {
-      mediaRecorder.current.stop();
-      setIsRecording(false);
-      toast({ title: 'Recording stopped' });
-    }
-  }, [isRecording, toast]);
-
-  const cleanup = useCallback(() => {
-    if (mediaRecorder.current && isRecording) {
-      stopRecording();
-    }
-
-    localStream?.getTracks().forEach((track) => track.stop());
-    peerConnections.current.forEach((pc) => pc.close());
-    peerConnections.current.clear();
-  }, [isRecording, localStream, stopRecording]);
-
-  const sendSignal = useCallback(async (participantId: string, signal: SignalingData) => {
-    await supabase.from('call_signals').insert({
-      call_id: callId,
-      from_user_id: user?.id,
-      to_user_id: participantId,
-      signal_data: signal as any,
-    });
-  }, [callId, user?.id]);
-
-  const handleIceCandidate = useCallback(async (fromUserId: string, candidate: RTCIceCandidateInit) => {
-    const pc = peerConnections.current.get(fromUserId);
-    if (pc) {
-      try {
-        await pc.addIceCandidate(new RTCIceCandidate(candidate));
-      } catch (error) {
-        console.error('Error adding ICE candidate:', error);
-      }
-    }
-  }, []);
-
-  const handleAnswer = useCallback(async (fromUserId: string, answer: RTCSessionDescriptionInit) => {
-    const pc = peerConnections.current.get(fromUserId);
-    if (pc) {
-      try {
-        await pc.setRemoteDescription(new RTCSessionDescription(answer));
-      } catch (error) {
-        console.error('Error setting remote description:', error);
-      }
-    }
-  }, []);
-
-  const handleOffer = useCallback(async (fromUserId: string, offer: RTCSessionDescriptionInit) => {
-    if (!localStream) return;
-
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
-
-    localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendSignal(fromUserId, {
-          type: 'ice-candidate',
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      setRemoteStreams((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(fromUserId, event.streams[0]);
-        return newMap;
-      });
-    };
-
-    peerConnections.current.set(fromUserId, pc);
-
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      sendSignal(fromUserId, { type: 'answer', answer });
-    } catch (error) {
-      console.error('Error handling offer:', error);
-    }
-  }, [localStream, sendSignal]);
-
-  const createPeerConnection = useCallback(async (participantId: string, stream: MediaStream) => {
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-    });
-
-    stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        sendSignal(participantId, {
-          type: 'ice-candidate',
-          candidate: event.candidate,
-        });
-      }
-    };
-
-    pc.ontrack = (event) => {
-      setRemoteStreams((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(participantId, event.streams[0]);
-        return newMap;
-      });
-    };
-
-    peerConnections.current.set(participantId, pc);
-
-    if (isInitiator) {
-      try {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        sendSignal(participantId, { type: 'offer', offer });
-      } catch (error) {
-        console.error('Error creating offer:', error);
-      }
-    }
-  }, [isInitiator, sendSignal]);
-
-  const initializeMedia = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-
-      setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
-
-      if (isInitiator) {
-        participants.forEach((participant) => {
-          if (participant.id !== user?.id) {
-            createPeerConnection(participant.id, stream);
-          }
-        });
-      }
-    } catch (error) {
-      console.error('Error accessing media devices:', error);
-      toast({
-        title: 'Media Access Error',
-        description: 'Could not access camera/microphone',
-        variant: 'destructive',
-      });
-    }
-  }, [createPeerConnection, isInitiator, participants, toast, user?.id]);
-
-  const subscribeToSignaling = useCallback(() => {
-    const channel = supabase
-      .channel(`call-${callId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_signals',
-          filter: `to_user_id=eq.${user?.id}`,
-        },
-        async (payload) => {
-          const signal = payload.new.signal_data as SignalingData;
-          const fromUserId = payload.new.from_user_id;
-
-          if (signal.type === 'offer') {
-            await handleOffer(fromUserId, signal.offer);
-          } else if (signal.type === 'answer') {
-            await handleAnswer(fromUserId, signal.answer);
-          } else if (signal.type === 'ice-candidate') {
-            await handleIceCandidate(fromUserId, signal.candidate);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [callId, user?.id, handleOffer, handleAnswer, handleIceCandidate]);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
-    initializeMedia();
-    const unsubscribe = subscribeToSignaling();
-
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
     return () => {
-      cleanup();
-      unsubscribe();
+      if (localVideoRef.current) localVideoRef.current.srcObject = null;
     };
-  }, [cleanup, initializeMedia, subscribeToSignaling]);
+  }, [localStream]);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+    return () => {
+      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null;
+    };
+  }, [remoteStream]);
+
+  const handleEndCall = useCallback(() => {
+    cleanup();
+    onEndCall();
+  }, [cleanup, onEndCall]);
+  
+  // Add a listener for the browser's beforeunload event.
+  useEffect(() => {
+    window.addEventListener("beforeunload", handleEndCall);
+    return () => {
+      window.removeEventListener("beforeunload", handleEndCall);
+    }
+  },[handleEndCall]);
 
   const toggleMute = () => {
     if (localStream) {
-      localStream.getAudioTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setIsMuted(!isMuted);
+      localStream.getAudioTracks().forEach((track) => { track.enabled = !track.enabled; });
+      setIsMuted((prev) => !prev);
     }
   };
 
   const toggleVideo = () => {
     if (localStream) {
-      localStream.getVideoTracks().forEach((track) => {
-        track.enabled = !track.enabled;
-      });
-      setIsVideoOff(!isVideoOff);
+      const isEnabling = localStream.getVideoTracks().some(t => !t.enabled)
+      localStream.getVideoTracks().forEach((track) => { track.enabled = isEnabling; });
+      setIsVideoOff(!isEnabling);
     }
   };
-
-  const startScreenShare = async () => {
-    try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-      });
-
-      const screenTrack = screenStream.getVideoTracks()[0];
-
-      peerConnections.current.forEach((pc) => {
-        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-        if (sender) {
-          sender.replaceTrack(screenTrack);
-        }
-      });
-
-      setIsScreenSharing(true);
-
-      screenTrack.onended = () => {
-        stopScreenShare();
-      };
-    } catch (error) {
-      console.error('Error sharing screen:', error);
-      toast({
-        title: 'Screen Share Error',
-        description: 'Could not start screen sharing',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const stopScreenShare = useCallback(() => {
-    if (localStream) {
-      const videoTrack = localStream.getVideoTracks()[0];
-      peerConnections.current.forEach((pc) => {
-        const sender = pc.getSenders().find((s) => s.track?.kind === 'video');
-        if (sender) {
-          sender.replaceTrack(videoTrack);
-        }
-      });
-      setIsScreenSharing(false);
-    }
-  }, [localStream]);
-
-  const uploadRecording = async (blob: Blob) => {
-    const fileName = `recordings/${callId}/${Date.now()}.webm`;
-    
-    // Store recording metadata - actual storage bucket will be created separately
-    console.log('Recording saved:', fileName, 'Size:', blob.size);
-    toast({ 
-      title: 'Recording saved',
-      description: 'Your call recording has been saved'
-    });
-  };
-
-  const startRecording = () => {
-    if (!localStream) return;
-
-    recordedChunks.current = [];
-    mediaRecorder.current = new MediaRecorder(localStream);
-
-    mediaRecorder.current.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        recordedChunks.current.push(event.data);
-      }
-    };
-
-    mediaRecorder.current.onstop = async () => {
-      const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
-      await uploadRecording(blob);
-    };
-
-    mediaRecorder.current.start();
-    setIsRecording(true);
-    toast({ title: 'Recording started' });
-  };
-
-  const handleEndCall = () => {
-    cleanup();
-    onEndCall();
-  };
+  
+  const remoteVideoHasTracks = remoteStream && remoteStream.getVideoTracks().length > 0 && remoteStream.getVideoTracks().some(t => t.enabled);
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      <div className="flex-1 relative grid grid-cols-2 gap-2 p-4">
-        {/* Local Video */}
-        <div className="relative bg-muted rounded-lg overflow-hidden">
-          <video
-            ref={localVideoRef}
-            autoPlay
-            muted
-            playsInline
-            className="w-full h-full object-cover"
+    <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col text-white animate-fade-in">
+      <div className="flex-1 relative flex items-center justify-center">
+        {/* Remote Video / Avatar */}
+        {remoteVideoHasTracks ? (
+            <video ref={remoteVideoRef} autoPlay playsInline className="w-full h-full object-contain" />
+        ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
+                <Avatar className="w-32 h-32 border-4 border-gray-600">
+                    <AvatarImage src={otherUser.avatar_url} alt={otherUser.display_name} />
+                    <AvatarFallback>{otherUser.display_name[0]}</AvatarFallback>
+                </Avatar>
+                <h2 className="text-3xl font-bold mt-4">{otherUser.display_name}</h2>
+                <p className="text-lg text-gray-400 mt-2 capitalize">{connectionState}</p>
+            </div>
+        )}
+
+        <div className="absolute top-4 left-4 flex items-center gap-2 bg-black/30 p-2 rounded-lg">
+          <ConnectionIndicator
+            connectionState={connectionState}
+            latency={callStats?.latency || null}
           />
-          <div className="absolute bottom-2 left-2 text-sm text-white bg-black/50 px-2 py-1 rounded">
-            You {isScreenSharing && '(Sharing)'}
-          </div>
+          <span className="text-sm font-medium">{callStats?.latency ? `${Math.round(callStats.latency)}ms` : ''}</span>
         </div>
 
-        {/* Remote Videos */}
-        {Array.from(remoteStreams.entries()).map(([userId, stream]) => {
-          const participant = participants.find((p) => p.id === userId);
-          return (
-            <div key={userId} className="relative bg-muted rounded-lg overflow-hidden">
+        {/* Local Video (PiP) */}
+        {localStream && (
+            <div className={`absolute bottom-24 md:bottom-28 right-4 w-32 h-48 md:w-40 md:h-56 bg-black rounded-lg overflow-hidden border-2 ${isScreenSharing ? 'border-blue-500' : 'border-gray-700'} transition-all duration-300 shadow-xl`}>
               <video
-                ref={(ref) => {
-                  if (ref) {
-                    ref.srcObject = stream;
-                    remoteVideoRefs.current.set(userId, ref);
-                  }
-                }}
+                ref={localVideoRef}
                 autoPlay
+                muted
                 playsInline
                 className="w-full h-full object-cover"
               />
-              <div className="absolute bottom-2 left-2 text-sm text-white bg-black/50 px-2 py-1 rounded">
-                {participant?.display_name || 'User'}
+              <div className="absolute bottom-1 left-1 text-xs text-white bg-black/50 px-1 rounded">
+                You
               </div>
             </div>
-          );
-        })}
+        )}
       </div>
 
       {/* Controls */}
-      <div className="p-4 bg-card flex items-center justify-center gap-4">
+      <div className="py-4 bg-gray-900/80 flex items-center justify-center gap-3 md:gap-4">
         <Button
           variant={isMuted ? 'destructive' : 'secondary'}
           size="icon"
-          className="rounded-full w-12 h-12"
+          className="rounded-full w-14 h-14 bg-white/10 hover:bg-white/20 text-white transition-all"
           onClick={toggleMute}
         >
-          {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
         </Button>
 
-        <Button
-          variant={isVideoOff ? 'destructive' : 'secondary'}
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={toggleVideo}
-        >
-          {isVideoOff ? <VideoOff className="w-5 h-5" /> : <Video className="w-5 h-5" />}
-        </Button>
+        {isVideo && (
+          <Button
+            variant={isVideoOff ? 'destructive' : 'secondary'}
+            size="icon"
+            className="rounded-full w-14 h-14 bg-white/10 hover:bg-white/20 text-white transition-all"
+            onClick={toggleVideo}
+          >
+            {isVideoOff ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+          </Button>
+        )}
 
-        <Button
-          variant={isScreenSharing ? 'default' : 'secondary'}
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-        >
-          <Monitor className="w-5 h-5" />
-        </Button>
-
-        <Button
-          variant={isRecording ? 'destructive' : 'secondary'}
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={isRecording ? stopRecording : startRecording}
-        >
-          <Radio className="w-5 h-5" />
-        </Button>
+        {isVideo && (
+          <Button
+            variant={isScreenSharing ? 'default' : 'secondary'}
+            size="icon"
+            className={`rounded-full w-14 h-14 text-white transition-all ${isScreenSharing ? 'bg-blue-600' : 'bg-white/10'} hover:bg-blue-700`}
+            onClick={toggleScreenShare}
+          >
+            <Monitor className="w-6 h-6" />
+          </Button>
+        )}
 
         <Button
           variant="destructive"
           size="icon"
-          className="rounded-full w-12 h-12"
+          className="rounded-full w-16 h-16 scale-110 shadow-lg mx-2"
           onClick={handleEndCall}
         >
-          <PhoneOff className="w-5 h-5" />
+          <PhoneOff className="w-7 h-7" />
         </Button>
       </div>
     </div>

@@ -39,12 +39,10 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
   const originalVideoTrack = useRef<MediaStreamTrack | null>(null);
   const statsInterval = useRef<NodeJS.Timeout | null>(null);
 
-  // High-quality configuration
   const rtcConfig: RTCConfiguration = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
-      { urls: 'stun:stun2.l.google.com:19302' },
     ],
     iceCandidatePoolSize: 10,
   };
@@ -63,6 +61,7 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     }
   }, [callId, otherUserId]);
 
+<<<<<<< HEAD
   const [videoQuality, setVideoQuality] = useState<'high' | 'medium' | 'low'>('high');
 
   const getVideoConstraints = useCallback((quality: 'high' | 'medium' | 'low') => {
@@ -102,39 +101,82 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
         },
         video: isVideo ? getVideoConstraints(quality) : false,
       };
+=======
+  const initializeMedia = useCallback(async () => {
+    let audioStream: MediaStream | null = null;
+    let videoStream: MediaStream | null = null;
+>>>>>>> 3d273f8 (updates on calls)
 
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      setLocalStream(stream);
-      return stream;
-    } catch (error) {
-      console.error('Error accessing media:', error);
-      toast({
-        title: 'Media Access Error',
-        description: 'Could not access camera/microphone. Please check permissions.',
-        variant: 'destructive',
-      });
-      throw error;
+    try {
+      // Try to get audio
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error: any) {
+      console.error('Audio access error: ', error);
+      if (error.name === 'NotAllowedError') {
+        toast({
+          title: 'Microphone Access Denied',
+          description: 'Please grant permission to use your microphone for calls.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'No Microphone Found',
+          description: 'Could not access a microphone. Please connect a microphone and try again.',
+          variant: 'destructive',
+        });
+      }
+      throw new Error('Audio permission denied or device not found.');
     }
+<<<<<<< HEAD
   }, [isVideo, toast, getVideoConstraints]);
+=======
+
+    if (isVideo) {
+      try {
+        // Try to get video
+        videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch (error: any) {
+        console.error('Video access error: ', error);
+        if (error.name === 'NotAllowedError') {
+          toast({
+            title: 'Camera Access Denied',
+            description: 'You can still join with audio only.',
+            variant: 'default',
+          });
+        } else {
+          toast({
+            title: 'No Camera Found',
+            description: 'Proceeding with audio-only call.',
+            variant: 'default',
+          });
+        }
+        // Proceed with audio only
+      }
+    }
+
+    const combinedStream = new MediaStream();
+    audioStream.getTracks().forEach(track => combinedStream.addTrack(track));
+    videoStream?.getTracks().forEach(track => combinedStream.addTrack(track));
+    
+    setLocalStream(combinedStream);
+    return combinedStream;
+
+  }, [isVideo, toast]);
+>>>>>>> 3d273f8 (updates on calls)
 
   const createPeerConnection = useCallback((stream: MediaStream) => {
     const pc = new RTCPeerConnection(rtcConfig);
 
-    // Add local tracks
     stream.getTracks().forEach(track => {
       pc.addTrack(track, stream);
     });
 
-    // Handle remote stream
     pc.ontrack = (event) => {
-      console.log('Received remote track:', event.track.kind);
       setRemoteStream(event.streams[0]);
     };
 
-    // Handle ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log('Sending ICE candidate');
         sendSignal({
           type: 'ice-candidate',
           candidate: event.candidate.toJSON(),
@@ -142,30 +184,20 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
       }
     };
 
-    // Handle connection state changes
     pc.onconnectionstatechange = () => {
-      console.log('Connection state:', pc.connectionState);
       setConnectionState(pc.connectionState);
       onConnectionStateChange?.(pc.connectionState);
-
       if (pc.connectionState === 'failed') {
         toast({
           title: 'Connection Failed',
-          description: 'Unable to establish connection. Please try again.',
+          description: 'Unable to establish connection.',
           variant: 'destructive',
         });
       }
     };
 
-    pc.oniceconnectionstatechange = () => {
-      console.log('ICE connection state:', pc.iceConnectionState);
-    };
-
     peerConnection.current = pc;
-    
-    // Start monitoring stats
     startStatsMonitoring(pc);
-    
     return pc;
   }, [rtcConfig, sendSignal, onConnectionStateChange, toast]);
 
@@ -215,24 +247,21 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
   const startStatsMonitoring = useCallback((pc: RTCPeerConnection) => {
     statsInterval.current = setInterval(async () => {
       if (pc.connectionState !== 'connected') return;
-
       try {
         const stats = await pc.getStats();
         let latency = 0;
         let packetLoss = 0;
         let bandwidth = 0;
-
         stats.forEach((report) => {
           if (report.type === 'candidate-pair' && report.state === 'succeeded') {
             latency = report.currentRoundTripTime ? report.currentRoundTripTime * 1000 : 0;
           }
           if (report.type === 'inbound-rtp' && report.kind === 'video') {
-            const packetsLost = report.packetsLost || 0;
-            const packetsReceived = report.packetsReceived || 0;
-            packetLoss = packetsReceived > 0 ? (packetsLost / packetsReceived) * 100 : 0;
+            packetLoss = (report.packetsLost || 0) / (report.packetsReceived || 1);
             bandwidth = report.bytesReceived || 0;
           }
         });
+<<<<<<< HEAD
 
         const currentStats = { latency, packetLoss, bandwidth };
         setCallStats(currentStats);
@@ -250,50 +279,57 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
       }
     }, 2000);
   }, [adjustQualityBasedOnStats]);
+=======
+        setCallStats({ latency, packetLoss, bandwidth });
+      } catch (error) {
+        console.error('Error getting stats:', error);
+      }
+    }, 3000);
+  }, []);
+>>>>>>> 3d273f8 (updates on calls)
 
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
-    console.log('Handling offer');
-    const stream = await initializeMedia();
-    const pc = createPeerConnection(stream);
+    try {
+        const stream = await initializeMedia();
+        const pc = createPeerConnection(stream);
 
-    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-    
-    // Add pending candidates
-    for (const candidate of pendingCandidates.current) {
-      await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        
+        for (const candidate of pendingCandidates.current) {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+        pendingCandidates.current = [];
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        
+        await sendSignal({
+          type: 'answer',
+          answer: pc.localDescription!.toJSON(),
+        });
+    } catch (error) {
+        console.error("Failed to handle offer:", error)
     }
-    pendingCandidates.current = [];
-
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    
-    await sendSignal({
-      type: 'answer',
-      answer: pc.localDescription!.toJSON(),
-    });
   }, [initializeMedia, createPeerConnection, sendSignal]);
 
   const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit) => {
-    console.log('Handling answer');
     if (!peerConnection.current) return;
-
-    await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
-    
-    // Add pending candidates
-    for (const candidate of pendingCandidates.current) {
-      await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+    try {
+        await peerConnection.current.setRemoteDescription(new RTCSessionDescription(answer));
+        for (const candidate of pendingCandidates.current) {
+          await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+        }
+        pendingCandidates.current = [];
+    } catch (error) {
+        console.error("Error handling answer", error)
     }
-    pendingCandidates.current = [];
   }, []);
 
   const handleIceCandidate = useCallback(async (candidate: RTCIceCandidateInit) => {
-    console.log('Handling ICE candidate');
     if (!peerConnection.current || !peerConnection.current.remoteDescription) {
-      // Store candidates until remote description is set
       pendingCandidates.current.push(candidate);
       return;
     }
-
     try {
       await peerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
     } catch (error) {
@@ -302,23 +338,26 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
   }, []);
 
   const startCall = useCallback(async () => {
-    console.log('Starting call as initiator');
-    const stream = await initializeMedia();
-    const pc = createPeerConnection(stream);
+    try {
+        const stream = await initializeMedia();
+        const pc = createPeerConnection(stream);
 
-    const offer = await pc.createOffer({
-      offerToReceiveAudio: true,
-      offerToReceiveVideo: isVideo,
-    });
-    await pc.setLocalDescription(offer);
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: true,
+          offerToReceiveVideo: isVideo,
+        });
+        await pc.setLocalDescription(offer);
 
-    await sendSignal({
-      type: 'offer',
-      offer: pc.localDescription!.toJSON(),
-    });
-  }, [initializeMedia, createPeerConnection, isVideo, sendSignal]);
+        await sendSignal({
+          type: 'offer',
+          offer: pc.localDescription!.toJSON(),
+        });
+    } catch(error) {
+        console.error("Failed to start call:", error)
+        onEndCall()
+    }
+  }, [initializeMedia, createPeerConnection, isVideo, sendSignal, onEndCall]);
 
-  // Subscribe to signaling
   useEffect(() => {
     const channel = supabase
       .channel(`call-signals-${callId}`)
@@ -331,13 +370,10 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
           filter: `call_id=eq.${callId}`,
         },
         async (payload: any) => {
-          const { from_user_id, signal_data } = payload.new;
-          
-          // Ignore our own signals
           const { data: { user } } = await supabase.auth.getUser();
-          if (from_user_id === user?.id) return;
+          if (payload.new.from_user_id === user?.id) return;
 
-          const signal = signal_data as SignalData;
+          const signal = payload.new.signal_data as SignalData;
           
           if (signal.type === 'offer' && signal.offer) {
             await handleOffer(signal.offer);
@@ -355,7 +391,6 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     };
   }, [callId, handleOffer, handleAnswer, handleIceCandidate]);
 
-  // Start call if initiator
   useEffect(() => {
     if (isInitiator) {
       startCall();
@@ -364,67 +399,37 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
 
   const startScreenShare = useCallback(async () => {
     if (!peerConnection.current || !localStream) return;
-
     try {
-      const screenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 },
-        },
-      });
-
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
       const screenTrack = screenStream.getVideoTracks()[0];
       
-      // Save original video track
-      originalVideoTrack.current = localStream.getVideoTracks()[0];
-
-      // Replace video track in peer connection
-      const sender = peerConnection.current
-        .getSenders()
-        .find((s) => s.track?.kind === 'video');
-
-      if (sender) {
-        await sender.replaceTrack(screenTrack);
+      const videoSender = peerConnection.current.getSenders().find(s => s.track?.kind === 'video');
+      
+      if (videoSender) {
+        originalVideoTrack.current = videoSender.track;
+        await videoSender.replaceTrack(screenTrack);
         setIsScreenSharing(true);
 
-        // Listen for screen share stop
-        screenTrack.onended = () => {
-          stopScreenShare();
-        };
+        screenTrack.onended = () => stopScreenShare();
 
-        toast({
-          title: 'Screen sharing started',
-          description: 'Your screen is now visible to the other user',
-        });
+        toast({ title: 'Screen sharing started' });
       }
     } catch (error) {
       console.error('Error sharing screen:', error);
-      toast({
-        title: 'Screen Share Error',
-        description: 'Could not start screen sharing',
-        variant: 'destructive',
-      });
+      toast({ title: 'Screen Share Error', variant: 'destructive' });
     }
   }, [localStream, toast]);
 
   const stopScreenShare = useCallback(async () => {
     if (!peerConnection.current || !originalVideoTrack.current) return;
-
     try {
-      const sender = peerConnection.current
-        .getSenders()
-        .find((s) => s.track?.kind === 'video');
-
-      if (sender && originalVideoTrack.current) {
-        await sender.replaceTrack(originalVideoTrack.current);
+      const videoSender = peerConnection.current.getSenders().find(s => s.track?.kind === 'video');
+      if (videoSender) {
+        await videoSender.replaceTrack(originalVideoTrack.current);
+        originalVideoTrack.current.stop() // Stop the camera track from screen share
+        originalVideoTrack.current = null
         setIsScreenSharing(false);
-        originalVideoTrack.current = null;
-
-        toast({
-          title: 'Screen sharing stopped',
-          description: 'Camera feed restored',
-        });
+        toast({ title: 'Screen sharing stopped' });
       }
     } catch (error) {
       console.error('Error stopping screen share:', error);

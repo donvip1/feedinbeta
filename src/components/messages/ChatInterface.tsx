@@ -35,16 +35,22 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    loadMessages();
-    loadOtherUser();
-    subscribeToMessages();
-    subscribeToTyping();
-    markMessagesAsRead();
-  }, [conversationId]);
+    const initializeChat = async () => {
+      setLoading(true);
+      await loadOtherUser();
+      await loadMessages();
+      setLoading(false);
+      subscribeToMessages();
+      subscribeToTyping();
+      markMessagesAsRead();
+    };
+    initializeChat();
+  }, [conversationId, user]);
 
   useEffect(() => {
     scrollToBottom();
@@ -311,7 +317,7 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <h2 className="font-semibold text-card-foreground">{otherUser?.display_name || 'Unknown User'}</h2>
+          <h2 className="font-semibold text-card-foreground">{loading ? 'Loading...' : otherUser?.display_name || 'Unknown User'}</h2>
           {otherUser?.username && (
             <p className="text-sm text-muted-foreground">@{otherUser.username}</p>
           )}
@@ -328,19 +334,25 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
 
       {/* Message List */}
       <div className="flex-1 overflow-y-auto px-4 py-2 w-full">
-        <div className="space-y-4">
-          {messages.map((msg) => (
-            <EnhancedMessageBubble
-              key={msg.id}
-              message={msg}
-              isOwn={msg.sender_id === user?.id}
-              onReply={() => {}}
-              onReact={() => {}}
-            />
-          ))}
-          {isTyping && <TypingIndicator />}
-          <div ref={scrollRef} />
-        </div>
+        {loading ? (
+          <div className="flex justify-center items-center h-full">
+            <p>Loading messages...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((msg) => (
+              <EnhancedMessageBubble
+                key={msg.id}
+                message={msg}
+                isOwn={msg.sender_id === user?.id}
+                onReply={() => {}}
+                onReact={() => {}}
+              />
+            ))}
+            {isTyping && <TypingIndicator />}
+            <div ref={scrollRef} />
+          </div>
+        )}
       </div>
 
       {/* Input & Send Button */}
