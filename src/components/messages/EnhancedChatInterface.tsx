@@ -934,9 +934,9 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   };
 
   return (
-    <>
+    <div className="flex flex-col h-full w-full overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col border-b border-border bg-background sticky top-0 z-10">
+      <div className="flex flex-col border-b border-border bg-background sticky top-0 z-10 w-full">
         <div className="flex items-center gap-3 p-4">
           <Button
             variant="ghost"
@@ -1018,7 +1018,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
       {/* Messages */}
       <div 
-        className="flex-1 overflow-y-auto p-4 relative min-h-0"
+        className="flex-1 overflow-y-auto p-4 relative min-h-0 w-full"
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
@@ -1090,7 +1090,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       </div>
 
       {/* Input */}
-      <div className="border-t border-border bg-background">
+      <div className="border-t border-border bg-background w-full flex-shrink-0">
         {/* Quick Replies */}
         {showQuickReplies && (
           <div className="px-4 pt-4 pb-2">
@@ -1136,9 +1136,9 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
             onCancel={() => setShowVoiceRecorder(false)}
           />
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 w-full">
             {/* Main input row */}
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2 w-full">
               <UserMentionInput
                 value={newMessage}
                 onChange={(val) => {
@@ -1177,43 +1177,43 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
             </div>
             
             {/* Action buttons below */}
-            <div className="flex items-center gap-2 px-1">
+            <div className="flex items-center gap-2 px-1 w-full overflow-x-auto">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowQuickReplies(!showQuickReplies)}
                 title="Quick replies"
-                className="h-8"
+                className="h-8 flex-shrink-0"
               >
-                <Smile className="w-4 h-4 mr-1" />
-                <span className="text-xs">Quick</span>
+                <Smile className="w-4 h-4 sm:mr-1" />
+                <span className="text-xs hidden sm:inline">Quick</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowMediaUpload(true)}
-                className="h-8"
+                className="h-8 flex-shrink-0"
               >
-                <ImageIcon className="w-4 h-4 mr-1" />
-                <span className="text-xs">Photo</span>
+                <ImageIcon className="w-4 h-4 sm:mr-1" />
+                <span className="text-xs hidden sm:inline">Photo</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowVideoRecorder(true)}
-                className="h-8"
+                className="h-8 flex-shrink-0"
               >
-                <Video className="w-4 h-4 mr-1" />
-                <span className="text-xs">Video</span>
+                <Video className="w-4 h-4 sm:mr-1" />
+                <span className="text-xs hidden sm:inline">Video</span>
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowMediaUpload(true)}
-                className="h-8"
+                className="h-8 flex-shrink-0"
               >
-                <Paperclip className="w-4 h-4 mr-1" />
-                <span className="text-xs">File</span>
+                <Paperclip className="w-4 h-4 sm:mr-1" />
+                <span className="text-xs hidden sm:inline">File</span>
               </Button>
             </div>
           </div>
@@ -1269,6 +1269,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         onClose={() => setShowVideoRecorder(false)}
         onSave={handleVideoMessage}
       />
-    </>
+    </div>
   );
 };
