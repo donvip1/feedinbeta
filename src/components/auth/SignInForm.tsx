@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Mail, Phone, User, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { SocialLogin } from './SocialLogin';
+import { TwoFactorVerification } from './TwoFactorVerification';
 
 const emailSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -32,6 +33,7 @@ interface SignInFormProps {
 export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [showMfaVerification, setShowMfaVerification] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -45,22 +47,57 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
       // Validate input
       if (method === 'email') {
         emailSchema.parse({ email: formData.email, password: formData.password });
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
         if (error) throw error;
+
+        // Check if user needs 2FA
+        if (data.user) {
+          const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const { data: mfaSettings } = await supabase
+            .from('user_mfa_settings')
+            .select('mfa_enabled, mfa_required')
+            .eq('user_id', data.user.id)
+            .single();
+
+          // If MFA is required or enabled and not yet verified
+          if (mfaSettings && (mfaSettings.mfa_required || mfaSettings.mfa_enabled)) {
+            if (mfaData?.currentLevel !== 'aal2') {
+              setShowMfaVerification(true);
+              setLoading(false);
+              return;
+            }
+          }
+        }
       } else if (method === 'phone') {
         phoneSchema.parse({ phone: formData.phone, password: formData.password });
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           phone: formData.phone,
           password: formData.password,
         });
         if (error) throw error;
+
+        // Check if user needs 2FA
+        if (data.user) {
+          const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const { data: mfaSettings } = await supabase
+            .from('user_mfa_settings')
+            .select('mfa_enabled, mfa_required')
+            .eq('user_id', data.user.id)
+            .single();
+
+          if (mfaSettings && (mfaSettings.mfa_required || mfaSettings.mfa_enabled)) {
+            if (mfaData?.currentLevel !== 'aal2') {
+              setShowMfaVerification(true);
+              setLoading(false);
+              return;
+            }
+          }
+        }
       } else if (method === 'username') {
         usernameSchema.parse({ username: formData.username, password: formData.password });
-        // Query profiles to find user with this username - note: this requires email to be stored
-        // For now, we'll show a helpful message
         toast.error('Username sign-in coming soon', {
           description: 'Please use your email or phone number to sign in'
         });
@@ -80,6 +117,17 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
       setLoading(false);
     }
   };
+
+  if (showMfaVerification) {
+    return (
+      <TwoFactorVerification
+        onCancel={() => {
+          setShowMfaVerification(false);
+          supabase.auth.signOut();
+        }}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">
