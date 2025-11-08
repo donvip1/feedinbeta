@@ -25,15 +25,6 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
   optimizeDeps: {
-    include: [
-      "react",
-      "react-dom",
-      "react/jsx-runtime",
-      "@tanstack/react-query",
-      "react-router-dom",
-      "next-themes",
-    ],
-    force: true, // Force re-optimization to clear cache
   },
   build: {
     rollupOptions: {
