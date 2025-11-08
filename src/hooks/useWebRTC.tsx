@@ -57,7 +57,35 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     }
   }, [callId, otherUserId]);
 
-  const initializeMedia = useCallback(async () => {
+  const [videoQuality, setVideoQuality] = useState<'high' | 'medium' | 'low'>('high');
+
+  const getVideoConstraints = useCallback((quality: 'high' | 'medium' | 'low') => {
+    switch (quality) {
+      case 'high':
+        return {
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 30, max: 60 },
+          facingMode: 'user',
+        };
+      case 'medium':
+        return {
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 },
+          frameRate: { ideal: 24, max: 30 },
+          facingMode: 'user',
+        };
+      case 'low':
+        return {
+          width: { ideal: 320, max: 640 },
+          height: { ideal: 240, max: 480 },
+          frameRate: { ideal: 15, max: 24 },
+          facingMode: 'user',
+        };
+    }
+  }, []);
+
+  const initializeMedia = useCallback(async (quality: 'high' | 'medium' | 'low' = 'high') => {
     try {
       const constraints: MediaStreamConstraints = {
         audio: {
@@ -66,12 +94,7 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
           autoGainControl: true,
           sampleRate: 48000,
         },
-        video: isVideo ? {
-          width: { ideal: 1280, max: 1920 },
-          height: { ideal: 720, max: 1080 },
-          frameRate: { ideal: 30, max: 60 },
-          facingMode: 'user',
-        } : false,
+        video: isVideo ? getVideoConstraints(quality) : false,
       };
 
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -86,7 +109,7 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
       });
       throw error;
     }
-  }, [isVideo, toast]);
+  }, [isVideo, toast, getVideoConstraints]);
 
   const createPeerConnection = useCallback((stream: MediaStream) => {
     const pc = new RTCPeerConnection(rtcConfig);
@@ -140,6 +163,49 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     return pc;
   }, [rtcConfig, sendSignal, onConnectionStateChange, toast]);
 
+  const adjustQualityBasedOnStats = useCallback(async (stats: { latency: number; packetLoss: number }) => {
+    if (!isVideo || !peerConnection.current) return;
+
+    let newQuality: 'high' | 'medium' | 'low' = videoQuality;
+
+    // Auto-adjust based on connection quality
+    if (stats.packetLoss > 5 || stats.latency > 300) {
+      // Poor connection - reduce to low quality
+      newQuality = 'low';
+      if (videoQuality !== 'low') {
+        toast({
+          title: 'Adjusting video quality',
+          description: 'Connection quality is poor, reducing video to maintain audio',
+        });
+      }
+    } else if (stats.packetLoss > 2 || stats.latency > 150) {
+      // Medium connection - use medium quality
+      newQuality = 'medium';
+      if (videoQuality === 'high') {
+        toast({
+          title: 'Adjusting video quality',
+          description: 'Optimizing for better connection stability',
+        });
+      }
+    } else if (stats.packetLoss < 1 && stats.latency < 100) {
+      // Good connection - use high quality
+      newQuality = 'high';
+    }
+
+    // Apply quality change if different
+    if (newQuality !== videoQuality && localStream) {
+      setVideoQuality(newQuality);
+      const newStream = await initializeMedia(newQuality);
+      
+      // Replace video track in peer connection
+      const videoTrack = newStream.getVideoTracks()[0];
+      const sender = peerConnection.current.getSenders().find(s => s.track?.kind === 'video');
+      if (sender) {
+        await sender.replaceTrack(videoTrack);
+      }
+    }
+  }, [videoQuality, isVideo, localStream, initializeMedia, toast]);
+
   const startStatsMonitoring = useCallback((pc: RTCPeerConnection) => {
     statsInterval.current = setInterval(async () => {
       if (pc.connectionState !== 'connected') return;
@@ -162,12 +228,16 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
           }
         });
 
-        setCallStats({ latency, packetLoss, bandwidth });
+        const currentStats = { latency, packetLoss, bandwidth };
+        setCallStats(currentStats);
+        
+        // Auto-adjust quality based on stats
+        adjustQualityBasedOnStats({ latency, packetLoss });
       } catch (error) {
         console.error('Error getting stats:', error);
       }
     }, 2000);
-  }, []);
+  }, [adjustQualityBasedOnStats]);
 
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
     console.log('Handling offer');

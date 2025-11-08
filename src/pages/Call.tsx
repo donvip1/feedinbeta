@@ -35,12 +35,16 @@ const Call = () => {
   const [isInitiator, setIsInitiator] = useState(false);
   const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'failed'>('connecting');
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const startTimeRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const notificationRef = useRef<Notification | null>(null);
 
   const { 
     localStream, 
@@ -106,11 +110,55 @@ const Call = () => {
     }
 
     loadCallData();
+    requestNotificationPermission();
 
     return () => {
       cleanup();
     };
   }, [callId]);
+
+  // Background notification when page is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && connectionState === 'connected') {
+        showBackgroundNotification();
+      } else if (!document.hidden && notificationRef.current) {
+        notificationRef.current.close();
+        notificationRef.current = null;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (notificationRef.current) {
+        notificationRef.current.close();
+      }
+    };
+  }, [connectionState, callData]);
+
+  const requestNotificationPermission = async () => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      await Notification.requestPermission();
+    }
+  };
+
+  const showBackgroundNotification = () => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const otherUser = callData?.profiles;
+      notificationRef.current = new Notification('Call in progress', {
+        body: `Call with ${otherUser?.display_name || 'Unknown'}`,
+        icon: otherUser?.avatar_url || '/favicon.png',
+        tag: 'active-call',
+        requireInteraction: true,
+      });
+
+      notificationRef.current.onclick = () => {
+        window.focus();
+        notificationRef.current?.close();
+      };
+    }
+  };
 
   const loadCallData = async () => {
     try {
@@ -220,6 +268,88 @@ const Call = () => {
     }
   };
 
+  const startRecording = async () => {
+    if (!localStream) return;
+
+    try {
+      // Combine local and remote streams for recording
+      const audioContext = new AudioContext();
+      const destination = audioContext.createMediaStreamDestination();
+
+      // Add local audio
+      if (localStream) {
+        const localSource = audioContext.createMediaStreamSource(localStream);
+        localSource.connect(destination);
+      }
+
+      // Add remote audio
+      if (remoteStream) {
+        const remoteSource = audioContext.createMediaStreamSource(remoteStream);
+        remoteSource.connect(destination);
+      }
+
+      // Create MediaRecorder with combined stream
+      const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+      const recorder = new MediaRecorder(destination.stream, options);
+      
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        downloadRecording();
+      };
+
+      recorder.start(1000); // Collect data every second
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+
+      toast({
+        title: 'Recording started',
+        description: 'Call is being recorded to your device',
+      });
+    } catch (error) {
+      console.error('Error starting recording:', error);
+      toast({
+        title: 'Recording failed',
+        description: 'Could not start call recording',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const downloadRecording = () => {
+    const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `call-recording-${callId}-${Date.now()}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+
+    toast({
+      title: 'Recording saved',
+      description: 'Call recording downloaded to your device',
+    });
+  };
+
   const endCall = async () => {
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
     const durationMinutes = Math.max(1, Math.ceil(duration / 60));
@@ -272,6 +402,12 @@ const Call = () => {
   const cleanup = () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
+    }
+    if (isRecording) {
+      stopRecording();
+    }
+    if (notificationRef.current) {
+      notificationRef.current.close();
     }
     cleanupWebRTC();
   };
@@ -430,10 +566,12 @@ const Call = () => {
             isVideoCall={isVideo}
             isScreenSharing={isScreenSharing}
             isSpeakerOn={isSpeakerOn}
+            isRecording={isRecording}
             onToggleMute={toggleMute}
             onToggleVideo={toggleVideo}
             onToggleScreenShare={toggleScreenShare}
             onToggleSpeaker={toggleSpeaker}
+            onToggleRecording={isRecording ? stopRecording : startRecording}
             onEndCall={endCall}
           />
         </div>

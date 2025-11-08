@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff, Volume2, VolumeX } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff, Volume2, VolumeX, Circle } from 'lucide-react';
 
 interface CallControlsProps {
   isMuted: boolean;
@@ -7,10 +7,12 @@ interface CallControlsProps {
   isVideoCall: boolean;
   isScreenSharing?: boolean;
   isSpeakerOn?: boolean;
+  isRecording?: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onToggleScreenShare?: () => void;
   onToggleSpeaker?: () => void;
+  onToggleRecording?: () => void;
   onEndCall: () => void;
 }
 
@@ -20,10 +22,12 @@ export const CallControls = ({
   isVideoCall,
   isScreenSharing = false,
   isSpeakerOn = true,
+  isRecording = false,
   onToggleMute,
   onToggleVideo,
   onToggleScreenShare,
   onToggleSpeaker,
+  onToggleRecording,
   onEndCall,
 }: CallControlsProps) => {
   return (
@@ -89,6 +93,19 @@ export const CallControls = ({
           ) : (
             <VolumeX className="w-6 h-6" />
           )}
+        </Button>
+      )}
+
+      {/* Recording Toggle */}
+      {onToggleRecording && (
+        <Button
+          onClick={onToggleRecording}
+          size="lg"
+          variant={isRecording ? 'destructive' : 'secondary'}
+          className="rounded-full w-14 h-14 p-0"
+          title={isRecording ? 'Stop recording' : 'Start recording'}
+        >
+          <Circle className={`w-6 h-6 ${isRecording ? 'fill-current animate-pulse' : ''}`} />
         </Button>
       )}
 

@@ -28,6 +28,28 @@ export const IncomingCall = ({
   const [isRinging, setIsRinging] = useState(true);
 
   useEffect(() => {
+    // Vibrate on incoming call (mobile devices)
+    if ('vibrate' in navigator) {
+      // Vibrate pattern: [vibrate, pause, vibrate, pause, ...] in milliseconds
+      const vibratePattern = [400, 200, 400, 200, 400];
+      const vibrateInterval = setInterval(() => {
+        if (isRinging) {
+          navigator.vibrate(vibratePattern);
+        }
+      }, 2000);
+
+      // Initial vibration
+      navigator.vibrate(vibratePattern);
+
+      // Cleanup
+      return () => {
+        clearInterval(vibrateInterval);
+        navigator.vibrate(0); // Stop vibration
+      };
+    }
+  }, [isRinging]);
+
+  useEffect(() => {
     // Create ringtone using Web Audio API
     const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     const oscillator = audioContext.createOscillator();
