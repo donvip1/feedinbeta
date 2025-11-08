@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Crop, RotateCw, X } from 'lucide-react';
+import { Crop, RotateCw } from 'lucide-react';
 
 interface ImageCropperProps {
   imageUrl: string;
@@ -20,11 +19,7 @@ const ASPECT_RATIOS = [
   { name: 'Story', value: 9 / 16 },
 ];
 
-interface ImageCropperPropsWithOpen extends ImageCropperProps {
-  open?: boolean;
-}
-
-export function ImageCropper({ imageUrl, onCropComplete, onClose, open = true }: ImageCropperPropsWithOpen) {
+export function ImageCropper({ imageUrl, onCropComplete, onClose }: ImageCropperProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [rotation, setRotation] = useState(0);
   const [selectedRatio, setSelectedRatio] = useState(0);
@@ -72,83 +67,62 @@ export function ImageCropper({ imageUrl, onCropComplete, onClose, open = true }:
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="h-screen w-screen max-w-none m-0 p-0 bg-black border-0 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 text-white">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onClose}
-            className="text-white hover:bg-white/10"
-          >
-            <X className="w-6 h-6" />
-          </Button>
-          <Button
-            onClick={handleCrop}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Crop className="w-4 h-4 mr-2" />
-            Done
-          </Button>
+    <div className="space-y-4">
+      <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
+        <canvas ref={canvasRef} className="max-w-full max-h-96" />
+      </div>
+
+      <div>
+        <label className="text-xs mb-2 block font-medium">Aspect Ratio</label>
+        <div className="grid grid-cols-4 gap-2">
+          {ASPECT_RATIOS.map((ratio, idx) => (
+            <Button
+              key={ratio.name}
+              variant={selectedRatio === idx ? 'default' : 'outline'}
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setSelectedRatio(idx)}
+            >
+              {ratio.name}
+            </Button>
+          ))}
         </div>
+      </div>
 
-        {/* Image preview - takes most of the screen */}
-        <div className="flex-1 flex items-center justify-center overflow-hidden p-4">
-          <canvas 
-            ref={canvasRef} 
-            className="max-w-full max-h-full object-contain"
-            style={{ touchAction: 'none' }}
-          />
-        </div>
+      <div>
+        <label className="text-xs mb-2 block font-medium flex items-center gap-2">
+          <RotateCw className="w-3 h-3" />
+          Rotation: {rotation}°
+        </label>
+        <Slider
+          value={[rotation]}
+          onValueChange={([v]) => setRotation(v)}
+          min={0}
+          max={360}
+          step={15}
+        />
+      </div>
 
-        {/* Controls - fixed at bottom */}
-        <div className="bg-background/95 backdrop-blur p-4 space-y-4 border-t border-border">
-          <div>
-            <label className="text-xs mb-2 block font-medium">Aspect Ratio</label>
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-              {ASPECT_RATIOS.map((ratio, idx) => (
-                <Button
-                  key={ratio.name}
-                  variant={selectedRatio === idx ? 'default' : 'outline'}
-                  size="sm"
-                  className="whitespace-nowrap"
-                  onClick={() => setSelectedRatio(idx)}
-                >
-                  {ratio.name}
-                </Button>
-              ))}
-            </div>
-          </div>
+      <div>
+        <label className="text-xs mb-2 block font-medium">Zoom: {scale.toFixed(1)}x</label>
+        <Slider
+          value={[scale]}
+          onValueChange={([v]) => setScale(v)}
+          min={0.5}
+          max={3}
+          step={0.1}
+        />
+      </div>
 
-          <div>
-            <label className="text-xs mb-2 block font-medium flex items-center gap-2">
-              <RotateCw className="w-3 h-3" />
-              Rotation: {rotation}°
-            </label>
-            <Slider
-              value={[rotation]}
-              onValueChange={([v]) => setRotation(v)}
-              min={0}
-              max={360}
-              step={15}
-              className="touch-none"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs mb-2 block font-medium">Zoom: {scale.toFixed(1)}x</label>
-            <Slider
-              value={[scale]}
-              onValueChange={([v]) => setScale(v)}
-              min={0.5}
-              max={3}
-              step={0.1}
-              className="touch-none"
-            />
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={onClose} className="flex-1">
+          Cancel
+        </Button>
+        <Button onClick={handleCrop} className="flex-1 bg-gradient-primary">
+          <Crop className="w-4 h-4 mr-2" />
+          Apply Crop
+        </Button>
+      </div>
+    </div>
   );
 }
