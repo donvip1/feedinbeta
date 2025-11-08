@@ -1,24 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 // Re-export toast from the new shadcn location
 export { toast } from "@/hooks/use-toast";
 
-// Lazy-load Sonner's Toaster on client to avoid provider/context timing issues
+// Import Sonner's Toaster directly to avoid hook context issues
+import { Toaster as SonnerToaster } from "sonner";
+
 const Toaster = (props: React.ComponentProps<any>) => {
-  const [SonnerToaster, setSonnerToaster] = useState<React.ComponentType<any> | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    import("sonner").then((mod) => {
-      if (mounted) setSonnerToaster(() => mod.Toaster);
-    });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  if (!SonnerToaster) return null;
-
   return (
     <SonnerToaster
       theme="system"
