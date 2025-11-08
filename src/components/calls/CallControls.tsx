@@ -1,12 +1,14 @@
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Volume2, SwitchCamera } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff } from 'lucide-react';
 
 interface CallControlsProps {
   isMuted: boolean;
   isVideoOff: boolean;
   isVideoCall: boolean;
+  isScreenSharing?: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
+  onToggleScreenShare?: () => void;
   onEndCall: () => void;
 }
 
@@ -14,12 +16,14 @@ export const CallControls = ({
   isMuted,
   isVideoOff,
   isVideoCall,
+  isScreenSharing = false,
   onToggleMute,
   onToggleVideo,
+  onToggleScreenShare,
   onEndCall,
 }: CallControlsProps) => {
   return (
-    <div className="flex items-center justify-center space-x-4">
+    <div className="flex items-center justify-center space-x-3">
       {/* Mute/Unmute Button */}
       <Button
         onClick={onToggleMute}
@@ -50,6 +54,23 @@ export const CallControls = ({
         </Button>
       )}
 
+      {/* Screen Share Toggle (only for video calls) */}
+      {isVideoCall && onToggleScreenShare && (
+        <Button
+          onClick={onToggleScreenShare}
+          size="lg"
+          variant={isScreenSharing ? 'default' : 'secondary'}
+          className="rounded-full w-14 h-14 p-0"
+          title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
+        >
+          {isScreenSharing ? (
+            <MonitorOff className="w-6 h-6" />
+          ) : (
+            <Monitor className="w-6 h-6" />
+          )}
+        </Button>
+      )}
+
       {/* End Call Button */}
       <Button
         onClick={onEndCall}
@@ -59,26 +80,6 @@ export const CallControls = ({
       >
         <PhoneOff className="w-7 h-7" />
       </Button>
-
-      {/* Speaker Button (future enhancement) */}
-      <Button
-        size="lg"
-        variant="secondary"
-        className="rounded-full w-14 h-14 p-0"
-      >
-        <Volume2 className="w-6 h-6" />
-      </Button>
-
-      {/* Switch Camera (only for video calls) */}
-      {isVideoCall && (
-        <Button
-          size="lg"
-          variant="secondary"
-          className="rounded-full w-14 h-14 p-0"
-        >
-          <SwitchCamera className="w-6 h-6" />
-        </Button>
-      )}
     </div>
   );
 };

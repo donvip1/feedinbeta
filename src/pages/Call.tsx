@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CallControls } from '@/components/calls/CallControls';
+import { CallQualityIndicator } from '@/components/calls/CallQualityIndicator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useWebRTC } from '@/hooks/useWebRTC';
 
@@ -39,7 +40,15 @@ const Call = () => {
   const startTimeRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { localStream, remoteStream, connectionState: rtcState, cleanup: cleanupWebRTC } = useWebRTC({
+  const { 
+    localStream, 
+    remoteStream, 
+    connectionState: rtcState, 
+    isScreenSharing,
+    callStats,
+    toggleScreenShare,
+    cleanup: cleanupWebRTC 
+  } = useWebRTC({
     callId: callId || '',
     isInitiator,
     otherUserId: callData?.caller_id === user?.id ? callData.receiver_id : callData?.caller_id || '',
@@ -327,13 +336,28 @@ const Call = () => {
 
         {/* Call Status Overlay for Video */}
         {isVideo && connectionState === 'connected' && (
-          <div className="absolute top-6 left-6 bg-black/70 backdrop-blur-md px-5 py-3 rounded-full border border-white/10">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <p className="text-white text-sm font-semibold">
-                {formatDuration(callDuration)}
-              </p>
+          <div className="absolute top-6 left-6 flex items-center gap-3">
+            <div className="bg-black/70 backdrop-blur-md px-5 py-3 rounded-full border border-white/10">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <p className="text-white text-sm font-semibold">
+                  {formatDuration(callDuration)}
+                </p>
+              </div>
             </div>
+            <CallQualityIndicator 
+              connectionState={rtcState}
+              stats={callStats || undefined}
+            />
+          </div>
+        )}
+
+        {/* Screen sharing indicator */}
+        {isScreenSharing && (
+          <div className="absolute top-6 right-6 bg-primary/90 backdrop-blur-md px-5 py-3 rounded-full border border-white/20 animate-pulse">
+            <p className="text-white text-sm font-semibold">
+              Sharing Screen
+            </p>
           </div>
         )}
 
@@ -349,14 +373,26 @@ const Call = () => {
 
       {/* Call Controls */}
       <div className="p-8 bg-gradient-to-t from-black via-black/95 to-transparent">
-        <CallControls
-          isMuted={isMuted}
-          isVideoOff={isVideoOff}
-          isVideoCall={isVideo}
-          onToggleMute={toggleMute}
-          onToggleVideo={toggleVideo}
-          onEndCall={endCall}
-        />
+        <div className="flex flex-col items-center gap-4">
+          {/* Quality indicator for voice calls */}
+          {!isVideo && connectionState === 'connected' && (
+            <CallQualityIndicator 
+              connectionState={rtcState}
+              stats={callStats || undefined}
+            />
+          )}
+          
+          <CallControls
+            isMuted={isMuted}
+            isVideoOff={isVideoOff}
+            isVideoCall={isVideo}
+            isScreenSharing={isScreenSharing}
+            onToggleMute={toggleMute}
+            onToggleVideo={toggleVideo}
+            onToggleScreenShare={toggleScreenShare}
+            onEndCall={endCall}
+          />
+        </div>
       </div>
 
       <style>{`

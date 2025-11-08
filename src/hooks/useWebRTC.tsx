@@ -22,8 +22,16 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [connectionState, setConnectionState] = useState<RTCPeerConnectionState>('new');
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [callStats, setCallStats] = useState<{
+    latency: number;
+    packetLoss: number;
+    bandwidth: number;
+  } | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
+  const originalVideoTrack = useRef<MediaStreamTrack | null>(null);
+  const statsInterval = useRef<NodeJS.Timeout | null>(null);
 
   // High-quality configuration
   const rtcConfig: RTCConfiguration = {
@@ -125,8 +133,41 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     };
 
     peerConnection.current = pc;
+    
+    // Start monitoring stats
+    startStatsMonitoring(pc);
+    
     return pc;
   }, [rtcConfig, sendSignal, onConnectionStateChange, toast]);
+
+  const startStatsMonitoring = useCallback((pc: RTCPeerConnection) => {
+    statsInterval.current = setInterval(async () => {
+      if (pc.connectionState !== 'connected') return;
+
+      try {
+        const stats = await pc.getStats();
+        let latency = 0;
+        let packetLoss = 0;
+        let bandwidth = 0;
+
+        stats.forEach((report) => {
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            latency = report.currentRoundTripTime ? report.currentRoundTripTime * 1000 : 0;
+          }
+          if (report.type === 'inbound-rtp' && report.kind === 'video') {
+            const packetsLost = report.packetsLost || 0;
+            const packetsReceived = report.packetsReceived || 0;
+            packetLoss = packetsReceived > 0 ? (packetsLost / packetsReceived) * 100 : 0;
+            bandwidth = report.bytesReceived || 0;
+          }
+        });
+
+        setCallStats({ latency, packetLoss, bandwidth });
+      } catch (error) {
+        console.error('Error getting stats:', error);
+      }
+    }, 2000);
+  }, []);
 
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit) => {
     console.log('Handling offer');
@@ -239,18 +280,102 @@ export const useWebRTC = ({ callId, isInitiator, otherUserId, isVideo, onConnect
     }
   }, [isInitiator, startCall]);
 
+  const startScreenShare = useCallback(async () => {
+    if (!peerConnection.current || !localStream) return;
+
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+        },
+      });
+
+      const screenTrack = screenStream.getVideoTracks()[0];
+      
+      // Save original video track
+      originalVideoTrack.current = localStream.getVideoTracks()[0];
+
+      // Replace video track in peer connection
+      const sender = peerConnection.current
+        .getSenders()
+        .find((s) => s.track?.kind === 'video');
+
+      if (sender) {
+        await sender.replaceTrack(screenTrack);
+        setIsScreenSharing(true);
+
+        // Listen for screen share stop
+        screenTrack.onended = () => {
+          stopScreenShare();
+        };
+
+        toast({
+          title: 'Screen sharing started',
+          description: 'Your screen is now visible to the other user',
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing screen:', error);
+      toast({
+        title: 'Screen Share Error',
+        description: 'Could not start screen sharing',
+        variant: 'destructive',
+      });
+    }
+  }, [localStream, toast]);
+
+  const stopScreenShare = useCallback(async () => {
+    if (!peerConnection.current || !originalVideoTrack.current) return;
+
+    try {
+      const sender = peerConnection.current
+        .getSenders()
+        .find((s) => s.track?.kind === 'video');
+
+      if (sender && originalVideoTrack.current) {
+        await sender.replaceTrack(originalVideoTrack.current);
+        setIsScreenSharing(false);
+        originalVideoTrack.current = null;
+
+        toast({
+          title: 'Screen sharing stopped',
+          description: 'Camera feed restored',
+        });
+      }
+    } catch (error) {
+      console.error('Error stopping screen share:', error);
+    }
+  }, [toast]);
+
+  const toggleScreenShare = useCallback(() => {
+    if (isScreenSharing) {
+      stopScreenShare();
+    } else {
+      startScreenShare();
+    }
+  }, [isScreenSharing, startScreenShare, stopScreenShare]);
+
   const cleanup = useCallback(() => {
+    if (statsInterval.current) {
+      clearInterval(statsInterval.current);
+    }
     localStream?.getTracks().forEach(track => track.stop());
     remoteStream?.getTracks().forEach(track => track.stop());
     peerConnection.current?.close();
     setLocalStream(null);
     setRemoteStream(null);
+    setIsScreenSharing(false);
   }, [localStream, remoteStream]);
 
   return {
     localStream,
     remoteStream,
     connectionState,
+    isScreenSharing,
+    callStats,
+    toggleScreenShare,
     cleanup,
   };
 };
