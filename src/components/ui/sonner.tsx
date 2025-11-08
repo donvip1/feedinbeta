@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React from "react";
 
 // Re-export toast from the new shadcn location
@@ -7,8 +8,15 @@ export { toast } from "@/hooks/use-toast";
 import { Toaster as SonnerToaster } from "sonner";
 
 const Toaster = (props: React.ComponentProps<any>) => {
+=======
+import { Toaster as Sonner, toast } from "sonner";
+
+type ToasterProps = React.ComponentProps<typeof Sonner>;
+
+const Toaster = ({ ...props }: ToasterProps) => {
+>>>>>>> a526514 (sooner)
   return (
-    <SonnerToaster
+    <Sonner
       theme="system"
       className="toaster group"
       toastOptions={{
@@ -25,4 +33,4 @@ const Toaster = (props: React.ComponentProps<any>) => {
   );
 };
 
-export { Toaster };
+export { Toaster, toast };
