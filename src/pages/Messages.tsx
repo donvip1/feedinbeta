@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import type { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -54,10 +54,24 @@ interface Group {
 
 // Messages page component
 export default function Messages() {
-  const { user, loading: authLoading } = useAuth();
+  // Local auth state to avoid cross-bundle hook issues
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   const [chatList, setChatList] = useState<ChatListItem[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);

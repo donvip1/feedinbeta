@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+// import { useAuth } from '@/hooks/useAuth';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -60,13 +60,26 @@ interface ChatInterfaceProps {
 
 // Force cache invalidation - React hooks dependency
 export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) => {
-  const { user } = useAuth();
+  // Local auth state (avoid cross-bundle hook issues)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [sending, setSending] = useState(false);
+  // Backwards-compat alias to minimize edits
+  const user: any = currentUserId ? { id: currentUserId } : null;
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setCurrentUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
   const [isOnline, setIsOnline] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
