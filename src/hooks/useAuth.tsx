@@ -18,16 +18,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
-
-    // Fetch initial session immediately to avoid blank screen
+    
+    // Fetch initial session immediately
     supabase.auth.getSession().then(({ data }) => {
       if (!isMounted) return;
       setSession(data.session ?? null);
       setUser(data.session?.user ?? null);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch(() => {
+      if (!isMounted) return;
+      setLoading(false);
+    });
 
+    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
       setSession(session);
@@ -54,7 +57,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const value: AuthContextValue = { user, session, loading, signOut };
 
   if (loading) {
-    return null; // Or a loading spinner component
+    return null;
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
