@@ -132,7 +132,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
                 Refresh Page
               </button>
               <button
-                onClick={() => (window.location.href = '/')}
+                onClick={() => window.location.replace('/')}
                 style={{
                   width: '100%',
                   padding: '0.5rem 1rem',

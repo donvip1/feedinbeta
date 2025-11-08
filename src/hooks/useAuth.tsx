@@ -52,7 +52,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (error: any) {
       console.error('Error signing out:', error.message);
     }
-    window.location.href = '/auth';
+    // Use window.location.replace to clear auth state and navigate
+    window.location.replace('/auth');
   };
 
   const value: AuthContextValue = { user, session, loading, signOut };

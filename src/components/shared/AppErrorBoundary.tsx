@@ -50,7 +50,8 @@ export class AppErrorBoundary extends Component<Props, State> {
       error: null,
       errorInfo: null,
     });
-    window.location.href = '/feed';
+    // Use window.location for error boundary since we can't use hooks in class components
+    window.location.replace('/feed');
   };
 
   render() {

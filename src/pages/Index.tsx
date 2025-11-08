@@ -1,4 +1,4 @@
-
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Users, Phone, Coins, Shield, Sparkles, LogOut } from 'lucide-react';
@@ -91,21 +91,23 @@ const Index = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-            <Button
-              onClick={() => (window.location.href = '/auth')}
-              size="lg"
-              className="bg-gradient-to-r from-pink-500 to-blue-500 hover:shadow-[0_0_30px_rgba(236,72,153,0.5)] text-white text-lg px-12 py-6 rounded-full font-semibold"
-            >
-              Get Started
-            </Button>
-            <Button
-              onClick={() => (window.location.href = '/auth')}
-              size="lg"
-              variant="outline"
-              className="border-2 border-gray-700 bg-transparent hover:bg-gray-900 text-white text-lg px-12 py-6 rounded-full font-semibold"
-            >
-              Sign In
-            </Button>
+            <Link to="/auth">
+              <Button
+                size="lg"
+                className="bg-gradient-to-r from-pink-500 to-blue-500 hover:shadow-[0_0_30px_rgba(236,72,153,0.5)] text-white text-lg px-12 py-6 rounded-full font-semibold"
+              >
+                Get Started
+              </Button>
+            </Link>
+            <Link to="/auth">
+              <Button
+                size="lg"
+                variant="outline"
+                className="border-2 border-gray-700 bg-transparent hover:bg-gray-900 text-white text-lg px-12 py-6 rounded-full font-semibold"
+              >
+                Sign In
+              </Button>
+            </Link>
           </div>
 
           {/* Footer */}
@@ -149,13 +151,14 @@ const Index = () => {
           <p className="text-xl text-muted-foreground mb-8">
             Your feed is ready. Start creating and sharing posts!
           </p>
-          <Button
-            onClick={() => (window.location.href = '/feed')}
-            size="lg"
-            className="bg-gradient-primary hover:shadow-glow text-lg px-8 py-6"
-          >
-            Go to Feed
-          </Button>
+          <Link to="/feed">
+            <Button
+              size="lg"
+              className="bg-gradient-primary hover:shadow-glow text-lg px-8 py-6"
+            >
+              Go to Feed
+            </Button>
+          </Link>
         </div>
       </main>
     </div>

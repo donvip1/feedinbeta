@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { Check, CheckCheck } from 'lucide-react';
@@ -20,11 +21,13 @@ interface MessageBubbleProps {
 }
 
 export const MessageBubble = ({ message, isOwn }: MessageBubbleProps) => {
+  const navigate = useNavigate();
+  
   return (
     <div className={`flex gap-2 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
       <Avatar 
         className="w-8 h-8 cursor-pointer hover:opacity-80"
-        onClick={() => window.location.href = `/profile/${message.sender_id}`}
+        onClick={() => navigate(`/profile/${message.sender_id}`)}
       >
         <AvatarImage src={message.profiles.avatar_url || ''} />
         <AvatarFallback>{message.profiles.display_name?.[0] || 'U'}</AvatarFallback>

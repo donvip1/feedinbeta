@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -77,6 +78,7 @@ export const EnhancedMessageBubble = ({
   onSwipeStart,
   onSwipeEnd
 }: MessageBubbleProps) => {
+  const navigate = useNavigate();
   const [showReactions, setShowReactions] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
@@ -206,7 +208,7 @@ export const EnhancedMessageBubble = ({
     >
       <Avatar 
         className="w-8 h-8 cursor-pointer hover:opacity-80 flex-shrink-0"
-        onClick={() => window.location.href = `/profile/${message.sender_id}`}
+        onClick={() => navigate(`/profile/${message.sender_id}`)}
       >
         <AvatarImage src={message.profiles.avatar_url || ''} />
         <AvatarFallback>{message.profiles.display_name?.[0] || 'U'}</AvatarFallback>
