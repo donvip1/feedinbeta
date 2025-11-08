@@ -5,6 +5,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ThemeProvider } from "@/components/ui/ThemeProviderShim";
 import { AuthProvider } from "@/hooks/useAuth";
+import { AuthLoadingScreen } from "@/components/auth/AuthLoadingScreen";
+import { AuthErrorBoundary } from "@/components/auth/AuthErrorBoundary";
 import { ClientToaster } from "@/components/ui/ClientToaster";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -52,8 +54,9 @@ const App = () => (
   <ErrorBoundary>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BrowserRouter future={{ v7_startTransition: true }}>
+        <AuthErrorBoundary>
+          <AuthProvider loadingComponent={<AuthLoadingScreen />}>
+            <BrowserRouter future={{ v7_startTransition: true }}>
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
@@ -98,6 +101,7 @@ const App = () => (
             <ClientToaster />
           </BrowserRouter>
         </AuthProvider>
+        </AuthErrorBoundary>
       </QueryClientProvider>
     </ThemeProvider>
   </ErrorBoundary>

@@ -11,7 +11,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface AuthProviderProps {
+  children: React.ReactNode;
+  loadingComponent?: React.ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ 
+  children, 
+  loadingComponent 
+}) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
@@ -56,6 +64,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const value: AuthContextValue = { user, session, loading, signOut };
+
+  if (loading && loadingComponent) {
+    return <AuthContext.Provider value={value}>{loadingComponent}</AuthContext.Provider>;
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
