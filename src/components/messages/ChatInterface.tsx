@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Send, Phone, Video } from 'lucide-react';
-import { MessageBubble } from './EnhancedMessageBubble';
+import { EnhancedMessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 
 interface Message {
@@ -330,10 +330,12 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
       <div className="flex-1 overflow-y-auto px-4 py-2 w-full">
         <div className="space-y-4">
           {messages.map((msg) => (
-            <MessageBubble
+            <EnhancedMessageBubble
               key={msg.id}
               message={msg}
               isOwn={msg.sender_id === user?.id}
+              onReply={() => {}}
+              onReact={() => {}}
             />
           ))}
           {isTyping && <TypingIndicator />}
