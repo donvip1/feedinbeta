@@ -1,20 +1,20 @@
-import React from 'react';
+import { useEffect, FC, ReactNode } from 'react';
 
 interface ThemeProviderProps {
-  children: React.ReactNode;
+  children: ReactNode;
   attribute?: 'class' | 'data-theme';
   defaultTheme?: 'light' | 'dark' | 'system';
   enableSystem?: boolean;
 }
 
 // Lightweight theme provider shim to avoid external dependency issues
-export const ThemeProvider: React.FC<ThemeProviderProps> = ({
+export const ThemeProvider: FC<ThemeProviderProps> = ({
   children,
   attribute = 'class',
   defaultTheme = 'system',
   enableSystem = true,
 }) => {
-  React.useEffect(() => {
+  useEffect(() => {
     try {
       const systemDark = enableSystem && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
       const theme = defaultTheme === 'system' ? (systemDark ? 'dark' : 'light') : defaultTheme;
