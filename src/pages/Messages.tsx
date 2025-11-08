@@ -106,17 +106,20 @@ export default function Messages() {
   }, [location.search, user]);
 
   const loadData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       await Promise.all([
-        loadFriendRequests(),
-        loadChatListAndFriends(),
-        loadGroups()
+        loadFriendRequests().catch(err => console.error("Friend requests error:", err)),
+        loadChatListAndFriends().catch(err => console.error("Chat list error:", err)),
+        loadGroups().catch(err => console.error("Groups error:", err))
       ]);
     } catch (error: any) {
       console.error("Error loading page data:", error);
-      toast({ title: "Error", description: `Could not load your data: ${error.message}` , variant: "destructive" });
+      toast({ title: "Error", description: "Could not load messages. Please refresh the page.", variant: "destructive" });
     } finally {
       setLoading(false);
     }
