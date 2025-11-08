@@ -49,6 +49,7 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
   const [showDrawingTools, setShowDrawingTools] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [showAIEnhancer, setShowAIEnhancer] = useState(false);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [editedFile, setEditedFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
 
@@ -111,6 +112,18 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
     });
     setEditedFile(trimmedAudioFile);
     setShowAudioTrimmer(false);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+  };
+
+  const handleShowAudioTrimmer = () => {
+    if (selectedFile) {
+      const url = URL.createObjectURL(selectedFile);
+      setAudioUrl(url);
+      setShowAudioTrimmer(true);
+    }
   };
 
   const handleVideoTrim = (blob: Blob) => {
@@ -290,7 +303,7 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setShowAudioTrimmer(true)}
+                          onClick={handleShowAudioTrimmer}
                         >
                           Trim Audio
                         </Button>
@@ -365,12 +378,17 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
         />
       )}
 
-      {selectedFile && showAudioTrimmer && (
+      {audioUrl && showAudioTrimmer && (
         <AudioTrimmer
-          open={showAudioTrimmer}
-          onClose={() => setShowAudioTrimmer(false)}
-          audioFile={selectedFile}
-          onSave={handleAudioTrim}
+          audioUrl={audioUrl}
+          onTrimComplete={handleAudioTrim}
+          onCancel={() => {
+            setShowAudioTrimmer(false);
+            if (audioUrl) {
+              URL.revokeObjectURL(audioUrl);
+              setAudioUrl(null);
+            }
+          }}
         />
       )}
 

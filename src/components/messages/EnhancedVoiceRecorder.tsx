@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Mic, X, Send, Pause, Play } from 'lucide-react';
+import { Mic, X, Send, Pause, Play, Scissors } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { AudioTrimmer } from './AudioTrimmer';
 
 interface EnhancedVoiceRecorderProps {
   onSend: (audioBlob: Blob) => void;
@@ -13,6 +14,8 @@ export const EnhancedVoiceRecorder = ({ onSend, onCancel }: EnhancedVoiceRecorde
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [showTrimmer, setShowTrimmer] = useState(false);
   const [waveformData, setWaveformData] = useState<number[]>([]);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -56,6 +59,8 @@ export const EnhancedVoiceRecorder = ({ onSend, onCancel }: EnhancedVoiceRecorde
       mediaRecorderRef.current.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
         stream.getTracks().forEach(track => track.stop());
       };
 
@@ -154,6 +159,26 @@ export const EnhancedVoiceRecorder = ({ onSend, onCancel }: EnhancedVoiceRecorde
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleTrimComplete = (trimmedBlob: Blob) => {
+    setAudioBlob(trimmedBlob);
+    const url = URL.createObjectURL(trimmedBlob);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
+    setAudioUrl(url);
+    setShowTrimmer(false);
+  };
+
+  if (showTrimmer && audioUrl) {
+    return (
+      <AudioTrimmer
+        audioUrl={audioUrl}
+        onTrimComplete={handleTrimComplete}
+        onCancel={() => setShowTrimmer(false)}
+      />
+    );
+  }
+
   return (
     <div className="flex items-center gap-3 p-4 bg-accent/50 rounded-lg">
       {/* Waveform Visualization */}
@@ -177,31 +202,63 @@ export const EnhancedVoiceRecorder = ({ onSend, onCancel }: EnhancedVoiceRecorde
 
       {/* Controls */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={togglePause}
-          className="h-10 w-10"
-        >
-          {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
-        </Button>
-        
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onCancel}
-          className="h-10 w-10 text-destructive hover:text-destructive"
-        >
-          <X className="w-5 h-5" />
-        </Button>
-        
-        <Button
-          size="icon"
-          onClick={handleSend}
-          className="h-10 w-10 bg-primary hover:bg-primary/90"
-        >
-          <Send className="w-5 h-5" />
-        </Button>
+        {!isRecording ? (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowTrimmer(true)}
+              className="h-10 w-10"
+            >
+              <Scissors className="w-5 h-5" />
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onCancel}
+              className="h-10 w-10 text-destructive hover:text-destructive"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+            
+            <Button
+              size="icon"
+              onClick={handleSend}
+              className="h-10 w-10 bg-primary hover:bg-primary/90"
+            >
+              <Send className="w-5 h-5" />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={togglePause}
+              className="h-10 w-10"
+            >
+              {isPaused ? <Play className="w-5 h-5" /> : <Pause className="w-5 h-5" />}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onCancel}
+              className="h-10 w-10 text-destructive hover:text-destructive"
+            >
+              <X className="w-5 h-5" />
+            </Button>
+            
+            <Button
+              size="icon"
+              onClick={handleSend}
+              className="h-10 w-10 bg-primary hover:bg-primary/90"
+            >
+              <Send className="w-5 h-5" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
