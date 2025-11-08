@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Bell } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 export const NotificationBadge = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
-  const navigate = useNavigate();
-
   useEffect(() => {
     loadUnreadCount();
 
@@ -55,7 +52,7 @@ export const NotificationBadge = () => {
 
   return (
     <button
-      onClick={() => navigate('/notifications')}
+      onClick={() => (window.location.href = '/notifications')}
       className="relative p-2 hover:bg-accent rounded-full transition-colors"
     >
       <Bell className="w-6 h-6" />
