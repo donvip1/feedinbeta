@@ -17,16 +17,35 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Force all React imports to use the same instance
       "react": path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
+      "react/jsx-runtime": path.resolve(__dirname, "./node_modules/react/jsx-runtime"),
+      "react/jsx-dev-runtime": path.resolve(__dirname, "./node_modules/react/jsx-dev-runtime"),
     },
-    dedupe: ["react", "react-dom"],
+    // Critical: dedupe all React-related packages
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "react-router-dom", "@tanstack/react-query", "date-fns"],
+    include: [
+      "react", 
+      "react-dom", 
+      "react-dom/client",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "react-router-dom", 
+      "@tanstack/react-query", 
+      "date-fns",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-avatar",
+      "@radix-ui/react-slot",
+    ],
     esbuildOptions: {
       target: 'esnext',
     },
+    // Force rebuild
+    force: true,
   },
   build: {
     rollupOptions: {
@@ -35,7 +54,8 @@ export default defineConfig(({ mode }) => ({
         chunkFileNames: `assets/[name].[hash].js`,
         assetFileNames: `assets/[name].[hash].[ext]`,
         manualChunks: {
-          'ui-vendor': ['@tanstack/react-query', 'react-router-dom'],
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'ui-vendor': ['@tanstack/react-query'],
         },
       },
     },
