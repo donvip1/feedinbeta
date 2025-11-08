@@ -1,15 +1,10 @@
-import { useEffect, useState } from "react";
+import React from "react";
 import { Toaster as SonnerToaster } from "sonner";
 
-export const ClientToaster = () => {
-  const [mounted, setMounted] = useState(false);
-  
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-  
+export const ClientToaster: React.FC = () => {
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
   if (!mounted) return null;
-  
   return (
     <SonnerToaster
       theme="system"
