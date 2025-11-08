@@ -28,16 +28,50 @@ export const IncomingCall = ({
   const [isRinging, setIsRinging] = useState(true);
 
   useEffect(() => {
-    // Play ringtone sound
-    const audio = new Audio('/sounds/ringtone.mp3');
-    audio.loop = true;
-    audio.play().catch((e) => console.error('Error playing ringtone:', e));
+    // Create ringtone using Web Audio API
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 440; // A4 note
+    gainNode.gain.value = 0.3;
+    
+    // Create ringing pattern (ring for 1s, pause for 2s)
+    const startRinging = () => {
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.stop();
+        if (isRinging) {
+          setTimeout(() => {
+            const newOsc = audioContext.createOscillator();
+            const newGain = audioContext.createGain();
+            newOsc.connect(newGain);
+            newGain.connect(audioContext.destination);
+            newOsc.type = 'sine';
+            newOsc.frequency.value = 440;
+            newGain.gain.value = 0.3;
+            newOsc.start();
+            setTimeout(() => newOsc.stop(), 1000);
+          }, 2000);
+        }
+      }, 1000);
+    };
+    
+    startRinging();
 
     return () => {
-      audio.pause();
-      audio.currentTime = 0;
+      try {
+        oscillator.stop();
+        audioContext.close();
+      } catch (e) {
+        console.log('Audio cleanup');
+      }
     };
-  }, []);
+  }, [isRinging]);
 
   const handleAccept = async () => {
     setIsRinging(false);

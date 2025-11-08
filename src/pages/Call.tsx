@@ -34,9 +34,11 @@ const Call = () => {
   const [callDuration, setCallDuration] = useState(0);
   const [isInitiator, setIsInitiator] = useState(false);
   const [connectionState, setConnectionState] = useState<'connecting' | 'connected' | 'failed'>('connecting');
+  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const startTimeRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -72,10 +74,25 @@ const Call = () => {
   }, [localStream, callType]);
 
   useEffect(() => {
-    if (remoteStream && remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = remoteStream;
+    if (remoteStream) {
+      // Set video stream
+      if (remoteVideoRef.current && callType === 'video') {
+        remoteVideoRef.current.srcObject = remoteStream;
+      }
+      
+      // Set audio stream for playback
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = remoteStream;
+        remoteAudioRef.current.play().catch(e => console.error('Error playing remote audio:', e));
+      }
+      
+      // Show connection established toast
+      toast({
+        title: 'Connected',
+        description: 'Call connected successfully',
+      });
     }
-  }, [remoteStream]);
+  }, [remoteStream, callType, toast]);
 
   useEffect(() => {
     if (!callId) {
@@ -190,6 +207,19 @@ const Call = () => {
     }
   };
 
+  const toggleSpeaker = () => {
+    if (remoteAudioRef.current) {
+      const newVolume = isSpeakerOn ? 0.5 : 1.0;
+      remoteAudioRef.current.volume = newVolume;
+      setIsSpeakerOn(!isSpeakerOn);
+      
+      toast({
+        title: isSpeakerOn ? 'Speaker lowered' : 'Speaker mode',
+        description: isSpeakerOn ? 'Volume reduced' : 'Full volume enabled',
+      });
+    }
+  };
+
   const endCall = async () => {
     const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
     const durationMinutes = Math.max(1, Math.ceil(duration / 60));
@@ -257,6 +287,9 @@ const Call = () => {
 
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
+      {/* Hidden audio element for remote stream playback */}
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+      
       {/* Video Container */}
       <div className="flex-1 relative">
         {isVideo ? (
@@ -281,12 +314,21 @@ const Call = () => {
                   <h2 className="text-3xl font-bold text-white mb-3">
                     {otherUser?.display_name || 'Unknown'}
                   </h2>
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                    <p className="text-lg text-gray-300">
-                      {connectionState === 'connecting' ? 'Connecting...' : 
-                       connectionState === 'failed' ? 'Connection failed' : 'Waiting...'}
-                    </p>
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                      <p className="text-lg text-gray-300">
+                        {connectionState === 'connecting' ? 'Connecting...' : 
+                         connectionState === 'failed' ? 'Connection failed' : 'Waiting...'}
+                      </p>
+                    </div>
+                    {connectionState === 'connecting' && (
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <div className="w-2 h-2 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -387,9 +429,11 @@ const Call = () => {
             isVideoOff={isVideoOff}
             isVideoCall={isVideo}
             isScreenSharing={isScreenSharing}
+            isSpeakerOn={isSpeakerOn}
             onToggleMute={toggleMute}
             onToggleVideo={toggleVideo}
             onToggleScreenShare={toggleScreenShare}
+            onToggleSpeaker={toggleSpeaker}
             onEndCall={endCall}
           />
         </div>

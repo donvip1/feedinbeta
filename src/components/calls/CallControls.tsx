@@ -1,14 +1,16 @@
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff, Volume2, VolumeX } from 'lucide-react';
 
 interface CallControlsProps {
   isMuted: boolean;
   isVideoOff: boolean;
   isVideoCall: boolean;
   isScreenSharing?: boolean;
+  isSpeakerOn?: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onToggleScreenShare?: () => void;
+  onToggleSpeaker?: () => void;
   onEndCall: () => void;
 }
 
@@ -17,9 +19,11 @@ export const CallControls = ({
   isVideoOff,
   isVideoCall,
   isScreenSharing = false,
+  isSpeakerOn = true,
   onToggleMute,
   onToggleVideo,
   onToggleScreenShare,
+  onToggleSpeaker,
   onEndCall,
 }: CallControlsProps) => {
   return (
@@ -67,6 +71,23 @@ export const CallControls = ({
             <MonitorOff className="w-6 h-6" />
           ) : (
             <Monitor className="w-6 h-6" />
+          )}
+        </Button>
+      )}
+
+      {/* Speaker Toggle */}
+      {onToggleSpeaker && (
+        <Button
+          onClick={onToggleSpeaker}
+          size="lg"
+          variant={isSpeakerOn ? 'default' : 'secondary'}
+          className="rounded-full w-14 h-14 p-0"
+          title={isSpeakerOn ? 'Lower volume' : 'Speaker mode'}
+        >
+          {isSpeakerOn ? (
+            <Volume2 className="w-6 h-6" />
+          ) : (
+            <VolumeX className="w-6 h-6" />
           )}
         </Button>
       )}
