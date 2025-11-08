@@ -57,10 +57,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const value: AuthContextValue = { user, session, loading, signOut };
 
-  if (loading) {
-    return null;
-  }
-
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
