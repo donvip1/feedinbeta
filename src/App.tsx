@@ -3,7 +3,7 @@ import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@/components/ui/ThemeProviderShim";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ClientToaster } from "@/components/ui/ClientToaster";
 import Index from "./pages/Index";
