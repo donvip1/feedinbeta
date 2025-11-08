@@ -52,6 +52,7 @@ interface Group {
   post_count: number;
 }
 
+// Messages page component
 export default function Messages() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();

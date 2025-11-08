@@ -58,6 +58,7 @@ interface ChatInterfaceProps {
   onBack: () => void;
 }
 
+// Force cache invalidation - React hooks dependency
 export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
