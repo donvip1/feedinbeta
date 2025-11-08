@@ -15,6 +15,8 @@ import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimePresence } from '@/hooks/useRealtimePresence';
+import { useRealtimeChannel } from '@/hooks/useRealtimeChannel';
 
 // Types
 interface Profile {
@@ -69,7 +71,16 @@ export default function Messages() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
-  const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+  
+  // Use realtime presence hook for online users
+  const { onlineUsers } = useRealtimePresence('online-users', user?.id);
+
+  // Subscribe to friend request changes
+  useRealtimeChannel({
+    channelName: 'friend-requests-updates',
+    table: 'friend_requests',
+    onChange: () => loadData(),
+  });
 
   useEffect(() => {
     const state = location.state as { sharedImage?: string };
@@ -128,45 +139,6 @@ export default function Messages() {
   useEffect(() => {
     if (user) {
       loadData();
-      const subscription = supabase.channel('public:friend_requests')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'friend_requests' }, loadData)
-        .subscribe();
-      
-      // Subscribe to presence for all friends
-      const presenceChannel = supabase.channel('online-users', {
-        config: {
-          presence: {
-            key: user.id,
-          },
-        },
-      });
-
-      presenceChannel
-        .on('presence', { event: 'sync' }, () => {
-          const state = presenceChannel.presenceState();
-          const online = new Set(Object.keys(state));
-          setOnlineUsers(online);
-        })
-        .on('presence', { event: 'join' }, ({ key }) => {
-          setOnlineUsers(prev => new Set([...prev, key]));
-        })
-        .on('presence', { event: 'leave' }, ({ key }) => {
-          setOnlineUsers(prev => {
-            const newSet = new Set(prev);
-            newSet.delete(key);
-            return newSet;
-          });
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            await presenceChannel.track({ online_at: new Date().toISOString() });
-          }
-        });
-
-      return () => {
-        supabase.removeChannel(subscription);
-        supabase.removeChannel(presenceChannel);
-      };
     }
   }, [user, loadData]);
 

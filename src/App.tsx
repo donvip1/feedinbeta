@@ -6,8 +6,6 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ClientToaster } from "@/components/ui/ClientToaster";
-import { HelmetProvider } from "react-helmet-async";
-import { AppShell } from "@/layouts/AppShell";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -52,61 +50,56 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <ErrorBoundary>
-    <HelmetProvider>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <BrowserRouter future={{ v7_startTransition: true }}>
-              <AppShell>
-                <Routes>
-                  <Route path="/" element={<Index />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/feed" element={<Feed />} />
-                  <Route path="/messages" element={<Messages />} />
-                  <Route path="/friends" element={<Friends />} />
-                  <Route path="/profile/:userId" element={<Profile />} />
-                  <Route path="/call" element={<Call />} />
-                  <Route path="/call-history" element={<CallHistory />} />
-                  <Route path="/live" element={<Live />} />
-                  <Route path="/ai-copilot" element={<AICopilot />} />
-                  <Route path="/thesis-writer" element={<ThesisWriter />} />
-                  <Route path="/video-creation" element={<VideoCreation />} />
-                  <Route path="/educational-qa" element={<EducationalQA />} />
-                  <Route path="/project-writing" element={<ProjectWriting />} />
-                  <Route path="/image-generation" element={<ImageGeneration />} />
-                  <Route path="/image-enhancement" element={<ImageEnhancement />} />
-                  <Route path="/groups" element={<Groups />} />
-                  <Route path="/groups/:groupId" element={<GroupDetail />} />
-                  <Route path="/subscription" element={<Subscription />} />
-                  <Route path="/credits" element={<Credits />} />
-                  <Route path="/saved" element={<SavedPosts />} />
-                  <Route path="/promote/:postId" element={<Promote />} />
-                  <Route path="/moderation" element={<Moderation />} />
-                  <Route path="/notifications" element={<NotificationsPage />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/settings/account" element={<AccountSettings />} />
-                  <Route path="/settings/privacy" element={<PrivacySettings />} />
-                  <Route path="/settings/notifications" element={<NotificationSettings />} />
-                  <Route path="/settings/cache" element={<CacheSettingsPage />} />
-                  <Route path="/settings/blocked" element={<BlockedUsers />} />
-                  <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
-                  <Route path="/initialize-groups" element={<InitializeGroups />} />
-                  <Route path="/trending" element={<Trending />} />
-                  <Route path="/wallet" element={<Wallet />} />
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/admin" element={<AdminPanel />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </AppShell>
-              <SafeCreditNotifications />
-              <NotificationToastManager />
-              <ClientToaster />
-            </BrowserRouter>
-          </AuthProvider>
-        </QueryClientProvider>
-      </ThemeProvider>
-    </HelmetProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BrowserRouter future={{ v7_startTransition: true }}>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/feed" element={<Feed />} />
+              <Route path="/messages" element={<Messages />} />
+              <Route path="/friends" element={<Friends />} />
+              <Route path="/profile/:userId" element={<Profile />} />
+              <Route path="/call" element={<Call />} />
+              <Route path="/call-history" element={<CallHistory />} />
+              <Route path="/live" element={<Live />} />
+              <Route path="/ai-copilot" element={<AICopilot />} />
+              <Route path="/thesis-writer" element={<ThesisWriter />} />
+              <Route path="/video-creation" element={<VideoCreation />} />
+              <Route path="/educational-qa" element={<EducationalQA />} />
+              <Route path="/project-writing" element={<ProjectWriting />} />
+              <Route path="/image-generation" element={<ImageGeneration />} />
+              <Route path="/image-enhancement" element={<ImageEnhancement />} />
+              <Route path="/groups" element={<Groups />} />
+              <Route path="/groups/:groupId" element={<GroupDetail />} />
+              <Route path="/subscription" element={<Subscription />} />
+              <Route path="/credits" element={<Credits />} />
+              <Route path="/saved" element={<SavedPosts />} />
+              <Route path="/promote/:postId" element={<Promote />} />
+              <Route path="/moderation" element={<Moderation />} />
+              <Route path="/notifications" element={<NotificationsPage />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings/account" element={<AccountSettings />} />
+              <Route path="/settings/privacy" element={<PrivacySettings />} />
+              <Route path="/settings/notifications" element={<NotificationSettings />} />
+              <Route path="/settings/cache" element={<CacheSettingsPage />} />
+              <Route path="/settings/blocked" element={<BlockedUsers />} />
+              <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
+              <Route path="/initialize-groups" element={<InitializeGroups />} />
+              <Route path="/trending" element={<Trending />} />
+              <Route path="/wallet" element={<Wallet />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/admin" element={<AdminPanel />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <SafeCreditNotifications />
+            <NotificationToastManager />
+            <ClientToaster />
+          </BrowserRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   </ErrorBoundary>
 );
 
