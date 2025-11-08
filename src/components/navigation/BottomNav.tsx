@@ -10,7 +10,6 @@ interface BottomNavProps {
 }
 
 export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default', minimized = false }: BottomNavProps) => {
-
   const navItems = [
     { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
@@ -18,7 +17,7 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
     { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}` },
   ];
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => window.location.pathname === path;
 
   // When minimized, only show the + button
   if (minimized) {
