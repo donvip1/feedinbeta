@@ -17,11 +17,13 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
+    dedupe: ["react", "react-dom"],
   },
   optimizeDeps: {
-    exclude: ["react", "react-dom"],
-    include: ["react-router-dom", "@tanstack/react-query", "date-fns"],
+    include: ["react", "react-dom", "react-router-dom", "@tanstack/react-query", "date-fns"],
     esbuildOptions: {
       target: 'esnext',
     },
