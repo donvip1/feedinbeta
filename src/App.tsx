@@ -1,11 +1,11 @@
 import React from "react";
 
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/hooks/useAuth";
+import { ClientToaster } from "@/components/ui/ClientToaster";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -97,7 +97,7 @@ const App = () => (
               </Routes>
               <SafeCreditNotifications />
               <NotificationToastManager />
-              <Sonner />
+              <ClientToaster />
             </BrowserRouter>
           </AuthProvider>
       </QueryClientProvider>

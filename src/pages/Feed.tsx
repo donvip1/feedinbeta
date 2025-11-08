@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { PostCard } from '@/components/feed/PostCard';
 import { EnhancedCreatePostModal } from '@/components/feed/EnhancedCreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
@@ -241,29 +241,24 @@ const Feed = () => {
         <div className="flex items-center justify-between px-4 py-3">
           <NotificationBadge />
           
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
-            <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center space-x-6">
-              <TabsTrigger 
-                value="following" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+          {/* Simple Tabs (no Radix) */}
+          <div className="flex-1 flex items-center justify-center space-x-6">
+            {([
+              { key: 'following', label: 'Following' },
+              { key: 'forYou', label: 'For You' },
+              { key: 'myPosts', label: 'My Posts' },
+            ] as const).map(t => (
+              <button
+                key={t.key}
+                onClick={() => setActiveTab(t.key)}
+                className={`text-base font-semibold pb-1 border-b-2 transition-colors ${
+                  activeTab === t.key ? 'text-white border-white' : 'text-gray-400 border-transparent'
+                }`}
               >
-                Following
-              </TabsTrigger>
-              <TabsTrigger 
-                value="forYou" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
-              >
-                For You
-              </TabsTrigger>
-              <TabsTrigger 
-                value="myPosts" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
-              >
-                My Posts
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+                {t.label}
+              </button>
+            ))}
+          </div>
 
           <button 
             onClick={() => setShowSearch(!showSearch)}
