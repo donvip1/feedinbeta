@@ -1,4 +1,4 @@
-import { useEffect, FC, ReactNode } from 'react';
+import { FC, ReactNode } from 'react';
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -7,28 +7,32 @@ interface ThemeProviderProps {
   enableSystem?: boolean;
 }
 
-// Lightweight theme provider shim to avoid external dependency issues
+// Ultra-light ThemeProvider without React hooks to avoid multi-React issues
 export const ThemeProvider: FC<ThemeProviderProps> = ({
   children,
   attribute = 'class',
   defaultTheme = 'system',
   enableSystem = true,
 }) => {
-  useEffect(() => {
-    try {
-      const systemDark = enableSystem && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = defaultTheme === 'system' ? (systemDark ? 'dark' : 'light') : defaultTheme;
-      const root = document.documentElement;
+  try {
+    const systemDark = enableSystem && typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const theme = defaultTheme === 'system' ? (systemDark ? 'dark' : 'light') : defaultTheme;
+    const root = typeof document !== 'undefined' ? document.documentElement : null;
 
+    if (root) {
       if (attribute === 'class') {
-        root.classList.toggle('dark', theme === 'dark');
+        if (theme === 'dark') {
+          root.classList.add('dark');
+        } else {
+          root.classList.remove('dark');
+        }
       } else {
         root.setAttribute(attribute, theme);
       }
-    } catch (e) {
-      // Fail silently if SSR or environment limitations
     }
-  }, [attribute, defaultTheme, enableSystem]);
+  } catch (e) {
+    // no-op
+  }
 
   return <>{children}</>;
 };
