@@ -146,7 +146,7 @@ export const NotificationItem = ({ notification, onUpdate }: NotificationItemPro
                 <AvatarFallback>{notification.from_user?.display_name?.[0] || '?'}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground" dangerouslySetInnerHTML={{ __html: notification.message || '' }}></p>
+                <p className="text-sm text-foreground">{notification.message || ''}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                     {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                 </p>

@@ -54,9 +54,7 @@ const Profile = () => {
   useEffect(() => {
     if (userId && user) {
       if (isOwnProfile) {
-        if (user.email) {
-          checkAdminStatus(user.email);
-        }
+        checkAdminStatus();
       } else {
         checkFollowStatus();
         checkIfFollowingMe();
@@ -65,9 +63,21 @@ const Profile = () => {
     }
   }, [userId, user, isOwnProfile]);
 
-  const checkAdminStatus = async (email: string) => {
-    const adminEmails = ["viplearn4free@gmail.com", "cryptosvip@gmail.com", "myconnectmate@gmail.com"];
-    setIsAdmin(adminEmails.includes(email.toLowerCase()));
+  const checkAdminStatus = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin'
+      });
+      
+      if (error) throw error;
+      setIsAdmin(data === true);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      setIsAdmin(false);
+    }
   };
 
   const loadProfile = async () => {

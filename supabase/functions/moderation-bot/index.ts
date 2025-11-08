@@ -12,11 +12,44 @@ serve(async (req) => {
   }
 
   try {
+    // Get auth token and validate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Verify user is authenticated
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const { messageId, content, senderId } = await req.json();
+
+    // Verify authenticated user matches senderId (only moderate own messages)
+    if (user.id !== senderId) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden - can only moderate own messages' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     // Phone number patterns (including smart spacing)
     const phonePatterns = [
@@ -61,7 +94,7 @@ serve(async (req) => {
 
     if (isViolation) {
       // Check if sender has premium subscription
-      const { data: subscription } = await supabase
+      const { data: subscription } = await supabaseAdmin
         .from("user_subscriptions")
         .select("tier_id, subscription_tiers(name)")
         .eq("user_id", senderId)
@@ -77,7 +110,7 @@ serve(async (req) => {
 
       if (!isPremium) {
         // Delete the message
-        const { error: deleteError } = await supabase
+        const { error: deleteError } = await supabaseAdmin
           .from("messages")
           .delete()
           .eq("id", messageId);

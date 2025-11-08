@@ -12,19 +12,87 @@ serve(async (req) => {
   }
 
   try {
-    const { contentType, contentId, content, mediaUrl } = await req.json();
-    
+    // Get auth token and validate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+    // Create client with user's token
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
+
+    // Verify user is authenticated
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { contentType, contentId, content, mediaUrl } = await req.json();
+
+    if (!contentType || !contentId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Verify user owns the content or is a moderator
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    if (contentType === 'post') {
+      const { data: post, error: postError } = await supabaseAdmin
+        .from('posts')
+        .select('user_id')
+        .eq('id', contentId)
+        .single();
+
+      if (postError || !post) {
+        return new Response(
+          JSON.stringify({ error: 'Content not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check if user is moderator or admin
+      const { data: isModerator } = await supabaseAdmin.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'moderator'
+      });
+
+      const { data: isAdmin } = await supabaseAdmin.rpc('has_role', {
+        _user_id: user.id,
+        _role: 'admin'
+      });
+
+      // Only allow if user owns content or is moderator/admin
+      if (post.user_id !== user.id && !isModerator && !isAdmin) {
+        return new Response(
+          JSON.stringify({ error: 'Forbidden' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    console.log(`Moderating ${contentType} content:`, contentId);
+    
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
 
     if (!lovableApiKey) {
       throw new Error('LOVABLE_API_KEY not configured');
     }
-
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
-    console.log(`Moderating ${contentType} content:`, contentId);
 
     // Build moderation prompt
     let moderationPrompt = `Analyze this ${contentType} content for policy violations. Check for:
@@ -141,7 +209,7 @@ Content to analyze:`;
     }
 
     // Store in moderation queue
-    const { data: queueEntry, error: queueError } = await supabase
+    const { data: queueEntry, error: queueError } = await supabaseAdmin
       .from('moderation_queue')
       .insert({
         content_type: contentType,
@@ -169,7 +237,7 @@ Content to analyze:`;
       const moderationStatus = findings.recommended_action === 'allow' ? 'approved' : 
                                findings.recommended_action === 'remove' ? 'removed' : 'held';
       
-      await supabase
+      await supabaseAdmin
         .from('posts')
         .update({ 
           moderation_status: moderationStatus,
