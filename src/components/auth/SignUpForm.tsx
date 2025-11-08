@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Mail, Phone, Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import { SocialLogin } from './SocialLogin';
 
 const emailSignupSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -108,6 +109,8 @@ export const SignUpForm = () => {
 
   return (
     <div className="space-y-6">
+      <SocialLogin />
+      
       <Tabs defaultValue="email" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="email">
