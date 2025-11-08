@@ -9,8 +9,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { ImageEditor } from './ImageEditor';
 import { AudioTrimmer } from './AudioTrimmer';
 import { VideoTrimmer } from './VideoTrimmer';
-import { ImageDrawingTools } from './ImageDrawingTools';
-import { EnhancedImageCropper } from './EnhancedImageCropper';
 import { compressImage, shouldCompressImage, formatFileSize as formatSize } from '@/lib/media-compression';
 
 interface MediaUploadModalProps {
@@ -45,8 +43,6 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [showAudioTrimmer, setShowAudioTrimmer] = useState(false);
   const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
-  const [showDrawingTools, setShowDrawingTools] = useState(false);
-  const [showCropper, setShowCropper] = useState(false);
   const [editedFile, setEditedFile] = useState<File | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
 
@@ -249,31 +245,15 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
 
                   {/* Edit buttons */}
                   {selectedFile && !isUploading && (
-                    <div className="mt-4 flex flex-wrap gap-2">
+                    <div className="mt-4 flex gap-2">
                       {selectedFile.type.startsWith('image/') && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowImageEditor(true)}
-                          >
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowCropper(true)}
-                          >
-                            Crop
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setShowDrawingTools(true)}
-                          >
-                            Draw
-                          </Button>
-                        </>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowImageEditor(true)}
+                        >
+                          Edit Image
+                        </Button>
                       )}
                       {selectedFile.type.startsWith('audio/') && (
                         <Button
@@ -369,24 +349,6 @@ export const MediaUploadModal = ({ open, onClose, conversationId, onUploadComple
           onClose={() => setShowVideoTrimmer(false)}
           videoFile={selectedFile}
           onSave={handleVideoTrim}
-        />
-      )}
-
-      {selectedFile && showDrawingTools && (
-        <ImageDrawingTools
-          open={showDrawingTools}
-          onClose={() => setShowDrawingTools(false)}
-          imageFile={selectedFile}
-          onSave={handleImageEdit}
-        />
-      )}
-
-      {selectedFile && showCropper && (
-        <EnhancedImageCropper
-          open={showCropper}
-          onClose={() => setShowCropper(false)}
-          imageFile={selectedFile}
-          onSave={handleImageEdit}
         />
       )}
     </>

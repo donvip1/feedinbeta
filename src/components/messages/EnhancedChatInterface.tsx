@@ -962,13 +962,12 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       </div>
 
       {/* Messages */}
-      <div 
-        className="flex-1 overflow-y-auto p-4 relative min-h-0"
+      <ScrollArea 
+        className="flex-1 p-4 relative"
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        ref={scrollRef}
       >
         {/* Drag overlay */}
         {isDragging && (
@@ -1032,7 +1031,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           {isTyping && <TypingIndicator />}
           <div ref={scrollRef} />
         </div>
-      </div>
+      </ScrollArea>
 
       {/* Input */}
       <div className="border-t border-border bg-background">
