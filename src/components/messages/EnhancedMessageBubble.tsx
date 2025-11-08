@@ -181,46 +181,6 @@ export const EnhancedMessageBubble = ({
       </a>
     );
   };
-          className="rounded-lg max-w-xs max-h-64 object-cover mb-2 cursor-pointer hover:opacity-90 transition-opacity"
-          onClick={(e) => {
-            e.stopPropagation();
-            onImageClick?.(message.media_url!);
-          }}
-        />
-      );
-    }
-
-    if (message.media_type?.startsWith('video')) {
-      return (
-        <video 
-          src={message.media_url} 
-          controls 
-          className="rounded-lg max-w-xs max-h-64 mb-2"
-        />
-      );
-    }
-
-    if (message.media_type?.startsWith('audio')) {
-      return (
-        <audio 
-          src={message.media_url} 
-          controls 
-          className="mb-2"
-        />
-      );
-    }
-
-    return (
-      <a 
-        href={message.media_url} 
-        download 
-        className="flex items-center gap-2 p-2 border rounded-lg mb-2 hover:bg-accent"
-      >
-        <Download className="w-4 h-4" />
-        <span className="text-sm">Download File</span>
-      </a>
-    );
-  };
 
   const reactionGroups = message.reactions?.reduce((acc, reaction) => {
     if (!acc[reaction.emoji]) {
