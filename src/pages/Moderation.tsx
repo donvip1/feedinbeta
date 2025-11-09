@@ -13,7 +13,7 @@ import {
   Shield, Flag, Eye, Check, X, AlertTriangle, FileText, 
   Search, Filter, ChevronDown, AlertCircle, Ban, MessageSquare 
 } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/BottomNav";

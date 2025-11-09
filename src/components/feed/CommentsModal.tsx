@@ -53,76 +53,8 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
   useEffect(() => {
     if (open) {
       loadComments();
+      subscribeToComments();
     }
-  }, [open, postId]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    const channel = supabase
-      .channel(`comments:${postId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'post_comments',
-          filter: `post_id=eq.${postId}`,
-        },
-        async (payload) => {
-          console.log('New comment received:', payload);
-          // Fetch the full comment with profile data
-          const { data, error } = await supabase
-            .from('post_comments')
-            .select(`
-              *,
-              profiles (
-                display_name,
-                username,
-                avatar_url
-              )
-            `)
-            .eq('id', payload.new.id)
-            .single();
-
-          if (!error && data) {
-            setComments((prev) => [...prev, data]);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'post_comments',
-          filter: `post_id=eq.${postId}`,
-        },
-        (payload) => {
-          console.log('Comment updated:', payload);
-          setComments((prev) =>
-            prev.map((c) => (c.id === payload.new.id ? { ...c, ...payload.new } : c))
-          );
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'post_comments',
-          filter: `post_id=eq.${postId}`,
-        },
-        (payload) => {
-          console.log('Comment deleted:', payload);
-          setComments((prev) => prev.filter((c) => c.id !== payload.old.id));
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [open, postId]);
 
   const loadComments = async () => {
@@ -155,6 +87,27 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
     }
   };
 
+  const subscribeToComments = () => {
+    const channel = supabase
+      .channel(`comments:${postId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'post_comments',
+          filter: `post_id=eq.${postId}`,
+        },
+        () => {
+          loadComments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
 
   const handleTextChange = (value: string) => {
     setNewComment(value);
@@ -204,7 +157,9 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
       if (error) throw error;
 
       setNewComment('');
-      // Don't show toast - comment will appear via real-time subscription
+      toast({
+        title: 'Comment added',
+      });
     } catch (error: any) {
       console.error('Error adding comment:', error);
       toast({
