@@ -7,28 +7,7 @@ interface ThemeProviderProps {
   enableSystem?: boolean;
 }
 
-// Ultra-light ThemeProvider without React hooks or runtime React import
-export const ThemeProvider = ({
-  children,
-  attribute = 'class',
-  defaultTheme = 'system',
-  enableSystem = true,
-}: ThemeProviderProps) => {
-  try {
-    if (typeof document !== 'undefined') {
-      const systemDark = enableSystem && typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-      const theme = defaultTheme === 'system' ? (systemDark ? 'dark' : 'light') : defaultTheme;
-      const root = document.documentElement;
-
-      if (attribute === 'class') {
-        root.classList.toggle('dark', theme === 'dark');
-      } else {
-        root.setAttribute(attribute, theme);
-      }
-    }
-  } catch {
-    // no-op: theming should never break rendering
-  }
-
+export const ThemeProvider = ({ children }: ThemeProviderProps) => {
+  // No-op ThemeProvider to avoid hook/runtime issues
   return <>{children}</>;
 };
