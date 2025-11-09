@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { ThemeProvider } from "@/components/ui/ThemeProviderShim";
-import { AuthProvider } from "@/hooks/useAuth";
+import AuthProvider from "@/hooks/AuthProvider";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
