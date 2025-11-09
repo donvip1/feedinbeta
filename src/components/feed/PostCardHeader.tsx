@@ -28,10 +28,10 @@ export const PostCardHeader = ({
   onMusicClick,
 }: PostCardHeaderProps) => {
   return (
-    <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/60 to-transparent">
+    <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
       <div className="flex items-center space-x-3">
         <Avatar 
-          className="w-12 h-12 cursor-pointer hover:opacity-80 ring-2 ring-white/20" 
+          className="w-12 h-12 cursor-pointer hover:opacity-80 ring-2 ring-white/20 pointer-events-auto" 
           onClick={onUserClick}
         >
           <AvatarImage src={avatarUrl || ''} />
@@ -41,7 +41,7 @@ export const PostCardHeader = ({
         </Avatar>
         <div className="flex-1 min-w-0">
           <p 
-            className="font-bold text-white cursor-pointer hover:underline truncate text-lg inline-block max-w-fit"
+            className="font-bold text-white cursor-pointer hover:underline truncate text-lg inline-block max-w-fit pointer-events-auto"
             onClick={onUserClick}
           >
             {displayName}
@@ -49,7 +49,7 @@ export const PostCardHeader = ({
           <div className="flex items-center space-x-2 text-sm">
             {username && (
               <span 
-                className="cursor-pointer hover:underline text-white/80 truncate inline-block max-w-fit"
+                className="cursor-pointer hover:underline text-white/80 truncate inline-block max-w-fit pointer-events-auto"
                 onClick={onUserClick}
               >
                 @{username}
@@ -63,7 +63,7 @@ export const PostCardHeader = ({
           
           {musicTitle && musicArtist && (
             <div 
-              className="flex items-center gap-1.5 mt-1 cursor-pointer hover:underline group"
+              className="flex items-center gap-1.5 mt-1 cursor-pointer hover:underline group pointer-events-auto w-fit"
               onClick={onMusicClick}
             >
               <Music className="w-3.5 h-3.5 text-white/90 group-hover:scale-110 transition-transform" />

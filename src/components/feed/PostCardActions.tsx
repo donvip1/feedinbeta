@@ -102,7 +102,10 @@ export const PostCardActions = ({
             <Button
               size="sm"
               variant="secondary"
-              onClick={onToggleMute}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleMute(e);
+              }}
               className="rounded-full w-10 h-10 p-0 bg-black/40 backdrop-blur-sm border-2 border-white/20 hover:bg-black/60"
             >
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
@@ -112,7 +115,10 @@ export const PostCardActions = ({
             <Button
               size="sm"
               variant="secondary"
-              onClick={onToggleFullScreen}
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleFullScreen(e);
+              }}
               className="rounded-full w-10 h-10 p-0 bg-black/40 backdrop-blur-sm border-2 border-white/20 hover:bg-black/60"
             >
               <Maximize className="w-5 h-5" />
