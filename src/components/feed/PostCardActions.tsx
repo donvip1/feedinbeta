@@ -97,31 +97,41 @@ export const PostCardActions = ({
 
       {/* Video Controls */}
       {hasVideo && (
-        <div className="absolute bottom-32 left-4 z-20 flex space-x-2">
+        <div className="absolute bottom-32 left-4 z-30 flex space-x-2 pointer-events-auto">
           {onToggleMute && (
             <Button
               size="sm"
               variant="secondary"
+              onClickCapture={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
+                e.preventDefault();
                 onToggleMute(e);
               }}
               className="rounded-full w-10 h-10 p-0 bg-black/40 backdrop-blur-sm border-2 border-white/20 hover:bg-black/60"
             >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              {isMuted ? <VolumeX className="w-5 h-5 pointer-events-none" /> : <Volume2 className="w-5 h-5 pointer-events-none" />}
             </Button>
           )}
           {onToggleFullScreen && (
             <Button
               size="sm"
               variant="secondary"
+              onClickCapture={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
+                e.preventDefault();
                 onToggleFullScreen(e);
               }}
               className="rounded-full w-10 h-10 p-0 bg-black/40 backdrop-blur-sm border-2 border-white/20 hover:bg-black/60"
             >
-              <Maximize className="w-5 h-5" />
+              <Maximize className="w-5 h-5 pointer-events-none" />
             </Button>
           )}
         </div>
