@@ -97,7 +97,7 @@ export const PostCardActions = ({
 
       {/* Video Controls */}
       {hasVideo && (
-        <div className="absolute bottom-32 left-4 z-30 flex space-x-2 pointer-events-auto">
+        <div className="absolute bottom-20 left-4 z-30 flex space-x-2 pointer-events-auto">
           {onToggleMute && (
             <Button
               size="sm"
