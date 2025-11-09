@@ -34,7 +34,7 @@ import AccountSettings from "./pages/AccountSettings";
 import PrivacySettings from "./pages/PrivacySettings";
 import NotificationSettings from "./pages/NotificationSettings";
 import { NotificationsPage } from "./pages/Notifications";
-import CacheSettingsPage from "./pages/CacheSettingsPage";
+
 import BlockedUsers from "./pages/BlockedUsers";
 import P2PMarketplace from "./pages/P2PMarketplace";
 import InitializeGroups from "./pages/InitializeGroups";
@@ -83,7 +83,7 @@ const App = () => (
               <Route path="/settings/account" element={<AccountSettings />} />
               <Route path="/settings/privacy" element={<PrivacySettings />} />
               <Route path="/settings/notifications" element={<NotificationSettings />} />
-              <Route path="/settings/cache" element={<CacheSettingsPage />} />
+              
               <Route path="/settings/blocked" element={<BlockedUsers />} />
               <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
               <Route path="/initialize-groups" element={<InitializeGroups />} />
