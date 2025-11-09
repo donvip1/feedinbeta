@@ -1,2 +1,3 @@
-export { default } from './useAuth';
 export { AuthProvider, useAuth } from './useAuth';
+import { AuthProvider as Provider } from './useAuth';
+export default Provider;
