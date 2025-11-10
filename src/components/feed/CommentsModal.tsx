@@ -179,9 +179,6 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
       <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[85vh] flex flex-col my-8">
         <DialogHeader>
           <DialogTitle>Comments ({comments.length})</DialogTitle>
-          <p className="text-sm text-muted-foreground pt-1">
-            Tap the 😊 button on any comment to add emoji reactions
-          </p>
         </DialogHeader>
 
         {/* Comments List */}

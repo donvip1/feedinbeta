@@ -19,7 +19,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.moderation-bot]
-verify_jwt = true
+verify_jwt = false
 
 [functions.daily-credit-bonus]
 verify_jwt = false
@@ -27,11 +27,3 @@ verify_jwt = false
 [functions.p2p-escrow]
 verify_jwt = true
 
-[functions.moderate-content]
-verify_jwt = true
-
-[functions.process-appeal]
-verify_jwt = true
-
-[functions.delete-chat-history]
-verify_jwt = true

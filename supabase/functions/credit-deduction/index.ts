@@ -6,88 +6,17 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Input validation schema
-const validateInput = (data: any) => {
-  const validActions = ['friend_request', 'profile_view', 'voice_call', 'video_call'];
-  
-  if (!data.action || !validActions.includes(data.action)) {
-    throw new Error('Invalid action type');
-  }
-  
-  if (data.targetUserId && !isValidUUID(data.targetUserId)) {
-    throw new Error('Invalid target user ID');
-  }
-  
-  if (data.metadata?.minutes && (!Number.isInteger(data.metadata.minutes) || data.metadata.minutes <= 0)) {
-    throw new Error('Invalid minutes value');
-  }
-  
-  if (data.metadata?.username && (typeof data.metadata.username !== 'string' || data.metadata.username.length > 100)) {
-    throw new Error('Invalid username');
-  }
-  
-  return data;
-};
-
-const isValidUUID = (uuid: string) => {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(uuid);
-};
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get authenticated user from JWT
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false }
-    });
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const userId = user.id;
-    const requestData = await req.json();
-    
-    // Validate input
-    const { action, targetUserId, metadata } = validateInput(requestData);
-
-    // Check if user is admin - admins get unlimited access
-    const { data: isAdmin } = await supabase.rpc('has_role', {
-      _user_id: userId,
-      _role: 'admin'
-    });
-
-    if (isAdmin) {
-      console.log(`Admin user ${userId} bypassing credit deduction for action: ${action}`);
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          amount: 0, 
-          description: `${action} - Admin unlimited access`,
-          admin_bypass: true 
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const { action, userId, targetUserId, metadata } = await req.json();
 
     // Define credit costs
     const COSTS = {
@@ -122,34 +51,23 @@ serve(async (req) => {
     }
 
     // Check if user has enough credits
-    const { data: userCredits, error: creditsError } = await supabase
+    const { data: userCredits } = await supabase
       .from("user_credits")
       .select("balance")
       .eq("user_id", userId)
-      .maybeSingle();
+      .single();
 
-    // If user has no credits record yet, initialize with 0 balance
-    const currentBalance = userCredits?.balance ?? 0;
-    
-    console.log(`User ${userId} current balance: ${currentBalance}, attempting to deduct: ${Math.abs(amount)}`);
-
-    if (currentBalance < Math.abs(amount)) {
-      console.log(`Insufficient credits for user ${userId}. Balance: ${currentBalance}, Required: ${Math.abs(amount)}`);
-      
+    if (!userCredits || userCredits.balance < Math.abs(amount)) {
       // For non-blocking actions like profile views, don't return an HTTP error
       if (action === "profile_view") {
         return new Response(
-          JSON.stringify({ success: false, error: "Insufficient credits", balance: currentBalance }),
+          JSON.stringify({ success: false, error: "Insufficient credits" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
       return new Response(
-        JSON.stringify({ 
-          error: "Insufficient credits", 
-          balance: currentBalance,
-          required: Math.abs(amount)
-        }),
+        JSON.stringify({ error: "Insufficient credits" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -159,7 +77,7 @@ serve(async (req) => {
       .from("credit_transactions")
       .insert({
         user_id: userId,
-        type: "spent",
+        type: "deduction",
         amount,
         description,
         related_id: targetUserId,

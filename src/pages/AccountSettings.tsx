@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Camera, Loader2, Trash2 } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { TwoFactorSettings } from '@/components/settings/TwoFactorSettings';
 
 const AccountSettings = () => {
   const navigate = useNavigate();
@@ -311,11 +310,6 @@ const AccountSettings = () => {
             </Button>
           </div>
         </Card>
-
-        {/* Two-Factor Authentication Section */}
-        <div className="mt-6">
-          <TwoFactorSettings />
-        </div>
 
         {/* Delete Account Section */}
         <Card className="bg-card border-destructive/50 mt-6 p-6">

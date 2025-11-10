@@ -16,14 +16,11 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
   const [duration, setDuration] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioURL, setAudioURL] = useState<string>('');
-  const [waveformData, setWaveformData] = useState<number[]>([]);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout>();
   const audioRef = useRef<HTMLAudioElement>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const animationRef = useRef<number>();
 
   useEffect(() => {
     return () => {
@@ -33,38 +30,12 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
       if (audioURL) {
         URL.revokeObjectURL(audioURL);
       }
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
     };
   }, [audioURL]);
-
-  const updateWaveform = () => {
-    if (!analyserRef.current || !isRecording) return;
-
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
-    
-    // Get average amplitude from the frequency data
-    const average = dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
-    const normalized = Math.min(100, (average / 255) * 100);
-    
-    setWaveformData(prev => [...prev.slice(-30), normalized]);
-    animationRef.current = requestAnimationFrame(updateWaveform);
-  };
 
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Set up audio analyser for waveform
-      const audioContext = new AudioContext();
-      const source = audioContext.createMediaStreamSource(stream);
-      const analyser = audioContext.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analyserRef.current = analyser;
-      
       const mediaRecorder = new MediaRecorder(stream);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -81,22 +52,15 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
         const url = URL.createObjectURL(blob);
         setAudioURL(url);
         stream.getTracks().forEach(track => track.stop());
-        audioContext.close();
-        if (animationRef.current) {
-          cancelAnimationFrame(animationRef.current);
-        }
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       setDuration(0);
-      setWaveformData([]);
 
       timerRef.current = setInterval(() => {
         setDuration(prev => prev + 1);
       }, 1000);
-
-      updateWaveform();
     } catch (error) {
       console.error('Error accessing microphone:', error);
       toast({
@@ -193,20 +157,14 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
           >
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
           </Button>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-12 bg-primary/20 rounded-lg overflow-hidden flex items-center px-2">
-                  {waveformData.map((height, i) => (
-                    <div
-                      key={i}
-                      className="flex-1 bg-primary rounded-full mx-px"
-                      style={{ height: `${Math.max(4, height / 2)}%` }}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm font-medium">{formatTime(duration)}</span>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-8 bg-primary/20 rounded-full overflow-hidden">
+                <div className="h-full bg-primary/40 rounded-full" style={{ width: '100%' }} />
               </div>
+              <span className="text-sm font-medium">{formatTime(duration)}</span>
             </div>
+          </div>
           <Button
             variant="ghost"
             size="icon"
@@ -228,27 +186,11 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
           <div className="flex items-center gap-2 flex-1">
             <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
             <span className="text-sm font-medium">{formatTime(duration)}</span>
-            <div className="flex-1 h-12 bg-primary/20 rounded-lg overflow-hidden flex items-center px-2">
-              {waveformData.length > 0 ? (
-                waveformData.map((height, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 bg-primary rounded-full mx-px animate-pulse"
-                    style={{ height: `${Math.max(8, height / 2)}%` }}
-                  />
-                ))
-              ) : (
-                Array.from({ length: 30 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="flex-1 bg-primary rounded-full mx-px animate-pulse"
-                    style={{ 
-                      height: `${20 + Math.random() * 40}%`,
-                      animationDelay: `${i * 50}ms`
-                    }}
-                  />
-                ))
-              )}
+            <div className="flex-1 h-8 bg-primary/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary rounded-full animate-pulse" 
+                style={{ width: '60%' }}
+              />
             </div>
           </div>
           {isPaused ? (

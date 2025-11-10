@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Music, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,7 +28,11 @@ export function AIMusicSuggester({ mediaUrl, mediaType, onSuggestionAccept, onDi
   const [suggestion, setSuggestion] = useState<{ name: string; url: string } | null>(null);
   const [dismissed, setDismissed] = useState(false);
 
-  const analyzeMoodAndSuggest = useCallback(async () => {
+  useEffect(() => {
+    analyzeMoodAndSuggest();
+  }, []);
+
+  const analyzeMoodAndSuggest = async () => {
     setLoading(true);
     try {
       // Call AI to analyze the image/video mood
@@ -49,11 +53,7 @@ export function AIMusicSuggester({ mediaUrl, mediaType, onSuggestionAccept, onDi
     } finally {
       setLoading(false);
     }
-  }, [mediaUrl, mediaType]);
-
-  useEffect(() => {
-    analyzeMoodAndSuggest();
-  }, [analyzeMoodAndSuggest]);
+  };
 
   const handleDismiss = () => {
     setDismissed(true);

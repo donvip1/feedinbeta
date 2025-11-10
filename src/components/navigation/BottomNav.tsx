@@ -1,6 +1,5 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Home, MessageCircle, Plus, User, Sparkles } from 'lucide-react';
+import { Home, MessageCircle, Plus, User, Sparkles, UsersRound } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
 interface BottomNavProps {
@@ -10,7 +9,8 @@ interface BottomNavProps {
 }
 
 export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default', minimized = false }: BottomNavProps) => {
-  const currentPath = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const navItems = [
     { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
@@ -19,7 +19,7 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
     { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}` },
   ];
 
-  const isActive = (path: string) => currentPath === path;
+  const isActive = (path: string) => location.pathname === path;
 
   // When minimized, only show the + button
   if (minimized) {
@@ -42,17 +42,17 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
           {navItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
             return (
-              <Link key={item.id} to={item.path}>
-                <Button
-                  variant="ghost"
-                  className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
-                    isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{item.label}</span>
-                </Button>
-              </Link>
+              <Button
+                key={item.id}
+                onClick={() => navigate(item.path)}
+                variant="ghost"
+                className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
+                  isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </Button>
             );
           })}
           
@@ -67,17 +67,17 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
           {navItems.slice(2).map((item) => {
             const Icon = item.icon;
             return (
-              <Link key={item.id} to={item.path}>
-                <Button
-                  variant="ghost"
-                  className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
-                    isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
-                  }`}
-                >
-                  <Icon className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">{item.label}</span>
-                </Button>
-              </Link>
+              <Button
+                key={item.id}
+                onClick={() => navigate(item.path)}
+                variant="ghost"
+                className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
+                  isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </Button>
             );
           })}
         </div>

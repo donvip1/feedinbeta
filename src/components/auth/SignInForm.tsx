@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Mail, Phone, User, Loader2 } from 'lucide-react';
 import { z } from 'zod';
-import { SocialLogin } from './SocialLogin';
-import { TwoFactorVerification } from './TwoFactorVerification';
 
 const emailSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -32,8 +30,8 @@ interface SignInFormProps {
 
 export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [showMfaVerification, setShowMfaVerification] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -47,92 +45,49 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
       // Validate input
       if (method === 'email') {
         emailSchema.parse({ email: formData.email, password: formData.password });
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           email: formData.email,
           password: formData.password,
         });
         if (error) throw error;
-
-        // Check if user needs 2FA
-        if (data.user) {
-          const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          const { data: mfaSettings } = await supabase
-            .from('user_mfa_settings')
-            .select('mfa_enabled, mfa_required')
-            .eq('user_id', data.user.id)
-            .single();
-
-          // If MFA is required or enabled and not yet verified
-          if (mfaSettings && (mfaSettings.mfa_required || mfaSettings.mfa_enabled)) {
-            if (mfaData?.currentLevel !== 'aal2') {
-              setShowMfaVerification(true);
-              setLoading(false);
-              return;
-            }
-          }
-        }
       } else if (method === 'phone') {
         phoneSchema.parse({ phone: formData.phone, password: formData.password });
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { error } = await supabase.auth.signInWithPassword({
           phone: formData.phone,
           password: formData.password,
         });
         if (error) throw error;
-
-        // Check if user needs 2FA
-        if (data.user) {
-          const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          const { data: mfaSettings } = await supabase
-            .from('user_mfa_settings')
-            .select('mfa_enabled, mfa_required')
-            .eq('user_id', data.user.id)
-            .single();
-
-          if (mfaSettings && (mfaSettings.mfa_required || mfaSettings.mfa_enabled)) {
-            if (mfaData?.currentLevel !== 'aal2') {
-              setShowMfaVerification(true);
-              setLoading(false);
-              return;
-            }
-          }
-        }
       } else if (method === 'username') {
         usernameSchema.parse({ username: formData.username, password: formData.password });
-        toast.error('Username sign-in coming soon', {
-          description: 'Please use your email or phone number to sign in'
+        // Query profiles to find user with this username - note: this requires email to be stored
+        // For now, we'll show a helpful message
+        toast({
+          title: "Username sign-in coming soon",
+          description: "Please use your email or phone number to sign in",
+          variant: "destructive",
         });
         setLoading(false);
         return;
       }
 
-      toast.success('Welcome back!', {
-        description: 'Successfully signed in'
+      toast({
+        title: "Welcome back!",
+        description: "Successfully signed in",
       });
       navigate('/');
-    } catch (error) {
-      toast.error('Sign in failed', {
-        description: error instanceof Error ? error.message : 'Invalid credentials'
+    } catch (error: any) {
+      toast({
+        title: "Sign in failed",
+        description: error.message || 'Invalid credentials',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
   };
 
-  if (showMfaVerification) {
-    return (
-      <TwoFactorVerification
-        onCancel={() => {
-          setShowMfaVerification(false);
-          supabase.auth.signOut();
-        }}
-      />
-    );
-  }
-
   return (
     <div className="space-y-6">
-      <SocialLogin />
-      
       <Tabs defaultValue="email" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="email">

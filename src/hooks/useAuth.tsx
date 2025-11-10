@@ -1,72 +1,54 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import type { User, Session } from '@supabase/supabase-js';
+import { useState, useEffect } from 'react';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
-interface AuthContextValue {
-  user: User | null;
-  session: Session | null;
-  loading: boolean;
-  signOut: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined);
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    let isMounted = true;
-    
-    // Fetch initial session immediately
-    supabase.auth.getSession().then(({ data }) => {
-      if (!isMounted) return;
-      setSession(data.session ?? null);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    }).catch((err) => {
-      console.error('Auth session error:', err);
-      if (!isMounted) return;
-      setLoading(false);
-    });
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!isMounted) return;
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    return () => {
-      isMounted = false;
-      subscription?.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      toast({
+        title: "Signed out successfully",
+      });
     } catch (error: any) {
-      console.error('Error signing out:', error.message);
+      toast({
+        title: "Error signing out",
+        description: error.message,
+        variant: "destructive",
+      });
     }
-    // Use window.location.replace to clear auth state and navigate
-    window.location.replace('/auth');
   };
 
-  const value: AuthContextValue = { user, session, loading, signOut };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return {
+    user,
+    session,
+    loading,
+    signOut,
+  };
 };
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
-
-export default AuthProvider;

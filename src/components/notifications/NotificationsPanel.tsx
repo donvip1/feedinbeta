@@ -5,13 +5,12 @@ import { useToast } from '@/hooks/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { Settings, CheckCheck, Bell, Trash2, ArrowLeft } from 'lucide-react';
-import { NotificationItem } from '@/components/notifications/NotificationItem';
-import { Link, useNavigate } from 'react-router-dom';
+import { Settings, CheckCheck, Bell } from 'lucide-react';
+import { NotificationItem } from './NotificationItem';
+import { NotificationPreferences } from './NotificationPreferences';
 
 interface Notification {
   id: string;
-  user_id: string;
   type: string;
   title: string;
   message: string | null;
@@ -20,44 +19,26 @@ interface Notification {
   from_user_id: string | null;
   is_read: boolean;
   created_at: string;
-  reference_id: string | null;
   from_user: {
-    id: string;
     display_name: string | null;
     avatar_url: string | null;
-    username: string | null;
   } | null;
 }
 
-export const NotificationsPage = () => {
+interface NotificationsPanelProps {
+  onClose: () => void;
+  onUpdate: () => void;
+}
+
+export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showPreferences, setShowPreferences] = useState(false);
 
   useEffect(() => {
     loadNotifications();
-  }, [user]);
-
-  // Realtime updates: keep the list in sync for this user
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel(`notifications:${user.id}:page`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
-        () => {
-          loadNotifications();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [user]);
 
   const loadNotifications = async () => {
@@ -69,19 +50,14 @@ export const NotificationsPage = () => {
         .from('notifications')
         .select(`
           *,
-          from_user:profiles!notifications_from_user_id_fkey(id, display_name, avatar_url, username)
+          from_user:profiles!notifications_from_user_id_fkey(display_name, avatar_url)
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      // Map related_id to reference_id for compatibility
-      const mappedData = (data || []).map(notif => ({
-        ...notif,
-        reference_id: notif.related_id
-      }));
-      setNotifications(mappedData as any || []);
+      setNotifications(data as any || []);
     } catch (error: any) {
       toast({
         title: 'Error loading notifications',
@@ -106,6 +82,7 @@ export const NotificationsPage = () => {
       if (error) throw error;
 
       await loadNotifications();
+      onUpdate();
       
       toast({
         title: 'All notifications marked as read',
@@ -118,47 +95,22 @@ export const NotificationsPage = () => {
       });
     }
   };
-  
-  const deleteAllNotifications = async () => {
-    if (!user) return;
 
-    try {
-      const { error } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      setNotifications([]);
-      
-      toast({
-        title: 'All notifications deleted',
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Error deleting notifications',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
+  if (showPreferences) {
+    return (
+      <NotificationPreferences
+        onClose={() => setShowPreferences(false)}
+        onBack={() => setShowPreferences(false)}
+      />
+    );
+  }
 
   return (
-    <div className="max-w-2xl mx-auto py-8">
+    <div className="fixed right-4 top-16 w-96 bg-background border border-border rounded-lg shadow-lg z-50">
       {/* Header */}
       <div className="p-4 border-b border-border">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(-1)}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h3 className="text-lg font-semibold">Notifications</h3>
-          </div>
+          <h3 className="text-lg font-semibold">Notifications</h3>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
@@ -169,27 +121,18 @@ export const NotificationsPage = () => {
               <CheckCheck className="w-4 h-4" />
             </Button>
             <Button
-              variant="destructive"
+              variant="ghost"
               size="icon"
-              onClick={deleteAllNotifications}
-              disabled={notifications.length === 0}
+              onClick={() => setShowPreferences(true)}
             >
-              <Trash2 className="w-4 h-4" />
+              <Settings className="w-4 h-4" />
             </Button>
-            <Link to="/notification-settings">
-              <Button
-                variant="ghost"
-                size="icon"
-              >
-                <Settings className="w-4 h-4" />
-              </Button>
-            </Link>
           </div>
         </div>
       </div>
 
       {/* Notifications List */}
-      <ScrollArea className="h-[calc(100vh-200px)]">
+      <ScrollArea className="h-[500px]">
         {loading ? (
           <div className="flex justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -205,7 +148,11 @@ export const NotificationsPage = () => {
               <React.Fragment key={notification.id}>
                 <NotificationItem
                   notification={notification}
-                  onUpdate={loadNotifications}
+                  onUpdate={() => {
+                    loadNotifications();
+                    onUpdate();
+                  }}
+                  onClose={onClose}
                 />
                 {index < notifications.length - 1 && <Separator />}
               </React.Fragment>

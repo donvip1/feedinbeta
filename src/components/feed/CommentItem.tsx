@@ -7,9 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Heart, MessageCircle, Trash2, Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
-import { CommentEmojiPicker } from './CommentEmojiPicker';
-import { CommentReactions } from './CommentReactions';
-import { useNavigate } from 'react-router-dom';
+import { ReactionPicker } from './ReactionPicker';
 
 interface Comment {
   id: string;
@@ -35,10 +33,6 @@ interface CommentItemProps {
   level?: number;
 }
 
-interface ApiError extends Error {
-  message: string;
-}
-
 export const CommentItem = ({
   comment,
   allComments,
@@ -48,7 +42,6 @@ export const CommentItem = ({
 }: CommentItemProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [isLiked, setIsLiked] = useState(false);
   const [localLikesCount, setLocalLikesCount] = useState(comment.likes_count);
   const [showReply, setShowReply] = useState(false);
@@ -84,55 +77,12 @@ export const CommentItem = ({
           .eq('comment_id', comment.id)
           .eq('user_id', user.id);
       }
-    } catch (error) {
+    } catch (error: any) {
       setIsLiked(!newIsLiked);
       setLocalLikesCount(localLikesCount);
       toast({
         title: 'Error',
-        description: (error as ApiError).message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleEmojiReact = async (emoji: string) => {
-    if (!user) return;
-
-    try {
-      // Check if user already reacted with this emoji
-      const { data: existing } = await supabase
-        .from('comment_emoji_reactions')
-        .select('id')
-        .eq('comment_id', comment.id)
-        .eq('user_id', user.id)
-        .eq('emoji', emoji)
-        .single();
-
-      if (existing) {
-        // Remove reaction if already exists
-        await supabase
-          .from('comment_emoji_reactions')
-          .delete()
-          .eq('comment_id', comment.id)
-          .eq('user_id', user.id)
-          .eq('emoji', emoji);
-      } else {
-        // Add new reaction
-        await supabase
-          .from('comment_emoji_reactions')
-          .insert({
-            comment_id: comment.id,
-            user_id: user.id,
-            emoji: emoji
-          });
-      }
-      
-      onUpdate();
-    } catch (error) {
-      console.error('Error adding reaction:', error);
-      toast({
-        title: 'Unable to add reaction',
-        description: 'Please try again.',
+        description: error.message,
         variant: 'destructive',
       });
     }
@@ -156,10 +106,10 @@ export const CommentItem = ({
       setShowReply(false);
       setShowReplies(true);
       onUpdate();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: (error as ApiError).message,
+        description: error.message,
         variant: 'destructive',
       });
     } finally {
@@ -182,10 +132,10 @@ export const CommentItem = ({
         title: 'Comment deleted',
       });
       onUpdate();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: (error as ApiError).message,
+        description: error.message,
         variant: 'destructive',
       });
     }
@@ -196,7 +146,7 @@ export const CommentItem = ({
       <div className="flex space-x-3">
         <Avatar 
           className="w-8 h-8 flex-shrink-0 cursor-pointer hover:opacity-80"
-          onClick={() => navigate(`/profile/${comment.user_id}`)}
+          onClick={() => window.location.href = `/profile/${comment.user_id}`}
         >
           <AvatarImage src={comment.profiles?.avatar_url || ''} />
           <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
@@ -209,7 +159,7 @@ export const CommentItem = ({
             <div className="flex items-center justify-between mb-1">
               <span 
                 className="font-semibold text-sm cursor-pointer hover:underline"
-                onClick={() => navigate(`/profile/${comment.user_id}`)}
+                onClick={() => window.location.href = `/profile/${comment.user_id}`}
               >
                 {displayName}
               </span>
@@ -245,8 +195,6 @@ export const CommentItem = ({
               Reply
             </Button>
 
-            <CommentEmojiPicker onEmojiSelect={handleEmojiReact} />
-
             <span className="text-xs text-gray-500">{timeAgo}</span>
 
             {isOwnComment && (
@@ -260,9 +208,6 @@ export const CommentItem = ({
               </Button>
             )}
           </div>
-
-          {/* Emoji Reactions Display */}
-          <CommentReactions commentId={comment.id} onReactionChange={onUpdate} />
 
           {/* Reply Input */}
           {showReply && (

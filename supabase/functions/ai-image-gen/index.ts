@@ -1,39 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
-
-const validateImageInput = (prompt: string) => {
-  if (typeof prompt !== 'string') {
-    throw new Error('Prompt must be a string');
-  }
-  
-  if (prompt.length < 3) {
-    throw new Error('Prompt too short (min 3 characters)');
-  }
-  
-  if (prompt.length > 1000) {
-    throw new Error('Prompt too long (max 1000 characters)');
-  }
-  
-  // Filter inappropriate content (basic check)
-  const blockedTerms = [
-    'nude', 'naked', 'nsfw', 'porn', 'xxx', 'sex', 'explicit',
-    'gore', 'violence', 'blood', 'death', 'kill',
-    'racist', 'hate', 'offensive'
-  ];
-  
-  const lowerPrompt = prompt.toLowerCase();
-  const foundBlockedTerm = blockedTerms.find(term => lowerPrompt.includes(term));
-  
-  if (foundBlockedTerm) {
-    throw new Error('Inappropriate content detected in prompt');
-  }
-  
-  return prompt;
 };
 
 serve(async (req) => {
@@ -42,40 +11,24 @@ serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Authorization header required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false }
-    });
-
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const { prompt, imageUrl: inputImageUrl, mode } = await req.json();
     
-    // Validate input
-    validateImageInput(prompt);
+    if (!prompt || typeof prompt !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Prompt is required" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating/Editing image for user", user.id, "with prompt:", prompt, "Mode:", mode);
+    console.log("Generating/Editing image with prompt:", prompt, "Mode:", mode);
 
     // Build the message content based on whether we're editing or generating
     let messageContent;
@@ -150,13 +103,13 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("AI response received");
+    console.log("AI response:", JSON.stringify(data));
     
     // Extract image URL from response - images are returned in the images array
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!imageUrl) {
-      console.error("No image in response");
+      console.error("No image in response:", data);
       throw new Error("No image generated");
     }
 
@@ -166,11 +119,11 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
-  } catch (error: any) {
+  } catch (error) {
     console.error("Image generation error:", error);
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Image generation failed",
+        error: "Image generation failed",
         code: "IMAGE_GEN_ERROR"
       }),
       {

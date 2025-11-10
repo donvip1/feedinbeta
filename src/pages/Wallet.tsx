@@ -30,26 +30,14 @@ const Wallet = () => {
     if (authLoading) return;
     if (!user) {
       navigate('/auth');
-    } else {
-      checkAdminStatus();
+    } else if (user.email) {
+      checkAdminStatus(user.email);
     }
   }, [user, authLoading, navigate]);
 
-  const checkAdminStatus = async () => {
-    if (!user?.id) return;
-    
-    try {
-      const { data, error } = await supabase.rpc('has_role', {
-        _user_id: user.id,
-        _role: 'admin'
-      });
-      
-      if (error) throw error;
-      setIsAdmin(data === true);
-    } catch (error) {
-      console.error('Error checking admin status:', error);
-      setIsAdmin(false);
-    }
+  const checkAdminStatus = (email: string) => {
+    const adminEmails = ['viplearn4free@gmail.com', 'cryptosvip@gmail.com', 'myconnectmate@gmail.com'];
+    setIsAdmin(adminEmails.includes(email.toLowerCase()));
   };
 
   const { data: credits } = useQuery({

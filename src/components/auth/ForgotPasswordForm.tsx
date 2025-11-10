@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +16,7 @@ interface ForgotPasswordFormProps {
 }
 
 export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -31,18 +32,22 @@ export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
           redirectTo: redirectUrl,
         });
         if (error) throw error;
-        toast.success('Reset link sent!', {
-          description: 'Check your email for the password reset link'
+        toast({
+          title: "Reset link sent!",
+          description: "Check your email for the password reset link",
         });
       } else {
         phoneSchema.parse(phone);
-        toast.success('SMS sent!', {
-          description: 'Check your phone for the verification code'
+        toast({
+          title: "SMS sent!",
+          description: "Check your phone for the verification code",
         });
       }
-    } catch (error) {
-      toast.error('Reset failed', {
-        description: error instanceof Error ? error.message : 'Unable to send reset instructions'
+    } catch (error: any) {
+      toast({
+        title: "Reset failed",
+        description: error.message || 'Unable to send reset instructions',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);

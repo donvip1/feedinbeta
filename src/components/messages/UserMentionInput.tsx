@@ -65,12 +65,6 @@ export const UserMentionInput = ({
     const newValue = e.target.value;
     const position = e.target.selectionStart || 0;
     
-    // Auto-resize textarea
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 120) + 'px';
-    }
-    
     onChange(newValue);
     setCursorPosition(position);
 
@@ -152,8 +146,7 @@ export const UserMentionInput = ({
         onKeyDown={handleKeyDown}
         disabled={disabled}
         placeholder={placeholder}
-        className="w-full min-h-[44px] px-4 py-3 bg-background border border-border rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-primary overflow-y-auto whitespace-pre-wrap break-words leading-relaxed"
-        style={{ maxHeight: '120px' }}
+        className="w-full min-h-[40px] max-h-[120px] px-4 py-2 bg-background border rounded-full resize-none focus:outline-none focus:ring-2 focus:ring-primary"
         rows={1}
       />
 

@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Mail, Phone, Loader2 } from 'lucide-react';
 import { z } from 'zod';
-import { SocialLogin } from './SocialLogin';
 
 const emailSignupSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -32,6 +31,7 @@ const phoneSignupSchema = z.object({
 
 export const SignUpForm = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -44,7 +44,10 @@ export const SignUpForm = () => {
 
   const handleSignUp = async (method: 'email' | 'phone') => {
     if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords don't match");
+      toast({
+        title: "Passwords don't match",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -94,13 +97,16 @@ export const SignUpForm = () => {
         if (error) throw error;
       }
 
-      toast.success('Account created!', {
-        description: 'Welcome to FEEDIN'
+      toast({
+        title: "Account created!",
+        description: "Welcome to FEEDIN",
       });
       navigate('/');
-    } catch (error) {
-      toast.error('Sign up failed', {
-        description: error instanceof Error ? error.message : 'Unable to create account'
+    } catch (error: any) {
+      toast({
+        title: "Sign up failed",
+        description: error.message || 'Unable to create account',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -109,8 +115,6 @@ export const SignUpForm = () => {
 
   return (
     <div className="space-y-6">
-      <SocialLogin />
-      
       <Tabs defaultValue="email" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="email">

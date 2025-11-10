@@ -114,24 +114,23 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
 
     try {
       if (friendRequestStatus === 'pending') {
-        toast({ title: 'Message request already sent' });
+        toast({ title: 'Friend request already sent' });
         return;
       }
 
-      const { error } = await supabase
+      await supabase
         .from('friend_requests')
         .insert({
           sender_id: user.id,
           receiver_id: userId,
+          status: 'pending',
         });
 
-      if (error) throw error;
-
       setFriendRequestStatus('pending');
-      toast({ title: 'Message request sent' });
+      toast({ title: 'Friend request sent' });
     } catch (error: any) {
       toast({
-        title: 'Error sending message request',
+        title: 'Error sending friend request',
         description: error.message,
         variant: 'destructive',
       });
@@ -141,8 +140,8 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
   const handleMessage = async () => {
     if (friendRequestStatus !== 'accepted') {
       toast({
-        title: 'Not connected',
-        description: "This person isn't on your message list. Send a message request to chat.",
+        title: 'Cannot send message',
+        description: "This person isn't on your friends list. Send a friend request to chat.",
         variant: 'destructive',
       });
       return;
@@ -279,10 +278,10 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 {friendRequestStatus === 'accepted'
-                  ? 'Connected'
+                  ? 'Friends'
                   : friendRequestStatus === 'pending'
                   ? 'Request Sent'
-                  : 'Add to Messages'}
+                  : 'Add Friend'}
               </Button>
 
               <Button

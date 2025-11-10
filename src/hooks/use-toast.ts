@@ -1,67 +1,186 @@
 import * as React from "react";
-import { toast as sonner } from "sonner";
 
-// Minimal compatibility layer for the former shadcn use-toast API
-// Maps to Sonner and avoids React hook collisions across the app.
+import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
-export type ToastVariant = "default" | "destructive" | "success" | "info" | "warning";
+const TOAST_LIMIT = 1;
+const TOAST_REMOVE_DELAY = 1000000;
 
-export interface ToastOptions {
-  id?: string | number;
+type ToasterToast = ToastProps & {
+  id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
-  variant?: ToastVariant;
-  // Optional action button (mapped to Sonner action)
-  action?: {
-    label: string;
-    onClick: () => void;
-  };
-  duration?: number;
+  action?: ToastActionElement;
+};
+
+const actionTypes = {
+  ADD_TOAST: "ADD_TOAST",
+  UPDATE_TOAST: "UPDATE_TOAST",
+  DISMISS_TOAST: "DISMISS_TOAST",
+  REMOVE_TOAST: "REMOVE_TOAST",
+} as const;
+
+let count = 0;
+
+function genId() {
+  count = (count + 1) % Number.MAX_SAFE_INTEGER;
+  return count.toString();
 }
 
-const mapToSonner = (opts: ToastOptions) => {
-  const description =
-    typeof opts.description === "string" ? opts.description : undefined;
-  const action = opts.action
-    ? {
-        label: opts.action.label,
-        onClick: opts.action.onClick,
+type ActionType = typeof actionTypes;
+
+type Action =
+  | {
+      type: ActionType["ADD_TOAST"];
+      toast: ToasterToast;
+    }
+  | {
+      type: ActionType["UPDATE_TOAST"];
+      toast: Partial<ToasterToast>;
+    }
+  | {
+      type: ActionType["DISMISS_TOAST"];
+      toastId?: ToasterToast["id"];
+    }
+  | {
+      type: ActionType["REMOVE_TOAST"];
+      toastId?: ToasterToast["id"];
+    };
+
+interface State {
+  toasts: ToasterToast[];
+}
+
+const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+
+const addToRemoveQueue = (toastId: string) => {
+  if (toastTimeouts.has(toastId)) {
+    return;
+  }
+
+  const timeout = setTimeout(() => {
+    toastTimeouts.delete(toastId);
+    dispatch({
+      type: "REMOVE_TOAST",
+      toastId: toastId,
+    });
+  }, TOAST_REMOVE_DELAY);
+
+  toastTimeouts.set(toastId, timeout);
+};
+
+export const reducer = (state: State, action: Action): State => {
+  switch (action.type) {
+    case "ADD_TOAST":
+      return {
+        ...state,
+        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
+      };
+
+    case "UPDATE_TOAST":
+      return {
+        ...state,
+        toasts: state.toasts.map((t) => (t.id === action.toast.id ? { ...t, ...action.toast } : t)),
+      };
+
+    case "DISMISS_TOAST": {
+      const { toastId } = action;
+
+      // ! Side effects ! - This could be extracted into a dismissToast() action,
+      // but I'll keep it here for simplicity
+      if (toastId) {
+        addToRemoveQueue(toastId);
+      } else {
+        state.toasts.forEach((toast) => {
+          addToRemoveQueue(toast.id);
+        });
       }
-    : undefined;
 
-  const common = { description, action, duration: opts.duration, id: opts.id } as any;
-
-  switch (opts.variant) {
-    case "destructive":
-      return sonner.error(opts.title || "", common);
-    case "success":
-      return sonner.success(opts.title || "", common);
-    case "info":
-      return sonner.info(opts.title || "", common);
-    case "warning":
-      return sonner.warning(opts.title || "", common);
-    default:
-      return sonner(opts.title || "", common);
+      return {
+        ...state,
+        toasts: state.toasts.map((t) =>
+          t.id === toastId || toastId === undefined
+            ? {
+                ...t,
+                open: false,
+              }
+            : t,
+        ),
+      };
+    }
+    case "REMOVE_TOAST":
+      if (action.toastId === undefined) {
+        return {
+          ...state,
+          toasts: [],
+        };
+      }
+      return {
+        ...state,
+        toasts: state.toasts.filter((t) => t.id !== action.toastId),
+      };
   }
 };
 
-export const toast = Object.assign(
-  (opts: ToastOptions) => mapToSonner(opts),
-  {
-    success: (title: string, extra?: Omit<ToastOptions, "title">) =>
-      sonner.success(title, extra as any),
-    error: (title: string, extra?: Omit<ToastOptions, "title">) =>
-      sonner.error(title, extra as any),
-    info: (title: string, extra?: Omit<ToastOptions, "title">) =>
-      sonner.info(title, extra as any),
-    warning: (title: string, extra?: Omit<ToastOptions, "title">) =>
-      sonner.warning(title, extra as any),
-    loading: (title: string, extra?: Omit<ToastOptions, "title">) =>
-      sonner.loading(title, extra as any),
-    dismiss: (id?: string | number) => sonner.dismiss(id as any),
-  }
-);
+const listeners: Array<(state: State) => void> = [];
 
-export function useToast() {
-  return { toast };
+let memoryState: State = { toasts: [] };
+
+function dispatch(action: Action) {
+  memoryState = reducer(memoryState, action);
+  listeners.forEach((listener) => {
+    listener(memoryState);
+  });
 }
+
+type Toast = Omit<ToasterToast, "id">;
+
+function toast({ ...props }: Toast) {
+  const id = genId();
+
+  const update = (props: ToasterToast) =>
+    dispatch({
+      type: "UPDATE_TOAST",
+      toast: { ...props, id },
+    });
+  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
+
+  dispatch({
+    type: "ADD_TOAST",
+    toast: {
+      ...props,
+      id,
+      open: true,
+      onOpenChange: (open) => {
+        if (!open) dismiss();
+      },
+    },
+  });
+
+  return {
+    id: id,
+    dismiss,
+    update,
+  };
+}
+
+function useToast() {
+  const [state, setState] = React.useState<State>(memoryState);
+
+  React.useEffect(() => {
+    listeners.push(setState);
+    return () => {
+      const index = listeners.indexOf(setState);
+      if (index > -1) {
+        listeners.splice(index, 1);
+      }
+    };
+  }, [state]);
+
+  return {
+    ...state,
+    toast,
+    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+  };
+}
+
+export { useToast, toast };

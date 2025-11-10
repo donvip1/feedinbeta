@@ -3,17 +3,15 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useFeed } from '@/hooks/useFeed';
-import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
-import { PostSkeleton } from '@/components/shared/SkeletonLoader';
 import { EnhancedCreatePostModal } from '@/components/feed/EnhancedCreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { NotificationBadge } from '@/components/notifications/NotificationBadge';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 interface Post {
   id: string;
@@ -22,9 +20,6 @@ interface Post {
   content: string | null;
   media_url: string | null;
   media_type: string | null;
-  aspect_ratio?: string;
-  has_blur_background?: boolean;
-  moderation_status?: string;
   likes_count: number;
   comments_count: number;
   views_count: number;
@@ -41,6 +36,8 @@ const Feed = () => {
   const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
@@ -49,18 +46,6 @@ const Feed = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [isCreatingContent, setIsCreatingContent] = useState(false);
-
-  const { posts, loading, hasMore, loadMore, refreshPosts } = useFeed({
-    userId: user?.id,
-    activeTab,
-    searchQuery,
-  });
-
-  const { loadMoreRef } = useInfiniteScroll({
-    onLoadMore: loadMore,
-    hasMore,
-    loading,
-  });
 
   useEffect(() => {
     if (authLoading) return;
@@ -82,12 +67,114 @@ const Feed = () => {
       // Clear the state
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [user, authLoading, navigate]);
+    
+    loadPosts();
+  }, [user, authLoading, navigate, activeTab, searchQuery]);
+
+  const loadPosts = async () => {
+    try {
+      setLoading(true);
+      
+      // Get regular posts
+      let query = supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles (
+            display_name,
+            username,
+            avatar_url
+          )
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      // Search filter
+      if (searchQuery) {
+        query = query.or(`content.ilike.%${searchQuery}%,profiles.username.ilike.%${searchQuery}%,profiles.display_name.ilike.%${searchQuery}%`);
+      } else {
+        // Filter based on active tab only when not searching
+        if (activeTab === 'myPosts' && user) {
+          query = query.eq('user_id', user.id);
+        } else if (activeTab === 'following' && user) {
+          // Get posts from users the current user follows
+          const { data: following } = await supabase
+            .from('follows')
+            .select('following_id')
+            .eq('follower_id', user.id);
+          
+          const followingIds = following?.map(f => f.following_id) || [];
+          if (followingIds.length > 0) {
+            query = query.in('user_id', followingIds);
+          } else {
+            setPosts([]);
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Get refed posts for myPosts tab
+      let refedPosts: Post[] = [];
+      if (activeTab === 'myPosts' && user) {
+        const { data: refeeds } = await supabase
+          .from('refeeds')
+          .select(`
+            created_at,
+            posts!inner (
+              *,
+              profiles (
+                display_name,
+                username,
+                avatar_url
+              )
+            )
+          `)
+          .eq('refed_by_user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        if (refeeds) {
+          refedPosts = refeeds.map((r: any) => ({
+            ...r.posts,
+            is_refeed: true,
+            refeed_date: r.created_at
+          }));
+        }
+      }
+
+      // Combine and sort posts
+      const allPosts = [...(data || []), ...refedPosts];
+      
+      // Randomize for "For You" tab, otherwise sort by date
+      const processed = activeTab === 'forYou' 
+        ? allPosts.sort(() => Math.random() - 0.5)
+        : allPosts.sort((a, b) => {
+            const dateA = (a as any).refeed_date || a.created_at;
+            const dateB = (b as any).refeed_date || b.created_at;
+            return new Date(dateB).getTime() - new Date(dateA).getTime();
+          });
+      
+      setPosts(processed);
+    } catch (error: any) {
+      toast({
+        title: 'Error loading posts',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handlePostCreated = () => {
     setShowCreatePost(false);
     setIsCreatingContent(false);
-    refreshPosts();
+    loadPosts();
   };
 
   const handleQuickAction = (action: string) => {
@@ -147,26 +234,31 @@ const Feed = () => {
       {/* TikTok-style Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg">
         <div className="flex items-center justify-between px-4 py-3">
-          <NotificationBadge />
+          <div className="w-10"></div>
           
-          {/* Simple Tabs (no Radix) */}
-          <div className="flex-1 flex items-center justify-center space-x-6">
-            {([
-              { key: 'following', label: 'Following' },
-              { key: 'forYou', label: 'For You' },
-              { key: 'myPosts', label: 'My Posts' },
-            ] as const).map(t => (
-              <button
-                key={t.key}
-                onClick={() => setActiveTab(t.key)}
-                className={`text-base font-semibold pb-1 border-b-2 transition-colors ${
-                  activeTab === t.key ? 'text-white border-white' : 'text-gray-400 border-transparent'
-                }`}
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
+            <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center space-x-6">
+              <TabsTrigger 
+                value="following" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
               >
-                {t.label}
-              </button>
-            ))}
-          </div>
+                Following
+              </TabsTrigger>
+              <TabsTrigger 
+                value="forYou" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+              >
+                For You
+              </TabsTrigger>
+              <TabsTrigger 
+                value="myPosts" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+              >
+                My Posts
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           <button 
             onClick={() => setShowSearch(!showSearch)}
@@ -182,6 +274,7 @@ const Feed = () => {
               placeholder="Search posts, users, hashtags..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && loadPosts()}
               className="bg-gray-900 border-gray-800 text-white placeholder:text-gray-500"
             />
           </div>
@@ -190,7 +283,22 @@ const Feed = () => {
 
       {/* Full-screen TikTok-style Feed */}
       <main className="fixed inset-0 top-14 bottom-16 overflow-y-auto snap-y snap-mandatory scroll-smooth">
-        {posts.length === 0 && !loading ? (
+        {loading ? (
+          <div className="space-y-6 p-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-gray-900 rounded-2xl p-6 space-y-4">
+                <div className="flex items-center space-x-3">
+                  <Skeleton className="w-12 h-12 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <Skeleton className="h-96 w-full" />
+              </div>
+            ))}
+          </div>
+        ) : posts.length === 0 ? (
           <div className="flex items-center justify-center h-full px-4">
             <div className="text-center">
               <p className="text-gray-400 text-lg mb-4">
@@ -208,19 +316,10 @@ const Feed = () => {
                 className="snap-start snap-always h-full w-full flex items-center justify-center px-4 py-2"
               >
                 <div className="w-full h-full max-w-2xl">
-                  <PostCard post={post} onUpdate={refreshPosts} />
+                  <PostCard post={post} onUpdate={loadPosts} />
                 </div>
               </div>
             ))}
-            
-            {/* Infinite scroll trigger */}
-            <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
-              {loading && (
-                <div className="space-y-6 p-4 w-full max-w-2xl">
-                  <PostSkeleton />
-                </div>
-              )}
-            </div>
           </>
         )}
       </main>

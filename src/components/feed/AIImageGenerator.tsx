@@ -12,10 +12,6 @@ interface AIImageGeneratorProps {
   onCreate: (file: File) => void;
 }
 
-interface ApiError extends Error {
-  message: string;
-}
-
 export function AIImageGenerator({ open, onClose, onCreate }: AIImageGeneratorProps) {
   const { toast } = useToast();
   const [prompt, setPrompt] = useState('');
@@ -46,11 +42,11 @@ export function AIImageGenerator({ open, onClose, onCreate }: AIImageGeneratorPr
       if (data.imageUrl) {
         setGeneratedImage(data.imageUrl);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI generation error:', error);
       toast({
         title: 'Generation failed',
-        description: (error as ApiError).message || 'Failed to generate image. Please try again.',
+        description: error.message || 'Failed to generate image. Please try again.',
         variant: 'destructive',
       });
     } finally {

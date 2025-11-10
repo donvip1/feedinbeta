@@ -6,10 +6,22 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Send, Phone, Video } from 'lucide-react';
-import { EnhancedMessageBubble } from './EnhancedMessageBubble';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ArrowLeft, Send, Smile, Phone, Video } from 'lucide-react';
+import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
-import { useRealtimeMessages } from '@/hooks/useRealtimeMessages';
+import { ReactionPicker } from '@/components/feed/ReactionPicker';
+
+interface Message {
+  id: string;
+  content: string;
+  sender_id: string;
+  created_at: string;
+  profiles: {
+    display_name: string | null;
+    avatar_url: string | null;
+  };
+}
 
 interface ChatInterfaceProps {
   conversationId: string;
@@ -20,19 +32,20 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
+  const [isTyping, setIsTyping] = useState(false);
   const [sending, setSending] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Use optimized real-time messages hook
-  const { messages, isTyping, loading, addOptimisticMessage, replaceOptimisticMessage } = 
-    useRealtimeMessages(conversationId, user?.id);
-
   useEffect(() => {
+    loadMessages();
     loadOtherUser();
-  }, [conversationId, user]);
+    subscribeToMessages();
+    subscribeToTyping();
+  }, [conversationId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -44,23 +57,95 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
     }
   };
 
+  const loadMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*, sender:profiles!messages_sender_id_fkey(display_name, avatar_url)')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      
+      const formattedMessages = (data || []).map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender_id: msg.sender_id,
+        created_at: msg.created_at,
+        profiles: {
+          display_name: msg.sender?.display_name || null,
+          avatar_url: msg.sender?.avatar_url || null,
+        }
+      }));
+      
+      setMessages(formattedMessages);
+    } catch (error: any) {
+      console.error('Error loading messages:', error);
+    }
+  };
+
   const loadOtherUser = async () => {
     if (!user) return;
 
     try {
       const { data, error } = await supabase
         .from('conversation_participants')
-        .select('profiles:user_id (id, display_name, username, avatar_url)')
+        .select('user_id, participant:profiles!conversation_participants_user_id_fkey(*)')
         .eq('conversation_id', conversationId)
         .neq('user_id', user.id)
         .maybeSingle();
 
       if (error) throw error;
-      const profile = Array.isArray(data?.profiles) ? data.profiles[0] : data?.profiles;
-      setOtherUser(profile);
-    } catch (error) {
+      setOtherUser(data?.participant);
+    } catch (error: any) {
       console.error('Error loading other user:', error);
     }
+  };
+
+  const subscribeToMessages = () => {
+    const channel = supabase
+      .channel(`messages:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        () => {
+          loadMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const subscribeToTyping = () => {
+    const channel = supabase
+      .channel(`typing:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'typing_indicators',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        async (payload: any) => {
+          if (payload.new?.user_id !== user?.id) {
+            setIsTyping(payload.new?.is_typing || false);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   };
 
   const handleTyping = async () => {
@@ -77,8 +162,6 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
         user_id: user.id,
         is_typing: true,
         updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'conversation_id,user_id'
       });
 
     typingTimeoutRef.current = setTimeout(async () => {
@@ -89,8 +172,6 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           user_id: user.id,
           is_typing: false,
           updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'conversation_id,user_id'
         });
     }, 2000);
   };
@@ -98,56 +179,50 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
   const handleSend = async () => {
     if (!user || !newMessage.trim()) return;
 
-    const messageContent = newMessage.trim();
-    const tempId = `temp-${Date.now()}`;
-    
-    // Optimistic update
-    addOptimisticMessage(messageContent, tempId);
-    setNewMessage('');
     setSending(true);
-
     try {
       const { data: newMsg, error } = await supabase
         .from('messages')
         .insert({
           conversation_id: conversationId,
           sender_id: user.id,
-          content: messageContent,
+          content: newMessage.trim(),
         })
-        .select(`
-          id,
-          content,
-          sender_id,
-          created_at,
-          is_read,
-          read_at,
-          profiles:sender_id (display_name, avatar_url)
-        `)
+        .select()
         .single();
 
       if (error) throw error;
 
-      // Replace optimistic message with real one
+      // Check message with moderation bot
       if (newMsg) {
-        const formatted = {
-          ...newMsg,
-          profiles: Array.isArray(newMsg.profiles) ? newMsg.profiles[0] : newMsg.profiles,
-        };
-        replaceOptimisticMessage(tempId, formatted);
+        const { data: modResult } = await supabase.functions.invoke('moderation-bot', {
+          body: {
+            messageId: newMsg.id,
+            content: newMessage.trim(),
+            senderId: user.id,
+          },
+        });
+
+        if (modResult?.deleted) {
+          toast({
+            title: 'Message blocked',
+            description: modResult.reason,
+            variant: 'destructive',
+          });
+          // Reload messages to remove the deleted one
+          loadMessages();
+        }
       }
 
-      // Clear typing indicator
       await supabase
         .from('typing_indicators')
         .upsert({
           conversation_id: conversationId,
           user_id: user.id,
           is_typing: false,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'conversation_id,user_id'
         });
 
+      setNewMessage('');
     } catch (error: any) {
       toast({
         title: 'Error sending message',
@@ -195,10 +270,15 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
   };
 
   return (
-    <div className="flex flex-col h-screen w-full overflow-hidden bg-background">
+    <>
       {/* Header */}
-      <div className="px-4 py-2 border-b flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={onBack} className="md:hidden">
+      <div className="flex items-center gap-3 p-4 border-b border-border">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onBack}
+          className="md:hidden"
+        >
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <Avatar>
@@ -206,69 +286,79 @@ export const ChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) =>
           <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <h2 className="font-semibold text-card-foreground">{loading ? 'Loading...' : otherUser?.display_name || 'Unknown User'}</h2>
+          <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
           {otherUser?.username && (
             <p className="text-sm text-muted-foreground">@{otherUser.username}</p>
           )}
         </div>
+        
+        {/* Call Buttons */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => initiateCall('voice')} title="Voice call">
-            <Phone className="w-5 h-5 text-primary" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => initiateCall('voice')}
+            className="text-primary hover:text-primary/90"
+            title="Voice call"
+          >
+            <Phone className="w-5 h-5" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => initiateCall('video')} title="Video call">
-            <Video className="w-5 h-5 text-primary" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => initiateCall('video')}
+            className="text-primary hover:text-primary/90"
+            title="Video call"
+          >
+            <Video className="w-5 h-5" />
           </Button>
         </div>
       </div>
 
-      {/* Message List */}
-      <div className="flex-1 overflow-y-auto px-4 py-2 w-full">
-        {loading ? (
-          <div className="flex justify-center items-center h-full">
-            <p>Loading messages...</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {messages.map((msg) => (
-              <EnhancedMessageBubble
-                key={msg.id}
-                message={msg}
-                isOwn={msg.sender_id === user?.id}
-                onReply={() => {}}
-                onReact={() => {}}
-              />
-            ))}
-            {isTyping && <TypingIndicator />}
-            <div ref={scrollRef} />
-          </div>
-        )}
-      </div>
+      {/* Messages */}
+      <ScrollArea className="flex-1 p-4">
+        <div className="space-y-4">
+          {messages.map((message) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isOwn={message.sender_id === user?.id}
+            />
+          ))}
+          {isTyping && <TypingIndicator />}
+          <div ref={scrollRef} />
+        </div>
+      </ScrollArea>
 
-      {/* Input & Send Button */}
-      <div className="px-4 py-3 border-t w-full bg-background">
-        <form
-          className="flex items-center gap-2 w-full"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-        >
+      {/* Input */}
+      <div className="p-4 border-t border-border">
+        <div className="flex items-end gap-2">
           <Input
-            type="text"
-            className="flex-1 px-4 py-2 rounded-full bg-muted text-sm"
             placeholder="Type a message..."
             value={newMessage}
             onChange={(e) => {
               setNewMessage(e.target.value);
               handleTyping();
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
             disabled={sending}
+            className="flex-1"
           />
-          <Button type="submit" size="icon" className="rounded-full bg-primary text-primary-foreground" disabled={sending || !newMessage.trim()}>
-            <Send className="w-5 h-5" />
+          <Button
+            onClick={handleSend}
+            disabled={sending || !newMessage.trim()}
+            size="icon"
+            className="bg-gradient-to-r from-pink-500 to-blue-500"
+          >
+            <Send className="w-4 h-4" />
           </Button>
-        </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };

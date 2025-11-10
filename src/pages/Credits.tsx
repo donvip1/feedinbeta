@@ -21,25 +21,9 @@ const Credits = () => {
         .select("*")
         .eq("is_active", true)
         .order("price", { ascending: true });
-
-      if (error) throw error;
       
-      // Filter and mark active promotions
-      const now = new Date();
-      return data?.map(pkg => {
-        const isPromotionActive = pkg.promotion_active && 
-          (!pkg.promotion_start || new Date(pkg.promotion_start) <= now) &&
-          (!pkg.promotion_end || new Date(pkg.promotion_end) >= now);
-        
-        return {
-          ...pkg,
-          isPromotionActive,
-          finalPrice: isPromotionActive && pkg.discount_percentage 
-            ? pkg.price * (1 - pkg.discount_percentage / 100)
-            : pkg.price,
-          totalCredits: pkg.credits + (isPromotionActive ? (pkg.bonus_credits || 0) : 0)
-        };
-      });
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -155,77 +139,63 @@ const Credits = () => {
         )}
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {packages?.map((pkg) => (
-            <Card 
-              key={pkg.id} 
-              className={`relative ${pkg.name.includes('Popular') ? 'border-primary shadow-lg' : ''}`}
-            >
-              {pkg.isPromotionActive && pkg.promotion_label && (
-                <Badge className="absolute -top-3 right-4 bg-gradient-to-r from-primary to-accent">
-                  {pkg.promotion_label}
-                </Badge>
-              )}
-              {(pkg.bonus_credits || 0) > 0 && !pkg.isPromotionActive && (
-                <Badge className="absolute -top-3 right-4 bg-gradient-to-r from-green-500 to-emerald-500">
-                  +{Math.round(((pkg.bonus_credits || 0) / pkg.credits) * 100)}% Bonus
-                </Badge>
-              )}
-              <CardHeader>
-                <CardTitle className="flex items-center justify-between">
-                  <span>{pkg.name}</span>
-                  {(pkg.bonus_credits || 0) > 0 && <Gift className="w-5 h-5 text-green-500" />}
-                </CardTitle>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold">{pkg.totalCredits}</span>
-                  <span className="text-muted-foreground text-sm">credits</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Base Credits:</span>
-                    <span className="font-semibold">{pkg.credits}</span>
+          {packages?.map((pkg) => {
+            const totalCredits = pkg.credits + (pkg.bonus_credits || 0);
+            const savingsPercent = pkg.bonus_credits ? Math.round((pkg.bonus_credits / pkg.credits) * 100) : 0;
+
+            return (
+              <Card 
+                key={pkg.id} 
+                className={`relative ${pkg.name.includes('Popular') ? 'border-primary shadow-lg' : ''}`}
+              >
+                {savingsPercent > 0 && (
+                  <Badge className="absolute -top-3 right-4 bg-gradient-to-r from-green-500 to-emerald-500">
+                    +{savingsPercent}% Bonus
+                  </Badge>
+                )}
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{pkg.name}</span>
+                    {pkg.bonus_credits > 0 && <Gift className="w-5 h-5 text-green-500" />}
+                  </CardTitle>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold">{totalCredits}</span>
+                    <span className="text-muted-foreground text-sm">credits</span>
                   </div>
-                  {(pkg.bonus_credits || 0) > 0 && (
-                    <div className="flex justify-between text-sm text-green-500">
-                      <span>Bonus:</span>
-                      <span className="font-semibold">+{pkg.bonus_credits}</span>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Base Credits:</span>
+                      <span className="font-semibold">{pkg.credits}</span>
                     </div>
-                  )}
-                  <div className="pt-2 border-t">
-                    {pkg.isPromotionActive && (pkg.discount_percentage || 0) > 0 ? (
-                      <div className="space-y-1">
-                        <div className="text-lg line-through text-muted-foreground">
-                          ${pkg.price.toFixed(2)}
-                        </div>
-                        <div className="text-2xl font-bold text-primary">
-                          ${pkg.finalPrice.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-green-500">
-                          Save {pkg.discount_percentage}%!
-                        </div>
+                    {pkg.bonus_credits > 0 && (
+                      <div className="flex justify-between text-sm text-green-500">
+                        <span>Bonus:</span>
+                        <span className="font-semibold">+{pkg.bonus_credits}</span>
                       </div>
-                    ) : (
-                      <div className="text-2xl font-bold text-primary">${pkg.price}</div>
                     )}
-                    <div className="text-xs text-muted-foreground mt-1">
-                      ${((pkg.finalPrice || pkg.price) / pkg.totalCredits).toFixed(3)} per credit
+                    <div className="pt-2 border-t">
+                      <div className="text-2xl font-bold text-primary">${pkg.price}</div>
+                      <div className="text-xs text-muted-foreground">
+                        ${(pkg.price / totalCredits).toFixed(3)} per credit
+                      </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  variant={pkg.name.includes('Popular') ? 'default' : 'outline'}
-                  onClick={() => handlePurchase(pkg.id, pkg.stripe_price_id, pkg.totalCredits)}
-                  disabled={loading === pkg.id}
-                >
-                  {loading === pkg.id ? 'Processing...' : 'Buy Now'}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
+                </CardContent>
+                <CardFooter>
+                  <Button
+                    className="w-full"
+                    variant={pkg.name.includes('Popular') ? 'default' : 'outline'}
+                    onClick={() => handlePurchase(pkg.id, pkg.stripe_price_id, totalCredits)}
+                    disabled={loading === pkg.id}
+                  >
+                    {loading === pkg.id ? 'Processing...' : 'Buy Now'}
+                  </Button>
+                </CardFooter>
+              </Card>
+            );
+          })}
         </div>
       </div>
       <BottomNav onQuickActionClick={() => {}} />

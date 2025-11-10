@@ -1,8 +1,6 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import { Check, CheckCheck } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: {
@@ -10,8 +8,6 @@ interface MessageBubbleProps {
     content: string;
     sender_id: string;
     created_at: string;
-    is_read?: boolean;
-    read_at?: string;
     profiles: {
       display_name: string | null;
       avatar_url: string | null;
@@ -21,13 +17,11 @@ interface MessageBubbleProps {
 }
 
 export const MessageBubble = ({ message, isOwn }: MessageBubbleProps) => {
-  const navigate = useNavigate();
-  
   return (
     <div className={`flex gap-2 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
       <Avatar 
         className="w-8 h-8 cursor-pointer hover:opacity-80"
-        onClick={() => navigate(`/profile/${message.sender_id}`)}
+        onClick={() => window.location.href = `/profile/${message.sender_id}`}
       >
         <AvatarImage src={message.profiles.avatar_url || ''} />
         <AvatarFallback>{message.profiles.display_name?.[0] || 'U'}</AvatarFallback>
@@ -42,16 +36,9 @@ export const MessageBubble = ({ message, isOwn }: MessageBubbleProps) => {
         >
           <p className="text-sm break-words">{message.content}</p>
         </div>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
-          <span>{format(new Date(message.created_at), 'HH:mm')}</span>
-          {isOwn && (
-            message.is_read ? (
-              <CheckCheck className="w-3 h-3 text-blue-500" />
-            ) : (
-              <Check className="w-3 h-3" />
-            )
-          )}
-        </div>
+        <span className="text-xs text-muted-foreground mt-1">
+          {format(new Date(message.created_at), 'HH:mm')}
+        </span>
       </div>
     </div>
   );

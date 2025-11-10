@@ -16,7 +16,6 @@ interface CameraCaptureProps {
   onClose: () => void;
   onCapture: (file: File, mediaType: 'image' | 'video', effects?: any, postToStory?: boolean) => void;
   onSwitchToGallery?: () => void;
-  initialMedia?: File | null;
 }
 
 interface StickerData {
@@ -50,7 +49,7 @@ const FILTERS = {
 
 const STICKERS = ['❤️', '🔥', '✨', '🎉', '😍', '👍', '💯', '⭐', '💪', '😂', '🎵', '🌟'];
 
-export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, initialMedia }: CameraCaptureProps) {
+export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: CameraCaptureProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -111,71 +110,16 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
   const [preCaptureFilter, setPreCaptureFilter] = useState<string>('None');
   const [galleryThumbnail, setGalleryThumbnail] = useState<string | null>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
-  
-  // Advanced camera features
-  const [timerMode, setTimerMode] = useState<'off' | '3s' | '10s'>('off');
-  const [countdown, setCountdown] = useState<number>(0);
-  const [burstMode, setBurstMode] = useState(false);
-  const [burstCount, setBurstCount] = useState(0);
-  const [videoStabilization, setVideoStabilization] = useState(true);
-  const [nightMode, setNightMode] = useState(false);
-  const [hdrMode, setHdrMode] = useState(false);
-  const [showGrid, setShowGrid] = useState<'off' | 'thirds' | 'golden'>('off');
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
-  
-  // Beauty mode and portrait effects
-  const [beautyMode, setBeautyMode] = useState(false);
-  const [skinSmoothing, setSkinSmoothing] = useState(50);
-  const [eyeEnhancement, setEyeEnhancement] = useState(30);
-  const [backgroundBlur, setBackgroundBlur] = useState(0);
-  
-  // Manual focus and exposure
-  const [manualFocus, setManualFocus] = useState(false);
-  const [focusX, setFocusX] = useState(0.5);
-  const [focusY, setFocusY] = useState(0.5);
-  const [exposure, setExposure] = useState(0);
-  
-  // Custom filter presets
-  const [customPresets, setCustomPresets] = useState<Array<{name: string, settings: any}>>([]);
-  const [showPresetManager, setShowPresetManager] = useState(false);
-  const [presetName, setPresetName] = useState('');
-
-  // Handle initial media from gallery
-  useEffect(() => {
-    if (initialMedia && open) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        if (initialMedia.type.startsWith('video/')) {
-          setCapturedMediaUrl(result);
-          setCapturedMediaType('video');
-        } else {
-          setCapturedMediaUrl(result);
-          setCapturedMediaType('image');
-          setCroppedImageUrl(result);
-        }
-      };
-      reader.readAsDataURL(initialMedia);
-    }
-  }, [initialMedia, open]);
 
   useEffect(() => {
-    if (open && !initialMedia) {
+    if (open) {
       startCamera();
       loadGalleryThumbnail();
-    } else if (!open) {
+    } else {
       stopCamera();
     }
     return () => stopCamera();
-  }, [open, facingMode, initialMedia]);
-
-  // Restart camera when advanced settings change
-  useEffect(() => {
-    if (open && !initialMedia && stream) {
-      stopCamera();
-      setTimeout(() => startCamera(), 100);
-    }
-  }, [nightMode, hdrMode, videoStabilization, mode]);
+  }, [open, facingMode]);
 
   const loadGalleryThumbnail = () => {
     // Try to get a sample image for thumbnail preview
@@ -193,33 +137,10 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
 
   const startCamera = async () => {
     try {
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode,
-          ...(nightMode && { exposureMode: 'manual' as any, exposureCompensation: 2 as any }),
-          ...(hdrMode && { whiteBalanceMode: 'continuous' as any }),
-        } as any,
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode },
         audio: mode === 'video',
-      };
-
-      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
-      
-      // Apply video stabilization if supported
-      if (videoStabilization && mode === 'video') {
-        const videoTrack = mediaStream.getVideoTracks()[0];
-        const capabilities = videoTrack.getCapabilities?.() as any;
-        
-        if (capabilities?.imageStabilization) {
-          try {
-            await videoTrack.applyConstraints({
-              advanced: [{ imageStabilization: true } as any]
-            });
-          } catch (e) {
-            console.log('Video stabilization not supported');
-          }
-        }
-      }
-      
+      });
       setStream(mediaStream);
       
       if (videoRef.current) {
@@ -259,34 +180,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
   const capturePhoto = () => {
     if (!videoRef.current) return;
 
-    // Handle timer
-    if (timerMode !== 'off' && countdown === 0) {
-      const seconds = timerMode === '3s' ? 3 : 10;
-      setCountdown(seconds);
-      
-      const timer = setInterval(() => {
-        setCountdown((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            // Capture after countdown
-            setTimeout(() => {
-              performCapture();
-              setCountdown(0);
-            }, 100);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-      return;
-    }
-
-    performCapture();
-  };
-
-  const performCapture = () => {
-    if (!videoRef.current) return;
-
     const video = videoRef.current;
     const canvas = document.createElement('canvas');
     
@@ -306,8 +199,10 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
     
     // Crop to match selected aspect ratio
     if (currentRatio > targetRatio) {
+      // Video is wider than target - crop width
       targetWidth = targetHeight * targetRatio;
     } else if (currentRatio < targetRatio) {
+      // Video is taller than target - crop height
       targetHeight = targetWidth / targetRatio;
     }
     
@@ -321,39 +216,15 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
     const sx = (video.videoWidth - targetWidth) / 2;
     const sy = (video.videoHeight - targetHeight) / 2;
     
-    // Apply night mode enhancement if enabled
-    if (nightMode) {
-      ctx.filter = 'brightness(1.3) contrast(1.2)';
-    }
-    
     ctx.drawImage(video, sx, sy, targetWidth, targetHeight, 0, 0, targetWidth, targetHeight);
     
     canvas.toBlob((blob) => {
       if (blob) {
         const url = URL.createObjectURL(blob);
-        
-        // Handle burst mode
-        if (burstMode && burstCount < 5) {
-          setBurstCount(burstCount + 1);
-          // Store burst photo and continue
-          toast({ title: `Burst ${burstCount + 1}/5 captured` });
-          
-          // Continue burst
-          if (burstCount + 1 < 5) {
-            setTimeout(performCapture, 200);
-          } else {
-            setBurstCount(0);
-            setBurstMode(false);
-          }
-        }
-        
         setCapturedMediaUrl(url);
         setCapturedMediaType('image');
         setCroppedImageUrl(url);
-        
-        if (!burstMode || burstCount >= 4) {
-          stopCamera();
-        }
+        stopCamera();
       }
     }, 'image/jpeg', 0.95);
   };
@@ -423,11 +294,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
     setVideoPlaybackSpeed(1);
     setVideoReversed(false);
     setSelectedMusic(null);
-    setTimerMode('off');
-    setCountdown(0);
-    setBurstMode(false);
-    setBurstCount(0);
-    setShowGrid('off');
   };
 
   const getFilterStyle = () => {
@@ -693,25 +559,14 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                 {/* Top Controls */}
                 <div className="absolute top-0 left-0 right-0 z-[110] bg-gradient-to-b from-black/80 via-black/50 to-transparent pt-4 pb-6">
                   <div className="flex items-center justify-between px-4">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={handleClose}
-                        className="text-white hover:bg-white/20 bg-black/60 backdrop-blur-md"
-                      >
-                        <X className="w-6 h-6 drop-shadow-lg" />
-                      </Button>
-                      
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setShowAdvancedSettings(!showAdvancedSettings)}
-                        className={`text-white hover:bg-white/20 backdrop-blur-md ${showAdvancedSettings ? 'bg-white/30' : 'bg-black/60'}`}
-                      >
-                        <Gauge className="w-6 h-6 drop-shadow-lg" />
-                      </Button>
-                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={handleClose}
+                      className="text-white hover:bg-white/20 bg-black/60 backdrop-blur-md"
+                    >
+                      <X className="w-6 h-6 drop-shadow-lg" />
+                    </Button>
                     
                     <Button
                       size="icon"
@@ -722,85 +577,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                       <RefreshCw className="w-6 h-6 drop-shadow-lg" />
                     </Button>
                   </div>
-
-                  {/* Advanced Settings Panel */}
-                  {showAdvancedSettings && (
-                    <div className="mt-4 px-4 space-y-3">
-                      <div className="flex gap-2 flex-wrap">
-                        {/* Timer */}
-                        <button
-                          onClick={() => setTimerMode(timerMode === 'off' ? '3s' : timerMode === '3s' ? '10s' : 'off')}
-                          className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border transition-all ${
-                            timerMode !== 'off' ? 'bg-white text-black border-white' : 'bg-black/60 text-white border-white/30'
-                          }`}
-                        >
-                          ⏱️ {timerMode === 'off' ? 'Timer Off' : timerMode}
-                        </button>
-
-                        {/* Burst Mode */}
-                        <button
-                          onClick={() => setBurstMode(!burstMode)}
-                          className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border transition-all ${
-                            burstMode ? 'bg-white text-black border-white' : 'bg-black/60 text-white border-white/30'
-                          }`}
-                        >
-                          📸 Burst
-                        </button>
-
-                        {/* Grid */}
-                        <button
-                          onClick={() => setShowGrid(showGrid === 'off' ? 'thirds' : showGrid === 'thirds' ? 'golden' : 'off')}
-                          className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border transition-all ${
-                            showGrid !== 'off' ? 'bg-white text-black border-white' : 'bg-black/60 text-white border-white/30'
-                          }`}
-                        >
-                          📐 {showGrid === 'off' ? 'Grid Off' : showGrid === 'thirds' ? 'Rule of 3' : 'Golden'}
-                        </button>
-
-                        {/* Night Mode */}
-                        <button
-                          onClick={() => {
-                            setNightMode(!nightMode);
-                            if (!nightMode) {
-                              toast({ title: 'Night mode enabled', description: 'Enhanced low-light capture' });
-                            }
-                          }}
-                          className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border transition-all ${
-                            nightMode ? 'bg-white text-black border-white' : 'bg-black/60 text-white border-white/30'
-                          }`}
-                        >
-                          🌙 Night
-                        </button>
-
-                        {/* HDR */}
-                        <button
-                          onClick={() => {
-                            setHdrMode(!hdrMode);
-                            if (!hdrMode) {
-                              toast({ title: 'HDR enabled', description: 'High dynamic range capture' });
-                            }
-                          }}
-                          className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border transition-all ${
-                            hdrMode ? 'bg-white text-black border-white' : 'bg-black/60 text-white border-white/30'
-                          }`}
-                        >
-                          ✨ HDR
-                        </button>
-
-                        {/* Video Stabilization */}
-                        {mode === 'video' && (
-                          <button
-                            onClick={() => setVideoStabilization(!videoStabilization)}
-                            className={`px-4 py-2 rounded-full text-xs font-bold backdrop-blur-md border transition-all ${
-                              videoStabilization ? 'bg-white text-black border-white' : 'bg-black/60 text-white border-white/30'
-                            }`}
-                          >
-                            🎥 Stabilize
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
 
                   {/* Aspect Ratio Selector - More Prominent */}
                   <div className="flex justify-center mt-4 gap-3 px-4">
@@ -840,55 +616,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                       filter: preCaptureFilter !== 'None' ? FILTERS[filterCategory].find(f => f.name === preCaptureFilter)?.filter || '' : ''
                     }}
                   />
-
-                  {/* Composition Grid Overlay */}
-                  {showGrid !== 'off' && (
-                    <div className="absolute inset-0 pointer-events-none">
-                      {showGrid === 'thirds' ? (
-                        // Rule of Thirds Grid
-                        <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                          <line x1="33.33" y1="0" x2="33.33" y2="100" stroke="white" strokeWidth="0.2" opacity="0.5" />
-                          <line x1="66.66" y1="0" x2="66.66" y2="100" stroke="white" strokeWidth="0.2" opacity="0.5" />
-                          <line x1="0" y1="33.33" x2="100" y2="33.33" stroke="white" strokeWidth="0.2" opacity="0.5" />
-                          <line x1="0" y1="66.66" x2="100" y2="66.66" stroke="white" strokeWidth="0.2" opacity="0.5" />
-                          {/* Intersection points */}
-                          <circle cx="33.33" cy="33.33" r="0.8" fill="white" opacity="0.7" />
-                          <circle cx="66.66" cy="33.33" r="0.8" fill="white" opacity="0.7" />
-                          <circle cx="33.33" cy="66.66" r="0.8" fill="white" opacity="0.7" />
-                          <circle cx="66.66" cy="66.66" r="0.8" fill="white" opacity="0.7" />
-                        </svg>
-                      ) : (
-                        // Golden Ratio Grid
-                        <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                          <line x1="38.2" y1="0" x2="38.2" y2="100" stroke="yellow" strokeWidth="0.2" opacity="0.5" />
-                          <line x1="61.8" y1="0" x2="61.8" y2="100" stroke="yellow" strokeWidth="0.2" opacity="0.5" />
-                          <line x1="0" y1="38.2" x2="100" y2="38.2" stroke="yellow" strokeWidth="0.2" opacity="0.5" />
-                          <line x1="0" y1="61.8" x2="100" y2="61.8" stroke="yellow" strokeWidth="0.2" opacity="0.5" />
-                          {/* Intersection points */}
-                          <circle cx="38.2" cy="38.2" r="0.8" fill="yellow" opacity="0.7" />
-                          <circle cx="61.8" cy="38.2" r="0.8" fill="yellow" opacity="0.7" />
-                          <circle cx="38.2" cy="61.8" r="0.8" fill="yellow" opacity="0.7" />
-                          <circle cx="61.8" cy="61.8" r="0.8" fill="yellow" opacity="0.7" />
-                        </svg>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Timer Countdown */}
-                  {countdown > 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                      <div className="text-white text-8xl font-bold animate-pulse drop-shadow-2xl">
-                        {countdown}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Burst Mode Indicator */}
-                  {burstMode && burstCount > 0 && (
-                    <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white/90 text-black px-4 py-2 rounded-full font-bold">
-                      Burst {burstCount}/5
-                    </div>
-                  )}
                   
                   {/* Pre-Capture Filter Preview */}
                   {showPreCaptureFilters && (
@@ -1092,35 +819,38 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                       setShowFiltersOverlay(false);
                       setShowTextOverlay(false);
                       setShowStickersOverlay(false);
-                      setShowDrawing(false);
-                      setShowBlur(false);
-                      setShowCropper(false);
                     }}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                       showVoiceoverOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
-                    <Mic className="w-6 h-6 drop-shadow-lg" />
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (capturedMediaType === 'video') {
-                        handleVideoTrim();
-                      } else {
-                        setShowCropper(true);
-                      }
-                      setShowFiltersOverlay(false);
-                      setShowTextOverlay(false);
-                      setShowStickersOverlay(false);
-                      setShowVoiceoverOverlay(false);
-                      setShowDrawing(false);
-                      setShowBlur(false);
-                    }}
-                    className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
-                      (capturedMediaType === 'video' ? showVideoTrimmer : showCropper) ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
-                    }`}
-                  >
-                    <Scissors className="w-6 h-6 drop-shadow-lg" />
+                    <button
+                      onClick={() => {
+                        if (capturedMediaType === 'video') {
+                          handleVideoTrim();
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowDrawing(false);
+                          setShowBlur(false);
+                          setShowCropper(false);
+                        } else {
+                          setShowCropper(true);
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowDrawing(false);
+                          setShowBlur(false);
+                        }
+                      }}
+                      className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
+                        (capturedMediaType === 'video' ? showVideoTrimmer : showCropper) ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                      }`}
+                    >
+                      <Scissors className="w-6 h-6 drop-shadow-lg" />
+                    </button>
                   </button>
                   {capturedMediaType === 'image' && (
                     <>
@@ -1132,7 +862,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                           setShowStickersOverlay(false);
                           setShowVoiceoverOverlay(false);
                           setShowBlur(false);
-                          setShowCropper(false);
                         }}
                         className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                           showDrawing ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
@@ -1148,7 +877,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                           setShowStickersOverlay(false);
                           setShowVoiceoverOverlay(false);
                           setShowDrawing(false);
-                          setShowCropper(false);
                         }}
                         className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                           showBlur ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
@@ -1156,21 +884,26 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
                       >
                         <Droplet className="w-6 h-6 drop-shadow-lg" />
                       </button>
+                      <button
+                        onClick={() => {
+                          setShowCropper(true);
+                          setShowFiltersOverlay(false);
+                          setShowTextOverlay(false);
+                          setShowStickersOverlay(false);
+                          setShowVoiceoverOverlay(false);
+                          setShowDrawing(false);
+                          setShowBlur(false);
+                        }}
+                        className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-black/80 transition-all border-2 border-white/10"
+                      >
+                        <Scissors className="w-6 h-6 drop-shadow-lg" />
+                      </button>
                     </>
                   )}
                   
                   {/* Music Library - Available for both image and video */}
                   <button
-                    onClick={() => {
-                      setShowMusicLibrary(true);
-                      setShowFiltersOverlay(false);
-                      setShowTextOverlay(false);
-                      setShowStickersOverlay(false);
-                      setShowVoiceoverOverlay(false);
-                      setShowDrawing(false);
-                      setShowBlur(false);
-                      setShowCropper(false);
-                    }}
+                    onClick={() => setShowMusicLibrary(true)}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                       selectedMusic ? 'bg-gradient-primary text-white border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
@@ -1742,19 +1475,17 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, ini
       )}
       
       {/* Music Library */}
-      {showMusicLibrary && (
-        <MusicLibrary
-          open={showMusicLibrary}
-          onClose={() => setShowMusicLibrary(false)}
-          onSelectMusic={(music) => {
-            setSelectedMusic(music);
-            toast({
-              title: 'Music added',
-              description: `${music.name} by ${music.artist}`,
-            });
-          }}
-        />
-      )}
+      <MusicLibrary
+        open={showMusicLibrary}
+        onClose={() => setShowMusicLibrary(false)}
+        onSelectMusic={(music) => {
+          setSelectedMusic(music);
+          toast({
+            title: 'Music added',
+            description: `${music.name} by ${music.artist}`,
+          });
+        }}
+      />
     </>
   );
 }

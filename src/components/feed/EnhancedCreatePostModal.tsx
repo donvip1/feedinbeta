@@ -44,7 +44,6 @@ export function EnhancedCreatePostModal({
   const [showGallery, setShowGallery] = useState(false);
   const [showTextToImage, setShowTextToImage] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [selectedGalleryFile, setSelectedGalleryFile] = useState<File | null>(null);
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -141,14 +140,25 @@ export function EnhancedCreatePostModal({
   };
 
   const handleGallerySelect = (files: File[]) => {
-    if (files.length === 0) return;
-    
+    // For now, use first file. Later can support multiple
     const file = files[0];
-    
-    // Pass the selected file to camera component
-    setSelectedGalleryFile(file);
+    const isVideo = file.type.startsWith('video/');
+    setMediaFile(file);
+    setMediaType(isVideo ? 'video' : 'image');
+    setMediaPreview(URL.createObjectURL(file));
     setShowGallery(false);
-    setShowCamera(true);
+    
+    // Check if multiple images for carousel
+    if (files.length > 1 && files.every(f => f.type.startsWith('image/'))) {
+      // Handle carousel - skip editor and go to details
+      setStep('details');
+      toast({
+        title: 'Carousel post',
+        description: `${files.length} images selected for carousel`,
+      });
+    } else {
+      setStep('edit');
+    }
   };
 
   const handleTextToImageCreate = (file: File) => {
@@ -194,14 +204,12 @@ export function EnhancedCreatePostModal({
         onClose={() => {
           setShowCamera(false);
           setShowMethodSelector(true);
-          setSelectedGalleryFile(null);
         }}
         onCapture={handleCameraCapture}
         onSwitchToGallery={() => {
           setShowCamera(false);
           setShowGallery(true);
         }}
-        initialMedia={selectedGalleryFile}
       />
 
       {/* Gallery Picker */}

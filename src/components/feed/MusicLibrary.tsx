@@ -4,9 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Music, Search, Play, Pause, TrendingUp, Clock, Heart, X, Upload, Globe } from 'lucide-react';
+import { Music, Search, Play, Pause, TrendingUp, Clock, Heart, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { fetchTrendingSongs, getAvailableContinents, checkCopyrightStatus, type TrendingSong } from '@/services/musicTrendingService';
 
 interface MusicLibraryProps {
   open: boolean;
@@ -14,61 +13,57 @@ interface MusicLibraryProps {
   onSelectMusic: (music: { name: string; artist: string; url: string; duration: number }) => void;
 }
 
+// Trending songs library (would connect to real API in production)
+const TRENDING_SONGS = [
+  { id: 1, name: 'Summer Vibes', artist: 'DJ Mix', genre: 'Electronic', duration: 45, url: 'https://example.com/music/summer.mp3' },
+  { id: 2, name: 'Chill Beats', artist: 'Lo-Fi King', genre: 'Lo-Fi', duration: 60, url: 'https://example.com/music/chill.mp3' },
+  { id: 3, name: 'Epic Moments', artist: 'Orchestra Pro', genre: 'Cinematic', duration: 50, url: 'https://example.com/music/epic.mp3' },
+  { id: 4, name: 'Happy Day', artist: 'Sunny Smith', genre: 'Pop', duration: 55, url: 'https://example.com/music/happy.mp3' },
+  { id: 5, name: 'Urban Flow', artist: 'Street Beats', genre: 'Hip Hop', duration: 48, url: 'https://example.com/music/urban.mp3' },
+  { id: 6, name: 'Love Story', artist: 'Romance Band', genre: 'Romantic', duration: 52, url: 'https://example.com/music/love.mp3' },
+  { id: 7, name: 'Energy Boost', artist: 'Workout Mix', genre: 'EDM', duration: 60, url: 'https://example.com/music/energy.mp3' },
+  { id: 8, name: 'Nature Sounds', artist: 'Ambient Zen', genre: 'Ambient', duration: 60, url: 'https://example.com/music/nature.mp3' },
+  { id: 9, name: 'Party Time', artist: 'Dance Master', genre: 'Dance', duration: 55, url: 'https://example.com/music/party.mp3' },
+  { id: 10, name: 'Smooth Jazz', artist: 'Jazz Legends', genre: 'Jazz', duration: 58, url: 'https://example.com/music/jazz.mp3' },
+];
+
+const RECENT_SONGS = [
+  { id: 11, name: 'Midnight Drive', artist: 'Night Rider', genre: 'Synthwave', duration: 47, url: 'https://example.com/music/midnight.mp3' },
+  { id: 12, name: 'Beach Sunset', artist: 'Coastal Waves', genre: 'Acoustic', duration: 53, url: 'https://example.com/music/beach.mp3' },
+];
+
+const FAVORITE_SONGS = [
+  { id: 13, name: 'My Favorite', artist: 'Best Artist', genre: 'Pop', duration: 50, url: 'https://example.com/music/favorite.mp3' },
+];
 
 export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps) {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'trending' | 'upload'>('trending');
-  const [selectedContinent, setSelectedContinent] = useState('worldwide');
-  const [selectedGenre, setSelectedGenre] = useState<string>('all');
-  const [trendingSongs, setTrendingSongs] = useState<TrendingSong[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'trending' | 'recent' | 'favorites'>('trending');
+  const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const continents = getAvailableContinents();
-
-  // Load trending songs when continent changes
-  useEffect(() => {
-    if (open && activeTab === 'trending') {
-      loadTrendingSongs();
-    }
-  }, [open, selectedContinent, activeTab]);
-
-  const loadTrendingSongs = async () => {
-    setLoading(true);
-    try {
-      const songs = await fetchTrendingSongs(selectedContinent);
-      setTrendingSongs(songs);
-    } catch (error) {
-      toast({
-        title: 'Error loading songs',
-        description: 'Failed to fetch trending music',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+  const getSongList = () => {
+    switch (activeTab) {
+      case 'trending':
+        return TRENDING_SONGS;
+      case 'recent':
+        return RECENT_SONGS;
+      case 'favorites':
+        return FAVORITE_SONGS;
+      default:
+        return TRENDING_SONGS;
     }
   };
 
-  // Get unique genres from trending songs
-  const availableGenres = ['all', ...new Set(trendingSongs.map(song => song.genre))];
-
-  const filteredSongs = trendingSongs.filter(
-    (song) => {
-      const matchesSearch = 
-        song.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        song.artist.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        song.genre.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      const matchesGenre = selectedGenre === 'all' || song.genre === selectedGenre;
-      
-      return matchesSearch && matchesGenre;
-    }
+  const filteredSongs = getSongList().filter(
+    (song) =>
+      song.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      song.artist.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      song.genre.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const togglePlayPause = (songId: string, url: string) => {
+  const togglePlayPause = (songId: number, url: string) => {
     if (playingId === songId) {
       audioRef.current?.pause();
       setPlayingId(null);
@@ -88,7 +83,7 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
     }
   };
 
-  const handleSelectSong = (song: TrendingSong) => {
+  const handleSelectSong = (song: typeof TRENDING_SONGS[0]) => {
     if (audioRef.current) {
       audioRef.current.pause();
     }
@@ -103,85 +98,6 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
       description: `${song.name} by ${song.artist} - ${song.duration}s`,
     });
     onClose();
-  };
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('audio/')) {
-      toast({
-        title: 'Invalid file type',
-        description: 'Please select an audio file',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    // Check file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast({
-        title: 'File too large',
-        description: 'Audio file must be under 10MB',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Check copyright status (silent in background)
-      const copyrightCheck = await checkCopyrightStatus(file);
-      
-      if (!copyrightCheck.isSafe) {
-        toast({
-          title: 'Copyright issue detected',
-          description: 'This audio cannot be used due to copyright restrictions',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Create object URL for the audio file
-      const audioUrl = URL.createObjectURL(file);
-      
-      // Get audio duration
-      const audio = new Audio(audioUrl);
-      audio.addEventListener('loadedmetadata', () => {
-        const duration = Math.floor(audio.duration);
-        
-        if (duration > 60) {
-          toast({
-            title: 'Audio too long',
-            description: 'Audio must be 60 seconds or less',
-            variant: 'destructive',
-          });
-          URL.revokeObjectURL(audioUrl);
-          return;
-        }
-
-        onSelectMusic({
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          artist: 'Custom Audio',
-          url: audioUrl,
-          duration,
-        });
-        
-        toast({
-          title: 'Audio uploaded',
-          description: `${file.name} (${duration}s)`,
-        });
-        onClose();
-      });
-    } catch (error) {
-      toast({
-        title: 'Upload failed',
-        description: 'Failed to process audio file',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   useEffect(() => {
@@ -217,69 +133,24 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="flex-1 flex flex-col">
-          <TabsList className="mx-6 grid w-auto grid-cols-2 mt-2">
+          <TabsList className="mx-6 grid w-auto grid-cols-3 mt-2">
             <TabsTrigger value="trending" className="flex items-center gap-2">
-              <Globe className="w-4 h-4" />
+              <TrendingUp className="w-4 h-4" />
               Trending
             </TabsTrigger>
-            <TabsTrigger value="upload" className="flex items-center gap-2">
-              <Upload className="w-4 h-4" />
-              Upload
+            <TabsTrigger value="recent" className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Recent
+            </TabsTrigger>
+            <TabsTrigger value="favorites" className="flex items-center gap-2">
+              <Heart className="w-4 h-4" />
+              Favorites
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="trending" className="flex-1 mt-0">
-            {/* Continent Selector */}
-            <div className="px-6 py-3 border-b space-y-3">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Region</p>
-                <ScrollArea className="w-full">
-                  <div className="flex gap-2">
-                    {continents.map((continent) => (
-                      <Button
-                        key={continent}
-                        size="sm"
-                        variant={selectedContinent === continent.toLowerCase() ? 'default' : 'outline'}
-                        onClick={() => {
-                          setSelectedContinent(continent.toLowerCase());
-                          setSelectedGenre('all');
-                        }}
-                        className="whitespace-nowrap"
-                      >
-                        {continent}
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-              
-              {/* Genre Filter */}
-              <div>
-                <p className="text-xs font-medium text-muted-foreground mb-2">Genre</p>
-                <ScrollArea className="w-full">
-                  <div className="flex gap-2">
-                    {availableGenres.map((genre) => (
-                      <Button
-                        key={genre}
-                        size="sm"
-                        variant={selectedGenre === genre ? 'default' : 'outline'}
-                        onClick={() => setSelectedGenre(genre)}
-                        className="whitespace-nowrap capitalize"
-                      >
-                        {genre}
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </div>
-            </div>
-
+          <TabsContent value={activeTab} className="flex-1 mt-0">
             <ScrollArea className="h-[50vh] px-6 py-4">
-              {loading ? (
-                <div className="flex items-center justify-center h-40">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
-              ) : filteredSongs.length === 0 ? (
+              {filteredSongs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
                   <Music className="w-12 h-12 mb-2 opacity-50" />
                   <p>No songs found</p>
@@ -308,11 +179,6 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
                           <p className="text-xs text-muted-foreground truncate">
                             {song.artist} • {song.genre} • {song.duration}s
                           </p>
-                          {song.trending_rank && (
-                            <p className="text-xs text-primary font-medium">
-                              #{song.trending_rank} Trending
-                            </p>
-                          )}
                         </div>
                       </div>
 
@@ -329,57 +195,14 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
               )}
             </ScrollArea>
           </TabsContent>
-
-          <TabsContent value="upload" className="flex-1 mt-0">
-            <div className="px-6 py-8 flex flex-col items-center justify-center h-[60vh]">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="audio/*"
-                onChange={handleFileUpload}
-                className="hidden"
-              />
-              
-              <div className="text-center space-y-4">
-                <div className="w-20 h-20 mx-auto bg-gradient-primary rounded-full flex items-center justify-center">
-                  <Upload className="w-10 h-10 text-white" />
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">Upload Your Music</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Select an audio file from your device<br />
-                    (Max 60 seconds, 10MB)
-                  </p>
-                </div>
-
-                <Button
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading}
-                  className="bg-gradient-primary"
-                >
-                  {loading ? 'Uploading...' : 'Choose Audio File'}
-                </Button>
-
-                <div className="text-xs text-muted-foreground mt-4 max-w-md">
-                  <p className="font-medium mb-2">⚠️ Copyright Notice:</p>
-                  <p>
-                    We automatically check uploaded audio for copyright issues.
-                    Copyrighted content will be rejected. Only use music you have
-                    rights to or royalty-free tracks.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
         </Tabs>
 
         <div className="px-6 py-4 border-t bg-muted/20">
           <div className="flex items-start gap-2 text-xs text-muted-foreground">
             <Music className="w-4 h-4 flex-shrink-0 mt-0.5" />
             <p>
-              Trending songs are royalty-free. Artist attribution will be automatically added.
-              Uploaded audio is checked for copyright compliance before use.
+              All songs are royalty-free. Artist attribution will be automatically added to your post.
+              Songs are limited to 60 seconds for posts.
             </p>
           </div>
         </div>

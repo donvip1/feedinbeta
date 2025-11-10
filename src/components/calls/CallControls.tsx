@@ -1,21 +1,12 @@
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Monitor, MonitorOff, Volume2, VolumeX, Circle, PictureInPicture, BarChart3 } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Volume2, SwitchCamera } from 'lucide-react';
 
 interface CallControlsProps {
   isMuted: boolean;
   isVideoOff: boolean;
   isVideoCall: boolean;
-  isScreenSharing?: boolean;
-  isSpeakerOn?: boolean;
-  isRecording?: boolean;
-  isPipEnabled?: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
-  onToggleScreenShare?: () => void;
-  onToggleSpeaker?: () => void;
-  onToggleRecording?: () => void;
-  onTogglePip?: () => void;
-  onShowStats?: () => void;
   onEndCall: () => void;
 }
 
@@ -23,21 +14,12 @@ export const CallControls = ({
   isMuted,
   isVideoOff,
   isVideoCall,
-  isScreenSharing = false,
-  isSpeakerOn = true,
-  isRecording = false,
-  isPipEnabled = false,
   onToggleMute,
   onToggleVideo,
-  onToggleScreenShare,
-  onToggleSpeaker,
-  onToggleRecording,
-  onTogglePip,
-  onShowStats,
   onEndCall,
 }: CallControlsProps) => {
   return (
-    <div className="flex items-center justify-center space-x-3">
+    <div className="flex items-center justify-center space-x-4">
       {/* Mute/Unmute Button */}
       <Button
         onClick={onToggleMute}
@@ -68,79 +50,6 @@ export const CallControls = ({
         </Button>
       )}
 
-      {/* Screen Share Toggle (only for video calls) */}
-      {isVideoCall && onToggleScreenShare && (
-        <Button
-          onClick={onToggleScreenShare}
-          size="lg"
-          variant={isScreenSharing ? 'default' : 'secondary'}
-          className="rounded-full w-14 h-14 p-0"
-          title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
-        >
-          {isScreenSharing ? (
-            <MonitorOff className="w-6 h-6" />
-          ) : (
-            <Monitor className="w-6 h-6" />
-          )}
-        </Button>
-      )}
-
-      {/* Speaker Toggle */}
-      {onToggleSpeaker && (
-        <Button
-          onClick={onToggleSpeaker}
-          size="lg"
-          variant={isSpeakerOn ? 'default' : 'secondary'}
-          className="rounded-full w-14 h-14 p-0"
-          title={isSpeakerOn ? 'Lower volume' : 'Speaker mode'}
-        >
-          {isSpeakerOn ? (
-            <Volume2 className="w-6 h-6" />
-          ) : (
-            <VolumeX className="w-6 h-6" />
-          )}
-        </Button>
-      )}
-
-      {/* Recording Toggle */}
-      {onToggleRecording && (
-        <Button
-          onClick={onToggleRecording}
-          size="lg"
-          variant={isRecording ? 'destructive' : 'secondary'}
-          className="rounded-full w-14 h-14 p-0"
-          title={isRecording ? 'Stop recording' : 'Start recording'}
-        >
-          <Circle className={`w-6 h-6 ${isRecording ? 'fill-current animate-pulse' : ''}`} />
-        </Button>
-      )}
-
-      {/* Picture-in-Picture Toggle */}
-      {isVideoCall && onTogglePip && (
-        <Button
-          onClick={onTogglePip}
-          size="lg"
-          variant={isPipEnabled ? 'default' : 'secondary'}
-          className="rounded-full w-14 h-14 p-0"
-          title="Picture-in-Picture"
-        >
-          <PictureInPicture className="w-6 h-6" />
-        </Button>
-      )}
-
-      {/* Stats Dashboard */}
-      {onShowStats && (
-        <Button
-          onClick={onShowStats}
-          size="lg"
-          variant="secondary"
-          className="rounded-full w-14 h-14 p-0"
-          title="View call statistics"
-        >
-          <BarChart3 className="w-6 h-6" />
-        </Button>
-      )}
-
       {/* End Call Button */}
       <Button
         onClick={onEndCall}
@@ -150,6 +59,26 @@ export const CallControls = ({
       >
         <PhoneOff className="w-7 h-7" />
       </Button>
+
+      {/* Speaker Button (future enhancement) */}
+      <Button
+        size="lg"
+        variant="secondary"
+        className="rounded-full w-14 h-14 p-0"
+      >
+        <Volume2 className="w-6 h-6" />
+      </Button>
+
+      {/* Switch Camera (only for video calls) */}
+      {isVideoCall && (
+        <Button
+          size="lg"
+          variant="secondary"
+          className="rounded-full w-14 h-14 p-0"
+        >
+          <SwitchCamera className="w-6 h-6" />
+        </Button>
+      )}
     </div>
   );
 };

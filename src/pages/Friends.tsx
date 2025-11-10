@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -35,6 +35,7 @@ interface FriendRequest {
 const Friends = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
@@ -154,8 +155,10 @@ const Friends = () => {
       if (error) throw error;
       setSearchResults(data || []);
     } catch (error: any) {
-      toast.error('Error searching users', {
-        description: error.message
+      toast({
+        title: 'Error searching users',
+        description: error.message,
+        variant: 'destructive',
       });
     } finally {
       setSearching(false);
@@ -163,46 +166,44 @@ const Friends = () => {
   };
 
   const sendFriendRequest = async (receiverId: string) => {
-    if (!user) return;
-
     try {
-      // 1. Create a friend request
-      const { data: request, error: requestError } = await supabase
-        .from('friend_requests')
-        .insert({
-          sender_id: user.id,
-          receiver_id: receiverId,
-        })
-        .select();
+      // Deduct credits first (5 credits)
+      const { error: creditError } = await supabase.functions.invoke('credit-deduction', {
+        body: {
+          action: 'friend_request',
+          userId: user?.id,
+          targetUserId: receiverId,
+        },
+      });
 
-      if (requestError) throw requestError;
-
-      // 2. Create a notification for the receiver
-      const { error: notificationError } = await supabase.from('notifications').insert([{
-        user_id: receiverId,
-        from_user_id: user.id,
-        type: 'friend_request',
-        title: 'New Message Request',
-        message: `You have a new message request from ${user.user_metadata.display_name || 'a user'}`,
-        related_id: request[0].id,
-        is_read: false
-      }]);
-
-      if (notificationError) {
-        // Even if notification fails, the request was created. 
-        // You might want to handle this case, e.g., by logging it.
-        console.error("Failed to create notification:", notificationError);
+      if (creditError) {
+        toast({
+          title: 'Insufficient credits',
+          description: 'You need 5 credits to send a friend request',
+          variant: 'destructive',
+        });
+        return;
       }
 
-      toast.success('Message request sent!');
+      const { error } = await supabase.from('friend_requests').insert({
+        sender_id: user?.id,
+        receiver_id: receiverId,
+      });
 
+      if (error) throw error;
+
+      toast({
+        title: 'Friend request sent',
+        description: '5 credits deducted',
+      });
     } catch (error: any) {
-      toast.error('Error sending message request', {
+      toast({
+        title: 'Error sending friend request',
         description: error.message,
+        variant: 'destructive',
       });
     }
   };
-
 
   const respondToRequest = async (requestId: string, status: 'accepted' | 'rejected') => {
     try {
@@ -213,15 +214,19 @@ const Friends = () => {
 
       if (error) throw error;
 
-      toast.success(status === 'accepted' ? 'Message request accepted' : 'Message request rejected');
+      toast({
+        title: status === 'accepted' ? 'Friend request accepted' : 'Friend request rejected',
+      });
 
       loadFriendRequests();
       if (status === 'accepted') {
         loadFriends();
       }
     } catch (error: any) {
-      toast.error('Error responding to request', {
-        description: error.message
+      toast({
+        title: 'Error responding to request',
+        description: error.message,
+        variant: 'destructive',
       });
     }
   };
@@ -301,7 +306,7 @@ const Friends = () => {
             ) : friends.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-400 mb-4">No friends yet</p>
-                <p className="text-sm text-gray-500">Search for users to send message requests</p>
+                <p className="text-sm text-gray-500">Search for users to send friend requests</p>
               </div>
             ) : (
               friends.map((friend) => (
@@ -341,7 +346,7 @@ const Friends = () => {
               </div>
             ) : friendRequests.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-400">No pending message requests</p>
+                <p className="text-gray-400">No pending friend requests</p>
               </div>
             ) : (
               friendRequests.map((request) => (
