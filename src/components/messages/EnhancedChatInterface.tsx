@@ -91,12 +91,14 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   };
 
   const loadMessages = async () => {
+    if (!conversationId) return;
+    
     try {
       const { data, error } = await supabase
         .from('messages')
         .select(`
           *,
-          profiles!messages_sender_id_fkey(display_name, avatar_url),
+          sender:profiles!messages_sender_id_fkey(display_name, avatar_url),
           reactions:message_reactions(
             emoji,
             user_id,
@@ -123,7 +125,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       const formattedMessages = (data || []).map(msg => {
         const msgReceipts = receipts.filter(r => r.message_id === msg.id);
         const isRead = msgReceipts.length > 0 && msgReceipts.some(r => r.user_id !== user?.id);
-        const isDelivered = msg.sender_id === user?.id; // Delivered if sent by current user
+        const isDelivered = msg.sender_id === user?.id;
         
         return {
           id: msg.id,
@@ -135,8 +137,8 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           reply_to_id: msg.reply_to_id || null,
           reply_to_message: null,
           profiles: {
-            display_name: msg.profiles?.display_name || 'Unknown User',
-            avatar_url: msg.profiles?.avatar_url || null,
+            display_name: msg.sender?.display_name || 'Unknown User',
+            avatar_url: msg.sender?.avatar_url || null,
           },
           reactions: msg.reactions || [],
           read_receipts: msgReceipts.map(r => ({
