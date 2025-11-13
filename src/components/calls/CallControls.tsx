@@ -5,8 +5,10 @@ interface CallControlsProps {
   isMuted: boolean;
   isVideoOff: boolean;
   isVideoCall: boolean;
+  isSpeakerOn: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
+  onToggleSpeaker: () => void;
   onEndCall: () => void;
 }
 
@@ -14,71 +16,67 @@ export const CallControls = ({
   isMuted,
   isVideoOff,
   isVideoCall,
+  isSpeakerOn,
   onToggleMute,
   onToggleVideo,
+  onToggleSpeaker,
   onEndCall,
 }: CallControlsProps) => {
   return (
-    <div className="flex items-center justify-center space-x-4">
+    <div className="flex items-center justify-center gap-3 px-4">
       {/* Mute/Unmute Button */}
-      <Button
+      <button
         onClick={onToggleMute}
-        size="lg"
-        variant={isMuted ? 'destructive' : 'secondary'}
-        className="rounded-full w-14 h-14 p-0"
+        className={`rounded-full w-16 h-16 flex items-center justify-center transition-all ${
+          isMuted 
+            ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
+            : 'bg-white/10 text-white hover:bg-white/20'
+        }`}
       >
         {isMuted ? (
           <MicOff className="w-6 h-6" />
         ) : (
           <Mic className="w-6 h-6" />
         )}
-      </Button>
+      </button>
 
       {/* Video Toggle (only for video calls) */}
       {isVideoCall && (
-        <Button
+        <button
           onClick={onToggleVideo}
-          size="lg"
-          variant={isVideoOff ? 'destructive' : 'secondary'}
-          className="rounded-full w-14 h-14 p-0"
+          className={`rounded-full w-16 h-16 flex items-center justify-center transition-all ${
+            isVideoOff 
+              ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
+              : 'bg-white/10 text-white hover:bg-white/20'
+          }`}
         >
           {isVideoOff ? (
             <VideoOff className="w-6 h-6" />
           ) : (
             <Video className="w-6 h-6" />
           )}
-        </Button>
+        </button>
       )}
 
       {/* End Call Button */}
-      <Button
+      <button
         onClick={onEndCall}
-        size="lg"
-        variant="destructive"
-        className="rounded-full w-16 h-16 p-0 bg-red-600 hover:bg-red-700"
+        className="rounded-full w-20 h-20 flex items-center justify-center bg-red-600 hover:bg-red-700 transition-all hover:scale-105 shadow-lg shadow-red-600/50"
       >
-        <PhoneOff className="w-7 h-7" />
-      </Button>
+        <PhoneOff className="w-8 h-8 text-white" />
+      </button>
 
-      {/* Speaker Button (future enhancement) */}
-      <Button
-        size="lg"
-        variant="secondary"
-        className="rounded-full w-14 h-14 p-0"
+      {/* Speaker Button */}
+      <button
+        onClick={onToggleSpeaker}
+        className={`rounded-full w-16 h-16 flex items-center justify-center transition-all ${
+          isSpeakerOn 
+            ? 'bg-primary/20 text-primary hover:bg-primary/30' 
+            : 'bg-white/10 text-white hover:bg-white/20'
+        }`}
       >
         <Volume2 className="w-6 h-6" />
-      </Button>
-
-      {/* Switch Camera (only for video calls) */}
-      {isVideoCall && (
-        <Button
-          size="lg"
-          variant="secondary"
-          className="rounded-full w-14 h-14 p-0"
-        >
-          <SwitchCamera className="w-6 h-6" />
-        </Button>
-      )}
+      </button>
     </div>
   );
 };
