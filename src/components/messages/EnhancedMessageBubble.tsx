@@ -165,7 +165,7 @@ export const EnhancedMessageBubble = ({
         {/* Reply Indicator */}
         {message.reply_to_message && (
           <div className={`text-xs p-2 mb-1 rounded border-l-2 ${
-            isOwn ? 'bg-white/10 border-white/30' : 'bg-accent/50 border-primary/30'
+            isOwn ? 'bg-primary/20 border-primary/50 text-primary-foreground' : 'bg-accent border-primary/30 text-foreground'
           }`}>
             <p className="font-semibold">{message.reply_to_message.sender.display_name}</p>
             <p className="truncate">{message.reply_to_message.content}</p>
@@ -177,7 +177,7 @@ export const EnhancedMessageBubble = ({
             className={`px-4 py-2 rounded-2xl ${
               isOwn
                 ? 'bg-gradient-to-r from-pink-500 to-blue-500 text-white'
-                : 'bg-accent'
+                : 'bg-accent text-foreground'
             }`}
           >
             {renderMedia()}

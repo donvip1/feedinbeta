@@ -130,28 +130,28 @@ export const WaveformPlayer = ({ audioUrl, isOwn = false }: WaveformPlayerProps)
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
         />
-        <Button
-          variant="ghost"
-          size="icon"
-          className={`h-8 w-8 flex-shrink-0 ${isOwn ? 'text-white hover:bg-white/20' : ''}`}
-          onClick={togglePlayPause}
-        >
-          {isPlaying ? (
-            <Pause className="w-4 h-4" />
-          ) : (
-            <Play className="w-4 h-4" />
-          )}
-        </Button>
-        
-        <div className="flex-1 min-w-0">
-          <div className="h-8 bg-muted/30 rounded-full flex items-center px-2">
-            <div className="text-xs">🎵 Voice message</div>
-          </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        className={`h-8 w-8 flex-shrink-0 ${isOwn ? 'text-primary-foreground hover:bg-primary/20' : 'text-foreground'}`}
+        onClick={togglePlayPause}
+      >
+        {isPlaying ? (
+          <Pause className="w-4 h-4" />
+        ) : (
+          <Play className="w-4 h-4" />
+        )}
+      </Button>
+      
+      <div className="flex-1 min-w-0">
+        <div className="h-8 bg-muted/30 rounded-full flex items-center px-2">
+          <div className="text-xs">🎵 Voice message</div>
         </div>
+      </div>
 
-        <span className={`text-xs flex-shrink-0 ${isOwn ? 'text-white/80' : 'text-muted-foreground'}`}>
-          {isPlaying ? currentTime : duration}
-        </span>
+      <span className={`text-xs flex-shrink-0 ${isOwn ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
+        {isPlaying ? currentTime : duration}
+      </span>
       </div>
     );
   }
@@ -161,7 +161,7 @@ export const WaveformPlayer = ({ audioUrl, isOwn = false }: WaveformPlayerProps)
       <Button
         variant="ghost"
         size="icon"
-        className={`h-8 w-8 flex-shrink-0 ${isOwn ? 'text-white hover:bg-white/20' : ''}`}
+        className={`h-8 w-8 flex-shrink-0 ${isOwn ? 'text-primary-foreground hover:bg-primary/20' : 'text-foreground'}`}
         onClick={togglePlayPause}
       >
         {isPlaying ? (
@@ -175,7 +175,7 @@ export const WaveformPlayer = ({ audioUrl, isOwn = false }: WaveformPlayerProps)
         <div ref={containerRef} className="w-full" />
       </div>
 
-      <span className={`text-xs flex-shrink-0 ${isOwn ? 'text-white/80' : 'text-muted-foreground'}`}>
+      <span className={`text-xs flex-shrink-0 ${isOwn ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
         {isPlaying ? currentTime : duration}
       </span>
     </div>
