@@ -176,8 +176,31 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           table: 'messages',
           filter: `conversation_id=eq.${conversationId}`,
         },
-        () => {
-          loadMessages();
+        (payload: any) => {
+          const row = payload?.new;
+          if (!row) return;
+
+          const profile = row.sender_id === user?.id
+            ? { display_name: 'You', avatar_url: null }
+            : { display_name: otherUser?.display_name || 'Unknown User', avatar_url: otherUser?.avatar_url || null };
+
+          const incoming = {
+            id: row.id,
+            content: row.content,
+            sender_id: row.sender_id,
+            created_at: row.created_at,
+            media_url: row.media_url || null,
+            media_type: row.media_type || null,
+            reply_to_id: row.reply_to_id || null,
+            reply_to_message: null,
+            profiles: profile,
+            reactions: [],
+            read_receipts: [],
+          } as Message;
+
+          // Avoid duplicates
+          setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
+          scrollToBottom();
         }
       )
       .subscribe();
@@ -186,6 +209,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       supabase.removeChannel(channel);
     };
   };
+
 
   const subscribeToTyping = () => {
     const channel = supabase
