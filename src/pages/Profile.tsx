@@ -282,16 +282,16 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-black pb-20">
+    <div className="min-h-screen bg-background pb-20">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-black/95 backdrop-blur-lg border-b border-white/10">
+      <div className="sticky top-0 z-40 bg-card/95 backdrop-blur-lg border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button onClick={() => navigate(-1)} variant="ghost" size="icon" className="hover:bg-white/10">
-            <ArrowLeft className="w-5 h-5 text-white" />
+          <Button onClick={() => navigate(-1)} variant="ghost" size="icon" className="hover:bg-accent/50">
+            <ArrowLeft className="w-5 h-5 text-foreground" />
           </Button>
           {isOwnProfile && (
-            <Button onClick={() => setShowSettings(true)} variant="ghost" size="icon" className="hover:bg-white/10">
-              <Settings className="w-5 h-5 text-white" />
+            <Button onClick={() => setShowSettings(true)} variant="ghost" size="icon" className="hover:bg-accent/50">
+              <Settings className="w-5 h-5 text-foreground" />
             </Button>
           )}
         </div>
@@ -300,25 +300,25 @@ const Profile = () => {
       {/* Profile Header */}
       <div className="relative">
         {/* Cover gradient */}
-        <div className="h-40 bg-gradient-to-br from-purple-900/40 via-blue-900/30 to-black" />
+        <div className="h-40 bg-gradient-to-br from-primary/40 via-accent/30 to-background" />
         
         {/* Profile Info */}
         <div className="container mx-auto px-4 -mt-20 max-w-2xl">
           <div className="flex items-end gap-4 mb-6">
             {/* Avatar */}
             <div className="relative">
-              <Avatar className="w-32 h-32 border-4 border-black shadow-xl">
+              <Avatar className="w-32 h-32 border-4 border-background shadow-xl">
                 <AvatarImage src={profile.avatar_url || ''} />
-                <AvatarFallback className="text-4xl bg-gradient-to-br from-purple-600 to-blue-600 text-white">
+                <AvatarFallback className="text-4xl bg-gradient-to-br from-primary to-accent text-primary-foreground">
                   {profile.display_name?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
               {isOwnProfile && (
                 <label
                   htmlFor="profile-avatar-upload"
-                  className="absolute bottom-0 right-0 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full p-2.5 cursor-pointer hover:opacity-90 transition-opacity shadow-lg"
+                  className="absolute bottom-0 right-0 bg-gradient-to-r from-primary to-accent rounded-full p-2.5 cursor-pointer hover:opacity-90 transition-opacity shadow-lg"
                 >
-                  <Camera className="w-4 h-4 text-white" />
+                  <Camera className="w-4 h-4 text-primary-foreground" />
                   <input
                     id="profile-avatar-upload"
                     type="file"
@@ -334,7 +334,7 @@ const Profile = () => {
             {/* Name & Username */}
             <div className="flex-1 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-white">
+                <h1 className="text-2xl font-bold text-foreground">
                   {profile.display_name || 'Unknown'}
                 </h1>
                 {profile.is_premium && (
@@ -344,13 +344,13 @@ const Profile = () => {
                   </Badge>
                 )}
               </div>
-              <p className="text-gray-400 text-sm">@{profile.username || 'user'}</p>
+              <p className="text-muted-foreground text-sm">@{profile.username || 'user'}</p>
             </div>
           </div>
 
           {/* Bio */}
           {profile.bio && (
-            <p className="text-gray-300 mb-6 leading-relaxed">{profile.bio}</p>
+            <p className="text-foreground mb-6 leading-relaxed">{profile.bio}</p>
           )}
 
           {/* Stats Grid */}
@@ -358,29 +358,29 @@ const Profile = () => {
             {isOwnProfile && (
               <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
                 <Coins className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-foreground">
                   {isAdmin ? '∞' : profile.credits_balance}
                 </p>
-                <p className="text-xs text-gray-400">Credits</p>
+                <p className="text-xs text-muted-foreground">Credits</p>
               </div>
             )}
             
             <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
               <Eye className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-white">{profile.total_views}</p>
-              <p className="text-xs text-gray-400">Views</p>
+              <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
+              <p className="text-xs text-muted-foreground">Views</p>
             </div>
             
             <div className="bg-gradient-to-br from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
               <Heart className="w-6 h-6 text-pink-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-white">{profile.followers_count}</p>
-              <p className="text-xs text-gray-400">Followers</p>
+              <p className="text-2xl font-bold text-foreground">{profile.followers_count}</p>
+              <p className="text-xs text-muted-foreground">Followers</p>
             </div>
 
             <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
               <UserPlus className="w-6 h-6 text-purple-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-white">{profile.following_count}</p>
-              <p className="text-xs text-gray-400">Following</p>
+              <p className="text-2xl font-bold text-foreground">{profile.following_count}</p>
+              <p className="text-xs text-muted-foreground">Following</p>
             </div>
           </div>
 
@@ -391,8 +391,8 @@ const Profile = () => {
                 onClick={toggleFollow}
                 className={
                   isFollowing
-                    ? 'flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                    : 'flex-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg'
+                    ? 'flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border'
+                    : 'flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg'
                 }
               >
                 {isFollowing ? 'Following' : 'Follow'}
@@ -400,14 +400,14 @@ const Profile = () => {
               <Button
                 onClick={hasPendingRequest ? undefined : sendFriendRequest}
                 disabled={hasPendingRequest}
-                className="flex-1 bg-white/10 hover:bg-white/20 text-white border border-white/20 disabled:opacity-50"
+                className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border disabled:opacity-50"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
                 {hasPendingRequest ? 'Pending' : 'Add Friend'}
               </Button>
               <Button 
                 onClick={startConversation}
-                className="bg-white/10 hover:bg-white/20 text-white border border-white/20"
+                className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
                 size="icon"
               >
                 <MessageCircle className="w-4 h-4" />
@@ -418,31 +418,31 @@ const Profile = () => {
           {/* Details Section */}
           <div className="space-y-4">
             {profile.about && (
-              <div className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-sm">
-                <h3 className="font-semibold text-white mb-3 text-base">About</h3>
-                <p className="text-gray-300 text-sm leading-relaxed">{profile.about}</p>
+              <div className="bg-card/50 border border-border rounded-xl p-5 backdrop-blur-sm">
+                <h3 className="font-semibold text-foreground mb-3 text-base">About</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed">{profile.about}</p>
               </div>
             )}
 
             {profile.purpose && (
-              <div className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-sm">
-                <h3 className="font-semibold text-white mb-3 text-base">Purpose</h3>
-                <p className="text-gray-300 text-sm capitalize">{profile.purpose.replace('_', ' ')}</p>
+              <div className="bg-card/50 border border-border rounded-xl p-5 backdrop-blur-sm">
+                <h3 className="font-semibold text-foreground mb-3 text-base">Purpose</h3>
+                <p className="text-muted-foreground text-sm capitalize">{profile.purpose.replace('_', ' ')}</p>
               </div>
             )}
 
             {profile.marital_status && (
-              <div className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-sm">
-                <h3 className="font-semibold text-white mb-3 text-base">Marital Status</h3>
-                <p className="text-gray-300 text-sm capitalize">{profile.marital_status}</p>
+              <div className="bg-card/50 border border-border rounded-xl p-5 backdrop-blur-sm">
+                <h3 className="font-semibold text-foreground mb-3 text-base">Marital Status</h3>
+                <p className="text-muted-foreground text-sm capitalize">{profile.marital_status}</p>
               </div>
             )}
 
             {/* Social Links */}
             {(profile.instagram_url || profile.twitter_url || profile.linkedin_url || 
               profile.facebook_url || profile.tiktok_url || profile.youtube_url || profile.website_url) && (
-              <div className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-sm">
-                <h3 className="font-semibold text-white mb-4 flex items-center gap-2 text-base">
+              <div className="bg-card/50 border border-border rounded-xl p-5 backdrop-blur-sm">
+                <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2 text-base">
                   <LinkIcon className="w-4 h-4" />
                   Social Links
                 </h3>
