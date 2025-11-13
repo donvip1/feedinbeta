@@ -8,13 +8,15 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Shield, Eye, Lock, Users } from 'lucide-react';
+import { ArrowLeft, Shield, Eye, Lock, Users, Moon, Sun } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { useTheme } from 'next-themes';
 
 const PrivacySettings = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({
     profile_visible: true,
@@ -145,6 +147,29 @@ const PrivacySettings = () => {
                 {index < privacyOptions.length - 1 && <Separator className="mt-6" />}
               </div>
             ))}
+          </div>
+
+          <Separator className="my-6" />
+
+          {/* Theme Toggle Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="text-yellow-500">
+                  {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                </div>
+                <div>
+                  <Label className="font-semibold">Theme</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose between light and dark mode
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={theme === 'dark'}
+                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              />
+            </div>
           </div>
 
           <Button
