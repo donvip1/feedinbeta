@@ -10,10 +10,7 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
   plugins: [
-    react({
-      // Exclude node_modules from Fast Refresh
-      exclude: [/node_modules/],
-    }),
+    react(),
     mode === "development" && componentTagger()
   ].filter(Boolean),
   resolve: {
