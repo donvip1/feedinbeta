@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { WaveformPlayer } from './WaveformPlayer';
 
 interface MessageBubbleProps {
   message: {
@@ -118,11 +119,9 @@ export const EnhancedMessageBubble = ({
 
     if (message.media_type?.startsWith('audio')) {
       return (
-        <audio 
-          src={message.media_url} 
-          controls 
-          className="mb-2"
-        />
+        <div className="mb-2">
+          <WaveformPlayer audioUrl={message.media_url} isOwn={isOwn} />
+        </div>
       );
     }
 

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Pause, Play, X, Send, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { WaveformPlayer } from './WaveformPlayer';
 
 interface VoiceRecorderProps {
   onSend: (audioBlob: Blob, duration: number) => void;
@@ -145,25 +146,8 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
     <div className="flex items-center gap-2 p-4 bg-accent rounded-lg">
       {audioURL ? (
         <>
-          <audio 
-            ref={audioRef} 
-            src={audioURL}
-            onEnded={() => setIsPlaying(false)}
-          />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={isPlaying ? pauseAudio : playAudio}
-          >
-            {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
-          </Button>
           <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <div className="flex-1 h-8 bg-primary/20 rounded-full overflow-hidden">
-                <div className="h-full bg-primary/40 rounded-full" style={{ width: '100%' }} />
-              </div>
-              <span className="text-sm font-medium">{formatTime(duration)}</span>
-            </div>
+            <WaveformPlayer audioUrl={audioURL} isOwn={false} />
           </div>
           <Button
             variant="ghost"
@@ -176,7 +160,7 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
           <Button
             size="icon"
             onClick={handleSend}
-            className="bg-gradient-primary"
+            className="bg-gradient-to-r from-pink-500 to-blue-500"
           >
             <Send className="w-5 h-5" />
           </Button>
