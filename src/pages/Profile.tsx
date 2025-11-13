@@ -282,241 +282,247 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20">
+    <div className="min-h-screen bg-background pb-20">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-card/80 backdrop-blur-lg border-b border-border">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Button
-            onClick={() => navigate(-1)}
-            variant="ghost"
-            size="icon"
-          >
+      <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-lg border-b border-border">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <Button onClick={() => navigate(-1)} variant="ghost" size="icon">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          
           {isOwnProfile && (
-            <Button
-              onClick={() => setShowSettings(true)}
-              variant="ghost"
-              size="icon"
-            >
+            <Button onClick={() => setShowSettings(true)} variant="ghost" size="icon">
               <Settings className="w-5 h-5" />
             </Button>
           )}
         </div>
-      </header>
+      </div>
 
-      {/* Profile Content */}
-      <div className="container mx-auto px-4 py-6 max-w-2xl">
-        {/* Avatar & Basic Info */}
-        <div className="flex flex-col items-center mb-6">
-          <div className="relative">
-            <Avatar className="w-32 h-32 mb-4">
-              <AvatarImage src={profile.avatar_url || ''} />
-              <AvatarFallback className="text-4xl">
-                {profile.display_name?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            {isOwnProfile && (
-              <label
-                htmlFor="profile-avatar-upload"
-                className="absolute bottom-4 right-0 bg-primary rounded-full p-3 cursor-pointer hover:bg-primary/80 transition-colors"
-              >
-                <Camera className="w-5 h-5 text-primary-foreground" />
-                <input
-                  id="profile-avatar-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAvatarUpload}
-                  disabled={uploading}
-                />
-              </label>
-            )}
-          </div>
-          
-          <h1 className="text-2xl font-bold mb-1">{profile.display_name || 'Unknown'}</h1>
-          <p className="text-gray-400 mb-2">@{profile.username || 'user'}</p>
-          
-          {profile.is_premium && (
-            <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 mb-2">
-              <Crown className="w-3 h-3 mr-1" />
-              Premium Member
-            </Badge>
-          )}
-
-          {profile.bio && (
-            <p className="text-center text-gray-300 mt-2 max-w-md">{profile.bio}</p>
-          )}
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          {isOwnProfile && (
-            <Card className="bg-gray-900 border-gray-800 p-4 text-center">
-              <Coins className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold">
-                {isAdmin ? '∞' : profile.credits_balance}
-              </p>
-              <p className="text-xs text-gray-400">
-                {isAdmin ? 'Unlimited Credits' : 'Credits'}
-              </p>
-            </Card>
-          )}
-          
-          <Card className="bg-gray-900 border-gray-800 p-4 text-center">
-            <Eye className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold">{profile.total_views}</p>
-            <p className="text-xs text-gray-400">Total Views</p>
-          </Card>
-          
-          <Card className="bg-gray-900 border-gray-800 p-4 text-center">
-            <Heart className="w-6 h-6 text-pink-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold">{profile.followers_count}</p>
-            <p className="text-xs text-gray-400">Followers</p>
-          </Card>
-        </div>
-
-        {/* Action Buttons for other profiles */}
-        {!isOwnProfile && (
-          <div className="flex space-x-2 mb-6">
-            <Button
-              onClick={toggleFollow}
-              className={
-                isFollowing
-                  ? 'flex-1 bg-gray-800 hover:bg-gray-700 text-white'
-                  : 'flex-1 bg-gradient-to-r from-pink-500 to-blue-500 text-white'
-              }
-            >
-              {isFollowing ? 'Following' : 'Follow'}
-            </Button>
-            <Button
-              onClick={hasPendingRequest ? undefined : sendFriendRequest}
-              disabled={hasPendingRequest}
-              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white disabled:opacity-50"
-            >
-              <UserPlus className="w-4 h-4 mr-2" />
-              {hasPendingRequest ? 'Request Sent' : 'Add Friend'}
-            </Button>
-            <Button
-              onClick={startConversation}
-              className="bg-gray-800 hover:bg-gray-700 text-white"
-            >
-              <MessageCircle className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
-
-        {/* Public Info */}
-        {profile.about && (
-          <Card className="bg-card border-border p-4 mb-4">
-            <h3 className="font-semibold mb-2">About</h3>
-            <p className="text-muted-foreground text-sm">{profile.about}</p>
-          </Card>
-        )}
-
-        {profile.purpose && (
-          <Card className="bg-card border-border p-4 mb-4">
-            <h3 className="font-semibold mb-2">Purpose</h3>
-            <p className="text-muted-foreground text-sm capitalize">{profile.purpose.replace('_', ' ')}</p>
-          </Card>
-        )}
-
-        {profile.marital_status && (
-          <Card className="bg-card border-border p-4 mb-4">
-            <h3 className="font-semibold mb-2">Marital Status</h3>
-            <p className="text-muted-foreground text-sm capitalize">{profile.marital_status}</p>
-          </Card>
-        )}
-
-        {/* Social Media Links */}
-        {(profile.instagram_url || profile.twitter_url || profile.linkedin_url || profile.facebook_url || profile.tiktok_url || profile.youtube_url || profile.website_url) && (
-          <Card className="bg-card border-border p-4 mb-4">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <LinkIcon className="w-4 h-4" />
-              Social Links
-            </h3>
-            <div className="flex flex-wrap gap-3">
-              {profile.instagram_url && (
-                <a
-                  href={profile.instagram_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+      {/* Profile Header */}
+      <div className="relative">
+        {/* Cover gradient */}
+        <div className="h-32 bg-gradient-to-br from-primary/20 via-primary/10 to-background" />
+        
+        {/* Profile Info */}
+        <div className="container mx-auto px-4 -mt-16 max-w-2xl">
+          <div className="flex items-end gap-4 mb-6">
+            {/* Avatar */}
+            <div className="relative">
+              <Avatar className="w-28 h-28 border-4 border-background">
+                <AvatarImage src={profile.avatar_url || ''} />
+                <AvatarFallback className="text-3xl bg-card">
+                  {profile.display_name?.[0] || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              {isOwnProfile && (
+                <label
+                  htmlFor="profile-avatar-upload"
+                  className="absolute bottom-0 right-0 bg-primary rounded-full p-2 cursor-pointer hover:bg-primary/90 transition-colors shadow-lg"
                 >
-                  <Instagram className="w-4 h-4" />
-                  <span className="text-sm font-medium">Instagram</span>
-                </a>
-              )}
-              {profile.twitter_url && (
-                <a
-                  href={profile.twitter_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-400 text-white rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  <Twitter className="w-4 h-4" />
-                  <span className="text-sm font-medium">Twitter</span>
-                </a>
-              )}
-              {profile.linkedin_url && (
-                <a
-                  href={profile.linkedin_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  <Linkedin className="w-4 h-4" />
-                  <span className="text-sm font-medium">LinkedIn</span>
-                </a>
-              )}
-              {profile.facebook_url && (
-                <a
-                  href={profile.facebook_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  <Facebook className="w-4 h-4" />
-                  <span className="text-sm font-medium">Facebook</span>
-                </a>
-              )}
-              {profile.tiktok_url && (
-                <a
-                  href={profile.tiktok_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  <Mic className="w-4 h-4" />
-                  <span className="text-sm font-medium">TikTok</span>
-                </a>
-              )}
-              {profile.youtube_url && (
-                <a
-                  href={profile.youtube_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  <Youtube className="w-4 h-4" />
-                  <span className="text-sm font-medium">YouTube</span>
-                </a>
-              )}
-              {profile.website_url && (
-                <a
-                  href={profile.website_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
-                >
-                  <LinkIcon className="w-4 h-4" />
-                  <span className="text-sm font-medium">Website</span>
-                </a>
+                  <Camera className="w-4 h-4 text-primary-foreground" />
+                  <input
+                    id="profile-avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                    disabled={uploading}
+                  />
+                </label>
               )}
             </div>
-          </Card>
-        )}
+
+            {/* Name & Username */}
+            <div className="flex-1 mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-2xl font-bold text-foreground">
+                  {profile.display_name || 'Unknown'}
+                </h1>
+                {profile.is_premium && (
+                  <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0">
+                    <Crown className="w-3 h-3 mr-1" />
+                    Premium
+                  </Badge>
+                )}
+              </div>
+              <p className="text-muted-foreground text-sm">@{profile.username || 'user'}</p>
+            </div>
+          </div>
+
+          {/* Bio */}
+          {profile.bio && (
+            <p className="text-foreground mb-6">{profile.bio}</p>
+          )}
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            {isOwnProfile && (
+              <div className="bg-card border border-border rounded-lg p-4 text-center">
+                <Coins className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
+                <p className="text-xl font-bold text-foreground">
+                  {isAdmin ? '∞' : profile.credits_balance}
+                </p>
+                <p className="text-xs text-muted-foreground">Credits</p>
+              </div>
+            )}
+            
+            <div className="bg-card border border-border rounded-lg p-4 text-center">
+              <Eye className="w-5 h-5 text-blue-500 mx-auto mb-1" />
+              <p className="text-xl font-bold text-foreground">{profile.total_views}</p>
+              <p className="text-xs text-muted-foreground">Views</p>
+            </div>
+            
+            <div className="bg-card border border-border rounded-lg p-4 text-center">
+              <Heart className="w-5 h-5 text-pink-500 mx-auto mb-1" />
+              <p className="text-xl font-bold text-foreground">{profile.followers_count}</p>
+              <p className="text-xs text-muted-foreground">Followers</p>
+            </div>
+
+            <div className="bg-card border border-border rounded-lg p-4 text-center">
+              <UserPlus className="w-5 h-5 text-purple-500 mx-auto mb-1" />
+              <p className="text-xl font-bold text-foreground">{profile.following_count}</p>
+              <p className="text-xs text-muted-foreground">Following</p>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          {!isOwnProfile && (
+            <div className="flex gap-2 mb-6">
+              <Button
+                onClick={toggleFollow}
+                variant={isFollowing ? "outline" : "default"}
+                className="flex-1"
+              >
+                {isFollowing ? 'Following' : 'Follow'}
+              </Button>
+              <Button
+                onClick={hasPendingRequest ? undefined : sendFriendRequest}
+                disabled={hasPendingRequest}
+                variant="outline"
+                className="flex-1"
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                {hasPendingRequest ? 'Pending' : 'Add Friend'}
+              </Button>
+              <Button onClick={startConversation} variant="outline" size="icon">
+                <MessageCircle className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+
+          {/* Details Section */}
+          <div className="space-y-4">
+            {profile.about && (
+              <div className="bg-card border border-border rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-2">About</h3>
+                <p className="text-foreground text-sm leading-relaxed">{profile.about}</p>
+              </div>
+            )}
+
+            {profile.purpose && (
+              <div className="bg-card border border-border rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-2">Purpose</h3>
+                <p className="text-foreground text-sm capitalize">{profile.purpose.replace('_', ' ')}</p>
+              </div>
+            )}
+
+            {profile.marital_status && (
+              <div className="bg-card border border-border rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-2">Marital Status</h3>
+                <p className="text-foreground text-sm capitalize">{profile.marital_status}</p>
+              </div>
+            )}
+
+            {/* Social Links */}
+            {(profile.instagram_url || profile.twitter_url || profile.linkedin_url || 
+              profile.facebook_url || profile.tiktok_url || profile.youtube_url || profile.website_url) && (
+              <div className="bg-card border border-border rounded-lg p-4">
+                <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <LinkIcon className="w-4 h-4" />
+                  Social Links
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {profile.instagram_url && (
+                    <a
+                      href={profile.instagram_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-md hover:opacity-90 transition-opacity text-sm"
+                    >
+                      <Instagram className="w-4 h-4" />
+                      Instagram
+                    </a>
+                  )}
+                  {profile.twitter_url && (
+                    <a
+                      href={profile.twitter_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-400 text-white rounded-md hover:opacity-90 transition-opacity text-sm"
+                    >
+                      <Twitter className="w-4 h-4" />
+                      Twitter
+                    </a>
+                  )}
+                  {profile.linkedin_url && (
+                    <a
+                      href={profile.linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-md hover:opacity-90 transition-opacity text-sm"
+                    >
+                      <Linkedin className="w-4 h-4" />
+                      LinkedIn
+                    </a>
+                  )}
+                  {profile.facebook_url && (
+                    <a
+                      href={profile.facebook_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-md hover:opacity-90 transition-opacity text-sm"
+                    >
+                      <Facebook className="w-4 h-4" />
+                      Facebook
+                    </a>
+                  )}
+                  {profile.tiktok_url && (
+                    <a
+                      href={profile.tiktok_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-foreground text-background rounded-md hover:opacity-90 transition-opacity text-sm"
+                    >
+                      <Mic className="w-4 h-4" />
+                      TikTok
+                    </a>
+                  )}
+                  {profile.youtube_url && (
+                    <a
+                      href={profile.youtube_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-red-500 text-white rounded-md hover:opacity-90 transition-opacity text-sm"
+                    >
+                      <Youtube className="w-4 h-4" />
+                      YouTube
+                    </a>
+                  )}
+                  {profile.website_url && (
+                    <a
+                      href={profile.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-md hover:opacity-90 transition-opacity text-sm"
+                    >
+                      <LinkIcon className="w-4 h-4" />
+                      Website
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Settings Drawer */}
