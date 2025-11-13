@@ -141,7 +141,7 @@ const Settings = () => {
       <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">
         <Card className="bg-card border-border">
           <div className="p-6">
-            <h2 className="text-2xl font-bold mb-2">Settings</h2>
+            <h2 className="text-2xl font-bold mb-2 text-foreground">Settings</h2>
             <p className="text-muted-foreground mb-6">
               Manage your account and preferences
             </p>
@@ -158,7 +158,7 @@ const Settings = () => {
                         <option.icon className="w-6 h-6" />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold">{option.title}</h3>
+                        <h3 className="font-semibold text-foreground">{option.title}</h3>
                         <p className="text-sm text-muted-foreground">
                           {option.description}
                         </p>
@@ -175,7 +175,7 @@ const Settings = () => {
 
             <Separator className="my-6" />
 
-            <h3 className="text-lg font-semibold mb-4">Content & Discovery</h3>
+            <h3 className="text-lg font-semibold mb-4 text-foreground">Content & Discovery</h3>
             <div className="space-y-2">
               {contentOptions.map((option) => (
                 <button
@@ -188,7 +188,7 @@ const Settings = () => {
                       <option.icon className="w-6 h-6" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold">{option.title}</h3>
+                      <h3 className="font-semibold text-foreground">{option.title}</h3>
                       <p className="text-sm text-muted-foreground">{option.description}</p>
                     </div>
                   </div>
@@ -199,7 +199,7 @@ const Settings = () => {
 
             <Separator className="my-6" />
 
-            <h3 className="text-lg font-semibold mb-4">Wallet & Credits</h3>
+            <h3 className="text-lg font-semibold mb-4 text-foreground">Wallet & Credits</h3>
             <div className="space-y-2">
               {walletOptions.map((option) => (
                 <button
@@ -212,7 +212,7 @@ const Settings = () => {
                       <option.icon className="w-6 h-6" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold">{option.title}</h3>
+                      <h3 className="font-semibold text-foreground">{option.title}</h3>
                       <p className="text-sm text-muted-foreground">{option.description}</p>
                     </div>
                   </div>
