@@ -71,7 +71,16 @@ const Profile = () => {
     try {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          *,
+          instagram_url,
+          twitter_url,
+          linkedin_url,
+          facebook_url,
+          tiktok_url,
+          youtube_url,
+          website_url
+        `)
         .eq('id', userId)
         .single();
 
@@ -90,10 +99,12 @@ const Profile = () => {
         }
       }
 
-      setProfile({
-        ...profileData,
-        credits_balance: creditsBalance,
-      } as Profile);
+      if (profileData) {
+        setProfile({
+          ...(profileData as any),
+          credits_balance: creditsBalance,
+        } as Profile);
+      }
     } catch (error: any) {
       toast({
         title: 'Error loading profile',
