@@ -162,15 +162,15 @@ const Settings = () => {
                         <option.icon className="w-5 h-5" />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        <h3 className={`font-semibold ${option.color} transition-colors`}>
                           {option.title}
                         </h3>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-gray-300">
                           {option.description}
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                    <ChevronRight className={`w-5 h-5 ${option.color} group-hover:translate-x-1 transition-all`} />
                   </button>
                   {index < settingsOptions.length - 1 && (
                     <Separator className="my-1 bg-border/30" />
@@ -200,13 +200,13 @@ const Settings = () => {
                       <option.icon className="w-5 h-5" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                      <h3 className={`font-semibold ${option.color} transition-colors`}>
                         {option.title}
                       </h3>
-                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                      <p className="text-sm text-gray-300">{option.description}</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                  <ChevronRight className={`w-5 h-5 ${option.color} group-hover:translate-x-1 transition-all`} />
                 </button>
               ))}
             </div>
@@ -232,13 +232,13 @@ const Settings = () => {
                       <option.icon className="w-5 h-5" />
                     </div>
                     <div className="text-left">
-                      <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                      <h3 className={`font-semibold ${option.color} transition-colors`}>
                         {option.title}
                       </h3>
-                      <p className="text-sm text-muted-foreground">{option.description}</p>
+                      <p className="text-sm text-gray-300">{option.description}</p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                  <ChevronRight className={`w-5 h-5 ${option.color} group-hover:translate-x-1 transition-all`} />
                 </button>
               ))}
             </div>
