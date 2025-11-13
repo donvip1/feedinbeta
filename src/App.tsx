@@ -46,6 +46,7 @@ const App = () => {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <Toaster />
         <BrowserRouter>
           <AuthProvider>
             <Routes>
@@ -85,7 +86,6 @@ const App = () => {
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
             </Routes>
-            <Toaster />
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
