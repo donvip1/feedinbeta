@@ -237,24 +237,25 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
 
       if (error) throw error;
       if (data) {
+        const profileData = data as any;
         setProfile({
-          display_name: data.display_name || '',
-          username: data.username || '',
-          bio: data.bio || '',
-          avatar_url: data.avatar_url || '',
-          status: data.status || '',
-          about: data.about || '',
-          purpose: data.purpose || '',
-          marital_status: data.marital_status || '',
-          age: data.age?.toString() || '',
-          country: data.country || '',
-          instagram_url: data.instagram_url || '',
-          twitter_url: data.twitter_url || '',
-          linkedin_url: data.linkedin_url || '',
-          facebook_url: data.facebook_url || '',
-          tiktok_url: data.tiktok_url || '',
-          youtube_url: data.youtube_url || '',
-          website_url: data.website_url || '',
+          display_name: profileData.display_name || '',
+          username: profileData.username || '',
+          bio: profileData.bio || '',
+          avatar_url: profileData.avatar_url || '',
+          status: profileData.status || '',
+          about: profileData.about || '',
+          purpose: profileData.purpose || '',
+          marital_status: profileData.marital_status || '',
+          age: profileData.age?.toString() || '',
+          country: profileData.country || '',
+          instagram_url: profileData.instagram_url || '',
+          twitter_url: profileData.twitter_url || '',
+          linkedin_url: profileData.linkedin_url || '',
+          facebook_url: profileData.facebook_url || '',
+          tiktok_url: profileData.tiktok_url || '',
+          youtube_url: profileData.youtube_url || '',
+          website_url: profileData.website_url || '',
         });
         setUsernameStatus(prev => ({ ...prev, originalUsername: data.username || '' }));
       }
