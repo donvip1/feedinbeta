@@ -37,6 +37,10 @@ interface MessageBubbleProps {
         display_name: string;
       };
     }>;
+    read_receipts?: Array<{
+      user_id: string;
+      read_at: string;
+    }>;
   };
   isOwn: boolean;
   onReply: (messageId: string, content: string) => void;
@@ -265,9 +269,22 @@ export const EnhancedMessageBubble = ({
           )}
         </div>
 
-        <span className="text-xs text-muted-foreground mt-1 px-1">
-          {format(new Date(message.created_at), 'HH:mm')}
-        </span>
+        {/* Timestamp and Read Receipts */}
+        <div className={`flex items-center gap-1 mt-1 px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+          <span className="text-xs text-muted-foreground">
+            {format(new Date(message.created_at), 'HH:mm')}
+          </span>
+          {isOwn && message.read_receipts && message.read_receipts.length > 0 && (
+            <span className="text-xs text-blue-500" title="Read">
+              ✓✓
+            </span>
+          )}
+          {isOwn && (!message.read_receipts || message.read_receipts.length === 0) && (
+            <span className="text-xs text-muted-foreground/50" title="Sent">
+              ✓
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

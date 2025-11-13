@@ -38,6 +38,10 @@ interface Message {
       display_name: string;
     };
   }>;
+  read_receipts?: Array<{
+    user_id: string;
+    read_at: string;
+  }>;
 }
 
 interface ChatInterfaceProps {
@@ -69,6 +73,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     subscribeToMessages();
     subscribeToTyping();
     subscribeToReactions();
+    subscribeToReadReceipts();
   }, [conversationId]);
 
   useEffect(() => {
@@ -87,11 +92,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         .from('messages')
         .select(`
           *,
-          sender:profiles!messages_sender_id_fkey(display_name, avatar_url),
-          reply_to:messages!messages_reply_to_id_fkey(
-            content,
-            sender:profiles!messages_sender_id_fkey(display_name)
-          ),
+          profiles!messages_sender_id_fkey(display_name, avatar_url),
           reactions:message_reactions(
             emoji,
             user_id,
@@ -103,6 +104,18 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
       if (error) throw error;
       
+      // Fetch read receipts separately
+      const messageIds = (data || []).map(msg => msg.id);
+      let receipts: any[] = [];
+      
+      if (messageIds.length > 0) {
+        const { data: receiptsData } = await supabase
+          .rpc('get_message_read_receipts', { message_ids: messageIds })
+          .returns<{ message_id: string; user_id: string; read_at: string }[]>();
+        
+        receipts = receiptsData || [];
+      }
+      
       const formattedMessages = (data || []).map(msg => ({
         id: msg.id,
         content: msg.content,
@@ -111,15 +124,24 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         media_url: msg.media_url || null,
         media_type: msg.media_type || null,
         reply_to_id: msg.reply_to_id || null,
-        reply_to_message: Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to,
+        reply_to_message: null,
         profiles: {
-          display_name: msg.sender?.display_name || null,
-          avatar_url: msg.sender?.avatar_url || null,
+          display_name: msg.profiles?.display_name || 'Unknown User',
+          avatar_url: msg.profiles?.avatar_url || null,
         },
         reactions: msg.reactions || [],
+        read_receipts: receipts.filter(r => r.message_id === msg.id).map(r => ({
+          user_id: r.user_id,
+          read_at: r.read_at
+        })),
       }));
       
       setMessages(formattedMessages);
+      
+      // Mark incoming messages as read
+      if (user) {
+        markMessagesAsRead(formattedMessages);
+      }
     } catch (error: any) {
       console.error('Error loading messages:', error);
     }
@@ -208,6 +230,56 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const subscribeToReadReceipts = () => {
+    const channel = supabase
+      .channel(`read_receipts:${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'message_read_receipts',
+        },
+        async () => {
+          // Reload messages to show updated read receipts
+          await loadMessages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  const markMessagesAsRead = async (messagesToMark: Message[]) => {
+    if (!user) return;
+
+    try {
+      const unreadMessages = messagesToMark.filter(
+        msg => msg.sender_id !== user.id && 
+        !msg.read_receipts?.some(receipt => receipt.user_id === user.id)
+      );
+
+      if (unreadMessages.length === 0) return;
+
+      // Insert read receipts one by one to avoid conflicts
+      for (const msg of unreadMessages) {
+        await supabase
+          .from('message_read_receipts' as any)
+          .insert({
+            message_id: msg.id,
+            user_id: user.id,
+          })
+          .select()
+          .maybeSingle();
+      }
+    } catch (error: any) {
+      // Silently handle errors (e.g., duplicate entries)
+      console.debug('Mark as read info:', error);
+    }
   };
 
   const handleTyping = async () => {
