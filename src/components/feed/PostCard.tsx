@@ -522,7 +522,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         )}
 
         {/* Content and Actions - Adjusted for text-only posts */}
-        <div className={`absolute bottom-0 left-0 right-0 z-20 p-4 ${isTextOnly ? 'bg-black/40 backdrop-blur-sm' : 'bg-gradient-to-t from-black/80 via-black/50 to-transparent'}`}>
+        <div className={`absolute bottom-24 left-0 right-0 z-20 p-4 ${isTextOnly ? 'bg-black/40 backdrop-blur-sm' : 'bg-gradient-to-t from-black/80 via-black/50 to-transparent'}`}>
           {/* Content - Only show if there's media */}
           {post.media_url && post.content && (
             <p className="text-white mb-2 whitespace-pre-wrap text-base line-clamp-3">
@@ -549,20 +549,20 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </button>
         </div>
 
-        {/* TikTok-style Vertical Action Buttons - Right Side (5% smaller) */}
-        <div className="absolute right-4 bottom-32 z-30 flex flex-col items-center space-y-4">
+        {/* Horizontal Social Action Buttons - Bottom */}
+        <div className="absolute bottom-4 left-0 right-0 z-30 flex items-center justify-center space-x-6 pb-2">
           {/* Like Button */}
           <button
             onClick={handleLike}
             disabled={isLiking}
-            className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
+            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
               isLiked ? 'bg-pink-500' : 'bg-white/10 backdrop-blur-sm'
             } shadow-lg`}>
-              <Heart className={`w-[18px] h-[18px] ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
+              <Heart className={`w-5 h-5 ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
             </div>
-            <span className="text-white text-[9px] font-bold">{localLikesCount}</span>
+            <span className="text-white text-xs font-bold">{localLikesCount}</span>
           </button>
 
           {/* Comment Button */}
@@ -576,25 +576,25 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                 if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
               }
             }}
-            className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
+            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <MessageCircle className="w-[18px] h-[18px] text-white" />
+            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <MessageCircle className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white text-[9px] font-bold">{post.comments_count}</span>
+            <span className="text-white text-xs font-bold">{post.comments_count}</span>
           </button>
 
           {/* Share Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95">
-                <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-                  <Share2 className="w-[18px] h-[18px] text-white" />
+              <button className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95">
+                <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                  <Share2 className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white text-[9px] font-bold">Share</span>
+                <span className="text-white text-xs font-bold">Share</span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-gray-800/60 backdrop-blur-md border-gray-700" align="end">
+            <DropdownMenuContent className="bg-gray-800/60 backdrop-blur-md border-gray-700" align="center">
               <DropdownMenuItem onClick={() => handleShare('refeed')} className="text-white hover:bg-gray-700/80">
                 {isRefed ? '✓ ReFEEDed' : '🔄 ReFEED Post'}
               </DropdownMenuItem>
@@ -621,22 +621,22 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           {/* Save/Bookmark Button */}
           <button
             onClick={handleSave}
-            className="flex flex-col items-center space-y-0.5 transform transition-transform hover:scale-110 active:scale-95"
+            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
               isSaved ? 'bg-yellow-500' : 'bg-white/10 backdrop-blur-sm'
             } shadow-lg`}>
-              <Bookmark className={`w-[18px] h-[18px] ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
+              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
             </div>
-            <span className="text-white text-[9px] font-bold">Save</span>
+            <span className="text-white text-xs font-bold">Save</span>
           </button>
 
           {/* Views Counter */}
-          <div className="flex flex-col items-center space-y-0.5">
-            <div className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
-              <Eye className="w-[18px] h-[18px] text-white" />
+          <div className="flex flex-col items-center space-y-1">
+            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+              <Eye className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white text-[9px] font-bold">{post.views_count}</span>
+            <span className="text-white text-xs font-bold">{post.views_count}</span>
           </div>
         </div>
       </div>
