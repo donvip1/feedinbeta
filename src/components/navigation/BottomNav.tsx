@@ -1,6 +1,7 @@
 import { Home, MessageCircle, Plus, User, Sparkles, UsersRound } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/shared/ThemeToggle';
 
 interface BottomNavProps {
   onQuickActionClick?: () => void;
@@ -36,9 +37,13 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-gray-900/95 backdrop-blur-lg border-t border-gray-800 transition-all">
+    <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-card/95 backdrop-blur-lg border-t border-border transition-all">
       <div className="container mx-auto px-2">
         <div className="flex items-center justify-around py-1 relative">
+          {/* Theme Toggle on far left */}
+          <div className="absolute left-2">
+            <ThemeToggle />
+          </div>
           {navItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
             return (
@@ -47,7 +52,7 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
                 onClick={() => navigate(item.path)}
                 variant="ghost"
                 className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
-                  isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
+                  isActive(item.path) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon className="w-5 h-5" />
@@ -72,7 +77,7 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
                 onClick={() => navigate(item.path)}
                 variant="ghost"
                 className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
-                  isActive(item.path) ? 'text-white' : 'text-gray-400 hover:text-white'
+                  isActive(item.path) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 <Icon className="w-5 h-5" />

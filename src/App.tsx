@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { ThemeProvider } from "next-themes";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -44,10 +45,11 @@ const queryClient = new QueryClient();
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
@@ -86,8 +88,9 @@ const App = () => (
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   </ErrorBoundary>
 );
 
