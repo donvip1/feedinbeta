@@ -41,7 +41,13 @@ import {
   GraduationCap,
   Mic,
   Palette,
-  Smile
+  Smile,
+  Instagram,
+  Twitter,
+  Linkedin,
+  Facebook,
+  Youtube,
+  Link as LinkIcon
 } from 'lucide-react';
 
 const COUNTRIES = [
@@ -196,6 +202,13 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
     marital_status: '',
     age: '',
     country: '',
+    instagram_url: '',
+    twitter_url: '',
+    linkedin_url: '',
+    facebook_url: '',
+    tiktok_url: '',
+    youtube_url: '',
+    website_url: '',
   });
   
   const [usernameStatus, setUsernameStatus] = useState({
@@ -235,6 +248,13 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
           marital_status: data.marital_status || '',
           age: data.age?.toString() || '',
           country: data.country || '',
+          instagram_url: data.instagram_url || '',
+          twitter_url: data.twitter_url || '',
+          linkedin_url: data.linkedin_url || '',
+          facebook_url: data.facebook_url || '',
+          tiktok_url: data.tiktok_url || '',
+          youtube_url: data.youtube_url || '',
+          website_url: data.website_url || '',
         });
         setUsernameStatus(prev => ({ ...prev, originalUsername: data.username || '' }));
       }
@@ -335,6 +355,13 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
         marital_status: profile.marital_status || null,
         age: profile.age ? parseInt(profile.age) : null,
         country: profile.country || null,
+        instagram_url: profile.instagram_url || null,
+        twitter_url: profile.twitter_url || null,
+        linkedin_url: profile.linkedin_url || null,
+        facebook_url: profile.facebook_url || null,
+        tiktok_url: profile.tiktok_url || null,
+        youtube_url: profile.youtube_url || null,
+        website_url: profile.website_url || null,
       };
 
       // Only include username if it can be changed and is different
@@ -668,6 +695,116 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <Separator className="my-6" />
+
+              {/* Social Media Links */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <LinkIcon className="w-5 h-5" />
+                  Social Media Links
+                </h3>
+
+                <div className="space-y-3">
+                  {/* Instagram */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Instagram className="w-4 h-4 text-pink-500" />
+                      Instagram
+                    </Label>
+                    <Input
+                      value={profile.instagram_url}
+                      onChange={(e) => setProfile({ ...profile, instagram_url: e.target.value })}
+                      placeholder="https://instagram.com/username"
+                      type="url"
+                    />
+                  </div>
+
+                  {/* Twitter/X */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Twitter className="w-4 h-4 text-blue-400" />
+                      Twitter / X
+                    </Label>
+                    <Input
+                      value={profile.twitter_url}
+                      onChange={(e) => setProfile({ ...profile, twitter_url: e.target.value })}
+                      placeholder="https://twitter.com/username"
+                      type="url"
+                    />
+                  </div>
+
+                  {/* LinkedIn */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Linkedin className="w-4 h-4 text-blue-600" />
+                      LinkedIn
+                    </Label>
+                    <Input
+                      value={profile.linkedin_url}
+                      onChange={(e) => setProfile({ ...profile, linkedin_url: e.target.value })}
+                      placeholder="https://linkedin.com/in/username"
+                      type="url"
+                    />
+                  </div>
+
+                  {/* Facebook */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Facebook className="w-4 h-4 text-blue-500" />
+                      Facebook
+                    </Label>
+                    <Input
+                      value={profile.facebook_url}
+                      onChange={(e) => setProfile({ ...profile, facebook_url: e.target.value })}
+                      placeholder="https://facebook.com/username"
+                      type="url"
+                    />
+                  </div>
+
+                  {/* TikTok */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Mic className="w-4 h-4" />
+                      TikTok
+                    </Label>
+                    <Input
+                      value={profile.tiktok_url}
+                      onChange={(e) => setProfile({ ...profile, tiktok_url: e.target.value })}
+                      placeholder="https://tiktok.com/@username"
+                      type="url"
+                    />
+                  </div>
+
+                  {/* YouTube */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Youtube className="w-4 h-4 text-red-500" />
+                      YouTube
+                    </Label>
+                    <Input
+                      value={profile.youtube_url}
+                      onChange={(e) => setProfile({ ...profile, youtube_url: e.target.value })}
+                      placeholder="https://youtube.com/@channel"
+                      type="url"
+                    />
+                  </div>
+
+                  {/* Website */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <LinkIcon className="w-4 h-4 text-primary" />
+                      Website
+                    </Label>
+                    <Input
+                      value={profile.website_url}
+                      onChange={(e) => setProfile({ ...profile, website_url: e.target.value })}
+                      placeholder="https://yourwebsite.com"
+                      type="url"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* Action Buttons */}

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
-import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera } from 'lucide-react';
+import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -25,6 +25,13 @@ interface Profile {
   credits_balance: number;
   followers_count: number;
   following_count: number;
+  instagram_url?: string | null;
+  twitter_url?: string | null;
+  linkedin_url?: string | null;
+  facebook_url?: string | null;
+  tiktok_url?: string | null;
+  youtube_url?: string | null;
+  website_url?: string | null;
 }
 
 const Profile = () => {
@@ -391,23 +398,112 @@ const Profile = () => {
 
         {/* Public Info */}
         {profile.about && (
-          <Card className="bg-gray-900 border-gray-800 p-4 mb-4">
+          <Card className="bg-card border-border p-4 mb-4">
             <h3 className="font-semibold mb-2">About</h3>
-            <p className="text-gray-300 text-sm">{profile.about}</p>
+            <p className="text-muted-foreground text-sm">{profile.about}</p>
           </Card>
         )}
 
         {profile.purpose && (
-          <Card className="bg-gray-900 border-gray-800 p-4 mb-4">
+          <Card className="bg-card border-border p-4 mb-4">
             <h3 className="font-semibold mb-2">Purpose</h3>
-            <p className="text-gray-300 text-sm">{profile.purpose}</p>
+            <p className="text-muted-foreground text-sm capitalize">{profile.purpose.replace('_', ' ')}</p>
           </Card>
         )}
 
         {profile.marital_status && (
-          <Card className="bg-gray-900 border-gray-800 p-4 mb-4">
+          <Card className="bg-card border-border p-4 mb-4">
             <h3 className="font-semibold mb-2">Marital Status</h3>
-            <p className="text-gray-300 text-sm capitalize">{profile.marital_status}</p>
+            <p className="text-muted-foreground text-sm capitalize">{profile.marital_status}</p>
+          </Card>
+        )}
+
+        {/* Social Media Links */}
+        {(profile.instagram_url || profile.twitter_url || profile.linkedin_url || profile.facebook_url || profile.tiktok_url || profile.youtube_url || profile.website_url) && (
+          <Card className="bg-card border-border p-4 mb-4">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <LinkIcon className="w-4 h-4" />
+              Social Links
+            </h3>
+            <div className="flex flex-wrap gap-3">
+              {profile.instagram_url && (
+                <a
+                  href={profile.instagram_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Instagram className="w-4 h-4" />
+                  <span className="text-sm font-medium">Instagram</span>
+                </a>
+              )}
+              {profile.twitter_url && (
+                <a
+                  href={profile.twitter_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-400 text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Twitter className="w-4 h-4" />
+                  <span className="text-sm font-medium">Twitter</span>
+                </a>
+              )}
+              {profile.linkedin_url && (
+                <a
+                  href={profile.linkedin_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Linkedin className="w-4 h-4" />
+                  <span className="text-sm font-medium">LinkedIn</span>
+                </a>
+              )}
+              {profile.facebook_url && (
+                <a
+                  href={profile.facebook_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Facebook className="w-4 h-4" />
+                  <span className="text-sm font-medium">Facebook</span>
+                </a>
+              )}
+              {profile.tiktok_url && (
+                <a
+                  href={profile.tiktok_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-foreground text-background rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Mic className="w-4 h-4" />
+                  <span className="text-sm font-medium">TikTok</span>
+                </a>
+              )}
+              {profile.youtube_url && (
+                <a
+                  href={profile.youtube_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <Youtube className="w-4 h-4" />
+                  <span className="text-sm font-medium">YouTube</span>
+                </a>
+              )}
+              {profile.website_url && (
+                <a
+                  href={profile.website_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  <span className="text-sm font-medium">Website</span>
+                </a>
+              )}
+            </div>
           </Card>
         )}
       </div>
