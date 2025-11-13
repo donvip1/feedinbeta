@@ -115,9 +115,9 @@ const Settings = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
+      <header className="sticky top-0 z-50 bg-card/50 backdrop-blur-lg border-b border-border">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -139,7 +139,7 @@ const Settings = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">
-        <Card className="bg-card border-border">
+        <Card className="bg-card/50 backdrop-blur-sm border-border">
           <div className="p-6">
             <h2 className="text-2xl font-bold mb-2 text-foreground">Settings</h2>
             <p className="text-muted-foreground mb-6">
@@ -151,11 +151,11 @@ const Settings = () => {
                 <div key={option.route}>
                   <button
                     onClick={() => navigate(option.route)}
-                    className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-accent/50 transition-colors"
+                    className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-secondary/50 transition-all duration-200"
                   >
                     <div className="flex items-center space-x-4">
-                      <div className={`${option.color}`}>
-                        <option.icon className="w-6 h-6" />
+                      <div className={`${option.color} bg-secondary/30 p-2 rounded-lg`}>
+                        <option.icon className="w-5 h-5" />
                       </div>
                       <div className="text-left">
                         <h3 className="font-semibold text-foreground">{option.title}</h3>
@@ -167,13 +167,13 @@ const Settings = () => {
                     <ChevronRight className="w-5 h-5 text-muted-foreground" />
                   </button>
                   {index < settingsOptions.length - 1 && (
-                    <Separator className="my-2" />
+                    <Separator className="my-2 bg-border/50" />
                   )}
                 </div>
               ))}
             </div>
 
-            <Separator className="my-6" />
+            <Separator className="my-6 bg-border/50" />
 
             <h3 className="text-lg font-semibold mb-4 text-foreground">Content & Discovery</h3>
             <div className="space-y-2">
@@ -181,11 +181,11 @@ const Settings = () => {
                 <button
                   key={option.route}
                   onClick={() => navigate(option.route)}
-                  className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-accent/50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-secondary/50 transition-all duration-200"
                 >
                   <div className="flex items-center space-x-4">
-                    <div className={`${option.color}`}>
-                      <option.icon className="w-6 h-6" />
+                    <div className={`${option.color} bg-secondary/30 p-2 rounded-lg`}>
+                      <option.icon className="w-5 h-5" />
                     </div>
                     <div className="text-left">
                       <h3 className="font-semibold text-foreground">{option.title}</h3>
@@ -197,7 +197,7 @@ const Settings = () => {
               ))}
             </div>
 
-            <Separator className="my-6" />
+            <Separator className="my-6 bg-border/50" />
 
             <h3 className="text-lg font-semibold mb-4 text-foreground">Wallet & Credits</h3>
             <div className="space-y-2">
@@ -205,11 +205,11 @@ const Settings = () => {
                 <button
                   key={option.route}
                   onClick={() => navigate(option.route)}
-                  className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-accent/50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-secondary/50 transition-all duration-200"
                 >
                   <div className="flex items-center space-x-4">
-                    <div className={`${option.color}`}>
-                      <option.icon className="w-6 h-6" />
+                    <div className={`${option.color} bg-secondary/30 p-2 rounded-lg`}>
+                      <option.icon className="w-5 h-5" />
                     </div>
                     <div className="text-left">
                       <h3 className="font-semibold text-foreground">{option.title}</h3>
@@ -224,7 +224,7 @@ const Settings = () => {
         </Card>
 
         {/* Danger Zone */}
-        <Card className="bg-card border-border mt-6">
+        <Card className="bg-card/50 backdrop-blur-sm border-destructive/30 mt-6">
           <div className="p-6">
             <h3 className="text-lg font-bold mb-4 text-destructive">
               Danger Zone
@@ -244,12 +244,12 @@ const Settings = () => {
         </Card>
 
         {/* Sign Out */}
-        <Card className="bg-card border-border mt-6">
+        <Card className="bg-card/50 backdrop-blur-sm border-border mt-6">
           <div className="p-6">
             <Button
               onClick={signOut}
               variant="outline"
-              className="w-full justify-center border-border"
+              className="w-full justify-center border-border text-foreground hover:bg-secondary/50"
             >
               <LogOut className="w-4 h-4 mr-2" />
               Sign Out
