@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2 } from 'lucide-react';
+import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,6 +42,7 @@ interface MessageBubbleProps {
       user_id: string;
       read_at: string;
     }>;
+    status?: 'sending' | 'sent' | 'delivered' | 'read';
   };
   isOwn: boolean;
   onReply: (messageId: string, content: string) => void;
@@ -268,20 +269,34 @@ export const EnhancedMessageBubble = ({
           )}
         </div>
 
-        {/* Timestamp and Read Receipts */}
+        {/* Timestamp and Status */}
         <div className={`flex items-center gap-1 mt-1 px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
           <span className="text-xs text-muted-foreground">
             {format(new Date(message.created_at), 'HH:mm')}
           </span>
-          {isOwn && message.read_receipts && message.read_receipts.length > 0 && (
-            <span className="text-xs text-blue-500" title="Read">
-              ✓✓
-            </span>
-          )}
-          {isOwn && (!message.read_receipts || message.read_receipts.length === 0) && (
-            <span className="text-xs text-muted-foreground/50" title="Sent">
-              ✓
-            </span>
+          {isOwn && (
+            <>
+              {message.status === 'sending' && (
+                <span className="text-xs text-muted-foreground/50" title="Sending">
+                  <Check className="w-3 h-3" />
+                </span>
+              )}
+              {message.status === 'sent' && (
+                <span className="text-xs text-muted-foreground/50" title="Sent">
+                  <Check className="w-3 h-3" />
+                </span>
+              )}
+              {message.status === 'delivered' && (
+                <span className="text-xs text-muted-foreground" title="Delivered">
+                  <CheckCheck className="w-3 h-3" />
+                </span>
+              )}
+              {message.status === 'read' && (
+                <span className="text-xs text-primary" title="Read">
+                  <CheckCheck className="w-3 h-3" />
+                </span>
+              )}
+            </>
           )}
         </div>
       </div>

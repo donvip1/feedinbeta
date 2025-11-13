@@ -42,6 +42,7 @@ interface Message {
     user_id: string;
     read_at: string;
   }>;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
 }
 
 interface ChatInterfaceProps {
@@ -68,12 +69,15 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
-    loadMessages();
-    loadOtherUser();
-    subscribeToMessages();
-    subscribeToTyping();
-    subscribeToReactions();
-    subscribeToReadReceipts();
+    const init = async () => {
+      await loadOtherUser(); // Load other user first
+      await loadMessages();
+      subscribeToMessages();
+      subscribeToTyping();
+      subscribeToReactions();
+      subscribeToReadReceipts();
+    };
+    init();
   }, [conversationId]);
 
   useEffect(() => {
@@ -116,25 +120,32 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         receipts = receiptsData || [];
       }
       
-      const formattedMessages = (data || []).map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        sender_id: msg.sender_id,
-        created_at: msg.created_at,
-        media_url: msg.media_url || null,
-        media_type: msg.media_type || null,
-        reply_to_id: msg.reply_to_id || null,
-        reply_to_message: null,
-        profiles: {
-          display_name: msg.profiles?.display_name || 'Unknown User',
-          avatar_url: msg.profiles?.avatar_url || null,
-        },
-        reactions: msg.reactions || [],
-        read_receipts: receipts.filter(r => r.message_id === msg.id).map(r => ({
-          user_id: r.user_id,
-          read_at: r.read_at
-        })),
-      }));
+      const formattedMessages = (data || []).map(msg => {
+        const msgReceipts = receipts.filter(r => r.message_id === msg.id);
+        const isRead = msgReceipts.length > 0 && msgReceipts.some(r => r.user_id !== user?.id);
+        const isDelivered = msg.sender_id === user?.id; // Delivered if sent by current user
+        
+        return {
+          id: msg.id,
+          content: msg.content,
+          sender_id: msg.sender_id,
+          created_at: msg.created_at,
+          media_url: msg.media_url || null,
+          media_type: msg.media_type || null,
+          reply_to_id: msg.reply_to_id || null,
+          reply_to_message: null,
+          profiles: {
+            display_name: msg.profiles?.display_name || 'Unknown User',
+            avatar_url: msg.profiles?.avatar_url || null,
+          },
+          reactions: msg.reactions || [],
+          read_receipts: msgReceipts.map(r => ({
+            user_id: r.user_id,
+            read_at: r.read_at
+          })),
+          status: isRead ? 'read' : (isDelivered ? 'delivered' : 'sent') as Message['status'],
+        };
+      });
       
       setMessages(formattedMessages);
       
@@ -180,6 +191,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           const row = payload?.new;
           if (!row) return;
 
+          // Use cached otherUser data
           const profile = row.sender_id === user?.id
             ? { display_name: 'You', avatar_url: null }
             : { display_name: otherUser?.display_name || 'Unknown User', avatar_url: otherUser?.avatar_url || null };
@@ -196,6 +208,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
             profiles: profile,
             reactions: [],
             read_receipts: [],
+            status: (row.sender_id === user?.id ? 'delivered' : 'sent') as Message['status'],
           } as Message;
 
           // Avoid duplicates
@@ -266,9 +279,18 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           schema: 'public',
           table: 'message_read_receipts',
         },
-        async () => {
-          // Reload messages to show updated read receipts
-          await loadMessages();
+        async (payload: any) => {
+          const receipt = payload?.new;
+          if (!receipt) return;
+
+          // Update message status optimistically
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === receipt.message_id && receipt.user_id !== user?.id
+                ? { ...msg, status: 'read' as Message['status'], read_receipts: [...(msg.read_receipts || []), { user_id: receipt.user_id, read_at: receipt.read_at }] }
+                : msg
+            )
+          );
         }
       )
       .subscribe();
@@ -356,6 +378,30 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     if (!user || (!newMessage.trim() && !mediaUrl)) return;
 
     setSending(true);
+    
+    // Optimistic message
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMessage: Message = {
+      id: tempId,
+      content: newMessage.trim() || (mediaType?.startsWith('audio') ? '🎤 Voice message' : '📎 Attachment'),
+      sender_id: user.id,
+      created_at: new Date().toISOString(),
+      media_url: mediaUrl || null,
+      media_type: mediaType || null,
+      reply_to_id: replyingTo?.id || null,
+      reply_to_message: null,
+      profiles: {
+        display_name: 'You',
+        avatar_url: null,
+      },
+      reactions: [],
+      read_receipts: [],
+      status: 'sending',
+    };
+
+    setMessages((prev) => [...prev, optimisticMessage]);
+    scrollToBottom();
+
     try {
       const { data: newMsg, error } = await supabase
         .from('messages')
@@ -372,6 +418,20 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
 
       if (error) throw error;
 
+      // Replace optimistic message with real one
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === tempId
+            ? {
+                ...msg,
+                id: newMsg.id,
+                created_at: newMsg.created_at,
+                status: 'delivered' as Message['status'],
+              }
+            : msg
+        )
+      );
+
       await supabase
         .from('typing_indicators')
         .upsert({
@@ -384,6 +444,9 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       setReplyingTo(null);
       setPreviewMedia(null);
     } catch (error: any) {
+      // Remove optimistic message on error
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+      
       toast({
         title: 'Error sending message',
         description: error.message,
@@ -548,10 +611,12 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <h2 className="font-semibold">{otherUser?.display_name || 'Unknown User'}</h2>
-          {otherUser?.username && (
+          <h2 className="font-semibold">{otherUser?.display_name || 'Loading...'}</h2>
+          {isTyping ? (
+            <p className="text-sm text-primary">typing...</p>
+          ) : otherUser?.username ? (
             <p className="text-sm text-muted-foreground">@{otherUser.username}</p>
-          )}
+          ) : null}
         </div>
         
         <div className="flex items-center gap-2">
