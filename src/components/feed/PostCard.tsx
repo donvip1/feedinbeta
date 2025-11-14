@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Play, Pause } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
@@ -62,6 +62,9 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [hasViewed, setHasViewed] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
   const viewStartTimeRef = useRef<number>(Date.now());
 
@@ -71,6 +74,29 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       checkAdminStatus();
     }
   }, [user]);
+
+  // Auto-play video when in view
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video && post.media_type === 'video') {
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              video.play().then(() => setIsPlaying(true)).catch(() => {});
+            } else {
+              video.pause();
+              setIsPlaying(false);
+            }
+          });
+        },
+        { threshold: 0.5 }
+      );
+
+      observer.observe(video);
+      return () => observer.disconnect();
+    }
+  }, [post.media_type]);
 
   const checkAdminStatus = async () => {
     try {
@@ -492,11 +518,124 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
               />
             )}
             {post.media_type === 'video' && (
-              <video
-                src={post.media_url}
-                controls
-                className="w-full h-full object-cover"
-              />
+              <>
+                <video
+                  ref={videoRef}
+                  src={post.media_url}
+                  className="w-full h-full object-cover"
+                  loop
+                  playsInline
+                  muted={isMuted}
+                  onClick={() => {
+                    if (videoRef.current) {
+                      if (isPlaying) {
+                        videoRef.current.pause();
+                        setIsPlaying(false);
+                      } else {
+                        videoRef.current.play();
+                        setIsPlaying(true);
+                      }
+                    }
+                  }}
+                />
+                {/* Video Controls - Top Right */}
+                <div className="absolute top-20 right-4 z-30 flex flex-col space-y-3">
+                  {/* Mute/Unmute */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMuted(!isMuted);
+                    }}
+                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all"
+                  >
+                    {isMuted ? (
+                      <VolumeX className="w-5 h-5 text-white" />
+                    ) : (
+                      <Volume2 className="w-5 h-5 text-white" />
+                    )}
+                  </button>
+                  
+                  {/* Fullscreen */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (videoRef.current) {
+                        if (document.fullscreenElement) {
+                          document.exitFullscreen();
+                        } else {
+                          videoRef.current.requestFullscreen();
+                        }
+                      }
+                    }}
+                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all"
+                  >
+                    <Maximize className="w-5 h-5 text-white" />
+                  </button>
+                  
+                  {/* Video Options Menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all"
+                      >
+                        <MoreVertical className="w-5 h-5 text-white" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="bg-gray-800/95 backdrop-blur-md border-gray-700 z-50" align="end">
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.playbackRate = 0.5;
+                          }
+                        }}
+                        className="text-white hover:bg-gray-700/80"
+                      >
+                        Speed 0.5x
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.playbackRate = 1;
+                          }
+                        }}
+                        className="text-white hover:bg-gray-700/80"
+                      >
+                        Speed 1x
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.playbackRate = 1.5;
+                          }
+                        }}
+                        className="text-white hover:bg-gray-700/80"
+                      >
+                        Speed 1.5x
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          if (videoRef.current) {
+                            videoRef.current.playbackRate = 2;
+                          }
+                        }}
+                        className="text-white hover:bg-gray-700/80"
+                      >
+                        Speed 2x
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                
+                {/* Play/Pause indicator (center) */}
+                {!isPlaying && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+                    <div className="w-20 h-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
+                      <Play className="w-10 h-10 text-white ml-1" />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
