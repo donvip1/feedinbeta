@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
       "react": path.resolve(__dirname, "./node_modules/react"),
       "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
-    dedupe: ["react", "react-dom", "react/jsx-runtime"],
+    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
   optimizeDeps: {
     include: [
@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => ({
       "@radix-ui/react-dialog",
       "@radix-ui/react-tabs",
       "@radix-ui/react-toast",
+      "@radix-ui/react-tooltip",
       "react-router-dom"
     ],
     esbuildOptions: {
