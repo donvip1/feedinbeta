@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
@@ -16,12 +16,26 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      // Force all React imports to resolve to the same instance
+      "react": path.resolve(__dirname, "./node_modules/react"),
+      "react-dom": path.resolve(__dirname, "./node_modules/react-dom"),
     },
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
   },
   optimizeDeps: {
-    include: ["react", "react-dom", "react/jsx-runtime"],
-    force: true,
+    include: [
+      "react", 
+      "react-dom", 
+      "react/jsx-runtime",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-toast",
+      "react-router-dom"
+    ],
+    esbuildOptions: {
+      // Ensure single React instance during optimization
+      mainFields: ["module", "main"],
+    },
   },
   build: {
     // Generate unique build hashes for cache busting
