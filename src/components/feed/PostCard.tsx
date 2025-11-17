@@ -199,13 +199,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-sm">{displayName[0].toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex items-center space-x-2 min-w-0">
-            <span className="font-semibold text-white text-sm cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</span>
-            <span className="text-white/60 text-xs flex-shrink-0">{format(new Date(post.created_at), 'h\'h\'')}</span>
+            <span className="font-semibold text-foreground text-sm cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</span>
+            <span className="text-muted-foreground text-xs flex-shrink-0">{format(new Date(post.created_at), 'h\'h\'')}</span>
           </div>
         </div>
         {(user?.id === post.user_id || isAdmin) && (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0"><MoreVertical className="w-4 h-4 text-white" /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0"><MoreVertical className="w-4 h-4 text-foreground" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-500"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
             </DropdownMenuContent>
@@ -216,7 +216,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       {/* Caption */}
       {post.content && !isTextOnly && (
         <div className="mb-3">
-          <p className="text-white text-sm leading-relaxed">{post.content}</p>
+          <p className="text-foreground text-sm leading-relaxed">{post.content}</p>
         </div>
       )}
 
@@ -262,25 +262,25 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       {/* Social Actions */}
       <div className="flex items-center space-x-5 mt-3 mb-4">
         <button onClick={handleLike} disabled={isLiking} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-          <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
-          <span className="text-white text-xs font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
+          <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
+          <span className="text-foreground text-xs font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
         </button>
         
         <button onClick={() => setShowComments(true)} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-          <MessageCircle className="w-4 h-4 text-white" />
-          <span className="text-white text-xs font-medium">{post.comments_count}</span>
+          <MessageCircle className="w-4 h-4 text-foreground" />
+          <span className="text-foreground text-xs font-medium">{post.comments_count}</span>
         </button>
         
         <button onClick={handleSave} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-          <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-white' : ''} text-white`} />
-          <span className="text-white text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
+          <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-foreground' : ''} text-foreground`} />
+          <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
         </button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-              <Share2 className="w-4 h-4 text-white" />
-              <span className="text-white text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
+              <Share2 className="w-4 h-4 text-foreground" />
+              <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
