@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
+import { FollowersModal } from '@/components/profile/FollowersModal';
 import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark } from 'lucide-react';
 
 interface Profile {
@@ -46,6 +47,8 @@ const Profile = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [showFollowersModal, setShowFollowersModal] = useState(false);
+  const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
 
   const isOwnProfile = user?.id === userId;
 
@@ -371,13 +374,13 @@ const Profile = () => {
               <p className="text-xs text-muted-foreground">Views</p>
             </div>
             
-            <div className="bg-gradient-to-br from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
+            <div className="bg-gradient-to-br from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-xl p-4 text-center backdrop-blur-sm cursor-pointer hover:border-pink-500/40 transition" onClick={() => { setFollowersModalTab('followers'); setShowFollowersModal(true); }}>
               <Heart className="w-6 h-6 text-pink-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{profile.followers_count}</p>
               <p className="text-xs text-muted-foreground">Followers</p>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
+            <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-xl p-4 text-center backdrop-blur-sm cursor-pointer hover:border-purple-500/40 transition" onClick={() => { setFollowersModalTab('following'); setShowFollowersModal(true); }}>
               <UserPlus className="w-6 h-6 text-purple-500 mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{profile.following_count}</p>
               <p className="text-xs text-muted-foreground">Following</p>
@@ -550,6 +553,14 @@ const Profile = () => {
 
       {/* Settings Drawer */}
       <ProfileSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      
+      {/* Followers/Following Modal */}
+      <FollowersModal
+        open={showFollowersModal}
+        onClose={() => setShowFollowersModal(false)}
+        userId={userId || ''}
+        defaultTab={followersModalTab}
+      />
     </div>
   );
 };
