@@ -77,10 +77,17 @@ export const NotificationBell = () => {
       </div>
 
       {showPanel && (
-        <NotificationsPanel
-          onClose={() => setShowPanel(false)}
-          onUpdate={loadUnreadCount}
-        />
+        <>
+          {/* Backdrop overlay */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setShowPanel(false)}
+          />
+          <NotificationsPanel
+            onClose={() => setShowPanel(false)}
+            onUpdate={loadUnreadCount}
+          />
+        </>
       )}
     </>
   );

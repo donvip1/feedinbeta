@@ -61,6 +61,7 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: Comm
   const [submitting, setSubmitting] = useState(false);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
+  const [isReplyActive, setIsReplyActive] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -260,12 +261,14 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: Comm
                   allComments={comments}
                   postOwnerId={postOwnerId}
                   onUpdate={loadComments}
+                  onReplyToggle={setIsReplyActive}
                 />
               ))
             )}
           </div>
 
           {/* Enhanced Comment Input */}
+          {!isReplyActive && (
           <div className="px-6 py-4 border-t border-border bg-card flex-shrink-0">
             <div className="flex items-start space-x-3">
               <Avatar className="w-10 h-10 flex-shrink-0">
@@ -335,6 +338,7 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: Comm
               </div>
             </div>
           </div>
+          )}
         </div>
       </SheetContent>
     </Sheet>
