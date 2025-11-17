@@ -291,7 +291,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         </DropdownMenu>
       </div>
 
-      <CommentsModal open={showComments} onClose={() => { setShowComments(false); onUpdate(); }} postId={post.id} postOwnerId={post.user_id} />
+      <CommentsModal open={showComments} onClose={() => setShowComments(false)} postId={post.id} postOwnerId={post.user_id} post={post} />
       <ProfilePreviewModal open={showProfilePreview} onClose={() => setShowProfilePreview(false)} userId={post.user_id} />
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
