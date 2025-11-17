@@ -3,14 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Play, Pause, Gauge, Repeat2, Copy, Download } from 'lucide-react';
-import { formatDistanceToNow, format } from 'date-fns';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize } from 'lucide-react';
+import { format } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
-import { ReactionPicker } from './ReactionPicker';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,24 +57,21 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [isLiking, setIsLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [showProfilePreview, setShowProfilePreview] = useState(false);
-  const [isRefed, setIsRefed] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const viewTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const viewStartTimeRef = useRef<number>(Date.now());
 
-  // Check if user is admin
   useEffect(() => {
     if (user) {
       checkAdminStatus();
+      checkIfLiked();
+      checkIfSaved();
     }
-  }, [user]);
+  }, [user, post.id]);
 
-  // Auto-play video when in view
   useEffect(() => {
     const video = videoRef.current;
     if (video && post.media_type === 'video') {
@@ -93,7 +88,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         },
         { threshold: 0.5 }
       );
-
       observer.observe(video);
       return () => observer.disconnect();
     }
@@ -101,165 +95,44 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
   const checkAdminStatus = async () => {
     try {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user?.id)
-        .single();
-      
+      const { data } = await supabase.from('user_roles').select('role').eq('user_id', user?.id).single();
       setIsAdmin(data?.role === 'admin' || data?.role === 'moderator');
-    } catch (error) {
-      // Not admin
-    }
+    } catch (error) {}
   };
-
-  // Check if user has liked this post and saved it
-  useEffect(() => {
-    if (user) {
-      checkIfLiked();
-      checkIfSaved();
-      checkIfRefed();
-      checkIfViewed();
-      startViewTimer();
-    }
-
-    return () => {
-      if (viewTimerRef.current) {
-        clearTimeout(viewTimerRef.current);
-      }
-    };
-  }, [user]);
 
   const checkIfLiked = async () => {
     try {
-      const { data } = await supabase
-        .from('post_likes')
-        .select('id')
-        .eq('post_id', post.id)
-        .eq('user_id', user?.id)
-        .single();
-
+      const { data } = await supabase.from('post_likes').select('*').eq('post_id', post.id).eq('user_id', user?.id).maybeSingle();
       setIsLiked(!!data);
-    } catch (error) {
-      // Not liked or error
-    }
+    } catch (error) {}
   };
 
   const checkIfSaved = async () => {
     try {
-      const { data } = await supabase
-        .from('saved_posts')
-        .select('id')
-        .eq('post_id', post.id)
-        .eq('user_id', user?.id)
-        .single();
-
+      const { data } = await supabase.from('saved_posts').select('*').eq('post_id', post.id).eq('user_id', user?.id).maybeSingle();
       setIsSaved(!!data);
-    } catch (error) {
-      // Not saved or error
-    }
-  };
-
-  const checkIfRefed = async () => {
-    try {
-      const { data } = await supabase
-        .from('refeeds')
-        .select('id')
-        .eq('original_post_id', post.id)
-        .eq('refed_by_user_id', user?.id)
-        .single();
-
-      setIsRefed(!!data);
-    } catch (error) {
-      // Not refed or error
-    }
-  };
-
-  const checkIfViewed = async () => {
-    try {
-      const { data } = await supabase
-        .from('post_views')
-        .select('id')
-        .eq('post_id', post.id)
-        .eq('user_id', user?.id)
-        .single();
-
-      setHasViewed(!!data);
-    } catch (error) {
-      // Not viewed or error
-    }
-  };
-
-  const startViewTimer = () => {
-    if (hasViewed) return; // Already viewed this post
-
-    viewStartTimeRef.current = Date.now();
-    
-    // Set timer for 5 seconds
-    viewTimerRef.current = setTimeout(async () => {
-      await trackView(5);
-    }, 5000);
-  };
-
-  const trackView = async (duration: number = 0, engaged: boolean = false) => {
-    if (hasViewed) return; // Don't track duplicate views
-
-    try {
-      await supabase.from('post_views').insert({
-        post_id: post.id,
-        user_id: user?.id,
-        view_duration: duration,
-        engaged: engaged,
-      });
-      setHasViewed(true);
-    } catch (error) {
-      // View tracking is non-critical, ignore unique constraint errors
-    }
+    } catch (error) {}
   };
 
   const handleLike = async () => {
     if (!user || isLiking) return;
-
     setIsLiking(true);
-    const newIsLiked = !isLiked;
-    const newLikesCount = newIsLiked ? localLikesCount + 1 : localLikesCount - 1;
-
-    // Optimistic update
-    setIsLiked(newIsLiked);
-    setLocalLikesCount(newLikesCount);
-
-    // Track as engaged view
-    if (!hasViewed) {
-      const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
-      await trackView(elapsed, true);
-      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
-    }
+    const prev = { liked: isLiked, count: localLikesCount };
+    setIsLiked(!isLiked);
+    setLocalLikesCount(p => isLiked ? p - 1 : p + 1);
 
     try {
-      if (newIsLiked) {
-        const { error } = await supabase.from('post_likes').insert({
-          post_id: post.id,
-          user_id: user.id,
-        });
-        if (error) throw error;
+      if (isLiked) {
+        await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+        await supabase.rpc('decrement_post_likes', { post_id: post.id });
       } else {
-        const { error } = await supabase
-          .from('post_likes')
-          .delete()
-          .eq('post_id', post.id)
-          .eq('user_id', user.id);
-        if (error) throw error;
+        await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
+        await supabase.rpc('increment_post_likes', { post_id: post.id });
       }
     } catch (error: any) {
-      console.error('Error updating like:', error);
-      // Revert on error
-      setIsLiked(!newIsLiked);
-      setLocalLikesCount(localLikesCount);
-      toast({
-        title: 'Unable to update reaction',
-        description: 'Please try again.',
-        variant: 'destructive',
-      });
+      setIsLiked(prev.liked);
+      setLocalLikesCount(prev.count);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     } finally {
       setIsLiking(false);
     }
@@ -267,547 +140,141 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
   const handleSave = async () => {
     if (!user) return;
-
-    const newIsSaved = !isSaved;
-    setIsSaved(newIsSaved);
-
+    const prev = isSaved;
+    setIsSaved(!isSaved);
     try {
-      if (newIsSaved) {
-        const { error } = await supabase.from('saved_posts').insert({
-          post_id: post.id,
-          user_id: user.id,
-        });
-        if (error) throw error;
+      if (isSaved) {
+        await supabase.from('saved_posts').delete().eq('post_id', post.id).eq('user_id', user.id);
+        toast({ title: 'Removed from saved' });
+      } else {
+        await supabase.from('saved_posts').insert({ post_id: post.id, user_id: user.id });
         toast({ title: 'Post saved' });
-      } else {
-        const { error } = await supabase
-          .from('saved_posts')
-          .delete()
-          .eq('post_id', post.id)
-          .eq('user_id', user.id);
-        if (error) throw error;
-        toast({ title: 'Post removed from saved' });
       }
     } catch (error: any) {
-      setIsSaved(!newIsSaved);
-      toast({
-        title: 'Unable to save post',
-        description: 'Please try again.',
-        variant: 'destructive',
-      });
+      setIsSaved(prev);
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
-  const handleRefeed = async () => {
-    if (!user) return;
-
-    // Track as engaged view
-    if (!hasViewed) {
-      const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
-      await trackView(elapsed, true);
-      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
-    }
-
+  const handleShare = async (type: string) => {
     try {
-      if (isRefed) {
-        // Remove refeed
-        await supabase
-          .from('refeeds')
-          .delete()
-          .eq('original_post_id', post.id)
-          .eq('refed_by_user_id', user.id);
-        setIsRefed(false);
-        toast({ title: 'ReFEED removed' });
-      } else {
-        // Add refeed
-        await supabase.from('refeeds').insert({
-          original_post_id: post.id,
-          refed_by_user_id: user.id,
-        });
-        setIsRefed(true);
-        toast({ title: 'Post ReFEEDed to your profile!' });
-      }
-      onUpdate();
-    } catch (error: any) {
-      toast({
-        title: 'Unable to ReFEED',
-        description: 'Please try again.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleShare = async (platform: string) => {
-    if (platform === 'refeed') {
-      handleRefeed();
-      return;
-    }
-
-    // Track as engaged view when sharing
-    if (!hasViewed) {
-      const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
-      await trackView(elapsed, true);
-      if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
-    }
-
-    const shareUrl = `${window.location.origin}/post/${post.id}`;
-    const shareText = `Check out this post on FeedIn: ${post.content?.substring(0, 100) || ''}`;
-
-    try {
-      if (platform === 'copy') {
-        await navigator.clipboard.writeText(shareUrl);
-        toast({ title: 'Link copied to clipboard' });
-      } else if (platform === 'download' && post.media_url) {
-        // Download with watermark
-        const response = await fetch(post.media_url);
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+      if (type === 'copy') {
+        await navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
+        toast({ title: 'Link copied!' });
+      } else if (type === 'download' && post.media_url) {
+        const res = await fetch(post.media_url);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `feedin-${post.feed_id}.${post.media_type === 'video' ? 'mp4' : 'jpg'}`;
-        document.body.appendChild(a);
+        a.download = `feedin-${post.id}.${post.media_type === 'video' ? 'mp4' : 'jpg'}`;
         a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-        toast({ title: 'Media downloaded' });
-      } else {
-        // Share to social platforms
-        const urls: Record<string, string> = {
-          whatsapp: `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`,
-          facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
-          twitter: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`,
-        };
-
-        if (urls[platform]) {
-          window.open(urls[platform], '_blank');
-        }
+        URL.revokeObjectURL(url);
       }
-    } catch (error) {
-      toast({
-        title: 'Error sharing',
-        description: 'Failed to share post',
-        variant: 'destructive',
-      });
+      if (user) await supabase.from('post_shares').insert({ post_id: post.id, user_id: user.id, share_type: type });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
   const handleDelete = async () => {
     try {
-      const { error } = await supabase
-        .from('posts')
-        .update({ status: 'deleted' })
-        .eq('id', post.id);
-
-      if (error) throw error;
-
-      toast({ title: 'Post deleted successfully' });
+      await supabase.from('posts').delete().eq('id', post.id);
+      toast({ title: 'Post deleted' });
       setShowDeleteDialog(false);
       onUpdate();
     } catch (error: any) {
-      toast({
-        title: 'Error deleting post',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
 
-  const handlePromote = () => {
-    // Navigate to promotion page with post ID
-    navigate(`/promote/${post.id}`);
-  };
-
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
-  const timeAgo = formatDistanceToNow(new Date(post.created_at), { addSuffix: true });
-
-  // Dynamic font sizing based on text length (similar to WhatsApp/Facebook statuses)
-  const getTextSize = (text: string) => {
-    const length = text.length;
-    if (length <= 30) return 'text-5xl md:text-6xl';
-    if (length <= 60) return 'text-4xl md:text-5xl';
-    if (length <= 100) return 'text-3xl md:text-4xl';
-    if (length <= 150) return 'text-2xl md:text-3xl';
-    if (length <= 250) return 'text-xl md:text-2xl';
-    return 'text-lg md:text-xl';
-  };
-
-  const getGradientBackground = () => {
-    const gradients = [
-      'from-purple-600 via-purple-500 to-blue-500',
-      'from-pink-500 via-red-500 to-yellow-500',
-      'from-green-500 via-teal-500 to-blue-500',
-      'from-indigo-600 via-purple-600 to-pink-500',
-      'from-orange-500 via-red-500 to-pink-500',
-      'from-blue-600 via-indigo-600 to-purple-600',
-    ];
-    // Use post ID to consistently select same gradient for same post
-    const index = parseInt(post.id.slice(0, 8), 16) % gradients.length;
-    return gradients[index];
-  };
-
   const isTextOnly = !post.media_url && post.content;
 
   return (
-    <div className="relative w-full h-full bg-black rounded-2xl overflow-hidden">
-      {/* Main Content Area */}
-      <div className="relative h-full flex flex-col">
-        {/* Header - Always visible at top */}
-        <div className="absolute top-0 left-0 right-0 z-20 p-4 bg-gradient-to-b from-black/60 to-transparent">
-          <div className="flex items-center space-x-3">
-            <Avatar 
-              className="w-12 h-12 cursor-pointer hover:opacity-80 ring-2 ring-white/20" 
-              onClick={() => navigate(`/profile/${post.user_id}`)}
-            >
-              <AvatarImage src={post.profiles?.avatar_url || ''} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">
-                {displayName.charAt(0).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p 
-                className="font-bold text-white cursor-pointer hover:underline truncate text-lg"
-                onClick={() => navigate(`/profile/${post.user_id}`)}
-              >
-                {displayName}
-              </p>
-              <div className="flex items-center space-x-2 text-sm">
-                {post.profiles?.username && (
-                  <span 
-                    className="cursor-pointer hover:underline text-white/80 truncate"
-                    onClick={() => navigate(`/profile/${post.user_id}`)}
-                  >
-                    @{post.profiles.username}
-                  </span>
-                )}
-                <span className="text-white/60">•</span>
-                <span className="text-white/60">{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
-              </div>
+    <div className="w-full space-y-3 mb-8">
+      {/* User Header BEFORE card */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center space-x-3">
+          <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-border" onClick={() => navigate(`/profile/${post.user_id}`)}>
+            <AvatarImage src={post.profiles?.avatar_url || ''} />
+            <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">{displayName[0].toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-foreground cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</p>
+            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+              {post.profiles?.username && <span className="cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>@{post.profiles.username}</span>}
+              <span>•</span>
+              <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
             </div>
-            
-            {/* Delete Button for Post Owner or Admin */}
-            {(user?.id === post.user_id || isAdmin) && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20"
-                  >
-                    <MoreVertical className="w-5 h-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-gray-800/60 backdrop-blur-md border-gray-700" align="end">
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-400 hover:bg-gray-700/80 hover:text-red-300"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete Post
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
         </div>
+        {(user?.id === post.user_id || isAdmin) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="w-5 h-5" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-500"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
 
-        {/* Media - Full screen like TikTok/Reels */}
+      {/* Post Card */}
+      <div className="relative w-full aspect-[9/16] bg-black rounded-2xl overflow-hidden">
         {post.media_url && (
-          <div className="absolute inset-0 z-0 bg-black">
-            {post.media_type === 'image' && (
-              <img
-                src={post.media_url}
-                alt="Post media"
-                className="w-full h-full object-cover"
-              />
-            )}
+          <div className="absolute inset-0">
+            {post.media_type === 'image' && <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />}
             {post.media_type === 'video' && (
               <>
-                <video
-                  ref={videoRef}
-                  src={post.media_url}
-                  className="w-full h-full object-cover"
-                  loop
-                  playsInline
-                  muted={isMuted}
-                  onClick={() => {
-                    if (videoRef.current) {
-                      if (isPlaying) {
-                        videoRef.current.pause();
-                        setIsPlaying(false);
-                      } else {
-                        videoRef.current.play();
-                        setIsPlaying(true);
-                      }
-                    }
-                  }}
-                />
-                {/* Video Controls - Top Right */}
-                <div className="absolute top-20 right-4 z-30 flex flex-col space-y-3">
-                  {/* Mute/Unmute */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsMuted(!isMuted);
-                    }}
-                    className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center hover:bg-white/20 transition-all"
-                  >
-                    {isMuted ? (
-                      <VolumeX className="w-5 h-5 text-white" />
-                    ) : (
-                      <Volume2 className="w-5 h-5 text-white" />
-                    )}
-                  </button>
-                  
-                  {/* Fullscreen */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (videoRef.current) {
-                        if (document.fullscreenElement) {
-                          document.exitFullscreen();
-                        } else {
-                          videoRef.current.requestFullscreen();
-                        }
-                      }
-                    }}
-                    className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center hover:bg-white/20 transition-all"
-                  >
-                    <Maximize className="w-5 h-5 text-white" />
-                  </button>
-                  
-                  {/* Video Options Menu */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all"
-                      >
-                        <MoreVertical className="w-5 h-5 text-white" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="bg-gray-800/95 backdrop-blur-md border-gray-700 z-50" align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          if (videoRef.current) {
-                            videoRef.current.playbackRate = 0.5;
-                          }
-                        }}
-                        className="text-white hover:bg-gray-700/80"
-                      >
-                        Speed 0.5x
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          if (videoRef.current) {
-                            videoRef.current.playbackRate = 1;
-                          }
-                        }}
-                        className="text-white hover:bg-gray-700/80"
-                      >
-                        Speed 1x
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          if (videoRef.current) {
-                            videoRef.current.playbackRate = 1.5;
-                          }
-                        }}
-                        className="text-white hover:bg-gray-700/80"
-                      >
-                        Speed 1.5x
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          if (videoRef.current) {
-                            videoRef.current.playbackRate = 2;
-                          }
-                        }}
-                        className="text-white hover:bg-gray-700/80"
-                      >
-                        Speed 2x
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                <video ref={videoRef} src={post.media_url} className="w-full h-full object-cover" loop playsInline muted={isMuted} onClick={() => videoRef.current && (isPlaying ? videoRef.current.pause() : videoRef.current.play())} />
+                <div className="absolute top-4 right-4 flex flex-col space-y-3">
+                  <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="hover:opacity-80">{isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}</button>
+                  <button onClick={(e) => { e.stopPropagation(); videoRef.current && (document.fullscreenElement ? document.exitFullscreen() : videoRef.current.requestFullscreen()); }} className="hover:opacity-80"><Maximize className="w-6 h-6 text-white" /></button>
                 </div>
-                
-                {/* Play/Pause indicator (center) */}
-                {!isPlaying && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                    <div className="w-20 h-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
-                      <Play className="w-10 h-10 text-white ml-1" />
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>
         )}
-
-        {/* Text-only post - Full-screen gradient style */}
-        {isTextOnly && post.content && post.content.length <= 150 && (
-          <div className={`absolute inset-0 z-0 flex items-center justify-center bg-gradient-to-br ${getGradientBackground()} p-6 pr-24`}>
-            <p className={`text-white ${getTextSize(post.content)} font-bold text-center leading-relaxed break-words max-w-3xl px-4`} style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-              {post.content}
-            </p>
-          </div>
-        )}
-
-        {/* Text-only post - Compact card style for longer text */}
-        {isTextOnly && post.content && post.content.length > 150 && (
-          <div className="absolute inset-0 z-0 flex items-start justify-center bg-gray-900 p-6 pt-24">
-            <div className="w-full max-w-2xl bg-gray-800/90 backdrop-blur-md rounded-2xl p-6 border border-gray-700/50">
-              <p className="text-white text-xl md:text-2xl font-medium leading-relaxed break-words whitespace-pre-wrap">
-                {post.content}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Content and Actions - Adjusted for text-only posts */}
-        <div className={`absolute bottom-24 left-0 right-0 z-20 p-4 ${isTextOnly ? 'bg-black/40 backdrop-blur-sm' : 'bg-gradient-to-t from-black/80 via-black/50 to-transparent'}`}>
-          {/* Promote Link */}
-          <button
-            onClick={handlePromote}
-            className="text-white/80 hover:text-white text-xs font-medium transition-colors flex items-center"
-          >
-            Promote this post
-          </button>
-        </div>
-
-        {/* Horizontal Social Action Buttons - Bottom */}
-        <div className="absolute bottom-4 left-0 right-0 z-30 flex items-center justify-center space-x-6 pb-2">
-          {/* Like Button */}
-          <button
-            onClick={handleLike}
-            disabled={isLiking}
-            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
-          >
-            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-              <Heart className={`w-5 h-5 ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
-            </div>
-            <span className="text-white text-xs font-bold drop-shadow-lg">{localLikesCount}</span>
-          </button>
-
-          {/* Comment Button */}
-          <button
-            onClick={() => {
-              setShowComments(true);
-              // Track as engaged view when commenting
-              if (!hasViewed) {
-                const elapsed = Math.floor((Date.now() - viewStartTimeRef.current) / 1000);
-                trackView(elapsed, true);
-                if (viewTimerRef.current) clearTimeout(viewTimerRef.current);
-              }
-            }}
-            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
-          >
-            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-              <MessageCircle className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-white text-xs font-bold drop-shadow-lg">{post.comments_count}</span>
-          </button>
-
-          {/* Share Button */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95">
-                <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-                  <Share2 className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-xs font-bold drop-shadow-lg">Share</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent className="bg-gray-800/60 backdrop-blur-md border-gray-700" align="center">
-              <DropdownMenuItem onClick={() => handleShare('refeed')} className="text-white hover:bg-gray-700/80">
-                {isRefed ? '✓ ReFEEDed' : '🔄 ReFEED Post'}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShare('whatsapp')} className="text-white hover:bg-gray-700/80">
-                Share to WhatsApp
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShare('facebook')} className="text-white hover:bg-gray-700/80">
-                Share to Facebook
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShare('twitter')} className="text-white hover:bg-gray-700/80">
-                Share to Twitter
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleShare('copy')} className="text-white hover:bg-gray-700/80">
-                Copy Link
-              </DropdownMenuItem>
-              {post.media_url && (
-                <DropdownMenuItem onClick={() => handleShare('download')} className="text-white hover:bg-gray-700/80">
-                  Download Media
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Save/Bookmark Button */}
-          <button
-            onClick={handleSave}
-            className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
-          >
-            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-              <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
-            </div>
-            <span className="text-white text-xs font-bold drop-shadow-lg">Save</span>
-          </button>
-
-          {/* Views Counter */}
-          <div className="flex flex-col items-center space-y-1">
-            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
-              <Eye className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-white text-xs font-bold drop-shadow-lg">{post.views_count}</span>
-          </div>
-        </div>
-
-        {/* Caption and timestamp at absolute bottom */}
-        {post.media_url && post.content && (
-          <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-2 bg-gradient-to-t from-black/90 to-transparent">
-            <p className="text-white text-sm mb-1 drop-shadow-lg line-clamp-2">{post.content}</p>
-            <p className="text-white/60 text-xs drop-shadow-lg">{format(new Date(post.created_at), 'MMM d, yyyy • h:mm a')}</p>
-          </div>
-        )}
+        {isTextOnly && post.content && <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500 p-8"><p className="text-white font-bold text-center text-3xl">{post.content}</p></div>}
+        {post.media_url && post.content && <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90"><p className="text-white text-sm line-clamp-2">{post.content}</p></div>}
       </div>
 
-      {/* Comments Modal */}
-      <CommentsModal
-        open={showComments}
-        onClose={() => {
-          setShowComments(false);
-          onUpdate();
-        }}
-        postId={post.id}
-        postOwnerId={post.user_id}
-      />
+      {/* Social Buttons BELOW card */}
+      <div className="flex items-center justify-around px-4 py-2">
+        <button onClick={handleLike} disabled={isLiking} className="flex flex-col items-center space-y-1 hover:scale-110 transition">
+          <Heart className={`w-7 h-7 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
+          <span className="text-xs font-bold text-foreground">{localLikesCount}</span>
+        </button>
+        <button onClick={() => setShowComments(true)} className="flex flex-col items-center space-y-1 hover:scale-110 transition">
+          <MessageCircle className="w-7 h-7 text-foreground" />
+          <span className="text-xs font-bold text-foreground">{post.comments_count}</span>
+        </button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><button className="flex flex-col items-center space-y-1 hover:scale-110 transition"><Share2 className="w-7 h-7 text-foreground" /><span className="text-xs font-bold text-foreground">Share</span></button></DropdownMenuTrigger>
+          <DropdownMenuContent align="center">
+            <DropdownMenuItem onClick={() => handleShare('copy')}>Copy Link</DropdownMenuItem>
+            {post.media_url && <DropdownMenuItem onClick={() => handleShare('download')}>Download</DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <button onClick={handleSave} className="flex flex-col items-center space-y-1 hover:scale-110 transition">
+          <Bookmark className={`w-7 h-7 ${isSaved ? 'fill-current' : ''} text-foreground`} />
+          <span className="text-xs font-bold text-foreground">Save</span>
+        </button>
+        <div className="flex flex-col items-center space-y-1">
+          <Eye className="w-7 h-7 text-foreground" />
+          <span className="text-xs font-bold text-foreground">{post.views_count}</span>
+        </div>
+      </div>
 
-      {/* Profile Preview Modal */}
-      <ProfilePreviewModal
-        open={showProfilePreview}
-        onClose={() => setShowProfilePreview(false)}
-        userId={post.user_id}
-      />
+      {/* Promote at end */}
+      <div className="px-4"><button onClick={() => navigate(`/promote/${post.id}`)} className="text-muted-foreground hover:text-foreground text-sm">Promote this post</button></div>
 
-      {/* Delete Confirmation Dialog */}
+      <CommentsModal open={showComments} onClose={() => { setShowComments(false); onUpdate(); }} postId={post.id} postOwnerId={post.user_id} />
+      <ProfilePreviewModal open={showProfilePreview} onClose={() => setShowProfilePreview(false)} userId={post.user_id} />
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="bg-gray-900 border-gray-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Delete Post?</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-400">
-              This will permanently delete this post. All likes, comments, views, and shares will be lost. This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-gray-800 text-white hover:bg-gray-700 border-gray-700">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 text-white hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Delete Post?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this post.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive">Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
