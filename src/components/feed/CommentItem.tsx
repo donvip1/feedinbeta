@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Heart, MessageCircle, Trash2, Send } from 'lucide-react';
+import { Heart, MessageCircle, Trash2, Send, AtSign } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { ReactionPicker } from './ReactionPicker';
+import { UserMentionPicker } from './UserMentionPicker';
+import { CommentText } from './CommentText';
 
 interface Comment {
   id: string;
@@ -50,6 +52,9 @@ export const CommentItem = ({
   const [replyText, setReplyText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showReplies, setShowReplies] = useState(level < 2); // Auto-expand first 2 levels
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const displayName =
     comment.profiles?.display_name || comment.profiles?.username || 'Anonymous';
@@ -90,6 +95,34 @@ export const CommentItem = ({
     }
   };
 
+  const handleTextChange = (value: string) => {
+    setReplyText(value);
+    
+    // Check for @ mention
+    const lastAtIndex = value.lastIndexOf('@');
+    if (lastAtIndex !== -1) {
+      const textAfterAt = value.substring(lastAtIndex + 1);
+      const hasSpace = textAfterAt.includes(' ');
+      
+      if (!hasSpace && textAfterAt.length > 0) {
+        setMentionSearch(textAfterAt);
+        setShowMentions(true);
+      } else {
+        setShowMentions(false);
+      }
+    } else {
+      setShowMentions(false);
+    }
+  };
+
+  const handleMentionSelect = (username: string) => {
+    const lastAtIndex = replyText.lastIndexOf('@');
+    const newText = replyText.substring(0, lastAtIndex) + '@' + username + ' ';
+    setReplyText(newText);
+    setShowMentions(false);
+    textareaRef.current?.focus();
+  };
+
   const handleReply = async () => {
     if (!user || !replyText.trim()) return;
 
@@ -106,6 +139,7 @@ export const CommentItem = ({
 
       setReplyText('');
       setShowReply(false);
+      setShowMentions(false);
       onReplyToggle?.(false);
       setShowReplies(true);
       onUpdate();
@@ -172,7 +206,7 @@ export const CommentItem = ({
                 </span>
               )}
             </div>
-            <p className="text-sm text-white whitespace-pre-wrap">{comment.content}</p>
+            <CommentText content={comment.content} className="text-sm text-white whitespace-pre-wrap" />
           </div>
 
           <div className="flex items-center space-x-4 mt-1 ml-2">
@@ -217,29 +251,52 @@ export const CommentItem = ({
 
           {/* Reply Input */}
           {showReply && (
-            <div className="flex items-end space-x-2 mt-2">
-              <Textarea
-                placeholder="Write a reply..."
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white text-sm resize-none"
-                rows={2}
-                disabled={submitting}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleReply();
-                  }
-                }}
-              />
-              <Button
-                onClick={handleReply}
-                disabled={submitting || !replyText.trim()}
-                size="icon"
-                className="bg-gradient-to-r from-pink-500 to-blue-500 h-8 w-8"
-              >
-                <Send className="w-3 h-3" />
-              </Button>
+            <div className="mt-2 space-y-2">
+              <div className="flex items-end space-x-2 relative">
+                {showMentions && (
+                  <div className="absolute bottom-full mb-2 left-0 right-12 z-10">
+                    <UserMentionPicker
+                      searchTerm={mentionSearch}
+                      onSelect={handleMentionSelect}
+                      show={showMentions}
+                    />
+                  </div>
+                )}
+                <Textarea
+                  ref={textareaRef}
+                  placeholder="Write a reply..."
+                  value={replyText}
+                  onChange={(e) => handleTextChange(e.target.value)}
+                  className="bg-gray-800 border-gray-700 text-white text-sm resize-none"
+                  rows={2}
+                  disabled={submitting}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleReply();
+                    }
+                  }}
+                />
+                <div className="flex flex-col space-y-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowMentions(!showMentions)}
+                    className="text-gray-400 hover:text-white h-8 w-8"
+                  >
+                    <AtSign className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    onClick={handleReply}
+                    disabled={submitting || !replyText.trim()}
+                    size="icon"
+                    className="bg-gradient-to-r from-pink-500 to-blue-500 h-8 w-8"
+                  >
+                    <Send className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
