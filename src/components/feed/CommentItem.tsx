@@ -30,6 +30,7 @@ interface CommentItemProps {
   allComments: Comment[];
   postOwnerId: string;
   onUpdate: () => void;
+  onReplyToggle?: (isActive: boolean) => void;
   level?: number;
 }
 
@@ -38,6 +39,7 @@ export const CommentItem = ({
   allComments,
   postOwnerId,
   onUpdate,
+  onReplyToggle,
   level = 0,
 }: CommentItemProps) => {
   const { user } = useAuth();
@@ -104,6 +106,7 @@ export const CommentItem = ({
 
       setReplyText('');
       setShowReply(false);
+      onReplyToggle?.(false);
       setShowReplies(true);
       onUpdate();
     } catch (error: any) {
@@ -186,7 +189,10 @@ export const CommentItem = ({
             </Button>
 
             <Button
-              onClick={() => setShowReply(!showReply)}
+              onClick={() => {
+                setShowReply(!showReply);
+                onReplyToggle?.(!showReply);
+              }}
               variant="ghost"
               size="sm"
               className="h-auto p-0 text-xs text-gray-400 hover:text-blue-500"
@@ -256,11 +262,12 @@ export const CommentItem = ({
                   {replies.map((reply) => (
                     <CommentItem
                       key={reply.id}
-                      comment={reply}
-                      allComments={allComments}
-                      postOwnerId={postOwnerId}
-                      onUpdate={onUpdate}
-                      level={level + 1}
+                  comment={reply}
+                  allComments={allComments}
+                  postOwnerId={postOwnerId}
+                  onUpdate={onUpdate}
+                  onReplyToggle={onReplyToggle}
+                  level={level + 1}
                     />
                   ))}
                 </>
