@@ -190,7 +190,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const isTextOnly = !post.media_url && post.content;
 
   return (
-    <div className="w-full space-y-3 mb-8">
+    <div className="w-full space-y-3 mb-12 pb-4">
       {/* User Header BEFORE card */}
       <div className="flex items-center justify-between px-2">
         <div className="flex items-center space-x-3">
@@ -199,8 +199,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">{displayName[0].toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-foreground cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</p>
-            <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <p className="font-bold text-white cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</p>
+            <div className="flex items-center space-x-2 text-sm text-white/80">
               {post.profiles?.username && <span className="cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>@{post.profiles.username}</span>}
               <span>•</span>
               <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
@@ -238,7 +238,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       </div>
 
       {/* Social Buttons BELOW card */}
-      <div className="flex items-center justify-around px-4 py-2">
+      <div className="flex items-center justify-around px-4 py-3 bg-card/50 rounded-lg">
         <button onClick={handleLike} disabled={isLiking} className="flex flex-col items-center space-y-1 hover:scale-110 transition">
           <Heart className={`w-7 h-7 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
           <span className="text-xs font-bold text-foreground">{localLikesCount}</span>
@@ -264,8 +264,17 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         </div>
       </div>
 
+      {/* Caption if not overlaid */}
+      {!isTextOnly && post.content && !post.media_url && (
+        <div className="px-4 text-foreground text-sm">{post.content}</div>
+      )}
+
       {/* Promote at end */}
-      <div className="px-4"><button onClick={() => navigate(`/promote/${post.id}`)} className="text-muted-foreground hover:text-foreground text-sm">Promote this post</button></div>
+      <div className="px-4 pt-2 border-t border-border/30">
+        <button onClick={() => navigate(`/promote/${post.id}`)} className="text-muted-foreground hover:text-foreground text-sm">
+          Promote this post
+        </button>
+      </div>
 
       <CommentsModal open={showComments} onClose={() => { setShowComments(false); onUpdate(); }} postId={post.id} postOwnerId={post.user_id} />
       <ProfilePreviewModal open={showProfilePreview} onClose={() => setShowProfilePreview(false)} userId={post.user_id} />
