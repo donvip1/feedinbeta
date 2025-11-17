@@ -6,10 +6,11 @@ import { useAuth } from '@/hooks/useAuth';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Play, Pause } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, TrendingUp, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Play, Pause, Gauge, Repeat2, Copy, Download } from 'lucide-react';
+import { formatDistanceToNow, format } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
+import { ReactionPicker } from './ReactionPicker';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -478,6 +479,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                     @{post.profiles.username}
                   </span>
                 )}
+                <span className="text-white/60">•</span>
+                <span className="text-white/60">{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
               </div>
             </div>
             
@@ -546,7 +549,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                       e.stopPropagation();
                       setIsMuted(!isMuted);
                     }}
-                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all"
+                    className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center hover:bg-white/20 transition-all"
                   >
                     {isMuted ? (
                       <VolumeX className="w-5 h-5 text-white" />
@@ -567,7 +570,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
                         }
                       }
                     }}
-                    className="w-10 h-10 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center hover:bg-black/70 transition-all"
+                    className="w-10 h-10 rounded-full border-2 border-white flex items-center justify-center hover:bg-white/20 transition-all"
                   >
                     <Maximize className="w-5 h-5 text-white" />
                   </button>
@@ -662,23 +665,6 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
         {/* Content and Actions - Adjusted for text-only posts */}
         <div className={`absolute bottom-24 left-0 right-0 z-20 p-4 ${isTextOnly ? 'bg-black/40 backdrop-blur-sm' : 'bg-gradient-to-t from-black/80 via-black/50 to-transparent'}`}>
-          {/* Content - Only show if there's media */}
-          {post.media_url && post.content && (
-            <p className="text-white mb-2 whitespace-pre-wrap text-base line-clamp-3">
-              {post.content}
-            </p>
-          )}
-
-          {/* Time */}
-          <p className="text-white/60 text-xs mb-1">{timeAgo}</p>
-
-          {/* Music Title - Placeholder for future implementation */}
-          {post.media_type === 'video' && (
-            <p className="text-white/70 text-xs mb-3 italic">
-              🎵 Original Audio
-            </p>
-          )}
-
           {/* Promote Link */}
           <button
             onClick={handlePromote}
@@ -696,12 +682,10 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             disabled={isLiking}
             className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-              isLiked ? 'bg-pink-500' : 'bg-white/10 backdrop-blur-sm'
-            } shadow-lg`}>
+            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
               <Heart className={`w-5 h-5 ${isLiked ? 'fill-white text-white' : 'text-white'}`} />
             </div>
-            <span className="text-white text-xs font-bold">{localLikesCount}</span>
+            <span className="text-white text-xs font-bold drop-shadow-lg">{localLikesCount}</span>
           </button>
 
           {/* Comment Button */}
@@ -717,20 +701,20 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             }}
             className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
               <MessageCircle className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white text-xs font-bold">{post.comments_count}</span>
+            <span className="text-white text-xs font-bold drop-shadow-lg">{post.comments_count}</span>
           </button>
 
           {/* Share Button */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95">
-                <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
                   <Share2 className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white text-xs font-bold">Share</span>
+                <span className="text-white text-xs font-bold drop-shadow-lg">Share</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="bg-gray-800/60 backdrop-blur-md border-gray-700" align="center">
@@ -762,22 +746,28 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
             onClick={handleSave}
             className="flex flex-col items-center space-y-1 transform transition-transform hover:scale-110 active:scale-95"
           >
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-              isSaved ? 'bg-yellow-500' : 'bg-white/10 backdrop-blur-sm'
-            } shadow-lg`}>
+            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
               <Bookmark className={`w-5 h-5 ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
             </div>
-            <span className="text-white text-xs font-bold">Save</span>
+            <span className="text-white text-xs font-bold drop-shadow-lg">Save</span>
           </button>
 
           {/* Views Counter */}
           <div className="flex flex-col items-center space-y-1">
-            <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-full border-2 border-white flex items-center justify-center shadow-lg">
               <Eye className="w-5 h-5 text-white" />
             </div>
-            <span className="text-white text-xs font-bold">{post.views_count}</span>
+            <span className="text-white text-xs font-bold drop-shadow-lg">{post.views_count}</span>
           </div>
         </div>
+
+        {/* Caption and timestamp at absolute bottom */}
+        {post.media_url && post.content && (
+          <div className="absolute bottom-0 left-0 right-0 z-10 p-4 pb-2 bg-gradient-to-t from-black/90 to-transparent">
+            <p className="text-white text-sm mb-1 drop-shadow-lg line-clamp-2">{post.content}</p>
+            <p className="text-white/60 text-xs drop-shadow-lg">{format(new Date(post.created_at), 'MMM d, yyyy • h:mm a')}</p>
+          </div>
+        )}
       </div>
 
       {/* Comments Modal */}

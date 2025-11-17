@@ -9,6 +9,7 @@ import { PostCard } from '@/components/feed/PostCard';
 import { EnhancedCreatePostModal } from '@/components/feed/EnhancedCreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -260,12 +261,15 @@ const Feed = () => {
             </TabsList>
           </Tabs>
 
-          <button 
-            onClick={() => setShowSearch(!showSearch)}
-            className="w-10 h-10 flex items-center justify-center"
-          >
-            {showSearch ? <X className="w-6 h-6 text-white" /> : <Search className="w-6 h-6 text-white" />}
-          </button>
+          <div className="flex items-center space-x-2">
+            <NotificationBell />
+            <button 
+              onClick={() => setShowSearch(!showSearch)}
+              className="w-10 h-10 flex items-center justify-center"
+            >
+              {showSearch ? <X className="w-6 h-6 text-white" /> : <Search className="w-6 h-6 text-white" />}
+            </button>
+          </div>
         </div>
         
         {showSearch && (
