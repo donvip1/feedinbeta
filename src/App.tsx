@@ -1,6 +1,6 @@
 import React from "react";
 import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
+
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -48,7 +48,7 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <TooltipProvider>
+          
             <Toaster />
             <AuthProvider>
             <Routes>
@@ -89,7 +89,7 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
-        </TooltipProvider>
+        
       </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>
