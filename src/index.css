@@ -4,17 +4,18 @@
 
 @layer base {
   :root {
-    --background: 220 25% 98%;
-    --foreground: 220 15% 10%;
+    /* Light mode - for pages with light backgrounds */
+    --background: 0 0% 100%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 220 15% 10%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 15% 10%;
+    --popover-foreground: 222 47% 11%;
     --primary: 230 85% 60%;
     --primary-foreground: 0 0% 100%;
     --primary-glow: 245 75% 70%;
     --secondary: 220 15% 92%;
-    --secondary-foreground: 220 15% 10%;
+    --secondary-foreground: 222 47% 11%;
     --muted: 220 15% 92%;
     --muted-foreground: 220 10% 45%;
     --accent: 280 70% 65%;
@@ -29,7 +30,7 @@
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(230, 85%, 60%), hsl(245, 75%, 70%));
     --gradient-accent: linear-gradient(135deg, hsl(230, 85%, 60%), hsl(280, 70%, 65%));
-    --gradient-subtle: linear-gradient(180deg, hsl(220, 25%, 98%), hsl(220, 20%, 96%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0, 0%, 100%), hsl(0, 0%, 98%));
     
     /* Shadows */
     --shadow-elegant: 0 10px 30px -10px hsl(230 85% 60% / 0.25);
@@ -40,31 +41,32 @@
   }
 
   .dark {
-    --background: 220 20% 8%;
-    --foreground: 220 15% 98%;
-    --card: 220 18% 12%;
-    --card-foreground: 220 15% 98%;
-    --popover: 220 18% 12%;
-    --popover-foreground: 220 15% 98%;
+    /* Dark mode - default for most pages */
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 15%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 15%;
+    --popover-foreground: 210 40% 98%;
     --primary: 230 85% 60%;
     --primary-foreground: 0 0% 100%;
     --primary-glow: 245 75% 70%;
-    --secondary: 220 15% 18%;
-    --secondary-foreground: 220 15% 98%;
-    --muted: 220 15% 18%;
-    --muted-foreground: 220 10% 70%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
     --accent: 280 70% 65%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 20%;
-    --input: 220 15% 20%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
     --ring: 230 85% 60%;
     
-    /* Gradients - same but work well in dark mode */
+    /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(230, 85%, 60%), hsl(245, 75%, 70%));
     --gradient-accent: linear-gradient(135deg, hsl(230, 85%, 60%), hsl(280, 70%, 65%));
-    --gradient-subtle: linear-gradient(180deg, hsl(220, 20%, 8%), hsl(220, 18%, 10%));
+    --gradient-subtle: linear-gradient(180deg, hsl(222, 47%, 11%), hsl(222, 47%, 13%));
     
     /* Shadows */
     --shadow-elegant: 0 10px 30px -10px hsl(230 85% 60% / 0.4);

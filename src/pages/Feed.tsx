@@ -224,16 +224,16 @@ const Feed = () => {
 
   if (authLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-black">
+      <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* TikTok-style Header with Tabs */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-lg">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Header with Tabs */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-lg border-b border-border">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="w-10"></div>
           
@@ -242,19 +242,19 @@ const Feed = () => {
             <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center space-x-6">
               <TabsTrigger 
                 value="following" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 Following
               </TabsTrigger>
               <TabsTrigger 
                 value="forYou" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 For You
               </TabsTrigger>
               <TabsTrigger 
                 value="myPosts" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-gray-400 data-[state=active]:text-white text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-white rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 My Posts
               </TabsTrigger>
@@ -267,7 +267,7 @@ const Feed = () => {
               onClick={() => setShowSearch(!showSearch)}
               className="w-10 h-10 flex items-center justify-center"
             >
-              {showSearch ? <X className="w-6 h-6 text-white" /> : <Search className="w-6 h-6 text-white" />}
+              {showSearch ? <X className="w-6 h-6 text-foreground" /> : <Search className="w-6 h-6 text-foreground" />}
             </button>
           </div>
         </div>
@@ -279,7 +279,7 @@ const Feed = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && loadPosts()}
-              className="bg-gray-900 border-gray-800 text-white placeholder:text-gray-500"
+              className="bg-card border-border text-foreground placeholder:text-muted-foreground"
             />
           </div>
         )}
@@ -291,7 +291,7 @@ const Feed = () => {
           {loading ? (
             <div className="space-y-6 p-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-gray-900 rounded-2xl p-6 space-y-4">
+                <div key={i} className="bg-card rounded-2xl p-6 space-y-4">
                   <div className="flex items-center space-x-3">
                     <Skeleton className="w-12 h-12 rounded-full" />
                     <div className="space-y-2">
@@ -306,7 +306,7 @@ const Feed = () => {
           ) : posts.length === 0 ? (
             <div className="flex items-center justify-center h-full px-4">
               <div className="text-center">
-                <p className="text-gray-400 text-lg mb-4">
+                <p className="text-muted-foreground text-lg mb-4">
                   {activeTab === 'following' ? 'Follow users to see their posts' : 
                    activeTab === 'myPosts' ? 'Create your first post' : 
                    'No posts yet'}
