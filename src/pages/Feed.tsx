@@ -286,46 +286,41 @@ const Feed = () => {
       </header>
 
       {/* Full-screen TikTok-style Feed */}
-      <main className="fixed inset-0 top-14 bottom-16 overflow-y-auto snap-y snap-mandatory scroll-smooth">
-        {loading ? (
-          <div className="space-y-6 p-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-gray-900 rounded-2xl p-6 space-y-4">
-                <div className="flex items-center space-x-3">
-                  <Skeleton className="w-12 h-12 rounded-full" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
+      <main className="fixed inset-0 top-14 bottom-16 overflow-y-auto">
+        <div className="max-w-md mx-auto">
+          {loading ? (
+            <div className="space-y-6 p-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-gray-900 rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <Skeleton className="w-12 h-12 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
                   </div>
+                  <Skeleton className="h-96 w-full" />
                 </div>
-                <Skeleton className="h-96 w-full" />
-              </div>
-            ))}
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="flex items-center justify-center h-full px-4">
-            <div className="text-center">
-              <p className="text-gray-400 text-lg mb-4">
-                {activeTab === 'following' ? 'Follow users to see their posts' : 
-                 activeTab === 'myPosts' ? 'Create your first post' : 
-                 'No posts yet'}
-              </p>
+              ))}
             </div>
-          </div>
-        ) : (
-          <>
-            {posts.map((post) => (
-              <div 
-                key={post.id} 
-                className="snap-start snap-always h-full w-full flex items-center justify-center px-4 py-2"
-              >
-                <div className="w-full h-full max-w-2xl">
-                  <PostCard post={post} onUpdate={loadPosts} />
-                </div>
+          ) : posts.length === 0 ? (
+            <div className="flex items-center justify-center h-full px-4">
+              <div className="text-center">
+                <p className="text-gray-400 text-lg mb-4">
+                  {activeTab === 'following' ? 'Follow users to see their posts' : 
+                   activeTab === 'myPosts' ? 'Create your first post' : 
+                   'No posts yet'}
+                </p>
               </div>
-            ))}
-          </>
-        )}
+            </div>
+          ) : (
+            <>
+              {posts.map((post) => (
+                <PostCard key={post.id} post={post} onUpdate={loadPosts} />
+              ))}
+            </>
+          )}
+        </div>
       </main>
 
       {/* Quick Actions Modal */}

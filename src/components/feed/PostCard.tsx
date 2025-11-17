@@ -190,9 +190,9 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const isTextOnly = !post.media_url && post.content;
 
   return (
-    <div className="w-full mb-16 pb-4">
+    <div className="w-full mb-16 pb-4 px-4">
       {/* User Header */}
-      <div className="flex items-center justify-between px-3 mb-3">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2 flex-1 min-w-0">
           <Avatar className="w-10 h-10 cursor-pointer flex-shrink-0" onClick={() => navigate(`/profile/${post.user_id}`)}>
             <AvatarImage src={post.profiles?.avatar_url || ''} />
@@ -215,13 +215,13 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
 
       {/* Caption */}
       {post.content && !isTextOnly && (
-        <div className="px-3 mb-3">
+        <div className="mb-3">
           <p className="text-white text-sm leading-relaxed">{post.content}</p>
         </div>
       )}
 
       {/* Media Card */}
-      <div className="relative w-full aspect-[9/16] bg-black rounded-xl overflow-hidden mx-3" style={{ maxWidth: 'calc(100% - 24px)' }}>
+      <div className="relative w-full aspect-[9/16] bg-black rounded-xl overflow-hidden">
         {post.media_url && (
           <div className="absolute inset-0">
             {post.media_type === 'image' && <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />}
@@ -248,7 +248,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       </div>
 
       {/* Social Actions */}
-      <div className="flex items-center space-x-5 px-3 mt-3 mb-4">
+      <div className="flex items-center space-x-5 mt-3 mb-4">
         <button onClick={handleLike} disabled={isLiking} className="flex items-center space-x-1.5 hover:opacity-70 transition">
           <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
           <span className="text-white text-xs font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
