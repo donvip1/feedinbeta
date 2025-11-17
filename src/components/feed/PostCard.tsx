@@ -124,10 +124,8 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
     try {
       if (isLiked) {
         await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
-        await supabase.rpc('decrement_post_likes', { post_id: post.id });
       } else {
         await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
-        await supabase.rpc('increment_post_likes', { post_id: post.id });
       }
     } catch (error: any) {
       setIsLiked(prev.liked);
