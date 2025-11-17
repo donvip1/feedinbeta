@@ -39,14 +39,36 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
     }
 
     // Navigate based on type
-    if (notification.related_type === 'post') {
-      navigate('/feed');
-    } else if (notification.related_type === 'comment') {
-      navigate('/feed');
-    } else if (notification.related_type === 'conversation') {
-      navigate('/messages');
-    } else if (notification.related_type === 'profile' && notification.related_id) {
+    if (notification.type === 'like' && notification.related_id) {
+      // For likes, get the post ID and navigate to it
+      navigate('/feed', { state: { postId: notification.related_id } });
+    } else if (notification.type === 'comment' && notification.related_id) {
+      // For comments, get the comment to find the post_id
+      try {
+        const { data: comment } = await supabase
+          .from('post_comments')
+          .select('post_id')
+          .eq('id', notification.related_id)
+          .single();
+        
+        if (comment?.post_id) {
+          navigate('/feed', { state: { postId: comment.post_id, commentId: notification.related_id } });
+        }
+      } catch (error) {
+        console.error('Error fetching comment:', error);
+        navigate('/feed');
+      }
+    } else if (notification.type === 'message' && notification.related_id) {
+      // For messages, navigate to the specific conversation
+      navigate('/messages', { state: { conversationId: notification.related_id } });
+    } else if ((notification.type === 'follow' || notification.related_type === 'profile') && notification.related_id) {
+      // For follows, navigate to the user's profile
       navigate(`/profile/${notification.related_id}`);
+    } else if (notification.related_type === 'post' && notification.related_id) {
+      navigate('/feed', { state: { postId: notification.related_id } });
+    } else {
+      // Default navigation
+      navigate('/feed');
     }
     
     onClose();

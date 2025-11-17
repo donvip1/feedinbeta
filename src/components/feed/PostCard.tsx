@@ -271,7 +271,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
           <span className="text-foreground text-xs font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
         </button>
         
-        <button onClick={() => setShowComments(true)} className="flex items-center space-x-1.5 hover:opacity-70 transition">
+        <button onClick={() => setShowComments(true)} data-comment-button className="flex items-center space-x-1.5 hover:opacity-70 transition">
           <MessageCircle className="w-4 h-4 text-foreground" />
           <span className="text-foreground text-xs font-medium">{post.comments_count}</span>
         </button>
