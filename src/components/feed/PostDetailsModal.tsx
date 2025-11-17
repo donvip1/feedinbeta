@@ -92,6 +92,26 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
   const handlePost = async (action: 'post' | 'draft' | 'schedule') => {
     if (!user) return;
 
+    // Validate text-only posts
+    if (mediaType === 'text') {
+      if (!description.trim()) {
+        toast({
+          title: 'Content required',
+          description: 'Please add some text to your post',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (description.length > 700) {
+        toast({
+          title: 'Text too long',
+          description: 'Text posts are limited to 700 characters',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       let finalMediaUrl = mediaUrl;
@@ -254,15 +274,25 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  placeholder="What's on your mind? Use #hashtags and @mentions"
+                  placeholder={mediaType === 'text' ? "Share what's on your mind..." : "What's on your mind? Use #hashtags and @mentions"}
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (mediaType === 'text' && value.length > 700) return;
+                    setDescription(value);
+                  }}
+                  rows={mediaType === 'text' ? 6 : 4}
                   className="mt-2"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Use # for hashtags and @ to mention friends
-                </p>
+                {mediaType === 'text' ? (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {description.length}/700 characters
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Use # for hashtags and @ to mention friends
+                  </p>
+                )}
               </div>
 
               {/* Location */}

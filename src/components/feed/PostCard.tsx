@@ -241,8 +241,20 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </div>
         )}
         {isTextOnly && post.content && (
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500 p-8">
-            <p className="text-white font-bold text-center text-2xl">{post.content}</p>
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 p-8">
+            <div className="w-full max-w-lg">
+              <p className="text-white font-semibold text-center leading-relaxed" 
+                 style={{
+                   fontSize: post.content.length < 50 ? '2rem' : 
+                            post.content.length < 150 ? '1.75rem' :
+                            post.content.length < 300 ? '1.5rem' : '1.25rem',
+                   lineHeight: post.content.length < 50 ? '2.5rem' : 
+                              post.content.length < 150 ? '2.25rem' :
+                              post.content.length < 300 ? '2rem' : '1.75rem',
+                 }}>
+                {post.content}
+              </p>
+            </div>
           </div>
         )}
       </div>
