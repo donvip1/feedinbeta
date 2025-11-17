@@ -190,26 +190,22 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const isTextOnly = !post.media_url && post.content;
 
   return (
-    <div className="w-full space-y-3 mb-12 pb-4">
-      {/* User Header BEFORE card */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center space-x-3">
-          <Avatar className="w-12 h-12 cursor-pointer ring-2 ring-border" onClick={() => navigate(`/profile/${post.user_id}`)}>
+    <div className="w-full mb-6">
+      {/* User Header */}
+      <div className="flex items-center justify-between px-3 mb-2">
+        <div className="flex items-center space-x-2">
+          <Avatar className="w-10 h-10 cursor-pointer" onClick={() => navigate(`/profile/${post.user_id}`)}>
             <AvatarImage src={post.profiles?.avatar_url || ''} />
-            <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">{displayName[0].toUpperCase()}</AvatarFallback>
+            <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-sm">{displayName[0].toUpperCase()}</AvatarFallback>
           </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-white cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</p>
-            <div className="flex items-center space-x-2 text-sm text-white/80">
-              {post.profiles?.username && <span className="cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>@{post.profiles.username}</span>}
-              <span>•</span>
-              <span>{format(new Date(post.created_at), 'MMM d, yyyy')}</span>
-            </div>
+          <div className="flex items-center space-x-2">
+            <span className="font-semibold text-white text-sm cursor-pointer hover:underline" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</span>
+            <span className="text-white/60 text-xs">{format(new Date(post.created_at), 'h\'h\'')}</span>
           </div>
         </div>
         {(user?.id === post.user_id || isAdmin) && (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreVertical className="w-5 h-5" /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4 text-white" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-red-500"><Trash2 className="w-4 h-4 mr-2" />Delete</DropdownMenuItem>
             </DropdownMenuContent>
@@ -217,63 +213,70 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
         )}
       </div>
 
-      {/* Post Card */}
-      <div className="relative w-full aspect-[9/16] bg-black rounded-2xl overflow-hidden">
+      {/* Caption */}
+      {post.content && !isTextOnly && (
+        <div className="px-3 mb-2">
+          <p className="text-white text-sm leading-relaxed">{post.content}</p>
+        </div>
+      )}
+
+      {/* Media Card */}
+      <div className="relative w-full aspect-[9/16] bg-black rounded-xl overflow-hidden mx-3" style={{ maxWidth: 'calc(100% - 24px)' }}>
         {post.media_url && (
           <div className="absolute inset-0">
             {post.media_type === 'image' && <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />}
             {post.media_type === 'video' && (
               <>
                 <video ref={videoRef} src={post.media_url} className="w-full h-full object-cover" loop playsInline muted={isMuted} onClick={() => videoRef.current && (isPlaying ? videoRef.current.pause() : videoRef.current.play())} />
-                <div className="absolute top-4 right-4 flex flex-col space-y-3">
-                  <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="hover:opacity-80">{isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}</button>
-                  <button onClick={(e) => { e.stopPropagation(); videoRef.current && (document.fullscreenElement ? document.exitFullscreen() : videoRef.current.requestFullscreen()); }} className="hover:opacity-80"><Maximize className="w-6 h-6 text-white" /></button>
+                <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                  <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition">
+                    {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); videoRef.current && (document.fullscreenElement ? document.exitFullscreen() : videoRef.current.requestFullscreen()); }} className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition">
+                    <Maximize className="w-5 h-5 text-white" />
+                  </button>
                 </div>
               </>
             )}
           </div>
         )}
-        {isTextOnly && post.content && <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500 p-8"><p className="text-white font-bold text-center text-3xl">{post.content}</p></div>}
-        {post.media_url && post.content && <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90"><p className="text-white text-sm line-clamp-2">{post.content}</p></div>}
+        {isTextOnly && post.content && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 to-blue-500 p-8">
+            <p className="text-white font-bold text-center text-2xl">{post.content}</p>
+          </div>
+        )}
       </div>
 
-      {/* Social Buttons BELOW card */}
-      <div className="flex items-center justify-around px-4 py-3 bg-card/50 rounded-lg">
-        <button onClick={handleLike} disabled={isLiking} className="flex flex-col items-center space-y-1 hover:scale-110 transition">
-          <Heart className={`w-7 h-7 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
-          <span className="text-xs font-bold text-foreground">{localLikesCount}</span>
+      {/* Social Actions */}
+      <div className="flex items-center space-x-6 px-3 mt-3">
+        <button onClick={handleLike} disabled={isLiking} className="flex items-center space-x-2 hover:opacity-70 transition">
+          <Heart className={`w-6 h-6 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
+          <span className="text-white text-sm font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
         </button>
-        <button onClick={() => setShowComments(true)} className="flex flex-col items-center space-y-1 hover:scale-110 transition">
-          <MessageCircle className="w-7 h-7 text-foreground" />
-          <span className="text-xs font-bold text-foreground">{post.comments_count}</span>
+        
+        <button onClick={() => setShowComments(true)} className="flex items-center space-x-2 hover:opacity-70 transition">
+          <MessageCircle className="w-6 h-6 text-white" />
+          <span className="text-white text-sm font-medium">{post.comments_count}</span>
         </button>
+        
+        <button onClick={handleSave} className="flex items-center space-x-2 hover:opacity-70 transition">
+          <Bookmark className={`w-6 h-6 ${isSaved ? 'fill-white' : ''} text-white`} />
+          <span className="text-white text-sm font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
+        </button>
+
         <DropdownMenu>
-          <DropdownMenuTrigger asChild><button className="flex flex-col items-center space-y-1 hover:scale-110 transition"><Share2 className="w-7 h-7 text-foreground" /><span className="text-xs font-bold text-foreground">Share</span></button></DropdownMenuTrigger>
-          <DropdownMenuContent align="center">
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center space-x-2 hover:opacity-70 transition">
+              <Share2 className="w-6 h-6 text-white" />
+              <span className="text-white text-sm font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => handleShare('copy')}>Copy Link</DropdownMenuItem>
             {post.media_url && <DropdownMenuItem onClick={() => handleShare('download')}>Download</DropdownMenuItem>}
+            <DropdownMenuItem onClick={() => navigate(`/promote/${post.id}`)}>Promote Post</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <button onClick={handleSave} className="flex flex-col items-center space-y-1 hover:scale-110 transition">
-          <Bookmark className={`w-7 h-7 ${isSaved ? 'fill-current' : ''} text-foreground`} />
-          <span className="text-xs font-bold text-foreground">Save</span>
-        </button>
-        <div className="flex flex-col items-center space-y-1">
-          <Eye className="w-7 h-7 text-foreground" />
-          <span className="text-xs font-bold text-foreground">{post.views_count}</span>
-        </div>
-      </div>
-
-      {/* Caption if not overlaid */}
-      {!isTextOnly && post.content && !post.media_url && (
-        <div className="px-4 text-foreground text-sm">{post.content}</div>
-      )}
-
-      {/* Promote at end */}
-      <div className="px-4 pt-2 border-t border-border/30">
-        <button onClick={() => navigate(`/promote/${post.id}`)} className="text-muted-foreground hover:text-foreground text-sm">
-          Promote this post
-        </button>
       </div>
 
       <CommentsModal open={showComments} onClose={() => { setShowComments(false); onUpdate(); }} postId={post.id} postOwnerId={post.user_id} />
