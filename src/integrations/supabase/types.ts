@@ -2797,6 +2797,7 @@ export type Database = {
           views_count: number
         }[]
       }
+      get_post_view_count: { Args: { post_id_param: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
