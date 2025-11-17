@@ -2049,9 +2049,11 @@ export type Database = {
           daily_ai_video_count: number | null
           daily_enhancement_count: number | null
           display_name: string | null
+          facebook_url: string | null
           followers_count: number | null
           following_count: number | null
           id: string
+          instagram_url: string | null
           interests: string[] | null
           is_premium: boolean | null
           last_ai_reset: string | null
@@ -2059,6 +2061,7 @@ export type Database = {
           last_enhancement_reset: string | null
           last_free_enhancement: string | null
           last_username_change: string | null
+          linkedin_url: string | null
           location: string | null
           marital_status: string | null
           max_friends: number | null
@@ -2067,9 +2070,13 @@ export type Database = {
           status: string | null
           status_updated_at: string | null
           stripe_customer_id: string | null
+          tiktok_url: string | null
           total_views: number | null
+          twitter_url: string | null
           updated_at: string
           username: string | null
+          website_url: string | null
+          youtube_url: string | null
         }
         Insert: {
           about?: string | null
@@ -2086,9 +2093,11 @@ export type Database = {
           daily_ai_video_count?: number | null
           daily_enhancement_count?: number | null
           display_name?: string | null
+          facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           id: string
+          instagram_url?: string | null
           interests?: string[] | null
           is_premium?: boolean | null
           last_ai_reset?: string | null
@@ -2096,6 +2105,7 @@ export type Database = {
           last_enhancement_reset?: string | null
           last_free_enhancement?: string | null
           last_username_change?: string | null
+          linkedin_url?: string | null
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
@@ -2104,9 +2114,13 @@ export type Database = {
           status?: string | null
           status_updated_at?: string | null
           stripe_customer_id?: string | null
+          tiktok_url?: string | null
           total_views?: number | null
+          twitter_url?: string | null
           updated_at?: string
           username?: string | null
+          website_url?: string | null
+          youtube_url?: string | null
         }
         Update: {
           about?: string | null
@@ -2123,9 +2137,11 @@ export type Database = {
           daily_ai_video_count?: number | null
           daily_enhancement_count?: number | null
           display_name?: string | null
+          facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string
+          instagram_url?: string | null
           interests?: string[] | null
           is_premium?: boolean | null
           last_ai_reset?: string | null
@@ -2133,6 +2149,7 @@ export type Database = {
           last_enhancement_reset?: string | null
           last_free_enhancement?: string | null
           last_username_change?: string | null
+          linkedin_url?: string | null
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
@@ -2141,9 +2158,13 @@ export type Database = {
           status?: string | null
           status_updated_at?: string | null
           stripe_customer_id?: string | null
+          tiktok_url?: string | null
           total_views?: number | null
+          twitter_url?: string | null
           updated_at?: string
           username?: string | null
+          website_url?: string | null
+          youtube_url?: string | null
         }
         Relationships: []
       }
