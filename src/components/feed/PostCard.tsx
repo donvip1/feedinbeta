@@ -6,7 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
 import {
@@ -200,7 +200,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           </Avatar>
           <div className="flex items-center space-x-2 min-w-0">
             <span className="font-semibold text-foreground text-sm cursor-pointer hover:underline truncate" onClick={() => navigate(`/profile/${post.user_id}`)}>{displayName}</span>
-            <span className="text-muted-foreground text-xs flex-shrink-0">{format(new Date(post.created_at), 'h\'h\'')}</span>
+            <span className="text-muted-foreground text-xs flex-shrink-0">{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
           </div>
         </div>
         {(user?.id === post.user_id || isAdmin) && (
@@ -271,16 +271,19 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
           <span className="text-foreground text-xs font-medium">{post.comments_count}</span>
         </button>
         
+        <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
+          <Eye className="w-4 h-4 text-foreground" />
+          <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
+        </button>
+        
         <button onClick={handleSave} className="flex items-center space-x-1.5 hover:opacity-70 transition">
           <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-foreground' : ''} text-foreground`} />
-          <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
         </button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
               <Share2 className="w-4 h-4 text-foreground" />
-              <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
