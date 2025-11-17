@@ -1,5 +1,5 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
@@ -72,9 +72,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(cacheFirstStrategy(request, CACHE_IMAGES, MAX_IMAGE_CACHE));
   } else if (
     request.destination === 'script' ||
-    request.destination === 'style' ||
-    request.destination === 'font'
+    request.destination === 'style'
   ) {
+    // Always prefer network for scripts/styles to avoid stale React builds
+    event.respondWith(networkFirstStrategy(request, CACHE_DYNAMIC, MAX_DYNAMIC_CACHE));
+  } else if (request.destination === 'font') {
     event.respondWith(cacheFirstStrategy(request, CACHE_STATIC));
   } else {
     // For HTML and other resources, use network first

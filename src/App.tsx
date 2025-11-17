@@ -48,9 +48,9 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          
-            <Toaster />
             <AuthProvider>
+              <Toaster />
+
             <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
@@ -89,6 +89,9 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
+
+
+
         
       </BrowserRouter>
       </QueryClientProvider>
