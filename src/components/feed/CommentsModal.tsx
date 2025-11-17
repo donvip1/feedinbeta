@@ -3,11 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Loader2, Send, Image as ImageIcon, AtSign } from 'lucide-react';
@@ -37,9 +37,22 @@ interface CommentsModalProps {
   onClose: () => void;
   postId: string;
   postOwnerId: string;
+  post: {
+    id: string;
+    user_id: string;
+    content: string | null;
+    media_url: string | null;
+    media_type: string | null;
+    created_at: string;
+    profiles: {
+      display_name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+    };
+  };
 }
 
-export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsModalProps) => {
+export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: CommentsModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -172,105 +185,158 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId }: CommentsMo
     }
   };
 
-  const topLevelComments = comments.filter((c) => !c.parent_comment_id);
+  const displayName = user?.user_metadata?.display_name || 'You';
+  const postDisplayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
+  const isTextOnly = !post.media_url && post.content;
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    // Auto-play video when comments open
+    if (open && post.media_type === 'video' && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [open, post.media_type]);
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-gray-800 text-white max-w-2xl max-h-[85vh] flex flex-col my-8">
-        <DialogHeader>
-          <DialogTitle>Comments ({comments.length})</DialogTitle>
-        </DialogHeader>
-
-        {/* Comments List */}
-        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+    <Sheet open={open} onOpenChange={onClose}>
+      <SheetContent side="bottom" className="h-[85vh] p-0 bg-background">
+        {/* Post Content - Visible Above Comments */}
+        <div className="h-[40vh] bg-black relative flex-shrink-0">
+          {post.media_url && (
+            <>
+              {post.media_type === 'image' && (
+                <img src={post.media_url} alt="Post" className="w-full h-full object-contain" />
+              )}
+              {post.media_type === 'video' && (
+                <video 
+                  ref={videoRef}
+                  src={post.media_url} 
+                  className="w-full h-full object-contain" 
+                  loop 
+                  playsInline 
+                  muted
+                  controls
+                />
+              )}
+            </>
+          )}
+          {isTextOnly && post.content && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 p-8">
+              <div className="w-full max-w-lg">
+                <p className="text-white font-semibold text-center leading-relaxed" 
+                   style={{
+                     fontSize: post.content.length < 50 ? '2rem' : 
+                              post.content.length < 150 ? '1.75rem' :
+                              post.content.length < 300 ? '1.5rem' : '1.25rem',
+                     lineHeight: post.content.length < 50 ? '2.5rem' : 
+                                post.content.length < 150 ? '2.25rem' :
+                                post.content.length < 300 ? '2rem' : '1.75rem',
+                   }}>
+                  {post.content}
+                </p>
+              </div>
             </div>
-          ) : topLevelComments.length === 0 ? (
-            <div className="text-center py-8 text-gray-400">
-              No comments yet. Be the first to comment!
-            </div>
-          ) : (
-            topLevelComments.map((comment) => (
-              <CommentItem
-                key={comment.id}
-                comment={comment}
-                allComments={comments}
-                postOwnerId={postOwnerId}
-                onUpdate={loadComments}
-              />
-            ))
           )}
         </div>
 
-        {/* Enhanced Comment Input */}
-        <div className="pt-4 border-t border-gray-800 space-y-2">
-          <div className="flex items-start space-x-2">
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={user?.user_metadata?.avatar_url || ''} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
-                {user?.user_metadata?.display_name?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 relative">
-              <UserMentionPicker
-                searchTerm={mentionSearch}
-                onSelect={handleMentionSelect}
-                show={showMentions}
-              />
-              <Textarea
-                ref={textareaRef}
-                placeholder="Add comment..."
-                value={newComment}
-                onChange={(e) => handleTextChange(e.target.value)}
-                className="bg-gray-800 border-gray-700 text-white resize-none min-h-[60px]"
-                disabled={submitting}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-              />
-            </div>
-          </div>
+        {/* Comments Section */}
+        <div className="flex flex-col h-[45vh]">
+          <SheetHeader className="px-6 py-4 border-b border-border flex-shrink-0">
+            <SheetTitle className="text-foreground">Comments ({comments.length})</SheetTitle>
+          </SheetHeader>
           
-          <div className="flex items-center justify-between pl-10">
-            <div className="flex items-center space-x-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white"
-              >
-                <AtSign className="w-5 h-5" />
-              </Button>
-              <EmojiPicker onEmojiSelect={handleEmojiSelect} />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white"
-              >
-                <ImageIcon className="w-5 h-5" />
-              </Button>
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : comments.filter((c) => !c.parent_comment_id).length === 0 ? (
+              <p className="text-center py-8 text-muted-foreground">No comments yet. Be the first!</p>
+            ) : (
+              comments.filter((c) => !c.parent_comment_id).map(comment => (
+                <CommentItem
+                  key={comment.id}
+                  comment={comment}
+                  allComments={comments}
+                  postOwnerId={postOwnerId}
+                  onUpdate={loadComments}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Enhanced Comment Input */}
+          <div className="px-6 py-4 border-t border-border bg-card flex-shrink-0">
+            <div className="flex items-start space-x-3">
+              <Avatar className="w-10 h-10 flex-shrink-0">
+                <AvatarImage src={user?.user_metadata?.avatar_url || ''} />
+                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">
+                  {displayName[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              
+              <div className="flex-1 space-y-2">
+                <div className="relative">
+                  {showMentions && (
+                    <div className="absolute bottom-full mb-2 w-full max-h-48 overflow-y-auto border border-border rounded-lg bg-card shadow-lg z-10">
+                      <UserMentionPicker
+                        searchTerm={mentionSearch}
+                        onSelect={handleMentionSelect}
+                        show={showMentions}
+                      />
+                    </div>
+                  )}
+                  <Textarea
+                    ref={textareaRef}
+                    value={newComment}
+                    onChange={(e) => handleTextChange(e.target.value)}
+                    placeholder="Add a comment..."
+                    className="min-h-[80px] resize-none bg-background text-foreground border-border"
+                    disabled={submitting}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit();
+                      }
+                    }}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowMentions(!showMentions)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <AtSign className="w-4 h-4" />
+                    </Button>
+                    
+                    <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                  </div>
+                  
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={submitting || !newComment.trim()}
+                    size="sm"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {submitting ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4 mr-2" />
+                        Post
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
-            
-            <Button
-              onClick={handleSubmit}
-              disabled={submitting || !newComment.trim()}
-              className="bg-pink-500 hover:bg-pink-600 text-white rounded-full px-6"
-            >
-              {submitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                'Post'
-              )}
-            </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 };
