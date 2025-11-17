@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
-import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon } from 'lucide-react';
+import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark } from 'lucide-react';
 
 interface Profile {
   id: string;
@@ -385,7 +385,24 @@ const Profile = () => {
           </div>
 
           {/* Action Buttons */}
-          {!isOwnProfile && (
+          {isOwnProfile ? (
+            <div className="flex gap-3 mb-6">
+              <Button
+                onClick={() => navigate('/saved')}
+                className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg"
+              >
+                <Bookmark className="w-4 h-4 mr-2" />
+                Saved Posts
+              </Button>
+              <Button 
+                onClick={() => setShowSettings(true)}
+                className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
+                size="icon"
+              >
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
             <div className="flex gap-3 mb-6">
               <Button
                 onClick={toggleFollow}

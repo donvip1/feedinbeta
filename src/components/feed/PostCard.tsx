@@ -85,6 +85,10 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
           entries.forEach((entry) => {
             if (entry.isIntersecting) {
               video.play().then(() => setIsPlaying(true)).catch(() => {});
+              // Track view when post is visible
+              if (!hasViewed) {
+                trackView();
+              }
             } else {
               video.pause();
               setIsPlaying(false);
@@ -95,8 +99,60 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
       );
       observer.observe(video);
       return () => observer.disconnect();
+    } else if (!hasViewed && post.media_type !== 'video') {
+      // For images and text posts, track view on mount
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting && !hasViewed) {
+              trackView();
+            }
+          });
+        },
+        { threshold: 0.5 }
+      );
+      
+      const element = document.getElementById(`post-${post.id}`);
+      if (element) {
+        observer.observe(element);
+        return () => observer.disconnect();
+      }
     }
-  }, [post.media_type]);
+  }, [post.media_type, hasViewed, post.id]);
+
+  const trackView = async () => {
+    if (!user || hasViewed) return;
+    
+    try {
+      // Check if user has already viewed this post
+      const { data: existingView } = await supabase
+        .from('post_views')
+        .select('id')
+        .eq('post_id', post.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      // Only insert if no existing view (one view per user)
+      if (!existingView) {
+        await supabase.from('post_views').insert({
+          post_id: post.id,
+          user_id: user.id
+        });
+        
+        // Increment views count on the post
+        await supabase
+          .from('posts')
+          .update({ views_count: (post.views_count || 0) + 1 })
+          .eq('id', post.id);
+        
+        setHasViewed(true);
+      } else {
+        setHasViewed(true);
+      }
+    } catch (error) {
+      console.error('Error tracking view:', error);
+    }
+  };
 
   const checkAdminStatus = async () => {
     try {
