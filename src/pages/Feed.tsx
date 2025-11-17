@@ -48,7 +48,11 @@ const Feed = () => {
   const [showSearch, setShowSearch] = useState(false);
   const [isCreatingContent, setIsCreatingContent] = useState(false);
   const [isCommenting, setIsCommenting] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [pullStartY, setPullStartY] = useState(0);
+  const [isPulling, setIsPulling] = useState(false);
 
+  // Initial load and visibility-based refresh
   useEffect(() => {
     if (authLoading) return;
     
@@ -70,8 +74,29 @@ const Feed = () => {
       navigate(location.pathname, { replace: true, state: {} });
     }
     
+    // Initial load
     loadPosts();
-  }, [user, authLoading, navigate, activeTab, searchQuery]);
+
+    // Refresh when user returns to the page
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadPosts();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, authLoading, navigate]);
+
+  // Handle tab changes
+  useEffect(() => {
+    if (user && !authLoading) {
+      loadPosts();
+    }
+  }, [activeTab]);
 
   const loadPosts = async () => {
     try {
@@ -92,10 +117,8 @@ const Feed = () => {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      // Search filter
-      if (searchQuery) {
-        query = query.or(`content.ilike.%${searchQuery}%,profiles.username.ilike.%${searchQuery}%,profiles.display_name.ilike.%${searchQuery}%`);
-      } else {
+      // No search filter in regular query - search is handled separately
+      if (!searchQuery) {
         // Filter based on active tab only when not searching
         if (activeTab === 'myPosts' && user) {
           query = query.eq('user_id', user.id);
@@ -177,6 +200,72 @@ const Feed = () => {
     setShowCreatePost(false);
     setIsCreatingContent(false);
     loadPosts();
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) {
+      loadPosts();
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      setLoading(true);
+
+      const { data, error } = await supabase.functions.invoke('ai-search', {
+        body: { query: searchQuery }
+      });
+
+      if (error) throw error;
+
+      if (data?.posts) {
+        setPosts(data.posts);
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Search failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      // Fallback to regular posts
+      loadPosts();
+    } finally {
+      setIsSearching(false);
+      setLoading(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    if (searchQuery) {
+      setSearchQuery('');
+    }
+    loadPosts();
+  };
+
+  // Pull-to-refresh handler
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const scrollTop = (e.currentTarget as HTMLElement).scrollTop;
+    if (scrollTop === 0) {
+      setPullStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    const scrollTop = (e.currentTarget as HTMLElement).scrollTop;
+    if (scrollTop === 0 && pullStartY > 0) {
+      const pullDistance = e.touches[0].clientY - pullStartY;
+      if (pullDistance > 100) {
+        setIsPulling(true);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (isPulling) {
+      handleRefresh();
+      setIsPulling(false);
+    }
+    setPullStartY(0);
   };
 
   const handleQuickAction = (action: string) => {
@@ -274,20 +363,38 @@ const Feed = () => {
         </div>
         
         {showSearch && (
-          <div className="px-4 pb-3">
+          <div className="px-4 pb-3 flex gap-2">
             <Input
               placeholder="Search posts, users, hashtags..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && loadPosts()}
-              className="bg-card border-border text-foreground placeholder:text-muted-foreground"
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="bg-card border-border text-foreground placeholder:text-muted-foreground flex-1"
             />
+            <Button
+              onClick={handleSearch}
+              disabled={isSearching}
+              size="sm"
+              className="shrink-0"
+            >
+              {isSearching ? 'Searching...' : 'Search'}
+            </Button>
           </div>
         )}
       </header>
 
       {/* Full-screen TikTok-style Feed */}
-      <main className="fixed inset-0 top-14 bottom-16 overflow-y-auto snap-y snap-mandatory scroll-smooth">
+      <main 
+        className="fixed inset-0 top-14 bottom-16 overflow-y-auto snap-y snap-mandatory scroll-smooth"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {isPulling && (
+          <div className="absolute top-0 left-0 right-0 flex items-center justify-center py-2 bg-primary/10 text-primary z-50">
+            <span className="text-sm font-medium">Release to refresh...</span>
+          </div>
+        )}
         <div className="max-w-md mx-auto">
           {loading ? (
             <div className="space-y-6 p-4">

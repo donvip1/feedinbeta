@@ -27,3 +27,6 @@ verify_jwt = false
 [functions.p2p-escrow]
 verify_jwt = true
 
+[functions.ai-search]
+verify_jwt = true
+
