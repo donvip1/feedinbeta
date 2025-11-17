@@ -36,9 +36,9 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-card/95 backdrop-blur-lg border-t border-border transition-all">
+    <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-card/70 backdrop-blur-lg border-t border-border/50 transition-all">
       <div className="container mx-auto px-2">
-        <div className="flex items-center justify-around py-1 relative">
+        <div className="flex items-center justify-around py-0.5 relative">
           {navItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
             return (
@@ -46,12 +46,12 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
                 key={item.id}
                 onClick={() => navigate(item.path)}
                 variant="ghost"
-                className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
+                className={`flex flex-col items-center gap-0 h-auto py-1 px-2 ${
                   isActive(item.path) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <Icon className="w-4 h-4" />
+                <span className="text-[9px] font-medium mt-0.5">{item.label}</span>
               </Button>
             );
           })}
@@ -59,9 +59,9 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
           {/* Central + Button */}
           <button
             onClick={onQuickActionClick}
-            className="relative -mt-6 w-11 h-11 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-glow hover:scale-110 transition-transform"
+            className="relative -mt-5 w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center shadow-glow hover:scale-110 transition-transform"
           >
-            <Plus className="w-6 h-6 text-white" />
+            <Plus className="w-5 h-5 text-white" />
           </button>
 
           {navItems.slice(2).map((item) => {
@@ -71,12 +71,12 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
                 key={item.id}
                 onClick={() => navigate(item.path)}
                 variant="ghost"
-                className={`flex flex-col items-center space-y-0.5 h-auto py-1.5 px-3 ${
+                className={`flex flex-col items-center gap-0 h-auto py-1 px-2 ${
                   isActive(item.path) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <Icon className="w-4 h-4" />
+                <span className="text-[9px] font-medium mt-0.5">{item.label}</span>
               </Button>
             );
           })}
