@@ -221,7 +221,7 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
       )}
 
       {/* Media Card */}
-      <div className="relative w-full aspect-[9/16] bg-black rounded-xl overflow-hidden">
+      <div className="relative w-full aspect-[9/13] bg-black rounded-xl overflow-hidden">
         {post.media_url && (
           <div className="absolute inset-0">
             {post.media_type === 'image' && <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />}
