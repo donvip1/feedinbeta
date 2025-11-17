@@ -65,7 +65,7 @@ const Feed = () => {
     localStorage.setItem('currentUserId', user.id);
     
     // Check if there's a shared image in location state
-    const state = location.state as { sharedImage?: string } | null;
+    const state = location.state as { sharedImage?: string; postId?: string; commentId?: string } | null;
     if (state?.sharedImage) {
       setSharedImageUrl(state.sharedImage);
       setDefaultPostTab('image');
@@ -90,6 +90,32 @@ const Feed = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [user, authLoading, navigate]);
+
+  // Handle notification navigation to specific post
+  useEffect(() => {
+    const state = location.state as { postId?: string; commentId?: string } | null;
+    if (state?.postId && posts.length > 0) {
+      // Find the post and scroll to it
+      setTimeout(() => {
+        const postElement = document.getElementById(`post-${state.postId}`);
+        if (postElement) {
+          postElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          
+          // If there's a commentId, trigger comment opening
+          if (state.commentId) {
+            // Find the PostCard and trigger its comment section
+            const commentButton = postElement.querySelector('[data-comment-button]');
+            if (commentButton instanceof HTMLElement) {
+              commentButton.click();
+            }
+          }
+        }
+      }, 500);
+      
+      // Clear the state after handling
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [posts, location.state]);
 
   // Handle tab changes
   useEffect(() => {
@@ -426,6 +452,7 @@ const Feed = () => {
               {posts.map((post, index) => (
                 <div 
                   key={post.id}
+                  id={`post-${post.id}`}
                   className="snap-start snap-always min-h-screen flex items-start justify-center pt-4"
                   style={{ paddingBottom: index === posts.length - 1 ? '0' : '2vh' }}
                 >

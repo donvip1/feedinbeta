@@ -61,14 +61,25 @@ export default function Messages() {
 
   // Handle shared image from location state
   useEffect(() => {
-    const state = location.state as { sharedImage?: string };
+    const state = location.state as { sharedImage?: string; conversationId?: string };
     if (state?.sharedImage) {
       setSharedImageUrl(state.sharedImage);
       setShowNewConversation(true);
       // Clear the state
       navigate(location.pathname, { replace: true });
     }
-  }, [location, navigate]);
+    
+    // Handle navigation from notification to specific conversation
+    if (state?.conversationId && conversations.length > 0) {
+      const conversation = conversations.find(c => c.id === state.conversationId);
+      if (conversation) {
+        setSelectedConversationId(state.conversationId);
+        setActiveTab('chats');
+      }
+      // Clear the state
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate, conversations]);
 
   useEffect(() => {
     if (!authLoading && !user) {
