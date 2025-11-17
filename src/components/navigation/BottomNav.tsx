@@ -6,9 +6,10 @@ interface BottomNavProps {
   onQuickActionClick?: () => void;
   currentPage?: 'feed' | 'ai' | 'default';
   minimized?: boolean;
+  hidden?: boolean;
 }
 
-export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default', minimized = false }: BottomNavProps) => {
+export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'default', minimized = false, hidden = false }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -20,6 +21,11 @@ export const BottomNav = ({ onQuickActionClick = () => {}, currentPage = 'defaul
   ];
 
   const isActive = (path: string) => location.pathname === path;
+
+  // Hide navigation completely when hidden prop is true
+  if (hidden) {
+    return null;
+  }
 
   // When minimized, only show the + button
   if (minimized) {

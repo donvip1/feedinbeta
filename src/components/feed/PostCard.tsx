@@ -45,9 +45,10 @@ interface PostCardProps {
     };
   };
   onUpdate: () => void;
+  onCommentStateChange?: (isOpen: boolean) => void;
 }
 
-export const PostCard = ({ post, onUpdate }: PostCardProps) => {
+export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -63,6 +64,10 @@ export const PostCard = ({ post, onUpdate }: PostCardProps) => {
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    onCommentStateChange?.(showComments);
+  }, [showComments, onCommentStateChange]);
 
   useEffect(() => {
     if (user) {

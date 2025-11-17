@@ -47,6 +47,7 @@ const Feed = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [isCreatingContent, setIsCreatingContent] = useState(false);
+  const [isCommenting, setIsCommenting] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -321,7 +322,11 @@ const Feed = () => {
                   className="snap-start snap-always min-h-screen flex items-start justify-center pt-4"
                   style={{ paddingBottom: index === posts.length - 1 ? '0' : '2vh' }}
                 >
-                  <PostCard post={post} onUpdate={loadPosts} />
+                  <PostCard 
+                    post={post} 
+                    onUpdate={loadPosts}
+                    onCommentStateChange={setIsCommenting}
+                  />
                 </div>
               ))}
             </>
@@ -354,6 +359,7 @@ const Feed = () => {
         onQuickActionClick={() => setShowQuickActions(prev => !prev)} 
         currentPage="feed"
         minimized={showQuickActions || isCreatingContent}
+        hidden={isCommenting}
       />
     </div>
   );

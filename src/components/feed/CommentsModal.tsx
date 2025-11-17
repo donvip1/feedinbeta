@@ -270,33 +270,34 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: Comm
 
           {/* Enhanced Comment Input */}
           {!isReplyActive && (
-          <div className="px-6 py-4 border-t border-border bg-card flex-shrink-0">
-            <div className="flex items-start space-x-3">
-              <Avatar className="w-10 h-10 flex-shrink-0">
+          <div className="px-4 py-3 border-t border-border bg-card flex-shrink-0">
+            <div className="flex items-center space-x-2">
+              <Avatar className="w-8 h-8 flex-shrink-0">
                 <AvatarImage src={user?.user_metadata?.avatar_url || ''} />
-                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white">
+                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-xs">
                   {displayName[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               
-              <div className="flex-1 space-y-2">
-                <div className="relative">
-                  {showMentions && (
-                    <div className="absolute bottom-full mb-2 w-full max-h-48 overflow-y-auto border border-border rounded-lg bg-card shadow-lg z-10">
-                      <UserMentionPicker
-                        searchTerm={mentionSearch}
-                        onSelect={handleMentionSelect}
-                        show={showMentions}
-                      />
-                    </div>
-                  )}
+              <div className="flex-1 relative">
+                {showMentions && (
+                  <div className="absolute bottom-full mb-2 left-0 right-0 max-h-48 overflow-y-auto border border-border rounded-lg bg-card shadow-lg z-10">
+                    <UserMentionPicker
+                      searchTerm={mentionSearch}
+                      onSelect={handleMentionSelect}
+                      show={showMentions}
+                    />
+                  </div>
+                )}
+                <div className="flex items-center space-x-2 bg-background rounded-full border border-border px-4 py-2">
                   <Textarea
                     ref={textareaRef}
                     value={newComment}
                     onChange={(e) => handleTextChange(e.target.value)}
                     placeholder="Add a comment..."
-                    className="min-h-[80px] resize-none bg-background text-foreground border-border"
+                    className="flex-1 min-h-[36px] max-h-[100px] resize-none bg-transparent text-foreground border-0 focus-visible:ring-0 focus-visible:ring-offset-0 p-0"
                     disabled={submitting}
+                    rows={1}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -304,37 +305,32 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: Comm
                       }
                     }}
                   />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1 flex-shrink-0">
                     <Button
+                      type="button"
                       variant="ghost"
-                      size="sm"
+                      size="icon"
                       onClick={() => setShowMentions(!showMentions)}
-                      className="text-muted-foreground hover:text-foreground"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
                     >
                       <AtSign className="w-4 h-4" />
                     </Button>
                     
                     <EmojiPicker onEmojiSelect={handleEmojiSelect} />
+                    
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={submitting || !newComment.trim()}
+                      size="icon"
+                      className="h-8 w-8 bg-primary text-primary-foreground hover:bg-primary/90 rounded-full"
+                    >
+                      {submitting ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                    </Button>
                   </div>
-                  
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={submitting || !newComment.trim()}
-                    size="sm"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90"
-                  >
-                    {submitting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4 mr-2" />
-                        Post
-                      </>
-                    )}
-                  </Button>
                 </div>
               </div>
             </div>
