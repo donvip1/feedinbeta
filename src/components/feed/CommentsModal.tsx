@@ -15,6 +15,7 @@ import { CommentItem } from './CommentItem';
 import { EmojiPicker } from './EmojiPicker';
 import { UserMentionPicker } from './UserMentionPicker';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { CommentText } from './CommentText';
 
 interface Comment {
   id: string;
