@@ -10,6 +10,7 @@ import { ImageCropper } from './ImageCropper';
 import { MusicLibrary } from './MusicLibrary';
 import { VideoTrimmer } from './VideoTrimmer';
 import { applyImageEffects } from '@/lib/media-processor';
+import { InstagramStylePostDetails } from './InstagramStylePostDetails';
 
 interface CameraCaptureProps {
   open: boolean;
@@ -68,6 +69,8 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
   // Captured media states
   const [capturedMediaUrl, setCapturedMediaUrl] = useState<string | null>(null);
   const [capturedMediaType, setCapturedMediaType] = useState<'image' | 'video'>('image');
+  const [capturedMediaFile, setCapturedMediaFile] = useState<File | null>(null);
+  const [showPostDetails, setShowPostDetails] = useState(false);
   
   // Editing states
   const [selectedFilter, setSelectedFilter] = useState<string>('None');
@@ -372,71 +375,74 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
     setStickerPinchStart(null);
   };
 
-  const handleNext = async (postToStory: boolean = false) => {
+  const handleProceedToPostDetails = async () => {
     if (!capturedMediaUrl) return;
-    
-    if (capturedMediaType === 'image') {
-      try {
-        const filterObj = selectedFilter !== 'None' ? FILTERS[filterCategory].find(f => f.name === selectedFilter) : null;
-        
-        // If has music, convert to video
-        const hasMusic = selectedMusic !== null;
-        let finalFile: File;
-        let effects: any = {
-          filter: filterObj?.filter,
-          brightness,
-          contrast,
-          saturation,
-          textOverlay,
-          textPosition: textPosition.y,
-          textSize,
-          stickers,
-          blur: blurAmount,
-          drawingPaths,
-          drawColor,
-          drawSize,
-        };
 
-        // Add music metadata to effects
-        if (hasMusic && selectedMusic) {
-          effects.musicTitle = selectedMusic.name;
-          effects.musicArtist = selectedMusic.artist;
-          effects.musicUrl = selectedMusic.url;
+    try {
+      let processedBlob: Blob | null = null;
+      
+      if (capturedMediaType === 'image') {
+        const img = new Image();
+        img.src = croppedImageUrl || capturedMediaUrl;
+        
+        await new Promise((resolve) => {
+          img.onload = resolve;
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Apply filter
+        const filter = FILTERS[filterCategory].find(f => f.name === selectedFilter);
+        if (filter) {
+          ctx.filter = filter.filter;
         }
         
-        if (hasMusic && selectedMusic) {
-          // Convert image + music to video
-          const processedBlob = await applyImageEffects(croppedImageUrl || capturedMediaUrl, effects);
-          
-          // Fetch the music file
-          const musicResponse = await fetch(selectedMusic.url);
-          const musicBlob = await musicResponse.blob();
-          
-          const videoBlob = await convertImageWithAudioToVideo(processedBlob, musicBlob);
-          finalFile = new File([videoBlob], `video-${Date.now()}.mp4`, { type: 'video/mp4' });
-          onCapture(finalFile, 'video', effects, postToStory);
-        } else {
-          // Regular image processing
-          const processedBlob = await applyImageEffects(croppedImageUrl || capturedMediaUrl, effects);
-          finalFile = new File([processedBlob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-          onCapture(finalFile, 'image', effects, postToStory);
+        // Apply adjustments
+        ctx.filter += ` brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+        ctx.drawImage(img, 0, 0);
+
+        // Add text overlay
+        if (textOverlay) {
+          ctx.filter = 'none';
+          ctx.font = `${textSize}px Arial`;
+          ctx.fillStyle = 'white';
+          ctx.strokeStyle = 'black';
+          ctx.lineWidth = 2;
+          ctx.textAlign = 'center';
+          ctx.strokeText(textOverlay, (textPosition.x / 100) * canvas.width, (textPosition.y / 100) * canvas.height);
+          ctx.fillText(textOverlay, (textPosition.x / 100) * canvas.width, (textPosition.y / 100) * canvas.height);
         }
-        
-        handleClose();
-      } catch (error) {
-        toast({ title: 'Processing failed', variant: 'destructive' });
+
+        // Add stickers
+        for (const sticker of stickers) {
+          ctx.font = `${48 * sticker.scale}px Arial`;
+          ctx.fillText(sticker.emoji, (sticker.x / 100) * canvas.width, (sticker.y / 100) * canvas.height);
+        }
+
+        processedBlob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.95);
+        });
+      } else {
+        // For video, convert the URL to blob
+        const response = await fetch(capturedMediaUrl);
+        processedBlob = await response.blob();
       }
-    } else {
-      const response = await fetch(capturedMediaUrl);
-      const blob = await response.blob();
-      const file = new File([blob], `video-${Date.now()}.webm`, { type: 'video/webm' });
-      const effects = selectedMusic ? {
-        musicTitle: selectedMusic.name,
-        musicArtist: selectedMusic.artist,
-        musicUrl: selectedMusic.url,
-      } : undefined;
-      onCapture(file, 'video', effects, postToStory);
-      handleClose();
+
+      const processedUrl = URL.createObjectURL(processedBlob);
+      
+      // Show post details with all editing effects
+      setShowPostDetails(true);
+    } catch (error) {
+      console.error('Processing error:', error);
+      toast({
+        title: 'Processing failed',
+        description: 'Could not process media',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -1398,15 +1404,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
                 <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[130] flex gap-3">
                   <Button
                     size="lg"
-                    onClick={() => handleNext(true)}
-                    variant="outline"
-                    className="bg-black/60 backdrop-blur-md text-white hover:bg-black/80 rounded-full px-8 py-7 text-base font-bold shadow-2xl border-2 border-white/30"
-                  >
-                    Story
-                  </Button>
-                  <Button
-                    size="lg"
-                    onClick={() => handleNext(false)}
+                    onClick={handleProceedToPostDetails}
                     className="bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:opacity-90 rounded-full px-12 py-7 text-lg font-bold shadow-2xl border-2 border-white/20"
                   >
                     Next
