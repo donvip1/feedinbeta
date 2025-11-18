@@ -7,11 +7,14 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/navigation/BottomNav";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import { ProgressBar } from "@/components/shared/ProgressBar";
 
 export default function VideoCreation() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { progress, isUploading, startUpload, updateProgress, completeUpload, failUpload } = useUploadProgress();
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +31,9 @@ export default function VideoCreation() {
     }
 
     setLoading(true);
+    startUpload();
     try {
+      updateProgress(10);
       // Check credits and limits
       const { data: profile } = await supabase
         .from("profiles")
@@ -48,6 +53,7 @@ export default function VideoCreation() {
         .eq("user_id", user.id);
 
       const isAdmin = roles?.some(r => r.role === "admin" || r.role === "moderator");
+      updateProgress(25);
 
       if (!isAdmin) {
         const today = new Date().toDateString();
@@ -68,6 +74,7 @@ export default function VideoCreation() {
       }
 
       // Generate video script and concept
+      updateProgress(40);
       const systemPrompt = `You are an expert video creator and scriptwriter. Based on the user's description, create a detailed video production plan including:
 - Video Title
 - Target Duration
@@ -89,10 +96,12 @@ Provide practical, actionable guidance for video creation.`;
       });
 
       if (error) throw error;
+      updateProgress(60);
 
       let fullResponse = "";
       const reader = data.getReader();
       const decoder = new TextDecoder();
+      let currentProgress = 60;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -112,11 +121,15 @@ Provide practical, actionable guidance for video creation.`;
               if (content) {
                 fullResponse += content;
                 setResult(fullResponse);
+                currentProgress = Math.min(90, currentProgress + 0.5);
+                updateProgress(currentProgress);
               }
             } catch {}
           }
         }
       }
+      
+      updateProgress(95);
 
       // Deduct credits if needed
       if (!isAdmin) {

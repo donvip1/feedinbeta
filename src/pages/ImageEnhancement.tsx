@@ -10,11 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ImageShareModal } from "@/components/shared/ImageShareModal";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import { ProgressBar } from "@/components/shared/ProgressBar";
 
 export default function ImageEnhancement() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { progress, isUploading, startUpload, updateProgress, completeUpload, failUpload } = useUploadProgress();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -49,7 +52,9 @@ export default function ImageEnhancement() {
     }
 
     setLoading(true);
+    startUpload();
     try {
+      updateProgress(10);
       // Check credits and limits
       const { data: profile } = await supabase
         .from("profiles")
@@ -109,6 +114,7 @@ export default function ImageEnhancement() {
       reader.readAsDataURL(selectedFile);
       reader.onload = async () => {
         const base64Image = reader.result as string;
+        updateProgress(40);
 
         const enhancementPrompts = {
           good: "Enhance this image with basic improvements: adjust brightness, contrast, and sharpness",
@@ -122,6 +128,7 @@ export default function ImageEnhancement() {
         }
 
         // Generate TWO different enhancement results
+        updateProgress(60);
         const [result1, result2] = await Promise.all([
           supabase.functions.invoke("ai-image-gen", {
             body: { 
@@ -143,9 +150,12 @@ export default function ImageEnhancement() {
           throw new Error(result1.error?.message || result2.error?.message || "Enhancement failed");
         }
 
+        updateProgress(85);
+
         if (result1.data?.imageUrl && result2.data?.imageUrl) {
           setEnhancedUrl1(result1.data.imageUrl);
           setEnhancedUrl2(result2.data.imageUrl);
+          updateProgress(95);
 
           // Deduct credits or update free enhancement timestamp
           if (willDeductCredits) {

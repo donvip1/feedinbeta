@@ -112,77 +112,78 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="bg-background border-border max-w-md max-h-[85vh] overflow-y-auto my-8">
-        <DialogHeader>
-          <DialogTitle>Create Story</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={handleClose}>
+        <DialogContent className="bg-background border-border max-w-md max-h-[85vh] overflow-y-auto my-8">
+          <DialogHeader>
+            <DialogTitle>Create Story</DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          {!preview ? (
-            <div>
-              <Label htmlFor="story-file" className="cursor-pointer">
-                <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary transition-colors">
-                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Click to upload image or video
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Story will expire in 24 hours
-                  </p>
-                </div>
-              </Label>
-              <Input
-                id="story-file"
-                type="file"
-                accept="image/*,video/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-            </div>
-          ) : (
-            <div className="relative">
-              <button
-                onClick={() => {
-                  setFile(null);
-                  setPreview(null);
-                }}
-                className="absolute top-2 right-2 z-10 bg-black/50 rounded-full p-2 hover:bg-black/70"
-                disabled={uploading}
-              >
-                <X className="w-4 h-4 text-white" />
-              </button>
-              <div className="relative aspect-[9/16] max-h-[500px] rounded-lg overflow-hidden bg-black">
-                {file?.type.startsWith('image/') ? (
-                  <img src={preview} alt="Preview" className="w-full h-full object-contain" />
-                ) : (
-                  <video src={preview} controls className="w-full h-full object-contain" />
-                )}
+          <div className="space-y-4">
+            {!preview ? (
+              <div>
+                <Label htmlFor="story-file" className="cursor-pointer">
+                  <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary transition-colors">
+                    <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Click to upload image or video
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Story will expire in 24 hours
+                    </p>
+                  </div>
+                </Label>
+                <Input
+                  id="story-file"
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setFile(null);
+                    setPreview(null);
+                  }}
+                  className="absolute top-2 right-2 z-10 bg-black/50 rounded-full p-2 hover:bg-black/70"
+                  disabled={uploading}
+                >
+                  <X className="w-4 h-4 text-white" />
+                </button>
+                <div className="relative aspect-[9/16] max-h-[500px] rounded-lg overflow-hidden bg-black">
+                  {file?.type.startsWith('image/') ? (
+                    <img src={preview} alt="Preview" className="w-full h-full object-contain" />
+                  ) : (
+                    <video src={preview} controls className="w-full h-full object-contain" />
+                  )}
+                </div>
+              </div>
+            )}
 
-          {preview && (
-            <Button
-              onClick={handleUpload}
-              disabled={uploading}
-              className="w-full bg-gradient-to-r from-pink-500 to-blue-500"
-            >
-              {uploading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                'Share Story'
-              )}
-            </Button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-    
-    <ProgressBar progress={progress} isUploading={isUploading} label="Uploading Story" />
+            {preview && (
+              <Button
+                onClick={handleUpload}
+                disabled={uploading}
+                className="w-full bg-gradient-to-r from-pink-500 to-blue-500"
+              >
+                {uploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  'Share Story'
+                )}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      <ProgressBar progress={progress} isVisible={isUploading} label="Uploading Story" />
     </>
   );
 };

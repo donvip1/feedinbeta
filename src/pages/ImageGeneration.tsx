@@ -8,11 +8,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { ImageShareModal } from "@/components/shared/ImageShareModal";
+import { useUploadProgress } from "@/hooks/useUploadProgress";
+import { ProgressBar } from "@/components/shared/ProgressBar";
 
 export default function ImageGeneration() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { progress, isUploading, startUpload, updateProgress, completeUpload, failUpload } = useUploadProgress();
   const [prompt, setPrompt] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,7 +33,9 @@ export default function ImageGeneration() {
     }
 
     setLoading(true);
+    startUpload();
     try {
+      updateProgress(10);
       // Check credits and limits
       const { data: profile } = await supabase
         .from("profiles")
@@ -50,6 +55,7 @@ export default function ImageGeneration() {
         .eq("user_id", user.id);
 
       const isAdmin = roles?.some(r => r.role === "admin" || r.role === "moderator");
+      updateProgress(30);
 
       if (!isAdmin) {
         const today = new Date().toDateString();
@@ -70,14 +76,17 @@ export default function ImageGeneration() {
       }
 
       // Generate image
+      updateProgress(50);
       const { data, error } = await supabase.functions.invoke("ai-image-gen", {
         body: { prompt, mode: "generate" }
       });
 
       if (error) throw error;
+      updateProgress(80);
 
       if (data?.imageUrl) {
         setImageUrl(data.imageUrl);
+        updateProgress(90);
 
         // Deduct credits if needed
         if (!isAdmin) {
@@ -103,10 +112,12 @@ export default function ImageGeneration() {
             .eq("id", user.id);
         }
 
+        completeUpload();
         toast({ title: "Image generated successfully!" });
       }
     } catch (error: any) {
       console.error("Error:", error);
+      failUpload(error.message);
       toast({ title: "Generation failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
