@@ -385,8 +385,8 @@ const Profile = () => {
         
         {/* Profile Info */}
         <div className="container mx-auto px-4 -mt-20 max-w-2xl">
-          <div className="flex items-end gap-4 mb-6">
-            {/* Avatar */}
+          {/* Avatar - Centered */}
+          <div className="flex justify-center mb-4">
             <div className="relative">
               <Avatar className="w-32 h-32 border-4 border-background shadow-xl">
                 <AvatarImage src={profile.avatar_url || ''} />
@@ -411,34 +411,34 @@ const Profile = () => {
                 </label>
               )}
             </div>
-
-            {/* Name & Username */}
-            <div className="flex-1 mb-2">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-2xl font-bold text-foreground">
-                  {profile.display_name || 'Unknown'}
-                </h1>
-                {profile.is_premium && (
-                  <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-lg">
-                    <Crown className="w-3 h-3 mr-1" />
-                    Premium
-                  </Badge>
-                )}
-              </div>
-              <p className="text-muted-foreground text-sm">@{profile.username || 'user'}</p>
-              {!isOwnProfile && isFollowingMe && (
-                <p className="text-xs text-muted-foreground mt-1">Following you</p>
-              )}
-            </div>
           </div>
 
-          {/* Followers & Following - Right after name/username */}
-          <div className="flex gap-4 mb-4">
+          {/* Name & Username - Centered */}
+          <div className="text-center mb-4">
+            <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
+              <h1 className="text-2xl font-bold text-foreground">
+                {profile.display_name || 'Unknown'}
+              </h1>
+              {profile.is_premium && (
+                <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-lg">
+                  <Crown className="w-3 h-3 mr-1" />
+                  Premium
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground text-sm">@{profile.username || 'user'}</p>
+            {!isOwnProfile && isFollowingMe && (
+              <p className="text-xs text-muted-foreground mt-1">Following you</p>
+            )}
+          </div>
+
+          {/* Followers & Following - Centered */}
+          <div className="flex gap-8 mb-6 justify-center">
             <button
               onClick={() => { setFollowersModalTab('followers'); setShowFollowersModal(true); }}
               className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
             >
-              <p className="text-xl font-bold text-foreground">{profile.followers_count}</p>
+              <p className="text-2xl font-bold text-foreground">{profile.followers_count}</p>
               <p className="text-xs text-muted-foreground">Followers</p>
             </button>
 
@@ -446,34 +446,34 @@ const Profile = () => {
               onClick={() => { setFollowersModalTab('following'); setShowFollowersModal(true); }}
               className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
             >
-              <p className="text-xl font-bold text-foreground">{profile.following_count}</p>
+              <p className="text-2xl font-bold text-foreground">{profile.following_count}</p>
               <p className="text-xs text-muted-foreground">Following</p>
             </button>
           </div>
 
-          {/* Bio */}
+          {/* Bio - Centered */}
           {profile.bio && (
-            <p className="text-foreground mb-6 leading-relaxed">{profile.bio}</p>
+            <p className="text-foreground mb-6 leading-relaxed text-center">{profile.bio}</p>
           )}
 
-          {/* Stats Grid - No backgrounds */}
-          <div className="flex gap-6 mb-6 justify-center">
+          {/* Stats Grid - Centered, No backgrounds */}
+          <div className="flex gap-8 mb-6 justify-center">
             <div className="text-center">
-              <FileText className="w-5 h-5 text-primary mx-auto mb-1" />
-              <p className="text-xl font-bold text-foreground">{profile.post_count}</p>
+              <FileText className="w-6 h-6 text-primary mx-auto mb-2" />
+              <p className="text-2xl font-bold text-foreground">{profile.post_count}</p>
               <p className="text-xs text-muted-foreground">Posts</p>
             </div>
             
             <div className="text-center">
-              <Eye className="w-5 h-5 text-primary mx-auto mb-1" />
-              <p className="text-xl font-bold text-foreground">{profile.total_views}</p>
+              <Eye className="w-6 h-6 text-primary mx-auto mb-2" />
+              <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
               <p className="text-xs text-muted-foreground">Views</p>
             </div>
           </div>
 
-          {/* Action Buttons */}
+          {/* Action Buttons - Centered */}
           {isOwnProfile ? (
-            <div className="flex gap-3 mb-6">
+            <div className="flex gap-3 mb-6 justify-center max-w-md mx-auto">
               <Button
                 onClick={() => navigate('/saved')}
                 className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg"
@@ -490,7 +490,7 @@ const Profile = () => {
               </Button>
             </div>
           ) : (
-            <div className="flex gap-3 mb-6">
+            <div className="flex gap-3 mb-6 justify-center max-w-md mx-auto">
               <Button
                 onClick={toggleFollow}
                 className={
