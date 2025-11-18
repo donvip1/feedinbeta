@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Repeat2, TrendingUp } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
@@ -337,39 +337,52 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
       </div>
 
       {/* Social Actions */}
-      <div className="flex items-center space-x-5 mt-3 mb-4">
-        <button onClick={handleLike} disabled={isLiking} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-          <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
-          <span className="text-foreground text-xs font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
-        </button>
-        
-        <button onClick={() => setShowComments(true)} data-comment-button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-          <MessageCircle className="w-4 h-4 text-foreground" />
-          <span className="text-foreground text-xs font-medium">{post.comments_count}</span>
-        </button>
-        
-        <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-          <Eye className="w-4 h-4 text-foreground" />
-          <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
-        </button>
-        
-        <button onClick={handleSave} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-          <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-foreground' : ''} text-foreground`} />
-        </button>
+      <div className="flex items-center justify-between mt-3 mb-4">
+        <div className="flex items-center space-x-5">
+          <button onClick={handleLike} disabled={isLiking} className="flex items-center space-x-1.5 hover:opacity-70 transition">
+            <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
+            <span className="text-foreground text-xs font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
+          </button>
+          
+          <button onClick={() => setShowComments(true)} data-comment-button className="flex items-center space-x-1.5 hover:opacity-70 transition">
+            <MessageCircle className="w-4 h-4 text-foreground" />
+            <span className="text-foreground text-xs font-medium">{post.comments_count}</span>
+          </button>
+          
+          <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
+            <Eye className="w-4 h-4 text-foreground" />
+            <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
+          </button>
+          
+          <button onClick={handleSave} className="flex items-center space-x-1.5 hover:opacity-70 transition">
+            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-foreground' : ''} text-foreground`} />
+          </button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-              <Share2 className="w-4 h-4 text-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem onClick={() => handleShare('refeed')}>Refeed</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleShare('copy')}>Copy Link</DropdownMenuItem>
-            {post.media_url && <DropdownMenuItem onClick={() => handleShare('download')}>Download</DropdownMenuItem>}
-            <DropdownMenuItem onClick={() => navigate(`/promote/${post.id}`)}>Promote Post</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          <button onClick={() => handleShare('refeed')} className="flex items-center space-x-1.5 hover:opacity-70 transition">
+            <Repeat2 className="w-4 h-4 text-foreground" />
+          </button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
+                <Share2 className="w-4 h-4 text-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => handleShare('copy')}>Copy Link</DropdownMenuItem>
+              {post.media_url && <DropdownMenuItem onClick={() => handleShare('download')}>Download</DropdownMenuItem>}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Promote button on the right */}
+        <button 
+          onClick={() => navigate(`/promote/${post.id}`)} 
+          className="flex items-center space-x-1.5 hover:opacity-70 transition text-primary"
+        >
+          <TrendingUp className="w-4 h-4" />
+          <span className="text-xs font-medium">Promote</span>
+        </button>
       </div>
 
       <CommentsModal open={showComments} onClose={() => setShowComments(false)} postId={post.id} postOwnerId={post.user_id} post={post} />
