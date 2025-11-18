@@ -13,7 +13,7 @@ import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload } from 'lucide-react';
+import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus } from 'lucide-react';
 import { PostsGrid } from '@/components/profile/PostsGrid';
 
 interface Profile {
@@ -64,7 +64,8 @@ const Profile = () => {
   const [showAvatarCropper, setShowAvatarCropper] = useState(false);
   const [tempAvatarImageUrl, setTempAvatarImageUrl] = useState<string>('');
 
-  const isOwnProfile = user?.id === userId;
+  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [areMutualFriends, setAreMutualFriends] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -74,15 +75,19 @@ const Profile = () => {
       return;
     }
     
+    const isOwn = user?.id === userId;
+    setIsOwnProfile(isOwn);
+    
     if (userId) {
       loadProfile();
-      if (isOwnProfile && user?.email) {
+      if (isOwn && user?.email) {
         checkAdminStatus(user.email);
       }
-      if (!isOwnProfile && user) {
+      if (!isOwn && user) {
         checkFollowStatus();
         checkIfFollowingMe();
         checkFriendRequestStatus();
+        checkMutualFriendStatus();
       }
     }
   }, [userId, user?.id]);
@@ -198,6 +203,22 @@ const Profile = () => {
     }
   };
 
+  const checkMutualFriendStatus = async () => {
+    if (!user || !userId) return;
+
+    try {
+      const { data, error } = await supabase.rpc('are_mutual_friends', {
+        user_a: user.id,
+        user_b: userId
+      });
+
+      if (error) throw error;
+      setAreMutualFriends(!!data);
+    } catch (error: any) {
+      console.error('Error checking mutual friend status:', error);
+    }
+  };
+
   const toggleFollow = async () => {
     if (!user) return;
 
@@ -230,17 +251,57 @@ const Profile = () => {
     if (!user || !userId) return;
 
     try {
-      const { data: conversationId, error } = await supabase.rpc('create_conversation', {
-        other_user_id: userId
-      });
+      // First check if already mutual friends
+      const { data: areFriends, error: friendCheckError } = await supabase
+        .rpc('are_mutual_friends', {
+          user_a: user.id,
+          user_b: userId
+        });
 
-      if (error) throw error;
+      if (friendCheckError) throw friendCheckError;
 
-      navigate(`/messages?conversation=${conversationId}`);
+      if (areFriends) {
+        // If already friends, create/open conversation
+        const { data: conversationId, error } = await supabase.rpc('create_conversation', {
+          other_user_id: userId
+        });
+
+        if (error) throw error;
+        navigate(`/messages?conversation=${conversationId}`);
+      } else {
+        // If not friends, send friend request
+        const { error: requestError } = await supabase
+          .from('friend_requests')
+          .insert({
+            sender_id: user.id,
+            receiver_id: userId,
+            status: 'pending'
+          });
+
+        if (requestError) {
+          // Check if request already exists
+          if (requestError.code === '23505') {
+            toast({
+              title: 'Friend request already sent',
+              description: 'Waiting for the user to accept.',
+            });
+          } else {
+            throw requestError;
+          }
+        } else {
+          setHasPendingRequest(true);
+          checkMutualFriendStatus(); // Recheck status
+          toast({
+            title: 'Friend request sent!',
+            description: 'You can chat once they accept your request.',
+          });
+        }
+      }
     } catch (error: any) {
+      console.error('Request chat error:', error);
       toast({
-        title: 'Unable to start conversation',
-        description: 'Please try again later.',
+        title: 'Unable to send request',
+        description: error.message || 'Please try again later.',
         variant: 'destructive',
       });
     }
@@ -555,10 +616,25 @@ const Profile = () => {
               </Button>
               <Button
                 onClick={requestChat}
-                className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
+                disabled={hasPendingRequest}
+                className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border disabled:opacity-50"
               >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Request Chat
+                {areMutualFriends ? (
+                  <>
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Send Message
+                  </>
+                ) : hasPendingRequest ? (
+                  <>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Request Sent
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    Add Friend
+                  </>
+                )}
               </Button>
             </div>
           )}
