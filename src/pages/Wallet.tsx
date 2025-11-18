@@ -352,10 +352,11 @@ const Wallet = () => {
 
       <div className="container mx-auto px-4 py-6 space-y-6">
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="buy">Buy Credits</TabsTrigger>
             <TabsTrigger value="subscribe">Subscribe</TabsTrigger>
+            <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
@@ -392,15 +393,6 @@ const Wallet = () => {
                       <p className="text-muted-foreground">Total Spent</p>
                       <p className="font-semibold">{credits?.total_spent || 0}</p>
                     </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={() => navigate('/p2p-marketplace')}
-                      className="flex-1"
-                      variant="outline"
-                    >
-                      P2P Trade
-                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -542,6 +534,31 @@ const Wallet = () => {
                 );
               })}
             </div>
+          </TabsContent>
+
+          {/* Marketplace Tab */}
+          <TabsContent value="marketplace" className="space-y-6 mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShoppingCart className="w-5 h-5" />
+                  P2P Marketplace
+                </CardTitle>
+                <CardDescription>
+                  Buy and sell credits directly with other users
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={() => navigate('/p2p-marketplace')}
+                  className="w-full"
+                  size="lg"
+                >
+                  <ShoppingCart className="w-4 h-4 mr-2" />
+                  Visit Marketplace
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* History Tab */}
