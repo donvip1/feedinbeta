@@ -78,15 +78,15 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                           </Avatar>
                         </div>
                       ) : (
-                        <div className={`rounded-lg p-1 ${active ? 'bg-primary/10' : ''}`}>
+                        <div className={`${active ? 'bg-primary/10' : ''}`}>
                           <Icon 
-                            size={36}
-                            strokeWidth={2.5}
+                            size={28}
+                            strokeWidth={2}
                             stroke="currentColor"
                           />
                         </div>
                       )}
-                      <span className="text-[10px] font-medium">{item.label}</span>
+                      {item.id === 'learn' && <span className="text-[9px] font-medium mt-0.5">{item.label}</span>}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top">
