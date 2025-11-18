@@ -4,11 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, Mic, RotateCcw, ArrowRight, Scissors, ZoomIn, RefreshCw, Check, Pencil, Droplet, Music, Gauge, Rewind } from 'lucide-react';
+import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, RotateCcw, ArrowRight, Crop, ZoomIn, RefreshCw, Check, Pencil, Droplet, Music, Gauge, Rewind } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { VoiceOverRecorder } from './VoiceOverRecorder';
 import { ImageCropper } from './ImageCropper';
 import { MusicLibrary } from './MusicLibrary';
+import { VideoTrimmer } from './VideoTrimmer';
 import { applyImageEffects } from '@/lib/media-processor';
 
 interface CameraCaptureProps {
@@ -75,8 +75,10 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
   const [textOverlay, setTextOverlay] = useState('');
-  const [textPosition, setTextPosition] = useState(50);
+  const [textPosition, setTextPosition] = useState({ x: 50, y: 50 });
   const [textSize, setTextSize] = useState(48);
+  const [isDraggingText, setIsDraggingText] = useState(false);
+  const [dragTextStart, setDragTextStart] = useState<{ x: number; y: number } | null>(null);
   const [stickers, setStickers] = useState<StickerData[]>([]);
   const [voiceOverBlob, setVoiceOverBlob] = useState<Blob | null>(null);
   const [croppedImageUrl, setCroppedImageUrl] = useState<string>('');
@@ -85,9 +87,9 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
   const [showFiltersOverlay, setShowFiltersOverlay] = useState(false);
   const [showTextOverlay, setShowTextOverlay] = useState(false);
   const [showStickersOverlay, setShowStickersOverlay] = useState(false);
-  const [showVoiceoverOverlay, setShowVoiceoverOverlay] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [showDrawing, setShowDrawing] = useState(false);
+  const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
   const [showBlur, setShowBlur] = useState(false);
   const [draggedStickerIndex, setDraggedStickerIndex] = useState<number | null>(null);
   const [stickerPinchStart, setStickerPinchStart] = useState<{ distance: number; scale: number } | null>(null);
@@ -99,7 +101,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
   const [drawSize, setDrawSize] = useState(3);
   const [videoTrimStart, setVideoTrimStart] = useState(0);
   const [videoTrimEnd, setVideoTrimEnd] = useState(0);
-  const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
   const [videoDuration, setVideoDuration] = useState(0);
   const trimVideoRef = useRef<HTMLVideoElement>(null);
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState(1);
@@ -281,10 +282,9 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
     setContrast(100);
     setSaturation(100);
     setTextOverlay('');
-    setTextPosition(50);
+    setTextPosition({ x: 50, y: 50 });
     setTextSize(48);
     setStickers([]);
-    setVoiceOverBlob(null);
     setCroppedImageUrl(capturedMediaUrl || '');
     setBlurAmount(0);
     setDrawingPaths([]);
@@ -306,8 +306,9 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
 
   const getTextPositionStyle = () => {
     return {
-      top: `${textPosition}%`,
-      transform: 'translateY(-50%)',
+      left: `${textPosition.x}%`,
+      top: `${textPosition.y}%`,
+      transform: 'translate(-50%, -50%)',
     };
   };
 
@@ -399,7 +400,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
             contrast,
             saturation,
             textOverlay,
-            textPosition,
+            textPosition: textPosition.y,
             textSize,
             stickers,
             blur: blurAmount,
@@ -419,7 +420,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
             contrast,
             saturation,
             textOverlay,
-            textPosition,
+            textPosition: textPosition.y,
             textSize,
             stickers,
             blur: blurAmount,
@@ -536,7 +537,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
     setShowFiltersOverlay(false);
     setShowTextOverlay(false);
     setShowStickersOverlay(false);
-    setShowVoiceoverOverlay(false);
     setShowDrawing(false);
     setShowBlur(false);
     setShowMusicLibrary(false);
@@ -779,7 +779,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                       setShowFiltersOverlay(!showFiltersOverlay);
                       setShowTextOverlay(false);
                       setShowStickersOverlay(false);
-                      setShowVoiceoverOverlay(false);
                     }}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                       showFiltersOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
@@ -792,7 +791,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                       setShowTextOverlay(!showTextOverlay);
                       setShowFiltersOverlay(false);
                       setShowStickersOverlay(false);
-                      setShowVoiceoverOverlay(false);
                     }}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                       showTextOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
@@ -805,7 +803,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                       setShowStickersOverlay(!showStickersOverlay);
                       setShowFiltersOverlay(false);
                       setShowTextOverlay(false);
-                      setShowVoiceoverOverlay(false);
                     }}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                       showStickersOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
@@ -815,54 +812,39 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                   </button>
                   <button
                     onClick={() => {
-                      setShowVoiceoverOverlay(!showVoiceoverOverlay);
-                      setShowFiltersOverlay(false);
-                      setShowTextOverlay(false);
-                      setShowStickersOverlay(false);
+                      if (capturedMediaType === 'video') {
+                        handleVideoTrim();
+                        setShowFiltersOverlay(false);
+                        setShowTextOverlay(false);
+                        setShowStickersOverlay(false);
+                        setShowDrawing(false);
+                        setShowBlur(false);
+                        setShowCropper(false);
+                      } else {
+                        setShowCropper(true);
+                        setShowFiltersOverlay(false);
+                        setShowTextOverlay(false);
+                        setShowStickersOverlay(false);
+                        setShowDrawing(false);
+                        setShowBlur(false);
+                      }
                     }}
                     className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
-                      showVoiceoverOverlay ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
+                      (capturedMediaType === 'video' ? showVideoTrimmer : showCropper) ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                     }`}
                   >
-                    <button
-                      onClick={() => {
-                        if (capturedMediaType === 'video') {
-                          handleVideoTrim();
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
-                          setShowDrawing(false);
-                          setShowBlur(false);
-                          setShowCropper(false);
-                        } else {
-                          setShowCropper(true);
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
-                          setShowDrawing(false);
-                          setShowBlur(false);
-                        }
-                      }}
-                      className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
-                        (capturedMediaType === 'video' ? showVideoTrimmer : showCropper) ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
-                      }`}
-                    >
-                      <Scissors className="w-6 h-6 drop-shadow-lg" />
-                    </button>
+                    <Crop className="w-6 h-6 drop-shadow-lg" />
                   </button>
                   {capturedMediaType === 'image' && (
                     <>
                       <button
                         onClick={() => {
-                          setShowDrawing(!showDrawing);
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
-                          setShowBlur(false);
-                        }}
+                        setShowDrawing(!showDrawing);
+                        setShowFiltersOverlay(false);
+                        setShowTextOverlay(false);
+                        setShowStickersOverlay(false);
+                        setShowBlur(false);
+                      }}
                         className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                           showDrawing ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                         }`}
@@ -871,13 +853,12 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                       </button>
                       <button
                         onClick={() => {
-                          setShowBlur(!showBlur);
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
-                          setShowDrawing(false);
-                        }}
+                        setShowBlur(!showBlur);
+                        setShowFiltersOverlay(false);
+                        setShowTextOverlay(false);
+                        setShowStickersOverlay(false);
+                        setShowDrawing(false);
+                      }}
                         className={`w-14 h-14 rounded-full backdrop-blur-md shadow-xl flex items-center justify-center transition-all border-2 ${
                           showBlur ? 'bg-white text-black border-white scale-110' : 'bg-black/60 text-white hover:bg-black/80 border-white/10'
                         }`}
@@ -890,13 +871,12 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                           setShowFiltersOverlay(false);
                           setShowTextOverlay(false);
                           setShowStickersOverlay(false);
-                          setShowVoiceoverOverlay(false);
                           setShowDrawing(false);
                           setShowBlur(false);
                         }}
                         className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-black/80 transition-all border-2 border-white/10"
                       >
-                        <Scissors className="w-6 h-6 drop-shadow-lg" />
+                        <Crop className="w-6 h-6 drop-shadow-lg" />
                       </button>
                     </>
                   )}
@@ -1185,22 +1165,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                           className="[&_[role=slider]]:bg-white [&_[role=slider]]:border-2 [&_[role=slider]]:border-black"
                         />
                       </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-white text-xs font-medium drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Position</label>
-                        <div className="flex gap-2 mb-2">
-                          <Button size="sm" variant="outline" onClick={() => setTextPosition(20)} className="flex-1 bg-white/20 border-white/30 text-white hover:bg-white/30 drop-shadow-lg">Top</Button>
-                          <Button size="sm" variant="outline" onClick={() => setTextPosition(50)} className="flex-1 bg-white/20 border-white/30 text-white hover:bg-white/30 drop-shadow-lg">Center</Button>
-                          <Button size="sm" variant="outline" onClick={() => setTextPosition(80)} className="flex-1 bg-white/20 border-white/30 text-white hover:bg-white/30 drop-shadow-lg">Bottom</Button>
-                        </div>
-                        <Slider 
-                          value={[textPosition]} 
-                          onValueChange={([v]) => setTextPosition(v)} 
-                          min={5} 
-                          max={95}
-                          className="[&_[role=slider]]:bg-white [&_[role=slider]]:border-2 [&_[role=slider]]:border-black"
-                        />
-                      </div>
                     </div>
                   </div>
                 )}
@@ -1227,39 +1191,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                         </button>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* Voiceover Overlay - Bottom Transparent */}
-                {showVoiceoverOverlay && (
-                  <div className="absolute bottom-24 left-4 right-20 z-[120] bg-black/40 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-white/20 max-h-[45vh] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-white font-bold text-sm drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">Voice Over</h3>
-                      <button onClick={() => setShowVoiceoverOverlay(false)} className="text-white/80 hover:text-white">
-                        <X className="w-5 h-5 drop-shadow-lg" />
-                      </button>
-                    </div>
-                    
-                    {!voiceOverBlob ? (
-                      <VoiceOverRecorder 
-                        onRecordingComplete={(blob) => setVoiceOverBlob(blob)} 
-                        maxDuration={60}
-                      />
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="p-3 bg-white/20 rounded-xl drop-shadow-lg">
-                          <p className="text-sm font-medium text-white drop-shadow-lg">Voice over recorded</p>
-                          <p className="text-xs text-white/80 drop-shadow-lg">Ready to add</p>
-                        </div>
-                        <Button
-                          variant="destructive"
-                          className="w-full"
-                          onClick={() => setVoiceOverBlob(null)}
-                        >
-                          Remove Voice Over
-                        </Button>
-                      </div>
-                    )}
                   </div>
                 )}
 

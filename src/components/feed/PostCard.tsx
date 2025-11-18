@@ -392,10 +392,6 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
             <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
           </button>
           
-          <button onClick={handleSave} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-            <Bookmark className={`w-4 h-4 ${isSaved ? 'fill-foreground' : ''} text-foreground`} />
-          </button>
-
           <button onClick={() => handleShare('refeed')} className="flex items-center space-x-1.5 hover:opacity-70 transition">
             <Repeat2 className={`w-4 h-4 ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`} />
             {localRefeedsCount > 0 && (
@@ -412,6 +408,10 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={handleSave}>
+                <Bookmark className={`w-4 h-4 mr-2 ${isSaved ? 'fill-foreground' : ''}`} />
+                {isSaved ? 'Unsave' : 'Save Post'}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleShare('copy')}>Copy Link</DropdownMenuItem>
               {post.media_url && <DropdownMenuItem onClick={() => handleShare('download')}>Download</DropdownMenuItem>}
             </DropdownMenuContent>
