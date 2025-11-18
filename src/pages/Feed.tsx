@@ -357,25 +357,35 @@ const Feed = () => {
           
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
-            <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center space-x-6">
+            <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center items-center space-x-6">
               <TabsTrigger 
                 value="following" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[9px] font-medium pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 Following
               </TabsTrigger>
               <TabsTrigger 
                 value="forYou" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[9px] font-medium pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 For You
               </TabsTrigger>
               <TabsTrigger 
                 value="myPosts" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-base font-semibold pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[9px] font-medium pb-1 px-0 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 My Posts
               </TabsTrigger>
+              <button
+                onClick={() => navigate('/live')}
+                className="flex items-center gap-1 px-3 py-1 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                <span className="text-[9px] font-semibold">LIVE</span>
+              </button>
             </TabsList>
           </Tabs>
 
