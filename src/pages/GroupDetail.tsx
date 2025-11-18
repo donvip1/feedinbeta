@@ -297,7 +297,7 @@ const GroupDetail = () => {
         </Tabs>
       </div>
 
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };

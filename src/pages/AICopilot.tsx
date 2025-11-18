@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { ArrowLeft, Send, Sparkles, Loader2, Trash2 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
@@ -604,7 +605,11 @@ const AICopilot = () => {
         </div>
       </div>
 
-      <BottomNav onQuickActionClick={() => setShowQuickActions(true)} currentPage="ai" />
+      <FloatingActionButton 
+        onClick={() => setShowQuickActions(prev => !prev)}
+      />
+
+      <BottomNav currentPage="ai" />
 
       {/* AI Tools Modal */}
       <QuickActionsModal

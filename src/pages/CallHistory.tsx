@@ -212,7 +212,7 @@ const CallHistory = () => {
         )}
       </main>
 
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };

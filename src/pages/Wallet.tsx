@@ -655,7 +655,7 @@ const Wallet = () => {
         </Tabs>
       </div>
 
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };

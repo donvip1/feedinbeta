@@ -198,7 +198,7 @@ const Credits = () => {
           })}
         </div>
       </div>
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };

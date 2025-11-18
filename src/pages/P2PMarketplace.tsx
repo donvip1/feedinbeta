@@ -256,7 +256,7 @@ const P2PMarketplace = () => {
           )}
         </div>
       </div>
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };

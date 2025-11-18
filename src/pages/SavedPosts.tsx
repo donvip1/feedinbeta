@@ -146,7 +146,7 @@ const SavedPosts = () => {
             )}
           </div>
         </div>
-        <BottomNav onQuickActionClick={() => {}} />
+        <BottomNav />
       </div>
     </>
   );
