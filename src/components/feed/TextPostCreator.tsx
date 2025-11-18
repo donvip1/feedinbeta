@@ -6,11 +6,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { X, Music, Volume2, Palette } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { MusicLibrary } from './MusicLibrary';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface TextPostCreatorProps {
   open: boolean;
   onClose: () => void;
-  onCreate: (textContent: string, textConfig: TextConfig, musicUrl?: string, voiceUrl?: string) => void;
+  onCreate: (textContent: string, textConfig: TextConfig, musicUrl?: string, voiceUrl?: string, postTarget?: 'feed' | 'story' | 'both') => void;
   isPremium?: boolean;
 }
 
@@ -61,6 +62,7 @@ export function TextPostCreator({ open, onClose, onCreate, isPremium = false }: 
   const [showVoiceTemplates, setShowVoiceTemplates] = useState(false);
   const [selectedVoice, setSelectedVoice] = useState<string | null>(null);
   const [isGeneratingVoice, setIsGeneratingVoice] = useState(false);
+  const [postTarget, setPostTarget] = useState<'feed' | 'story' | 'both'>('feed');
 
   const maxChars = 700;
   const charCount = text.length;
@@ -138,7 +140,7 @@ export function TextPostCreator({ open, onClose, onCreate, isPremium = false }: 
       backgroundColor,
     };
 
-    onCreate(text, textConfig, selectedMusic?.url, selectedVoice || undefined);
+    onCreate(text, textConfig, selectedMusic?.url, selectedVoice || undefined, postTarget);
   };
 
   return (
@@ -287,13 +289,28 @@ export function TextPostCreator({ open, onClose, onCreate, isPremium = false }: 
             </ScrollArea>
 
             {/* Footer */}
-            <div className="p-4 border-t flex justify-end gap-2">
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreate}>
-                Next
-              </Button>
+            <div className="p-4 border-t space-y-3">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium whitespace-nowrap">Post to:</label>
+                <Select value={postTarget} onValueChange={(value: any) => setPostTarget(value)}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="feed">Feed Only</SelectItem>
+                    <SelectItem value="story">Story Only</SelectItem>
+                    <SelectItem value="both">Feed & Story</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreate}>
+                  Post
+                </Button>
+              </div>
             </div>
           </div>
         </DialogContent>

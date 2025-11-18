@@ -9,6 +9,7 @@ import { PostDetailsModal } from './PostDetailsModal';
 import { CreatePostMethodSelector } from './CreatePostMethodSelector';
 import { CameraCapture } from './CameraCapture';
 import { MediaGalleryPicker } from './MediaGalleryPicker';
+import { VideoTrimmer } from './VideoTrimmer';
 import { TextToImageCreator } from './TextToImageCreator';
 import { AIImageGenerator } from './AIImageGenerator';
 import { TextPostCreator } from './TextPostCreator';
@@ -46,6 +47,8 @@ export function EnhancedCreatePostModal({
   const [showTextToImage, setShowTextToImage] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
   const [showTextCreator, setShowTextCreator] = useState(false);
+  const [showVideoTrimmer, setShowVideoTrimmer] = useState(false);
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState<string | null>(null);
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,12 +117,15 @@ export function EnhancedCreatePostModal({
     onClose();
   };
 
-  const handleMethodSelect = (method: 'camera' | 'text-to-image' | 'ai-generate') => {
+  const handleMethodSelect = (method: 'camera' | 'gallery' | 'text-to-image' | 'ai-generate') => {
     setShowMethodSelector(false);
     
     switch (method) {
       case 'camera':
         setShowCamera(true);
+        break;
+      case 'gallery':
+        setShowGallery(true);
         break;
       case 'text-to-image':
         setShowTextToImage(true);
@@ -139,26 +145,65 @@ export function EnhancedCreatePostModal({
     setStep('edit');
   };
 
-  const handleGallerySelect = (files: File[]) => {
+  const handleGallerySelect = async (files: File[]) => {
     // For now, use first file. Later can support multiple
     const file = files[0];
     const isVideo = file.type.startsWith('video/');
-    setMediaFile(file);
-    setMediaType(isVideo ? 'video' : 'image');
-    setMediaPreview(URL.createObjectURL(file));
-    setShowGallery(false);
     
-    // Check if multiple images for carousel
-    if (files.length > 1 && files.every(f => f.type.startsWith('image/'))) {
-      // Handle carousel - skip editor and go to details
-      setStep('details');
-      toast({
-        title: 'Carousel post',
-        description: `${files.length} images selected for carousel`,
-      });
+    if (isVideo) {
+      // Check video duration
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        const duration = video.duration;
+        const maxDuration = isPremium ? 120 : 60; // 2 mins for premium, 1 min for free
+        
+        if (duration > maxDuration) {
+          // Show trimmer
+          setSelectedVideoUrl(URL.createObjectURL(file));
+          setShowGallery(false);
+          setShowVideoTrimmer(true);
+        } else {
+          // Video is within limit
+          setMediaFile(file);
+          setMediaType('video');
+          setMediaPreview(URL.createObjectURL(file));
+          setShowGallery(false);
+          setStep('edit');
+        }
+      };
+      
+      video.src = URL.createObjectURL(file);
     } else {
-      setStep('edit');
+      setMediaFile(file);
+      setMediaType('image');
+      setMediaPreview(URL.createObjectURL(file));
+      setShowGallery(false);
+      
+      // Check if multiple images for carousel
+      if (files.length > 1 && files.every(f => f.type.startsWith('image/'))) {
+        // Handle carousel - skip editor and go to details
+        setStep('details');
+        toast({
+          title: 'Carousel post',
+          description: `${files.length} images selected for carousel`,
+        });
+      } else {
+        setStep('edit');
+      }
     }
+  };
+
+  const handleVideoTrim = (trimmedBlob: Blob) => {
+    const file = new File([trimmedBlob], 'trimmed-video.mp4', { type: 'video/mp4' });
+    setMediaFile(file);
+    setMediaType('video');
+    setMediaPreview(URL.createObjectURL(file));
+    setShowVideoTrimmer(false);
+    setSelectedVideoUrl(null);
+    setStep('edit');
   };
 
   const handleTextToImageCreate = (file: File) => {
@@ -179,7 +224,7 @@ export function EnhancedCreatePostModal({
     setStep('edit');
   };
 
-  const handleTextCreate = (textContent: string, textConfig: any, musicUrl?: string, voiceUrl?: string) => {
+  const handleTextCreate = (textContent: string, textConfig: any, musicUrl?: string, voiceUrl?: string, postTarget?: 'feed' | 'story' | 'both') => {
     // TODO: Create text post with config
     setMediaType('text');
     setShowTextCreator(false);
@@ -230,11 +275,25 @@ export function EnhancedCreatePostModal({
         open={showGallery}
         onClose={() => {
           setShowGallery(false);
-          setShowCamera(true);
+          setShowMethodSelector(true);
         }}
         onSelect={handleGallerySelect}
         multiSelect={false}
       />
+
+      {/* Video Trimmer */}
+      {selectedVideoUrl && showVideoTrimmer && (
+        <VideoTrimmer
+          videoUrl={selectedVideoUrl}
+          onTrimComplete={handleVideoTrim}
+          onClose={() => {
+            setShowVideoTrimmer(false);
+            setSelectedVideoUrl(null);
+            setShowGallery(true);
+          }}
+          isPremium={isPremium}
+        />
+      )}
 
       {/* Text to Image */}
       <TextToImageCreator

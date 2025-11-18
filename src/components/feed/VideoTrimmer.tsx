@@ -7,9 +7,10 @@ interface VideoTrimmerProps {
   videoUrl: string;
   onTrimComplete: (trimmedBlob: Blob) => void;
   onClose: () => void;
+  isPremium?: boolean;
 }
 
-export function VideoTrimmer({ videoUrl, onTrimComplete, onClose }: VideoTrimmerProps) {
+export function VideoTrimmer({ videoUrl, onTrimComplete, onClose, isPremium = false }: VideoTrimmerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [duration, setDuration] = useState(0);
   const [startTime, setStartTime] = useState(0);
@@ -17,6 +18,8 @@ export function VideoTrimmer({ videoUrl, onTrimComplete, onClose }: VideoTrimmer
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
 
+  const maxDuration = isPremium ? 120 : 60; // 2 mins for premium, 1 min for free
+  
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -24,7 +27,7 @@ export function VideoTrimmer({ videoUrl, onTrimComplete, onClose }: VideoTrimmer
     const handleLoadedMetadata = () => {
       const dur = video.duration;
       setDuration(dur);
-      setEndTime(Math.min(dur, 120)); // Max 2 minutes
+      setEndTime(Math.min(dur, maxDuration));
     };
 
     const handleTimeUpdate = () => {
@@ -133,7 +136,7 @@ export function VideoTrimmer({ videoUrl, onTrimComplete, onClose }: VideoTrimmer
                 value={[endTime]}
                 onValueChange={([v]) => setEndTime(Math.max(v, startTime + 1))}
                 min={0}
-                max={Math.min(duration, 120)}
+                max={Math.min(duration, maxDuration)}
                 step={0.1}
                 className="[&_[role=slider]]:bg-white"
               />
@@ -141,7 +144,8 @@ export function VideoTrimmer({ videoUrl, onTrimComplete, onClose }: VideoTrimmer
           </div>
 
           <p className="text-white/60 text-xs text-center mt-2">
-            Trim duration: {formatTime(endTime - startTime)} (Max: 2:00)
+            Trim duration: {formatTime(endTime - startTime)} (Max: {formatTime(maxDuration)})
+            {!isPremium && <span className="block text-yellow-400 mt-1">Premium users can upload up to 2 minutes</span>}
           </p>
         </div>
       </div>

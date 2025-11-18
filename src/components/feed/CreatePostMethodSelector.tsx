@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 interface CreatePostMethodSelectorProps {
   open: boolean;
   onClose: () => void;
-  onSelectMethod: (method: 'camera' | 'text-to-image' | 'ai-generate') => void;
+  onSelectMethod: (method: 'camera' | 'gallery' | 'text-to-image' | 'ai-generate') => void;
   isPremium?: boolean;
 }
 
@@ -22,6 +22,13 @@ export function CreatePostMethodSelector({
       title: 'Camera',
       description: 'Capture photo, video, or text',
       color: 'from-blue-500 to-cyan-500',
+    },
+    {
+      id: 'gallery' as const,
+      icon: Image,
+      title: 'Gallery',
+      description: 'Select from gallery',
+      color: 'from-purple-500 to-pink-500',
     },
     {
       id: 'ai-generate' as const,
@@ -41,7 +48,7 @@ export function CreatePostMethodSelector({
           <p className="text-sm text-muted-foreground">Choose how you want to create your post</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           {methods.map((method) => {
             const Icon = method.icon;
             const isLocked = method.premium && !isPremium;
