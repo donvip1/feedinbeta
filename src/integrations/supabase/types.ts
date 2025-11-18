@@ -2041,6 +2041,7 @@ export type Database = {
           banner_url: string | null
           bio: string | null
           country: string | null
+          cover_url: string | null
           created_at: string
           daily_ai_chat_count: number | null
           daily_ai_eduqa_count: number | null
@@ -2085,6 +2086,7 @@ export type Database = {
           banner_url?: string | null
           bio?: string | null
           country?: string | null
+          cover_url?: string | null
           created_at?: string
           daily_ai_chat_count?: number | null
           daily_ai_eduqa_count?: number | null
@@ -2129,6 +2131,7 @@ export type Database = {
           banner_url?: string | null
           bio?: string | null
           country?: string | null
+          cover_url?: string | null
           created_at?: string
           daily_ai_chat_count?: number | null
           daily_ai_eduqa_count?: number | null
@@ -2798,6 +2801,7 @@ export type Database = {
         }[]
       }
       get_post_view_count: { Args: { post_id_param: string }; Returns: number }
+      get_user_post_count: { Args: { user_uuid: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
