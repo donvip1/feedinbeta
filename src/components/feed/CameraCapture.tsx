@@ -668,7 +668,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
 
                 {/* Bottom Controls */}
                 <div className="absolute bottom-0 left-0 right-0 z-[110] bg-gradient-to-t from-black/80 to-transparent p-6">
-                  <div className="flex items-center justify-around">
+                  <div className="flex items-end justify-between px-4">
                     {/* Pre-Capture Filters Toggle */}
                     <button
                       onClick={() => setShowPreCaptureFilters(!showPreCaptureFilters)}
@@ -679,7 +679,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
                       <Wand2 className="w-6 h-6" />
                     </button>
 
-                    {/* Mode Selector */}
+                    {/* Center: Mode Selector & Shutter with Gallery */}
                     <div className="flex flex-col items-center gap-3">
                       <div className="flex gap-2 bg-black/60 backdrop-blur-md rounded-full px-3 py-1.5 border border-white/10">
                         <button
@@ -714,42 +714,48 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
                         </button>
                       </div>
 
-                      {/* Shutter Button */}
-                      <button
-                        onClick={mode === 'photo' ? capturePhoto : isRecording ? stopRecording : startRecording}
-                        className={`w-20 h-20 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
-                          isRecording 
-                            ? 'bg-red-500 border-4 border-white' 
-                            : 'bg-white border-4 border-white'
-                        }`}
-                      >
-                        {mode === 'photo' ? (
-                          <Circle className="w-16 h-16 text-black" strokeWidth={3} />
-                        ) : isRecording ? (
-                          <Square className="w-8 h-8 fill-white" />
-                        ) : (
-                          <Circle className="w-16 h-16 fill-red-500 text-red-500" />
-                        )}
-                      </button>
+                      {/* Shutter and Gallery Row */}
+                      <div className="flex items-center gap-4">
+                        {/* Shutter Button */}
+                        <button
+                          onClick={mode === 'photo' ? capturePhoto : isRecording ? stopRecording : startRecording}
+                          className={`w-20 h-20 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 ${
+                            isRecording 
+                              ? 'bg-red-500 border-4 border-white' 
+                              : 'bg-white border-4 border-white'
+                          }`}
+                        >
+                          {mode === 'photo' ? (
+                            <Circle className="w-16 h-16 text-black" strokeWidth={3} />
+                          ) : isRecording ? (
+                            <Square className="w-8 h-8 fill-white" />
+                          ) : (
+                            <Circle className="w-16 h-16 fill-red-500 text-red-500" />
+                          )}
+                        </button>
+
+                        {/* Gallery Quick Access with Thumbnail */}
+                        <button
+                          onClick={handleGalleryClick}
+                          className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white/50 hover:border-white hover:scale-105 transition-all backdrop-blur-md bg-black/40 shadow-lg"
+                        >
+                          {galleryThumbnail ? (
+                            <img 
+                              src={galleryThumbnail} 
+                              alt="Gallery" 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                              <span className="text-white text-2xl">🖼️</span>
+                            </div>
+                          )}
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Gallery Quick Access with Thumbnail */}
-                    <button
-                      onClick={handleGalleryClick}
-                      className="w-14 h-14 rounded-xl overflow-hidden border-2 border-white/30 hover:border-white transition-all backdrop-blur-md bg-black/40"
-                    >
-                      {galleryThumbnail ? (
-                        <img 
-                          src={galleryThumbnail} 
-                          alt="Gallery" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                          <span className="text-white text-2xl">🖼️</span>
-                        </div>
-                      )}
-                    </button>
+                    {/* Spacer to balance layout */}
+                    <div className="w-14"></div>
                   </div>
                 </div>
               </>
