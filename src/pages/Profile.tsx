@@ -452,7 +452,6 @@ const Profile = () => {
             </button>
 
             <div className="flex flex-col items-center">
-              <Eye className="w-6 h-6 text-primary mx-auto mb-2" />
               <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
               <p className="text-xs text-muted-foreground">Views</p>
             </div>
