@@ -13,7 +13,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
   const location = useLocation();
 
   const navItems = [
-    { id: 'feed', label: 'Feed', icon: Home, path: '/feed' },
+    { id: 'feed', label: 'Feeds', icon: Home, path: '/feed' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
     { id: 'wallet', label: 'Wallet', icon: Wallet, path: '/wallet' },
     { id: 'ai', label: 'FeedAI', icon: Sparkles, path: '/ai-copilot' },

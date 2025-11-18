@@ -9,6 +9,7 @@ import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volu
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
+import { SharePostModal } from './SharePostModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,6 +72,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
   const [isMuted, setIsMuted] = useState(false); // Start unmuted when music is present
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const iconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -507,6 +509,9 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => setShowShareModal(true)}>
+                Share Post
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleSave}>
                 <Bookmark className={`w-4 h-4 mr-2 ${isSaved ? 'fill-foreground' : ''}`} />
                 {isSaved ? 'Unsave' : 'Save Post'}
@@ -529,6 +534,11 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
 
       <CommentsModal open={showComments} onClose={() => setShowComments(false)} postId={post.id} postOwnerId={post.user_id} post={post} />
       <ProfilePreviewModal open={showProfilePreview} onClose={() => setShowProfilePreview(false)} userId={post.user_id} />
+      <SharePostModal 
+        open={showShareModal} 
+        onClose={() => setShowShareModal(false)} 
+        post={{ id: post.id, content: post.content, media_url: post.media_url, user_id: post.user_id }} 
+      />
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Delete Post?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this post.</AlertDialogDescription></AlertDialogHeader>
