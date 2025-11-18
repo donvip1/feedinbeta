@@ -1,5 +1,5 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
@@ -49,6 +49,67 @@ self.addEventListener('activate', (event) => {
     })
   );
 });
+
+// Request Notification Permission
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'REQUEST_NOTIFICATION_PERMISSION') {
+    Notification.requestPermission().then(permission => {
+      console.log('[SW] Notification permission:', permission);
+    });
+  }
+});
+
+// Handle Push Notifications
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push notification received');
+  
+  const data = event.data ? event.data.json() : {};
+  const title = data.title || 'FeedIn';
+  const options = {
+    body: data.body || 'New notification',
+    icon: '/favicon.png',
+    badge: '/favicon.png',
+    vibrate: [200, 100, 200],
+    data: data,
+    actions: [
+      { action: 'open', title: 'Open' },
+      { action: 'close', title: 'Close' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+// Handle Notification Clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notification clicked:', event.action);
+  
+  event.notification.close();
+  
+  if (event.action === 'open' || !event.action) {
+    // Open the app
+    event.waitUntil(
+      clients.openWindow('/')
+    );
+  }
+});
+
+// Background Sync for offline actions
+self.addEventListener('sync', (event) => {
+  console.log('[SW] Background sync:', event.tag);
+  
+  if (event.tag === 'sync-posts') {
+    event.waitUntil(syncPosts());
+  }
+});
+
+async function syncPosts() {
+  // Sync pending posts when connection is restored
+  console.log('[SW] Syncing pending posts...');
+  // Implementation would fetch from IndexedDB and sync with server
+}
 
 // Fetch - smart caching strategy
 self.addEventListener('fetch', (event) => {
