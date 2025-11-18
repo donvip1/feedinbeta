@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Slider } from '@/components/ui/slider';
-import { Crop, RotateCw } from 'lucide-react';
+import { Crop, Check, X } from 'lucide-react';
 
 interface ImageCropperProps {
   imageUrl: string;
@@ -9,120 +8,131 @@ interface ImageCropperProps {
   onClose: () => void;
 }
 
-const ASPECT_RATIOS = [
-  { name: 'Original', value: 0 },
-  { name: 'Freeform', value: 0 },
-  { name: '3:4', value: 3 / 4 },
-  { name: '9:16', value: 9 / 16 },
-  { name: '1:1', value: 1 },
-  { name: 'Post', value: 4 / 5 },
-  { name: 'Story', value: 9 / 16 },
-];
-
 export function ImageCropper({ imageUrl, onCropComplete, onClose }: ImageCropperProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [rotation, setRotation] = useState(0);
-  const [selectedRatio, setSelectedRatio] = useState(0);
-  const [scale, setScale] = useState(1);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  
+  const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 100, height: 100 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [isResizing, setIsResizing] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
-    drawImage();
-  }, [rotation, scale]);
+    const img = imageRef.current;
+    if (img) {
+      img.onload = () => {
+        setImageLoaded(true);
+        const container = containerRef.current;
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const centerX = rect.width * 0.1;
+          const centerY = rect.height * 0.1;
+          const size = Math.min(rect.width, rect.height) * 0.8;
+          setCropArea({ x: centerX, y: centerY, width: size, height: size });
+        }
+      };
+    }
+  }, []);
 
-  const drawImage = () => {
+  const handleMouseDown = (e: React.MouseEvent, type: 'move' | 'resize') => {
+    e.preventDefault();
+    if (type === 'move') {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX - cropArea.x, y: e.clientY - cropArea.y });
+    } else {
+      setIsResizing(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    if (isDragging) {
+      const newX = Math.max(0, Math.min(e.clientX - dragStart.x, rect.width - cropArea.width));
+      const newY = Math.max(0, Math.min(e.clientY - dragStart.y, rect.height - cropArea.height));
+      setCropArea(prev => ({ ...prev, x: newX, y: newY }));
+    } else if (isResizing) {
+      const delta = Math.max(e.clientX - dragStart.x, e.clientY - dragStart.y);
+      const newWidth = Math.max(50, Math.min(cropArea.width + delta, rect.width - cropArea.x));
+      const newHeight = Math.max(50, Math.min(cropArea.height + delta, rect.height - cropArea.y));
+      setCropArea(prev => ({ ...prev, width: newWidth, height: newHeight }));
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
+  }, [isDragging, isResizing, dragStart, cropArea]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setIsResizing(false);
+  }, []);
+
+  useEffect(() => {
+    if (isDragging || isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
+
+  const handleCrop = () => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    const img = imageRef.current;
+    const container = containerRef.current;
+    if (!canvas || !img || !container) return;
+
+    const rect = container.getBoundingClientRect();
+    const scaleX = img.naturalWidth / rect.width;
+    const scaleY = img.naturalHeight / rect.height;
+
+    canvas.width = cropArea.width * scaleX;
+    canvas.height = cropArea.height * scaleY;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = imageUrl;
-    
-    img.onload = () => {
-      canvas.width = img.width;
-      canvas.height = img.height;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((rotation * Math.PI) / 180);
-      ctx.scale(scale, scale);
-      ctx.drawImage(img, -img.width / 2, -img.height / 2);
-      ctx.restore();
-    };
-  };
-
-  const handleCrop = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    ctx.drawImage(img, cropArea.x * scaleX, cropArea.y * scaleY, cropArea.width * scaleX, cropArea.height * scaleY, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob((blob) => {
-      if (blob) {
-        const url = URL.createObjectURL(blob);
-        onCropComplete(url);
-      }
+      if (blob) onCropComplete(URL.createObjectURL(blob));
     }, 'image/jpeg', 0.95);
   };
 
   return (
-    <div className="space-y-4">
-      <div className="bg-black rounded-lg overflow-hidden flex items-center justify-center">
-        <canvas ref={canvasRef} className="max-w-full max-h-96" />
+    <div className="fixed inset-0 z-[200] bg-black flex flex-col">
+      <div className="flex items-center justify-between p-4 border-b border-white/10">
+        <button onClick={onClose} className="text-white"><X className="w-6 h-6" /></button>
+        <h3 className="text-white font-semibold">Crop Image</h3>
+        <Button onClick={handleCrop} variant="ghost" className="text-white"><Check className="w-5 h-5 mr-2" />Apply</Button>
       </div>
 
-      <div>
-        <label className="text-xs mb-2 block font-medium">Aspect Ratio</label>
-        <div className="grid grid-cols-4 gap-2">
-          {ASPECT_RATIOS.map((ratio, idx) => (
-            <Button
-              key={ratio.name}
-              variant={selectedRatio === idx ? 'default' : 'outline'}
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => setSelectedRatio(idx)}
-            >
-              {ratio.name}
-            </Button>
-          ))}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div ref={containerRef} className="relative max-w-full max-h-full" style={{ touchAction: 'none' }}>
+          <img ref={imageRef} src={imageUrl} alt="Crop" className="max-w-full max-h-[70vh] select-none" draggable={false} />
+          
+          {imageLoaded && (
+            <>
+              <div className="absolute inset-0 bg-black/50 pointer-events-none" />
+              <div className="absolute border-2 border-white cursor-move" style={{ left: `${cropArea.x}px`, top: `${cropArea.y}px`, width: `${cropArea.width}px`, height: `${cropArea.height}px`, boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)' }} onMouseDown={(e) => handleMouseDown(e, 'move')}>
+                <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                  {[...Array(9)].map((_, i) => <div key={i} className="border border-white/30" />)}
+                </div>
+                <div className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-tl-lg cursor-nwse-resize" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, 'resize'); }}>
+                  <Crop className="w-4 h-4 m-2 text-black" />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div>
-        <label className="text-xs mb-2 block font-medium flex items-center gap-2">
-          <RotateCw className="w-3 h-3" />
-          Rotation: {rotation}°
-        </label>
-        <Slider
-          value={[rotation]}
-          onValueChange={([v]) => setRotation(v)}
-          min={0}
-          max={360}
-          step={15}
-        />
-      </div>
-
-      <div>
-        <label className="text-xs mb-2 block font-medium">Zoom: {scale.toFixed(1)}x</label>
-        <Slider
-          value={[scale]}
-          onValueChange={([v]) => setScale(v)}
-          min={0.5}
-          max={3}
-          step={0.1}
-        />
-      </div>
-
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={onClose} className="flex-1">
-          Cancel
-        </Button>
-        <Button onClick={handleCrop} className="flex-1 bg-gradient-primary">
-          <Crop className="w-4 h-4 mr-2" />
-          Apply Crop
-        </Button>
-      </div>
+      <canvas ref={canvasRef} className="hidden" />
+      <div className="p-4 bg-black/80 backdrop-blur"><p className="text-white/70 text-sm text-center">Drag to reposition • Drag corner to resize</p></div>
     </div>
   );
 }
