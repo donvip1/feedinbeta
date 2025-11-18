@@ -72,15 +72,15 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                     >
                       {item.isProfile && avatarUrl ? (
                         <div className={`rounded-full p-1 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-background' : 'border-2 border-white'}`}>
-                          <Avatar className="w-7 h-7">
+                          <Avatar className="w-10 h-10">
                             <AvatarImage src={avatarUrl} />
-                            <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
+                            <AvatarFallback><Icon className="w-5 h-5" /></AvatarFallback>
                           </Avatar>
                         </div>
                       ) : (
                         <div className={`rounded-lg p-1.5 ${active ? 'bg-primary/10' : ''}`}>
                           <Icon 
-                            className="w-10 h-10" 
+                            className="w-12 h-12" 
                             strokeWidth={2.5}
                             stroke="currentColor"
                           />
