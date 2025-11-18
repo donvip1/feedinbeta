@@ -16,7 +16,7 @@ export function ImageCropper({ imageUrl, onCropComplete, onClose }: ImageCropper
   const [cropArea, setCropArea] = useState({ x: 0, y: 0, width: 100, height: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const [isResizing, setIsResizing] = useState(false);
+  const [isResizing, setIsResizing] = useState<'tl' | 'tr' | 'bl' | 'br' | false>(false);
   const [imageLoaded, setImageLoaded] = useState(false);
 
   useEffect(() => {
@@ -36,13 +36,13 @@ export function ImageCropper({ imageUrl, onCropComplete, onClose }: ImageCropper
     }
   }, []);
 
-  const handleMouseDown = (e: React.MouseEvent, type: 'move' | 'resize') => {
+  const handleMouseDown = (e: React.MouseEvent, type: 'move' | 'tl' | 'tr' | 'bl' | 'br') => {
     e.preventDefault();
     if (type === 'move') {
       setIsDragging(true);
       setDragStart({ x: e.clientX - cropArea.x, y: e.clientY - cropArea.y });
     } else {
-      setIsResizing(true);
+      setIsResizing(type);
       setDragStart({ x: e.clientX, y: e.clientY });
     }
   };
@@ -56,10 +56,33 @@ export function ImageCropper({ imageUrl, onCropComplete, onClose }: ImageCropper
       const newY = Math.max(0, Math.min(e.clientY - dragStart.y, rect.height - cropArea.height));
       setCropArea(prev => ({ ...prev, x: newX, y: newY }));
     } else if (isResizing) {
-      const delta = Math.max(e.clientX - dragStart.x, e.clientY - dragStart.y);
-      const newWidth = Math.max(50, Math.min(cropArea.width + delta, rect.width - cropArea.x));
-      const newHeight = Math.max(50, Math.min(cropArea.height + delta, rect.height - cropArea.y));
-      setCropArea(prev => ({ ...prev, width: newWidth, height: newHeight }));
+      const deltaX = e.clientX - dragStart.x;
+      const deltaY = e.clientY - dragStart.y;
+      
+      let newX = cropArea.x;
+      let newY = cropArea.y;
+      let newWidth = cropArea.width;
+      let newHeight = cropArea.height;
+
+      if (isResizing === 'br') {
+        newWidth = Math.max(50, Math.min(cropArea.width + deltaX, rect.width - cropArea.x));
+        newHeight = Math.max(50, Math.min(cropArea.height + deltaY, rect.height - cropArea.y));
+      } else if (isResizing === 'bl') {
+        newX = Math.max(0, Math.min(cropArea.x + deltaX, cropArea.x + cropArea.width - 50));
+        newWidth = cropArea.width - (newX - cropArea.x);
+        newHeight = Math.max(50, Math.min(cropArea.height + deltaY, rect.height - cropArea.y));
+      } else if (isResizing === 'tr') {
+        newY = Math.max(0, Math.min(cropArea.y + deltaY, cropArea.y + cropArea.height - 50));
+        newWidth = Math.max(50, Math.min(cropArea.width + deltaX, rect.width - cropArea.x));
+        newHeight = cropArea.height - (newY - cropArea.y);
+      } else if (isResizing === 'tl') {
+        newX = Math.max(0, Math.min(cropArea.x + deltaX, cropArea.x + cropArea.width - 50));
+        newY = Math.max(0, Math.min(cropArea.y + deltaY, cropArea.y + cropArea.height - 50));
+        newWidth = cropArea.width - (newX - cropArea.x);
+        newHeight = cropArea.height - (newY - cropArea.y);
+      }
+
+      setCropArea({ x: newX, y: newY, width: newWidth, height: newHeight });
       setDragStart({ x: e.clientX, y: e.clientY });
     }
   }, [isDragging, isResizing, dragStart, cropArea]);
@@ -122,9 +145,11 @@ export function ImageCropper({ imageUrl, onCropComplete, onClose }: ImageCropper
                 <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
                   {[...Array(9)].map((_, i) => <div key={i} className="border border-white/30" />)}
                 </div>
-                <div className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-tl-lg cursor-nwse-resize" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, 'resize'); }}>
-                  <Crop className="w-4 h-4 m-2 text-black" />
-                </div>
+                {/* Corner resize handles */}
+                <div className="absolute -top-2 -left-2 w-6 h-6 bg-white rounded-full cursor-nwse-resize" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, 'tl'); }} />
+                <div className="absolute -top-2 -right-2 w-6 h-6 bg-white rounded-full cursor-nesw-resize" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, 'tr'); }} />
+                <div className="absolute -bottom-2 -left-2 w-6 h-6 bg-white rounded-full cursor-nesw-resize" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, 'bl'); }} />
+                <div className="absolute -bottom-2 -right-2 w-6 h-6 bg-white rounded-full cursor-nwse-resize" onMouseDown={(e) => { e.stopPropagation(); handleMouseDown(e, 'br'); }} />
               </div>
             </>
           )}
