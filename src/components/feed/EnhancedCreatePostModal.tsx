@@ -31,7 +31,7 @@ export function EnhancedCreatePostModal({
 }: EnhancedCreatePostModalProps) {
   const { toast } = useToast();
   const { isPremium } = usePremiumStatus();
-  const [step, setStep] = useState<'method' | 'upload' | 'edit' | 'details'>('method');
+  const [step, setStep] = useState<'method' | 'edit' | 'details'>('method');
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'video'>(defaultTab);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(initialImageUrl);
@@ -243,141 +243,15 @@ export function EnhancedCreatePostModal({
         onCreate={handleAIImageCreate}
       />
 
-      {/* Step 1: Upload (Legacy - keeping for backward compatibility) */}
-      <Dialog open={open && step === 'upload'} onOpenChange={handleClose}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Create Post</DialogTitle>
-          </DialogHeader>
-
-          <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="text">
-                <Type className="w-4 h-4 mr-2" />
-                Text
-              </TabsTrigger>
-              <TabsTrigger value="image">
-                <ImageIcon className="w-4 h-4 mr-2" />
-                Image
-              </TabsTrigger>
-              <TabsTrigger value="video">
-                <Video className="w-4 h-4 mr-2" />
-                Video
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="text" className="space-y-4 mt-6">
-              <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                <Type className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-lg font-medium mb-2">Share your thoughts</p>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create a text-only post
-                </p>
-                <Button onClick={handleTextPost} className="bg-gradient-primary">
-                  Continue
-                </Button>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="image" className="space-y-4 mt-6">
-              <div className="text-center">
-                {mediaPreview && mediaType === 'image' ? (
-                  <div className="relative inline-block">
-                    <img
-                      src={mediaPreview}
-                      alt="Preview"
-                      className="max-w-full max-h-60 rounded-lg"
-                    />
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      className="absolute top-2 right-2"
-                      onClick={() => {
-                        setMediaFile(null);
-                        setMediaPreview(null);
-                      }}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="py-12 border-2 border-dashed rounded-lg">
-                    <Upload className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-lg font-medium mb-2">Upload an image</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      JPG, PNG, WEBP
-                    </p>
-                    <label htmlFor="image-upload" className="inline-block">
-                      <Button type="button" className="bg-gradient-primary" onClick={() => document.getElementById('image-upload')?.click()}>
-                        Choose File
-                      </Button>
-                    </label>
-                    <Input
-                      id="image-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleMediaChange}
-                      className="hidden"
-                    />
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="video" className="space-y-4 mt-6">
-              <div className="text-center">
-                {mediaPreview && mediaType === 'video' ? (
-                  <div className="relative inline-block">
-                    <video
-                      src={mediaPreview}
-                      className="max-w-full max-h-60 rounded-lg"
-                      controls
-                    />
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      className="absolute top-2 right-2"
-                      onClick={() => {
-                        setMediaFile(null);
-                        setMediaPreview(null);
-                      }}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="py-12 border-2 border-dashed rounded-lg">
-                    <Upload className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                    <p className="text-lg font-medium mb-2">Upload a video</p>
-                    <p className="text-sm text-muted-foreground mb-4">
-                      MP4, MOV
-                    </p>
-                    <label htmlFor="video-upload" className="inline-block">
-                      <Button type="button" className="bg-gradient-primary" onClick={() => document.getElementById('video-upload')?.click()}>
-                        Choose File
-                      </Button>
-                    </label>
-                    <Input
-                      id="video-upload"
-                      type="file"
-                      accept="video/*"
-                      onChange={handleMediaChange}
-                      className="hidden"
-                    />
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-          </Tabs>
-        </DialogContent>
-      </Dialog>
-
-      {/* Step 2: Editor */}
+      {/* Editor */}
       {mediaPreview && mediaType !== 'text' && (
         <PostEditorModal
           open={step === 'edit'}
           onClose={handleClose}
-          onBack={() => setStep('upload')}
+          onBack={() => {
+            setStep('method');
+            setShowMethodSelector(true);
+          }}
           mediaUrl={mediaPreview}
           mediaType={mediaType as 'image' | 'video'}
           onNext={handleEditorNext}
@@ -388,7 +262,7 @@ export function EnhancedCreatePostModal({
       <PostDetailsModal
         open={step === 'details'}
         onClose={handleClose}
-        onBack={() => setStep(mediaType === 'text' ? 'upload' : 'edit')}
+        onBack={() => setStep(mediaType === 'text' ? 'method' : 'edit')}
         mediaUrl={mediaPreview || ''}
         mediaType={mediaType}
         effects={effects}
