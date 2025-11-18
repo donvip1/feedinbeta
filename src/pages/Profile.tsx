@@ -377,24 +377,10 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-card/95 backdrop-blur-lg border-b border-border">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Button onClick={() => navigate(-1)} variant="ghost" size="icon" className="hover:bg-accent/50">
-            <ArrowLeft className="w-5 h-5 text-foreground" />
-          </Button>
-          {isOwnProfile && (
-            <Button onClick={() => setShowSettings(true)} variant="ghost" size="icon" className="hover:bg-accent/50">
-              <Settings className="w-5 h-5 text-foreground" />
-            </Button>
-          )}
-        </div>
-      </div>
-
       {/* Profile Header */}
       <div className="relative">
-        {/* Cover photo or gradient */}
-        <div className="relative h-40 bg-gradient-to-br from-primary/40 via-accent/30 to-background">
+        {/* Cover photo or gradient - extends to top */}
+        <div className="relative h-64 bg-gradient-to-br from-primary/40 via-accent/30 to-background">
           {profile.cover_url && (
             <img 
               src={profile.cover_url} 
@@ -403,10 +389,35 @@ const Profile = () => {
               onClick={() => setShowCoverModal(true)}
             />
           )}
+          
+          {/* Header controls overlaid on cover */}
+          <div className="absolute top-0 left-0 right-0 z-40">
+            <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+              <Button 
+                onClick={() => navigate(-1)} 
+                variant="ghost" 
+                size="icon" 
+                className="bg-background/40 backdrop-blur-md hover:bg-background/60 border border-background/20 shadow-lg"
+              >
+                <ArrowLeft className="w-5 h-5 text-foreground" />
+              </Button>
+              {isOwnProfile && (
+                <Button 
+                  onClick={() => setShowSettings(true)} 
+                  variant="ghost" 
+                  size="icon" 
+                  className="bg-background/40 backdrop-blur-md hover:bg-background/60 border border-background/20 shadow-lg"
+                >
+                  <Settings className="w-5 h-5 text-foreground" />
+                </Button>
+              )}
+            </div>
+          </div>
+
           {isOwnProfile && (
             <label
               htmlFor="cover-upload"
-              className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm rounded-full p-2 cursor-pointer hover:bg-background transition-colors shadow-lg"
+              className="absolute bottom-3 right-3 bg-background/80 backdrop-blur-sm rounded-full p-2 cursor-pointer hover:bg-background transition-colors shadow-lg"
             >
               <Upload className="w-4 h-4 text-foreground" />
               <input
