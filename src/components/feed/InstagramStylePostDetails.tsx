@@ -221,9 +221,9 @@ export function InstagramStylePostDetails({
       </div>
 
       {/* Right: Post Details */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen md:h-full overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
@@ -252,8 +252,9 @@ export function InstagramStylePostDetails({
         {/* Progress Bar */}
         <ProgressBar progress={progress} isVisible={isUploading} />
 
-        {/* Form */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+        {/* Form - Scrollable */}
+        <div className="flex-1 overflow-y-auto overscroll-contain pb-20 md:pb-4">
+          <div className="p-4 space-y-6">
           {/* Caption */}
           <div className="space-y-2">
             <Label>Caption</Label>
@@ -421,6 +422,7 @@ export function InstagramStylePostDetails({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
