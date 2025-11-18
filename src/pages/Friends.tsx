@@ -447,7 +447,7 @@ const Friends = () => {
         </Tabs>
       </main>
 
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };

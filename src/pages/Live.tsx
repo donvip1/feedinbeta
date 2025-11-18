@@ -172,7 +172,7 @@ const Live = () => {
             </TabsContent>
           </Tabs>
         </div>
-        <BottomNav onQuickActionClick={() => {}} />
+        <BottomNav />
       </div>
 
       <CreateLiveStreamModal

@@ -9,6 +9,7 @@ import { PostCard } from '@/components/feed/PostCard';
 import { EnhancedCreatePostModal } from '@/components/feed/EnhancedCreatePostModal';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Search, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -504,11 +505,15 @@ const Feed = () => {
         initialImageUrl={sharedImageUrl}
       />
 
+      {/* Floating Action Button */}
+      <FloatingActionButton 
+        onClick={() => setShowQuickActions(prev => !prev)}
+        hidden={isCommenting}
+      />
+
       {/* Bottom Navigation */}
       <BottomNav 
-        onQuickActionClick={() => setShowQuickActions(prev => !prev)} 
         currentPage="feed"
-        minimized={showQuickActions || isCreatingContent}
         hidden={isCommenting}
       />
     </div>

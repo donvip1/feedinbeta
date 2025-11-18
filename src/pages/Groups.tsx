@@ -241,7 +241,7 @@ const Groups = () => {
         onSuccess={loadGroups}
       />
 
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };

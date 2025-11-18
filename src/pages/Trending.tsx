@@ -217,7 +217,7 @@ const Trending = () => {
           </Tabs>
         </div>
 
-        <BottomNav onQuickActionClick={() => {}} />
+        <BottomNav />
       </div>
     </>
   );

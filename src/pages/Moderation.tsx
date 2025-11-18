@@ -270,7 +270,7 @@ const Moderation = () => {
           </TabsContent>
         </Tabs>
       </div>
-      <BottomNav onQuickActionClick={() => {}} />
+      <BottomNav />
     </div>
   );
 };
