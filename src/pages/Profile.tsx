@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { FollowersModal } from '@/components/profile/FollowersModal';
 import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload } from 'lucide-react';
+import { PostsGrid } from '@/components/profile/PostsGrid';
 
 interface Profile {
   id: string;
@@ -432,7 +433,7 @@ const Profile = () => {
             )}
           </div>
 
-          {/* Followers & Following - Centered */}
+          {/* Followers, Following & Views - Same line, Centered */}
           <div className="flex gap-8 mb-6 justify-center">
             <button
               onClick={() => { setFollowersModalTab('followers'); setShowFollowersModal(true); }}
@@ -449,6 +450,12 @@ const Profile = () => {
               <p className="text-2xl font-bold text-foreground">{profile.following_count}</p>
               <p className="text-xs text-muted-foreground">Following</p>
             </button>
+
+            <div className="flex flex-col items-center">
+              <Eye className="w-6 h-6 text-primary mx-auto mb-2" />
+              <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
+              <p className="text-xs text-muted-foreground">Views</p>
+            </div>
           </div>
 
           {/* Bio - Centered */}
@@ -456,22 +463,7 @@ const Profile = () => {
             <p className="text-foreground mb-6 leading-relaxed text-center">{profile.bio}</p>
           )}
 
-          {/* Stats Grid - Centered, No backgrounds */}
-          <div className="flex gap-8 mb-6 justify-center">
-            <div className="text-center">
-              <FileText className="w-6 h-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{profile.post_count}</p>
-              <p className="text-xs text-muted-foreground">Posts</p>
-            </div>
-            
-            <div className="text-center">
-              <Eye className="w-6 h-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
-              <p className="text-xs text-muted-foreground">Views</p>
-            </div>
-          </div>
-
-          {/* Action Buttons - Centered */}
+          {/* Action Buttons - Centered, BEFORE Posts */}
           {isOwnProfile ? (
             <div className="flex gap-3 mb-6 justify-center max-w-md mx-auto">
               <Button
@@ -510,6 +502,17 @@ const Profile = () => {
               </Button>
             </div>
           )}
+
+          {/* Posts Section - Scrollable Grid */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                Posts ({profile.post_count})
+              </h3>
+            </div>
+            <PostsGrid userId={userId || ''} />
+          </div>
 
           {/* Details Section */}
           <div className="space-y-4">
