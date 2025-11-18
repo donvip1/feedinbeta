@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Music, Search, Play, Pause, TrendingUp, Clock, Heart, X } from 'lucide-react';
+import { Music, Search, Play, Pause, TrendingUp, Clock, Heart, X, Upload, Folder } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface MusicLibraryProps {
@@ -42,6 +42,7 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
   const [activeTab, setActiveTab] = useState<'trending' | 'recent' | 'favorites'>('trending');
   const [playingId, setPlayingId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const getSongList = () => {
     switch (activeTab) {
@@ -86,6 +87,7 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
   const handleSelectSong = (song: typeof TRENDING_SONGS[0]) => {
     if (audioRef.current) {
       audioRef.current.pause();
+      setPlayingId(null);
     }
     onSelectMusic({
       name: song.name,
@@ -93,11 +95,37 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
       url: song.url,
       duration: song.duration,
     });
-    toast({
-      title: 'Music added',
-      description: `${song.name} by ${song.artist} - ${song.duration}s`,
-    });
+    toast({ title: 'Music added', description: `${song.name} by ${song.artist}` });
     onClose();
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/')) {
+      toast({ title: 'Error', description: 'Please select an audio file', variant: 'destructive' });
+      return;
+    }
+
+    // Create object URL for the uploaded audio
+    const url = URL.createObjectURL(file);
+    const audio = new Audio(url);
+    
+    audio.onloadedmetadata = () => {
+      onSelectMusic({
+        name: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+        artist: 'My Upload',
+        url: url,
+        duration: Math.round(audio.duration),
+      });
+      toast({ title: 'Music added', description: `${file.name} uploaded successfully` });
+      onClose();
+    };
+
+    audio.onerror = () => {
+      toast({ title: 'Error', description: 'Failed to load audio file', variant: 'destructive' });
+    };
   };
 
   useEffect(() => {
@@ -120,6 +148,25 @@ export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps
             <p className="text-xs text-muted-foreground">Max 60 seconds</p>
           </div>
           
+          {/* Upload Button */}
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Upload from Device
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </div>
+
           {/* Search Bar */}
           <div className="relative mt-4">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />

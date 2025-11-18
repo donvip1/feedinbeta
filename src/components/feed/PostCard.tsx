@@ -39,6 +39,7 @@ interface PostCardProps {
     views_count: number;
     refeeds_count: number;
     created_at: string;
+    allow_refeed?: boolean | null;
     profiles: {
       display_name: string | null;
       username: string | null;
@@ -236,6 +237,16 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
     try {
       if (type === 'refeed') {
         if (!user) return;
+        
+        // Check if refeed is allowed
+        if (post.allow_refeed === false) {
+          toast({ 
+            title: 'Refeed not allowed', 
+            description: 'The author has disabled refeeding for this post',
+            variant: 'destructive' 
+          });
+          return;
+        }
         
         // Optimistically update UI
         const prevRefeeded = isRefeeded;

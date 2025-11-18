@@ -926,9 +926,41 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                     />
                   )}
 
-                  {/* Text Overlay */}
+                  {/* Text Overlay - Draggable */}
                   {textOverlay && (
-                    <div className="absolute left-0 right-0 flex justify-center px-4 pointer-events-none" style={getTextPositionStyle()}>
+                    <div 
+                      className="absolute cursor-move pointer-events-auto"
+                      style={{
+                        left: `${textPosition.x}%`,
+                        top: `${textPosition.y}%`,
+                        transform: 'translate(-50%, -50%)',
+                        touchAction: 'none',
+                        zIndex: isDraggingText ? 50 : 10,
+                      }}
+                      onTouchStart={(e) => {
+                        const touch = e.touches[0];
+                        const rect = previewRef.current?.getBoundingClientRect();
+                        if (!rect) return;
+                        setIsDraggingText(true);
+                        setDragTextStart({
+                          x: (touch.clientX - rect.left) / rect.width * 100 - textPosition.x,
+                          y: (touch.clientY - rect.top) / rect.height * 100 - textPosition.y,
+                        });
+                      }}
+                      onTouchMove={(e) => {
+                        if (!isDraggingText || !dragTextStart) return;
+                        const touch = e.touches[0];
+                        const rect = previewRef.current?.getBoundingClientRect();
+                        if (!rect) return;
+                        const newX = Math.max(10, Math.min(90, (touch.clientX - rect.left) / rect.width * 100 - dragTextStart.x));
+                        const newY = Math.max(10, Math.min(90, (touch.clientY - rect.top) / rect.height * 100 - dragTextStart.y));
+                        setTextPosition({ x: newX, y: newY });
+                      }}
+                      onTouchEnd={() => {
+                        setIsDraggingText(false);
+                        setDragTextStart(null);
+                      }}
+                    >
                       <p 
                         className="text-white font-bold drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)] text-center px-6 py-3 bg-black/40 rounded-xl backdrop-blur-sm"
                         style={{ fontSize: `${textSize}px`, textShadow: '2px 2px 4px rgba(0,0,0,0.8)' }}
@@ -990,63 +1022,65 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                     </div>
                   ))}
                   
-                  {/* Drawing Canvas Overlay */}
-                  {showDrawing && (
-                    <svg 
-                      className="absolute inset-0 w-full h-full pointer-events-auto"
-                      style={{ touchAction: 'none' }}
-                      onTouchStart={(e) => {
-                        if (!previewRef.current) return;
-                        e.preventDefault();
-                        const touch = e.touches[0];
-                        const rect = previewRef.current.getBoundingClientRect();
-                        const x = ((touch.clientX - rect.left) / rect.width) * 100;
-                        const y = ((touch.clientY - rect.top) / rect.height) * 100;
-                        setCurrentPath([{ x, y }]);
-                        setIsDrawing(true);
-                      }}
-                      onTouchMove={(e) => {
-                        if (!isDrawing || !previewRef.current) return;
-                        e.preventDefault();
-                        const touch = e.touches[0];
-                        const rect = previewRef.current.getBoundingClientRect();
-                        const x = ((touch.clientX - rect.left) / rect.width) * 100;
-                        const y = ((touch.clientY - rect.top) / rect.height) * 100;
-                        setCurrentPath([...currentPath, { x, y }]);
-                      }}
-                      onTouchEnd={() => {
-                        if (isDrawing && currentPath.length > 0) {
-                          setDrawingPaths([...drawingPaths, currentPath]);
-                          setCurrentPath([]);
-                          setIsDrawing(false);
-                        }
-                      }}
-                    >
-                      {/* Render completed paths */}
-                      {drawingPaths.map((path, pathIndex) => (
-                        <polyline
-                          key={pathIndex}
-                          points={path.map(p => `${p.x},${p.y}`).join(' ')}
-                          fill="none"
-                          stroke={drawColor}
-                          strokeWidth={drawSize / 2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      ))}
-                      {/* Render current path being drawn */}
-                      {currentPath.length > 0 && (
-                        <polyline
-                          points={currentPath.map(p => `${p.x},${p.y}`).join(' ')}
-                          fill="none"
-                          stroke={drawColor}
-                          strokeWidth={drawSize / 2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      )}
-                    </svg>
-                  )}
+                  {/* Drawing Canvas - Always visible to show paths, interactive only when drawing mode */}
+                  <svg 
+                    className="absolute inset-0 w-full h-full"
+                    style={{ 
+                      touchAction: showDrawing ? 'none' : 'auto',
+                      pointerEvents: showDrawing ? 'auto' : 'none',
+                      zIndex: 15
+                    }}
+                    onTouchStart={(e) => {
+                      if (!showDrawing || !previewRef.current) return;
+                      e.preventDefault();
+                      const touch = e.touches[0];
+                      const rect = previewRef.current.getBoundingClientRect();
+                      const x = ((touch.clientX - rect.left) / rect.width) * 100;
+                      const y = ((touch.clientY - rect.top) / rect.height) * 100;
+                      setCurrentPath([{ x, y }]);
+                      setIsDrawing(true);
+                    }}
+                    onTouchMove={(e) => {
+                      if (!showDrawing || !isDrawing || !previewRef.current) return;
+                      e.preventDefault();
+                      const touch = e.touches[0];
+                      const rect = previewRef.current.getBoundingClientRect();
+                      const x = ((touch.clientX - rect.left) / rect.width) * 100;
+                      const y = ((touch.clientY - rect.top) / rect.height) * 100;
+                      setCurrentPath([...currentPath, { x, y }]);
+                    }}
+                    onTouchEnd={() => {
+                      if (showDrawing && isDrawing && currentPath.length > 0) {
+                        setDrawingPaths([...drawingPaths, currentPath]);
+                        setCurrentPath([]);
+                        setIsDrawing(false);
+                      }
+                    }}
+                  >
+                    {/* Render completed paths - always visible */}
+                    {drawingPaths.map((path, pathIndex) => (
+                      <polyline
+                        key={pathIndex}
+                        points={path.map(p => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke={drawColor}
+                        strokeWidth={drawSize / 2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    ))}
+                    {/* Render current path being drawn */}
+                    {currentPath.length > 0 && (
+                      <polyline
+                        points={currentPath.map(p => `${p.x},${p.y}`).join(' ')}
+                        fill="none"
+                        stroke={drawColor}
+                        strokeWidth={drawSize / 2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    )}
+                  </svg>
                 </div>
 
                 {/* Filters Overlay - Bottom Transparent */}
