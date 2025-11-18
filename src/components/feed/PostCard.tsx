@@ -155,26 +155,21 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
     if (!user || hasViewed) return;
     
     try {
-      // Check if user has already viewed this post
-      const { data: existingView } = await supabase
-        .from('post_views')
-        .select('id')
-        .eq('post_id', post.id)
-        .eq('user_id', user.id)
-        .maybeSingle();
+      // Try to insert view (will be ignored if already exists due to unique constraint)
+      const { error } = await supabase.from('post_views').insert({
+        post_id: post.id,
+        user_id: user.id
+      });
       
-      // Only insert if no existing view (one view per user)
-      if (!existingView) {
-        await supabase.from('post_views').insert({
-          post_id: post.id,
-          user_id: user.id
-        });
-        
-        // Increment views count on the post
-        await supabase
-          .from('posts')
-          .update({ views_count: (post.views_count || 0) + 1 })
-          .eq('id', post.id);
+      // If no error (new view) or duplicate key error, proceed
+      if (!error || error.code === '23505') {
+        // Only increment count if it was a new view (no error)
+        if (!error) {
+          await supabase
+            .from('posts')
+            .update({ views_count: (post.views_count || 0) + 1 })
+            .eq('id', post.id);
+        }
         
         setHasViewed(true);
       } else {
