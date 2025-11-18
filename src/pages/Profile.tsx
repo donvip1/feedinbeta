@@ -9,13 +9,14 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { FollowersModal } from '@/components/profile/FollowersModal';
-import { ArrowLeft, Settings, Coins, Eye, Crown, UserPlus, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark } from 'lucide-react';
+import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload } from 'lucide-react';
 
 interface Profile {
   id: string;
   display_name: string | null;
   username: string | null;
   avatar_url: string | null;
+  cover_url?: string | null;
   bio: string | null;
   status: string | null;
   about: string | null;
@@ -23,7 +24,7 @@ interface Profile {
   marital_status: string | null;
   total_views: number;
   is_premium: boolean;
-  credits_balance: number;
+  post_count: number;
   followers_count: number;
   following_count: number;
   instagram_url?: string | null;
@@ -46,9 +47,11 @@ const Profile = () => {
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
+  const [isFollowingMe, setIsFollowingMe] = useState(false);
 
   const isOwnProfile = user?.id === userId;
 
@@ -58,12 +61,13 @@ const Profile = () => {
       if (isOwnProfile && user?.email) {
         checkAdminStatus(user.email);
       }
-      if (!isOwnProfile) {
+      if (!isOwnProfile && user) {
         checkFollowStatus();
+        checkIfFollowingMe();
         checkFriendRequestStatus();
       }
     }
-  }, [userId]);
+  }, [userId, user?.id]);
 
   const checkAdminStatus = async (email: string) => {
     const adminEmails = ['viplearn4free@gmail.com', 'cryptosvip@gmail.com', 'myconnectmate@gmail.com'];
@@ -82,30 +86,22 @@ const Profile = () => {
           facebook_url,
           tiktok_url,
           youtube_url,
-          website_url
+          website_url,
+          cover_url
         `)
         .eq('id', userId)
         .single();
 
       if (profileError) throw profileError;
 
-      // Get credits balance from credit_transactions if own profile
-      let creditsBalance = 0;
-      if (isOwnProfile) {
-        const { data: transactions } = await supabase
-          .from('credit_transactions')
-          .select('amount, type')
-          .eq('user_id', userId);
-        
-        if (transactions) {
-          creditsBalance = transactions.reduce((sum, t) => sum + t.amount, 0);
-        }
-      }
+      // Get post count
+      const { data: postCount } = await supabase
+        .rpc('get_user_post_count', { user_uuid: userId });
 
       if (profileData) {
         setProfile({
           ...(profileData as any),
-          credits_balance: creditsBalance,
+          post_count: postCount || 0,
         } as Profile);
       }
     } catch (error: any) {
@@ -120,7 +116,7 @@ const Profile = () => {
   };
 
   const checkFollowStatus = async () => {
-    if (!user) return;
+    if (!user || !userId) return;
 
     try {
       const { data, error } = await supabase
@@ -128,12 +124,30 @@ const Profile = () => {
         .select('id')
         .eq('follower_id', user.id)
         .eq('following_id', userId)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
       setIsFollowing(!!data);
     } catch (error: any) {
       console.error('Error checking follow status:', error);
+    }
+  };
+
+  const checkIfFollowingMe = async () => {
+    if (!user || !userId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', userId)
+        .eq('following_id', user.id)
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setIsFollowingMe(!!data);
+    } catch (error: any) {
+      console.error('Error checking if following me:', error);
     }
   };
 
@@ -184,22 +198,21 @@ const Profile = () => {
     }
   };
 
-  const sendFriendRequest = async () => {
-    if (!user) return;
+  const requestChat = async () => {
+    if (!user || !userId) return;
 
     try {
-      await supabase.from('friend_requests').insert({
-        sender_id: user.id,
-        receiver_id: userId,
+      const { data: conversationId, error } = await supabase.rpc('create_conversation', {
+        other_user_id: userId
       });
-      setHasPendingRequest(true);
-      toast({
-        title: 'Friend request sent',
-      });
+
+      if (error) throw error;
+
+      navigate(`/messages?conversation=${conversationId}`);
     } catch (error: any) {
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'Unable to start conversation',
+        description: 'Please try again later.',
         variant: 'destructive',
       });
     }
@@ -250,7 +263,6 @@ const Profile = () => {
 
       if (updateError) throw updateError;
 
-      // Reload profile to show new avatar
       await loadProfile();
       
       toast({
@@ -265,6 +277,48 @@ const Profile = () => {
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      setUploadingCover(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `cover-${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `covers/${user.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('posts')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from('posts').getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ cover_url: data.publicUrl })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      await loadProfile();
+      
+      toast({
+        title: 'Cover photo updated',
+        description: 'Your cover photo has been changed',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Error uploading cover',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingCover(false);
     }
   };
 
@@ -302,8 +356,32 @@ const Profile = () => {
 
       {/* Profile Header */}
       <div className="relative">
-        {/* Cover gradient */}
-        <div className="h-40 bg-gradient-to-br from-primary/40 via-accent/30 to-background" />
+        {/* Cover photo or gradient */}
+        <div className="relative h-40 bg-gradient-to-br from-primary/40 via-accent/30 to-background">
+          {profile.cover_url && (
+            <img 
+              src={profile.cover_url} 
+              alt="Cover" 
+              className="w-full h-full object-cover"
+            />
+          )}
+          {isOwnProfile && (
+            <label
+              htmlFor="cover-upload"
+              className="absolute top-3 right-3 bg-background/80 backdrop-blur-sm rounded-full p-2 cursor-pointer hover:bg-background transition-colors shadow-lg"
+            >
+              <Upload className="w-4 h-4 text-foreground" />
+              <input
+                id="cover-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleCoverUpload}
+                disabled={uploadingCover}
+              />
+            </label>
+          )}
+        </div>
         
         {/* Profile Info */}
         <div className="container mx-auto px-4 -mt-20 max-w-2xl">
@@ -348,7 +426,29 @@ const Profile = () => {
                 )}
               </div>
               <p className="text-muted-foreground text-sm">@{profile.username || 'user'}</p>
+              {!isOwnProfile && isFollowingMe && (
+                <p className="text-xs text-muted-foreground mt-1">Following you</p>
+              )}
             </div>
+          </div>
+
+          {/* Followers & Following - Right after name/username */}
+          <div className="flex gap-4 mb-4">
+            <button
+              onClick={() => { setFollowersModalTab('followers'); setShowFollowersModal(true); }}
+              className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
+            >
+              <p className="text-xl font-bold text-foreground">{profile.followers_count}</p>
+              <p className="text-xs text-muted-foreground">Followers</p>
+            </button>
+
+            <button
+              onClick={() => { setFollowersModalTab('following'); setShowFollowersModal(true); }}
+              className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
+            >
+              <p className="text-xl font-bold text-foreground">{profile.following_count}</p>
+              <p className="text-xs text-muted-foreground">Following</p>
+            </button>
           </div>
 
           {/* Bio */}
@@ -356,34 +456,18 @@ const Profile = () => {
             <p className="text-foreground mb-6 leading-relaxed">{profile.bio}</p>
           )}
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            {isOwnProfile && (
-              <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
-                <Coins className="w-6 h-6 text-yellow-500 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-foreground">
-                  {isAdmin ? '∞' : profile.credits_balance}
-                </p>
-                <p className="text-xs text-muted-foreground">Credits</p>
-              </div>
-            )}
+          {/* Stats Grid - No backgrounds */}
+          <div className="flex gap-6 mb-6 justify-center">
+            <div className="text-center">
+              <FileText className="w-5 h-5 text-primary mx-auto mb-1" />
+              <p className="text-xl font-bold text-foreground">{profile.post_count}</p>
+              <p className="text-xs text-muted-foreground">Posts</p>
+            </div>
             
-            <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-xl p-4 text-center backdrop-blur-sm">
-              <Eye className="w-6 h-6 text-blue-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
+            <div className="text-center">
+              <Eye className="w-5 h-5 text-primary mx-auto mb-1" />
+              <p className="text-xl font-bold text-foreground">{profile.total_views}</p>
               <p className="text-xs text-muted-foreground">Views</p>
-            </div>
-            
-            <div className="bg-gradient-to-br from-pink-500/10 to-rose-500/10 border border-pink-500/20 rounded-xl p-4 text-center backdrop-blur-sm cursor-pointer hover:border-pink-500/40 transition" onClick={() => { setFollowersModalTab('followers'); setShowFollowersModal(true); }}>
-              <Heart className="w-6 h-6 text-pink-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{profile.followers_count}</p>
-              <p className="text-xs text-muted-foreground">Followers</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/20 rounded-xl p-4 text-center backdrop-blur-sm cursor-pointer hover:border-purple-500/40 transition" onClick={() => { setFollowersModalTab('following'); setShowFollowersModal(true); }}>
-              <UserPlus className="w-6 h-6 text-purple-500 mx-auto mb-2" />
-              <p className="text-2xl font-bold text-foreground">{profile.following_count}</p>
-              <p className="text-xs text-muted-foreground">Following</p>
             </div>
           </div>
 
@@ -418,19 +502,11 @@ const Profile = () => {
                 {isFollowing ? 'Following' : 'Follow'}
               </Button>
               <Button
-                onClick={hasPendingRequest ? undefined : sendFriendRequest}
-                disabled={hasPendingRequest}
-                className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border disabled:opacity-50"
+                onClick={requestChat}
+                className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
               >
-                <UserPlus className="w-4 h-4 mr-2" />
-                {hasPendingRequest ? 'Pending' : 'Add Friend'}
-              </Button>
-              <Button 
-                onClick={startConversation}
-                className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
-                size="icon"
-              >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className="w-4 h-4 mr-2" />
+                Request Chat
               </Button>
             </div>
           )}
