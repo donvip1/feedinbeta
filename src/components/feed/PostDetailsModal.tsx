@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2, ArrowLeft, Navigation } from 'lucide-react';
+import { MapPin, Hash, AtSign, Globe, Users, UserCheck, Lock, Clock, Loader2, ArrowLeft, Navigation, X, Camera } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -89,7 +89,7 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
     }
   };
 
-  const handlePost = async (action: 'post' | 'draft' | 'schedule') => {
+  const handlePost = async (action: 'post' | 'draft' | 'schedule' | 'story') => {
     if (!user) return;
 
     // Validate text-only posts
@@ -158,6 +158,30 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
           .getPublicUrl(uploadData.path);
 
         finalMediaUrl = publicUrl;
+      }
+
+      // Story logic
+      if (action === 'story') {
+        const { error: storyError } = await supabase
+          .from('stories')
+          .insert({
+            user_id: user.id,
+            media_url: finalMediaUrl,
+            media_type: mediaType === 'text' ? 'text' : mediaType,
+            content: description.trim() || null,
+          });
+
+        if (storyError) throw storyError;
+
+        toast({
+          title: 'Story created!',
+          description: 'Your story is now live for 24 hours',
+        });
+
+        onSuccess();
+        onClose();
+        setLoading(false);
+        return;
       }
 
       const postData = {
@@ -354,7 +378,7 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
                   <SelectTrigger className="mt-2">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="z-[9999]">
                     <SelectItem value="everyone">
                       <div className="flex items-center">
                         <Globe className="w-4 h-4 mr-2" />
@@ -440,23 +464,28 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
           </div>
 
           {/* Action Buttons */}
-          <div className="sticky bottom-0 px-6 py-4 border-t bg-background flex gap-2 shrink-0">
-          <Button variant="outline" onClick={onClose} className="flex-1">
-            Cancel
-          </Button>
+          <div className="sticky bottom-0 pt-4 border-t bg-background grid grid-cols-2 gap-2">
           <Button
             variant="outline"
             onClick={() => handlePost('draft')}
             disabled={loading}
-            className="flex-1"
           >
             Save Draft
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => handlePost('story')}
+            disabled={loading}
+            className="bg-gradient-to-r from-pink-500 to-purple-500 text-white hover:from-pink-600 hover:to-purple-600"
+          >
+            <Camera className="w-4 h-4 mr-2" />
+            Story
           </Button>
           {scheduleTime && (
             <Button
               onClick={handleSchedule}
               disabled={loading}
-              className="flex-1 bg-blue-600 hover:bg-blue-700"
+              className="col-span-2 bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Clock className="w-4 h-4 mr-2" />
               Schedule
@@ -465,7 +494,7 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
           <Button
             onClick={() => handlePost('post')}
             disabled={loading}
-            className="flex-1 bg-gradient-primary"
+            className="col-span-2 bg-gradient-to-r from-primary to-primary/80"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Post Now'}
           </Button>
