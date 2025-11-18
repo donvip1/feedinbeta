@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useUploadProgress } from '@/hooks/useUploadProgress';
+import { ProgressBar } from '@/components/shared/ProgressBar';
 import {
   Dialog,
   DialogContent,
@@ -22,6 +24,7 @@ interface CreateStoryModalProps {
 export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { progress, isUploading, startUpload, updateProgress, completeUpload, failUpload } = useUploadProgress();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -51,20 +54,25 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
     if (!user || !file) return;
 
     setUploading(true);
+    startUpload();
     try {
+      updateProgress(10);
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
+      updateProgress(30);
       const { error: uploadError } = await supabase.storage
         .from('posts')
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
+      updateProgress(60);
       const { data: { publicUrl } } = supabase.storage
         .from('posts')
         .getPublicUrl(fileName);
 
+      updateProgress(80);
       const { error: insertError } = await supabase.from('stories').insert({
         user_id: user.id,
         media_url: publicUrl,
@@ -73,15 +81,18 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
 
       if (insertError) throw insertError;
 
+      updateProgress(95);
       toast({
         title: 'Story created',
         description: 'Your story has been shared',
       });
 
+      completeUpload();
       onSuccess();
       setFile(null);
       setPreview(null);
     } catch (error: any) {
+      failUpload(error.message);
       toast({
         title: 'Error creating story',
         description: error.message,
@@ -170,5 +181,8 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
         </div>
       </DialogContent>
     </Dialog>
+    
+    <ProgressBar progress={progress} isUploading={isUploading} label="Uploading Story" />
+    </>
   );
 };

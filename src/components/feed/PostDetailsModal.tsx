@@ -11,6 +11,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { extractHashtags } from '@/lib/hashtag-utils';
+import { useUploadProgress } from '@/hooks/useUploadProgress';
+import { ProgressBar } from '@/components/shared/ProgressBar';
 
 interface PostDetailsModalProps {
   open: boolean;
@@ -26,6 +28,7 @@ interface PostDetailsModalProps {
 export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, effects, onSuccess, mediaFile }: PostDetailsModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { progress, isUploading, startUpload, updateProgress, completeUpload, failUpload } = useUploadProgress();
   const [loading, setLoading] = useState(false);
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
@@ -113,14 +116,16 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
     }
 
     setLoading(true);
+    startUpload();
     try {
       let finalMediaUrl = mediaUrl;
       let musicUrl: string | null = null;
       let musicTitle: string | null = null;
       let musicArtist: string | null = null;
 
-      // Upload music file if present
+      // Upload music file if present (10% of progress)
       if (effects?.overlayAudioFile) {
+        updateProgress(5);
         const audioFile = effects.overlayAudioFile as File;
         const audioFileName = `${user.id}/${Date.now()}_music.${audioFile.name.split('.').pop()}`;
         
@@ -137,14 +142,15 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
             .getPublicUrl(audioUploadData.path);
           
           musicUrl = publicUrl;
-          // Extract music title from filename (remove extension)
           musicTitle = audioFile.name.replace(/\.[^/.]+$/, '');
           musicArtist = 'Unknown Artist';
         }
+        updateProgress(15);
       }
 
-      // Upload processed media if we have a blob from effects
+      // Upload processed media if we have a blob from effects (50% of progress)
       if (mediaType !== 'text' && effects?.processedBlob) {
+        updateProgress(20);
         const fileExt = mediaType === 'image' ? 'jpg' : 'mp4';
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
         const bucketName = mediaType === 'image' ? 'post-images' : 'posts';
@@ -163,11 +169,11 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
           .getPublicUrl(uploadData.path);
 
         finalMediaUrl = publicUrl;
+        updateProgress(60);
       } else if (mediaType !== 'text' && mediaFile) {
-        // Fallback: upload original file if no processed blob
+        updateProgress(20);
         const fileExt = mediaFile.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        // Determine bucket based on actual file type
         const isVideoFile = mediaFile.type.startsWith('video/');
         const bucketName = isVideoFile ? 'posts' : 'post-images';
 
@@ -185,10 +191,12 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
           .getPublicUrl(uploadData.path);
 
         finalMediaUrl = publicUrl;
+        updateProgress(60);
       }
 
-      // Story logic
+      // Story logic (80% progress)
       if (action === 'story') {
+        updateProgress(70);
         const { error: storyError } = await supabase
           .from('stories')
           .insert({
@@ -200,17 +208,20 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
 
         if (storyError) throw storyError;
 
+        updateProgress(90);
         toast({
           title: 'Story created!',
           description: 'Your story is now live for 24 hours',
         });
 
+        completeUpload();
         onSuccess();
         onClose();
         setLoading(false);
         return;
       }
 
+      updateProgress(70);
       const postData = {
         user_id: user.id,
         content: description.trim() || null,
@@ -236,6 +247,8 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
 
       if (error) throw error;
 
+      updateProgress(85);
+
       // Process hashtags
       if (description && extractHashtags(description).length > 0) {
         try {
@@ -247,6 +260,8 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
         }
       }
 
+      updateProgress(95);
+
       toast({
         title: action === 'draft' ? 'Draft saved!' : action === 'schedule' ? 'Post scheduled!' : 'Post created!',
         description: action === 'draft' 
@@ -256,9 +271,11 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
           : 'Your post is now live on your feed',
       });
 
+      completeUpload();
       onSuccess();
       onClose();
     } catch (error: any) {
+      failUpload(error.message);
       toast({
         title: 'Error creating post',
         description: error.message,
@@ -531,6 +548,8 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
         </div>
       </div>
     </DialogContent>
+    
+    <ProgressBar progress={progress} isVisible={isUploading} label="Uploading" />
     </Dialog>
   );
 }
