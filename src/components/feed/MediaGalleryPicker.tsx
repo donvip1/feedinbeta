@@ -23,8 +23,6 @@ export function MediaGalleryPicker({
   const [previews, setPreviews] = useState<{ file: File; url: string; type: 'image' | 'video' }[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'videos' | 'photos'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isMultiSelect, setIsMultiSelect] = useState(multiSelect);
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -39,26 +37,7 @@ export function MediaGalleryPicker({
   };
 
   const toggleFileSelection = (file: File) => {
-    if (isMultiSelect) {
-      setSelectedFiles((prev) => {
-        const newSelection = prev.includes(file) 
-          ? prev.filter((f) => f !== file) 
-          : [...prev, file];
-        
-        // Limit to 10 images for carousel
-        if (newSelection.length > 10) {
-          toast({
-            title: 'Maximum 10 images',
-            description: 'You can select up to 10 images for a carousel post',
-            variant: 'destructive',
-          });
-          return prev;
-        }
-        return newSelection;
-      });
-    } else {
-      setSelectedFiles([file]);
-    }
+    setSelectedFiles([file]);
   };
 
   const handleNext = () => {
@@ -176,26 +155,9 @@ export function MediaGalleryPicker({
 
         <div className="flex items-center justify-between pt-4 border-t">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="select-multiple"
-                className="w-4 h-4"
-                checked={isMultiSelect}
-                onChange={(e) => {
-                  setIsMultiSelect(e.target.checked);
-                  if (!e.target.checked && selectedFiles.length > 1) {
-                    setSelectedFiles([selectedFiles[0]]);
-                  }
-                }}
-              />
-              <label htmlFor="select-multiple" className="text-sm">
-                Multi-select
-              </label>
-            </div>
             {selectedFiles.length > 0 && (
               <p className="text-sm text-muted-foreground">
-                {selectedFiles.length} selected {isMultiSelect && '(max 10)'}
+                {selectedFiles.length} selected
               </p>
             )}
           </div>
@@ -204,7 +166,7 @@ export function MediaGalleryPicker({
             disabled={selectedFiles.length === 0}
             className="ml-auto bg-gradient-primary"
           >
-            Next {selectedFiles.length > 1 && `(${selectedFiles.length})`}
+            Next
           </Button>
         </div>
       </DialogContent>
