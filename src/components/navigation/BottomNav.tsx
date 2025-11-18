@@ -54,9 +54,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   return (
     <TooltipProvider>
-      <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t-2 border-white/30 transition-all">
+      <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-white/30 transition-all">
         <div className="container mx-auto px-2">
-          <div className="flex items-center justify-around py-1">
+          <div className="flex items-center justify-around py-0.5">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -71,14 +71,14 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       }`}
                     >
                       {item.isProfile && avatarUrl ? (
-                        <div className={`rounded-full p-1 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-background' : 'border-2 border-white'}`}>
+                        <div className={`rounded-full p-0.5 ${active ? 'ring-1 ring-white ring-offset-1 ring-offset-background' : 'border border-white'}`}>
                           <Avatar className="w-6 h-6">
                             <AvatarImage src={avatarUrl} />
                             <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
                           </Avatar>
                         </div>
                       ) : (
-                        <div className={`rounded-lg p-1.5 ${active ? 'bg-primary/10' : ''}`}>
+                        <div className={`rounded-lg p-1 ${active ? 'bg-primary/10' : ''}`}>
                           <Icon 
                             size={36}
                             strokeWidth={2.5}
