@@ -139,7 +139,7 @@ export function InstagramStylePostDetails({
         allow_comments: allowComments,
         allow_refeed: allowRefeed,
         scheduled_at: scheduleTime || null,
-        status: scheduleTime ? 'scheduled' : 'published',
+        status: scheduleTime ? 'scheduled' : 'active',
       };
 
       const { data: post, error: postError } = await supabase

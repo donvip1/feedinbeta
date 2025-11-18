@@ -80,7 +80,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       ) : (
                         <div className={`rounded-lg p-1.5 ${active ? 'bg-primary/10' : ''}`}>
                           <Icon 
-                            className="w-8 h-8" 
+                            className="w-10 h-10" 
                             strokeWidth={2.5}
                             stroke="currentColor"
                           />
