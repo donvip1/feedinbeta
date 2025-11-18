@@ -296,6 +296,18 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
           setLocalRefeedsCount(prevCount);
           throw err;
         }
+      } else if (type === 'quote') {
+        // Quote refeed - navigate to create post with quote
+        navigate('/feed', { 
+          state: { 
+            quotePost: {
+              id: post.id,
+              content: post.content,
+              media_url: post.media_url,
+              user: post.profiles
+            }
+          }
+        });
       } else if (type === 'copy') {
         await navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
         toast({ title: 'Link copied!' });
@@ -365,13 +377,24 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
         {post.media_url && (
           <div className="absolute inset-0">
             {post.media_type === 'image' && (
-              <img 
-                src={post.media_url} 
-                alt="Post" 
-                className="w-full h-full object-cover select-none pointer-events-auto"
-                onContextMenu={(e) => e.preventDefault()}
-                draggable={false}
-              />
+              <>
+                <img 
+                  src={post.media_url} 
+                  alt="Post" 
+                  className="w-full h-full object-cover select-none pointer-events-auto"
+                  onContextMenu={(e) => e.preventDefault()}
+                  draggable={false}
+                />
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    window.open(post.media_url, '_blank');
+                  }} 
+                  className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition"
+                >
+                  <Maximize className="w-5 h-5 text-white" />
+                </button>
+              </>
             )}
             {post.media_type === 'video' && (
               <>
@@ -495,11 +518,9 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
           
           <button onClick={() => handleShare('refeed')} className="flex items-center space-x-1.5 hover:opacity-70 transition">
             <Repeat2 className={`w-4 h-4 ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`} />
-            {localRefeedsCount > 0 && (
-              <span className={`text-xs font-medium ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`}>
-                {localRefeedsCount > 999 ? `${(localRefeedsCount / 1000).toFixed(1)}K` : localRefeedsCount}
-              </span>
-            )}
+            <span className={`text-xs font-medium ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`}>
+              {localRefeedsCount > 999 ? `${(localRefeedsCount / 1000).toFixed(1)}K` : localRefeedsCount}
+            </span>
           </button>
 
           <DropdownMenu>
@@ -509,6 +530,9 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => handleShare('quote')}>
+                Quote Refeed
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowShareModal(true)}>
                 Share Post
               </DropdownMenuItem>

@@ -9,6 +9,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { FollowersModal } from '@/components/profile/FollowersModal';
+import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
+import { BottomNav } from '@/components/navigation/BottomNav';
 import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload } from 'lucide-react';
 import { PostsGrid } from '@/components/profile/PostsGrid';
 
@@ -53,6 +55,8 @@ const Profile = () => {
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
   const [isFollowingMe, setIsFollowingMe] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showCoverModal, setShowCoverModal] = useState(false);
 
   const isOwnProfile = user?.id === userId;
 
@@ -363,7 +367,8 @@ const Profile = () => {
             <img 
               src={profile.cover_url} 
               alt="Cover" 
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover cursor-pointer"
+              onClick={() => setShowCoverModal(true)}
             />
           )}
           {isOwnProfile && (
@@ -389,7 +394,10 @@ const Profile = () => {
           {/* Avatar - Centered */}
           <div className="flex justify-center mb-4">
             <div className="relative">
-              <Avatar className="w-32 h-32 border-4 border-background shadow-xl">
+              <Avatar 
+                className="w-32 h-32 border-4 border-background shadow-xl cursor-pointer"
+                onClick={() => setShowAvatarModal(true)}
+              >
                 <AvatarImage src={profile.avatar_url || ''} />
                 <AvatarFallback className="text-4xl bg-gradient-to-br from-primary to-accent text-primary-foreground">
                   {profile.display_name?.[0] || 'U'}
@@ -471,13 +479,6 @@ const Profile = () => {
               >
                 <Bookmark className="w-4 h-4 mr-2" />
                 Saved Posts
-              </Button>
-              <Button 
-                onClick={() => setShowSettings(true)}
-                className="bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border"
-                size="icon"
-              >
-                <Settings className="w-4 h-4" />
               </Button>
             </div>
           ) : (
@@ -639,6 +640,27 @@ const Profile = () => {
         userId={userId || ''}
         defaultTab={followersModalTab}
       />
+
+      {/* Profile Image Modals */}
+      {profile.avatar_url && (
+        <ProfileImageModal
+          isOpen={showAvatarModal}
+          onClose={() => setShowAvatarModal(false)}
+          imageUrl={profile.avatar_url}
+          title="Profile Picture"
+        />
+      )}
+      
+      {profile.cover_url && (
+        <ProfileImageModal
+          isOpen={showCoverModal}
+          onClose={() => setShowCoverModal(false)}
+          imageUrl={profile.cover_url}
+          title="Cover Photo"
+        />
+      )}
+      
+      <BottomNav />
     </div>
   );
 };
