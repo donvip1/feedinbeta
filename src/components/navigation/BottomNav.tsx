@@ -71,12 +71,12 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       }`}
                     >
                       {item.isProfile && avatarUrl ? (
-                        <Avatar className="w-6 h-6">
+                        <Avatar className="w-7 h-7">
                           <AvatarImage src={avatarUrl} />
                           <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
                         </Avatar>
                       ) : (
-                        <Icon className="w-6 h-6" />
+                        <Icon className="w-7 h-7" />
                       )}
                     </Button>
                   </TooltipTrigger>
