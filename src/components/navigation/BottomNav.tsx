@@ -1,7 +1,11 @@
 import { Home, MessageCircle, User, Sparkles, Wallet } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from 'react';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -11,13 +15,33 @@ interface BottomNavProps {
 export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      loadAvatar();
+    }
+  }, [user]);
+
+  const loadAvatar = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('avatar_url')
+      .eq('id', user.id)
+      .single();
+    if (data) {
+      setAvatarUrl(data.avatar_url);
+    }
+  };
 
   const navItems = [
     { id: 'feed', label: 'Feeds', icon: Home, path: '/feed' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
     { id: 'wallet', label: 'Wallet', icon: Wallet, path: '/wallet' },
     { id: 'ai', label: 'FeedAI', icon: Sparkles, path: '/ai-copilot' },
-    { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}` },
+    { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}`, isProfile: true },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -34,6 +58,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
           <div className="flex items-center justify-around py-2">
             {navItems.map((item) => {
               const Icon = item.icon;
+              const active = isActive(item.path);
               return (
                 <Tooltip key={item.id}>
                   <TooltipTrigger asChild>
@@ -41,10 +66,17 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       onClick={() => navigate(item.path)}
                       variant="ghost"
                       className={`flex items-center justify-center h-auto p-2 ${
-                        isActive(item.path) ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                        active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <Icon className="w-5 h-5" />
+                      {item.isProfile && avatarUrl ? (
+                        <Avatar className="w-5 h-5">
+                          <AvatarImage src={avatarUrl} />
+                          <AvatarFallback><Icon className="w-3 h-3" /></AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <Icon className="w-5 h-5" />
+                      )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top">
