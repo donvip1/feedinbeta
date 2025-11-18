@@ -388,48 +388,47 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
       try {
         const filterObj = selectedFilter !== 'None' ? FILTERS[filterCategory].find(f => f.name === selectedFilter) : null;
         
-        // If has voiceover, convert to video
-        const hasAudio = voiceOverBlob !== null;
+        // If has music, convert to video
+        const hasMusic = selectedMusic !== null;
         let finalFile: File;
+        let effects: any = {
+          filter: filterObj?.filter,
+          brightness,
+          contrast,
+          saturation,
+          textOverlay,
+          textPosition: textPosition.y,
+          textSize,
+          stickers,
+          blur: blurAmount,
+          drawingPaths,
+          drawColor,
+          drawSize,
+        };
+
+        // Add music metadata to effects
+        if (hasMusic && selectedMusic) {
+          effects.musicTitle = selectedMusic.name;
+          effects.musicArtist = selectedMusic.artist;
+          effects.musicUrl = selectedMusic.url;
+        }
         
-        if (hasAudio && voiceOverBlob) {
-          // Convert image + audio to video
-          const processedBlob = await applyImageEffects(croppedImageUrl, {
-            filter: filterObj?.filter,
-            brightness,
-            contrast,
-            saturation,
-            textOverlay,
-            textPosition: textPosition.y,
-            textSize,
-            stickers,
-            blur: blurAmount,
-            drawingPaths,
-            drawColor,
-            drawSize,
-          });
+        if (hasMusic && selectedMusic) {
+          // Convert image + music to video
+          const processedBlob = await applyImageEffects(croppedImageUrl || capturedMediaUrl, effects);
           
-          const videoBlob = await convertImageWithAudioToVideo(processedBlob, voiceOverBlob);
+          // Fetch the music file
+          const musicResponse = await fetch(selectedMusic.url);
+          const musicBlob = await musicResponse.blob();
+          
+          const videoBlob = await convertImageWithAudioToVideo(processedBlob, musicBlob);
           finalFile = new File([videoBlob], `video-${Date.now()}.mp4`, { type: 'video/mp4' });
-          onCapture(finalFile, 'video', undefined, postToStory);
+          onCapture(finalFile, 'video', effects, postToStory);
         } else {
           // Regular image processing
-          const processedBlob = await applyImageEffects(croppedImageUrl, {
-            filter: filterObj?.filter,
-            brightness,
-            contrast,
-            saturation,
-            textOverlay,
-            textPosition: textPosition.y,
-            textSize,
-            stickers,
-            blur: blurAmount,
-            drawingPaths,
-            drawColor,
-            drawSize,
-          });
+          const processedBlob = await applyImageEffects(croppedImageUrl || capturedMediaUrl, effects);
           finalFile = new File([processedBlob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
-          onCapture(finalFile, 'image', undefined, postToStory);
+          onCapture(finalFile, 'image', effects, postToStory);
         }
         
         handleClose();
@@ -440,7 +439,12 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
       const response = await fetch(capturedMediaUrl);
       const blob = await response.blob();
       const file = new File([blob], `video-${Date.now()}.webm`, { type: 'video/webm' });
-      onCapture(file, 'video', undefined, postToStory);
+      const effects = selectedMusic ? {
+        musicTitle: selectedMusic.name,
+        musicArtist: selectedMusic.artist,
+        musicUrl: selectedMusic.url,
+      } : undefined;
+      onCapture(file, 'video', effects, postToStory);
       handleClose();
     }
   };
@@ -864,19 +868,6 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                         }`}
                       >
                         <Droplet className="w-6 h-6 drop-shadow-lg" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowCropper(true);
-                          setShowFiltersOverlay(false);
-                          setShowTextOverlay(false);
-                          setShowStickersOverlay(false);
-                          setShowDrawing(false);
-                          setShowBlur(false);
-                        }}
-                        className="w-14 h-14 rounded-full bg-black/60 backdrop-blur-md shadow-xl flex items-center justify-center text-white hover:bg-black/80 transition-all border-2 border-white/10"
-                      >
-                        <Crop className="w-6 h-6 drop-shadow-lg" />
                       </button>
                     </>
                   )}
@@ -1368,8 +1359,8 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                   </div>
                 )}
 
-                {/* Post/Story Buttons */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[130] flex gap-3">
+                {/* Post/Story Buttons - Positioned higher to not hide video controls */}
+                <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[130] flex gap-3">
                   <Button
                     size="lg"
                     onClick={() => handleNext(true)}
