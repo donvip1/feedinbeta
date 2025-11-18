@@ -56,7 +56,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     <TooltipProvider>
       <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t-2 border-white/30 transition-all">
         <div className="container mx-auto px-2">
-          <div className="flex items-center justify-around py-1.5">
+          <div className="flex items-center justify-around py-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -72,9 +72,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                     >
                       {item.isProfile && avatarUrl ? (
                         <div className={`rounded-full p-1 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-background' : 'border-2 border-white'}`}>
-                          <Avatar className="w-9 h-9">
+                          <Avatar className="w-6 h-6">
                             <AvatarImage src={avatarUrl} />
-                            <AvatarFallback><Icon className="w-5 h-5" /></AvatarFallback>
+                            <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
                           </Avatar>
                         </div>
                       ) : (
