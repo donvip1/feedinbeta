@@ -11,8 +11,6 @@ interface QuickActionsModalProps {
 const feedActions = [
   { id: 'thoughts', label: 'Share Thoughts', icon: FileText, color: 'from-blue-500 to-blue-600' },
   { id: 'story', label: 'Create Story', icon: Camera, color: 'from-pink-500 to-purple-500' },
-  { id: 'wallet', label: 'Wallet & Credit', icon: Wallet, color: 'from-yellow-500 to-orange-500' },
-  { id: 'marketplace', label: 'Marketplace', icon: ShoppingBag, color: 'from-green-500 to-emerald-600' },
 ];
 
 // AI context actions
