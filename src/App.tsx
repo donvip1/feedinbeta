@@ -40,6 +40,7 @@ import P2PMarketplace from "./pages/P2PMarketplace";
 import InitializeGroups from "./pages/InitializeGroups";
 import Trending from "./pages/Trending";
 import Wallet from "./pages/Wallet";
+import LearnTech from "./pages/LearnTech";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -92,6 +93,7 @@ const App = () => {
             <Route path="/initialize-groups" element={<InitializeGroups />} />
             <Route path="/trending" element={<Trending />} />
             <Route path="/wallet" element={<Wallet />} />
+            <Route path="/learn-tech" element={<LearnTech />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
             </Routes>

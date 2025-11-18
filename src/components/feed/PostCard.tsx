@@ -5,12 +5,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Repeat2, TrendingUp, Music } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Repeat2, TrendingUp, Music, Gift } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
 import { SharePostModal } from './SharePostModal';
 import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
+import { GiftModal } from './GiftModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -76,6 +77,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
 
   // Auto-open comments if highlightCommentId is provided
   useEffect(() => {
@@ -533,6 +535,10 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
             </span>
           </button>
 
+          <button onClick={() => setShowGiftModal(true)} className="flex items-center space-x-1.5 hover:opacity-70 transition">
+            <Gift className="w-4 h-4 text-primary" />
+          </button>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
@@ -579,6 +585,12 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
         open={showShareModal} 
         onClose={() => setShowShareModal(false)} 
         post={{ id: post.id, content: post.content, media_url: post.media_url, user_id: post.user_id }} 
+      />
+      <GiftModal
+        isOpen={showGiftModal}
+        onClose={() => setShowGiftModal(false)}
+        postOwnerId={post.user_id}
+        postId={post.id}
       />
       {post.media_type === 'image' && post.media_url && (
         <ProfileImageModal

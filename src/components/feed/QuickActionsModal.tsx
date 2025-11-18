@@ -1,4 +1,4 @@
-import { FileText, Image, Video, Radio, Layers, Wallet, Zap, ShoppingBag, Camera, UsersRound, Sparkles, Wand2, BookOpen, X } from 'lucide-react';
+import { FileText, Image, Video, Radio, Layers, Wallet, Zap, ShoppingBag, Camera, UsersRound, Sparkles, Wand2, BookOpen, X, GraduationCap } from 'lucide-react';
 
 interface QuickActionsModalProps {
   open: boolean;
@@ -11,6 +11,7 @@ interface QuickActionsModalProps {
 const feedActions = [
   { id: 'thoughts', label: 'Share Thoughts', icon: FileText, color: 'from-blue-500 to-blue-600' },
   { id: 'story', label: 'Create Story', icon: Camera, color: 'from-pink-500 to-purple-500' },
+  { id: 'learn-tech', label: 'Learn Tech', icon: GraduationCap, color: 'from-emerald-500 to-teal-500' },
 ];
 
 // AI context actions

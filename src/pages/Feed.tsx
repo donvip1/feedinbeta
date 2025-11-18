@@ -308,6 +308,10 @@ const Feed = () => {
         navigate('/messages');
         setIsCreatingContent(false);
         break;
+      case 'learn-tech':
+        navigate('/learn-tech');
+        setIsCreatingContent(false);
+        break;
       case 'group':
         navigate('/groups');
         setIsCreatingContent(false);
