@@ -21,11 +21,15 @@ interface Post {
   content: string | null;
   media_url: string | null;
   media_type: string | null;
+  music_url: string | null;
+  music_title: string | null;
+  music_artist: string | null;
   likes_count: number;
   comments_count: number;
   views_count: number;
   refeeds_count: number;
   created_at: string;
+  allow_refeed?: boolean | null;
   profiles: {
     display_name: string | null;
     username: string | null;

@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Repeat2, TrendingUp } from 'lucide-react';
+import { Heart, MessageCircle, Eye, Share2, Bookmark, Trash2, MoreVertical, Volume2, VolumeX, Maximize, Repeat2, TrendingUp, Music } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
@@ -34,6 +34,9 @@ interface PostCardProps {
     content: string | null;
     media_url: string | null;
     media_type: string | null;
+    music_url: string | null;
+    music_title: string | null;
+    music_artist: string | null;
     likes_count: number;
     comments_count: number;
     views_count: number;
@@ -65,9 +68,10 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
   const [hasViewed, setHasViewed] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false); // Start unmuted when music is present
   const [isPlaying, setIsPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     onCommentStateChange?.(showComments);
@@ -84,18 +88,24 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
 
   useEffect(() => {
     const video = videoRef.current;
+    const audio = audioRef.current;
+    
     if (video && post.media_type === 'video') {
       const observer = new IntersectionObserver(
         (entries) => {
           entries.forEach((entry) => {
             if (entry.isIntersecting) {
               video.play().then(() => setIsPlaying(true)).catch(() => {});
+              if (audio && post.music_url) {
+                audio.play().catch(() => {});
+              }
               // Track view when post is visible
               if (!hasViewed) {
                 trackView();
               }
             } else {
               video.pause();
+              if (audio) audio.pause();
               setIsPlaying(false);
             }
           });
@@ -353,9 +363,24 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
             {post.media_type === 'image' && <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />}
             {post.media_type === 'video' && (
               <>
-                <video ref={videoRef} src={post.media_url} className="w-full h-full object-cover" loop playsInline muted={isMuted} onClick={() => videoRef.current && (isPlaying ? videoRef.current.pause() : videoRef.current.play())} />
+                <video ref={videoRef} src={post.media_url} className="w-full h-full object-cover" loop playsInline muted onClick={() => videoRef.current && (isPlaying ? videoRef.current.pause() : videoRef.current.play())} />
+                {post.music_url && <audio ref={audioRef} src={post.music_url} loop />}
+                
+                {/* Music Info Display */}
+                {post.music_url && post.music_title && (
+                  <div className="absolute bottom-16 left-3 right-3 bg-black/70 backdrop-blur-sm rounded-lg px-3 py-2">
+                    <div className="flex items-center space-x-2">
+                      <Music className="w-4 h-4 text-white flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-xs font-semibold truncate">{post.music_title}</p>
+                        <p className="text-white/70 text-[10px] truncate">{post.music_artist || 'Unknown Artist'}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                  <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); }} className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition">
+                  <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); if (audioRef.current) audioRef.current.muted = !isMuted; }} className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition">
                     {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); videoRef.current && (document.fullscreenElement ? document.exitFullscreen() : videoRef.current.requestFullscreen()); }} className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition">

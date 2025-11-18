@@ -115,6 +115,33 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
     setLoading(true);
     try {
       let finalMediaUrl = mediaUrl;
+      let musicUrl: string | null = null;
+      let musicTitle: string | null = null;
+      let musicArtist: string | null = null;
+
+      // Upload music file if present
+      if (effects?.overlayAudioFile) {
+        const audioFile = effects.overlayAudioFile as File;
+        const audioFileName = `${user.id}/${Date.now()}_music.${audioFile.name.split('.').pop()}`;
+        
+        const { data: audioUploadData, error: audioUploadError } = await supabase.storage
+          .from('posts')
+          .upload(audioFileName, audioFile, {
+            contentType: audioFile.type,
+            upsert: false,
+          });
+
+        if (!audioUploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('posts')
+            .getPublicUrl(audioUploadData.path);
+          
+          musicUrl = publicUrl;
+          // Extract music title from filename (remove extension)
+          musicTitle = audioFile.name.replace(/\.[^/.]+$/, '');
+          musicArtist = 'Unknown Artist';
+        }
+      }
 
       // Upload processed media if we have a blob from effects
       if (mediaType !== 'text' && effects?.processedBlob) {
@@ -196,6 +223,9 @@ export function PostDetailsModal({ open, onClose, onBack, mediaUrl, mediaType, e
         status: action === 'draft' ? 'draft' : 'active',
         scheduled_at: action === 'schedule' && scheduleTime ? new Date(scheduleTime).toISOString() : null,
         feed_id: '',
+        music_url: musicUrl,
+        music_title: musicTitle,
+        music_artist: musicArtist,
       };
 
       const { data: postResult, error } = await supabase
