@@ -70,8 +70,10 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMuted, setIsMuted] = useState(false); // Start unmuted when music is present
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showPlayIcon, setShowPlayIcon] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const iconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     onCommentStateChange?.(showComments);
@@ -363,8 +365,49 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
             {post.media_type === 'image' && <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />}
             {post.media_type === 'video' && (
               <>
-                <video ref={videoRef} src={post.media_url} className="w-full h-full object-cover" loop playsInline muted onClick={() => videoRef.current && (isPlaying ? videoRef.current.pause() : videoRef.current.play())} />
+                <video 
+                  ref={videoRef} 
+                  src={post.media_url} 
+                  className="w-full h-full object-cover" 
+                  loop 
+                  playsInline 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const video = videoRef.current;
+                    if (video) {
+                      if (isPlaying) {
+                        video.pause();
+                        if (audioRef.current) audioRef.current.pause();
+                        setIsPlaying(false);
+                      } else {
+                        video.play().then(() => {
+                          if (audioRef.current && post.music_url) audioRef.current.play();
+                        });
+                        setIsPlaying(true);
+                      }
+                      setShowPlayIcon(true);
+                      if (iconTimeoutRef.current) clearTimeout(iconTimeoutRef.current);
+                      iconTimeoutRef.current = setTimeout(() => setShowPlayIcon(false), 800);
+                    }
+                  }}
+                />
                 {post.music_url && <audio ref={audioRef} src={post.music_url} loop />}
+                
+                {/* Play/Pause Icon Overlay */}
+                {showPlayIcon && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/40 backdrop-blur-sm rounded-full p-8 animate-in fade-in zoom-in-95 duration-200">
+                      {isPlaying ? (
+                        <div className="flex space-x-2">
+                          <div className="w-2 h-12 bg-white rounded-full"></div>
+                          <div className="w-2 h-12 bg-white rounded-full"></div>
+                        </div>
+                      ) : (
+                        <div className="w-0 h-0 border-t-[24px] border-t-transparent border-l-[36px] border-l-white border-b-[24px] border-b-transparent ml-2"></div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Music Info Display */}
                 {post.music_url && post.music_title && (
@@ -380,7 +423,16 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
                 )}
                 
                 <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                  <button onClick={(e) => { e.stopPropagation(); setIsMuted(!isMuted); if (audioRef.current) audioRef.current.muted = !isMuted; }} className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition">
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      const newMutedState = !isMuted;
+                      setIsMuted(newMutedState);
+                      if (videoRef.current) videoRef.current.muted = newMutedState;
+                      if (audioRef.current) audioRef.current.muted = newMutedState;
+                    }} 
+                    className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition"
+                  >
                     {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); videoRef.current && (document.fullscreenElement ? document.exitFullscreen() : videoRef.current.requestFullscreen()); }} className="bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition">
