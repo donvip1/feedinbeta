@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
-import { EnhancedCreatePostModal } from '@/components/feed/EnhancedCreatePostModal';
+import { InstagramStylePostCreator } from '@/components/feed/InstagramStylePostCreator';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
@@ -494,7 +494,7 @@ const Feed = () => {
       />
 
       {/* Create Post Modal */}
-      <EnhancedCreatePostModal
+      <InstagramStylePostCreator
         open={showCreatePost}
         onClose={() => {
           setShowCreatePost(false);
@@ -502,8 +502,8 @@ const Feed = () => {
           setIsCreatingContent(false);
         }}
         onSuccess={handlePostCreated}
-        defaultTab={defaultPostTab}
-        initialImageUrl={sharedImageUrl}
+        defaultTab={defaultPostTab === 'text' ? 'text' : defaultPostTab === 'image' ? 'gallery' : 'camera'}
+        initialImageUrl={sharedImageUrl || undefined}
       />
 
       {/* Floating Action Button */}
