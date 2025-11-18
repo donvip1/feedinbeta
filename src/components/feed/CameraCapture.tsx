@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, RotateCcw, ArrowRight, Crop, ZoomIn, RefreshCw, Check, Pencil, Droplet, Music, Gauge, Rewind } from 'lucide-react';
+import { X, RotateCw, Circle, Square, Wand2, Type, Sticker as StickerIcon, RotateCcw, ArrowRight, Crop, ZoomIn, RefreshCw, Check, Pencil, Droplet, Music, Gauge, Rewind, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ImageCropper } from './ImageCropper';
 import { MusicLibrary } from './MusicLibrary';
@@ -110,25 +110,15 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
   const [selectedMusic, setSelectedMusic] = useState<{ name: string; artist: string; url: string; duration: number } | null>(null);
   const [showPreCaptureFilters, setShowPreCaptureFilters] = useState(false);
   const [preCaptureFilter, setPreCaptureFilter] = useState<string>('None');
-  const [galleryThumbnail, setGalleryThumbnail] = useState<string | null>(null);
-  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (open) {
       startCamera();
-      loadGalleryThumbnail();
     } else {
       stopCamera();
     }
     return () => stopCamera();
   }, [open, facingMode]);
-
-  const loadGalleryThumbnail = () => {
-    // Try to get a sample image for thumbnail preview
-    // In a real app, this would access the device's gallery
-    // For demo, we'll show a placeholder
-    setGalleryThumbnail('https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=100&h=100&fit=crop');
-  };
 
   const handleGalleryClick = () => {
     if (onSwitchToGallery) {
@@ -737,19 +727,9 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onT
                         {/* Gallery Quick Access with Thumbnail */}
                         <button
                           onClick={handleGalleryClick}
-                          className="w-16 h-16 rounded-xl overflow-hidden border-2 border-white/50 hover:border-white hover:scale-105 transition-all backdrop-blur-md bg-black/40 shadow-lg"
+                          className="w-16 h-16 rounded-xl flex items-center justify-center border-2 border-white/50 hover:border-white hover:scale-105 transition-all backdrop-blur-md bg-black/40 shadow-lg"
                         >
-                          {galleryThumbnail ? (
-                            <img 
-                              src={galleryThumbnail} 
-                              alt="Gallery" 
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                              <span className="text-white text-2xl">🖼️</span>
-                            </div>
-                          )}
+                          <ImageIcon className="w-7 h-7 text-white" />
                         </button>
                       </div>
                     </div>
