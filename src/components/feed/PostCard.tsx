@@ -53,9 +53,10 @@ interface PostCardProps {
   };
   onUpdate: () => void;
   onCommentStateChange?: (isOpen: boolean) => void;
+  highlightCommentId?: string;
 }
 
-export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps) => {
+export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommentId }: PostCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -75,6 +76,13 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
+
+  // Auto-open comments if highlightCommentId is provided
+  useEffect(() => {
+    if (highlightCommentId && !showComments) {
+      setShowComments(true);
+    }
+  }, [highlightCommentId]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const iconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -558,7 +566,14 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
         </button>
       </div>
 
-      <CommentsModal open={showComments} onClose={() => setShowComments(false)} postId={post.id} postOwnerId={post.user_id} post={post} />
+      <CommentsModal 
+        open={showComments} 
+        onClose={() => setShowComments(false)} 
+        postId={post.id} 
+        postOwnerId={post.user_id} 
+        post={post}
+        highlightCommentId={highlightCommentId}
+      />
       <ProfilePreviewModal open={showProfilePreview} onClose={() => setShowProfilePreview(false)} userId={post.user_id} />
       <SharePostModal 
         open={showShareModal} 
