@@ -198,7 +198,7 @@ export default function LearnTech() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold text-foreground">Learn Tech</h1>
-              <p className="text-sm text-muted-foreground">Tech is the new oil ⚡</p>
+              <p className="text-sm text-muted-foreground">Master the Skills Shaping Tomorrow</p>
             </div>
           </div>
         </div>
