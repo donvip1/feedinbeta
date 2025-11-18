@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SignInForm } from '@/components/auth/SignInForm';
@@ -9,14 +9,23 @@ import feedinLogo from '@/assets/feedin-logo.png';
 
 const Auth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   useEffect(() => {
     if (user) {
-      navigate('/');
+      // Check for redirect parameter or sessionStorage
+      const redirectTo = searchParams.get('redirect') || sessionStorage.getItem('redirectAfterAuth');
+      
+      if (redirectTo) {
+        sessionStorage.removeItem('redirectAfterAuth');
+        navigate(redirectTo);
+      } else {
+        navigate('/');
+      }
     }
-  }, [user, navigate]);
+  }, [user, navigate, searchParams]);
 
   if (showForgotPassword) {
     return (
