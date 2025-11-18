@@ -508,13 +508,13 @@ const Feed = () => {
       {/* Floating Action Button */}
       <FloatingActionButton 
         onClick={() => setShowQuickActions(prev => !prev)}
-        hidden={isCommenting}
+        hidden={isCommenting || isCreatingContent}
       />
 
       {/* Bottom Navigation */}
       <BottomNav 
         currentPage="feed"
-        hidden={isCommenting}
+        hidden={isCommenting || isCreatingContent}
       />
     </div>
   );
