@@ -67,6 +67,13 @@ const Profile = () => {
   const isOwnProfile = user?.id === userId;
 
   useEffect(() => {
+    if (!user) {
+      // Store the current path to redirect back after auth
+      sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
+      navigate('/welcome');
+      return;
+    }
+    
     if (userId) {
       loadProfile();
       if (isOwnProfile && user?.email) {
@@ -101,9 +108,19 @@ const Profile = () => {
           cover_url
         `)
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
+      
+      if (!profileData) {
+        toast({
+          title: 'Profile not found',
+          description: 'This profile does not exist.',
+          variant: 'destructive',
+        });
+        navigate('/feed');
+        return;
+      }
 
       // Get post count
       const { data: postCount } = await supabase

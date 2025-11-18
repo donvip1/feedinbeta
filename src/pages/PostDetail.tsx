@@ -19,7 +19,7 @@ const PostDetail = () => {
     if (!user) {
       // Store the current path to redirect back after auth
       sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
-      navigate('/auth');
+      navigate('/welcome');
       return;
     }
 

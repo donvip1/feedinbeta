@@ -41,6 +41,7 @@ import InitializeGroups from "./pages/InitializeGroups";
 import Trending from "./pages/Trending";
 import Wallet from "./pages/Wallet";
 import LearnTech from "./pages/LearnTech";
+import Welcome from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +61,7 @@ const App = () => {
 
             <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/welcome" element={<Welcome />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/feed" element={<Feed />} />
             <Route path="/messages" element={<Messages />} />
