@@ -11,7 +11,7 @@ import { CameraCapture } from './CameraCapture';
 import { MediaGalleryPicker } from './MediaGalleryPicker';
 import { TextToImageCreator } from './TextToImageCreator';
 import { AIImageGenerator } from './AIImageGenerator';
-import { AIEnhancementModal } from './AIEnhancementModal';
+import { TextPostCreator } from './TextPostCreator';
 import { useToast } from '@/hooks/use-toast';
 import { usePremiumStatus } from '@/hooks/usePremiumStatus';
 
@@ -32,7 +32,7 @@ export function EnhancedCreatePostModal({
 }: EnhancedCreatePostModalProps) {
   const { toast } = useToast();
   const { isPremium } = usePremiumStatus();
-  const [step, setStep] = useState<'method' | 'enhance' | 'edit' | 'details'>('method');
+  const [step, setStep] = useState<'method' | 'edit' | 'details'>('method');
   const [activeTab, setActiveTab] = useState<'text' | 'image' | 'video'>(defaultTab);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(initialImageUrl);
@@ -45,7 +45,7 @@ export function EnhancedCreatePostModal({
   const [showGallery, setShowGallery] = useState(false);
   const [showTextToImage, setShowTextToImage] = useState(false);
   const [showAIGenerator, setShowAIGenerator] = useState(false);
-  const [capturedMediaUrl, setCapturedMediaUrl] = useState<string | null>(null);
+  const [showTextCreator, setShowTextCreator] = useState(false);
 
   const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,16 +90,11 @@ export function EnhancedCreatePostModal({
     setStep('details');
   };
 
-  const handleEnhancementNext = (enhancedImageUrl: string) => {
-    setMediaPreview(enhancedImageUrl);
-    setStep('edit');
-  };
 
   const handleDetailsSuccess = () => {
     setStep('method');
     setMediaFile(null);
     setMediaPreview(null);
-    setCapturedMediaUrl(null);
     setEffects(null);
     setShowMethodSelector(false);
     onSuccess();
@@ -109,25 +104,22 @@ export function EnhancedCreatePostModal({
     setStep('method');
     setMediaFile(null);
     setMediaPreview(null);
-    setCapturedMediaUrl(null);
     setEffects(null);
     setShowMethodSelector(false);
     setShowCamera(false);
     setShowGallery(false);
     setShowTextToImage(false);
     setShowAIGenerator(false);
+    setShowTextCreator(false);
     onClose();
   };
 
-  const handleMethodSelect = (method: 'camera' | 'text-to-image' | 'text-only' | 'ai-generate') => {
+  const handleMethodSelect = (method: 'camera' | 'text-to-image' | 'ai-generate') => {
     setShowMethodSelector(false);
     
     switch (method) {
       case 'camera':
         setShowCamera(true);
-        break;
-      case 'text-only':
-        handleTextPost();
         break;
       case 'text-to-image':
         setShowTextToImage(true);
@@ -143,15 +135,8 @@ export function EnhancedCreatePostModal({
     setMediaType(type);
     const mediaUrl = URL.createObjectURL(file);
     setMediaPreview(mediaUrl);
-    setCapturedMediaUrl(mediaUrl);
     setShowCamera(false);
-    
-    // For images, go to enhancement step; for videos, go directly to edit
-    if (type === 'image') {
-      setStep('enhance');
-    } else {
-      setStep('edit');
-    }
+    setStep('edit');
   };
 
   const handleGallerySelect = (files: File[]) => {
@@ -181,9 +166,8 @@ export function EnhancedCreatePostModal({
     setMediaType('image');
     const mediaUrl = URL.createObjectURL(file);
     setMediaPreview(mediaUrl);
-    setCapturedMediaUrl(mediaUrl);
     setShowTextToImage(false);
-    setStep('enhance');
+    setStep('edit');
   };
 
   const handleAIImageCreate = (file: File) => {
@@ -191,9 +175,15 @@ export function EnhancedCreatePostModal({
     setMediaType('image');
     const mediaUrl = URL.createObjectURL(file);
     setMediaPreview(mediaUrl);
-    setCapturedMediaUrl(mediaUrl);
     setShowAIGenerator(false);
-    setStep('enhance');
+    setStep('edit');
+  };
+
+  const handleTextCreate = (textContent: string, textConfig: any, musicUrl?: string, voiceUrl?: string) => {
+    // TODO: Create text post with config
+    setMediaType('text');
+    setShowTextCreator(false);
+    setStep('details');
   };
 
   // For text-only posts, skip editor
@@ -229,6 +219,10 @@ export function EnhancedCreatePostModal({
           setShowCamera(false);
           setShowGallery(true);
         }}
+        onTextPost={() => {
+          setShowCamera(false);
+          setShowTextCreator(true);
+        }}
       />
 
       {/* Gallery Picker */}
@@ -262,30 +256,24 @@ export function EnhancedCreatePostModal({
         onCreate={handleAIImageCreate}
       />
 
-      {/* AI Enhancement */}
-      {capturedMediaUrl && mediaType === 'image' && (
-        <AIEnhancementModal
-          open={step === 'enhance'}
-          onClose={handleClose}
-          onBack={() => setStep('method')}
-          imageUrl={capturedMediaUrl}
-          onNext={handleEnhancementNext}
-          isPremium={isPremium}
-        />
-      )}
+
+      {/* Text Creator */}
+      <TextPostCreator
+        open={showTextCreator}
+        onClose={() => {
+          setShowTextCreator(false);
+          setShowMethodSelector(true);
+        }}
+        onCreate={handleTextCreate}
+        isPremium={isPremium}
+      />
 
       {/* Editor */}
       {mediaPreview && mediaType !== 'text' && (
         <PostEditorModal
           open={step === 'edit'}
           onClose={handleClose}
-          onBack={() => {
-            if (mediaType === 'image' && capturedMediaUrl) {
-              setStep('enhance');
-            } else {
-              setStep('method');
-            }
-          }}
+          onBack={() => setStep('method')}
           mediaUrl={mediaPreview}
           mediaType={mediaType as 'image' | 'video'}
           onNext={handleEditorNext}

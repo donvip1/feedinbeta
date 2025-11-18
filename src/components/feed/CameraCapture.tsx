@@ -16,6 +16,7 @@ interface CameraCaptureProps {
   onClose: () => void;
   onCapture: (file: File, mediaType: 'image' | 'video', effects?: any, postToStory?: boolean) => void;
   onSwitchToGallery?: () => void;
+  onTextPost?: () => void;
 }
 
 interface StickerData {
@@ -49,7 +50,7 @@ const FILTERS = {
 
 const STICKERS = ['❤️', '🔥', '✨', '🎉', '😍', '👍', '💯', '⭐', '💪', '😂', '🎵', '🌟'];
 
-export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: CameraCaptureProps) {
+export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery, onTextPost }: CameraCaptureProps) {
   const { toast } = useToast();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -58,7 +59,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
   // Camera states
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [mode, setMode] = useState<'photo' | 'video'>('photo');
+  const [mode, setMode] = useState<'photo' | 'video' | 'text'>('photo');
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '1:1' | '4:3' | '16:9'>('9:16');
   const [zoom, setZoom] = useState(1);
@@ -696,6 +697,20 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
                           }`}
                         >
                           VIDEO
+                        </button>
+                        <button
+                          onClick={() => {
+                            setMode('text');
+                            if (onTextPost) {
+                              stopCamera();
+                              onTextPost();
+                            }
+                          }}
+                          className={`px-6 py-2 rounded-full text-sm font-bold transition-all ${
+                            mode === 'text' ? 'bg-white text-black shadow-xl' : 'text-white hover:bg-white/20'
+                          }`}
+                        >
+                          TEXT
                         </button>
                       </div>
 
