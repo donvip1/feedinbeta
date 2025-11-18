@@ -24,6 +24,7 @@ interface Post {
   likes_count: number;
   comments_count: number;
   views_count: number;
+  refeeds_count: number;
   created_at: string;
   profiles: {
     display_name: string | null;
@@ -133,6 +134,7 @@ const Feed = () => {
         .from('posts')
         .select(`
           *,
+          refeeds_count,
           profiles (
             display_name,
             username,
