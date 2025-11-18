@@ -1,173 +1,181 @@
 import { useState, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { X, CheckCircle2 } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface MediaGalleryPickerProps {
   open: boolean;
   onClose: () => void;
   onSelect: (files: File[]) => void;
-  multiSelect?: boolean;
 }
 
-export function MediaGalleryPicker({
-  open,
-  onClose,
-  onSelect,
-  multiSelect = true,
-}: MediaGalleryPickerProps) {
+export function MediaGalleryPicker({ open, onClose, onSelect }: MediaGalleryPickerProps) {
   const { toast } = useToast();
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<{ file: File; url: string; type: 'image' | 'video' }[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'videos' | 'photos'>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>('');
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    const newPreviews = files.map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-      type: file.type.startsWith('video/') ? ('video' as const) : ('image' as const),
-    }));
+    const file = files[0]; // Only single selection
+    const type = file.type.startsWith('video/') ? 'video' : 'image';
 
-    setPreviews((prev) => [...prev, ...newPreviews]);
-  };
-
-  const toggleFileSelection = (file: File) => {
-    setSelectedFiles([file]);
-  };
-
-  const handleNext = () => {
-    if (selectedFiles.length === 0) {
+    // Validation
+    const maxSize = 100 * 1024 * 1024; // 100MB
+    if (file.size > maxSize) {
       toast({
-        title: 'No media selected',
-        description: 'Please select at least one media file',
+        title: 'File too large',
+        description: 'Maximum file size is 100MB',
         variant: 'destructive',
       });
       return;
     }
-    onSelect(selectedFiles);
-    onClose();
+
+    setSelectedFile(file);
+    setMediaType(type);
+    setPreview(URL.createObjectURL(file));
   };
 
-  const filteredPreviews = previews.filter((preview) => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'videos') return preview.type === 'video';
-    if (activeTab === 'photos') return preview.type === 'image';
-    return true;
-  });
+  const handleNext = () => {
+    if (selectedFile) {
+      onSelect([selectedFile]);
+    }
+  };
+
+  const handleBrowse = () => {
+    fileInputRef.current?.click();
+  };
+
+  const clearSelection = () => {
+    setSelectedFile(null);
+    setPreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle>Select Media</DialogTitle>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Browse Files
-            </Button>
-          </div>
-        </DialogHeader>
+      <DialogContent className="max-w-full md:max-w-4xl h-[100dvh] md:h-[90vh] p-0 gap-0">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </Button>
+          <h2 className="text-lg font-semibold">Select Media</h2>
+          <Button 
+            onClick={handleNext}
+            disabled={!selectedFile}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
+          >
+            Next
+          </Button>
+        </div>
 
+        {/* Hidden File Input */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*,video/*"
-          multiple
           onChange={handleFileSelect}
           className="hidden"
         />
 
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="flex-1 flex flex-col">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="videos">Videos</TabsTrigger>
-            <TabsTrigger value="photos">Photos</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value={activeTab} className="flex-1 overflow-y-auto mt-4">
-            {filteredPreviews.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                <p>No media files yet</p>
-                <Button
-                  variant="link"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="mt-2"
-                >
-                  Click to browse files
-                </Button>
+        {/* Content */}
+        <div className="flex-1 flex flex-col p-6 overflow-hidden">
+          {!preview ? (
+            // Empty State
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="w-32 h-32 rounded-full bg-accent/50 flex items-center justify-center mb-6">
+                <Upload className="w-16 h-16 text-muted-foreground" />
               </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-2">
-                {filteredPreviews.map((preview, index) => {
-                  const isSelected = selectedFiles.includes(preview.file);
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => toggleFileSelection(preview.file)}
-                      className="relative aspect-square rounded-lg overflow-hidden group"
-                    >
-                      {preview.type === 'video' ? (
-                        <>
-                          <video
-                            src={preview.url}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute bottom-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                            VIDEO
-                          </div>
-                        </>
-                      ) : (
-                        <img
-                          src={preview.url}
-                          alt="Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      )}
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                          <CheckCircle2 className="w-8 h-8 text-primary" />
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2">
-                        <div
-                          className={`w-6 h-6 rounded-full border-2 ${
-                            isSelected ? 'bg-primary border-primary' : 'bg-white/50 border-white'
-                          } flex items-center justify-center`}
-                        >
-                          {isSelected && <CheckCircle2 className="w-4 h-4 text-white" />}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
-
-        <div className="flex items-center justify-between pt-4 border-t">
-          <div className="flex items-center gap-4">
-            {selectedFiles.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                {selectedFiles.length} selected
+              <h3 className="text-xl font-semibold mb-2">Select media from your device</h3>
+              <p className="text-muted-foreground mb-8 text-center max-w-md">
+                Choose photos or videos from your gallery to share
               </p>
-            )}
-          </div>
-          <Button
-            onClick={handleNext}
-            disabled={selectedFiles.length === 0}
-            className="ml-auto bg-gradient-primary"
-          >
-            Next
-          </Button>
+              <Button
+                onClick={handleBrowse}
+                size="lg"
+                className="px-8"
+              >
+                Browse Files
+              </Button>
+              <div className="mt-8 flex gap-8 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Images: JPG, PNG, GIF</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Video className="w-4 h-4" />
+                  <span>Videos: MP4, MOV</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Preview State
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 relative bg-black rounded-xl overflow-hidden mb-4">
+                {mediaType === 'image' ? (
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <video
+                    src={preview}
+                    className="w-full h-full object-contain"
+                    controls
+                    autoPlay
+                    loop
+                    muted
+                  />
+                )}
+
+                {/* Media Type Badge */}
+                <div className="absolute top-4 left-4 bg-background/90 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-2">
+                  {mediaType === 'image' ? (
+                    <>
+                      <ImageIcon className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">Image</span>
+                    </>
+                  ) : (
+                    <>
+                      <Video className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-medium">Video</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Clear Button */}
+                <button
+                  onClick={clearSelection}
+                  className="absolute top-4 right-4 w-10 h-10 rounded-full bg-background/90 backdrop-blur-sm flex items-center justify-center hover:bg-background transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* File Info */}
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>{selectedFile?.name}</span>
+                <span>{(selectedFile!.size / (1024 * 1024)).toFixed(2)} MB</span>
+              </div>
+
+              {/* Change File Button */}
+              <Button
+                onClick={handleBrowse}
+                variant="outline"
+                className="mt-4 w-full"
+              >
+                Choose Different File
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

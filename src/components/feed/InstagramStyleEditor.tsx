@@ -1,13 +1,22 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { X, ArrowLeft, Sparkles, Type, Smile, Crop, Volume2, VolumeX, Music } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { 
+  ArrowLeft, 
+  Check, 
+  Music, 
+  Type, 
+  Crop,
+  Sparkles,
+  Sun,
+  Contrast,
+  Droplet,
+  Volume2,
+  VolumeX
+} from 'lucide-react';
 import { ImageCropper } from './ImageCropper';
 import { MusicLibrary } from './MusicLibrary';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
 
 interface InstagramStyleEditorProps {
   open: boolean;
@@ -19,306 +28,344 @@ interface InstagramStyleEditorProps {
   onNext: (effects: any) => void;
 }
 
-const FILTERS = {
-  normal: 'none',
-  clarendon: 'contrast(1.2) saturate(1.35)',
-  gingham: 'brightness(1.05) hue-rotate(-10deg)',
-  moon: 'grayscale(1) contrast(1.1) brightness(1.1)',
-  lark: 'contrast(0.9) saturate(1.1) brightness(1.1)',
-  reyes: 'sepia(0.22) brightness(1.1) contrast(0.85)',
-  juno: 'contrast(1.2) saturate(1.4) brightness(1.1)',
-  slumber: 'saturate(0.66) brightness(1.05)',
-  crema: 'sepia(0.5) contrast(1.25)',
-  ludwig: 'brightness(1.05) saturate(2)',
-  aden: 'hue-rotate(-20deg) contrast(0.9) saturate(0.85) brightness(1.2)',
-  perpetua: 'contrast(1.1) saturate(1.1)',
-};
+const FILTERS = [
+  { name: 'Normal', filter: '' },
+  { name: 'Vivid', filter: 'saturate(1.3) contrast(1.1)' },
+  { name: 'Warm', filter: 'sepia(0.3) brightness(1.1)' },
+  { name: 'Cool', filter: 'hue-rotate(20deg) saturate(1.2)' },
+  { name: 'B&W', filter: 'grayscale(1) contrast(1.2)' },
+  { name: 'Retro', filter: 'sepia(0.5) contrast(1.1) saturate(1.3)' },
+  { name: 'Bright', filter: 'brightness(1.2) saturate(1.2)' },
+  { name: 'Moody', filter: 'brightness(0.9) contrast(1.3) saturate(0.8)' },
+];
 
-export function InstagramStyleEditor({ 
-  open, 
-  onClose, 
-  onBack, 
-  mediaUrl, 
+export function InstagramStyleEditor({
+  open,
+  onClose,
+  onBack,
+  mediaUrl,
   mediaType,
   mediaFile,
-  onNext 
+  onNext
 }: InstagramStyleEditorProps) {
-  const { toast } = useToast();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [activeFilter, setActiveFilter] = useState<keyof typeof FILTERS>('normal');
+  const [activeFilter, setActiveFilter] = useState('Normal');
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
-  const [textOverlay, setTextOverlay] = useState('');
+  const [textOverlays, setTextOverlays] = useState<Array<{ text: string; x: number; y: number }>>([]);
   const [showTextInput, setShowTextInput] = useState(false);
-  const [textColor, setTextColor] = useState('#ffffff');
+  const [currentText, setCurrentText] = useState('');
   const [isMuted, setIsMuted] = useState(false);
-  const [showCrop, setShowCrop] = useState(false);
-  const [croppedImage, setCroppedImage] = useState<string>('');
-  const [showMusic, setShowMusic] = useState(false);
-  const [selectedMusic, setSelectedMusic] = useState<{url: string; title: string; artist: string} | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [showMusicLibrary, setShowMusicLibrary] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<any>(null);
+  const [croppedImageUrl, setCroppedImageUrl] = useState('');
+  const [activeTab, setActiveTab] = useState<'filters' | 'adjust'>('filters');
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const getFilterStyle = () => {
-    const filters = [
-      FILTERS[activeFilter],
-      `brightness(${brightness}%)`,
-      `contrast(${contrast}%)`,
-      `saturate(${saturation}%)`
-    ].filter(f => f !== 'none').join(' ');
-    
-    return { filter: filters || 'none' };
+    const filterObj = FILTERS.find(f => f.name === activeFilter);
+    const baseFilter = filterObj?.filter || '';
+    const adjustments = `brightness(${brightness / 100}) contrast(${contrast / 100}) saturate(${saturation / 100})`;
+    return `${baseFilter} ${adjustments}`.trim();
+  };
+
+  const handleAddText = () => {
+    if (currentText.trim()) {
+      setTextOverlays([...textOverlays, { text: currentText, x: 50, y: 50 }]);
+      setCurrentText('');
+      setShowTextInput(false);
+    }
+  };
+
+  const handleCropComplete = (croppedUrl: string) => {
+    setCroppedImageUrl(croppedUrl);
+    setShowCropper(false);
+  };
+
+  const handleMusicSelect = (music: any) => {
+    setSelectedMusic(music);
+    setShowMusicLibrary(false);
   };
 
   const handleNext = () => {
-    const effects = {
+    onNext({
       filter: activeFilter,
       brightness,
       contrast,
       saturation,
-      textOverlay,
-      textColor,
+      textOverlays,
+      isMuted,
       music: selectedMusic,
-      processedBlob: croppedImage ? croppedImage : mediaUrl,
-    };
-    onNext(effects);
+      croppedUrl: croppedImageUrl,
+    });
   };
 
-  const handleCropComplete = (croppedImageUrl: string) => {
-    setCroppedImage(croppedImageUrl);
-    setShowCrop(false);
-  };
+  if (!open) return null;
 
-
-  if (showCrop && mediaType === 'image') {
+  if (showCropper && mediaType === 'image') {
     return (
-      <div className="fixed inset-0 z-50 bg-background">
-        <ImageCropper
-          imageUrl={croppedImage || mediaUrl}
-          onCropComplete={handleCropComplete}
-          onClose={() => setShowCrop(false)}
-        />
-      </div>
+      <ImageCropper
+        imageUrl={mediaUrl}
+        onCropComplete={handleCropComplete}
+        onClose={() => setShowCropper(false)}
+      />
     );
   }
 
-  if (showMusic) {
+  if (showMusicLibrary) {
     return (
       <MusicLibrary
         open={true}
-        onClose={() => setShowMusic(false)}
-        onSelectMusic={(music) => {
-          setSelectedMusic({ url: music.url, title: music.name, artist: music.artist });
-          setShowMusic(false);
-          toast({
-            title: "Music added",
-            description: `${music.name} by ${music.artist}`,
-          });
-        }}
+        onClose={() => setShowMusicLibrary(false)}
+        onSelectMusic={handleMusicSelect}
       />
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="fixed inset-0 bg-background z-50 flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border">
         <Button variant="ghost" size="icon" onClick={onBack}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h2 className="text-lg font-semibold">Edit</h2>
-        <Button onClick={handleNext} className="font-semibold">
+        <Button 
+          onClick={handleNext}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
+        >
           Next
         </Button>
       </div>
 
       {/* Media Preview */}
-      <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
+      <div className="flex-1 relative bg-black overflow-hidden">
         {mediaType === 'image' ? (
-          <div className="relative w-full h-full flex items-center justify-center">
-            <img
-              src={croppedImage || mediaUrl}
-              alt="Preview"
-              className="max-w-full max-h-full object-contain"
-              style={getFilterStyle()}
-            />
-            {textOverlay && (
-              <div
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-4xl font-bold px-4 py-2 text-center max-w-full"
-                style={{ color: textColor, textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
-              >
-                {textOverlay}
-              </div>
-            )}
-          </div>
+          <img
+            src={croppedImageUrl || mediaUrl}
+            alt="Preview"
+            className="w-full h-full object-contain"
+            style={{ filter: getFilterStyle() }}
+          />
         ) : (
-          <div className="relative w-full h-full">
-            <video
-              ref={videoRef}
-              src={mediaUrl}
-              className="w-full h-full object-contain"
-              style={getFilterStyle()}
-              controls
-              muted={isMuted}
-              playsInline
-            />
-            {textOverlay && (
-              <div
-                className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-4xl font-bold px-4 py-2 text-center max-w-full pointer-events-none"
-                style={{ color: textColor, textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
-              >
-                {textOverlay}
-              </div>
-            )}
-          </div>
+          <video
+            ref={videoRef}
+            src={mediaUrl}
+            className="w-full h-full object-contain"
+            style={{ filter: getFilterStyle() }}
+            controls
+            muted={isMuted}
+            autoPlay
+            loop
+          />
         )}
-      </div>
 
-      {/* Bottom Tools */}
-      <div className="border-t border-border bg-background">
-        {/* Quick Actions */}
-        <div className="flex items-center justify-around p-4 border-b border-border">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowTextInput(!showTextInput)}
-            className="flex flex-col gap-1"
+        {/* Text Overlays */}
+        {textOverlays.map((overlay, index) => (
+          <div
+            key={index}
+            className="absolute text-white font-bold text-2xl shadow-lg"
+            style={{
+              left: `${overlay.x}%`,
+              top: `${overlay.y}%`,
+              transform: 'translate(-50%, -50%)',
+              textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
+            }}
+          >
+            {overlay.text}
+          </div>
+        ))}
+
+        {/* Right Side Tools */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4">
+          <button
+            onClick={() => setShowTextInput(true)}
+            className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
           >
             <Type className="w-5 h-5" />
-            <span className="text-xs">Text</span>
-          </Button>
-          
+          </button>
+
           {mediaType === 'image' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowCrop(true)}
-              className="flex flex-col gap-1"
+            <button
+              onClick={() => setShowCropper(true)}
+              className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
             >
               <Crop className="w-5 h-5" />
-              <span className="text-xs">Crop</span>
-            </Button>
+            </button>
           )}
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowMusic(true)}
-            className="flex flex-col gap-1"
+          <button
+            onClick={() => setShowMusicLibrary(true)}
+            className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
           >
             <Music className="w-5 h-5" />
-            <span className="text-xs">Music</span>
-          </Button>
+          </button>
 
           {mediaType === 'video' && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={() => setIsMuted(!isMuted)}
-              className="flex flex-col gap-1"
+              className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
             >
               {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              <span className="text-xs">{isMuted ? 'Unmute' : 'Mute'}</span>
-            </Button>
+            </button>
           )}
         </div>
+      </div>
 
-        {/* Text Input */}
-        {showTextInput && (
-          <div className="p-4 border-b border-border space-y-3">
+      {/* Text Input Overlay */}
+      {showTextInput && (
+        <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center p-6">
+          <div className="bg-background rounded-2xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Add Text</h3>
             <Input
-              placeholder="Add text..."
-              value={textOverlay}
-              onChange={(e) => setTextOverlay(e.target.value)}
-              className="text-center"
+              value={currentText}
+              onChange={(e) => setCurrentText(e.target.value)}
+              placeholder="Type your text..."
+              className="mb-4"
+              autoFocus
             />
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Color:</span>
-              <input
-                type="color"
-                value={textColor}
-                onChange={(e) => setTextColor(e.target.value)}
-                className="w-10 h-10 rounded cursor-pointer"
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowTextInput(false);
+                  setCurrentText('');
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleAddText} className="flex-1">
+                Add
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Controls */}
+      <div className="border-t border-border bg-background">
+        {/* Tabs */}
+        <div className="flex border-b border-border">
+          <button
+            onClick={() => setActiveTab('filters')}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'filters'
+                ? 'text-foreground border-b-2 border-primary'
+                : 'text-muted-foreground'
+            }`}
+          >
+            Filters
+          </button>
+          <button
+            onClick={() => setActiveTab('adjust')}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'adjust'
+                ? 'text-foreground border-b-2 border-primary'
+                : 'text-muted-foreground'
+            }`}
+          >
+            Adjust
+          </button>
+        </div>
+
+        {/* Filters Tab */}
+        {activeTab === 'filters' && (
+          <div className="p-4">
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+              {FILTERS.map((filter) => (
+                <button
+                  key={filter.name}
+                  onClick={() => setActiveFilter(filter.name)}
+                  className="flex flex-col items-center gap-2 flex-shrink-0"
+                >
+                  <div
+                    className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
+                      activeFilter === filter.name
+                        ? 'border-primary scale-95'
+                        : 'border-border'
+                    }`}
+                  >
+                    {mediaType === 'image' ? (
+                      <img
+                        src={mediaUrl}
+                        alt={filter.name}
+                        className="w-full h-full object-cover"
+                        style={{ filter: filter.filter }}
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full bg-gradient-to-br from-primary/20 to-primary/40"
+                        style={{ filter: filter.filter }}
+                      />
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">{filter.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Adjust Tab */}
+        {activeTab === 'adjust' && (
+          <div className="p-4 space-y-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sun className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm">Brightness</span>
+                </div>
+                <span className="text-sm text-muted-foreground">{brightness}%</span>
+              </div>
+              <Slider
+                value={[brightness]}
+                onValueChange={([value]) => setBrightness(value)}
+                min={50}
+                max={150}
+                step={1}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Contrast className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm">Contrast</span>
+                </div>
+                <span className="text-sm text-muted-foreground">{contrast}%</span>
+              </div>
+              <Slider
+                value={[contrast]}
+                onValueChange={([value]) => setContrast(value)}
+                min={50}
+                max={150}
+                step={1}
+                className="w-full"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Droplet className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm">Saturation</span>
+                </div>
+                <span className="text-sm text-muted-foreground">{saturation}%</span>
+              </div>
+              <Slider
+                value={[saturation]}
+                onValueChange={([value]) => setSaturation(value)}
+                min={50}
+                max={150}
+                step={1}
+                className="w-full"
               />
             </div>
           </div>
         )}
-
-        {/* Filters */}
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="w-4 h-4" />
-            <span className="text-sm font-medium">Filters</span>
-          </div>
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
-            {Object.keys(FILTERS).map((filter) => (
-              <button
-                key={filter}
-                onClick={() => setActiveFilter(filter as keyof typeof FILTERS)}
-                className="flex flex-col items-center gap-2 min-w-[70px]"
-              >
-                <div
-                  className={cn(
-                    "w-16 h-16 rounded-lg overflow-hidden border-2",
-                    activeFilter === filter ? "border-primary" : "border-border"
-                  )}
-                  style={{ filter: FILTERS[filter as keyof typeof FILTERS] }}
-                >
-                  <img
-                    src={croppedImage || mediaUrl}
-                    alt={filter}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <span className="text-xs capitalize">{filter}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Adjustments */}
-        <div className="p-4 space-y-4 max-h-48 overflow-y-auto">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>Brightness</span>
-              <span className="text-muted-foreground">{brightness}%</span>
-            </div>
-            <Slider
-              value={[brightness]}
-              onValueChange={(v) => setBrightness(v[0])}
-              min={0}
-              max={200}
-              step={1}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>Contrast</span>
-              <span className="text-muted-foreground">{contrast}%</span>
-            </div>
-            <Slider
-              value={[contrast]}
-              onValueChange={(v) => setContrast(v[0])}
-              min={0}
-              max={200}
-              step={1}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>Saturation</span>
-              <span className="text-muted-foreground">{saturation}%</span>
-            </div>
-            <Slider
-              value={[saturation]}
-              onValueChange={(v) => setSaturation(v[0])}
-              min={0}
-              max={200}
-              step={1}
-            />
-          </div>
-        </div>
       </div>
     </div>
   );

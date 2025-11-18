@@ -278,7 +278,6 @@ export function EnhancedCreatePostModal({
           setShowMethodSelector(true);
         }}
         onSelect={handleGallerySelect}
-        multiSelect={false}
       />
 
       {/* Video Trimmer */}
