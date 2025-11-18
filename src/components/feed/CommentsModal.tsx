@@ -38,6 +38,7 @@ interface CommentsModalProps {
   onClose: () => void;
   postId: string;
   postOwnerId: string;
+  highlightCommentId?: string;
   post: {
     id: string;
     user_id: string;
@@ -53,7 +54,7 @@ interface CommentsModalProps {
   };
 }
 
-export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: CommentsModalProps) => {
+export const CommentsModal = ({ open, onClose, postId, postOwnerId, post, highlightCommentId }: CommentsModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -71,6 +72,23 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: Comm
       subscribeToComments();
     }
   }, [open, postId]);
+
+  // Scroll to highlighted comment
+  useEffect(() => {
+    if (open && highlightCommentId && comments.length > 0) {
+      setTimeout(() => {
+        const commentElement = document.getElementById(`comment-${highlightCommentId}`);
+        if (commentElement) {
+          commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Add a highlight animation
+          commentElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          setTimeout(() => {
+            commentElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+          }, 2000);
+        }
+      }, 300);
+    }
+  }, [open, highlightCommentId, comments]);
 
   const loadComments = async () => {
     setLoading(true);
@@ -256,14 +274,15 @@ export const CommentsModal = ({ open, onClose, postId, postOwnerId, post }: Comm
               <p className="text-center py-8 text-muted-foreground">No comments yet. Be the first!</p>
             ) : (
               comments.filter((c) => !c.parent_comment_id).map(comment => (
-                <CommentItem
-                  key={comment.id}
-                  comment={comment}
-                  allComments={comments}
-                  postOwnerId={postOwnerId}
-                  onUpdate={loadComments}
-                  onReplyToggle={setIsReplyActive}
-                />
+                <div key={comment.id} id={`comment-${comment.id}`}>
+                  <CommentItem
+                    comment={comment}
+                    allComments={comments}
+                    postOwnerId={postOwnerId}
+                    onUpdate={loadComments}
+                    onReplyToggle={setIsReplyActive}
+                  />
+                </div>
               ))
             )}
           </div>

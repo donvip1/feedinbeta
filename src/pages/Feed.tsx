@@ -57,6 +57,8 @@ const Feed = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [pullStartY, setPullStartY] = useState(0);
   const [isPulling, setIsPulling] = useState(false);
+  const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
 
   // Initial load and visibility-based refresh
   useEffect(() => {
@@ -97,24 +99,18 @@ const Feed = () => {
     };
   }, [user, authLoading, navigate]);
 
-  // Handle notification navigation to specific post
+  // Handle notification navigation to specific post and comment
   useEffect(() => {
     const state = location.state as { postId?: string; commentId?: string } | null;
     if (state?.postId && posts.length > 0) {
+      setHighlightedPostId(state.postId);
+      setHighlightedCommentId(state.commentId || null);
+      
       // Find the post and scroll to it
       setTimeout(() => {
         const postElement = document.getElementById(`post-${state.postId}`);
         if (postElement) {
           postElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          
-          // If there's a commentId, trigger comment opening
-          if (state.commentId) {
-            // Find the PostCard and trigger its comment section
-            const commentButton = postElement.querySelector('[data-comment-button]');
-            if (commentButton instanceof HTMLElement) {
-              commentButton.click();
-            }
-          }
         }
       }, 500);
       
@@ -477,6 +473,7 @@ const Feed = () => {
                     post={post} 
                     onUpdate={loadPosts}
                     onCommentStateChange={setIsCommenting}
+                    highlightCommentId={post.id === highlightedPostId ? highlightedCommentId || undefined : undefined}
                   />
                 </div>
               ))}

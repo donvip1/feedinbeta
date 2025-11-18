@@ -42,8 +42,8 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
     if (notification.type === 'like' && notification.related_id) {
       // For likes, get the post ID and navigate to it
       navigate('/feed', { state: { postId: notification.related_id } });
-    } else if (notification.type === 'comment' && notification.related_id) {
-      // For comments, get the comment to find the post_id
+    } else if ((notification.type === 'comment' || notification.type === 'reply') && notification.related_id) {
+      // For comments and replies, get the comment to find the post_id
       try {
         const { data: comment } = await supabase
           .from('post_comments')
