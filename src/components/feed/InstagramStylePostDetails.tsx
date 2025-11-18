@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, MapPin, Clock, Globe, Users, UserCheck, Lock, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Globe, Users, UserCheck, Lock, Loader2, Calendar, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -45,6 +45,12 @@ export function InstagramStylePostDetails({
   const [allowRefeed, setAllowRefeed] = useState(true);
   const [scheduleTime, setScheduleTime] = useState<string>('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [shareToStory, setShareToStory] = useState(false);
+  const [showScheduling, setShowScheduling] = useState(false);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleHour, setScheduleHour] = useState('12');
+  const [scheduleMinute, setScheduleMinute] = useState('00');
+  const [schedulePeriod, setSchedulePeriod] = useState<'AM' | 'PM'>('PM');
 
   const privacyOptions = [
     { value: 'everyone', label: 'Everyone', icon: Globe },
@@ -53,8 +59,18 @@ export function InstagramStylePostDetails({
     { value: 'only_me', label: 'Only Me', icon: Lock },
   ];
 
-  const handlePost = async () => {
+  const handlePost = async (postNow: boolean = true) => {
     if (!user) return;
+
+    // Validate scheduling if not posting now
+    if (!postNow && (!scheduleDate || !scheduleHour || !scheduleMinute)) {
+      toast({
+        title: 'Schedule time required',
+        description: 'Please select a date and time for your scheduled post',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setLoading(true);
     startUpload();
@@ -211,14 +227,26 @@ export function InstagramStylePostDetails({
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h2 className="text-lg font-semibold">New Post</h2>
-          <Button 
-            onClick={handlePost} 
-            disabled={loading}
-            className="font-semibold"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : scheduleTime ? 'Schedule' : 'Share'}
-          </Button>
+          <h1 className="text-xl font-semibold text-foreground">New Post</h1>
+          <div className="flex gap-2">
+            {showScheduling ? (
+              <Button 
+                onClick={() => handlePost(false)}
+                disabled={loading}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Schedule'}
+              </Button>
+            ) : (
+              <Button 
+                onClick={() => handlePost(true)}
+                disabled={loading}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Share'}
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Progress Bar */}
@@ -279,32 +307,99 @@ export function InstagramStylePostDetails({
             </Select>
           </div>
 
-          {/* Advanced Settings Toggle */}
-          <Button
-            variant="ghost"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full justify-between"
+          {/* Share to Story */}
+          <div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-500 flex items-center justify-center">
+                <span className="text-white text-sm font-bold">S</span>
+              </div>
+              <span className="text-base font-medium">Also share to Story</span>
+            </div>
+            <Switch
+              checked={shareToStory}
+              onCheckedChange={setShareToStory}
+            />
+          </div>
+
+          {/* Schedule Post */}
+          <button
+            onClick={() => setShowScheduling(!showScheduling)}
+            className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors border-b border-border"
           >
-            <span>Advanced Settings</span>
-            <span className="text-xs">{showAdvanced ? '▼' : '▶'}</span>
-          </Button>
+            <div className="flex items-center gap-3">
+              <Calendar className="w-5 h-5 text-muted-foreground" />
+              <span className="text-base font-medium">Schedule Post</span>
+            </div>
+            <ChevronRight className={`w-5 h-5 transition-transform ${showScheduling ? 'rotate-90' : ''}`} />
+          </button>
+
+          {showScheduling && (
+            <div className="p-4 bg-accent/30 border-b border-border space-y-4">
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block">Date</Label>
+                <Input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="bg-background"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-sm text-muted-foreground mb-2 block">Hour</Label>
+                  <Select value={scheduleHour} onValueChange={setScheduleHour}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map((hour) => (
+                        <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground mb-2 block">Minute</Label>
+                  <Select value={scheduleMinute} onValueChange={setScheduleMinute}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['00', '15', '30', '45'].map((min) => (
+                        <SelectItem key={min} value={min}>{min}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground mb-2 block">Period</Label>
+                  <Select value={schedulePeriod} onValueChange={(val) => setSchedulePeriod(val as 'AM' | 'PM')}>
+                    <SelectTrigger className="bg-background">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AM">AM</SelectItem>
+                      <SelectItem value="PM">PM</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Advanced Settings Toggle */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors"
+          >
+            <span className="text-base font-medium">Advanced Settings</span>
+            <ChevronRight className={`w-5 h-5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+          </button>
 
           {/* Advanced Settings */}
           {showAdvanced && (
-            <div className="space-y-4 pl-4 border-l-2 border-border">
-              {/* Schedule */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Schedule Post
-                </Label>
-                <Input
-                  type="datetime-local"
-                  value={scheduleTime}
-                  onChange={(e) => setScheduleTime(e.target.value)}
-                />
-              </div>
-
+            <div className="space-y-4 p-4 bg-accent/30">
               {/* Comments */}
               <div className="flex items-center justify-between">
                 <Label htmlFor="comments">Allow Comments</Label>
