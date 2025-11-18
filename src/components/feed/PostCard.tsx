@@ -10,6 +10,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { CommentsModal } from './CommentsModal';
 import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
 import { SharePostModal } from './SharePostModal';
+import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,6 +74,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showImageModal, setShowImageModal] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const iconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -388,7 +390,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
                 <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
-                    window.open(post.media_url, '_blank');
+                    setShowImageModal(true);
                   }} 
                   className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm rounded-full p-2 hover:bg-black/70 transition"
                 >
@@ -563,6 +565,14 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
         onClose={() => setShowShareModal(false)} 
         post={{ id: post.id, content: post.content, media_url: post.media_url, user_id: post.user_id }} 
       />
+      {post.media_type === 'image' && post.media_url && (
+        <ProfileImageModal
+          isOpen={showImageModal}
+          onClose={() => setShowImageModal(false)}
+          imageUrl={post.media_url}
+          title={`Photo by ${post.profiles?.display_name || post.profiles?.username || 'User'}`}
+        />
+      )}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader><AlertDialogTitle>Delete Post?</AlertDialogTitle><AlertDialogDescription>This will permanently delete this post.</AlertDialogDescription></AlertDialogHeader>
