@@ -10,6 +10,8 @@ import { Badge } from '@/components/ui/badge';
 import { ProfileSettings } from '@/components/profile/ProfileSettings';
 import { FollowersModal } from '@/components/profile/FollowersModal';
 import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
+import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
+import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload } from 'lucide-react';
 import { PostsGrid } from '@/components/profile/PostsGrid';
@@ -57,6 +59,10 @@ const Profile = () => {
   const [isFollowingMe, setIsFollowingMe] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
+  const [showCoverCropper, setShowCoverCropper] = useState(false);
+  const [tempCoverImageUrl, setTempCoverImageUrl] = useState<string>('');
+  const [showAvatarCropper, setShowAvatarCropper] = useState(false);
+  const [tempAvatarImageUrl, setTempAvatarImageUrl] = useState<string>('');
 
   const isOwnProfile = user?.id === userId;
 
@@ -247,15 +253,23 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    // Create temporary URL for cropper
+    const imageUrl = URL.createObjectURL(file);
+    setTempAvatarImageUrl(imageUrl);
+    setShowAvatarCropper(true);
+  };
+
+  const handleCroppedAvatarUpload = async (croppedBlob: Blob) => {
+    if (!user) return;
+
     try {
       setUploading(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const fileName = `${user.id}-${Date.now()}.jpg`;
       const filePath = `avatars/${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('posts')
-        .upload(filePath, file);
+        .upload(filePath, croppedBlob);
 
       if (uploadError) throw uploadError;
 
@@ -282,6 +296,11 @@ const Profile = () => {
       });
     } finally {
       setUploading(false);
+      // Clean up temporary URL
+      if (tempAvatarImageUrl) {
+        URL.revokeObjectURL(tempAvatarImageUrl);
+        setTempAvatarImageUrl('');
+      }
     }
   };
 
@@ -289,15 +308,23 @@ const Profile = () => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
+    // Create temporary URL for cropper
+    const imageUrl = URL.createObjectURL(file);
+    setTempCoverImageUrl(imageUrl);
+    setShowCoverCropper(true);
+  };
+
+  const handleCroppedCoverUpload = async (croppedBlob: Blob) => {
+    if (!user) return;
+
     try {
       setUploadingCover(true);
-      const fileExt = file.name.split('.').pop();
-      const fileName = `cover-${user.id}-${Date.now()}.${fileExt}`;
+      const fileName = `cover-${user.id}-${Date.now()}.jpg`;
       const filePath = `covers/${user.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('posts')
-        .upload(filePath, file);
+        .upload(filePath, croppedBlob);
 
       if (uploadError) throw uploadError;
 
@@ -324,6 +351,11 @@ const Profile = () => {
       });
     } finally {
       setUploadingCover(false);
+      // Clean up temporary URL
+      if (tempCoverImageUrl) {
+        URL.revokeObjectURL(tempCoverImageUrl);
+        setTempCoverImageUrl('');
+      }
     }
   };
 
@@ -659,6 +691,34 @@ const Profile = () => {
           title="Cover Photo"
         />
       )}
+
+      {/* Cover Image Cropper */}
+      <CoverImageCropper
+        isOpen={showCoverCropper}
+        onClose={() => {
+          setShowCoverCropper(false);
+          if (tempCoverImageUrl) {
+            URL.revokeObjectURL(tempCoverImageUrl);
+            setTempCoverImageUrl('');
+          }
+        }}
+        imageUrl={tempCoverImageUrl}
+        onCropComplete={handleCroppedCoverUpload}
+      />
+
+      {/* Avatar Image Cropper */}
+      <AvatarImageCropper
+        isOpen={showAvatarCropper}
+        onClose={() => {
+          setShowAvatarCropper(false);
+          if (tempAvatarImageUrl) {
+            URL.revokeObjectURL(tempAvatarImageUrl);
+            setTempAvatarImageUrl('');
+          }
+        }}
+        imageUrl={tempAvatarImageUrl}
+        onCropComplete={handleCroppedAvatarUpload}
+      />
       
       <BottomNav />
     </div>
