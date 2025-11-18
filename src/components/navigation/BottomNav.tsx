@@ -72,21 +72,20 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                     >
                       {item.isProfile && avatarUrl ? (
                         <div className={`rounded-full p-0.5 ${active ? 'ring-1 ring-white ring-offset-1 ring-offset-background' : 'border border-white'}`}>
-                          <Avatar className="w-6 h-6">
+                          <Avatar className="w-9 h-9">
                             <AvatarImage src={avatarUrl} />
-                            <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
+                            <AvatarFallback><Icon className="w-6 h-6" /></AvatarFallback>
                           </Avatar>
                         </div>
                       ) : (
                         <div className={`${active ? 'bg-primary/10' : ''}`}>
                           <Icon 
-                            size={28}
+                            size={39}
                             strokeWidth={2}
                             stroke="currentColor"
                           />
                         </div>
                       )}
-                      {item.id === 'learn' && <span className="text-[9px] font-medium mt-0.5">{item.label}</span>}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top">
