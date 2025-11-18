@@ -31,13 +31,6 @@ export function CreatePostMethodSelector({
       color: 'from-indigo-500 to-purple-500',
     },
     {
-      id: 'text-to-image' as const,
-      icon: Type,
-      title: 'Text to Image',
-      description: 'Create styled text post',
-      color: 'from-orange-500 to-red-500',
-    },
-    {
       id: 'ai-generate' as const,
       icon: Sparkles,
       title: 'AI Generate',
