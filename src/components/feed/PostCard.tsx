@@ -362,15 +362,26 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange }: PostCardProps
       <div className="relative w-full aspect-[9/13] bg-black rounded-xl overflow-hidden">
         {post.media_url && (
           <div className="absolute inset-0">
-            {post.media_type === 'image' && <img src={post.media_url} alt="Post" className="w-full h-full object-cover" />}
+            {post.media_type === 'image' && (
+              <img 
+                src={post.media_url} 
+                alt="Post" 
+                className="w-full h-full object-cover select-none pointer-events-auto"
+                onContextMenu={(e) => e.preventDefault()}
+                draggable={false}
+              />
+            )}
             {post.media_type === 'video' && (
               <>
                 <video 
                   ref={videoRef} 
                   src={post.media_url} 
-                  className="w-full h-full object-cover" 
+                  className="w-full h-full object-cover select-none" 
                   loop 
-                  playsInline 
+                  playsInline
+                  controlsList="nodownload"
+                  onContextMenu={(e) => e.preventDefault()}
+                  disablePictureInPicture
                   onClick={(e) => {
                     e.stopPropagation();
                     const video = videoRef.current;
