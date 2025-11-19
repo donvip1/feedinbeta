@@ -529,12 +529,26 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
             <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
           </button>
           
-          <button onClick={() => handleShare('refeed')} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-            <Repeat2 className={`w-4 h-4 ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`} />
-            <span className={`text-xs font-medium ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`}>
-              {localRefeedsCount > 999 ? `${(localRefeedsCount / 1000).toFixed(1)}K` : localRefeedsCount}
-            </span>
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
+                <Repeat2 className={`w-4 h-4 ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`} />
+                <span className={`text-xs font-medium ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`}>
+                  {localRefeedsCount > 999 ? `${(localRefeedsCount / 1000).toFixed(1)}K` : localRefeedsCount}
+                </span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => handleShare('refeed')}>
+                <Repeat2 className="mr-2 h-4 w-4" />
+                Refeed
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare('quote')}>
+                <MessageCircle className="mr-2 h-4 w-4" />
+                Quote Refeed
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <button onClick={() => setShowGiftModal(true)} className="flex items-center space-x-1.5 hover:opacity-70 transition">
             <Gift className="w-4 h-4 text-primary" />
@@ -547,9 +561,6 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem onClick={() => handleShare('quote')}>
-                Quote Refeed
-              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowShareModal(true)}>
                 Share Post
               </DropdownMenuItem>

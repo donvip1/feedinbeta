@@ -261,19 +261,11 @@ export function SharePostModal({ open, onClose, post }: SharePostModalProps) {
 
         <div className="space-y-4">
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              onClick={handleQuoteRefeed}
-              variant="outline"
-              className="flex flex-col items-center gap-2 h-auto py-4"
-            >
-              <Quote className="w-6 h-6" />
-              <span className="text-xs">Quote Refeed</span>
-            </Button>
+          <div className="flex justify-center">
             <Button
               onClick={handleShareToStory}
               variant="outline"
-              className="flex flex-col items-center gap-2 h-auto py-4"
+              className="flex flex-col items-center gap-2 h-auto py-4 w-full max-w-xs"
               disabled={loading}
             >
               <Bookmark className="w-6 h-6" />
