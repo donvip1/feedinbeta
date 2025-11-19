@@ -13,27 +13,27 @@ interface MusicLibraryProps {
   onSelectMusic: (music: { name: string; artist: string; url: string; duration: number }) => void;
 }
 
-// Trending songs library (would connect to real API in production)
+// Royalty-free music library from Pixabay
 const TRENDING_SONGS = [
-  { id: 1, name: 'Summer Vibes', artist: 'DJ Mix', genre: 'Electronic', duration: 45, url: 'https://example.com/music/summer.mp3' },
-  { id: 2, name: 'Chill Beats', artist: 'Lo-Fi King', genre: 'Lo-Fi', duration: 60, url: 'https://example.com/music/chill.mp3' },
-  { id: 3, name: 'Epic Moments', artist: 'Orchestra Pro', genre: 'Cinematic', duration: 50, url: 'https://example.com/music/epic.mp3' },
-  { id: 4, name: 'Happy Day', artist: 'Sunny Smith', genre: 'Pop', duration: 55, url: 'https://example.com/music/happy.mp3' },
-  { id: 5, name: 'Urban Flow', artist: 'Street Beats', genre: 'Hip Hop', duration: 48, url: 'https://example.com/music/urban.mp3' },
-  { id: 6, name: 'Love Story', artist: 'Romance Band', genre: 'Romantic', duration: 52, url: 'https://example.com/music/love.mp3' },
-  { id: 7, name: 'Energy Boost', artist: 'Workout Mix', genre: 'EDM', duration: 60, url: 'https://example.com/music/energy.mp3' },
-  { id: 8, name: 'Nature Sounds', artist: 'Ambient Zen', genre: 'Ambient', duration: 60, url: 'https://example.com/music/nature.mp3' },
-  { id: 9, name: 'Party Time', artist: 'Dance Master', genre: 'Dance', duration: 55, url: 'https://example.com/music/party.mp3' },
-  { id: 10, name: 'Smooth Jazz', artist: 'Jazz Legends', genre: 'Jazz', duration: 58, url: 'https://example.com/music/jazz.mp3' },
+  { id: 1, name: 'Summer Vibes', artist: 'Coma-Media', genre: 'Electronic', duration: 60, url: 'https://cdn.pixabay.com/audio/2022/05/27/audio_1808fbf07a.mp3' },
+  { id: 2, name: 'Chill Beats', artist: 'Chillmore', genre: 'Lo-Fi', duration: 60, url: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c8a3bad6b7.mp3' },
+  { id: 3, name: 'Epic Moments', artist: 'Grand_Project', genre: 'Cinematic', duration: 60, url: 'https://cdn.pixabay.com/audio/2024/07/30/audio_13baf4d6b0.mp3' },
+  { id: 4, name: 'Happy Day', artist: 'Olexy', genre: 'Pop', duration: 60, url: 'https://cdn.pixabay.com/audio/2022/03/22/audio_1327e1c18d.mp3' },
+  { id: 5, name: 'Urban Flow', artist: 'RKVC', genre: 'Hip Hop', duration: 60, url: 'https://cdn.pixabay.com/audio/2022/08/02/audio_4a588b1e41.mp3' },
+  { id: 6, name: 'Love Story', artist: 'Ashot-Danielyan', genre: 'Romantic', duration: 60, url: 'https://cdn.pixabay.com/audio/2023/10/30/audio_ea1f8fa8b0.mp3' },
+  { id: 7, name: 'Energy Boost', artist: 'FASSounds', genre: 'EDM', duration: 60, url: 'https://cdn.pixabay.com/audio/2022/10/25/audio_c8c528c3e0.mp3' },
+  { id: 8, name: 'Nature Sounds', artist: 'Lexin_Music', genre: 'Ambient', duration: 60, url: 'https://cdn.pixabay.com/audio/2023/08/30/audio_e68b21bf19.mp3' },
+  { id: 9, name: 'Party Time', artist: 'SoundGalleryBy', genre: 'Dance', duration: 60, url: 'https://cdn.pixabay.com/audio/2023/11/08/audio_e8ffb7a32f.mp3' },
+  { id: 10, name: 'Smooth Jazz', artist: 'Lesfm', genre: 'Jazz', duration: 60, url: 'https://cdn.pixabay.com/audio/2022/11/22/audio_1e5d941b26.mp3' },
 ];
 
 const RECENT_SONGS = [
-  { id: 11, name: 'Midnight Drive', artist: 'Night Rider', genre: 'Synthwave', duration: 47, url: 'https://example.com/music/midnight.mp3' },
-  { id: 12, name: 'Beach Sunset', artist: 'Coastal Waves', genre: 'Acoustic', duration: 53, url: 'https://example.com/music/beach.mp3' },
+  { id: 11, name: 'Midnight Drive', artist: 'Lux-Inspira', genre: 'Synthwave', duration: 60, url: 'https://cdn.pixabay.com/audio/2024/03/18/audio_f6ae8441fb.mp3' },
+  { id: 12, name: 'Beach Sunset', artist: 'Zakhar_Valaha', genre: 'Acoustic', duration: 60, url: 'https://cdn.pixabay.com/audio/2022/09/07/audio_e87eb6c28b.mp3' },
 ];
 
 const FAVORITE_SONGS = [
-  { id: 13, name: 'My Favorite', artist: 'Best Artist', genre: 'Pop', duration: 50, url: 'https://example.com/music/favorite.mp3' },
+  { id: 13, name: 'Inspiring Dreams', artist: 'penguinmusic', genre: 'Inspirational', duration: 60, url: 'https://cdn.pixabay.com/audio/2023/12/27/audio_d32ef65f69.mp3' },
 ];
 
 export function MusicLibrary({ open, onClose, onSelectMusic }: MusicLibraryProps) {
