@@ -26,7 +26,7 @@ interface Profile {
   status: string | null;
   status_visibility: string | null;
   about: string | null;
-  purpose: string | null;
+  purpose: string[] | null;
   marital_status: string | null;
   total_views: number;
   is_premium: boolean;
@@ -42,17 +42,17 @@ interface Profile {
   website_url?: string | null;
 }
 
-const PURPOSE_OPTIONS = [
-  { value: "friends", label: "Make friends" },
-  { value: "dating", label: "Dating" },
-  { value: "networking", label: "Networking" },
-  { value: "business", label: "Business" },
-  { value: "gaming", label: "Gaming" },
-  { value: "learning", label: "Learning" },
-  { value: "content", label: "Find content" },
-  { value: "streaming", label: "Live streaming" },
-  { value: "browsing", label: "Just browsing" },
-];
+const PURPOSE_OPTIONS: Record<string, string> = {
+  friends: "Make friends",
+  dating: "Dating",
+  networking: "Networking",
+  business: "Business",
+  gaming: "Gaming",
+  learning: "Learning",
+  content: "Find content",
+  streaming: "Live streaming",
+  browsing: "Just browsing",
+};
 
 const Profile = () => {
   const { userId } = useParams();
@@ -644,19 +644,19 @@ const Profile = () => {
           )}
 
           {/* Purpose on Platform */}
-          {profile.purpose && (
+          {profile.purpose && Array.isArray(profile.purpose) && profile.purpose.length > 0 && (
             <div className="mb-6 text-center">
               <p className="text-xs text-muted-foreground mb-2">Purpose on Platform</p>
               <div className="flex flex-wrap gap-2 justify-center">
-                {profile.purpose.split(',').map((purposeValue) => {
-                  const purpose = PURPOSE_OPTIONS.find(p => p.value === purposeValue);
-                  return purpose ? (
+                {profile.purpose.map((purposeValue) => {
+                  const purposeLabel = PURPOSE_OPTIONS[purposeValue];
+                  return purposeLabel ? (
                     <Badge 
                       key={purposeValue}
                       variant="secondary"
                       className="bg-primary/10 text-primary border border-primary/20"
                     >
-                      {purpose.label}
+                      {purposeLabel}
                     </Badge>
                   ) : null;
                 })}
@@ -731,10 +731,23 @@ const Profile = () => {
               </div>
             )}
 
-            {profile.purpose && (
+            {profile.purpose && Array.isArray(profile.purpose) && profile.purpose.length > 0 && (
               <div className="bg-card/50 border border-border rounded-xl p-5 backdrop-blur-sm">
                 <h3 className="font-semibold text-foreground mb-3 text-base">Purpose</h3>
-                <p className="text-muted-foreground text-sm capitalize">{profile.purpose.replace('_', ' ')}</p>
+                <div className="flex flex-wrap gap-2">
+                  {profile.purpose.map((purposeValue) => {
+                    const purposeLabel = PURPOSE_OPTIONS[purposeValue];
+                    return purposeLabel ? (
+                      <Badge 
+                        key={purposeValue}
+                        variant="secondary"
+                        className="bg-primary/10 text-primary"
+                      >
+                        {purposeLabel}
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
               </div>
             )}
 
