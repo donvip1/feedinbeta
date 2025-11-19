@@ -48,7 +48,7 @@ const Feed = () => {
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [defaultPostTab, setDefaultPostTab] = useState<'text' | 'image' | 'video'>('text');
-  const [activeTab, setActiveTab] = useState<'following' | 'forYou' | 'myPosts'>('forYou');
+  const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -164,9 +164,7 @@ const Feed = () => {
       // No search filter in regular query - search is handled separately
       if (!searchQuery) {
         // Filter based on active tab only when not searching
-        if (activeTab === 'myPosts' && user) {
-          query = query.eq('user_id', user.id);
-        } else if (activeTab === 'following' && user) {
+        if (activeTab === 'following' && user) {
           // Get posts from users the current user follows
           const { data: following } = await supabase
             .from('follows')
@@ -188,43 +186,15 @@ const Feed = () => {
 
       if (error) throw error;
 
-      // Get refed posts for myPosts tab
-      let refedPosts: Post[] = [];
-      if (activeTab === 'myPosts' && user) {
-        const { data: refeeds } = await supabase
-          .from('refeeds')
-          .select(`
-            created_at,
-            posts!inner (
-              *,
-              profiles (
-                display_name,
-                username,
-                avatar_url
-              )
-            )
-          `)
-          .eq('refed_by_user_id', user.id)
-          .order('created_at', { ascending: false });
-        
-        if (refeeds) {
-          refedPosts = refeeds.map((r: any) => ({
-            ...r.posts,
-            is_refeed: true,
-            refeed_date: r.created_at
-          }));
-        }
-      }
-
       // Combine and sort posts
-      const allPosts = [...(data || []), ...refedPosts];
+      const allPosts = [...(data || [])];
       
       // Randomize for "For You" tab, otherwise sort by date
       const processed = activeTab === 'forYou' 
         ? allPosts.sort(() => Math.random() - 0.5)
         : allPosts.sort((a, b) => {
-            const dateA = (a as any).refeed_date || a.created_at;
-            const dateB = (b as any).refeed_date || b.created_at;
+            const dateA = a.created_at;
+            const dateB = b.created_at;
             return new Date(dateB).getTime() - new Date(dateA).getTime();
           });
       
@@ -429,72 +399,52 @@ const Feed = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
-        <div className="w-full px-3 py-2.5">
-          <div className="flex items-center justify-between gap-2">
-            {/* Left: Tabs */}
-            <div className="flex items-center gap-1 flex-shrink min-w-0">
-              <button
-                onClick={() => setActiveTab('following')}
-                className={`text-xs font-semibold px-1.5 py-1 whitespace-nowrap transition-colors ${
-                  activeTab === 'following' 
-                    ? 'text-foreground border-b-2 border-primary' 
-                    : 'text-muted-foreground'
-                }`}
-              >
-                Following
-              </button>
-              <button
-                onClick={() => setActiveTab('forYou')}
-                className={`text-xs font-semibold px-1.5 py-1 whitespace-nowrap transition-colors ${
-                  activeTab === 'forYou' 
-                    ? 'text-foreground border-b-2 border-primary' 
-                    : 'text-muted-foreground'
-                }`}
-              >
-                For You
-              </button>
-              <button
-                onClick={() => setActiveTab('myPosts')}
-                className={`text-xs font-semibold px-1.5 py-1 whitespace-nowrap transition-colors ${
-                  activeTab === 'myPosts' 
-                    ? 'text-foreground border-b-2 border-primary' 
-                    : 'text-muted-foreground'
-                }`}
-              >
-                My Posts
-              </button>
+        <div className="w-full px-4 py-2.5">
+          <div className="flex items-center justify-center gap-3 max-w-screen-xl mx-auto">
+            {/* Notification Icon */}
+            <div className="h-9 w-9 flex items-center justify-center flex-shrink-0">
+              <NotificationBell />
             </div>
 
-            {/* Center: LIVE Button */}
+            {/* Following Tab */}
             <button
-              onClick={() => navigate('/live')}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 flex-shrink-0"
+              onClick={() => setActiveTab('following')}
+              className={`text-sm font-semibold px-3 py-1 whitespace-nowrap transition-colors ${
+                activeTab === 'following' 
+                  ? 'text-foreground border-b-2 border-primary' 
+                  : 'text-muted-foreground'
+              }`}
             >
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
-              </span>
-              <span className="text-[10px] font-bold whitespace-nowrap">LIVE</span>
+              Following
             </button>
 
-            {/* Right: Action Icons */}
-            <div className="flex items-center gap-0.5 flex-shrink-0">
-              <button
-                onClick={() => navigate('/trending')}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
-              >
-                <TrendingUp className="w-4.5 h-4.5 text-primary" />
-              </button>
-              <div className="h-8 w-8 flex items-center justify-center">
-                <NotificationBell />
-              </div>
-              <button 
-                onClick={() => setShowSearch(!showSearch)}
-                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
-              >
-                {showSearch ? <X className="w-4.5 h-4.5 text-foreground" /> : <Search className="w-4.5 h-4.5 text-foreground" />}
-              </button>
-            </div>
+            {/* For You Tab */}
+            <button
+              onClick={() => setActiveTab('forYou')}
+              className={`text-sm font-semibold px-3 py-1 whitespace-nowrap transition-colors ${
+                activeTab === 'forYou' 
+                  ? 'text-foreground border-b-2 border-primary' 
+                  : 'text-muted-foreground'
+              }`}
+            >
+              For You
+            </button>
+
+            {/* Trending Icon */}
+            <button
+              onClick={() => navigate('/trending')}
+              className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors flex-shrink-0"
+            >
+              <TrendingUp className="w-5 h-5 text-primary" />
+            </button>
+
+            {/* Search Icon */}
+            <button 
+              onClick={() => setShowSearch(!showSearch)}
+              className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors flex-shrink-0"
+            >
+              {showSearch ? <X className="w-5 h-5 text-foreground" /> : <Search className="w-5 h-5 text-foreground" />}
+            </button>
           </div>
         </div>
         
@@ -551,9 +501,7 @@ const Feed = () => {
             <div className="flex items-center justify-center h-full px-4">
               <div className="text-center">
                 <p className="text-muted-foreground text-lg mb-4">
-                  {activeTab === 'following' ? 'Follow users to see their posts' : 
-                   activeTab === 'myPosts' ? 'Create your first post' : 
-                   'No posts yet'}
+                  {activeTab === 'following' ? 'Follow users to see their posts' : 'No posts yet'}
                 </p>
               </div>
             </div>
