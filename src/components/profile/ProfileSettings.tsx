@@ -193,6 +193,7 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
   const [statusVisibility, setStatusVisibility] = useState<'public' | 'friends' | 'followers'>('public');
   const [purposeUpdatedAt, setPurposeUpdatedAt] = useState<string | null>(null);
   const [selectedPurposes, setSelectedPurposes] = useState<string[]>([]);
+  const [canEditPurpose, setCanEditPurpose] = useState(true);
   
   const [profile, setProfile] = useState({
     display_name: '',
@@ -262,8 +263,17 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
         });
         setStatusVisibility(profileData.status_visibility || 'public');
         setPurposeUpdatedAt(profileData.purpose_updated_at);
-        setSelectedPurposes(profileData.purpose ? profileData.purpose.split(',') : []);
+        setSelectedPurposes(Array.isArray(profileData.purpose) ? profileData.purpose : []);
         setUsernameStatus(prev => ({ ...prev, originalUsername: data.username || '' }));
+        
+        // Check if purpose can be edited
+        if (profileData.purpose_updated_at) {
+          const twoWeeksAgo = new Date();
+          twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+          setCanEditPurpose(new Date(profileData.purpose_updated_at) < twoWeeksAgo);
+        } else {
+          setCanEditPurpose(true);
+        }
       }
     } catch (error: any) {
       console.error('Error loading profile:', error);

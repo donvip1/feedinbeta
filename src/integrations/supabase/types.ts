@@ -1993,6 +1993,7 @@ export type Database = {
           music_artist: string | null
           music_title: string | null
           music_url: string | null
+          original_post_id: string | null
           post_type: string | null
           privacy: string | null
           refeeds_count: number | null
@@ -2024,6 +2025,7 @@ export type Database = {
           music_artist?: string | null
           music_title?: string | null
           music_url?: string | null
+          original_post_id?: string | null
           post_type?: string | null
           privacy?: string | null
           refeeds_count?: number | null
@@ -2055,6 +2057,7 @@ export type Database = {
           music_artist?: string | null
           music_title?: string | null
           music_url?: string | null
+          original_post_id?: string | null
           post_type?: string | null
           privacy?: string | null
           refeeds_count?: number | null
@@ -2066,6 +2069,13 @@ export type Database = {
           views_count?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "posts_original_post_id_fkey"
+            columns: ["original_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "posts_user_id_fkey"
             columns: ["user_id"]
@@ -2109,7 +2119,7 @@ export type Database = {
           marital_status: string | null
           max_friends: number | null
           phone_number: string | null
-          purpose: string | null
+          purpose: string[] | null
           purpose_updated_at: string | null
           status: string | null
           status_updated_at: string | null
@@ -2156,7 +2166,7 @@ export type Database = {
           marital_status?: string | null
           max_friends?: number | null
           phone_number?: string | null
-          purpose?: string | null
+          purpose?: string[] | null
           purpose_updated_at?: string | null
           status?: string | null
           status_updated_at?: string | null
@@ -2203,7 +2213,7 @@ export type Database = {
           marital_status?: string | null
           max_friends?: number | null
           phone_number?: string | null
-          purpose?: string | null
+          purpose?: string[] | null
           purpose_updated_at?: string | null
           status?: string | null
           status_updated_at?: string | null
@@ -2868,6 +2878,7 @@ export type Database = {
         Args: { message_id: string; user_id: string }
         Returns: boolean
       }
+      can_update_purpose: { Args: { user_id: string }; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }
