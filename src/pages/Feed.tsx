@@ -429,13 +429,13 @@ const Feed = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
-        <div className="w-full px-2 py-2.5">
-          <div className="flex items-center justify-between max-w-screen-xl mx-auto">
+        <div className="w-full px-3 py-2.5">
+          <div className="flex items-center justify-between gap-2">
             {/* Left: Tabs */}
-            <div className="flex items-center gap-2 flex-1 min-w-0">
+            <div className="flex items-center gap-1 flex-shrink min-w-0">
               <button
                 onClick={() => setActiveTab('following')}
-                className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
+                className={`text-xs font-semibold px-1.5 py-1 whitespace-nowrap transition-colors ${
                   activeTab === 'following' 
                     ? 'text-foreground border-b-2 border-primary' 
                     : 'text-muted-foreground'
@@ -445,7 +445,7 @@ const Feed = () => {
               </button>
               <button
                 onClick={() => setActiveTab('forYou')}
-                className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
+                className={`text-xs font-semibold px-1.5 py-1 whitespace-nowrap transition-colors ${
                   activeTab === 'forYou' 
                     ? 'text-foreground border-b-2 border-primary' 
                     : 'text-muted-foreground'
@@ -455,7 +455,7 @@ const Feed = () => {
               </button>
               <button
                 onClick={() => setActiveTab('myPosts')}
-                className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
+                className={`text-xs font-semibold px-1.5 py-1 whitespace-nowrap transition-colors ${
                   activeTab === 'myPosts' 
                     ? 'text-foreground border-b-2 border-primary' 
                     : 'text-muted-foreground'
@@ -468,31 +468,31 @@ const Feed = () => {
             {/* Center: LIVE Button */}
             <button
               onClick={() => navigate('/live')}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 mx-2 flex-shrink-0"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 flex-shrink-0"
             >
-              <span className="relative flex h-2 w-2">
+              <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-red-500"></span>
               </span>
-              <span className="text-xs font-bold whitespace-nowrap">LIVE</span>
+              <span className="text-[10px] font-bold whitespace-nowrap">LIVE</span>
             </button>
 
             {/* Right: Action Icons */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               <button
                 onClick={() => navigate('/trending')}
-                className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
+                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
               >
-                <TrendingUp className="w-5 h-5 text-primary" />
+                <TrendingUp className="w-4.5 h-4.5 text-primary" />
               </button>
-              <div className="h-9 w-9 flex items-center justify-center">
+              <div className="h-8 w-8 flex items-center justify-center">
                 <NotificationBell />
               </div>
               <button 
                 onClick={() => setShowSearch(!showSearch)}
-                className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
+                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
               >
-                {showSearch ? <X className="w-5 h-5 text-foreground" /> : <Search className="w-5 h-5 text-foreground" />}
+                {showSearch ? <X className="w-4.5 h-4.5 text-foreground" /> : <Search className="w-4.5 h-4.5 text-foreground" />}
               </button>
             </div>
           </div>
