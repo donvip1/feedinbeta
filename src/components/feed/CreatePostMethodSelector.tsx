@@ -52,18 +52,18 @@ export function CreatePostMethodSelector({
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center animate-fade-in">
+    <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center animate-fade-in p-4">
       {/* Close Button */}
       <button
         onClick={onClose}
-        className="absolute top-5 right-5 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition"
+        className="absolute top-4 right-4 w-12 h-12 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition z-10"
         aria-label="Close"
       >
-        <X className="w-6 h-6 text-white" />
+        <X className="w-7 h-7 text-white" />
       </button>
 
       {/* Selector Grid */}
-      <div className="grid grid-cols-2 gap-6 p-6 max-w-sm w-full">
+      <div className="grid grid-cols-2 gap-4 p-4 w-full max-w-[340px] mx-auto">
         {methods.map((method) => {
           const Icon = method.icon;
           const isLocked = method.premium && !isPremium;
@@ -78,14 +78,14 @@ export function CreatePostMethodSelector({
                 }
               }}
               disabled={isLocked}
-              className={`flex flex-col items-center justify-center p-4 rounded-2xl shadow-xl ${method.color} text-white transition transform active:scale-95 ${
+              className={`flex flex-col items-center justify-center aspect-square rounded-2xl shadow-xl ${method.color} text-white transition transform active:scale-95 ${
                 isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'
               }`}
             >
-              <Icon className="w-8 h-8 mb-2" />
-              <span className="text-sm font-semibold">{method.title}</span>
+              <Icon className="w-10 h-10 mb-2" />
+              <span className="text-base font-semibold">{method.title}</span>
               {isLocked && (
-                <span className="text-[10px] mt-1 bg-white/20 px-2 py-0.5 rounded-full font-bold">
+                <span className="text-xs mt-1 bg-white/20 px-2 py-0.5 rounded-full font-bold">
                   PRO
                 </span>
               )}
