@@ -35,13 +35,13 @@ export function CreatePostMethodSelector({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold mb-2">Create Post</h2>
-          <p className="text-sm text-muted-foreground">Choose how you want to create your post</p>
+      <DialogContent className="max-w-[90vw] sm:max-w-md mx-auto">
+        <div className="text-center mb-4 sm:mb-6">
+          <h2 className="text-xl sm:text-2xl font-bold mb-1 sm:mb-2">Create Post</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground">Choose how you want to create your post</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           {methods.map((method) => {
             const Icon = method.icon;
             const isLocked = method.premium && !isPremium;
@@ -50,27 +50,27 @@ export function CreatePostMethodSelector({
               <Button
                 key={method.id}
                 variant="outline"
-                className="h-auto flex flex-col items-center gap-3 p-6 relative group hover:border-primary"
+                className="h-auto flex flex-col items-center gap-2 sm:gap-3 p-4 sm:p-6 relative group hover:border-primary"
                 onClick={() => !isLocked && onSelectMethod(method.id)}
                 disabled={isLocked}
               >
-                <div className={`w-16 h-16 rounded-full bg-gradient-to-br ${method.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                  <Icon className="w-8 h-8 text-white" />
+                <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br ${method.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                  <Icon className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                 </div>
                 <div className="text-center">
-                  <p className="font-semibold text-sm">{method.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{method.description}</p>
+                  <p className="font-semibold text-xs sm:text-sm">{method.title}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1 leading-tight">{method.description}</p>
                 </div>
                 {method.premium && (
-                  <div className="absolute top-2 right-2">
-                    <span className="text-xs bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-2 py-1 rounded-full font-semibold">
+                  <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2">
+                    <span className="text-[10px] sm:text-xs bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full font-semibold">
                       PRO
                     </span>
                   </div>
                 )}
                 {isLocked && (
                   <div className="absolute inset-0 bg-background/80 rounded-lg flex items-center justify-center">
-                    <p className="text-xs font-semibold">Subscribe to unlock</p>
+                    <p className="text-[10px] sm:text-xs font-semibold">Subscribe to unlock</p>
                   </div>
                 )}
               </Button>
