@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, MapPin, Clock, Globe, Users, UserCheck, Lock, Loader2, Calendar, ChevronRight, MessageCircle } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Globe, Users, UserCheck, Lock, Loader2, Calendar, ChevronRight, MessageCircle, Heart, Eye } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -29,6 +29,9 @@ interface InstagramStylePostDetailsProps {
     media_url: string | null;
     media_type: string | null;
     user_id: string;
+    likes_count: number;
+    comments_count: number;
+    views_count: number;
     user: {
       display_name: string | null;
       username: string | null;
@@ -278,7 +281,63 @@ export function InstagramStylePostDetails({
       {/* Left: Media Preview */}
       <div className="hidden md:flex md:w-1/2 bg-black items-center justify-center border-r border-border p-4">
         <div className="flex flex-col gap-4 max-w-md w-full">
-          {mediaType === 'text' ? (
+          {quotePost && !mediaUrl ? (
+            // Quote post without user media - show quoted post prominently
+            <div className="border border-border rounded-xl p-4 bg-muted/30 w-full">
+              <div className="flex items-center gap-2 mb-2">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={quotePost.user.avatar_url || undefined} />
+                  <AvatarFallback className="text-sm">
+                    {quotePost.user.display_name?.[0] || quotePost.user.username?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    {quotePost.user.display_name || quotePost.user.username || 'Unknown'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    @{quotePost.user.username || 'user'}
+                  </p>
+                </div>
+              </div>
+              {quotePost.content && (
+                <p className="text-sm text-foreground mb-2">
+                  {quotePost.content}
+                </p>
+              )}
+              {quotePost.media_url && (
+                <div className="rounded-lg overflow-hidden mt-2">
+                  {quotePost.media_type === 'image' ? (
+                    <img 
+                      src={quotePost.media_url} 
+                      alt="Quoted post" 
+                      className="w-full max-h-64 object-cover"
+                    />
+                  ) : (
+                    <video 
+                      src={quotePost.media_url} 
+                      className="w-full max-h-64 object-cover"
+                      controls={false}
+                    />
+                  )}
+                </div>
+              )}
+              <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground border-t border-border/50 pt-3">
+                <div className="flex items-center gap-1">
+                  <Heart className="w-3.5 h-3.5" />
+                  <span>{quotePost.likes_count > 999 ? `${(quotePost.likes_count / 1000).toFixed(1)}K` : quotePost.likes_count}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span>{quotePost.comments_count}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Eye className="w-3.5 h-3.5" />
+                  <span>{quotePost.views_count > 999 ? `${(quotePost.views_count / 1000).toFixed(1)}K` : quotePost.views_count}</span>
+                </div>
+              </div>
+            </div>
+          ) : mediaType === 'text' ? (
             <div className="p-8 text-white text-2xl text-center">
               {mediaUrl}
             </div>
@@ -455,6 +514,21 @@ export function InstagramStylePostDetails({
                         )}
                       </div>
                     )}
+                    {/* Engagement Metrics */}
+                    <div className="flex items-center gap-4 mt-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Heart className="w-3.5 h-3.5" />
+                        <span>{quotePost.likes_count > 999 ? `${(quotePost.likes_count / 1000).toFixed(1)}K` : quotePost.likes_count}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>{quotePost.comments_count}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Eye className="w-3.5 h-3.5" />
+                        <span>{quotePost.views_count > 999 ? `${(quotePost.views_count / 1000).toFixed(1)}K` : quotePost.views_count}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

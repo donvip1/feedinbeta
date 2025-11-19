@@ -20,6 +20,9 @@ interface InstagramStylePostCreatorProps {
     media_url: string | null;
     media_type: string | null;
     user_id: string;
+    likes_count: number;
+    comments_count: number;
+    views_count: number;
     user: {
       display_name: string | null;
       username: string | null;
@@ -45,7 +48,9 @@ export function InstagramStylePostCreator({
   useEffect(() => {
     if (open) {
       if (quotePost) {
-        // If quotePost is provided, skip directly to details
+        // If quotePost is provided, skip directly to details with text type
+        setMediaType('text');
+        setMediaPreview(''); // No media needed for quote post
         setStep('details');
       } else if (initialImageUrl) {
         setMediaPreview(initialImageUrl);
@@ -101,7 +106,12 @@ export function InstagramStylePostCreator({
 
   const handleBack = () => {
     if (step === 'details') {
-      setStep('edit');
+      if (quotePost) {
+        // For quote posts, back should close the modal
+        handleClose();
+      } else {
+        setStep('edit');
+      }
     } else if (step === 'edit' || step === 'text') {
       setStep('select');
     } else if (step === 'capture' || step === 'gallery') {
@@ -202,7 +212,7 @@ export function InstagramStylePostCreator({
         )}
 
         {/* Post Details Step */}
-        {step === 'details' && (
+        {step === 'details' && (quotePost || mediaPreview || mediaType === 'text') && (
           <InstagramStylePostDetails
             open={true}
             onClose={handleClose}
