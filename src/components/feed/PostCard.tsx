@@ -582,7 +582,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
                 </span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
+            <DropdownMenuContent side="top" align="center" className="animate-slide-in-bottom">
               <DropdownMenuItem onClick={() => handleShare('refeed')}>
                 <Repeat2 className="mr-2 h-4 w-4" />
                 Refeed
