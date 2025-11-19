@@ -1,7 +1,19 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Play } from 'lucide-react';
+import { Play, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface Post {
   id: string;
@@ -17,7 +29,12 @@ interface PostsGridProps {
 export const PostsGrid = ({ userId }: PostsGridProps) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletePostId, setDeletePostId] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const isOwnProfile = user?.id === userId;
 
   useEffect(() => {
     loadPosts();
@@ -41,6 +58,34 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
     }
   };
 
+  const handleDeletePost = async () => {
+    if (!deletePostId) return;
+
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .update({ status: 'deleted' })
+        .eq('id', deletePostId);
+
+      if (error) throw error;
+
+      setPosts(posts.filter(p => p.id !== deletePostId));
+      toast({
+        title: "Post deleted",
+        description: "Your post has been deleted successfully.",
+      });
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete post. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletePostId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="grid grid-cols-5 gap-1 max-h-[360px] overflow-y-auto">
@@ -60,41 +105,75 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
   }
 
   return (
-    <div className="grid grid-cols-5 gap-1 max-h-[360px] overflow-y-auto rounded-lg border border-border p-2 bg-card/30">
-      {posts.map((post) => (
-        <div
-          key={post.id}
-          onClick={() => navigate('/feed', { state: { postId: post.id } })}
-          className="aspect-square bg-muted rounded cursor-pointer hover:opacity-80 transition relative overflow-hidden group"
-        >
-          {post.media_url && post.media_type === 'image' && (
-            <img 
-              src={post.media_url} 
-              alt="Post" 
-              className="w-full h-full object-cover"
-            />
-          )}
-          {post.media_url && post.media_type === 'video' && (
-            <>
-              <video 
-                src={post.media_url} 
-                className="w-full h-full object-cover"
-                muted
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition">
-                <Play className="w-6 h-6 text-white" />
-              </div>
-            </>
-          )}
-          {!post.media_url && post.content && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 p-2">
-              <p className="text-white text-[10px] text-center line-clamp-4 font-medium">
-                {post.content}
-              </p>
+    <>
+      <div className="grid grid-cols-5 gap-1 max-h-[360px] overflow-y-auto rounded-lg border border-border p-2 bg-card/30">
+        {posts.map((post) => (
+          <div
+            key={post.id}
+            className="aspect-square bg-muted rounded cursor-pointer hover:opacity-80 transition relative overflow-hidden group"
+          >
+            <div onClick={() => navigate('/feed', { state: { postId: post.id } })}>
+              {post.media_url && post.media_type === 'image' && (
+                <img 
+                  src={post.media_url} 
+                  alt="Post" 
+                  className="w-full h-full object-cover"
+                />
+              )}
+              {post.media_url && post.media_type === 'video' && (
+                <>
+                  <video 
+                    src={post.media_url} 
+                    className="w-full h-full object-cover"
+                    muted
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition">
+                    <Play className="w-6 h-6 text-white" />
+                  </div>
+                </>
+              )}
+              {!post.media_url && post.content && (
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-600 via-pink-500 to-orange-500 p-2">
+                  <p className="text-white text-[10px] text-center line-clamp-4 font-medium">
+                    {post.content}
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      ))}
-    </div>
+
+            {/* Delete Button - Only for own profile */}
+            {isOwnProfile && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeletePostId(post.id);
+                }}
+                className="absolute top-1 right-1 p-1.5 bg-red-500/80 hover:bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-white" />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletePostId} onOpenChange={() => setDeletePostId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your post.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePost} className="bg-red-500 hover:bg-red-600">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
