@@ -19,6 +19,7 @@ interface InstagramStylePostCreatorProps {
     content: string | null;
     media_url: string | null;
     media_type: string | null;
+    user_id: string;
     user: {
       display_name: string | null;
       username: string | null;
@@ -43,7 +44,10 @@ export function InstagramStylePostCreator({
 
   useEffect(() => {
     if (open) {
-      if (initialImageUrl) {
+      if (quotePost) {
+        // If quotePost is provided, skip directly to details
+        setStep('details');
+      } else if (initialImageUrl) {
         setMediaPreview(initialImageUrl);
         setMediaType('image');
         setStep('edit');
@@ -51,7 +55,7 @@ export function InstagramStylePostCreator({
         setStep('select');
       }
     }
-  }, [open, initialImageUrl]);
+  }, [open, initialImageUrl, quotePost]);
 
   const handleClose = () => {
     setStep('select');

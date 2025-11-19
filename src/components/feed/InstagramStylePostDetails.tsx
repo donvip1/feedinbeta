@@ -28,6 +28,7 @@ interface InstagramStylePostDetailsProps {
     content: string | null;
     media_url: string | null;
     media_type: string | null;
+    user_id: string;
     user: {
       display_name: string | null;
       username: string | null;
