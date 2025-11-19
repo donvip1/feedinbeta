@@ -149,12 +149,17 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
     if (!user || !currentStory) return;
 
     try {
+      // Insert view - unique constraint ensures each user counts only once per story
+      // Database trigger automatically updates views_count
       await supabase.from('story_views').insert({
         story_id: currentStory.id,
         user_id: user.id,
       });
     } catch (error) {
-      console.error('Error marking story as viewed:', error);
+      // Ignore duplicate key errors - user already viewed this story
+      if (error && error.code !== '23505') {
+        console.error('Error marking story as viewed:', error);
+      }
     }
   };
 
