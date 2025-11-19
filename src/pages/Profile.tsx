@@ -321,6 +321,19 @@ const Profile = () => {
             throw requestError;
           }
         } else {
+          // Create notification for the receiver
+          await supabase
+            .from('notifications')
+            .insert({
+              user_id: userId,
+              from_user_id: user.id,
+              type: 'friend_request',
+              title: 'New friend request',
+              message: `${profile?.display_name || profile?.username || 'Someone'} sent you a friend request`,
+              related_id: user.id,
+              related_type: 'profile'
+            });
+
           setHasPendingRequest(true);
           checkMutualFriendStatus(); // Recheck status
           toast({

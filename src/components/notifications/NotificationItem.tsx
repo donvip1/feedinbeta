@@ -39,7 +39,10 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
     }
 
     // Navigate based on type
-    if (notification.type === 'like' && notification.related_id) {
+    if (notification.type === 'friend_request') {
+      // For friend requests, navigate to Friends page
+      navigate('/friends');
+    } else if (notification.type === 'like' && notification.related_id) {
       // For likes, get the post ID and navigate to it
       navigate('/feed', { state: { postId: notification.related_id } });
     } else if ((notification.type === 'comment' || notification.type === 'reply') && notification.related_id) {
