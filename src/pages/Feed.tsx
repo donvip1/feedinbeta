@@ -435,22 +435,22 @@ const Feed = () => {
           
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
-            <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center items-center gap-3">
+            <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center items-center gap-1.5">
               <TabsTrigger 
                 value="following" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 Following
               </TabsTrigger>
               <TabsTrigger 
                 value="forYou" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 For You
               </TabsTrigger>
               <TabsTrigger 
                 value="myPosts" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-3 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 My Posts
               </TabsTrigger>
