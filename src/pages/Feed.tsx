@@ -62,7 +62,11 @@ const Feed = () => {
   const [quotePost, setQuotePost] = useState<any>(null);
   const [showQuoteComposer, setShowQuoteComposer] = useState(false);
 
-  // Jump to top instantly when tab changes
+  // Scroll to top on mount and tab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [activeTab]);
