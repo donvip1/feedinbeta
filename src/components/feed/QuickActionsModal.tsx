@@ -39,20 +39,20 @@ export const QuickActionsModal = ({ open, onClose, onActionSelect, context = 'de
       />
       
       {/* Modal positioned above nav bar */}
-      <div className="fixed bottom-20 left-0 right-0 z-50 px-4 pb-4 animate-in slide-in-from-bottom duration-300">
-        <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-2xl mx-auto shadow-2xl max-h-[70vh] overflow-y-auto">
-          <div className="py-6 px-4 relative">
+      <div className="fixed bottom-20 left-0 right-0 z-50 px-3 pb-4 animate-in slide-in-from-bottom duration-300">
+        <div className="bg-gray-900 border border-gray-800 rounded-3xl max-w-md mx-auto shadow-2xl max-h-[65vh] overflow-y-auto">
+          <div className="py-5 px-3 relative">
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 transition-colors"
+              className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-gray-800 hover:bg-gray-700 transition-colors"
               aria-label="Close"
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="w-4 h-4 text-gray-400" />
             </button>
-            <div className="w-12 h-1 bg-gray-700 rounded-full mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white text-center mb-6">{title}</h2>
+            <div className="w-12 h-1 bg-gray-700 rounded-full mx-auto mb-3" />
+            <h2 className="text-xl font-bold text-white text-center mb-5">{title}</h2>
             
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               {actions.map((action) => {
                 const Icon = action.icon;
                 return (
@@ -62,12 +62,12 @@ export const QuickActionsModal = ({ open, onClose, onActionSelect, context = 'de
                       onActionSelect(action.id);
                       onClose();
                     }}
-                    className="bg-gray-800/50 hover:bg-gray-800 rounded-2xl p-4 flex flex-col items-center justify-center space-y-2 transition-all hover:scale-105 active:scale-95"
+                    className="bg-gray-800/50 hover:bg-gray-800 rounded-2xl p-3 flex flex-col items-center justify-center space-y-2 transition-all hover:scale-105 active:scale-95 min-h-[100px]"
                   >
-                    <div className={`w-11 h-11 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg`}>
+                    <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${action.color} flex items-center justify-center shadow-lg`}>
                       <Icon className="w-5 h-5 text-white" />
                     </div>
-                    <span className="text-white font-medium text-center text-xs">{action.label}</span>
+                    <span className="text-white font-medium text-center text-[11px] leading-tight">{action.label}</span>
                   </button>
                 );
               })}
