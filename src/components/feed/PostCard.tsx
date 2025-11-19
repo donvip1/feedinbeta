@@ -334,7 +334,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
           throw err;
         }
       } else if (type === 'quote') {
-        // Quote refeed - navigate to create post with quote
+        // Quote refeed - navigate to create post with quote (Twitter-style)
         navigate('/feed', { 
           state: { 
             quotePost: {
@@ -343,6 +343,9 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
               media_url: post.media_url,
               media_type: post.media_type,
               user_id: post.user_id,
+              likes_count: localLikesCount,
+              comments_count: post.comments_count,
+              views_count: post.views_count,
               user: post.profiles
             }
           }
@@ -475,6 +478,22 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
               ) : null}
             </div>
           )}
+          
+          {/* Engagement Metrics */}
+          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Heart className="w-3.5 h-3.5" />
+              <span>{originalPost.likes_count > 999 ? `${(originalPost.likes_count / 1000).toFixed(1)}K` : originalPost.likes_count}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>{originalPost.comments_count}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Eye className="w-3.5 h-3.5" />
+              <span>{originalPost.views_count > 999 ? `${(originalPost.views_count / 1000).toFixed(1)}K` : originalPost.views_count}</span>
+            </div>
+          </div>
         </div>
       )}
 
