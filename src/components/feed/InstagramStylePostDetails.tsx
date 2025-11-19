@@ -229,6 +229,15 @@ export function InstagramStylePostDetails({
 
       if (postError) throw postError;
 
+      // If this is a quote post, also record it in post_shares to increment refeed count
+      if (quotePost?.id) {
+        await supabase.from('post_shares').insert({
+          post_id: quotePost.id,
+          user_id: user.id,
+          share_type: 'refeed'
+        });
+      }
+
       updateProgress(90);
 
       // Process hashtags
