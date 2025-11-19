@@ -362,40 +362,12 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
 
     setLoading(true);
     try {
-      // Check if purpose can be changed (2 week restriction)
-      const purposeChanged = selectedPurposes.join(',') !== profile.purpose;
-      if (purposeChanged && purposeUpdatedAt) {
-        const twoWeeksAgo = new Date();
-        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
-        if (new Date(purposeUpdatedAt) > twoWeeksAgo) {
-          toast({
-            title: 'Cannot change purpose yet',
-            description: 'You can only change your purpose selection once every 2 weeks',
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
-        }
-      }
-
       const updates: any = {
         display_name: profile.display_name,
-        bio: profile.bio,
-        status: profile.status,
-        status_visibility: statusVisibility,
-        about: profile.about,
-        purpose: selectedPurposes.join(','),
-        purpose_updated_at: purposeChanged ? new Date().toISOString() : purposeUpdatedAt,
-        marital_status: profile.marital_status || null,
         age: profile.age ? parseInt(profile.age) : null,
         country: profile.country || null,
-        instagram_url: profile.instagram_url || null,
-        twitter_url: profile.twitter_url || null,
-        linkedin_url: profile.linkedin_url || null,
-        facebook_url: profile.facebook_url || null,
-        tiktok_url: profile.tiktok_url || null,
-        youtube_url: profile.youtube_url || null,
-        website_url: profile.website_url || null,
+        marital_status: profile.marital_status || null,
+        status_visibility: statusVisibility,
       };
 
       // Only include username if it can be changed and is different
@@ -420,6 +392,108 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
     } catch (error: any) {
       toast({
         title: 'Error updating profile',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSavePurpose = async () => {
+    // Check for mandatory purpose selection
+    if (selectedPurposes.length === 0) {
+      toast({
+        title: 'Purpose required',
+        description: 'Please select at least one purpose (max 3)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (selectedPurposes.length > 3) {
+      toast({
+        title: 'Too many purposes',
+        description: 'Please select a maximum of 3 purposes',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Check if purpose can be changed (2 week restriction)
+      const purposeChanged = selectedPurposes.join(',') !== profile.purpose;
+      if (purposeChanged && purposeUpdatedAt) {
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        if (new Date(purposeUpdatedAt) > twoWeeksAgo) {
+          toast({
+            title: 'Cannot change purpose yet',
+            description: 'You can only change your purpose selection once every 2 weeks',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
+      const updates: any = {
+        purpose: selectedPurposes.join(','),
+        purpose_updated_at: purposeChanged ? new Date().toISOString() : purposeUpdatedAt,
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user?.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Purpose updated successfully',
+      });
+      
+      loadProfile(); // Reload to get updated data
+    } catch (error: any) {
+      toast({
+        title: 'Error updating purpose',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveSocialLinks = async () => {
+    setLoading(true);
+    try {
+      const updates: any = {
+        instagram_url: profile.instagram_url || null,
+        twitter_url: profile.twitter_url || null,
+        linkedin_url: profile.linkedin_url || null,
+        facebook_url: profile.facebook_url || null,
+        tiktok_url: profile.tiktok_url || null,
+        youtube_url: profile.youtube_url || null,
+        website_url: profile.website_url || null,
+      };
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user?.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Social links updated successfully',
+      });
+      
+      loadProfile(); // Reload to get updated data
+    } catch (error: any) {
+      toast({
+        title: 'Error updating social links',
         description: error.message,
         variant: 'destructive',
       });
@@ -652,17 +726,6 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
                 />
               </div>
 
-              {/* Bio */}
-              <div className="space-y-2">
-                <Label>Bio</Label>
-                <Textarea
-                  value={profile.bio}
-                  onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                  placeholder="Tell us about yourself"
-                  rows={3}
-                />
-              </div>
-
               {/* Purpose - Now shown on profile */}
               <div className="space-y-2">
                 <Label>Purpose on Platform (Public - Max 3)</Label>
@@ -691,12 +754,23 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
                         <Icon size={16} className="mr-2" />
                         <span className="text-sm">{opt.label}</span>
                       </button>
-                    );
-                  })}
-                </div>
+                  );
+                })}
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Selected: {selectedPurposes.length}/3 purposes
+              </p>
+              <Button
+                onClick={handleSavePurpose}
+                disabled={loading || selectedPurposes.length === 0 || selectedPurposes.length > 3}
+                className="w-full"
+              >
+                <Save className="w-4 h-4 mr-2" />
+                {loading ? 'Saving...' : 'Save Purpose'}
+              </Button>
+            </div>
 
-              {/* Status Visibility */}
+            {/* Status Visibility */}
               <div className="space-y-2">
                 <Label>Status Visibility</Label>
                 <Select value={statusVisibility} onValueChange={(v: any) => setStatusVisibility(v)}>
@@ -837,6 +911,14 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
                     />
                   </div>
                 </div>
+                <Button
+                  onClick={handleSaveSocialLinks}
+                  disabled={loading}
+                  className="w-full mt-4"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {loading ? 'Saving...' : 'Save Social Links'}
+                </Button>
               </div>
 
               {/* Action Buttons */}
