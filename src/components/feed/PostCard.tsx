@@ -57,9 +57,10 @@ interface PostCardProps {
   onUpdate: () => void;
   onCommentStateChange?: (isOpen: boolean) => void;
   highlightCommentId?: string;
+  onQuotePost?: (quotePost: any) => void;
 }
 
-export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommentId }: PostCardProps) => {
+export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommentId, onQuotePost }: PostCardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -334,22 +335,20 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
           throw err;
         }
       } else if (type === 'quote') {
-        // Quote refeed - navigate to create post with quote (Twitter-style)
-        navigate('/feed', { 
-          state: { 
-            quotePost: {
-              id: post.id,
-              content: post.content,
-              media_url: post.media_url,
-              media_type: post.media_type,
-              user_id: post.user_id,
-              likes_count: localLikesCount,
-              comments_count: post.comments_count,
-              views_count: post.views_count,
-              user: post.profiles
-            }
-          }
-        });
+        // Quote refeed - open composer instantly
+        if (onQuotePost) {
+          onQuotePost({
+            id: post.id,
+            content: post.content,
+            media_url: post.media_url,
+            media_type: post.media_type,
+            user_id: post.user_id,
+            likes_count: localLikesCount,
+            comments_count: post.comments_count,
+            views_count: post.views_count,
+            profiles: post.profiles
+          });
+        }
       } else if (type === 'copy') {
         await navigator.clipboard.writeText(`${window.location.origin}/post/${post.id}`);
         toast({ title: 'Link copied!' });

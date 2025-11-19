@@ -7,7 +7,6 @@ import { MediaGalleryPicker } from './MediaGalleryPicker';
 import { TextPostCreator } from './TextPostCreator';
 import { InstagramStyleEditor } from './InstagramStyleEditor';
 import { InstagramStylePostDetails } from './InstagramStylePostDetails';
-import { QuotePostComposer } from './QuotePostComposer';
 
 interface InstagramStylePostCreatorProps {
   open: boolean;
@@ -15,21 +14,6 @@ interface InstagramStylePostCreatorProps {
   onSuccess: () => void;
   defaultTab?: 'camera' | 'gallery' | 'text';
   initialImageUrl?: string;
-  quotePost?: {
-    id: string;
-    content: string | null;
-    media_url: string | null;
-    media_type: string | null;
-    user_id: string;
-    likes_count: number;
-    comments_count: number;
-    views_count: number;
-    user: {
-      display_name: string | null;
-      username: string | null;
-      avatar_url: string | null;
-    };
-  } | null;
 }
 
 export function InstagramStylePostCreator({ 
@@ -37,43 +21,35 @@ export function InstagramStylePostCreator({
   onClose, 
   onSuccess,
   defaultTab = 'camera',
-  initialImageUrl,
-  quotePost 
+  initialImageUrl
 }: InstagramStylePostCreatorProps) {
   // Determine initial step based on props immediately
   const getInitialStep = () => {
-    if (quotePost) return 'details';
     if (initialImageUrl) return 'edit';
     return 'select';
   };
 
-  const getInitialMediaType = () => {
-    if (quotePost) return 'text';
+  const getInitialMediaType = (): 'image' | 'video' | 'text' => {
     if (initialImageUrl) return 'image';
     return 'image';
   };
 
-  const getInitialMediaPreview = () => {
-    if (quotePost) return '';
+  const getInitialMediaPreview = (): string => {
     if (initialImageUrl) return initialImageUrl;
     return '';
   };
 
-  const [step, setStep] = useState<'select' | 'capture' | 'gallery' | 'text' | 'edit' | 'details'>(getInitialStep());
+  const [step, setStep] = useState<'select' | 'capture' | 'gallery' | 'text' | 'edit' | 'details'>(getInitialStep);
   const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string>(getInitialMediaPreview());
-  const [mediaType, setMediaType] = useState<'image' | 'video' | 'text'>(getInitialMediaType());
+  const [mediaPreview, setMediaPreview] = useState<string>(getInitialMediaPreview);
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'text'>(getInitialMediaType);
   const [editedEffects, setEditedEffects] = useState<any>(null);
 
   // Synchronously update state when dialog opens with new props using useLayoutEffect
   // This runs synchronously before the browser paints, ensuring instant updates
   useLayoutEffect(() => {
     if (open) {
-      if (quotePost) {
-        setMediaType('text');
-        setMediaPreview('');
-        setStep('details');
-      } else if (initialImageUrl) {
+      if (initialImageUrl) {
         setMediaPreview(initialImageUrl);
         setMediaType('image');
         setStep('edit');
@@ -81,7 +57,7 @@ export function InstagramStylePostCreator({
         setStep('select');
       }
     }
-  }, [open, initialImageUrl, quotePost]);
+  }, [open, initialImageUrl]);
 
   const handleClose = () => {
     setStep('select');
@@ -127,8 +103,7 @@ export function InstagramStylePostCreator({
 
   const handleBack = () => {
     if (step === 'details') {
-      if (quotePost) {
-        // For quote posts, back should close the modal
+      if (mediaType === 'text') {
         handleClose();
       } else {
         setStep('edit');
@@ -136,7 +111,7 @@ export function InstagramStylePostCreator({
     } else if (step === 'edit' || step === 'text') {
       setStep('select');
     } else if (step === 'capture' || step === 'gallery') {
-      setStep('select'); // Return to selection instead of closing
+      setStep('select');
     }
   };
 
@@ -235,22 +210,8 @@ export function InstagramStylePostCreator({
           />
         )}
 
-        {/* Post Details Step - Use Quote composer for quotes, Instagram style for regular posts */}
-        {step === 'details' && quotePost && (
-          <QuotePostComposer
-            onClose={handleClose}
-            onSuccess={() => {
-              onSuccess();
-              handleClose();
-            }}
-            quotePost={{
-              ...quotePost,
-              profiles: quotePost.user
-            }}
-          />
-        )}
-
-        {step === 'details' && !quotePost && (mediaPreview || mediaType === 'text') && (
+        {/* Post Details Step */}
+        {step === 'details' && (mediaPreview || mediaType === 'text') && (
           <InstagramStylePostDetails
             open={true}
             onClose={handleClose}
