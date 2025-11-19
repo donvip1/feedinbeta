@@ -42,6 +42,7 @@ import Trending from "./pages/Trending";
 import Wallet from "./pages/Wallet";
 import LearnTech from "./pages/LearnTech";
 import Welcome from "./pages/Welcome";
+import Search from "./pages/Search";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -50,6 +51,16 @@ const App = () => {
   // Set dark mode by default
   useEffect(() => {
     document.documentElement.classList.add('dark');
+    
+    // Request notification permission on app load
+    if ('Notification' in window && Notification.permission === 'default') {
+      // Request after a slight delay to not overwhelm on first load
+      setTimeout(() => {
+        Notification.requestPermission().then(permission => {
+          console.log('Notification permission:', permission);
+        });
+      }, 3000);
+    }
   }, []);
 
   return (
@@ -96,6 +107,7 @@ const App = () => {
             <Route path="/trending" element={<Trending />} />
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/learn-tech" element={<LearnTech />} />
+            <Route path="/search" element={<Search />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
             </Routes>
