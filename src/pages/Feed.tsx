@@ -254,7 +254,7 @@ const Feed = () => {
           )
         `)
         .eq('status', 'active')
-        .or(`content.ilike.%${searchQuery}%`)
+        .ilike('content', `%${searchQuery}%`)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -264,7 +264,7 @@ const Feed = () => {
       const { data: userData, error: userError } = await supabase
         .from('profiles')
         .select('id')
-        .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
+        .or(`display_name.ilike.*${searchQuery}*,username.ilike.*${searchQuery}*`)
         .limit(10);
 
       if (!userError && userData && userData.length > 0) {
