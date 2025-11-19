@@ -622,24 +622,60 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Status */}
-          {canViewStatus() && profile.status && (
-            <div className="bg-accent/10 rounded-lg p-3 mb-4 border border-accent/20">
+          {/* Status - Always show when exists */}
+          {profile.status && (
+            <div className="bg-accent/10 rounded-lg p-3 mb-3 border border-accent/20">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-muted-foreground">Status</span>
+                <span className="text-xs font-medium text-muted-foreground">Status</span>
                 {isOwnProfile && (
-                  <span className="text-xs text-accent">{getStatusVisibilityLabel()}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate('/profile-edit')}
+                    className="h-auto py-0 px-2 text-xs text-accent hover:text-accent/80"
+                  >
+                    Edit
+                  </Button>
                 )}
               </div>
-              <p className="text-sm text-foreground">{profile.status}</p>
+              <p className="text-sm text-foreground leading-relaxed">{profile.status}</p>
             </div>
           )}
 
-          {/* About */}
+          {/* About/Bio - Always show when exists */}
           {profile.about && (
-            <div className="bg-secondary/10 rounded-lg p-3 mb-4 border border-border">
-              <span className="text-xs text-muted-foreground mb-1 block">About</span>
-              <p className="text-sm text-foreground">{profile.about}</p>
+            <div className="bg-secondary/10 rounded-lg p-3 mb-3 border border-border">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-muted-foreground">About</span>
+                {isOwnProfile && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate('/profile-edit')}
+                    className="h-auto py-0 px-2 text-xs text-accent hover:text-accent/80"
+                  >
+                    Edit
+                  </Button>
+                )}
+              </div>
+              <p className="text-sm text-foreground leading-relaxed">{profile.about}</p>
+            </div>
+          )}
+          
+          {/* Show prompt to add status/about if own profile and not set */}
+          {isOwnProfile && !profile.status && !profile.about && (
+            <div className="bg-muted/30 rounded-lg p-4 mb-3 border border-dashed border-border">
+              <p className="text-sm text-muted-foreground text-center mb-2">
+                Add a status or about section to your profile
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/profile-edit')}
+                className="w-full"
+              >
+                Edit Profile
+              </Button>
             </div>
           )}
 

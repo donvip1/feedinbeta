@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, MapPin, Clock, Globe, Users, UserCheck, Lock, Loader2, Calendar, ChevronRight } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Globe, Users, UserCheck, Lock, Loader2, Calendar, ChevronRight, MessageCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -253,11 +253,12 @@ export function InstagramStylePostDetails({
       completeUpload();
       
       toast({
-        title: scheduleTime ? "Post scheduled!" : "Post created!",
-        description: scheduleTime ? "Your post will be published at the scheduled time" : "Your post is now live",
+        title: scheduleTime ? "Post scheduled!" : quotePost ? "Quote feed posted!" : "Post created!",
+        description: scheduleTime ? "Your post will be published at the scheduled time" : quotePost ? "Your quote feed is now live" : "Your post is now live",
       });
 
       onSuccess();
+      onClose();
     } catch (error: any) {
       console.error('Error creating post:', error);
       failUpload(error.message);
@@ -403,9 +404,9 @@ export function InstagramStylePostDetails({
           <div className="p-4 space-y-6">
           {/* Caption */}
           <div className="space-y-2">
-            <Label>Caption</Label>
+            <Label>{quotePost ? "Add Your Comment" : "Caption"}</Label>
             <Textarea
-              placeholder="Write a caption..."
+              placeholder={quotePost ? "Share your thoughts on this post..." : "Write a caption..."}
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               className="min-h-[100px] resize-none"
@@ -414,6 +415,53 @@ export function InstagramStylePostDetails({
               Use # for hashtags and @ to mention people
             </p>
           </div>
+
+          {/* Quote Feed Preview */}
+          {quotePost && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <MessageCircle className="w-4 h-4" />
+                Quote Feeding
+              </Label>
+              <div className="border border-border rounded-xl p-4 bg-muted/30 hover:bg-muted/40 transition-colors">
+                <div className="flex items-start gap-3">
+                  <Avatar className="w-10 h-10 flex-shrink-0">
+                    <AvatarImage src={quotePost.user.avatar_url || ''} />
+                    <AvatarFallback className="bg-gradient-to-br from-pink-500 to-blue-500 text-white text-sm">
+                      {quotePost.user.display_name?.[0] || quotePost.user.username?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-sm truncate">
+                        {quotePost.user.display_name || quotePost.user.username || 'User'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        @{quotePost.user.username || 'user'}
+                      </span>
+                    </div>
+                    {quotePost.content && (
+                      <p className="text-sm text-foreground/80 mb-2 line-clamp-3 leading-relaxed">
+                        {quotePost.content}
+                      </p>
+                    )}
+                    {quotePost.media_url && (
+                      <div className="rounded-lg overflow-hidden mt-2 border border-border/50">
+                        {quotePost.media_type === 'video' ? (
+                          <video src={quotePost.media_url} className="w-full max-h-48 object-cover" />
+                        ) : (
+                          <img src={quotePost.media_url} alt="Quote" className="w-full max-h-48 object-cover" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This post will appear in your quote feed with your comment above
+              </p>
+            </div>
+          )}
 
           {/* Location */}
           <div className="space-y-2">
