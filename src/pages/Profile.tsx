@@ -24,6 +24,7 @@ interface Profile {
   cover_url?: string | null;
   bio: string | null;
   status: string | null;
+  status_visibility: string | null;
   about: string | null;
   purpose: string | null;
   marital_status: string | null;
@@ -40,6 +41,18 @@ interface Profile {
   youtube_url?: string | null;
   website_url?: string | null;
 }
+
+const PURPOSE_OPTIONS = [
+  { value: "friends", label: "Make friends" },
+  { value: "dating", label: "Dating" },
+  { value: "networking", label: "Networking" },
+  { value: "business", label: "Business" },
+  { value: "gaming", label: "Gaming" },
+  { value: "learning", label: "Learning" },
+  { value: "content", label: "Find content" },
+  { value: "streaming", label: "Live streaming" },
+  { value: "browsing", label: "Just browsing" },
+];
 
 const Profile = () => {
   const { userId } = useParams();
@@ -217,6 +230,25 @@ const Profile = () => {
     } catch (error: any) {
       console.error('Error checking mutual friend status:', error);
     }
+  };
+
+  const canViewStatus = () => {
+    if (!profile?.status) return false;
+    if (isOwnProfile) return true;
+    
+    const visibility = profile.status_visibility || 'public';
+    if (visibility === 'public') return true;
+    if (visibility === 'friends') return areMutualFriends;
+    if (visibility === 'followers') return isFollowing;
+    return false;
+  };
+
+  const getStatusVisibilityLabel = () => {
+    const visibility = profile?.status_visibility || 'public';
+    if (visibility === 'public') return 'Public';
+    if (visibility === 'friends') return 'Friends only';
+    if (visibility === 'followers') return 'Followers only';
+    return 'Public';
   };
 
   const toggleFollow = async () => {
@@ -587,13 +619,16 @@ const Profile = () => {
           </div>
 
           {/* Bio and Status - Centered */}
-          {profile.status && (
+          {canViewStatus() && (
             <div className="mb-3 text-center">
               <p className="text-foreground font-medium">{profile.status}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {getStatusVisibilityLabel()}
+              </p>
               {isOwnProfile && (
                 <button
                   onClick={() => setShowSettings(true)}
-                  className="text-xs text-muted-foreground hover:text-primary mt-1"
+                  className="text-xs text-primary hover:text-primary/80 mt-1 underline"
                 >
                   Change status visibility
                 </button>
@@ -601,7 +636,28 @@ const Profile = () => {
             </div>
           )}
           {profile.bio && (
-            <p className="text-foreground mb-6 leading-relaxed text-center">{profile.bio}</p>
+            <p className="text-foreground mb-4 leading-relaxed text-center">{profile.bio}</p>
+          )}
+
+          {/* Purpose on Platform */}
+          {profile.purpose && (
+            <div className="mb-6 text-center">
+              <p className="text-xs text-muted-foreground mb-2">Purpose on Platform</p>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {profile.purpose.split(',').map((purposeValue) => {
+                  const purpose = PURPOSE_OPTIONS.find(p => p.value === purposeValue);
+                  return purpose ? (
+                    <Badge 
+                      key={purposeValue}
+                      variant="secondary"
+                      className="bg-primary/10 text-primary border border-primary/20"
+                    >
+                      {purpose.label}
+                    </Badge>
+                  ) : null;
+                })}
+              </div>
+            </div>
           )}
 
           {/* Action Buttons - Centered, BEFORE Posts */}
