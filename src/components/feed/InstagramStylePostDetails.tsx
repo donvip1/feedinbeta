@@ -443,7 +443,7 @@ export function InstagramStylePostDetails({
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-semibold text-foreground">New Post</h1>
+          <h1 className="text-xl font-semibold text-foreground">{quotePost ? 'Quote Feeds' : 'New Post'}</h1>
           <div className="flex gap-2">
             {showScheduling ? (
               <Button 
@@ -547,59 +547,61 @@ export function InstagramStylePostDetails({
             </div>
           )}
 
-          {/* Location */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Add Location
-              </Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={detectLocation}
-                disabled={isDetectingLocation}
-                className="text-primary"
-              >
-                {isDetectingLocation ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                    Detecting...
-                  </>
-                ) : (
-                  'Detect'
+          {/* Location - Hide for quote posts */}
+          {!quotePost && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Add Location
+                </Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={detectLocation}
+                  disabled={isDetectingLocation}
+                  className="text-primary"
+                >
+                  {isDetectingLocation ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      Detecting...
+                    </>
+                  ) : (
+                    'Detect'
+                  )}
+                </Button>
+              </div>
+              <div className="relative">
+                <Input
+                  placeholder="Where was this?"
+                  value={location}
+                  onChange={(e) => {
+                    setLocation(e.target.value);
+                    searchLocation(e.target.value);
+                  }}
+                />
+                {locationSuggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                    {locationSuggestions.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        className="w-full px-4 py-2 text-left hover:bg-secondary transition-colors text-sm"
+                        onClick={() => {
+                          setLocation(suggestion);
+                          setLocationSuggestions([]);
+                        }}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </Button>
+              </div>
             </div>
-            <div className="relative">
-              <Input
-                placeholder="Where was this?"
-                value={location}
-                onChange={(e) => {
-                  setLocation(e.target.value);
-                  searchLocation(e.target.value);
-                }}
-              />
-              {locationSuggestions.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                  {locationSuggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      className="w-full px-4 py-2 text-left hover:bg-secondary transition-colors text-sm"
-                      onClick={() => {
-                        setLocation(suggestion);
-                        setLocationSuggestions([]);
-                      }}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+          )}
 
           {/* Privacy */}
           <div className="space-y-2">
@@ -641,84 +643,90 @@ export function InstagramStylePostDetails({
             />
           </div>
 
-          {/* Schedule Post */}
-          <button
-            onClick={() => setShowScheduling(!showScheduling)}
-            className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors border-b border-border"
-          >
-            <div className="flex items-center gap-3">
-              <Calendar className="w-5 h-5 text-muted-foreground" />
-              <span className="text-base font-medium">Schedule Post</span>
-            </div>
-            <ChevronRight className={`w-5 h-5 transition-transform ${showScheduling ? 'rotate-90' : ''}`} />
-          </button>
+          {/* Schedule Post - Hide for quote posts */}
+          {!quotePost && (
+            <>
+              <button
+                onClick={() => setShowScheduling(!showScheduling)}
+                className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors border-b border-border"
+              >
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-base font-medium">Schedule Post</span>
+                </div>
+                <ChevronRight className={`w-5 h-5 transition-transform ${showScheduling ? 'rotate-90' : ''}`} />
+              </button>
 
-          {showScheduling && (
-            <div className="p-4 bg-accent/30 border-b border-border space-y-4">
-              <div>
-                <Label className="text-sm text-muted-foreground mb-2 block">Date</Label>
-                <Input
-                  type="date"
-                  value={scheduleDate}
-                  onChange={(e) => setScheduleDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="bg-background"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-sm text-muted-foreground mb-2 block">Hour</Label>
-                  <Select value={scheduleHour} onValueChange={setScheduleHour}>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map((hour) => (
-                        <SelectItem key={hour} value={hour}>{hour}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {showScheduling && (
+                <div className="p-4 bg-accent/30 border-b border-border space-y-4">
+                  <div>
+                    <Label className="text-sm text-muted-foreground mb-2 block">Date</Label>
+                    <Input
+                      type="date"
+                      value={scheduleDate}
+                      onChange={(e) => setScheduleDate(e.target.value)}
+                      min={new Date().toISOString().split('T')[0]}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">Hour</Label>
+                      <Select value={scheduleHour} onValueChange={setScheduleHour}>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 12 }, (_, i) => (i + 1).toString().padStart(2, '0')).map((hour) => (
+                            <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">Minute</Label>
+                      <Select value={scheduleMinute} onValueChange={setScheduleMinute}>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {['00', '15', '30', '45'].map((min) => (
+                            <SelectItem key={min} value={min}>{min}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-sm text-muted-foreground mb-2 block">Period</Label>
+                      <Select value={schedulePeriod} onValueChange={(val) => setSchedulePeriod(val as 'AM' | 'PM')}>
+                        <SelectTrigger className="bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AM">AM</SelectItem>
+                          <SelectItem value="PM">PM</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground mb-2 block">Minute</Label>
-                  <Select value={scheduleMinute} onValueChange={setScheduleMinute}>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {['00', '15', '30', '45'].map((min) => (
-                        <SelectItem key={min} value={min}>{min}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label className="text-sm text-muted-foreground mb-2 block">Period</Label>
-                  <Select value={schedulePeriod} onValueChange={(val) => setSchedulePeriod(val as 'AM' | 'PM')}>
-                    <SelectTrigger className="bg-background">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="AM">AM</SelectItem>
-                      <SelectItem value="PM">PM</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
+              )}
+            </>
           )}
 
-          {/* Advanced Settings Toggle */}
-          <button
-            onClick={() => setShowAdvanced(!showAdvanced)}
-            className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors"
-          >
-            <span className="text-base font-medium">Advanced Settings</span>
-            <ChevronRight className={`w-5 h-5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
-          </button>
+          {/* Advanced Settings Toggle - Hide for quote posts */}
+          {!quotePost && (
+            <>
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center justify-between w-full p-4 hover:bg-accent/50 transition-colors"
+              >
+                <span className="text-base font-medium">Advanced Settings</span>
+                <ChevronRight className={`w-5 h-5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+              </button>
 
-          {/* Advanced Settings */}
-          {showAdvanced && (
+              {/* Advanced Settings */}
+              {showAdvanced && (
             <div className="space-y-4 p-4 bg-accent/30">
               {/* Comments */}
               <div className="flex items-center justify-between">
@@ -740,6 +748,8 @@ export function InstagramStylePostDetails({
                 />
               </div>
             </div>
+              )}
+            </>
           )}
           </div>
         </div>
