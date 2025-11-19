@@ -438,19 +438,19 @@ const Feed = () => {
             <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center items-center space-x-4">
               <TabsTrigger 
                 value="following" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[13.5px] font-medium pb-1 px-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[9px] font-medium pb-1 px-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 Following
               </TabsTrigger>
               <TabsTrigger 
                 value="forYou" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[13.5px] font-medium pb-1 px-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[9px] font-medium pb-1 px-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 For You
               </TabsTrigger>
               <TabsTrigger 
                 value="myPosts" 
-                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[13.5px] font-medium pb-1 px-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-[9px] font-medium pb-1 px-2 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
               >
                 My Posts
               </TabsTrigger>
