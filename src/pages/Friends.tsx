@@ -192,6 +192,26 @@ const Friends = () => {
 
       if (error) throw error;
 
+      // Get sender profile for notification
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', user?.id)
+        .single();
+
+      // Create notification for the receiver
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: receiverId,
+          from_user_id: user?.id,
+          type: 'friend_request',
+          title: 'New friend request',
+          message: `${senderProfile?.display_name || senderProfile?.username || 'Someone'} sent you a friend request`,
+          related_id: user?.id,
+          related_type: 'profile'
+        });
+
       toast({
         title: 'Friend request sent',
         description: '5 credits deducted',
@@ -207,12 +227,34 @@ const Friends = () => {
 
   const respondToRequest = async (requestId: string, status: 'accepted' | 'rejected') => {
     try {
+      // Get the request details first to know the sender
+      const { data: request } = await supabase
+        .from('friend_requests')
+        .select('sender_id')
+        .eq('id', requestId)
+        .single();
+
       const { error } = await supabase
         .from('friend_requests')
         .update({ status, updated_at: new Date().toISOString() })
         .eq('id', requestId);
 
       if (error) throw error;
+
+      // Create notification for the sender if request was accepted
+      if (status === 'accepted' && request?.sender_id) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: request.sender_id,
+            from_user_id: user?.id,
+            type: 'friend_request_accepted',
+            title: 'Friend request accepted',
+            message: 'You can now start chatting!',
+            related_id: user?.id,
+            related_type: 'profile'
+          });
+      }
 
       toast({
         title: status === 'accepted' ? 'Friend request accepted' : 'Friend request rejected',

@@ -190,9 +190,18 @@ export default function Messages() {
       setShowNewConversation(false);
     } catch (error: any) {
       console.error('Error creating conversation:', error);
+      
+      // Check if it's a mutual friends error
+      const errorMessage = error?.message || '';
+      const isFriendshipError = errorMessage.includes('mutual friends') || 
+                                errorMessage.includes('friend') ||
+                                error?.code === 'P0001';
+      
       toast({
-        title: 'Unable to create conversation',
-        description: 'Please try again later.',
+        title: isFriendshipError ? 'Not Friends Yet' : 'Unable to create conversation',
+        description: isFriendshipError 
+          ? 'You can only chat with users who are your friends. Please send them a friend request first, and both of you must accept each other as friends.'
+          : 'Please try again later.',
         variant: 'destructive',
       });
     }
