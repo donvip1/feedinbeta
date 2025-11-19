@@ -2,12 +2,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Share2, Users, MessageCircle, Bookmark } from 'lucide-react';
+import { Share2, Users, MessageCircle, Bookmark, Quote } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
+import { useNavigate } from 'react-router-dom';
 
 interface SharePostModalProps {
   open: boolean;
@@ -37,6 +38,7 @@ interface Group {
 export function SharePostModal({ open, onClose, post }: SharePostModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [friends, setFriends] = useState<Friend[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,6 +118,13 @@ export function SharePostModal({ open, onClose, post }: SharePostModalProps) {
     } catch (error: any) {
       console.error('Error loading groups:', error);
     }
+  };
+
+  const handleQuoteRefeed = async () => {
+    if (!user) return;
+    onClose();
+    // Navigate to create post with quote
+    navigate(`/feed?quotePost=${post.id}`);
   };
 
   const handleShareToStory = async () => {
@@ -250,25 +259,49 @@ export function SharePostModal({ open, onClose, post }: SharePostModalProps) {
           <DialogTitle>Share Post</DialogTitle>
         </DialogHeader>
 
-        <div className="flex gap-2 mb-4">
-          <Button
-            variant={selectedTab === 'story' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedTab('story')}
-            className="flex-1"
-          >
-            <Share2 className="w-4 h-4 mr-2" />
-            Story
-          </Button>
-          <Button
-            variant={selectedTab === 'friends' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedTab('friends')}
-            className="flex-1"
-          >
-            <MessageCircle className="w-4 h-4 mr-2" />
-            Friends
-          </Button>
+        <div className="space-y-4">
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              onClick={handleQuoteRefeed}
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4"
+            >
+              <Quote className="w-6 h-6" />
+              <span className="text-xs">Quote Refeed</span>
+            </Button>
+            <Button
+              onClick={handleShareToStory}
+              variant="outline"
+              className="flex flex-col items-center gap-2 h-auto py-4"
+              disabled={loading}
+            >
+              <Bookmark className="w-6 h-6" />
+              <span className="text-xs">Share to Story</span>
+            </Button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 border-b border-border">
+            <Button
+              variant={selectedTab === 'friends' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSelectedTab('friends')}
+              className="flex-1"
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Friends
+            </Button>
+            <Button
+              variant={selectedTab === 'groups' ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setSelectedTab('groups')}
+              className="flex-1"
+            >
+              <Users className="w-4 h-4 mr-2" />
+              Groups
+            </Button>
+          </div>
           <Button
             variant={selectedTab === 'groups' ? 'default' : 'outline'}
             size="sm"

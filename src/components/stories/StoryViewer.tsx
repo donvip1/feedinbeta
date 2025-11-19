@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX } from 'lucide-react';
 import { ReactionPicker } from '@/components/feed/ReactionPicker';
+import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 
 interface Story {
@@ -50,6 +51,8 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
   const [isPaused, setIsPaused] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const progressInterval = useRef<NodeJS.Timeout>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const touchStartX = useRef<number>(0);
@@ -60,10 +63,11 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
   const isOwn = currentStory?.user_id === user?.id;
 
   useEffect(() => {
-    if (currentStory && user) {
-      markAsViewed();
+    const video = videoRef.current;
+    if (video && currentStory.media_type === 'video') {
+      video.muted = isMuted;
     }
-  }, [currentStory?.id, user]);
+  }, [isMuted, currentStory]);
 
   useEffect(() => {
     if (!isPaused && currentStory) {

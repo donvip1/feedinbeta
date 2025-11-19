@@ -59,17 +59,18 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
       updateProgress(10);
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      const storageBucket = file.type.startsWith('video/') ? 'post-videos' : 'posts';
 
       updateProgress(30);
       const { error: uploadError } = await supabase.storage
-        .from('posts')
+        .from(storageBucket)
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
       updateProgress(60);
       const { data: { publicUrl } } = supabase.storage
-        .from('posts')
+        .from(storageBucket)
         .getPublicUrl(fileName);
 
       updateProgress(80);

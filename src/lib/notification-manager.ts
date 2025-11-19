@@ -45,12 +45,14 @@ export class NotificationManager {
       await registration.showNotification(title, {
         icon: '/favicon.png',
         badge: '/favicon.png',
+        requireInteraction: true,
         ...options,
       });
     } else {
       // Fallback to regular notification
       new Notification(title, {
         icon: '/favicon.png',
+        requireInteraction: true,
         ...options,
       });
     }
@@ -71,5 +73,39 @@ export class NotificationManager {
       return 'denied';
     }
     return Notification.permission;
+  }
+
+  /**
+   * Initialize offline notifications
+   */
+  static async initializeOfflineNotifications(): Promise<void> {
+    if (!NotificationManager.isSupported()) {
+      console.warn('Notifications not supported');
+      return;
+    }
+
+    // Request permission on init
+    await NotificationManager.requestPermission();
+
+    // Listen for online/offline events
+    window.addEventListener('offline', () => {
+      NotificationManager.showNotification(
+        'You are offline',
+        {
+          body: 'FeedIn is now in offline mode. Some features may be limited.',
+          tag: 'offline-notification',
+        }
+      );
+    });
+
+    window.addEventListener('online', () => {
+      NotificationManager.showNotification(
+        'You are back online',
+        {
+          body: 'FeedIn is now connected. All features are available.',
+          tag: 'online-notification',
+        }
+      );
+    });
   }
 }
