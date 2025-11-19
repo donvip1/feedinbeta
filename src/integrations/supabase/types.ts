@@ -1570,6 +1570,36 @@ export type Database = {
           },
         ]
       }
+      offline_notifications: {
+        Row: {
+          body: string
+          created_at: string | null
+          data: Json | null
+          id: string
+          synced: boolean | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          synced?: boolean | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          synced?: boolean | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       p2p_escrow: {
         Row: {
           credits_amount: number
