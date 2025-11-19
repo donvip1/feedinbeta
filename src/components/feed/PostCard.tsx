@@ -636,7 +636,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleShare('quote')}>
                 <MessageCircle className="mr-2 h-4 w-4" />
-                Quote Refeed
+                Quote Feed
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

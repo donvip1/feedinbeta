@@ -86,8 +86,8 @@ const Feed = () => {
     if (state?.quotePost) {
       setQuotePost(state.quotePost);
       setShowCreatePost(true);
-      // Clear the state
-      navigate(location.pathname, { replace: true, state: {} });
+      // Clear the state without reloading
+      window.history.replaceState({}, '', location.pathname);
     }
     
     // Initial load
@@ -236,7 +236,9 @@ const Feed = () => {
   const handlePostCreated = () => {
     setShowCreatePost(false);
     setIsCreatingContent(false);
-    loadPosts();
+    setQuotePost(null); // Clear quote post
+    setSharedImageUrl(null);
+    loadPosts(); // Refresh feed without reload
   };
 
   const handleSearch = async () => {
