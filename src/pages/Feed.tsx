@@ -560,6 +560,10 @@ const Feed = () => {
                     onUpdate={loadPosts}
                     onCommentStateChange={setIsCommenting}
                     highlightCommentId={post.id === highlightedPostId ? highlightedCommentId || undefined : undefined}
+                    onQuotePost={(quoteData) => {
+                      setQuotePost(quoteData);
+                      setShowQuoteComposer(true);
+                    }}
                   />
                 </div>
               ))}
@@ -575,28 +579,22 @@ const Feed = () => {
         onActionSelect={handleQuickAction}
       />
 
-      {/* Create Post Modal */}
       <InstagramStylePostCreator
         open={showCreatePost}
         onClose={() => {
           setShowCreatePost(false);
           setSharedImageUrl(null);
-          setQuotePost(null);
           setIsCreatingContent(false);
         }}
         onSuccess={handlePostCreated}
         defaultTab={defaultPostTab === 'text' ? 'text' : defaultPostTab === 'image' ? 'gallery' : 'camera'}
         initialImageUrl={sharedImageUrl || undefined}
-        quotePost={null}
       />
 
       {/* Quote Post Composer - Renders instantly without Dialog delays */}
       {showQuoteComposer && quotePost && (
         <QuotePostComposer
-          quotePost={{
-            ...quotePost,
-            profiles: quotePost.user
-          }}
+          quotePost={quotePost}
           onClose={() => {
             setShowQuoteComposer(false);
             setQuotePost(null);

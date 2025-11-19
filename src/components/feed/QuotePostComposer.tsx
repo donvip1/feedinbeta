@@ -58,10 +58,10 @@ export function QuotePostComposer({ quotePost, onClose, onSuccess }: QuotePostCo
           content: comment,
           original_post_id: quotePost.id,
           privacy,
-          post_type: 'quote',
+          post_type: 'public',
           allow_comments: true,
           allow_refeed: true,
-          status: 'published'
+          status: 'active'
         })
         .select()
         .single();
