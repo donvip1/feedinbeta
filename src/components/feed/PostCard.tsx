@@ -497,9 +497,10 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
         </div>
       )}
 
-      {/* Media Card */}
-      <div className="relative w-full aspect-[9/13] bg-black rounded-xl overflow-hidden">
-        {post.media_url && (
+      {/* Media Card - Only show if there's media OR it's a text-only post WITHOUT quoted content */}
+      {(post.media_url || (isTextOnly && !post.original_post_id)) && (
+        <div className="relative w-full aspect-[9/13] bg-black rounded-xl overflow-hidden">
+          {post.media_url && (
           <div className="absolute inset-0">
             {post.media_type === 'image' && (
               <>
@@ -622,6 +623,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
           </div>
         )}
       </div>
+      )}
 
       {/* Social Actions */}
       <div className="flex items-center justify-between mt-3 mb-4">

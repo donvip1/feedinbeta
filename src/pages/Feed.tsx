@@ -61,6 +61,11 @@ const Feed = () => {
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
   const [quotePost, setQuotePost] = useState<any>(null);
 
+  // Scroll to top when tab changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [activeTab]);
+
   // Initial load and visibility-based refresh
   useEffect(() => {
     if (authLoading) return;
