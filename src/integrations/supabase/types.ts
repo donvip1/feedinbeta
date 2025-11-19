@@ -1864,6 +1864,42 @@ export type Database = {
           },
         ]
       }
+      post_mentions: {
+        Row: {
+          created_at: string | null
+          id: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          mentioned_user_id: string
+          post_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          mentioned_user_id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_mentions_mentioned_user_id_fkey"
+            columns: ["mentioned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_mentions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_shares: {
         Row: {
           created_at: string | null
@@ -1950,7 +1986,9 @@ export type Database = {
           likes_count: number | null
           location: string | null
           media_type: string | null
+          media_types: string[] | null
           media_url: string | null
+          media_urls: string[] | null
           moderation_status: string | null
           music_artist: string | null
           music_title: string | null
@@ -1979,7 +2017,9 @@ export type Database = {
           likes_count?: number | null
           location?: string | null
           media_type?: string | null
+          media_types?: string[] | null
           media_url?: string | null
+          media_urls?: string[] | null
           moderation_status?: string | null
           music_artist?: string | null
           music_title?: string | null
@@ -2008,7 +2048,9 @@ export type Database = {
           likes_count?: number | null
           location?: string | null
           media_type?: string | null
+          media_types?: string[] | null
           media_url?: string | null
+          media_urls?: string[] | null
           moderation_status?: string | null
           music_artist?: string | null
           music_title?: string | null
@@ -2323,6 +2365,55 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "stories_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      story_comments: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          story_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          story_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          story_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "story_comments_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "active_stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_comments_story_id_fkey"
+            columns: ["story_id"]
+            isOneToOne: false
+            referencedRelation: "stories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "story_comments_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"

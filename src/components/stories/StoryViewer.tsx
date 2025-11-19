@@ -53,6 +53,8 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
   const [chatMessage, setChatMessage] = useState('');
   const [isMuted, setIsMuted] = useState(false);
   const [showComments, setShowComments] = useState(false);
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
   const progressInterval = useRef<NodeJS.Timeout>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const touchStartX = useRef<number>(0);
@@ -68,6 +70,13 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
       video.muted = isMuted;
     }
   }, [isMuted, currentStory]);
+
+  useEffect(() => {
+    if (currentStory) {
+      loadComments();
+      markAsViewed();
+    }
+  }, [currentStory]);
 
   useEffect(() => {
     if (!isPaused && currentStory) {
@@ -92,6 +101,47 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
       }
     };
   }, [isPaused, currentStory, currentStoryIndex, currentUserIndex]);
+
+  const loadComments = async () => {
+    if (!currentStory) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('story_comments')
+        .select(`
+          *,
+          profiles:user_id (
+            display_name,
+            username,
+            avatar_url
+          )
+        `)
+        .eq('story_id', currentStory.id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setComments(data || []);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!user || !currentStory || !newComment.trim()) return;
+
+    try {
+      await supabase.from('story_comments').insert({
+        story_id: currentStory.id,
+        user_id: user.id,
+        content: newComment.trim(),
+      });
+
+      setNewComment('');
+      loadComments();
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    }
+  };
 
   const markAsViewed = async () => {
     if (!user || !currentStory) return;
@@ -350,6 +400,52 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
         </button>
       </div>
 
+      {/* Comments Section */}
+      {showComments && (
+        <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm rounded-t-3xl max-h-[60vh] overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Comments</h3>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowComments(false)}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {comments.map((comment) => (
+              <div key={comment.id} className="flex gap-2">
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={comment.profiles?.avatar_url || ''} />
+                  <AvatarFallback>{comment.profiles?.display_name?.[0] || 'U'}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold">{comment.profiles?.display_name}</p>
+                  <p className="text-sm text-muted-foreground">{comment.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-4 border-t border-border">
+            <div className="flex gap-2">
+              <Input
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                placeholder="Add a comment..."
+                className="flex-1"
+              />
+              <Button onClick={handleAddComment} size="sm">
+                Post
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reaction and Chat bar */}
       {!isOwn && (
         <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
@@ -381,6 +477,14 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
                   React
                 </Button>
               </ReactionPicker>
+              <Button
+                onClick={() => setShowComments(true)}
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
+              >
+                <MessageCircle className="w-4 h-4 mr-1" />
+                Comment
+              </Button>
               <Button
                 onClick={() => setShowChat(true)}
                 variant="outline"
