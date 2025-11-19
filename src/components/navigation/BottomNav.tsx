@@ -1,4 +1,4 @@
-import { Home, MessageCircle, User, Sparkles, Wallet, GraduationCap, Search } from 'lucide-react';
+import { Home, MessageCircle, User, Sparkles, Wallet } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,7 +38,6 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   const navItems = [
     { id: 'feed', label: 'Feeds', icon: Home, path: '/feed' },
-    { id: 'search', label: 'Search', icon: Search, path: '/search' },
     { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
     { id: 'wallet', label: 'Wallet', icon: Wallet, path: '/wallet' },
     { id: 'ai', label: 'FeedAI', icon: Sparkles, path: '/ai-copilot' },
