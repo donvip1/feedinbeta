@@ -54,9 +54,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   return (
     <TooltipProvider>
-      <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-white/30 transition-all">
-        <div className="container mx-auto px-2">
-          <div className="flex items-center justify-around py-0.5">
+      <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-border/50">
+        <div className="max-w-screen-xl mx-auto px-4">
+          <div className="flex items-center justify-around py-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -66,25 +66,24 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                     <Button
                       onClick={() => navigate(item.path)}
                       variant="ghost"
-                      className={`flex flex-col items-center justify-center gap-1 h-auto p-2 hover:bg-transparent ${
-                        active ? 'text-primary' : 'text-foreground'
+                      size="icon"
+                      className={`h-14 w-14 hover:bg-transparent transition-colors ${
+                        active ? 'text-primary' : 'text-foreground/80 hover:text-foreground'
                       }`}
                     >
                       {item.isProfile && avatarUrl ? (
-                        <div className={`rounded-full p-0.5 ${active ? 'ring-1 ring-white ring-offset-1 ring-offset-background' : 'border border-white'}`}>
-                          <Avatar className="w-9 h-9">
+                        <div className={`rounded-full ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}>
+                          <Avatar className="w-8 h-8">
                             <AvatarImage src={avatarUrl} />
-                            <AvatarFallback><Icon className="w-6 h-6" /></AvatarFallback>
+                            <AvatarFallback><Icon className="w-5 h-5" /></AvatarFallback>
                           </Avatar>
                         </div>
                       ) : (
-                        <div className={`${active ? 'bg-primary/10' : ''}`}>
-                          <Icon 
-                            size={39}
-                            strokeWidth={2}
-                            stroke="currentColor"
-                          />
-                        </div>
+                        <Icon 
+                          size={28}
+                          strokeWidth={1.5}
+                          className="transition-transform hover:scale-110"
+                        />
                       )}
                     </Button>
                   </TooltipTrigger>
