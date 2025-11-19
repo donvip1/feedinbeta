@@ -27,6 +27,14 @@ interface Message {
     sender: {
       display_name: string;
     };
+    media_url?: string | null;
+    media_type?: string | null;
+  } | null;
+  reply_metadata?: {
+    type?: string;
+    story_id?: string;
+    story_media_url?: string;
+    story_media_type?: string;
   } | null;
   profiles: {
     display_name: string | null;
