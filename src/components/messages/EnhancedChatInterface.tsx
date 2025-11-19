@@ -6,7 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send, Smile, Phone, Video, Paperclip, Mic, X, Image as ImageIcon, File } from 'lucide-react';
+import { ArrowLeft, Send, Smile, Phone, Video, Mic, X, Image as ImageIcon } from 'lucide-react';
+import { AttachmentPicker } from './AttachmentPicker';
 import { EnhancedMessageBubble } from './EnhancedMessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 import { UserMentionInput } from './UserMentionInput';
@@ -64,8 +65,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
   const [uploadingFile, setUploadingFile] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
@@ -358,7 +357,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }, 2000);
   };
 
-  const uploadFile = async (file: File): Promise<string> => {
+  const uploadFile = async (file: File): Promise<{ url: string; path: string }> => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
     const filePath = `${user!.id}/${fileName}`;
@@ -373,7 +372,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       .from('chat-media')
       .getPublicUrl(filePath);
 
-    return publicUrl;
+    return { url: publicUrl, path: filePath };
   };
 
   const handleSend = async (mediaUrl?: string, mediaType?: string) => {
@@ -459,19 +458,43 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
     }
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileSelect = async (file: File, type: 'image' | 'video' | 'file') => {
+    if (!user) return;
 
     setUploadingFile(true);
     try {
-      const url = await uploadFile(file);
-      const type = file.type;
+      const { url, path } = await uploadFile(file);
       
-      if (type.startsWith('image') || type.startsWith('video')) {
-        setPreviewMedia({ url, type });
+      if (type === 'image' || type === 'video') {
+        setPreviewMedia({ url, type: file.type });
       } else {
-        await handleSend(url, type);
+        // Send file directly
+        const { data: newMsg, error } = await supabase
+          .from('messages')
+          .insert({
+            conversation_id: conversationId,
+            sender_id: user.id,
+            content: file.name,
+            media_url: url,
+            media_type: 'file',
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Track attachment for auto-deletion
+        await supabase.from('message_attachments').insert({
+          message_id: newMsg.id,
+          file_path: path,
+          file_size: file.size,
+          file_type: file.type,
+        });
+
+        toast({
+          title: 'File sent',
+          description: 'Your file will be automatically deleted 24 hours after download',
+        });
       }
     } catch (error: any) {
       toast({
@@ -481,8 +504,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
       });
     } finally {
       setUploadingFile(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      if (imageInputRef.current) imageInputRef.current.value = '';
     }
   };
 
@@ -495,7 +516,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         lastModified: Date.now(),
       }) as File;
       
-      const url = await uploadFile(file);
+      const { url } = await uploadFile(file);
       await handleSend(url, 'audio/webm');
       setShowVoiceRecorder(false);
     } catch (error: any) {
@@ -688,22 +709,10 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
           />
         ) : (
           <div className="flex items-end gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => imageInputRef.current?.click()}
+            <AttachmentPicker
+              onFileSelect={handleFileSelect}
               disabled={uploadingFile}
-            >
-              <ImageIcon className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingFile}
-            >
-              <Paperclip className="w-5 h-5" />
-            </Button>
+            />
 
             <UserMentionInput
               value={newMessage}
@@ -743,20 +752,6 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
             )}
           </div>
         )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
-        <input
-          ref={imageInputRef}
-          type="file"
-          accept="image/*,video/*"
-          className="hidden"
-          onChange={handleFileSelect}
-        />
       </div>
 
       {/* Media Preview Dialog */}

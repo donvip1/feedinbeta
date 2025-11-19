@@ -1038,6 +1038,50 @@ export type Database = {
         }
         Relationships: []
       }
+      message_attachments: {
+        Row: {
+          created_at: string | null
+          deleted_at: string | null
+          downloaded_at: string | null
+          file_path: string
+          file_size: number
+          file_type: string
+          id: string
+          message_id: string | null
+          uploaded_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deleted_at?: string | null
+          downloaded_at?: string | null
+          file_path: string
+          file_size: number
+          file_type: string
+          id?: string
+          message_id?: string | null
+          uploaded_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deleted_at?: string | null
+          downloaded_at?: string | null
+          file_path?: string
+          file_size?: number
+          file_type?: string
+          id?: string
+          message_id?: string | null
+          uploaded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_attachments_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       message_edit_history: {
         Row: {
           edited_at: string | null
@@ -1150,6 +1194,7 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           read_at: string | null
+          read_by_receiver_at: string | null
           reply_to_id: string | null
           sender_id: string
           status: string | null
@@ -1169,6 +1214,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           read_at?: string | null
+          read_by_receiver_at?: string | null
           reply_to_id?: string | null
           sender_id: string
           status?: string | null
@@ -1188,6 +1234,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           read_at?: string | null
+          read_by_receiver_at?: string | null
           reply_to_id?: string | null
           sender_id?: string
           status?: string | null
@@ -2884,6 +2931,14 @@ export type Database = {
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
+      get_expired_attachments: {
+        Args: never
+        Returns: {
+          file_path: string
+          id: string
+          message_id: string
+        }[]
+      }
       get_message_read_receipts: {
         Args: { message_ids: string[] }
         Returns: {
@@ -2909,6 +2964,10 @@ export type Database = {
         }[]
       }
       get_post_view_count: { Args: { post_id_param: string }; Returns: number }
+      get_unread_message_count: {
+        Args: { conv_id: string; uid: string }
+        Returns: number
+      }
       get_user_post_count: { Args: { user_uuid: string }; Returns: number }
       has_role: {
         Args: {
@@ -2932,6 +2991,10 @@ export type Database = {
       is_user_muted: {
         Args: { muted: string; muter: string }
         Returns: boolean
+      }
+      mark_attachment_downloaded: {
+        Args: { attachment_id: string }
+        Returns: undefined
       }
     }
     Enums: {
