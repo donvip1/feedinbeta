@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-function-secret",
 };
 
 serve(async (req) => {
@@ -12,6 +12,18 @@ serve(async (req) => {
   }
 
   try {
+    // Secret-based authentication for scheduled jobs
+    const secret = req.headers.get("x-function-secret");
+    const expectedSecret = Deno.env.get("DAILY_BONUS_SECRET") || "default-secret-change-me";
+    
+    if (secret !== expectedSecret) {
+      console.error("Unauthorized access attempt to daily-credit-bonus");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);

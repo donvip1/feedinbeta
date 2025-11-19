@@ -6,17 +6,70 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation schema
+const validateInput = (data: any) => {
+  const { action, targetUserId, metadata } = data;
+  
+  const validActions = ["friend_request", "profile_view", "voice_call", "video_call"];
+  if (!validActions.includes(action)) {
+    throw new Error("Invalid action type");
+  }
+  
+  if (targetUserId && typeof targetUserId !== "string") {
+    throw new Error("Invalid targetUserId");
+  }
+  
+  if (metadata) {
+    if (metadata.minutes !== undefined) {
+      const minutes = Number(metadata.minutes);
+      if (isNaN(minutes) || minutes <= 0 || minutes > 120) {
+        throw new Error("Invalid minutes value");
+      }
+    }
+    if (metadata.username && typeof metadata.username !== "string") {
+      throw new Error("Invalid username");
+    }
+  }
+  
+  return { action, targetUserId, metadata };
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Extract and verify JWT
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const { action, userId, targetUserId, metadata } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate input (no userId accepted from client)
+    const requestData = await req.json();
+    const { action, targetUserId, metadata } = validateInput(requestData);
+    
+    // Use authenticated user ID
+    const userId = user.id;
 
     // Define credit costs
     const COSTS = {
@@ -46,8 +99,6 @@ serve(async (req) => {
         amount = -(COSTS.video_call_per_min * (metadata?.minutes || 1));
         description = `Video call - ${metadata?.minutes || 1} minutes`;
         break;
-      default:
-        throw new Error("Invalid action type");
     }
 
     // Check if user has enough credits
@@ -58,7 +109,6 @@ serve(async (req) => {
       .single();
 
     if (!userCredits || userCredits.balance < Math.abs(amount)) {
-      // For non-blocking actions like profile views, don't return an HTTP error
       if (action === "profile_view") {
         return new Response(
           JSON.stringify({ success: false, error: "Insufficient credits" }),
@@ -84,6 +134,8 @@ serve(async (req) => {
       });
 
     if (transactionError) throw transactionError;
+
+    console.log(`Credit deduction: user=${userId}, action=${action}, amount=${amount}`);
 
     return new Response(
       JSON.stringify({ success: true, amount, description }),

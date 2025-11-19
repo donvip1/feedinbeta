@@ -19,7 +19,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.moderation-bot]
-verify_jwt = false
+verify_jwt = true
 
 [functions.daily-credit-bonus]
 verify_jwt = false
@@ -29,4 +29,3 @@ verify_jwt = true
 
 [functions.ai-search]
 verify_jwt = true
-
