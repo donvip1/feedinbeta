@@ -11,11 +11,11 @@ export const CaptionText = ({ content, hasMedia, className = '' }: CaptionTextPr
   const shouldTruncate = hasMedia && content.length > 120;
 
   if (!shouldTruncate) {
-    return <p className={`text-foreground whitespace-pre-wrap ${className}`}>{content}</p>;
+    return <p className={`text-foreground break-words ${className}`}>{content}</p>;
   }
 
   return (
-    <div className={`text-foreground whitespace-pre-wrap ${className}`}>
+    <div className={`text-foreground break-words ${className}`}>
       {showFullCaption ? content : content.slice(0, 120) + '...'}
       {!showFullCaption && (
         <button 
