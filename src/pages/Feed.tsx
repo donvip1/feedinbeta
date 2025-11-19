@@ -404,7 +404,7 @@ const Feed = () => {
       {/* Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
         <div className="w-full px-4 py-2.5">
-          <div className="flex items-center justify-center gap-3 max-w-screen-xl mx-auto">
+          <div className="flex items-center justify-center gap-2 max-w-screen-xl mx-auto">
             {/* Notification Icon */}
             <div className="h-9 w-9 flex items-center justify-center flex-shrink-0">
               <NotificationBell />
@@ -413,7 +413,7 @@ const Feed = () => {
             {/* Following Tab */}
             <button
               onClick={() => setActiveTab('following')}
-              className={`text-sm font-semibold px-3 py-1 whitespace-nowrap transition-colors ${
+              className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
                 activeTab === 'following' 
                   ? 'text-foreground border-b-2 border-primary' 
                   : 'text-muted-foreground'
@@ -425,7 +425,7 @@ const Feed = () => {
             {/* For You Tab */}
             <button
               onClick={() => setActiveTab('forYou')}
-              className={`text-sm font-semibold px-3 py-1 whitespace-nowrap transition-colors ${
+              className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
                 activeTab === 'forYou' 
                   ? 'text-foreground border-b-2 border-primary' 
                   : 'text-muted-foreground'
@@ -453,7 +453,7 @@ const Feed = () => {
             {/* Live Icon Button */}
             <button
               onClick={() => navigate('/live')}
-              className="h-9 px-3 flex items-center justify-center gap-1.5 bg-primary/10 hover:bg-primary/20 rounded-md transition-colors flex-shrink-0"
+              className="h-9 px-2.5 flex items-center justify-center gap-1 bg-primary/10 hover:bg-primary/20 rounded-md transition-colors flex-shrink-0"
             >
               <Radio className="w-4 h-4 text-primary" />
               <span className="text-xs font-bold text-primary">LIVE</span>
