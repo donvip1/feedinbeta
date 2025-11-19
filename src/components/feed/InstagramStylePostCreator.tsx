@@ -7,6 +7,7 @@ import { MediaGalleryPicker } from './MediaGalleryPicker';
 import { TextPostCreator } from './TextPostCreator';
 import { InstagramStyleEditor } from './InstagramStyleEditor';
 import { InstagramStylePostDetails } from './InstagramStylePostDetails';
+import { TwitterStyleQuotePost } from './TwitterStyleQuotePost';
 
 interface InstagramStylePostCreatorProps {
   open: boolean;
@@ -234,8 +235,19 @@ export function InstagramStylePostCreator({
           />
         )}
 
-        {/* Post Details Step */}
-        {step === 'details' && (quotePost || mediaPreview || mediaType === 'text') && (
+        {/* Post Details Step - Use Twitter style for quotes, Instagram style for regular posts */}
+        {step === 'details' && quotePost && (
+          <TwitterStyleQuotePost
+            onClose={handleClose}
+            onSuccess={() => {
+              onSuccess();
+              handleClose();
+            }}
+            quotePost={quotePost}
+          />
+        )}
+
+        {step === 'details' && !quotePost && (mediaPreview || mediaType === 'text') && (
           <InstagramStylePostDetails
             open={true}
             onClose={handleClose}
@@ -244,7 +256,7 @@ export function InstagramStylePostCreator({
             mediaType={mediaType}
             effects={editedEffects}
             mediaFile={mediaFile}
-            quotePost={quotePost}
+            quotePost={null}
             onSuccess={() => {
               onSuccess();
               handleClose();
