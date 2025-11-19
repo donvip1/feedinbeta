@@ -139,8 +139,8 @@ export function InstagramStylePostCreator({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-full md:max-w-4xl h-[100dvh] md:h-[90vh] p-0 gap-0 bg-background [&>button]:hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
+    <Dialog open={open} onOpenChange={handleClose} key={quotePost?.id || 'new-post'}>
+      <DialogContent className="max-w-full md:max-w-4xl h-[100dvh] md:h-[90vh] p-0 gap-0 bg-background [&>button]:hidden animate-in fade-in-0 zoom-in-95 duration-200" onOpenAutoFocus={(e) => e.preventDefault()}>
         {/* Method Selection */}
         {step === 'select' && (
           <div className="flex flex-col h-full">
