@@ -86,8 +86,10 @@ export function InstagramStylePostCreator({
   const handleBack = () => {
     if (step === 'details') {
       setStep('edit');
-    } else if (step === 'edit' || step === 'capture' || step === 'gallery' || step === 'text') {
+    } else if (step === 'edit' || step === 'text') {
       setStep('select');
+    } else if (step === 'capture' || step === 'gallery') {
+      setStep('select'); // Return to selection instead of closing
     }
   };
 
