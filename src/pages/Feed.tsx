@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
 import { InstagramStylePostCreator } from '@/components/feed/InstagramStylePostCreator';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
+import { QuotePostComposer } from '@/components/feed/QuotePostComposer';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -60,6 +61,7 @@ const Feed = () => {
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
   const [quotePost, setQuotePost] = useState<any>(null);
+  const [showQuoteComposer, setShowQuoteComposer] = useState(false);
 
   // Scroll to top when tab changes
   useEffect(() => {
@@ -91,7 +93,7 @@ const Feed = () => {
     if (state?.quotePost) {
       // Use synchronous state updates for instant UI response
       setQuotePost(state.quotePost);
-      setShowCreatePost(true);
+      setShowQuoteComposer(true);
       // Clear the state immediately
       window.history.replaceState({}, '', location.pathname);
     }
@@ -585,8 +587,27 @@ const Feed = () => {
         onSuccess={handlePostCreated}
         defaultTab={defaultPostTab === 'text' ? 'text' : defaultPostTab === 'image' ? 'gallery' : 'camera'}
         initialImageUrl={sharedImageUrl || undefined}
-        quotePost={quotePost}
+        quotePost={null}
       />
+
+      {/* Quote Post Composer - Renders instantly without Dialog delays */}
+      {showQuoteComposer && quotePost && (
+        <QuotePostComposer
+          quotePost={{
+            ...quotePost,
+            profiles: quotePost.user
+          }}
+          onClose={() => {
+            setShowQuoteComposer(false);
+            setQuotePost(null);
+          }}
+          onSuccess={() => {
+            loadPosts();
+            setShowQuoteComposer(false);
+            setQuotePost(null);
+          }}
+        />
+      )}
 
       {/* Floating Action Button */}
       <FloatingActionButton 
