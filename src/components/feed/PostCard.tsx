@@ -341,6 +341,8 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
               id: post.id,
               content: post.content,
               media_url: post.media_url,
+              media_type: post.media_type,
+              user_id: post.user_id,
               user: post.profiles
             }
           }
