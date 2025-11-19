@@ -241,14 +241,69 @@ const Feed = () => {
       setIsSearching(true);
       setLoading(true);
 
-      const { data, error } = await supabase.functions.invoke('ai-search', {
-        body: { query: searchQuery }
-      });
+      // Search for posts by content
+      const { data: postData, error: postError } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          refeeds_count,
+          profiles (
+            display_name,
+            username,
+            avatar_url
+          )
+        `)
+        .eq('status', 'active')
+        .or(`content.ilike.%${searchQuery}%`)
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      if (error) throw error;
+      if (postError) throw postError;
 
-      if (data?.posts) {
-        setPosts(data.posts);
+      // Search for posts by username or display name
+      const { data: userData, error: userError } = await supabase
+        .from('profiles')
+        .select('id')
+        .or(`display_name.ilike.%${searchQuery}%,username.ilike.%${searchQuery}%`)
+        .limit(10);
+
+      if (!userError && userData && userData.length > 0) {
+        const userIds = userData.map(u => u.id);
+        const { data: userPosts } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            refeeds_count,
+            profiles (
+              display_name,
+              username,
+              avatar_url
+            )
+          `)
+          .eq('status', 'active')
+          .in('user_id', userIds)
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (userPosts) {
+          // Combine and deduplicate posts
+          const allPosts = [...(postData || []), ...(userPosts || [])];
+          const uniquePosts = Array.from(
+            new Map(allPosts.map(post => [post.id, post])).values()
+          );
+          setPosts(uniquePosts as Post[]);
+        } else {
+          setPosts(postData || []);
+        }
+      } else {
+        setPosts(postData || []);
+      }
+
+      if ((postData?.length || 0) === 0) {
+        toast({
+          title: 'No results found',
+          description: 'Try different keywords',
+        });
       }
     } catch (error: any) {
       toast({
