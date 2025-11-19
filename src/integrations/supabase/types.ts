@@ -2068,8 +2068,10 @@ export type Database = {
           max_friends: number | null
           phone_number: string | null
           purpose: string | null
+          purpose_updated_at: string | null
           status: string | null
           status_updated_at: string | null
+          status_visibility: string | null
           stripe_customer_id: string | null
           tiktok_url: string | null
           total_views: number | null
@@ -2113,8 +2115,10 @@ export type Database = {
           max_friends?: number | null
           phone_number?: string | null
           purpose?: string | null
+          purpose_updated_at?: string | null
           status?: string | null
           status_updated_at?: string | null
+          status_visibility?: string | null
           stripe_customer_id?: string | null
           tiktok_url?: string | null
           total_views?: number | null
@@ -2158,8 +2162,10 @@ export type Database = {
           max_friends?: number | null
           phone_number?: string | null
           purpose?: string | null
+          purpose_updated_at?: string | null
           status?: string | null
           status_updated_at?: string | null
+          status_visibility?: string | null
           stripe_customer_id?: string | null
           tiktok_url?: string | null
           total_views?: number | null

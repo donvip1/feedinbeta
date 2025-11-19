@@ -190,6 +190,9 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState<'menu' | 'edit-profile'>('menu');
   const [canChangeUsername, setCanChangeUsername] = useState(false);
+  const [statusVisibility, setStatusVisibility] = useState<'public' | 'friends' | 'followers'>('public');
+  const [purposeUpdatedAt, setPurposeUpdatedAt] = useState<string | null>(null);
+  const [selectedPurposes, setSelectedPurposes] = useState<string[]>([]);
   
   const [profile, setProfile] = useState({
     display_name: '',
@@ -257,6 +260,9 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
           youtube_url: profileData.youtube_url || '',
           website_url: profileData.website_url || '',
         });
+        setStatusVisibility(profileData.status_visibility || 'public');
+        setPurposeUpdatedAt(profileData.purpose_updated_at);
+        setSelectedPurposes(profileData.purpose ? profileData.purpose.split(',') : []);
         setUsernameStatus(prev => ({ ...prev, originalUsername: data.username || '' }));
       }
     } catch (error: any) {
@@ -346,13 +352,30 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
 
     setLoading(true);
     try {
+      // Check if purpose can be changed (2 week restriction)
+      const purposeChanged = selectedPurposes.join(',') !== profile.purpose;
+      if (purposeChanged && purposeUpdatedAt) {
+        const twoWeeksAgo = new Date();
+        twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
+        if (new Date(purposeUpdatedAt) > twoWeeksAgo) {
+          toast({
+            title: 'Cannot change purpose yet',
+            description: 'You can only change your purpose selection once every 2 weeks',
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+      }
+
       const updates: any = {
         display_name: profile.display_name,
         bio: profile.bio,
         status: profile.status,
-        status_updated_at: profile.status ? new Date().toISOString() : null,
+        status_visibility: statusVisibility,
         about: profile.about,
-        purpose: profile.purpose,
+        purpose: selectedPurposes.join(','),
+        purpose_updated_at: purposeChanged ? new Date().toISOString() : purposeUpdatedAt,
         marital_status: profile.marital_status || null,
         age: profile.age ? parseInt(profile.age) : null,
         country: profile.country || null,
@@ -657,19 +680,27 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
 
               {/* Purpose */}
               <div className="space-y-2">
-                <Label>Purpose on Platform (Public)</Label>
+                <Label>Purpose on Platform (Public - Max 3)</Label>
+                <p className="text-xs text-muted-foreground">Select up to 3 purposes. Can only be changed every 2 weeks.</p>
                 <div className="grid grid-cols-2 gap-2">
                   {PURPOSE_OPTIONS.map((opt) => {
                     const Icon = opt.icon;
+                    const isSelected = selectedPurposes.includes(opt.value);
                     return (
                       <button
                         key={opt.value}
                         type="button"
-                        onClick={() => setProfile({ ...profile, purpose: opt.value })}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedPurposes(selectedPurposes.filter(p => p !== opt.value));
+                          } else if (selectedPurposes.length < 3) {
+                            setSelectedPurposes([...selectedPurposes, opt.value]);
+                          }
+                        }}
                         className={`flex items-center p-3 rounded-lg transition-all ${
-                          profile.purpose === opt.value
-                            ? 'bg-blue-600 text-white ring-2 ring-blue-400'
-                            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                          isSelected
+                            ? 'bg-primary text-primary-foreground ring-2 ring-primary'
+                            : 'bg-secondary text-foreground hover:bg-secondary/80'
                         }`}
                       >
                         <Icon size={16} className="mr-2" />
@@ -678,6 +709,21 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Status Visibility */}
+              <div className="space-y-2">
+                <Label>Status Visibility</Label>
+                <Select value={statusVisibility} onValueChange={(v: any) => setStatusVisibility(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public - Everyone can see</SelectItem>
+                    <SelectItem value="friends">Friends Only</SelectItem>
+                    <SelectItem value="followers">Followers Only</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Marital Status */}

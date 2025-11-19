@@ -80,37 +80,6 @@ const Settings = () => {
       description: 'Discover trending posts and hashtags',
       route: '/trending',
       color: 'text-orange-500'
-    },
-    {
-      icon: UsersRound,
-      title: 'Groups',
-      description: 'Join and manage community groups',
-      route: '/groups',
-      color: 'text-green-500'
-    },
-    {
-      icon: Bookmark,
-      title: 'Saved Posts',
-      description: 'View your bookmarked content',
-      route: '/saved',
-      color: 'text-blue-500'
-    }
-  ];
-
-  const walletOptions = [
-    {
-      icon: Wallet,
-      title: 'Wallet & Credit',
-      description: 'Balance, credits, subscriptions & transactions',
-      route: '/wallet',
-      color: 'text-yellow-500'
-    },
-    {
-      icon: Layers,
-      title: 'P2P Marketplace',
-      description: 'Trade credits with other users',
-      route: '/p2p-marketplace',
-      color: 'text-cyan-500'
     }
   ];
 
@@ -190,38 +159,6 @@ const Settings = () => {
             </h3>
             <div className="space-y-1">
               {contentOptions.map((option) => (
-                <button
-                  key={option.route}
-                  onClick={() => navigate(option.route)}
-                  className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-gradient-to-r hover:from-secondary/50 hover:to-accent/20 transition-all duration-300 group border border-transparent hover:border-border/50"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className={`${option.color} bg-gradient-to-br from-secondary/40 to-secondary/20 p-3 rounded-xl shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                      <option.icon className="w-5 h-5" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className={`font-semibold ${option.color} transition-colors`}>
-                        {option.title}
-                      </h3>
-                      <p className="text-sm text-gray-300">{option.description}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className={`w-5 h-5 ${option.color} group-hover:translate-x-1 transition-all`} />
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        {/* Wallet & Credits Card */}
-        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
-          <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-              <Wallet className="w-5 h-5 text-yellow-500" />
-              Wallet & Credits
-            </h3>
-            <div className="space-y-1">
-              {walletOptions.map((option) => (
                 <button
                   key={option.route}
                   onClick={() => navigate(option.route)}

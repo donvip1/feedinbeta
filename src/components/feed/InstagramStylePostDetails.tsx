@@ -51,6 +51,8 @@ export function InstagramStylePostDetails({
   const [scheduleHour, setScheduleHour] = useState('12');
   const [scheduleMinute, setScheduleMinute] = useState('00');
   const [schedulePeriod, setSchedulePeriod] = useState<'AM' | 'PM'>('PM');
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
   const privacyOptions = [
     { value: 'everyone', label: 'Everyone', icon: Globe },
@@ -58,6 +60,62 @@ export function InstagramStylePostDetails({
     { value: 'followers', label: 'Followers', icon: UserCheck },
     { value: 'only_me', label: 'Only Me', icon: Lock },
   ];
+
+  const detectLocation = async () => {
+    if (!navigator.geolocation) {
+      toast({
+        title: 'Location not supported',
+        description: 'Your browser does not support location detection',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          const locationName = data.display_name?.split(',').slice(0, 3).join(',') || '';
+          setLocation(locationName);
+          setIsDetectingLocation(false);
+        } catch (error) {
+          console.error('Error getting location:', error);
+          setIsDetectingLocation(false);
+        }
+      },
+      (error) => {
+        toast({
+          title: 'Location access denied',
+          description: 'Please allow location access to use this feature',
+          variant: 'destructive',
+        });
+        setIsDetectingLocation(false);
+      }
+    );
+  };
+
+  const searchLocation = async (query: string) => {
+    if (query.length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
+      );
+      const data = await response.json();
+      const suggestions = data.map((item: any) => item.display_name);
+      setLocationSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error searching location:', error);
+    }
+  };
 
   const handlePost = async (postNow: boolean = true) => {
     if (!user) return;
@@ -271,15 +329,56 @@ export function InstagramStylePostDetails({
 
           {/* Location */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
-              Add Location
-            </Label>
-            <Input
-              placeholder="Where was this?"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            />
+            <div className="flex items-center justify-between">
+              <Label className="flex items-center gap-2">
+                <MapPin className="w-4 h-4" />
+                Add Location
+              </Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={detectLocation}
+                disabled={isDetectingLocation}
+                className="text-primary"
+              >
+                {isDetectingLocation ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                    Detecting...
+                  </>
+                ) : (
+                  'Detect'
+                )}
+              </Button>
+            </div>
+            <div className="relative">
+              <Input
+                placeholder="Where was this?"
+                value={location}
+                onChange={(e) => {
+                  setLocation(e.target.value);
+                  searchLocation(e.target.value);
+                }}
+              />
+              {locationSuggestions.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {locationSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      className="w-full px-4 py-2 text-left hover:bg-secondary transition-colors text-sm"
+                      onClick={() => {
+                        setLocation(suggestion);
+                        setLocationSuggestions([]);
+                      }}
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Privacy */}
