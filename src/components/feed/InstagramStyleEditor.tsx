@@ -1,7 +1,6 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Input } from '@/components/ui/input';
 import { 
   ArrowLeft, 
   Check, 
@@ -17,6 +16,7 @@ import {
 } from 'lucide-react';
 import { ImageCropper } from './ImageCropper';
 import { MusicLibrary } from './MusicLibrary';
+import { TextOverlay, TextOverlayData } from './TextOverlay';
 
 interface InstagramStyleEditorProps {
   open: boolean;
@@ -52,9 +52,7 @@ export function InstagramStyleEditor({
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
-  const [textOverlays, setTextOverlays] = useState<Array<{ text: string; x: number; y: number }>>([]);
-  const [showTextInput, setShowTextInput] = useState(false);
-  const [currentText, setCurrentText] = useState('');
+  const [textOverlays, setTextOverlays] = useState<TextOverlayData[]>([]);
   const [isMuted, setIsMuted] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [showMusicLibrary, setShowMusicLibrary] = useState(false);
@@ -62,6 +60,7 @@ export function InstagramStyleEditor({
   const [croppedImageUrl, setCroppedImageUrl] = useState('');
   const [activeTab, setActiveTab] = useState<'filters' | 'adjust'>('filters');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaContainerRef = useRef<HTMLDivElement>(null);
 
   const getFilterStyle = () => {
     const filterObj = FILTERS.find(f => f.name === activeFilter);
@@ -71,11 +70,26 @@ export function InstagramStyleEditor({
   };
 
   const handleAddText = () => {
-    if (currentText.trim()) {
-      setTextOverlays([...textOverlays, { text: currentText, x: 50, y: 50 }]);
-      setCurrentText('');
-      setShowTextInput(false);
-    }
+    const newText: TextOverlayData = {
+      text: 'Tap to edit',
+      x: 50,
+      y: 50,
+      fontSize: 32,
+      color: '#FFFFFF',
+      backgroundColor: 'transparent',
+      hasOutline: true,
+    };
+    setTextOverlays([...textOverlays, newText]);
+  };
+
+  const handleUpdateText = (index: number, updates: Partial<TextOverlayData>) => {
+    setTextOverlays(textOverlays.map((overlay, i) => 
+      i === index ? { ...overlay, ...updates } : overlay
+    ));
+  };
+
+  const handleRemoveText = (index: number) => {
+    setTextOverlays(textOverlays.filter((_, i) => i !== index));
   };
 
   const handleCropComplete = (croppedUrl: string) => {
@@ -140,7 +154,7 @@ export function InstagramStyleEditor({
       </div>
 
       {/* Media Preview */}
-      <div className="flex-1 relative bg-black overflow-hidden">
+      <div ref={mediaContainerRef} className="flex-1 relative bg-black overflow-hidden">
         {mediaType === 'image' ? (
           <img
             src={croppedImageUrl || mediaUrl}
@@ -163,24 +177,20 @@ export function InstagramStyleEditor({
 
         {/* Text Overlays */}
         {textOverlays.map((overlay, index) => (
-          <div
+          <TextOverlay
             key={index}
-            className="absolute text-white font-bold text-2xl shadow-lg"
-            style={{
-              left: `${overlay.x}%`,
-              top: `${overlay.y}%`,
-              transform: 'translate(-50%, -50%)',
-              textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-            }}
-          >
-            {overlay.text}
-          </div>
+            {...overlay}
+            onUpdate={(updates) => handleUpdateText(index, updates)}
+            onRemove={() => handleRemoveText(index)}
+            containerWidth={mediaContainerRef.current?.offsetWidth || 600}
+            containerHeight={mediaContainerRef.current?.offsetHeight || 600}
+          />
         ))}
 
         {/* Right Side Tools */}
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4">
           <button
-            onClick={() => setShowTextInput(true)}
+            onClick={handleAddText}
             className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
           >
             <Type className="w-5 h-5" />
@@ -212,37 +222,6 @@ export function InstagramStyleEditor({
           )}
         </div>
       </div>
-
-      {/* Text Input Overlay */}
-      {showTextInput && (
-        <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center p-6">
-          <div className="bg-background rounded-2xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add Text</h3>
-            <Input
-              value={currentText}
-              onChange={(e) => setCurrentText(e.target.value)}
-              placeholder="Type your text..."
-              className="mb-4"
-              autoFocus
-            />
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowTextInput(false);
-                  setCurrentText('');
-                }}
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleAddText} className="flex-1">
-                Add
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Bottom Controls */}
       <div className="border-t border-border bg-background">

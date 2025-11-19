@@ -266,11 +266,42 @@ export function InstagramStylePostDetails({
             {mediaUrl}
           </div>
         ) : mediaType === 'image' ? (
-          <img
-            src={effects?.processedBlob || mediaUrl}
-            alt="Preview"
-            className="max-w-full max-h-full object-contain"
-          />
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img
+              src={effects?.croppedUrl || effects?.processedBlob || mediaUrl}
+              alt="Preview"
+              className="max-w-full max-h-full object-contain"
+              style={{
+                filter: effects?.filter ? 
+                  `brightness(${effects.brightness / 100}) contrast(${effects.contrast / 100}) saturate(${effects.saturation / 100})` 
+                  : undefined
+              }}
+            />
+            {/* Text Overlays Preview */}
+            {effects?.textOverlays && effects.textOverlays.length > 0 && (
+              <div className="absolute inset-0">
+                {effects.textOverlays.map((overlay: any, index: number) => (
+                  <div
+                    key={index}
+                    className="absolute font-bold whitespace-nowrap pointer-events-none"
+                    style={{
+                      left: `${overlay.x}px`,
+                      top: `${overlay.y}px`,
+                      fontSize: `${overlay.fontSize}px`,
+                      color: overlay.color,
+                      backgroundColor: overlay.backgroundColor,
+                      padding: overlay.backgroundColor !== 'transparent' ? '4px 8px' : '0',
+                      borderRadius: overlay.backgroundColor !== 'transparent' ? '4px' : '0',
+                      textShadow: overlay.hasOutline ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none',
+                      WebkitTextStroke: overlay.hasOutline ? '1px rgba(0,0,0,0.5)' : 'none',
+                    }}
+                  >
+                    {overlay.text}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <video
             src={mediaUrl}
