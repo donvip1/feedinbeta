@@ -586,7 +586,20 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Bio - Centered */}
+          {/* Bio and Status - Centered */}
+          {profile.status && (
+            <div className="mb-3 text-center">
+              <p className="text-foreground font-medium">{profile.status}</p>
+              {isOwnProfile && (
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="text-xs text-muted-foreground hover:text-primary mt-1"
+                >
+                  Change status visibility
+                </button>
+              )}
+            </div>
+          )}
           {profile.bio && (
             <p className="text-foreground mb-6 leading-relaxed text-center">{profile.bio}</p>
           )}

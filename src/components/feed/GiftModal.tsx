@@ -60,7 +60,7 @@ export const GiftModal = ({ isOpen, onClose, postOwnerId, postId }: GiftModalPro
 
     try {
       // Deduct credits from sender
-      const { error: deductError } = await supabase.from('credit_transactions').insert({
+      await supabase.from('credit_transactions').insert({
         user_id: user.id,
         type: 'spent',
         amount: -gift.credits,
@@ -68,18 +68,14 @@ export const GiftModal = ({ isOpen, onClose, postOwnerId, postId }: GiftModalPro
         related_id: postId
       });
 
-      if (deductError) throw deductError;
-
       // Add credits to receiver
-      const { error: addError } = await supabase.from('credit_transactions').insert({
+      await supabase.from('credit_transactions').insert({
         user_id: postOwnerId,
         type: 'gift',
         amount: gift.credits,
         description: `Received ${gift.name} gift`,
         related_id: postId
       });
-
-      if (addError) throw addError;
 
       // Create notification for receiver
       await supabase.from('notifications').insert({

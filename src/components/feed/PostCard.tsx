@@ -12,6 +12,7 @@ import { ProfilePreviewModal } from '@/components/profile/ProfilePreviewModal';
 import { SharePostModal } from './SharePostModal';
 import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { GiftModal } from './GiftModal';
+import { CaptionText } from './CaptionText';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,6 +79,7 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
   const [showShareModal, setShowShareModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
+  const [showFullCaption, setShowFullCaption] = useState(false);
 
   // Auto-open comments if highlightCommentId is provided
   useEffect(() => {
@@ -374,8 +376,12 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
 
       {/* Caption */}
       {post.content && !isTextOnly && (
-        <div className="mb-3">
-          <p className="text-foreground text-sm leading-relaxed">{post.content}</p>
+        <div className="mb-3 px-4">
+          <CaptionText 
+            content={post.content}
+            hasMedia={!!post.media_url}
+            className="text-sm leading-relaxed"
+          />
         </div>
       )}
 
