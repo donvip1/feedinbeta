@@ -11,7 +11,7 @@ import { QuotePostComposer } from '@/components/feed/QuotePostComposer';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { Search, X, TrendingUp } from 'lucide-react';
+import { Search, X, TrendingUp, Radio } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -448,6 +448,15 @@ const Feed = () => {
               className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors flex-shrink-0"
             >
               {showSearch ? <X className="w-5 h-5 text-foreground" /> : <Search className="w-5 h-5 text-foreground" />}
+            </button>
+
+            {/* Live Icon Button */}
+            <button
+              onClick={() => navigate('/live')}
+              className="h-9 px-3 flex items-center justify-center gap-1.5 bg-primary/10 hover:bg-primary/20 rounded-md transition-colors flex-shrink-0"
+            >
+              <Radio className="w-4 h-4 text-primary" />
+              <span className="text-xs font-bold text-primary">LIVE</span>
             </button>
           </div>
         </div>
