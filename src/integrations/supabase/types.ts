@@ -2138,6 +2138,8 @@ export type Database = {
       profiles: {
         Row: {
           about: string | null
+          about_updated_at: string | null
+          about_visibility: string | null
           age: number | null
           avatar_url: string | null
           banner_url: string | null
@@ -2185,6 +2187,8 @@ export type Database = {
         }
         Insert: {
           about?: string | null
+          about_updated_at?: string | null
+          about_visibility?: string | null
           age?: number | null
           avatar_url?: string | null
           banner_url?: string | null
@@ -2232,6 +2236,8 @@ export type Database = {
         }
         Update: {
           about?: string | null
+          about_updated_at?: string | null
+          about_visibility?: string | null
           age?: number | null
           avatar_url?: string | null
           banner_url?: string | null

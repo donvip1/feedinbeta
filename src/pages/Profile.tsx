@@ -622,46 +622,44 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Bio and Status - Centered */}
-          {canViewStatus() && (
-            <div className="mb-3 text-center">
-              <p className="text-foreground font-medium">{profile.status}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {getStatusVisibilityLabel()}
-              </p>
-              {isOwnProfile && (
-                <button
-                  onClick={() => setShowSettings(true)}
-                  className="text-xs text-primary hover:text-primary/80 mt-1 underline"
-                >
-                  Change status visibility
-                </button>
-              )}
+          {/* Status */}
+          {canViewStatus() && profile.status && (
+            <div className="bg-accent/10 rounded-lg p-3 mb-4 border border-accent/20">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-muted-foreground">Status</span>
+                {isOwnProfile && (
+                  <span className="text-xs text-accent">{getStatusVisibilityLabel()}</span>
+                )}
+              </div>
+              <p className="text-sm text-foreground">{profile.status}</p>
             </div>
-          )}
-          {profile.bio && (
-            <p className="text-foreground mb-4 leading-relaxed text-center">{profile.bio}</p>
           )}
 
-          {/* Purpose on Platform */}
-          {profile.purpose && Array.isArray(profile.purpose) && profile.purpose.length > 0 && (
-            <div className="mb-6 text-center">
-              <p className="text-xs text-muted-foreground mb-2">Purpose on Platform</p>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {profile.purpose.map((purposeValue) => {
-                  const purposeLabel = PURPOSE_OPTIONS[purposeValue];
-                  return purposeLabel ? (
-                    <Badge 
-                      key={purposeValue}
-                      variant="secondary"
-                      className="bg-primary/10 text-primary border border-primary/20"
-                    >
-                      {purposeLabel}
-                    </Badge>
-                  ) : null;
-                })}
+          {/* About */}
+          {profile.about && (
+            <div className="bg-secondary/10 rounded-lg p-3 mb-4 border border-border">
+              <span className="text-xs text-muted-foreground mb-1 block">About</span>
+              <p className="text-sm text-foreground">{profile.about}</p>
+            </div>
+          )}
+
+          {/* Purpose */}
+          {profile.purpose && profile.purpose.length > 0 && (
+            <div className="mb-4">
+              <span className="text-xs text-muted-foreground mb-2 block">Purpose on Platform</span>
+              <div className="flex flex-wrap gap-2">
+                {profile.purpose.map((purposeKey) => (
+                  <Badge key={purposeKey} variant="secondary" className="text-xs">
+                    {PURPOSE_OPTIONS[purposeKey] || purposeKey}
+                  </Badge>
+                ))}
               </div>
             </div>
+          )}
+
+          {/* Bio */}
+          {profile.bio && (
+            <p className="text-foreground mb-4 leading-relaxed">{profile.bio}</p>
           )}
 
           {/* Action Buttons - Centered, BEFORE Posts */}
