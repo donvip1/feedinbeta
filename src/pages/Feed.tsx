@@ -63,7 +63,7 @@ const Feed = () => {
 
   // Scroll to top when tab changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [activeTab]);
 
   // Initial load and visibility-based refresh

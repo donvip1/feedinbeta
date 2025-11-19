@@ -443,9 +443,7 @@ export function InstagramStylePostDetails({
           <Button variant="ghost" size="icon" onClick={onBack}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-semibold text-foreground">
-            {quotePost ? 'Quote Feed' : 'New Post'}
-          </h1>
+          <h1 className="text-xl font-semibold text-foreground">New Post</h1>
           <div className="flex gap-2">
             {showScheduling ? (
               <Button 
