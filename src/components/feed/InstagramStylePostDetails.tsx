@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { extractHashtags } from '@/lib/hashtag-utils';
 import { useUploadProgress } from '@/hooks/useUploadProgress';
 import { ProgressBar } from '@/components/shared/ProgressBar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 interface InstagramStylePostDetailsProps {
   open: boolean;
@@ -22,6 +23,17 @@ interface InstagramStylePostDetailsProps {
   effects: any;
   mediaFile: File | null;
   onSuccess: () => void;
+  quotePost?: {
+    id: string;
+    content: string | null;
+    media_url: string | null;
+    media_type: string | null;
+    user: {
+      display_name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+    };
+  } | null;
 }
 
 export function InstagramStylePostDetails({
@@ -32,7 +44,8 @@ export function InstagramStylePostDetails({
   mediaType,
   effects,
   mediaFile,
-  onSuccess
+  onSuccess,
+  quotePost
 }: InstagramStylePostDetailsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -201,6 +214,7 @@ export function InstagramStylePostDetails({
         allow_refeed: allowRefeed,
         scheduled_at: scheduleTime || null,
         status: scheduleTime ? 'scheduled' : 'active',
+        original_post_id: quotePost?.id || null,
       };
 
       const { data: post, error: postError } = await supabase
@@ -260,56 +274,96 @@ export function InstagramStylePostDetails({
   return (
     <div className="flex flex-col md:flex-row h-full bg-background">
       {/* Left: Media Preview */}
-      <div className="hidden md:flex md:w-1/2 bg-black items-center justify-center border-r border-border">
-        {mediaType === 'text' ? (
-          <div className="p-8 text-white text-2xl text-center">
-            {mediaUrl}
-          </div>
-        ) : mediaType === 'image' ? (
-          <div className="relative w-full h-full flex items-center justify-center">
-            <img
-              src={effects?.croppedUrl || effects?.processedBlob || mediaUrl}
-              alt="Preview"
-              className="max-w-full max-h-full object-contain"
-              style={{
-                filter: effects?.filter ? 
-                  `brightness(${effects.brightness / 100}) contrast(${effects.contrast / 100}) saturate(${effects.saturation / 100})` 
-                  : undefined
-              }}
+      <div className="hidden md:flex md:w-1/2 bg-black items-center justify-center border-r border-border p-4">
+        <div className="flex flex-col gap-4 max-w-md w-full">
+          {mediaType === 'text' ? (
+            <div className="p-8 text-white text-2xl text-center">
+              {mediaUrl}
+            </div>
+          ) : mediaType === 'image' ? (
+            <div className="relative w-full h-full flex items-center justify-center">
+              <img
+                src={effects?.croppedUrl || effects?.processedBlob || mediaUrl}
+                alt="Preview"
+                className="max-w-full max-h-full object-contain rounded-xl"
+                style={{
+                  filter: effects?.filter ? 
+                    `brightness(${effects.brightness / 100}) contrast(${effects.contrast / 100}) saturate(${effects.saturation / 100})` 
+                    : undefined
+                }}
+              />
+              {/* Text Overlays Preview */}
+              {effects?.textOverlays && effects.textOverlays.length > 0 && (
+                <div className="absolute inset-0">
+                  {effects.textOverlays.map((overlay: any, index: number) => (
+                    <div
+                      key={index}
+                      className="absolute font-bold whitespace-nowrap pointer-events-none"
+                      style={{
+                        left: `${overlay.x}px`,
+                        top: `${overlay.y}px`,
+                        fontSize: `${overlay.fontSize}px`,
+                        color: overlay.color,
+                        backgroundColor: overlay.backgroundColor,
+                        padding: overlay.backgroundColor !== 'transparent' ? '4px 8px' : '0',
+                        borderRadius: overlay.backgroundColor !== 'transparent' ? '4px' : '0',
+                        textShadow: overlay.hasOutline ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none',
+                        WebkitTextStroke: overlay.hasOutline ? '1px rgba(0,0,0,0.5)' : 'none',
+                      }}
+                    >
+                      {overlay.text}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <video
+              src={mediaUrl}
+              className="max-w-full max-h-full object-contain rounded-xl"
+              controls
+              playsInline
             />
-            {/* Text Overlays Preview */}
-            {effects?.textOverlays && effects.textOverlays.length > 0 && (
-              <div className="absolute inset-0">
-                {effects.textOverlays.map((overlay: any, index: number) => (
-                  <div
-                    key={index}
-                    className="absolute font-bold whitespace-nowrap pointer-events-none"
-                    style={{
-                      left: `${overlay.x}px`,
-                      top: `${overlay.y}px`,
-                      fontSize: `${overlay.fontSize}px`,
-                      color: overlay.color,
-                      backgroundColor: overlay.backgroundColor,
-                      padding: overlay.backgroundColor !== 'transparent' ? '4px 8px' : '0',
-                      borderRadius: overlay.backgroundColor !== 'transparent' ? '4px' : '0',
-                      textShadow: overlay.hasOutline ? '2px 2px 4px rgba(0,0,0,0.8)' : 'none',
-                      WebkitTextStroke: overlay.hasOutline ? '1px rgba(0,0,0,0.5)' : 'none',
-                    }}
-                  >
-                    {overlay.text}
-                  </div>
-                ))}
+          )}
+          
+          {/* Quoted Post Preview */}
+          {quotePost && (
+            <div className="border border-border rounded-xl p-3 bg-muted/30 w-full">
+              <div className="flex items-center gap-2 mb-2">
+                <Avatar className="w-5 h-5">
+                  <AvatarImage src={quotePost.user.avatar_url || undefined} />
+                  <AvatarFallback className="text-xs">
+                    {quotePost.user.display_name?.[0] || quotePost.user.username?.[0] || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm font-semibold text-foreground">
+                  {quotePost.user.display_name || quotePost.user.username || 'Unknown'}
+                </span>
               </div>
-            )}
-          </div>
-        ) : (
-          <video
-            src={mediaUrl}
-            className="max-w-full max-h-full object-contain"
-            controls
-            playsInline
-          />
-        )}
+              {quotePost.content && (
+                <p className="text-sm text-foreground mb-2 line-clamp-2">
+                  {quotePost.content}
+                </p>
+              )}
+              {quotePost.media_url && (
+                <div className="rounded-lg overflow-hidden">
+                  {quotePost.media_type === 'image' ? (
+                    <img 
+                      src={quotePost.media_url} 
+                      alt="Quoted post" 
+                      className="w-full max-h-32 object-cover"
+                    />
+                  ) : (
+                    <video 
+                      src={quotePost.media_url} 
+                      className="w-full max-h-32 object-cover"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Right: Post Details */}

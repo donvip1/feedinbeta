@@ -14,6 +14,17 @@ interface InstagramStylePostCreatorProps {
   onSuccess: () => void;
   defaultTab?: 'camera' | 'gallery' | 'text';
   initialImageUrl?: string;
+  quotePost?: {
+    id: string;
+    content: string | null;
+    media_url: string | null;
+    media_type: string | null;
+    user: {
+      display_name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+    };
+  } | null;
 }
 
 export function InstagramStylePostCreator({ 
@@ -21,7 +32,8 @@ export function InstagramStylePostCreator({
   onClose, 
   onSuccess,
   defaultTab = 'camera',
-  initialImageUrl 
+  initialImageUrl,
+  quotePost 
 }: InstagramStylePostCreatorProps) {
   const [step, setStep] = useState<'select' | 'capture' | 'gallery' | 'text' | 'edit' | 'details'>('select');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
@@ -195,6 +207,7 @@ export function InstagramStylePostCreator({
             mediaType={mediaType}
             effects={editedEffects}
             mediaFile={mediaFile}
+            quotePost={quotePost}
             onSuccess={() => {
               onSuccess();
               handleClose();

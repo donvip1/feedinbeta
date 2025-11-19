@@ -429,6 +429,53 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
         </div>
       )}
 
+      {/* Quoted Post Card - Twitter Style */}
+      {originalPost && !post.media_url && (
+        <div className="mx-4 mb-3 border border-border rounded-xl p-3 bg-muted/30 hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => navigate(`/post/${originalPost.id}`)}>
+          {/* Original Poster Info */}
+          <div className="flex items-center gap-2 mb-2">
+            <Avatar className="w-5 h-5">
+              <AvatarImage src={originalPost.profiles?.avatar_url} />
+              <AvatarFallback className="text-xs">
+                {originalPost.profiles?.display_name?.[0] || originalPost.profiles?.username?.[0] || '?'}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-sm font-semibold text-foreground">
+              {originalPost.profiles?.display_name || originalPost.profiles?.username || 'Unknown'}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              @{originalPost.profiles?.username || 'unknown'}
+            </span>
+          </div>
+          
+          {/* Original Post Content */}
+          {originalPost.content && (
+            <p className="text-sm text-foreground mb-2 line-clamp-3">
+              {originalPost.content}
+            </p>
+          )}
+          
+          {/* Original Post Media */}
+          {originalPost.media_url && (
+            <div className="rounded-lg overflow-hidden mt-2">
+              {originalPost.media_type === 'image' ? (
+                <img 
+                  src={originalPost.media_url} 
+                  alt="Quoted post" 
+                  className="w-full max-h-64 object-cover"
+                />
+              ) : originalPost.media_type === 'video' ? (
+                <video 
+                  src={originalPost.media_url} 
+                  className="w-full max-h-64 object-cover"
+                  controls={false}
+                />
+              ) : null}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Media Card */}
       <div className="relative w-full aspect-[9/13] bg-black rounded-xl overflow-hidden">
         {post.media_url && (

@@ -59,6 +59,7 @@ const Feed = () => {
   const [isPulling, setIsPulling] = useState(false);
   const [highlightedPostId, setHighlightedPostId] = useState<string | null>(null);
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
+  const [quotePost, setQuotePost] = useState<any>(null);
 
   // Initial load and visibility-based refresh
   useEffect(() => {
@@ -72,11 +73,18 @@ const Feed = () => {
     // Store user ID for profile navigation
     localStorage.setItem('currentUserId', user.id);
     
-    // Check if there's a shared image in location state
-    const state = location.state as { sharedImage?: string; postId?: string; commentId?: string } | null;
+    // Check if there's a shared image or quote post in location state
+    const state = location.state as { sharedImage?: string; postId?: string; commentId?: string; quotePost?: any } | null;
     if (state?.sharedImage) {
       setSharedImageUrl(state.sharedImage);
       setDefaultPostTab('image');
+      setShowCreatePost(true);
+      // Clear the state
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    
+    if (state?.quotePost) {
+      setQuotePost(state.quotePost);
       setShowCreatePost(true);
       // Clear the state
       navigate(location.pathname, { replace: true, state: {} });
@@ -563,11 +571,13 @@ const Feed = () => {
         onClose={() => {
           setShowCreatePost(false);
           setSharedImageUrl(null);
+          setQuotePost(null);
           setIsCreatingContent(false);
         }}
         onSuccess={handlePostCreated}
         defaultTab={defaultPostTab === 'text' ? 'text' : defaultPostTab === 'image' ? 'gallery' : 'camera'}
         initialImageUrl={sharedImageUrl || undefined}
+        quotePost={quotePost}
       />
 
       {/* Floating Action Button */}
