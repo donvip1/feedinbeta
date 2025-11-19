@@ -616,27 +616,27 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
       )}
 
       {/* Social Actions */}
-      <div className="flex items-center justify-between mt-3 mb-4">
+      <div className="mt-3 mb-4">
         <div className="flex items-center space-x-5">
           <button onClick={handleLike} disabled={isLiking} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-            <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
+            <Heart className={`w-5 h-5 ${isLiked ? 'fill-red-500 text-red-500' : 'text-foreground'}`} />
             <span className="text-foreground text-xs font-medium">{localLikesCount > 999 ? `${(localLikesCount / 1000).toFixed(1)}K` : localLikesCount}</span>
           </button>
           
           <button onClick={() => setShowComments(true)} data-comment-button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-            <MessageCircle className="w-4 h-4 text-foreground" />
+            <MessageCircle className="w-5 h-5 text-foreground" />
             <span className="text-foreground text-xs font-medium">{post.comments_count}</span>
           </button>
           
           <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-            <Eye className="w-4 h-4 text-foreground" />
+            <Eye className="w-5 h-5 text-foreground" />
             <span className="text-foreground text-xs font-medium">{post.views_count > 999 ? `${(post.views_count / 1000).toFixed(1)}K` : post.views_count}</span>
           </button>
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-                <Repeat2 className={`w-4 h-4 ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`} />
+                <Repeat2 className={`w-5 h-5 ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`} />
                 <span className={`text-xs font-medium ${isRefeeded ? 'text-pink-500' : 'text-foreground'}`}>
                   {localRefeedsCount > 999 ? `${(localRefeedsCount / 1000).toFixed(1)}K` : localRefeedsCount}
                 </span>
@@ -655,13 +655,13 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
           </DropdownMenu>
 
           <button onClick={() => setShowGiftModal(true)} className="flex items-center space-x-1.5 hover:opacity-70 transition">
-            <Gift className="w-4 h-4 text-primary" />
+            <Gift className="w-5 h-5 text-primary" />
           </button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center space-x-1.5 hover:opacity-70 transition">
-                <Share2 className="w-4 h-4 text-foreground" />
+                <Share2 className="w-5 h-5 text-foreground" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
@@ -678,14 +678,16 @@ export const PostCard = ({ post, onUpdate, onCommentStateChange, highlightCommen
           </DropdownMenu>
         </div>
 
-        {/* Promote button on the right */}
-        <button 
-          onClick={() => navigate(`/promote/${post.id}`)} 
-          className="flex items-center space-x-1.5 hover:opacity-70 transition text-primary"
-        >
-          <TrendingUp className="w-4 h-4" />
-          <span className="text-xs font-medium">Promote</span>
-        </button>
+        {/* Promote button on its own line */}
+        <div className="mt-3">
+          <button 
+            onClick={() => navigate(`/promote/${post.id}`)} 
+            className="flex items-center space-x-1.5 hover:opacity-70 transition text-primary"
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span className="text-xs font-medium">Promote</span>
+          </button>
+        </div>
       </div>
 
       <CommentsModal 
