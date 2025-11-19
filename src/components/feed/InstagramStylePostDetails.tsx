@@ -253,7 +253,7 @@ export function InstagramStylePostDetails({
         <ProgressBar progress={progress} isVisible={isUploading} />
 
         {/* Form - Scrollable */}
-        <div className="flex-1 overflow-y-auto overscroll-contain pb-20 md:pb-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain pb-32 md:pb-8">
           <div className="p-4 space-y-6">
           {/* Caption */}
           <div className="space-y-2">
