@@ -296,6 +296,11 @@ export const EnhancedMessageBubble = ({
                   <CheckCheck className="w-3 h-3" />
                 </span>
               )}
+              {message.read_receipts && message.read_receipts.length > 0 && (
+                <span className="text-[10px] text-primary">
+                  Seen
+                </span>
+              )}
             </>
           )}
         </div>

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX, Heart } from 'lucide-react';
 import { ReactionPicker } from '@/components/feed/ReactionPicker';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
@@ -446,54 +446,18 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
         </div>
       )}
 
-      {/* Reaction and Chat bar */}
+      {/* Reaction bar - Icon only */}
       {!isOwn && (
-        <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
-          {showChat ? (
-            <div className="flex gap-2 bg-black/50 backdrop-blur-sm rounded-full p-2">
-              <input
-                type="text"
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Send message..."
-                className="flex-1 bg-transparent text-white placeholder-white/50 outline-none px-3"
-              />
-              <Button
-                onClick={handleSendMessage}
-                size="sm"
-                className="bg-gradient-to-r from-pink-500 to-blue-500 rounded-full"
-              >
-                Send
-              </Button>
-            </div>
-          ) : (
-            <div className="flex gap-2 justify-center">
-              <ReactionPicker onSelect={handleReaction}>
-                <Button
-                  variant="outline"
-                  className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-                >
-                  React
-                </Button>
-              </ReactionPicker>
-              <Button
-                onClick={() => setShowComments(true)}
-                variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-              >
-                <MessageCircle className="w-4 h-4 mr-1" />
-                Comment
-              </Button>
-              <Button
-                onClick={() => setShowChat(true)}
-                variant="outline"
-                className="bg-white/10 border-white/30 text-white hover:bg-white/20"
-              >
-                Message
-              </Button>
-            </div>
-          )}
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+          <ReactionPicker onSelect={handleReaction}>
+            <Button
+              size="icon"
+              variant="outline"
+              className="bg-white/10 border-white/30 text-white hover:bg-white/20 rounded-full w-12 h-12"
+            >
+              <Heart className="w-6 h-6" />
+            </Button>
+          </ReactionPicker>
         </div>
       )}
 
