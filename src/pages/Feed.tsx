@@ -431,11 +431,9 @@ const Feed = () => {
       {/* Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
         <div className="max-w-screen-xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between gap-2">
-            <div className="w-8"></div>
-            
+          <div className="flex items-center justify-center gap-3">
             {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
               <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center items-center gap-1.5">
                 <TabsTrigger 
                   value="following" 
