@@ -1195,6 +1195,7 @@ export type Database = {
           media_url: string | null
           read_at: string | null
           read_by_receiver_at: string | null
+          reply_metadata: Json | null
           reply_to_id: string | null
           sender_id: string
           status: string | null
@@ -1215,6 +1216,7 @@ export type Database = {
           media_url?: string | null
           read_at?: string | null
           read_by_receiver_at?: string | null
+          reply_metadata?: Json | null
           reply_to_id?: string | null
           sender_id: string
           status?: string | null
@@ -1235,6 +1237,7 @@ export type Database = {
           media_url?: string | null
           read_at?: string | null
           read_by_receiver_at?: string | null
+          reply_metadata?: Json | null
           reply_to_id?: string | null
           sender_id?: string
           status?: string | null

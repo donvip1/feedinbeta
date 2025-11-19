@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX, Heart } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX, Heart, Send } from 'lucide-react';
 import { ReactionPicker } from '@/components/feed/ReactionPicker';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
@@ -43,6 +44,7 @@ interface StoryViewerProps {
 
 export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: StoryViewerProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentUserIndex, setCurrentUserIndex] = useState(
     allUserStories.findIndex(us => us.user_id === userId)
   );
@@ -281,11 +283,22 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
       }
 
       if (conversationId) {
+        // Send message with story context
         await supabase.from('messages').insert({
           conversation_id: conversationId,
           sender_id: user.id,
           content: chatMessage,
           media_type: 'text',
+          reply_metadata: {
+            type: 'story_reply',
+            story_id: currentStory.id,
+            story_media_url: currentStory.media_url,
+            story_media_type: currentStory.media_type,
+          }
+        });
+
+        toast({
+          title: 'Message sent!',
         });
       }
       
@@ -293,6 +306,10 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
       setShowChat(false);
     } catch (error) {
       console.error('Error sending message:', error);
+      toast({
+        title: 'Error sending message',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -446,18 +463,48 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
         </div>
       )}
 
-      {/* Reaction bar - Icon only */}
+      {/* Reaction and Message bar */}
       {!isOwn && (
-        <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-          <ReactionPicker onSelect={handleReaction}>
-            <Button
-              size="icon"
-              variant="outline"
-              className="bg-white/10 border-white/30 text-white hover:bg-white/20 rounded-full w-12 h-12"
-            >
-              <Heart className="w-6 h-6" />
-            </Button>
-          </ReactionPicker>
+        <div className="absolute bottom-4 left-0 right-0 px-4">
+          {showChat ? (
+            <div className="flex gap-2 bg-black/50 backdrop-blur-sm rounded-full p-2">
+              <input
+                type="text"
+                value={chatMessage}
+                onChange={(e) => setChatMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Send message..."
+                className="flex-1 bg-transparent text-white placeholder-white/50 outline-none px-3"
+              />
+              <Button
+                onClick={handleSendMessage}
+                size="sm"
+                className="bg-gradient-to-r from-pink-500 to-blue-500 rounded-full"
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex justify-center gap-3">
+              <ReactionPicker onSelect={handleReaction}>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="bg-white/10 border-white/30 text-white hover:bg-white/20 rounded-full w-12 h-12"
+                >
+                  <Heart className="w-6 h-6" />
+                </Button>
+              </ReactionPicker>
+              <Button
+                onClick={() => setShowChat(true)}
+                size="icon"
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 rounded-full w-12 h-12"
+              >
+                <MessageCircle className="w-6 h-6" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 

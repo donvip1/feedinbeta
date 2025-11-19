@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck } from 'lucide-react';
+import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck, FileText } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +26,14 @@ interface MessageBubbleProps {
       sender: {
         display_name: string;
       };
+      media_url?: string | null;
+      media_type?: string | null;
+    } | null;
+    reply_metadata?: {
+      type?: string;
+      story_id?: string;
+      story_media_url?: string;
+      story_media_type?: string;
     } | null;
     profiles: {
       display_name: string | null;
@@ -162,13 +170,60 @@ export const EnhancedMessageBubble = ({
       </Avatar>
 
       <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%] relative`}>
-        {/* Reply Indicator */}
+        {/* Story Reply Indicator */}
+        {message.reply_metadata?.type === 'story_reply' && (
+          <div className={`flex items-center gap-2 p-2 mb-1 rounded-lg border ${
+            isOwn ? 'bg-primary/20 border-primary/50' : 'bg-accent border-primary/30'
+          }`}>
+            {message.reply_metadata.story_media_url && (
+              <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">
+                {message.reply_metadata.story_media_type?.startsWith('video') ? (
+                  <video 
+                    src={message.reply_metadata.story_media_url} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <img 
+                    src={message.reply_metadata.story_media_url} 
+                    alt="Story" 
+                    className="w-full h-full object-cover"
+                  />
+                )}
+              </div>
+            )}
+            <span className="text-xs text-muted-foreground">Replied to story</span>
+          </div>
+        )}
+
+        {/* Regular Reply Indicator */}
         {message.reply_to_message && (
-          <div className={`text-xs p-2 mb-1 rounded border-l-2 ${
+          <div className={`flex items-start gap-2 p-2 mb-1 rounded border-l-2 ${
             isOwn ? 'bg-primary/20 border-primary/50 text-primary-foreground' : 'bg-accent border-primary/30 text-foreground'
           }`}>
-            <p className="font-semibold">{message.reply_to_message.sender.display_name}</p>
-            <p className="truncate">{message.reply_to_message.content}</p>
+            {message.reply_to_message.media_url && (
+              <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
+                {message.reply_to_message.media_type?.startsWith('video') ? (
+                  <video 
+                    src={message.reply_to_message.media_url} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : message.reply_to_message.media_type?.startsWith('image') ? (
+                  <img 
+                    src={message.reply_to_message.media_url} 
+                    alt="Reply" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-muted flex items-center justify-center">
+                    <FileText className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-xs">{message.reply_to_message.sender.display_name}</p>
+              <p className="truncate text-xs">{message.reply_to_message.content}</p>
+            </div>
           </div>
         )}
 
