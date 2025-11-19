@@ -471,10 +471,6 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
     { icon: Lock, title: 'Privacy Settings', route: '/settings/privacy', color: 'text-purple-500' },
     { icon: Shield, title: 'Blocked Users', route: '/settings/blocked', color: 'text-red-500' },
     { icon: TrendingUp, title: 'Trending', route: '/trending', color: 'text-orange-500' },
-    { icon: UsersRound, title: 'Groups', route: '/groups', color: 'text-green-500' },
-    { icon: Bookmark, title: 'Saved Posts', route: '/saved', color: 'text-blue-500' },
-    { icon: Wallet, title: 'Wallet & Credits', route: '/wallet', color: 'text-yellow-500' },
-    { icon: Layers, title: 'P2P Marketplace', route: '/p2p-marketplace', color: 'text-cyan-500' },
   ];
 
   if (!isOpen) return null;
@@ -667,28 +663,7 @@ export const ProfileSettings = ({ isOpen, onClose }: ProfileSettingsProps) => {
                 />
               </div>
 
-              {/* Status (Friends Only) */}
-              <div className="space-y-2">
-                <Label>Status (Visible to friends only)</Label>
-                <Input
-                  value={profile.status}
-                  onChange={(e) => setProfile({ ...profile, status: e.target.value })}
-                  placeholder="What's on your mind?"
-                />
-              </div>
-
-              {/* About */}
-              <div className="space-y-2">
-                <Label>About (Public)</Label>
-                <Textarea
-                  value={profile.about}
-                  onChange={(e) => setProfile({ ...profile, about: e.target.value })}
-                  placeholder="About you..."
-                  rows={3}
-                />
-              </div>
-
-              {/* Purpose */}
+              {/* Purpose - Now shown on profile */}
               <div className="space-y-2">
                 <Label>Purpose on Platform (Public - Max 3)</Label>
                 <p className="text-xs text-muted-foreground">Select up to 3 purposes. Can only be changed every 2 weeks.</p>

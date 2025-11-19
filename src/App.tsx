@@ -43,6 +43,7 @@ import Wallet from "./pages/Wallet";
 import LearnTech from "./pages/LearnTech";
 import Welcome from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
+import ProfileEdit from "./pages/ProfileEdit";
 
 const queryClient = new QueryClient();
 
@@ -77,6 +78,7 @@ const App = () => {
             <Route path="/messages" element={<Messages />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/profile/:userId" element={<Profile />} />
+            <Route path="/profile-edit" element={<ProfileEdit />} />
             <Route path="/call" element={<Call />} />
             <Route path="/call-history" element={<CallHistory />} />
             <Route path="/live" element={<Live />} />
