@@ -89,9 +89,10 @@ const Feed = () => {
     }
     
     if (state?.quotePost) {
+      // Use synchronous state updates for instant UI response
       setQuotePost(state.quotePost);
       setShowCreatePost(true);
-      // Clear the state without reloading
+      // Clear the state immediately
       window.history.replaceState({}, '', location.pathname);
     }
     

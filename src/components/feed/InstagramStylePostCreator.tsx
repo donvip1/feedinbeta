@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { X, ArrowLeft, Image as ImageIcon, Video, Type, Camera as CameraIcon } from 'lucide-react';
@@ -64,8 +64,9 @@ export function InstagramStylePostCreator({
   const [mediaType, setMediaType] = useState<'image' | 'video' | 'text'>(getInitialMediaType());
   const [editedEffects, setEditedEffects] = useState<any>(null);
 
-  // Update state when props change (for reopening with different props)
-  useEffect(() => {
+  // Synchronously update state when dialog opens with new props using useLayoutEffect
+  // This runs synchronously before the browser paints, ensuring instant updates
+  useLayoutEffect(() => {
     if (open) {
       if (quotePost) {
         setMediaType('text');
@@ -140,7 +141,10 @@ export function InstagramStylePostCreator({
 
   return (
     <Dialog open={open} onOpenChange={handleClose} modal={true}>
-      <DialogContent className="fixed inset-0 w-screen h-screen max-w-none m-0 p-0 gap-0 bg-background border-0 rounded-none [&>button]:hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent 
+        className="fixed inset-0 w-screen h-screen max-w-none m-0 p-0 gap-0 bg-background border-0 rounded-none [&>button]:hidden data-[state=open]:animate-none data-[state=closed]:animate-none" 
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         {/* Method Selection */}
         {step === 'select' && (
           <div className="flex flex-col h-full">
