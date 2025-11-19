@@ -696,28 +696,27 @@ const Profile = () => {
               >
                 {isFollowing ? 'Following' : 'Follow'}
               </Button>
-              <Button
-                onClick={requestChat}
-                disabled={hasPendingRequest}
-                className="flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border disabled:opacity-50"
-              >
-                {areMutualFriends ? (
-                  <>
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    Send Message
-                  </>
-                ) : hasPendingRequest ? (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Request Sent
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Add Friend
-                  </>
-                )}
-              </Button>
+              
+              {areMutualFriends ? (
+                <Button
+                  onClick={() => navigate('/messages')}
+                  variant="outline"
+                  className="flex-1 border-primary/50 text-primary hover:bg-primary/10"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Message
+                </Button>
+              ) : (
+                <Button
+                  onClick={requestChat}
+                  disabled={hasPendingRequest}
+                  variant="outline"
+                  className="flex-1 border-primary/50 text-primary hover:bg-primary/10 disabled:opacity-50"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  {hasPendingRequest ? 'Request Sent' : 'Request Chat'}
+                </Button>
+              )}
             </div>
           )}
 

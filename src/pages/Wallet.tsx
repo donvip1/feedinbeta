@@ -306,6 +306,14 @@ const Wallet = () => {
                 <h1 className="text-xl font-bold">Wallet & Credit</h1>
               </div>
             </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate('/p2p-marketplace')}
+              className="hover:bg-secondary"
+            >
+              <ShoppingBag className="w-5 h-5 text-primary" />
+            </Button>
             <Dialog open={isSendModalOpen} onOpenChange={setIsSendModalOpen}>
               <DialogTrigger asChild>
                 <Button size="sm">

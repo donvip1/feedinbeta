@@ -11,7 +11,7 @@ import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { Search, X } from 'lucide-react';
+import { Search, X, TrendingUp } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
@@ -450,6 +450,15 @@ const Feed = () => {
           </Tabs>
 
           <div className="flex items-center space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/trending')}
+              className="text-primary hover:text-primary/90"
+            >
+              <TrendingUp className="w-5 h-5 mr-1" />
+              <span className="hidden sm:inline">Trending</span>
+            </Button>
             <NotificationBell />
             <button 
               onClick={() => setShowSearch(!showSearch)}

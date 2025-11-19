@@ -103,28 +103,60 @@ export function ImageCropper({ imageUrl, onCropComplete, onClose }: ImageCropper
     }
   }, [isDragging, isResizing, handleMouseMove, handleMouseUp]);
 
-  const handleCrop = () => {
+  const handleCrop = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imageRef.current;
     const container = containerRef.current;
-    if (!canvas || !img || !container) return;
+    
+    if (!canvas || !img || !container || !imageLoaded) {
+      console.error('Missing required elements for cropping');
+      return;
+    }
 
     const rect = container.getBoundingClientRect();
     const scaleX = img.naturalWidth / rect.width;
     const scaleY = img.naturalHeight / rect.height;
 
-    canvas.width = cropArea.width * scaleX;
-    canvas.height = cropArea.height * scaleY;
+    const targetWidth = Math.floor(cropArea.width * scaleX);
+    const targetHeight = Math.floor(cropArea.height * scaleY);
+
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error('Could not get canvas context');
+      return;
+    }
 
-    ctx.drawImage(img, cropArea.x * scaleX, cropArea.y * scaleY, cropArea.width * scaleX, cropArea.height * scaleY, 0, 0, canvas.width, canvas.height);
+    // Clear canvas before drawing
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    canvas.toBlob((blob) => {
-      if (blob) onCropComplete(URL.createObjectURL(blob));
-    }, 'image/jpeg', 0.95);
-  };
+    try {
+      ctx.drawImage(
+        img,
+        Math.floor(cropArea.x * scaleX),
+        Math.floor(cropArea.y * scaleY),
+        targetWidth,
+        targetHeight,
+        0,
+        0,
+        targetWidth,
+        targetHeight
+      );
+
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const croppedUrl = URL.createObjectURL(blob);
+          onCropComplete(croppedUrl);
+        } else {
+          console.error('Failed to create blob from canvas');
+        }
+      }, 'image/jpeg', 0.95);
+    } catch (error) {
+      console.error('Error during crop operation:', error);
+    }
+  }, [cropArea, imageLoaded, onCropComplete]);
 
   return (
     <div className="fixed inset-0 z-[200] bg-black flex flex-col">
