@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PostCard } from '@/components/feed/PostCard';
 import { InstagramStylePostCreator } from '@/components/feed/InstagramStylePostCreator';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
@@ -430,55 +429,68 @@ const Feed = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
-        <div className="max-w-screen-xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-center gap-3">
-            {/* Tabs */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-              <TabsList className="bg-transparent border-0 h-auto p-0 flex justify-center items-center gap-1.5">
-                <TabsTrigger 
-                  value="following" 
-                  className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                >
-                  Following
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="forYou" 
-                  className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                >
-                  For You
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="myPosts" 
-                  className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none border-0 text-muted-foreground data-[state=active]:text-foreground text-xs font-semibold pb-1.5 px-1.5 data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none"
-                >
-                  My Posts
-                </TabsTrigger>
-                <button
-                  onClick={() => navigate('/live')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20"
-                >
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                  </span>
-                  <span className="text-xs font-bold">LIVE</span>
-                </button>
-              </TabsList>
-            </Tabs>
-
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/trending')}
-                className="text-primary hover:text-primary/90 h-8 px-2"
+        <div className="w-full px-2 py-2.5">
+          <div className="flex items-center justify-between max-w-screen-xl mx-auto">
+            {/* Left: Tabs */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <button
+                onClick={() => setActiveTab('following')}
+                className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
+                  activeTab === 'following' 
+                    ? 'text-foreground border-b-2 border-primary' 
+                    : 'text-muted-foreground'
+                }`}
               >
-                <TrendingUp className="w-5 h-5" />
-              </Button>
-              <NotificationBell />
+                Following
+              </button>
+              <button
+                onClick={() => setActiveTab('forYou')}
+                className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
+                  activeTab === 'forYou' 
+                    ? 'text-foreground border-b-2 border-primary' 
+                    : 'text-muted-foreground'
+                }`}
+              >
+                For You
+              </button>
+              <button
+                onClick={() => setActiveTab('myPosts')}
+                className={`text-sm font-semibold px-2 py-1 whitespace-nowrap transition-colors ${
+                  activeTab === 'myPosts' 
+                    ? 'text-foreground border-b-2 border-primary' 
+                    : 'text-muted-foreground'
+                }`}
+              >
+                My Posts
+              </button>
+            </div>
+
+            {/* Center: LIVE Button */}
+            <button
+              onClick={() => navigate('/live')}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20 mx-2 flex-shrink-0"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              <span className="text-xs font-bold whitespace-nowrap">LIVE</span>
+            </button>
+
+            {/* Right: Action Icons */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={() => navigate('/trending')}
+                className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
+              >
+                <TrendingUp className="w-5 h-5 text-primary" />
+              </button>
+              <div className="h-9 w-9 flex items-center justify-center">
+                <NotificationBell />
+              </div>
               <button 
                 onClick={() => setShowSearch(!showSearch)}
-                className="h-8 px-2 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
+                className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors"
               >
                 {showSearch ? <X className="w-5 h-5 text-foreground" /> : <Search className="w-5 h-5 text-foreground" />}
               </button>
