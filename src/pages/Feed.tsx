@@ -453,10 +453,9 @@ const Feed = () => {
             {/* Live Icon Button */}
             <button
               onClick={() => navigate('/live')}
-              className="h-9 px-2.5 flex items-center justify-center gap-1 bg-primary/10 hover:bg-primary/20 rounded-md transition-colors flex-shrink-0"
+              className="h-9 w-9 flex items-center justify-center hover:bg-accent rounded-md transition-colors flex-shrink-0"
             >
-              <Radio className="w-4 h-4 text-primary" />
-              <span className="text-xs font-bold text-primary">LIVE</span>
+              <Radio className="w-5 h-5 text-red-500" />
             </button>
           </div>
         </div>
