@@ -1,4 +1,4 @@
-import { Home, MessageCircle, User, Sparkles, Wallet, GraduationCap } from 'lucide-react';
+import { Home, Mail, User, Zap, Wallet, BookOpen } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -38,10 +38,10 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   const navItems = [
     { id: 'feed', label: 'Feeds', icon: Home, path: '/feed' },
-    { id: 'chats', label: 'Chats', icon: MessageCircle, path: '/messages' },
+    { id: 'chats', label: 'Chats', icon: Mail, path: '/messages' },
     { id: 'wallet', label: 'Wallet', icon: Wallet, path: '/wallet' },
-    { id: 'learn', label: 'Learn Tech', icon: GraduationCap, path: '/learn-tech' },
-    { id: 'ai', label: 'FeedAI', icon: Sparkles, path: '/ai-copilot' },
+    { id: 'learn', label: 'Learn Tech', icon: BookOpen, path: '/learn-tech' },
+    { id: 'ai', label: 'FeedAI', icon: Zap, path: '/ai-copilot' },
     { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}`, isProfile: true },
   ];
 
@@ -81,7 +81,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       ) : (
                         <Icon 
                           size={28}
-                          strokeWidth={1.5}
+                          strokeWidth={2.5}
                           className="transition-transform hover:scale-110"
                         />
                       )}
