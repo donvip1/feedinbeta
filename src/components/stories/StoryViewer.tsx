@@ -53,7 +53,7 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
   const [isPaused, setIsPaused] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Start muted by default for better UX
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -396,7 +396,12 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
             src={currentStory.media_url}
             autoPlay
             playsInline
-            muted
+            muted={isMuted}
+            onLoadedMetadata={() => {
+              if (videoRef.current) {
+                videoRef.current.muted = isMuted;
+              }
+            }}
             className="w-full h-full object-contain"
           />
         )}

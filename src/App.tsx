@@ -48,9 +48,15 @@ import ProfileEdit from "./pages/ProfileEdit";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Set dark mode by default
+  // Set dark mode by default and initialize offline manager
   useEffect(() => {
     document.documentElement.classList.add('dark');
+    
+    // Initialize offline manager
+    import('@/lib/offline-manager').then(({ offlineManager: manager }) => {
+      // Manager auto-initializes as singleton
+      console.log('Offline manager ready');
+    });
     
     // Request notification permission on app load
     if ('Notification' in window && Notification.permission === 'default') {
