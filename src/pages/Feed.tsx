@@ -403,8 +403,8 @@ const Feed = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Header with Tabs */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
-        <div className="w-full px-4 py-2.5">
-          <div className="flex items-center justify-center gap-2 max-w-screen-xl mx-auto">
+        <div className="w-full px-3 py-2.5">
+          <div className="flex items-center justify-center gap-1.5 max-w-screen-xl mx-auto">
             {/* Notification Icon */}
             <div className="h-9 w-9 flex items-center justify-center flex-shrink-0">
               <NotificationBell />
