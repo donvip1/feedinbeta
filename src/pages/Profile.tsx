@@ -66,7 +66,6 @@ const Profile = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
   const [isFollowingMe, setIsFollowingMe] = useState(false);
@@ -93,9 +92,6 @@ const Profile = () => {
     
     if (userId) {
       loadProfile();
-      if (isOwn && user?.email) {
-        checkAdminStatus(user.email);
-      }
       if (!isOwn && user) {
         checkFollowStatus();
         checkIfFollowingMe();
@@ -104,11 +100,6 @@ const Profile = () => {
       }
     }
   }, [userId, user?.id]);
-
-  const checkAdminStatus = async (email: string) => {
-    const adminEmails = ['viplearn4free@gmail.com', 'cryptosvip@gmail.com', 'myconnectmate@gmail.com'];
-    setIsAdmin(adminEmails.includes(email.toLowerCase()));
-  };
 
   const loadProfile = async () => {
     try {

@@ -1,8 +1,45 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
+// Input validation schema
+interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+const validateMessages = (messages: any[]): Message[] => {
+  if (!Array.isArray(messages)) {
+    throw new Error("Messages must be an array");
+  }
+  
+  if (messages.length === 0 || messages.length > 50) {
+    throw new Error("Messages array must contain between 1 and 50 messages");
+  }
+  
+  return messages.map((msg, index) => {
+    if (!msg || typeof msg !== 'object') {
+      throw new Error(`Message at index ${index} is invalid`);
+    }
+    
+    if (msg.role !== 'user' && msg.role !== 'assistant') {
+      throw new Error(`Message at index ${index} has invalid role`);
+    }
+    
+    if (typeof msg.content !== 'string') {
+      throw new Error(`Message at index ${index} has invalid content`);
+    }
+    
+    if (msg.content.length === 0 || msg.content.length > 4000) {
+      throw new Error(`Message at index ${index} content must be between 1 and 4000 characters`);
+    }
+    
+    return { role: msg.role, content: msg.content };
+  });
 };
 
 serve(async (req) => {
@@ -11,7 +48,38 @@ serve(async (req) => {
   }
 
   try {
-    const { messages } = await req.json();
+    // Authenticate user via JWT
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Missing authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("Authentication error:", authError);
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Authenticated user:", user.id);
+
+    // Parse and validate request body
+    const body = await req.json();
+    const messages = validateMessages(body.messages);
     
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
