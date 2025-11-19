@@ -63,12 +63,10 @@ const Feed = () => {
   const [quotePost, setQuotePost] = useState<any>(null);
   const [showQuoteComposer, setShowQuoteComposer] = useState(false);
 
-  // Scroll to top when tab changes - after posts are loaded
+  // Jump to top instantly when tab changes
   useEffect(() => {
-    if (!loading) {
-      window.scrollTo({ top: 0, behavior: 'instant' });
-    }
-  }, [activeTab, loading]);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeTab]);
 
   // Initial load and visibility-based refresh
   useEffect(() => {
