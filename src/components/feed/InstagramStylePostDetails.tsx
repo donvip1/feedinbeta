@@ -141,9 +141,12 @@ export function InstagramStylePostDetails({
       if (mediaType !== 'text') {
         updateProgress(20);
         
-        if (effects?.processedBlob) {
+        // Check for cropped image or processed media
+        const mediaToUpload = effects?.croppedUrl || effects?.processedBlob;
+        
+        if (mediaToUpload) {
           // Convert blob URL to File
-          const response = await fetch(effects.processedBlob);
+          const response = await fetch(mediaToUpload);
           const blob = await response.blob();
           const filename = `${Date.now()}.${mediaType === 'image' ? 'jpg' : 'mp4'}`;
           const file = new File([blob], filename, { type: blob.type });
