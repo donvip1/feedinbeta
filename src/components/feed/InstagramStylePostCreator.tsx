@@ -39,18 +39,37 @@ export function InstagramStylePostCreator({
   initialImageUrl,
   quotePost 
 }: InstagramStylePostCreatorProps) {
-  const [step, setStep] = useState<'select' | 'capture' | 'gallery' | 'text' | 'edit' | 'details'>('select');
+  // Determine initial step based on props immediately
+  const getInitialStep = () => {
+    if (quotePost) return 'details';
+    if (initialImageUrl) return 'edit';
+    return 'select';
+  };
+
+  const getInitialMediaType = () => {
+    if (quotePost) return 'text';
+    if (initialImageUrl) return 'image';
+    return 'image';
+  };
+
+  const getInitialMediaPreview = () => {
+    if (quotePost) return '';
+    if (initialImageUrl) return initialImageUrl;
+    return '';
+  };
+
+  const [step, setStep] = useState<'select' | 'capture' | 'gallery' | 'text' | 'edit' | 'details'>(getInitialStep());
   const [mediaFile, setMediaFile] = useState<File | null>(null);
-  const [mediaPreview, setMediaPreview] = useState<string>('');
-  const [mediaType, setMediaType] = useState<'image' | 'video' | 'text'>('image');
+  const [mediaPreview, setMediaPreview] = useState<string>(getInitialMediaPreview());
+  const [mediaType, setMediaType] = useState<'image' | 'video' | 'text'>(getInitialMediaType());
   const [editedEffects, setEditedEffects] = useState<any>(null);
 
+  // Update state when props change (for reopening with different props)
   useEffect(() => {
     if (open) {
       if (quotePost) {
-        // If quotePost is provided, skip directly to details with text type
         setMediaType('text');
-        setMediaPreview(''); // No media needed for quote post
+        setMediaPreview('');
         setStep('details');
       } else if (initialImageUrl) {
         setMediaPreview(initialImageUrl);
@@ -121,7 +140,7 @@ export function InstagramStylePostCreator({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-full md:max-w-4xl h-[100dvh] md:h-[90vh] p-0 gap-0 bg-background">
+      <DialogContent className="max-w-full md:max-w-4xl h-[100dvh] md:h-[90vh] p-0 gap-0 bg-background [&>button]:hidden" onOpenAutoFocus={(e) => e.preventDefault()}>
         {/* Method Selection */}
         {step === 'select' && (
           <div className="flex flex-col h-full">
