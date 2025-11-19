@@ -24,21 +24,13 @@ const Wallet = () => {
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
       navigate('/auth');
-    } else if (user.email) {
-      checkAdminStatus(user.email);
     }
   }, [user, authLoading, navigate]);
-
-  const checkAdminStatus = (email: string) => {
-    const adminEmails = ['viplearn4free@gmail.com', 'cryptosvip@gmail.com', 'myconnectmate@gmail.com'];
-    setIsAdmin(adminEmails.includes(email.toLowerCase()));
-  };
 
   const { data: credits } = useQuery({
     queryKey: ['user-credits', user?.id],
@@ -387,9 +379,9 @@ const Wallet = () => {
               <CardContent>
                 <div className="space-y-4">
                   <div className="text-4xl font-bold text-primary">
-                    {isAdmin ? '∞' : (credits?.balance || 0)}
+                    {credits?.balance || 0}
                     <span className="text-lg text-muted-foreground ml-2">
-                      {isAdmin ? 'Unlimited' : 'credits'}
+                      credits
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
