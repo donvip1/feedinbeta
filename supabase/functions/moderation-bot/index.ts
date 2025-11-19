@@ -6,17 +6,57 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Input validation
+const validateInput = (data: any) => {
+  const { messageId, content } = data;
+  
+  if (!messageId || typeof messageId !== "string") {
+    throw new Error("Invalid messageId");
+  }
+  
+  if (!content || typeof content !== "string" || content.length > 10000) {
+    throw new Error("Invalid content");
+  }
+  
+  return { messageId, content };
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Extract and verify JWT
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    const { messageId, content, senderId } = await req.json();
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid token" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate input
+    const requestData = await req.json();
+    const { messageId, content } = validateInput(requestData);
+    
+    // Use authenticated user ID
+    const senderId = user.id;
 
     // Phone number patterns (including smart spacing)
     const phonePatterns = [
@@ -76,13 +116,21 @@ serve(async (req) => {
         (tier?.name === "Pro" || tier?.name === "Premium");
 
       if (!isPremium) {
-        // Delete the message
-        const { error: deleteError } = await supabase
+        // Delete the message (use service role for deletion)
+        const supabaseService = createClient(
+          supabaseUrl,
+          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+        );
+
+        const { error: deleteError } = await supabaseService
           .from("messages")
           .delete()
-          .eq("id", messageId);
+          .eq("id", messageId)
+          .eq("sender_id", senderId); // Extra safety check
 
         if (deleteError) throw deleteError;
+
+        console.log(`Moderation: deleted message ${messageId} from user ${senderId} for ${violationType}`);
 
         return new Response(
           JSON.stringify({
