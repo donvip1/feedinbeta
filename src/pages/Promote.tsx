@@ -128,18 +128,41 @@ const Promote = () => {
         {/* Post Preview */}
         <Card className="bg-gray-900 border-gray-800 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4 text-gradient-primary">Your Post</h2>
-          {post.media_url && (
-            <div className="mb-4 rounded-xl overflow-hidden">
-              {post.media_type === 'image' ? (
-                <img src={post.media_url} alt="Post" className="w-full" />
-              ) : (
-                <video src={post.media_url} className="w-full" controls />
-              )}
-            </div>
-          )}
-          {post.content && (
+          
+          {/* Caption for non-styled text posts */}
+          {post.content && post.media_type !== 'text_styled' && (
             <p className="text-white mb-4">{post.content}</p>
           )}
+
+          {/* Text posts with styled background (gradient/solid) */}
+          {post.media_type === 'text_styled' && post.media_url && post.content ? (
+            <div className={`${post.media_url} rounded-lg overflow-hidden border border-border mb-4`}>
+              <div className="w-full h-[400px] flex items-center justify-center p-8">
+                <p className="text-white text-2xl md:text-3xl font-bold text-center leading-relaxed">
+                  {post.content}
+                </p>
+              </div>
+            </div>
+          ) : post.media_url && post.media_type !== 'text_styled' ? (
+            <div className="mb-4 rounded-xl overflow-hidden bg-card border border-border">
+              <div className="w-full relative h-[400px]">
+                {post.media_type === 'image' ? (
+                  <img 
+                    src={post.media_url} 
+                    alt="Post content" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <video 
+                    src={post.media_url} 
+                    className="w-full h-full object-cover" 
+                    controls 
+                  />
+                )}
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex items-center space-x-4 text-sm text-gray-400">
             <span className="flex items-center space-x-1">
               <Eye className="w-4 h-4" />
