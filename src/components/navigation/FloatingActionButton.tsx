@@ -13,10 +13,10 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
   return (
     <button
       onClick={onClick}
-      className="fixed bottom-[72px] right-4 md:bottom-20 md:right-8 z-[80] bg-primary w-14 h-14 md:w-16 md:h-16 rounded-full hover:bg-primary/90 hover:scale-110 active:scale-95 transition-all duration-200 shadow-lg flex items-center justify-center"
+      className="fixed bottom-[72px] right-4 md:bottom-20 md:right-8 z-[80] hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center"
       aria-label="Create post"
     >
-      <img src={editIcon} alt="Create post" className="w-8 h-8 md:w-9 md:h-9 object-contain" />
+      <img src={editIcon} alt="Create post" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
     </button>
   );
 };
