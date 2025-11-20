@@ -228,10 +228,10 @@ const Feed = () => {
         ) : posts && posts.length > 0 ? (
           <>
             {posts.map((post) => {
-              // Text-only posts should be compact, media posts should be full height
-              const isTextOnly = !post.media_url && !post.media_type;
+              // Text posts with backgrounds should be full height like media posts
+              const isTextOnly = !post.media_url && post.content;
               const wrapperClass = isTextOnly 
-                ? "snap-start mb-4" 
+                ? "snap-start snap-always h-[calc(100vh-8rem)] flex items-start" 
                 : "snap-start snap-always h-[calc(100vh-8rem)] flex items-start";
               
               return (

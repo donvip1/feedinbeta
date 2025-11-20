@@ -258,8 +258,16 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
           </div>
         )}
 
-        {/* Media Card - Only render if there's media */}
-        {post.media_url && (
+        {/* Text-only posts with styled background or Media Card */}
+        {!post.media_url && post.content ? (
+          <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg overflow-hidden border border-border relative">
+            <div className="w-full h-[55vh] flex items-center justify-center p-8">
+              <p className="text-white text-2xl md:text-3xl font-bold text-center leading-relaxed">
+                {post.content}
+              </p>
+            </div>
+          </div>
+        ) : post.media_url ? (
           <div className="bg-card rounded-lg overflow-hidden border border-border relative">
             <div className="w-full relative group h-[55vh]" id={`media-${post.id}`}>
               {post.media_type === 'image' ? (
@@ -346,7 +354,7 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
               )}
             </div>
           </div>
-        )}
+        ) : null}
 
         {/* Actions - Outside below card */}
         <div className="px-1 py-2">

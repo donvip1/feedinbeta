@@ -19,15 +19,26 @@ type Stage = 'style' | 'compose' | 'details';
 type BackgroundStyle = 'plain' | 'gradient' | 'image';
 type Privacy = 'everyone' | 'friends' | 'followers' | 'only_me';
 
+const solidColorOptions = [
+  'bg-slate-800',
+  'bg-gray-900',
+  'bg-zinc-800',
+  'bg-stone-800',
+  'bg-red-900',
+  'bg-orange-900',
+  'bg-amber-900',
+  'bg-yellow-900',
+];
+
 const gradientOptions = [
-  'bg-gradient-to-br from-purple-500 to-pink-500',
-  'bg-gradient-to-br from-blue-500 to-cyan-500',
-  'bg-gradient-to-br from-green-500 to-emerald-500',
-  'bg-gradient-to-br from-orange-500 to-red-500',
-  'bg-gradient-to-br from-indigo-500 to-purple-500',
-  'bg-gradient-to-br from-pink-500 to-rose-500',
-  'bg-gradient-to-br from-yellow-500 to-orange-500',
-  'bg-gradient-to-br from-teal-500 to-blue-500',
+  'bg-gradient-to-br from-purple-600 to-pink-600',
+  'bg-gradient-to-br from-blue-600 to-cyan-600',
+  'bg-gradient-to-br from-green-600 to-emerald-600',
+  'bg-gradient-to-br from-orange-600 to-red-600',
+  'bg-gradient-to-br from-indigo-600 to-purple-600',
+  'bg-gradient-to-br from-pink-600 to-rose-600',
+  'bg-gradient-to-br from-yellow-600 to-orange-600',
+  'bg-gradient-to-br from-teal-600 to-blue-600',
 ];
 
 interface TextPostCreatorProps {
@@ -39,8 +50,9 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
   const { user } = useAuth();
   const { toast } = useToast();
   const [stage, setStage] = useState<Stage>('style');
-  const [background, setBackground] = useState<BackgroundStyle>('plain');
+  const [background, setBackground] = useState<BackgroundStyle>('gradient');
   const [selectedGradient, setSelectedGradient] = useState(gradientOptions[0]);
+  const [selectedSolidColor, setSelectedSolidColor] = useState(solidColorOptions[0]);
   const [music, setMusic] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [caption, setCaption] = useState('');
@@ -111,13 +123,13 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
   };
 
   const getBackgroundClass = () => {
-    if (background === 'plain') return 'bg-muted';
+    if (background === 'plain') return selectedSolidColor;
     if (background === 'gradient') return selectedGradient;
     return 'bg-card';
   };
 
   const getTextColorClass = () => {
-    return background === 'plain' ? 'text-foreground' : 'text-white';
+    return 'text-white';
   };
 
   return (
@@ -142,7 +154,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
               }`}
             >
               <Type className="w-5 h-5 mx-auto mb-1" />
-              Plain
+              Solid
             </button>
             <button
               onClick={() => setBackground('gradient')}
@@ -154,6 +166,21 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
               Gradient
             </button>
           </div>
+
+          {/* Solid color selector */}
+          {background === 'plain' && (
+            <div className="grid grid-cols-4 gap-2 mt-4">
+              {solidColorOptions.map((color, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedSolidColor(color)}
+                  className={`w-full h-16 rounded-lg ${color} ${
+                    selectedSolidColor === color ? 'ring-2 ring-primary ring-offset-2' : ''
+                  }`}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Gradient selector */}
           {background === 'gradient' && (
