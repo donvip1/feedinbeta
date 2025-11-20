@@ -227,17 +227,25 @@ const Feed = () => {
           </div>
         ) : posts && posts.length > 0 ? (
           <>
-            {posts.map((post) => (
-              <div key={post.id} className="snap-start snap-always h-[calc(100vh-8rem)] flex items-start">
-                <PostCard
-                  post={post}
-                  onLikeUpdate={() => refetch()}
-                  onCommentsOpenChange={setIsCommentsOpen}
-                  onInteractionStart={handleInteractionStart}
-                  onInteractionEnd={handleInteractionEnd}
-                />
-              </div>
-            ))}
+            {posts.map((post) => {
+              // Text-only posts should be compact, media posts should be full height
+              const isTextOnly = !post.media_url && !post.media_type;
+              const wrapperClass = isTextOnly 
+                ? "snap-start mb-4" 
+                : "snap-start snap-always h-[calc(100vh-8rem)] flex items-start";
+              
+              return (
+                <div key={post.id} className={wrapperClass}>
+                  <PostCard
+                    post={post}
+                    onLikeUpdate={() => refetch()}
+                    onCommentsOpenChange={setIsCommentsOpen}
+                    onInteractionStart={handleInteractionStart}
+                    onInteractionEnd={handleInteractionEnd}
+                  />
+                </div>
+              );
+            })}
           </>
         ) : (
           <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
