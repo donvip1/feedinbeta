@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -61,14 +61,19 @@ const Feed = () => {
   const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(null);
   const [quotePost, setQuotePost] = useState<any>(null);
   const [showQuoteComposer, setShowQuoteComposer] = useState(false);
+  const feedContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll to top on mount and tab changes
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (feedContainerRef.current) {
+      feedContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
   }, []);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    if (feedContainerRef.current) {
+      feedContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
   }, [activeTab]);
 
   // Initial load and visibility-based refresh
@@ -483,6 +488,7 @@ const Feed = () => {
 
       {/* Full-screen TikTok-style Feed */}
       <main 
+        ref={feedContainerRef}
         className="fixed inset-0 top-14 bottom-16 overflow-y-auto snap-y snap-mandatory scroll-smooth"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
