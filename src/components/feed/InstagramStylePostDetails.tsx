@@ -123,9 +123,9 @@ export function InstagramStylePostDetails({
         allow_comments: true,
         allow_refeed: true,
         scheduled_at: null,
-        status: 'published' as const,
+        status: 'active' as const,
         original_post_id: quotePost?.id || null,
-        post_type: quotePost ? 'quote' as const : 'original' as const,
+        post_type: quotePost ? 'quote' as const : 'public' as const,
       };
 
       const { data: post, error: postError } = await supabase
@@ -182,118 +182,120 @@ export function InstagramStylePostDetails({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-start p-4 overflow-y-auto max-w-sm mx-auto">
-      <ProgressBar progress={progress} isVisible={isUploading} />
+    <div className="fixed inset-0 z-[100] bg-background">
+      <div className="w-full h-full max-w-md mx-auto flex flex-col p-4 overflow-y-auto">
+        <ProgressBar progress={progress} isVisible={isUploading} />
       
-      {/* Header */}
-      <div className="w-full flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-foreground">
-          {quotePost ? 'Quote Feeds' : 'Post Details'}
-        </h2>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground transition"
-          aria-label="Close"
-        >
-          <X className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Caption */}
-      <textarea
-        placeholder="Write a caption..."
-        value={caption}
-        onChange={(e) => setCaption(e.target.value)}
-        className="w-full p-3 border border-border rounded-lg text-sm resize-none mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
-        rows={4}
-      />
-
-      {/* Hashtags */}
-      <input
-        type="text"
-        placeholder="Add hashtags (e.g. #style #vibes)"
-        value={hashtags}
-        onChange={(e) => setHashtags(e.target.value)}
-        className="w-full p-3 border border-border rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
-      />
-      {parsedHashtags.length > 0 && (
-        <div className="w-full mb-4 flex flex-wrap gap-2">
-          {parsedHashtags.map((tag) => (
-            <span key={tag} className="px-3 py-1 text-xs rounded-full bg-muted text-foreground">
-              #{tag}
-            </span>
-          ))}
+        {/* Header */}
+        <div className="w-full flex items-center justify-between mb-4 shrink-0">
+          <h2 className="text-lg font-bold text-foreground">
+            {quotePost ? 'Quote Feeds' : 'Post Details'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
-      )}
 
-      {/* Location */}
-      <input
-        type="text"
-        placeholder="Add location (optional)"
-        value={location}
-        onChange={(e) => setLocation(e.target.value)}
-        className="w-full p-3 border border-border rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
-      />
+        {/* Caption */}
+        <textarea
+          placeholder="Write a caption..."
+          value={caption}
+          onChange={(e) => setCaption(e.target.value)}
+          className="w-full p-3 border border-border rounded-lg text-sm resize-none mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
+          rows={3}
+        />
 
-      {/* Privacy */}
-      <div className="w-full mb-4">
-        <label className="text-xs font-medium text-muted-foreground mb-2 block">Visibility</label>
-        <div className="flex flex-wrap gap-2">
-          {privacyOptions.map((opt) => {
-            const IconComponent = opt.icon;
-            return (
-              <button
-                key={opt.value}
-                onClick={() => setPrivacy(opt.value as Privacy)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-                  privacy === opt.value
-                    ? 'bg-primary text-white'
-                    : 'bg-muted text-foreground hover:bg-muted/80'
-                }`}
-              >
-                <IconComponent className="w-3.5 h-3.5" />
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Detect Faces Toggle */}
-      <button
-        onClick={() => setDetectFaces(!detectFaces)}
-        className={`w-full flex items-center justify-between p-3 rounded-lg border transition ${
-          detectFaces ? 'border-primary bg-primary/10' : 'border-border hover:border-primary'
-        } mb-4`}
-      >
-        <span className="text-sm font-medium text-foreground">Detect Faces</span>
-        <Sparkles className="w-5 h-5 text-muted-foreground" />
-      </button>
-
-      {/* Add from Gallery */}
-      <button
-        onClick={() => console.log('Open gallery')}
-        className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary transition mb-6"
-      >
-        <span className="text-sm font-medium text-foreground">Add from Gallery</span>
-        <ImagePlus className="w-5 h-5 text-muted-foreground" />
-      </button>
-
-      {/* Post Button */}
-      <button
-        onClick={handlePost}
-        disabled={loading}
-        className="w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {loading ? (
-          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-        ) : (
-          'Post'
+        {/* Hashtags */}
+        <input
+          type="text"
+          placeholder="Add hashtags (e.g. #style #vibes)"
+          value={hashtags}
+          onChange={(e) => setHashtags(e.target.value)}
+          className="w-full p-3 border border-border rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+        {parsedHashtags.length > 0 && (
+          <div className="w-full mb-3 flex flex-wrap gap-2">
+            {parsedHashtags.map((tag) => (
+              <span key={tag} className="px-2 py-1 text-xs rounded-full bg-muted text-foreground">
+                #{tag}
+              </span>
+            ))}
+          </div>
         )}
-      </button>
 
-      {/* Safe area padding for mobile */}
-      <div className="h-6" />
+        {/* Location */}
+        <input
+          type="text"
+          placeholder="Add location (optional)"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          className="w-full p-3 border border-border rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
+        />
+
+        {/* Privacy */}
+        <div className="w-full mb-3">
+          <label className="text-xs font-medium text-muted-foreground mb-2 block">Visibility</label>
+          <div className="flex flex-wrap gap-2">
+            {privacyOptions.map((opt) => {
+              const IconComponent = opt.icon;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setPrivacy(opt.value as Privacy)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition ${
+                    privacy === opt.value
+                      ? 'bg-primary text-white'
+                      : 'bg-muted text-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  <IconComponent className="w-3 h-3" />
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Detect Faces Toggle */}
+        <button
+          onClick={() => setDetectFaces(!detectFaces)}
+          className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition ${
+            detectFaces ? 'border-primary bg-primary/10' : 'border-border hover:border-primary'
+          } mb-3`}
+        >
+          <span className="text-sm font-medium text-foreground">Detect Faces</span>
+          <Sparkles className="w-4 h-4 text-muted-foreground" />
+        </button>
+
+        {/* Add from Gallery */}
+        <button
+          onClick={() => console.log('Open gallery')}
+          className="w-full flex items-center justify-between p-2.5 rounded-lg border border-border hover:border-primary transition mb-4"
+        >
+          <span className="text-sm font-medium text-foreground">Add from Gallery</span>
+          <ImagePlus className="w-4 h-4 text-muted-foreground" />
+        </button>
+
+        {/* Post Button */}
+        <button
+          onClick={handlePost}
+          disabled={loading}
+          className="w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+          ) : (
+            'Post'
+          )}
+        </button>
+
+        {/* Safe area padding for mobile */}
+        <div className="h-4" />
+      </div>
     </div>
   );
 }
