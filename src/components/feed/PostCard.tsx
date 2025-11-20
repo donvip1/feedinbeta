@@ -233,7 +233,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
         {/* Media Card */}
         <div className="bg-card rounded-lg overflow-hidden border border-border relative">
           {post.media_url && (
-            <div className="w-full relative group h-[70vh]" id={`media-${post.id}`}>
+            <div className="w-full relative group h-[55vh]" id={`media-${post.id}`}>
               {post.media_type === 'image' ? (
                 <>
                   <img
