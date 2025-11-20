@@ -69,6 +69,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const currentVideoTime = useRef(0);
 
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const username = post.profiles?.username || 'user';
@@ -126,8 +127,16 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   };
 
   const toggleFullscreen = () => {
+    // Save current video time before opening fullscreen
+    if (videoRef.current && post.media_type === 'video') {
+      currentVideoTime.current = videoRef.current.currentTime;
+    }
     setShowFullscreenViewer(true);
     onInteractionStart?.();
+  };
+
+  const handleProfileClick = () => {
+    navigate(`/profile/${post.user_id}`);
   };
 
   const handleDeletePost = async () => {
@@ -197,16 +206,17 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 >
         {/* Header - Outside card */}
         <div className="flex items-center justify-between mb-2 px-1">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-10 h-10 cursor-pointer" onClick={() => navigate(`/profile/${post.user_id}`)}>
+          <div 
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={handleProfileClick}
+          >
+            <Avatar className="w-10 h-10">
               <AvatarImage src={post.profiles?.avatar_url || ''} />
               <AvatarFallback>{displayName[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
             <div>
               <p className="font-semibold text-sm">{displayName}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
-              </p>
+              <p className="text-xs text-muted-foreground">@{username}</p>
             </div>
           </div>
           {canDeletePost && (
@@ -467,6 +477,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           setShowFullscreenViewer(false);
           onInteractionEnd?.();
         }}
+        initialTime={currentVideoTime.current}
       />
     </>
   );
