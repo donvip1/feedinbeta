@@ -10,7 +10,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ArrowLeft, Send, Smile, Phone, Video } from 'lucide-react';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
-import { ReactionPicker } from '@/components/feed/ReactionPicker';
 
 interface Message {
   id: string;
