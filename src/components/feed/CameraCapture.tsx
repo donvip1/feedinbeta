@@ -167,6 +167,7 @@ export function CameraCapture({ open, onClose, onCapture, onSwitchToGallery }: C
         mediaType={capturedMediaType}
         effects={{ filter: selectedFilter }}
         mediaFile={capturedMediaFile}
+        quotePost={null}
         onSuccess={() => {
           setCapturedMediaUrl(null);
           setCapturedMediaFile(null);

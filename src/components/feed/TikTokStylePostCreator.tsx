@@ -88,6 +88,26 @@ export function TikTokStylePostCreator({
     }
   };
 
+  // For details step, render without Dialog wrapper to avoid conflicts
+  if (step === 'details' && (mediaPreview || mediaType === 'text')) {
+    return (
+      <InstagramStylePostDetails
+        open={true}
+        onClose={handleClose}
+        onBack={handleBack}
+        mediaUrl={mediaPreview}
+        mediaType={mediaType}
+        effects={editedEffects}
+        mediaFile={mediaFile}
+        quotePost={null}
+        onSuccess={() => {
+          onSuccess();
+          handleClose();
+        }}
+      />
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleClose} modal={true}>
       <DialogContent 
@@ -198,23 +218,7 @@ export function TikTokStylePostCreator({
           />
         )}
 
-        {/* Details Step - Caption, hashtags, location, etc. (after editing) */}
-        {step === 'details' && (mediaPreview || mediaType === 'text') && (
-          <InstagramStylePostDetails
-            open={true}
-            onClose={handleClose}
-            onBack={handleBack}
-            mediaUrl={mediaPreview}
-            mediaType={mediaType}
-            effects={editedEffects}
-            mediaFile={mediaFile}
-            quotePost={null}
-            onSuccess={() => {
-              onSuccess();
-              handleClose();
-            }}
-          />
-        )}
+        {/* Details step is now rendered outside Dialog - see early return above */}
       </DialogContent>
     </Dialog>
   );

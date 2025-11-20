@@ -92,6 +92,7 @@ export function TextPostCreator({ open, onClose, onCreate, isPremium = false }: 
           fontSize,
         }}
         mediaFile={null}
+        quotePost={null}
         onSuccess={() => {
           setText('');
           setSelectedBackground(null);
