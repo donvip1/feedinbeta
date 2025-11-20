@@ -41,15 +41,20 @@ export default function FullscreenMediaViewer({
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
 
-  const currentPost = allPosts[currentPostIndex];
+  // Filter to only video posts for swipe navigation in video fullscreen
+  const navigablePosts = post.media_type === 'video' 
+    ? allPosts.filter(p => p.media_type === 'video')
+    : allPosts;
+
+  const currentPost = navigablePosts[currentPostIndex];
   const isVideo = currentPost?.media_type === 'video';
 
   useEffect(() => {
-    const index = allPosts.findIndex(p => p.id === post.id);
+    const index = navigablePosts.findIndex(p => p.id === post.id);
     if (index !== -1) {
       setCurrentPostIndex(index);
     }
-  }, [post.id, allPosts]);
+  }, [post.id, navigablePosts]);
 
   useEffect(() => {
     if (isOpen && isVideo && videoRef.current) {
@@ -86,8 +91,11 @@ export default function FullscreenMediaViewer({
     const touchEndY = e.changedTouches[0].clientY;
     const diff = touchStartY.current - touchEndY;
 
+    // Only allow swipe navigation for videos
+    if (!isVideo) return;
+
     // Swipe up - next video
-    if (diff > 50 && currentPostIndex < allPosts.length - 1) {
+    if (diff > 50 && currentPostIndex < navigablePosts.length - 1) {
       navigateToPost(currentPostIndex + 1);
     }
     // Swipe down - previous video
@@ -97,7 +105,7 @@ export default function FullscreenMediaViewer({
   };
 
   const navigateToPost = (index: number) => {
-    const newPost = allPosts[index];
+    const newPost = navigablePosts[index];
     if (!newPost) return;
 
     setCurrentPostIndex(index);
@@ -276,10 +284,10 @@ export default function FullscreenMediaViewer({
           </div>
         )}
 
-        {/* Navigation Hints */}
-        {allPosts.length > 1 && (
+        {/* Navigation Hints - only for videos */}
+        {isVideo && navigablePosts.length > 1 && (
           <>
-            {currentPostIndex < allPosts.length - 1 && (
+            {currentPostIndex < navigablePosts.length - 1 && (
               <div className="absolute bottom-32 right-4 text-white/50 text-xs">
                 Swipe up for next
               </div>
