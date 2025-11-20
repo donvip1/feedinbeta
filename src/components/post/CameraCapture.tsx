@@ -1,31 +1,76 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Camera, Image as ImageIcon, X } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface CameraCaptureProps {
-  onCapture: (media: { url: string; type: 'image' | 'video' }) => void;
+  onCapture: (media: { url: string; type: 'image' | 'video'; file: File }) => void;
+  onClose: () => void;
 }
 
-export default function CameraCapture({ onCapture }: CameraCaptureProps) {
-  const [captured, setCaptured] = useState(false);
+export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
-  const handleCapture = () => {
-    // Simulate capture
-    const dummyMedia = {
-      url: '/placeholder.svg',
-      type: 'image' as const,
-    };
-    setCaptured(true);
-    onCapture(dummyMedia);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/');
+
+    if (!isImage && !isVideo) {
+      toast({
+        title: 'Invalid file type',
+        description: 'Please select an image or video file.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    onCapture({
+      url,
+      type: isVideo ? 'video' : 'image',
+      file,
+    });
   };
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-4">
-      <div className="text-white text-lg mb-4">Camera (Portrait)</div>
       <button
-        onClick={handleCapture}
-        className="bg-white text-black px-6 py-3 rounded-full font-semibold"
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white p-2 hover:bg-white/10 rounded-full"
       >
-        Capture
+        <X className="w-6 h-6" />
       </button>
+
+      <div className="text-white text-xl font-semibold mb-8">Create Post</div>
+
+      <div className="flex flex-col gap-4 w-full max-w-xs">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="bg-white text-black px-8 py-4 rounded-full font-semibold flex items-center justify-center gap-3 hover:bg-white/90 transition-colors"
+        >
+          <Camera className="w-6 h-6" />
+          Camera
+        </button>
+
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="bg-white/20 text-white px-8 py-4 rounded-full font-semibold flex items-center justify-center gap-3 hover:bg-white/30 transition-colors backdrop-blur-sm"
+        >
+          <ImageIcon className="w-6 h-6" />
+          Gallery
+        </button>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,video/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
     </div>
   );
 }
