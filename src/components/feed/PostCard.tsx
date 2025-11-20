@@ -365,6 +365,12 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
         isOpen={commentsOpen}
         onClose={() => setCommentsOpen(false)}
         postId={post.id}
+        postData={{
+          content: post.content,
+          media_url: post.media_url,
+          media_type: post.media_type,
+          profiles: post.profiles,
+        }}
       />
       <ShareModal
         isOpen={shareOpen}
