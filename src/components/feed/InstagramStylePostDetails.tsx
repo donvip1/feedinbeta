@@ -22,7 +22,7 @@ interface InstagramStylePostDetailsProps {
   mediaType: 'text' | 'image' | 'video';
   effects: any;
   mediaFile: File | null;
-  onSuccess: () => void;
+  onSuccess: (postId?: string) => void;
   quotePost?: {
     id: string;
     content: string | null;
@@ -210,12 +210,25 @@ export function InstagramStylePostDetails({
       if (postError) throw postError;
       updateProgress(90);
 
+      // Process hashtags
       if (caption) {
         const hashtags = extractHashtags(caption);
-        await supabase.rpc('process_hashtags', {
-          p_post_id: post.id,
-          p_hashtags: hashtags,
-        });
+        
+        for (const tag of hashtags) {
+          // Insert or get hashtag
+          const { data: hashtag, error: hashtagError } = await supabase
+            .from('hashtags')
+            .upsert({ name: tag.toLowerCase() }, { onConflict: 'name' })
+            .select()
+            .single();
+
+          if (!hashtagError && hashtag) {
+            // Link hashtag to post
+            await supabase
+              .from('post_hashtags')
+              .insert({ post_id: post.id, hashtag_id: hashtag.id });
+          }
+        }
       }
 
       if (shareToStory && finalMediaUrl && mediaType !== 'text') {
@@ -237,10 +250,10 @@ export function InstagramStylePostDetails({
         description: scheduledAt ? 'Your post will be published at the scheduled time' : 'Your post has been shared successfully',
       });
 
-      onSuccess();
+      onSuccess(post.id);
     } catch (error: any) {
       console.error('Error creating post:', error);
-      failUpload();
+      failUpload(error.message || 'Failed to create post');
       toast({
         title: 'Error',
         description: error.message || 'Failed to create post',
