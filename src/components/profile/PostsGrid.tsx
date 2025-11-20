@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Play, Trash2 } from 'lucide-react';
+import { Play, Trash2, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -20,6 +20,7 @@ interface Post {
   media_url: string | null;
   media_type: string | null;
   content: string | null;
+  views_count: number | null;
 }
 
 interface PostsGridProps {
@@ -44,7 +45,7 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
     try {
       const { data, error } = await supabase
         .from('posts')
-        .select('id, media_url, media_type, content')
+        .select('id, media_url, media_type, content, views_count')
         .eq('user_id', userId)
         .eq('status', 'active')
         .order('created_at', { ascending: false });
@@ -137,6 +138,14 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
                   <p className="text-white text-[10px] text-center line-clamp-4 font-medium">
                     {post.content}
                   </p>
+                </div>
+              )}
+              
+              {/* View count badge */}
+              {post.views_count !== null && post.views_count > 0 && (
+                <div className="absolute bottom-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <Eye className="w-2.5 h-2.5" />
+                  {post.views_count}
                 </div>
               )}
             </div>

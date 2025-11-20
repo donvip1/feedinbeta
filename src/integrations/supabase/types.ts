@@ -3008,6 +3008,7 @@ export type Database = {
         Returns: number
       }
       get_user_post_count: { Args: { user_uuid: string }; Returns: number }
+      get_user_total_likes: { Args: { user_uuid: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
