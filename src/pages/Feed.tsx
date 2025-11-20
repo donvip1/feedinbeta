@@ -7,6 +7,9 @@ import { FloatingActionButton } from '@/components/navigation/FloatingActionButt
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Search, TrendingUp, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import CameraCapture from '@/components/post/CameraCapture';
+import PostEditor from '@/components/post/PostEditor';
+import PostDetails from '@/components/post/PostDetails';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -14,6 +17,8 @@ const Feed = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const feedContainerRef = useRef<HTMLDivElement>(null);
+  const [postStep, setPostStep] = useState<'camera' | 'editor' | 'details' | null>(null);
+  const [media, setMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -27,10 +32,17 @@ const Feed = () => {
   }, [user, authLoading, navigate]);
 
   const handleCreatePost = () => {
+    setPostStep('camera');
+  };
+
+  const handlePostSubmit = (data: any) => {
+    console.log('Final post data:', { ...data, media });
     toast({
-      title: 'Post System Removed',
-      description: 'The post creation system has been completely removed.',
+      title: 'Post Created',
+      description: 'Your post has been created successfully.',
     });
+    setPostStep(null);
+    setMedia(null);
   };
 
   return (
@@ -102,6 +114,25 @@ const Feed = () => {
 
       <FloatingActionButton onClick={handleCreatePost} />
       <BottomNav />
+
+      {postStep === 'camera' && (
+        <CameraCapture
+          onCapture={(m) => {
+            setMedia(m);
+            setPostStep('editor');
+          }}
+        />
+      )}
+      {postStep === 'editor' && media && (
+        <PostEditor
+          media={media}
+          onRetake={() => setPostStep('camera')}
+          onNext={() => setPostStep('details')}
+        />
+      )}
+      {postStep === 'details' && (
+        <PostDetails onSubmit={handlePostSubmit} />
+      )}
     </div>
   );
 };
