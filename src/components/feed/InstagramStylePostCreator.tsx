@@ -131,47 +131,47 @@ export function InstagramStylePostCreator({
               </Button>
             </div>
             
-            <div className="flex-1 flex items-center justify-center px-6 py-8 overflow-y-auto">
-              <div className="w-full max-w-xs mx-auto space-y-3">
+            <div className="flex-1 overflow-y-auto">
+              <div className="space-y-2 p-3">
                 {/* Camera */}
                 <button
                   onClick={() => handleMethodSelect('camera')}
-                  className="w-full flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary transition-all hover:scale-[1.02] bg-accent/30"
+                  className="w-full flex items-center gap-3 p-4 bg-card hover:bg-accent transition-colors active:scale-[0.98]"
                 >
                   <div className="flex-shrink-0">
-                    <CameraIcon className="w-10 h-10 text-primary" />
+                    <CameraIcon className="w-8 h-8 text-primary" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="text-base font-semibold">Camera</div>
-                    <div className="text-xs text-muted-foreground">Take photo or video</div>
+                    <div className="font-semibold">Camera</div>
+                    <div className="text-sm text-muted-foreground">Take photo or video</div>
                   </div>
                 </button>
 
                 {/* Gallery */}
                 <button
                   onClick={() => handleMethodSelect('gallery')}
-                  className="w-full flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary transition-all hover:scale-[1.02] bg-accent/30"
+                  className="w-full flex items-center gap-3 p-4 bg-card hover:bg-accent transition-colors active:scale-[0.98]"
                 >
                   <div className="flex-shrink-0">
-                    <ImageIcon className="w-10 h-10 text-primary" />
+                    <ImageIcon className="w-8 h-8 text-primary" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="text-base font-semibold">Gallery</div>
-                    <div className="text-xs text-muted-foreground">Choose from device</div>
+                    <div className="font-semibold">Gallery</div>
+                    <div className="text-sm text-muted-foreground">Choose from device</div>
                   </div>
                 </button>
 
                 {/* Text */}
                 <button
                   onClick={() => handleMethodSelect('text')}
-                  className="w-full flex items-center gap-4 p-4 rounded-lg border border-border hover:border-primary transition-all hover:scale-[1.02] bg-accent/30"
+                  className="w-full flex items-center gap-3 p-4 bg-card hover:bg-accent transition-colors active:scale-[0.98]"
                 >
                   <div className="flex-shrink-0">
-                    <Type className="w-10 h-10 text-primary" />
+                    <Type className="w-8 h-8 text-primary" />
                   </div>
                   <div className="flex-1 text-left">
-                    <div className="text-base font-semibold">Text</div>
-                    <div className="text-xs text-muted-foreground">Write a post</div>
+                    <div className="font-semibold">Text</div>
+                    <div className="text-sm text-muted-foreground">Write a post</div>
                   </div>
                 </button>
               </div>
