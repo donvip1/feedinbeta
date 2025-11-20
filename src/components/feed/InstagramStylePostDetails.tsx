@@ -182,8 +182,8 @@ export function InstagramStylePostDetails({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background">
-      <div className="w-full h-full max-w-md mx-auto flex flex-col p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[100] bg-background flex items-start justify-center overflow-y-auto">
+      <div className="w-full max-w-sm flex flex-col p-4 min-h-full">
         <ProgressBar progress={progress} isVisible={isUploading} />
       
         {/* Header */}
