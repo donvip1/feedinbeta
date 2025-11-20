@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ImageIcon, Video, Type, X, Upload } from 'lucide-react';
 import { PostEditorModal } from './PostEditorModal';
 import { PostDetailsModal } from './PostDetailsModal';
+import { CreatePostMethodSelector } from './CreatePostMethodSelector';
 import { CameraCapture } from './CameraCapture';
 import { MediaGalleryPicker } from './MediaGalleryPicker';
 import { VideoTrimmer } from './VideoTrimmer';
@@ -40,6 +41,7 @@ export function EnhancedCreatePostModal({
     initialImageUrl ? 'image' : 'text'
   );
   const [effects, setEffects] = useState<any>(null);
+  const [showMethodSelector, setShowMethodSelector] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [showTextToImage, setShowTextToImage] = useState(false);
@@ -97,6 +99,7 @@ export function EnhancedCreatePostModal({
     setMediaFile(null);
     setMediaPreview(null);
     setEffects(null);
+    setShowMethodSelector(false);
     onSuccess();
   };
 
@@ -105,6 +108,7 @@ export function EnhancedCreatePostModal({
     setMediaFile(null);
     setMediaPreview(null);
     setEffects(null);
+    setShowMethodSelector(false);
     setShowCamera(false);
     setShowGallery(false);
     setShowTextToImage(false);
@@ -113,6 +117,27 @@ export function EnhancedCreatePostModal({
     onClose();
   };
 
+  const handleMethodSelect = (method: 'camera' | 'gallery' | 'text-to-image' | 'ai-generate' | 'text') => {
+    setShowMethodSelector(false);
+    
+    switch (method) {
+      case 'camera':
+        setShowCamera(true);
+        break;
+      case 'gallery':
+        setShowGallery(true);
+        break;
+      case 'text':
+        setShowTextCreator(true);
+        break;
+      case 'text-to-image':
+        setShowTextToImage(true);
+        break;
+      case 'ai-generate':
+        setShowAIGenerator(true);
+        break;
+    }
+  };
 
   const handleCameraCapture = (file: File, type: 'image' | 'video', appliedEffects?: any) => {
     setMediaFile(file);
@@ -215,13 +240,27 @@ export function EnhancedCreatePostModal({
     setStep('details');
   };
 
+  // Show method selector when modal opens
+  if (open && step === 'method' && !showMethodSelector) {
+    setTimeout(() => setShowMethodSelector(true), 0);
+  }
+
   return (
     <>
+      {/* Method Selector */}
+      <CreatePostMethodSelector
+        open={open && showMethodSelector}
+        onClose={handleClose}
+        onSelectMethod={handleMethodSelect}
+        isPremium={isPremium}
+      />
+
       {/* Camera Capture */}
       <CameraCapture
         open={showCamera}
         onClose={() => {
           setShowCamera(false);
+          setShowMethodSelector(true);
         }}
         onCapture={handleCameraCapture}
         onSwitchToGallery={() => {
@@ -239,6 +278,7 @@ export function EnhancedCreatePostModal({
         open={showGallery}
         onClose={() => {
           setShowGallery(false);
+          setShowMethodSelector(true);
         }}
         onSelect={handleGallerySelect}
       />
@@ -262,6 +302,7 @@ export function EnhancedCreatePostModal({
         open={showTextToImage}
         onClose={() => {
           setShowTextToImage(false);
+          setShowMethodSelector(true);
         }}
         onCreate={handleTextToImageCreate}
       />
@@ -271,6 +312,7 @@ export function EnhancedCreatePostModal({
         open={showAIGenerator}
         onClose={() => {
           setShowAIGenerator(false);
+          setShowMethodSelector(true);
         }}
         onCreate={handleAIImageCreate}
       />
@@ -281,6 +323,7 @@ export function EnhancedCreatePostModal({
         open={showTextCreator}
         onClose={() => {
           setShowTextCreator(false);
+          setShowMethodSelector(true);
         }}
         onCreate={handleTextCreate}
         isPremium={isPremium}
