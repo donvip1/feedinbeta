@@ -182,8 +182,7 @@ const Feed = () => {
         )}
       </div>
 
-      <FloatingActionButton onClick={handleCreatePost} />
-      <BottomNav />
+      <BottomNav onCreatePost={handleCreatePost} />
 
       {postStep === 'camera' && (
         <CameraCapture

@@ -1,4 +1,4 @@
-import { Home, Mail, User, Zap, Wallet, BookOpen } from 'lucide-react';
+import { Home, Mail, User, Zap, Wallet, BookOpen, PenSquare } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -10,9 +10,10 @@ import { useEffect, useState } from 'react';
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
   hidden?: boolean;
+  onCreatePost?: () => void;
 }
 
-export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNavProps) => {
+export const BottomNav = ({ currentPage = 'default', hidden = false, onCreatePost }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -52,12 +53,17 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     return null;
   }
 
+  // Split nav items to put quick action in middle
+  const firstHalf = navItems.slice(0, 3); // Feed, Chats, Wallet
+  const secondHalf = navItems.slice(3); // Learn Tech, AI, Profile
+
   return (
     <TooltipProvider>
       <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-border/50">
-        <div className="max-w-screen-xl mx-auto px-4">
-          <div className="flex items-center justify-around py-2">
-            {navItems.map((item) => {
+        <div className="max-w-screen-xl mx-auto px-2">
+          <div className="flex items-center justify-between py-2">
+            {/* First half of nav items */}
+            {firstHalf.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
               return (
@@ -67,20 +73,76 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       onClick={() => navigate(item.path)}
                       variant="ghost"
                       size="icon"
-                      className={`h-14 w-14 hover:bg-transparent transition-colors ${
+                      className={`h-12 w-12 hover:bg-transparent transition-colors ${
                         active ? 'text-primary' : 'text-foreground/80 hover:text-foreground'
                       }`}
                     >
                       {item.isProfile && avatarUrl ? (
                         <div className={`rounded-full ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}>
-                          <Avatar className="w-8 h-8">
+                          <Avatar className="w-7 h-7">
                             <AvatarImage src={avatarUrl} />
-                            <AvatarFallback><Icon className="w-5 h-5" /></AvatarFallback>
+                            <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
                           </Avatar>
                         </div>
                       ) : (
                         <Icon 
-                          size={28}
+                          size={24}
+                          strokeWidth={2.5}
+                          className="transition-transform hover:scale-110"
+                        />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    <p>{item.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+
+            {/* Quick Action Button in the middle */}
+            {onCreatePost && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onCreatePost}
+                    className="bg-primary/10 p-2 rounded-lg hover:bg-primary/20 hover:scale-110 active:scale-95 transition-all duration-200 border border-primary/20"
+                    aria-label="Create post"
+                  >
+                    <PenSquare className="w-7 h-7 text-primary" strokeWidth={2} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">
+                  <p>Create Post</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Second half of nav items */}
+            {secondHalf.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.path);
+              return (
+                <Tooltip key={item.id}>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={() => navigate(item.path)}
+                      variant="ghost"
+                      size="icon"
+                      className={`h-12 w-12 hover:bg-transparent transition-colors ${
+                        active ? 'text-primary' : 'text-foreground/80 hover:text-foreground'
+                      }`}
+                    >
+                      {item.isProfile && avatarUrl ? (
+                        <div className={`rounded-full ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}>
+                          <Avatar className="w-7 h-7">
+                            <AvatarImage src={avatarUrl} />
+                            <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
+                          </Avatar>
+                        </div>
+                      ) : (
+                        <Icon 
+                          size={24}
                           strokeWidth={2.5}
                           className="transition-transform hover:scale-110"
                         />
