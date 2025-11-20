@@ -9,9 +9,7 @@ import { Search, TrendingUp, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import CameraCapture from '@/components/post/CameraCapture';
-import PostEditor from '@/components/post/PostEditor';
-import PostDetails from '@/components/post/PostDetails';
+import TikTokPortraitPostFlow from '@/components/post/TikTokPortraitPostFlow';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
@@ -22,8 +20,7 @@ const Feed = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const feedContainerRef = useRef<HTMLDivElement>(null);
-  const [postStep, setPostStep] = useState<'camera' | 'editor' | 'details' | 'story' | null>(null);
-  const [media, setMedia] = useState<{ url: string; type: 'image' | 'video'; file: File } | null>(null);
+  const [postStep, setPostStep] = useState<'create' | 'story' | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [showNav, setShowNav] = useState(true);
@@ -125,12 +122,11 @@ const Feed = () => {
   };
 
   const handleCreatePost = () => {
-    setPostStep('camera');
+    setPostStep('create');
   };
 
   const handlePostSubmit = () => {
     setPostStep(null);
-    setMedia(null);
     refetch();
   };
 
@@ -237,37 +233,10 @@ const Feed = () => {
 
       <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen || !showNav || postStep !== null} />
 
-      {postStep === 'camera' && (
-        <CameraCapture
-          onCapture={(m) => {
-            setMedia(m);
-            setPostStep('editor');
-          }}
+      {postStep === 'create' && (
+        <TikTokPortraitPostFlow
           onClose={() => setPostStep(null)}
-          onStorySelect={() => setPostStep('story')}
-        />
-      )}
-      {postStep === 'editor' && media && (
-        <PostEditor
-          media={media}
-          onRetake={() => {
-            setMedia(null);
-            setPostStep('camera');
-          }}
-          onNext={(editedMedia) => {
-            setMedia(editedMedia);
-            setPostStep('details');
-          }}
-        />
-      )}
-      {postStep === 'details' && media && (
-        <PostDetails
-          media={media}
           onSubmit={handlePostSubmit}
-          onClose={() => {
-            setPostStep(null);
-            setMedia(null);
-          }}
         />
       )}
       {postStep === 'story' && (
