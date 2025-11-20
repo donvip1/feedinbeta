@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
@@ -48,6 +50,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
@@ -94,15 +97,48 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
   };
 
   const toggleFullscreen = () => {
-    const mediaElement = post.media_type === 'video' ? videoRef.current : document.querySelector(`#media-${post.id}`);
+    const mediaElement = post.media_type === 'video' 
+      ? videoRef.current 
+      : document.querySelector(`#media-${post.id}`) as HTMLElement;
+    
     if (mediaElement) {
       if (document.fullscreenElement) {
         document.exitFullscreen();
       } else {
-        mediaElement.requestFullscreen();
+        mediaElement.requestFullscreen().catch(err => {
+          console.error('Error attempting to enable fullscreen:', err);
+        });
       }
     }
   };
+
+  const handleDeletePost = async () => {
+    try {
+      const { error } = await supabase
+        .from('posts')
+        .delete()
+        .eq('id', post.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Post deleted',
+        description: 'Your post has been deleted successfully',
+      });
+
+      onLikeUpdate?.();
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete post',
+        variant: 'destructive',
+      });
+    }
+    setShowDeleteDialog(false);
+  };
+
+  const canDeletePost = user && (user.id === post.user_id);
 
   const handleLike = async () => {
     if (!user) {
@@ -155,9 +191,24 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
               </p>
             </div>
           </div>
-          <button className="p-2 hover:bg-muted rounded-full">
-            <MoreVertical className="w-5 h-5 text-muted-foreground" />
-          </button>
+          {canDeletePost && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="p-2 hover:bg-muted rounded-full">
+                  <MoreVertical className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem 
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Post
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Caption - Outside card */}
@@ -182,13 +233,13 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
         {/* Media Card */}
         <div className="bg-card rounded-lg overflow-hidden border border-border relative">
           {post.media_url && (
-            <div className="w-full relative group" id={`media-${post.id}`}>
+            <div className="w-full relative group h-[70vh]" id={`media-${post.id}`}>
               {post.media_type === 'image' ? (
                 <>
                   <img
                     src={post.media_url}
                     alt="Post content"
-                    className="w-full object-cover max-h-96"
+                    className="w-full h-full object-cover"
                   />
                   {/* Fullscreen button for images */}
                   <button
@@ -203,7 +254,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
                   <video
                     ref={videoRef}
                     src={post.media_url}
-                    className="w-full max-h-96"
+                    className="w-full h-full object-cover"
                     playsInline
                     muted={isMuted}
                     onClick={togglePlayPause}
@@ -329,6 +380,24 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
         onClose={() => setRefeedOpen(false)}
         postId={post.id}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Post</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this post? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePost} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
