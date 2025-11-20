@@ -85,6 +85,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
 
   const fetchComments = async () => {
     try {
+      // Fetch all comments including replies
       const { data, error } = await supabase
         .from('post_comments')
         .select(`
@@ -98,11 +99,31 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
           comment_likes (count)
         `)
         .eq('post_id', postId)
-        .is('parent_comment_id', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setComments(data || []);
+      
+      // Organize comments into a tree structure
+      const commentMap = new Map();
+      const topLevelComments: any[] = [];
+      
+      (data || []).forEach((comment: any) => {
+        commentMap.set(comment.id, { ...comment, replies: [] });
+      });
+      
+      (data || []).forEach((comment: any) => {
+        const commentWithReplies = commentMap.get(comment.id);
+        if (comment.parent_comment_id) {
+          const parent = commentMap.get(comment.parent_comment_id);
+          if (parent) {
+            parent.replies.push(commentWithReplies);
+          }
+        } else {
+          topLevelComments.push(commentWithReplies);
+        }
+      });
+      
+      setComments(topLevelComments);
     } catch (error) {
       console.error('Error fetching comments:', error);
     }
@@ -186,11 +207,21 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
       // Immediately add the new comment to the list
       if (newComment) {
         if (replyTo?.id) {
-          // If it's a reply, refetch to update the parent comment
-          fetchComments();
+          // If it's a reply, add it to the parent's replies in real-time
+          setComments((prev) => 
+            prev.map((comment) => {
+              if (comment.id === replyTo.id) {
+                return {
+                  ...comment,
+                  replies: [{ ...newComment, replies: [] }, ...(comment.replies || [])]
+                };
+              }
+              return comment;
+            })
+          );
         } else {
           // If it's a top-level comment, add it to the beginning
-          setComments((prev) => [newComment, ...prev]);
+          setComments((prev) => [{ ...newComment, replies: [] }, ...prev]);
         }
       }
 
@@ -235,11 +266,11 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-        {/* Post Preview - Full Media Display */}
+        {/* Post Preview - Compact Media Display */}
         {postData && (
-          <div className="flex-shrink-0 bg-background relative">
+          <div className="flex-shrink-0 bg-background relative border-b">
             {postData.media_url && (
-              <div className="w-full aspect-[9/16] max-h-[50vh] bg-black flex items-center justify-center">
+              <div className="w-full max-h-[25vh] bg-black flex items-center justify-center">
                 {postData.media_type?.startsWith('video') ? (
                   <video 
                     src={postData.media_url} 
@@ -267,7 +298,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
           </Button>
         </div>
 
-        {/* Comments list */}
+        {/* Comments list - YouTube style */}
         <ScrollArea className="flex-1 px-4">
           {comments.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
@@ -275,17 +306,23 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
               <p className="text-xs">Be the first to comment</p>
             </div>
           ) : (
-            <div className="space-y-4 py-4">
+            <div className="space-y-6 py-4">
               {comments.map((c) => (
-                <div key={c.id} className="flex gap-3 group animate-in fade-in slide-in-from-bottom-2">
-                  <Avatar className="w-9 h-9 ring-2 ring-background">
-                    <AvatarImage src={c.profiles?.avatar_url} />
-                    <AvatarFallback className="text-xs">{c.profiles?.display_name?.[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="bg-muted rounded-2xl px-3 py-2">
-                      <p className="text-sm font-semibold">{c.profiles?.display_name}</p>
-                      <p className="text-sm leading-relaxed break-words">
+                <div key={c.id} className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                  {/* Main Comment */}
+                  <div className="flex gap-3 group">
+                    <Avatar className="w-10 h-10 flex-shrink-0">
+                      <AvatarImage src={c.profiles?.avatar_url} />
+                      <AvatarFallback className="text-xs">{c.profiles?.display_name?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-semibold">{c.profiles?.display_name}</p>
+                        <span className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
+                        </span>
+                      </div>
+                      <p className="text-sm leading-relaxed break-words mb-2">
                         {formatTextWithHashtagsAndMentions(c.content).map((part: any) => {
                           if (part.type === 'hashtag') {
                             return (
@@ -318,29 +355,90 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                           return <span key={part.key}>{part.text}</span>;
                         })}
                       </p>
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => handleLikeComment(c.id)}
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          <Heart className="w-3.5 h-3.5" />
+                          <span>{c.comment_likes?.[0]?.count || 0}</span>
+                        </button>
+                        <button
+                          onClick={() => setReplyTo({ id: c.id, username: c.profiles?.display_name || 'User' })}
+                          className="text-xs text-muted-foreground hover:text-primary transition-colors font-medium"
+                        >
+                          Reply
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-4 mt-1 px-3">
-                      <button
-                        onClick={() => handleLikeComment(c.id)}
-                        className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
-                      >
-                        <Heart className="w-3 h-3" />
-                        <span>{c.comment_likes?.[0]?.count || 0}</span>
-                      </button>
-                      <button
-                        onClick={() => setReplyTo({ id: c.id, username: c.profiles?.display_name || 'User' })}
-                        className="text-xs text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        Reply
-                      </button>
-                      <span className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
-                      </span>
-                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
+                  
+                  {/* Replies */}
+                  {c.replies && c.replies.length > 0 && (
+                    <div className="ml-12 space-y-3 border-l-2 border-border pl-4">
+                      {c.replies.map((reply: any) => (
+                        <div key={reply.id} className="flex gap-3 group">
+                          <Avatar className="w-8 h-8 flex-shrink-0">
+                            <AvatarImage src={reply.profiles?.avatar_url} />
+                            <AvatarFallback className="text-xs">{reply.profiles?.display_name?.[0]}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="text-sm font-semibold">{reply.profiles?.display_name}</p>
+                              <span className="text-xs text-muted-foreground">
+                                {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
+                              </span>
+                            </div>
+                            <p className="text-sm leading-relaxed break-words mb-2">
+                              {formatTextWithHashtagsAndMentions(reply.content).map((part: any) => {
+                                if (part.type === 'hashtag') {
+                                  return (
+                                    <span
+                                      key={part.key}
+                                      className="text-primary cursor-pointer hover:underline"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/search?q=${encodeURIComponent(part.searchTerm)}`);
+                                      }}
+                                    >
+                                      {part.text}
+                                    </span>
+                                  );
+                                }
+                                if (part.type === 'mention') {
+                                  return (
+                                    <span
+                                      key={part.key}
+                                      className="text-primary cursor-pointer hover:underline"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/profile/${part.username}`);
+                                      }}
+                                    >
+                                      {part.text}
+                                    </span>
+                                  );
+                                }
+                                return <span key={part.key}>{part.text}</span>;
+                              })}
+                            </p>
+                            <div className="flex items-center gap-4">
+                              <button
+                                onClick={() => handleLikeComment(reply.id)}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                              >
+                                <Heart className="w-3.5 h-3.5" />
+                                <span>{reply.comment_likes?.[0]?.count || 0}</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
