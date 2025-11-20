@@ -162,9 +162,10 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
               )}
             </div>
           )}
+        </div>
 
-          {/* Actions */}
-          <div className="px-3 py-2 border-t border-border">
+        {/* Actions - Outside below card */}
+        <div className="px-1 py-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
               <button
@@ -213,12 +214,11 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
             </div>
           </div>
 
-            {/* Promote button on separate line */}
-            <button className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-              <TrendingUp className="w-4 h-4" />
-              <span>Promote</span>
-            </button>
-          </div>
+          {/* Promote button on separate line */}
+          <button className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+            <TrendingUp className="w-4 h-4" />
+            <span>Promote</span>
+          </button>
         </div>
       </div>
 
