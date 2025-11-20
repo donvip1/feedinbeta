@@ -265,35 +265,34 @@ export function InstagramStylePostDetails({
   };
 
   return (
-    <div className="flex flex-col h-full bg-background w-full">
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-          <Button variant="ghost" size="icon" onClick={onBack} className="h-9 w-9">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">{quotePost ? 'Quote Feeds' : 'New Post'}</h1>
-          <Button 
-            onClick={() => handlePost(!showScheduling)}
-            disabled={loading}
-            size="sm"
-            className="h-9 px-4"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (showScheduling ? 'Schedule' : 'Share')}
-          </Button>
-        </div>
+    <div className="fixed inset-0 z-50 bg-background flex flex-col">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
+        <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8">
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <h1 className="text-base font-semibold">{quotePost ? 'Quote Feeds' : 'New Post'}</h1>
+        <Button 
+          onClick={() => handlePost(!showScheduling)}
+          disabled={loading}
+          size="sm"
+          className="h-8 px-3 text-sm"
+        >
+          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : (showScheduling ? 'Schedule' : 'Share')}
+        </Button>
+      </div>
 
-        <ProgressBar progress={progress} isVisible={isUploading} />
+      <ProgressBar progress={progress} isVisible={isUploading} />
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="w-full max-w-md mx-auto px-4 py-4 space-y-4 pb-24">
+      <div className="flex-1 overflow-y-auto">
+        <div className="w-full px-3 py-3 space-y-3 pb-20">
 
-            <div className="space-y-2">
-              <Label className="text-base font-medium">{quotePost ? "Comment" : "Caption"}</Label>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">{quotePost ? "Comment" : "Caption"}</Label>
               <Textarea 
                 placeholder="Write a caption..." 
                 value={caption} 
                 onChange={(e) => setCaption(e.target.value)} 
-                className="min-h-[100px] resize-none"
+                className="min-h-[80px] resize-none text-sm"
               />
             </div>
 
@@ -319,10 +318,10 @@ export function InstagramStylePostDetails({
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-base font-medium flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <MapPin className="w-3.5 h-3.5" />
                   Location
                 </Label>
                 <Button 
@@ -330,9 +329,9 @@ export function InstagramStylePostDetails({
                   size="sm" 
                   onClick={detectLocation} 
                   disabled={isDetectingLocation} 
-                  className="h-8 px-3"
+                  className="h-7 px-2 text-xs"
                 >
-                  {isDetectingLocation ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Detect'}
+                  {isDetectingLocation ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Detect'}
                 </Button>
               </div>
               <Input 
@@ -342,24 +341,24 @@ export function InstagramStylePostDetails({
                   setLocation(e.target.value); 
                   searchLocation(e.target.value); 
                 }} 
-                className="h-11"
+                className="h-9 text-sm"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-base font-medium flex items-center gap-2">
-                <Globe className="w-4 h-4" />
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Globe className="w-3.5 h-3.5" />
                 Privacy
               </Label>
               <Select value={privacy} onValueChange={(value: any) => setPrivacy(value)}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger className="h-9 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {privacyOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <div className="flex items-center gap-2">
-                        <option.icon className="w-4 h-4" />
+                    <SelectItem key={option.value} value={option.value} className="text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <option.icon className="w-3.5 h-3.5" />
                         {option.label}
                       </div>
                     </SelectItem>
@@ -369,8 +368,8 @@ export function InstagramStylePostDetails({
             </div>
 
             {!quotePost && mediaType !== 'text' && (
-              <div className="flex items-center justify-between py-3 border-y">
-                <Label htmlFor="share-story" className="text-base font-medium cursor-pointer">
+              <div className="flex items-center justify-between py-2 border-y">
+                <Label htmlFor="share-story" className="text-sm font-medium cursor-pointer">
                   Share to Story
                 </Label>
                 <Switch id="share-story" checked={shareToStory} onCheckedChange={setShareToStory} />
@@ -379,54 +378,54 @@ export function InstagramStylePostDetails({
 
             <button 
               onClick={() => setShowScheduling(!showScheduling)} 
-              className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+              className="w-full flex items-center justify-between p-2.5 rounded-lg border hover:bg-accent transition-colors"
             >
-              <div className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
-                <span className="text-base font-medium">Schedule</span>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm font-medium">Schedule</span>
               </div>
-              <ChevronRight className={`w-5 h-5 transition-transform ${showScheduling ? 'rotate-90' : ''}`} />
+              <ChevronRight className={`w-4 h-4 transition-transform ${showScheduling ? 'rotate-90' : ''}`} />
             </button>
 
             {showScheduling && (
-              <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="space-y-2 p-3 border rounded-lg bg-muted/30">
                 <Input 
                   type="date" 
                   value={scheduleDate} 
                   onChange={(e) => setScheduleDate(e.target.value)} 
                   min={new Date().toISOString().split('T')[0]} 
-                  className="h-11"
+                  className="h-9 text-sm"
                 />
                 <div className="grid grid-cols-3 gap-2">
                   <Select value={scheduleHour} onValueChange={setScheduleHour}>
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                        <SelectItem key={h} value={h.toString().padStart(2, '0')}>
+                        <SelectItem key={h} value={h.toString().padStart(2, '0')} className="text-sm">
                           {h.toString().padStart(2, '0')}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Select value={scheduleMinute} onValueChange={setScheduleMinute}>
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {['00', '15', '30', '45'].map((m) => (
-                        <SelectItem key={m} value={m}>{m}</SelectItem>
+                        <SelectItem key={m} value={m} className="text-sm">{m}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <Select value={schedulePeriod} onValueChange={(v: 'AM' | 'PM') => setSchedulePeriod(v)}>
-                    <SelectTrigger className="h-11">
+                    <SelectTrigger className="h-9 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="AM">AM</SelectItem>
-                      <SelectItem value="PM">PM</SelectItem>
+                      <SelectItem value="AM" className="text-sm">AM</SelectItem>
+                      <SelectItem value="PM" className="text-sm">PM</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -435,27 +434,26 @@ export function InstagramStylePostDetails({
 
             <button 
               onClick={() => setShowAdvanced(!showAdvanced)} 
-              className="w-full flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
+              className="w-full flex items-center justify-between p-2.5 rounded-lg border hover:bg-accent transition-colors"
             >
-              <span className="text-base font-medium">Advanced</span>
-              <ChevronRight className={`w-5 h-5 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
+              <span className="text-sm font-medium">Advanced</span>
+              <ChevronRight className={`w-4 h-4 transition-transform ${showAdvanced ? 'rotate-90' : ''}`} />
             </button>
 
             {showAdvanced && (
-              <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+              <div className="space-y-2.5 p-3 border rounded-lg bg-muted/30">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="comments" className="text-base cursor-pointer">Allow Comments</Label>
+                  <Label htmlFor="comments" className="text-sm cursor-pointer">Allow Comments</Label>
                   <Switch id="comments" checked={allowComments} onCheckedChange={setAllowComments} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="refeed" className="text-base cursor-pointer">Allow Refeed</Label>
+                  <Label htmlFor="refeed" className="text-sm cursor-pointer">Allow Refeed</Label>
                   <Switch id="refeed" checked={allowRefeed} onCheckedChange={setAllowRefeed} />
                 </div>
               </div>
             )}
           </div>
         </div>
-      </div>
     </div>
   );
 }
