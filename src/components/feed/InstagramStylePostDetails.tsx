@@ -1,11 +1,22 @@
 import { useState } from 'react';
-import { X, ImagePlus, Sparkles, Loader2 } from 'lucide-react';
+import {
+  X,
+  Sparkles,
+  ImagePlus,
+  Globe,
+  Users,
+  UserCheck,
+  Lock,
+  Loader2,
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { extractHashtags } from '@/lib/hashtag-utils';
 import { useUploadProgress } from '@/hooks/useUploadProgress';
 import { ProgressBar } from '@/components/shared/ProgressBar';
+
+type Privacy = 'everyone' | 'friends' | 'followers' | 'only_me';
 
 interface InstagramStylePostDetailsProps {
   open: boolean;
@@ -49,7 +60,22 @@ export function InstagramStylePostDetails({
   const { progress, isUploading, startUpload, updateProgress, completeUpload, failUpload } = useUploadProgress();
   const [loading, setLoading] = useState(false);
   const [caption, setCaption] = useState('');
+  const [hashtags, setHashtags] = useState('');
+  const [location, setLocation] = useState('');
+  const [privacy, setPrivacy] = useState<Privacy>('everyone');
   const [detectFaces, setDetectFaces] = useState(false);
+
+  const privacyOptions = [
+    { value: 'everyone', label: 'Everyone', icon: Globe },
+    { value: 'friends', label: 'Friends', icon: Users },
+    { value: 'followers', label: 'Followers', icon: UserCheck },
+    { value: 'only_me', label: 'Only Me', icon: Lock },
+  ];
+
+  const parsedHashtags = hashtags
+    .split(/[,\s]+/)
+    .map((tag) => tag.replace(/^#/, '').trim())
+    .filter((tag) => tag.length > 0);
 
   const handlePost = async () => {
     if (!user) return;
@@ -92,8 +118,8 @@ export function InstagramStylePostDetails({
         music_url: effects?.selectedMusic?.url || null,
         music_title: effects?.selectedMusic?.title || null,
         music_artist: effects?.selectedMusic?.artist || null,
-        location: null,
-        privacy: 'everyone' as const,
+        location: location || null,
+        privacy: privacy,
         allow_comments: true,
         allow_refeed: true,
         scheduled_at: null,
@@ -111,22 +137,24 @@ export function InstagramStylePostDetails({
       if (postError) throw postError;
       updateProgress(90);
 
-      // Process hashtags
-      if (caption) {
-        const hashtags = extractHashtags(caption);
-        
-        for (const tag of hashtags) {
-          const { data: hashtag, error: hashtagError } = await supabase
-            .from('hashtags')
-            .upsert({ name: tag.toLowerCase() }, { onConflict: 'name' })
-            .select()
-            .single();
+      // Process hashtags from both caption and hashtags input
+      const allHashtags = [
+        ...extractHashtags(caption),
+        ...parsedHashtags
+      ];
+      const uniqueHashtags = [...new Set(allHashtags)];
+      
+      for (const tag of uniqueHashtags) {
+        const { data: hashtag, error: hashtagError } = await supabase
+          .from('hashtags')
+          .upsert({ name: tag.toLowerCase() }, { onConflict: 'name' })
+          .select()
+          .single();
 
-          if (!hashtagError && hashtag) {
-            await supabase
-              .from('post_hashtags')
-              .insert({ post_id: post.id, hashtag_id: hashtag.id });
-          }
+        if (!hashtagError && hashtag) {
+          await supabase
+            .from('post_hashtags')
+            .insert({ post_id: post.id, hashtag_id: hashtag.id });
         }
       }
 
@@ -154,7 +182,7 @@ export function InstagramStylePostDetails({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex flex-col items-start justify-start p-4 overflow-y-auto max-w-sm mx-auto">
+    <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-start p-4 overflow-y-auto max-w-sm mx-auto">
       <ProgressBar progress={progress} isVisible={isUploading} />
       
       {/* Header */}
@@ -171,7 +199,7 @@ export function InstagramStylePostDetails({
         </button>
       </div>
 
-      {/* Caption Input */}
+      {/* Caption */}
       <textarea
         placeholder="Write a caption..."
         value={caption}
@@ -180,36 +208,88 @@ export function InstagramStylePostDetails({
         rows={4}
       />
 
-      {/* Post Options */}
-      <div className="w-full space-y-3">
-        {/* Detect Faces Toggle */}
-        <button
-          onClick={() => setDetectFaces(!detectFaces)}
-          className={`w-full flex items-center justify-between p-3 rounded-lg border ${
-            detectFaces ? 'border-primary bg-primary/10' : 'border-border'
-          } transition`}
-        >
-          <span className="text-sm font-medium text-foreground">Detect Faces</span>
-          <Sparkles className="w-5 h-5 text-muted-foreground" />
-        </button>
+      {/* Hashtags */}
+      <input
+        type="text"
+        placeholder="Add hashtags (e.g. #style #vibes)"
+        value={hashtags}
+        onChange={(e) => setHashtags(e.target.value)}
+        className="w-full p-3 border border-border rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
+      />
+      {parsedHashtags.length > 0 && (
+        <div className="w-full mb-4 flex flex-wrap gap-2">
+          {parsedHashtags.map((tag) => (
+            <span key={tag} className="px-3 py-1 text-xs rounded-full bg-muted text-foreground">
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
 
-        {/* Add from Gallery */}
-        <button
-          onClick={() => console.log('Open gallery')}
-          className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary transition"
-        >
-          <span className="text-sm font-medium text-foreground">Add from Gallery</span>
-          <ImagePlus className="w-5 h-5 text-muted-foreground" />
-        </button>
+      {/* Location */}
+      <input
+        type="text"
+        placeholder="Add location (optional)"
+        value={location}
+        onChange={(e) => setLocation(e.target.value)}
+        className="w-full p-3 border border-border rounded-lg text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary"
+      />
+
+      {/* Privacy */}
+      <div className="w-full mb-4">
+        <label className="text-xs font-medium text-muted-foreground mb-2 block">Visibility</label>
+        <div className="flex flex-wrap gap-2">
+          {privacyOptions.map((opt) => {
+            const IconComponent = opt.icon;
+            return (
+              <button
+                key={opt.value}
+                onClick={() => setPrivacy(opt.value as Privacy)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+                  privacy === opt.value
+                    ? 'bg-primary text-white'
+                    : 'bg-muted text-foreground hover:bg-muted/80'
+                }`}
+              >
+                <IconComponent className="w-3.5 h-3.5" />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Detect Faces Toggle */}
+      <button
+        onClick={() => setDetectFaces(!detectFaces)}
+        className={`w-full flex items-center justify-between p-3 rounded-lg border transition ${
+          detectFaces ? 'border-primary bg-primary/10' : 'border-border hover:border-primary'
+        } mb-4`}
+      >
+        <span className="text-sm font-medium text-foreground">Detect Faces</span>
+        <Sparkles className="w-5 h-5 text-muted-foreground" />
+      </button>
+
+      {/* Add from Gallery */}
+      <button
+        onClick={() => console.log('Open gallery')}
+        className="w-full flex items-center justify-between p-3 rounded-lg border border-border hover:border-primary transition mb-6"
+      >
+        <span className="text-sm font-medium text-foreground">Add from Gallery</span>
+        <ImagePlus className="w-5 h-5 text-muted-foreground" />
+      </button>
 
       {/* Post Button */}
       <button
         onClick={handlePost}
         disabled={loading}
-        className="mt-6 w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition disabled:opacity-50"
+        className="w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Post'}
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+        ) : (
+          'Post'
+        )}
       </button>
 
       {/* Safe area padding for mobile */}
