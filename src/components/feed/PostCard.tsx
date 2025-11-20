@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,6 +63,7 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -87,6 +88,18 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
 
     recordView();
   }, [user, post.id, hasViewed]);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   const togglePlayPause = () => {
     if (videoRef.current) {
@@ -263,6 +276,16 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                   >
                     <Maximize className="w-5 h-5" />
                   </button>
+
+                  {/* Exit fullscreen button for images */}
+                  {isFullscreen && (
+                    <button
+                      onClick={() => document.exitFullscreen()}
+                      className="absolute top-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
                 </>
               ) : (
                 <>
@@ -309,6 +332,16 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                       <Maximize className="w-5 h-5" />
                     </button>
                   </div>
+
+                  {/* Exit fullscreen button (shown when in fullscreen) */}
+                  {isFullscreen && (
+                    <button
+                      onClick={() => document.exitFullscreen()}
+                      className="absolute top-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  )}
                 </>
               )}
             </div>

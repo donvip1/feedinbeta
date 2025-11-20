@@ -5,10 +5,12 @@ import { useToast } from '@/hooks/use-toast';
 interface CameraCaptureProps {
   onCapture: (media: { url: string; type: 'image' | 'video'; file: File }) => void;
   onClose: () => void;
+  onStorySelect?: () => void;
 }
 
-export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps) {
+export default function CameraCapture({ onCapture, onClose, onStorySelect }: CameraCaptureProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -48,7 +50,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
 
       <div className="flex flex-col gap-4 w-full max-w-xs">
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => cameraInputRef.current?.click()}
           className="bg-white text-black px-8 py-4 rounded-full font-semibold flex items-center justify-center gap-3 hover:bg-white/90 transition-colors"
         >
           <Camera className="w-6 h-6" />
@@ -62,8 +64,29 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
           <ImageIcon className="w-6 h-6" />
           Gallery
         </button>
+
+        {onStorySelect && (
+          <button
+            onClick={onStorySelect}
+            className="bg-primary/20 text-primary px-8 py-4 rounded-full font-semibold flex items-center justify-center gap-3 hover:bg-primary/30 transition-colors backdrop-blur-sm border border-primary/30"
+          >
+            <span className="text-2xl">📖</span>
+            Story
+          </button>
+        )}
       </div>
 
+      {/* Camera input with capture attribute */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*,video/*"
+        capture="environment"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
+
+      {/* Gallery input */}
       <input
         ref={fileInputRef}
         type="file"

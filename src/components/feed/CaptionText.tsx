@@ -8,7 +8,7 @@ interface CaptionTextProps {
   onToggleMore?: () => void;
 }
 
-export default function CaptionText({ text, maxLength = 120, showMore = false, onToggleMore }: CaptionTextProps) {
+export default function CaptionText({ text, maxLength = 150, showMore = false, onToggleMore }: CaptionTextProps) {
   const navigate = useNavigate();
   const shouldTruncate = text.length > maxLength;
   const displayText = showMore || !shouldTruncate ? text : text.slice(0, maxLength);
@@ -47,9 +47,9 @@ export default function CaptionText({ text, maxLength = 120, showMore = false, o
         }
         return <span key={part.key}>{part.text}</span>;
       })}
-      {shouldTruncate && !showMore && (
+      {shouldTruncate && (
         <button onClick={onToggleMore} className="text-primary ml-1 font-medium">
-          ... more
+          {showMore ? 'show less' : '... more'}
         </button>
       )}
     </p>
