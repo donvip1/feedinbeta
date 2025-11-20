@@ -99,12 +99,14 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
   const toggleFullscreen = () => {
     const mediaElement = post.media_type === 'video' 
       ? videoRef.current 
-      : document.querySelector(`#media-${post.id}`) as HTMLElement;
+      : document.querySelector(`#media-${post.id} img`) as HTMLElement;
     
     if (mediaElement) {
       if (document.fullscreenElement) {
         document.exitFullscreen();
+        mediaElement.style.objectFit = 'cover';
       } else {
+        mediaElement.style.objectFit = 'contain';
         mediaElement.requestFullscreen().catch(err => {
           console.error('Error attempting to enable fullscreen:', err);
         });
