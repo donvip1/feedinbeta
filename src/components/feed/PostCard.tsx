@@ -142,25 +142,25 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
           </div>
         )}
 
-      {/* Media */}
-      {post.media_url && (
-        <div className="w-full">
-          {post.media_type === 'image' ? (
-            <img
-              src={post.media_url}
-              alt="Post content"
-              className="w-full object-cover max-h-96"
-            />
-          ) : (
-            <video
-              src={post.media_url}
-              className="w-full max-h-96"
-              controls
-              playsInline
-            />
-          )}
-        </div>
-      )}
+        {/* Media */}
+        {post.media_url && (
+          <div className="w-full">
+            {post.media_type === 'image' ? (
+              <img
+                src={post.media_url}
+                alt="Post content"
+                className="w-full object-cover max-h-96"
+              />
+            ) : (
+              <video
+                src={post.media_url}
+                className="w-full max-h-96"
+                controls
+                playsInline
+              />
+            )}
+          </div>
+        )}
 
         {/* Actions */}
         <div className="px-3 py-2 border-t border-border">
@@ -171,7 +171,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
                 <Heart
-                  className={`w-6 h-6 ${liked ? 'fill-red-500 text-red-500' : ''}`}
+                  className={`w-4 h-4 ${liked ? 'fill-red-500 text-red-500' : ''}`}
                 />
               </button>
               <span className="text-sm">{likesCount}</span>
@@ -180,12 +180,12 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
                 onClick={() => setCommentsOpen(true)}
                 className="p-2 hover:bg-muted rounded-full transition-colors ml-2"
               >
-                <MessageCircle className="w-6 h-6" />
+                <MessageCircle className="w-4 h-4" />
               </button>
               <span className="text-sm">{post.comments_count || 0}</span>
 
               <button className="p-2 hover:bg-muted rounded-full transition-colors ml-2">
-                <Eye className="w-6 h-6" />
+                <Eye className="w-4 h-4" />
               </button>
               <span className="text-sm">{post.views_count || 0}</span>
 
@@ -193,21 +193,21 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
                 onClick={() => setRefeedOpen(true)}
                 className="p-2 hover:bg-muted rounded-full transition-colors ml-2"
               >
-                <Repeat className="w-6 h-6" />
+                <Repeat className="w-4 h-4" />
               </button>
 
               <button
                 onClick={() => setGiftOpen(true)}
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
-                <Gift className="w-6 h-6" />
+                <Gift className="w-4 h-4" />
               </button>
 
               <button
                 onClick={() => setShareOpen(true)}
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
-                <Share2 className="w-6 h-6" />
+                <Share2 className="w-4 h-4" />
               </button>
             </div>
           </div>
