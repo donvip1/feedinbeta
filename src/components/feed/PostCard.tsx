@@ -34,9 +34,11 @@ interface PostCardProps {
   };
   onLikeUpdate?: () => void;
   onCommentsOpenChange?: (open: boolean) => void;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
-export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange }: PostCardProps) {
+export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd }: PostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -49,6 +51,11 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange }: P
   const handleCommentsOpenChange = (open: boolean) => {
     setCommentsOpen(open);
     onCommentsOpenChange?.(open);
+    if (open) {
+      onInteractionStart?.();
+    } else {
+      onInteractionEnd?.();
+    }
   };
   const [shareOpen, setShareOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
@@ -336,21 +343,30 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange }: P
               <span className="text-sm">{post.views_count || 0}</span>
 
               <button
-                onClick={() => setRefeedOpen(true)}
+                onClick={() => {
+                  setRefeedOpen(true);
+                  onInteractionStart?.();
+                }}
                 className="p-2 hover:bg-muted rounded-full transition-colors ml-2"
               >
                 <Repeat className="w-4 h-4" />
               </button>
 
               <button
-                onClick={() => setGiftOpen(true)}
+                onClick={() => {
+                  setGiftOpen(true);
+                  onInteractionStart?.();
+                }}
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
                 <Gift className="w-4 h-4" />
               </button>
 
               <button
-                onClick={() => setShareOpen(true)}
+                onClick={() => {
+                  setShareOpen(true);
+                  onInteractionStart?.();
+                }}
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
                 <Share2 className="w-4 h-4" />
@@ -380,18 +396,27 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange }: P
       />
       <ShareModal
         isOpen={shareOpen}
-        onClose={() => setShareOpen(false)}
+        onClose={() => {
+          setShareOpen(false);
+          onInteractionEnd?.();
+        }}
         postId={post.id}
       />
       <GiftModal
         isOpen={giftOpen}
-        onClose={() => setGiftOpen(false)}
+        onClose={() => {
+          setGiftOpen(false);
+          onInteractionEnd?.();
+        }}
         postId={post.id}
         recipientId={post.user_id}
       />
       <RefeedModal
         isOpen={refeedOpen}
-        onClose={() => setRefeedOpen(false)}
+        onClose={() => {
+          setRefeedOpen(false);
+          onInteractionEnd?.();
+        }}
         postId={post.id}
         post={post}
       />

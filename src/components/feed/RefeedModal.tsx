@@ -178,33 +178,24 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
 
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="h-auto rounded-t-3xl">
-        <div className="py-2 space-y-1">
+      <SheetContent side="bottom" className="h-auto rounded-t-3xl p-0 pb-6">
+        <div className="space-y-1 p-4">
           <Button
-            variant="ghost"
-            className="w-full justify-start gap-3 h-14 text-base hover:bg-accent/50 transition-colors"
             onClick={handleRefeed}
-          >
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Repeat className="w-5 h-5 text-primary" />
-            </div>
-            <div className="text-left">
-              <div className="font-semibold">Refeed</div>
-              <div className="text-xs text-muted-foreground">Share instantly</div>
-            </div>
-          </Button>
-          <Button
+            className="w-full flex items-center justify-start gap-3 h-12 rounded-lg bg-card hover:bg-accent"
             variant="ghost"
-            className="w-full justify-start gap-3 h-14 text-base hover:bg-accent/50 transition-colors"
-            onClick={() => setShowQuoteComposer(true)}
           >
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Quote className="w-5 h-5 text-primary" />
-            </div>
-            <div className="text-left">
-              <div className="font-semibold">Quote</div>
-              <div className="text-xs text-muted-foreground">Add your thoughts</div>
-            </div>
+            <Repeat className="w-5 h-5" />
+            <span className="font-medium">Refeed</span>
+          </Button>
+
+          <Button
+            onClick={() => setShowQuoteComposer(true)}
+            className="w-full flex items-center justify-start gap-3 h-12 rounded-lg bg-card hover:bg-accent"
+            variant="ghost"
+          >
+            <Quote className="w-5 h-5" />
+            <span className="font-medium">Quote Feed</span>
           </Button>
         </div>
       </SheetContent>

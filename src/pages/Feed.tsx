@@ -24,6 +24,10 @@ const Feed = () => {
   const [postStep, setPostStep] = useState<'camera' | 'editor' | 'details' | null>(null);
   const [media, setMedia] = useState<{ url: string; type: 'image' | 'video'; file: File } | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false);
+  const [showNav, setShowNav] = useState(true);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastScrollY = useRef(0);
 
   // Fetch posts
   const { data: posts, isLoading, refetch } = useQuery({
@@ -74,6 +78,50 @@ const Feed = () => {
     
     localStorage.setItem('currentUserId', user.id);
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      // Hide nav when user is interacting or scrolling
+      if (isInteracting) {
+        setShowNav(false);
+        return;
+      }
+
+      setShowNav(false);
+      
+      // Clear existing timeout
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+
+      // Show nav after user stops scrolling
+      scrollTimeout.current = setTimeout(() => {
+        if (!isInteracting) {
+          setShowNav(true);
+        }
+      }, 150);
+
+      lastScrollY.current = window.scrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+    };
+  }, [isInteracting]);
+
+  const handleInteractionStart = () => {
+    setIsInteracting(true);
+    setShowNav(false);
+  };
+
+  const handleInteractionEnd = () => {
+    setIsInteracting(false);
+    setShowNav(true);
+  };
 
   const handleCreatePost = () => {
     setPostStep('camera');
@@ -168,6 +216,8 @@ const Feed = () => {
                   post={post}
                   onLikeUpdate={() => refetch()}
                   onCommentsOpenChange={setIsCommentsOpen}
+                  onInteractionStart={handleInteractionStart}
+                  onInteractionEnd={handleInteractionEnd}
                 />
               </div>
             ))}
@@ -184,7 +234,7 @@ const Feed = () => {
         )}
       </div>
 
-      <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen} />
+      <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen || !showNav} />
 
       {postStep === 'camera' && (
         <CameraCapture
