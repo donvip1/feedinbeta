@@ -56,6 +56,7 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
           media_type: media.type,
           location: location || null,
           privacy,
+          post_type: 'public',
           status: 'active',
         });
 

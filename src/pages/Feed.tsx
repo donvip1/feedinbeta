@@ -14,6 +14,7 @@ import PostEditor from '@/components/post/PostEditor';
 import PostDetails from '@/components/post/PostDetails';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const Feed = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const feedContainerRef = useRef<HTMLDivElement>(null);
-  const [postStep, setPostStep] = useState<'camera' | 'editor' | 'details' | null>(null);
+  const [postStep, setPostStep] = useState<'camera' | 'editor' | 'details' | 'story' | null>(null);
   const [media, setMedia] = useState<{ url: string; type: 'image' | 'video'; file: File } | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
@@ -243,6 +244,7 @@ const Feed = () => {
             setPostStep('editor');
           }}
           onClose={() => setPostStep(null)}
+          onStorySelect={() => setPostStep('story')}
         />
       )}
       {postStep === 'editor' && media && (
@@ -265,6 +267,19 @@ const Feed = () => {
           onClose={() => {
             setPostStep(null);
             setMedia(null);
+          }}
+        />
+      )}
+      {postStep === 'story' && (
+        <CreateStoryModal
+          open={true}
+          onClose={() => setPostStep(null)}
+          onSuccess={() => {
+            setPostStep(null);
+            toast({
+              title: 'Story created!',
+              description: 'Your story has been shared.',
+            });
           }}
         />
       )}
