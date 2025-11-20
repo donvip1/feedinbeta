@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Heart, MessageCircle, Share2, Eye, MoreVertical } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -40,25 +40,23 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
   const username = post.profiles?.username || 'user';
 
   // Record view when post is visible
-  useState(() => {
-    if (user && !hasViewed) {
-      recordView();
-      setHasViewed(true);
-    }
-  });
+  useEffect(() => {
+    const recordView = async () => {
+      if (!user || hasViewed) return;
+      
+      try {
+        await supabase.from('post_views').insert({
+          post_id: post.id,
+          user_id: user.id,
+        });
+        setHasViewed(true);
+      } catch (error) {
+        console.error('Error recording view:', error);
+      }
+    };
 
-  const recordView = async () => {
-    if (!user) return;
-    
-    try {
-      await supabase.from('post_views').insert({
-        post_id: post.id,
-        user_id: user.id,
-      });
-    } catch (error) {
-      console.error('Error recording view:', error);
-    }
-  };
+    recordView();
+  }, [user, post.id, hasViewed]);
 
   const handleLike = async () => {
     if (!user) {
