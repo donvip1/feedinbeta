@@ -125,7 +125,7 @@ export function InstagramStylePostDetails({
         scheduled_at: null,
         status: 'active' as const,
         original_post_id: quotePost?.id || null,
-        post_type: quotePost ? 'quote' as const : 'public' as const,
+        post_type: 'public' as const,
       };
 
       const { data: post, error: postError } = await supabase
