@@ -138,23 +138,24 @@ export function InstagramStyleEditor({
   }
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <Button variant="ghost" size="icon" onClick={onBack}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h2 className="text-lg font-semibold">Edit</h2>
-        <Button 
-          onClick={handleNext}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground px-6"
-        >
-          Next
-        </Button>
-      </div>
+    <div className="fixed inset-0 bg-background z-50 flex items-center justify-center">
+      <div className="w-full max-w-sm h-full flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-3 border-b border-border shrink-0">
+          <Button variant="ghost" size="icon" onClick={onBack}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <h2 className="text-base font-semibold">Edit</h2>
+          <Button 
+            onClick={handleNext}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm"
+          >
+            Next
+          </Button>
+        </div>
 
-      {/* Media Preview */}
-      <div ref={mediaContainerRef} className="flex-1 relative bg-black overflow-hidden">
+        {/* Media Preview */}
+        <div ref={mediaContainerRef} className="flex-1 relative bg-black overflow-hidden">
         {mediaType === 'image' ? (
           <img
             src={croppedImageUrl || mediaUrl}
@@ -187,71 +188,71 @@ export function InstagramStyleEditor({
           />
         ))}
 
-        {/* Right Side Tools */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4">
-          <button
-            onClick={handleAddText}
-            className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
-          >
-            <Type className="w-5 h-5" />
-          </button>
-
-          {mediaType === 'image' && (
+          {/* Right Side Tools */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-3">
             <button
-              onClick={() => setShowCropper(true)}
-              className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
+              onClick={handleAddText}
+              className="w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
             >
-              <Crop className="w-5 h-5" />
+              <Type className="w-4 h-4" />
             </button>
-          )}
 
-          <button
-            onClick={() => setShowMusicLibrary(true)}
-            className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
-          >
-            <Music className="w-5 h-5" />
-          </button>
+            {mediaType === 'image' && (
+              <button
+                onClick={() => setShowCropper(true)}
+                className="w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
+              >
+                <Crop className="w-4 h-4" />
+              </button>
+            )}
 
-          {mediaType === 'video' && (
             <button
-              onClick={() => setIsMuted(!isMuted)}
-              className="w-12 h-12 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
+              onClick={() => setShowMusicLibrary(true)}
+              className="w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
             >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              <Music className="w-4 h-4" />
             </button>
-          )}
-        </div>
-      </div>
 
-      {/* Bottom Controls */}
-      <div className="border-t border-border bg-background">
-        {/* Tabs */}
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('filters')}
-            className={`flex-1 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'filters'
-                ? 'text-foreground border-b-2 border-primary'
-                : 'text-muted-foreground'
-            }`}
-          >
-            Filters
-          </button>
-          <button
-            onClick={() => setActiveTab('adjust')}
-            className={`flex-1 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'adjust'
-                ? 'text-foreground border-b-2 border-primary'
-                : 'text-muted-foreground'
-            }`}
-          >
-            Adjust
-          </button>
+            {mediaType === 'video' && (
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                className="w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
+              >
+                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Filters Tab */}
-        {activeTab === 'filters' && (
-          <div className="p-4">
+        {/* Bottom Controls */}
+        <div className="border-t border-border bg-background shrink-0">
+          {/* Tabs */}
+          <div className="flex border-b border-border">
+            <button
+              onClick={() => setActiveTab('filters')}
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === 'filters'
+                  ? 'text-foreground border-b-2 border-primary'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              Filters
+            </button>
+            <button
+              onClick={() => setActiveTab('adjust')}
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+                activeTab === 'adjust'
+                  ? 'text-foreground border-b-2 border-primary'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              Adjust
+            </button>
+          </div>
+
+          {/* Filters Tab */}
+          {activeTab === 'filters' && (
+            <div className="p-3">
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
               {FILTERS.map((filter) => (
                 <button
@@ -287,9 +288,9 @@ export function InstagramStyleEditor({
           </div>
         )}
 
-        {/* Adjust Tab */}
-        {activeTab === 'adjust' && (
-          <div className="p-4 space-y-4">
+          {/* Adjust Tab */}
+          {activeTab === 'adjust' && (
+            <div className="p-3 space-y-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -343,8 +344,9 @@ export function InstagramStyleEditor({
                 className="w-full"
               />
             </div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
