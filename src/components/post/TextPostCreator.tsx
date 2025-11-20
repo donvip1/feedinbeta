@@ -16,7 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 type Stage = 'style' | 'compose' | 'details';
-type BackgroundStyle = 'plain' | 'gradient' | 'image';
+type BackgroundStyle = 'none' | 'solid' | 'gradient';
 type Privacy = 'everyone' | 'friends' | 'followers' | 'only_me';
 
 const solidColorOptions = [
@@ -50,7 +50,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
   const { user } = useAuth();
   const { toast } = useToast();
   const [stage, setStage] = useState<Stage>('style');
-  const [background, setBackground] = useState<BackgroundStyle>('gradient');
+  const [background, setBackground] = useState<BackgroundStyle>('none');
   const [selectedGradient, setSelectedGradient] = useState(gradientOptions[0]);
   const [selectedSolidColor, setSelectedSolidColor] = useState(solidColorOptions[0]);
   const [music, setMusic] = useState<string | null>(null);
@@ -95,7 +95,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
 
     try {
       // Store background style in media_url for text posts with backgrounds
-      const backgroundStyle = background !== 'image' ? getBackgroundClass() : null;
+      const backgroundStyle = background !== 'none' ? getBackgroundClass() : null;
       
       const { error } = await supabase.from('posts').insert({
         user_id: user.id,
@@ -105,8 +105,8 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
         privacy: privacy,
         location: location || null,
         status: 'active',
-        media_url: backgroundStyle, // Store background class here
-        media_type: backgroundStyle ? 'text_styled' : null, // Mark as styled text post
+        media_url: backgroundStyle, // Store background class here (null for plain text)
+        media_type: backgroundStyle ? 'text_styled' : null, // Mark as styled text post only if has background
       });
 
       if (error) throw error;
@@ -128,13 +128,13 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
   };
 
   const getBackgroundClass = () => {
-    if (background === 'plain') return selectedSolidColor;
+    if (background === 'solid') return selectedSolidColor;
     if (background === 'gradient') return selectedGradient;
-    return 'bg-card';
+    return '';
   };
 
   const getTextColorClass = () => {
-    return 'text-white';
+    return background === 'none' ? 'text-foreground' : 'text-white';
   };
 
   return (
@@ -153,9 +153,18 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
           <div className="text-sm font-medium text-muted-foreground">Choose background style</div>
           <div className="flex gap-2">
             <button
-              onClick={() => setBackground('plain')}
+              onClick={() => setBackground('none')}
               className={`flex-1 rounded-lg p-3 text-sm font-semibold transition ${
-                background === 'plain' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+                background === 'none' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
+              }`}
+            >
+              <Type className="w-5 h-5 mx-auto mb-1" />
+              Plain text
+            </button>
+            <button
+              onClick={() => setBackground('solid')}
+              className={`flex-1 rounded-lg p-3 text-sm font-semibold transition ${
+                background === 'solid' ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
               }`}
             >
               <Type className="w-5 h-5 mx-auto mb-1" />
@@ -173,7 +182,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
           </div>
 
           {/* Solid color selector */}
-          {background === 'plain' && (
+          {background === 'solid' && (
             <div className="grid grid-cols-4 gap-2 mt-4">
               {solidColorOptions.map((color, idx) => (
                 <button
@@ -226,7 +235,9 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
       {stage === 'compose' && (
         <div className="w-full flex flex-col items-center">
           <div
-            className={`w-full min-h-[60vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${getBackgroundClass()}`}
+            className={`w-full min-h-[60vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${getBackgroundClass()} ${
+              background === 'none' ? 'bg-card border border-border' : ''
+            }`}
           >
             <textarea
               value={text}
@@ -281,7 +292,9 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
         <div className="w-full space-y-4">
           {/* Preview */}
           <div
-            className={`w-full min-h-[30vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${getBackgroundClass()}`}
+            className={`w-full min-h-[30vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${getBackgroundClass()} ${
+              background === 'none' ? 'bg-card border border-border' : ''
+            }`}
           >
             <p className={`text-lg font-semibold break-words ${getTextColorClass()}`}>
               {text}
