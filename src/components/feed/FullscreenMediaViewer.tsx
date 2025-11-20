@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Volume2, VolumeX, Play, Pause, SkipForward, SkipBack } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useNavigate } from 'react-router-dom';
 
 interface Post {
   id: string;
@@ -23,6 +24,7 @@ interface FullscreenMediaViewerProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (postId: string) => void;
+  initialTime?: number;
 }
 
 export default function FullscreenMediaViewer({ 
@@ -30,8 +32,10 @@ export default function FullscreenMediaViewer({
   allPosts, 
   isOpen, 
   onClose,
-  onNavigate 
+  onNavigate,
+  initialTime = 0
 }: FullscreenMediaViewerProps) {
+  const navigate = useNavigate();
   const [currentPostIndex, setCurrentPostIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -58,10 +62,12 @@ export default function FullscreenMediaViewer({
 
   useEffect(() => {
     if (isOpen && isVideo && videoRef.current) {
-      videoRef.current.play();
+      // Sync with the initial time from the feed video
+      videoRef.current.currentTime = initialTime;
+      videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
-  }, [isOpen, currentPostIndex, isVideo]);
+  }, [isOpen, currentPostIndex, isVideo, initialTime]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -119,8 +125,10 @@ export default function FullscreenMediaViewer({
     
     if (isPlaying) {
       videoRef.current.pause();
+      setIsPlaying(false);
     } else {
-      videoRef.current.play();
+      videoRef.current.play().catch(() => {});
+      setIsPlaying(true);
     }
   };
 
@@ -152,14 +160,21 @@ export default function FullscreenMediaViewer({
   };
 
   const formatTime = (time: number) => {
+    if (!isFinite(time)) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const handleProfileClick = () => {
+    onClose();
+    navigate(`/profile/${currentPost.user_id}`);
+  };
+
   if (!isOpen || !currentPost) return null;
 
   const displayName = currentPost.profiles?.display_name || currentPost.profiles?.username || 'Anonymous';
+  const username = currentPost.profiles?.username || 'anonymous';
 
   return (
     <div 
@@ -193,18 +208,19 @@ export default function FullscreenMediaViewer({
         )}
 
         {/* Top Overlay - User Info & Close */}
-        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4">
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 z-10">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div 
+              className="flex items-center gap-3 cursor-pointer"
+              onClick={handleProfileClick}
+            >
               <Avatar className="w-10 h-10">
                 <AvatarImage src={currentPost.profiles?.avatar_url || ''} />
                 <AvatarFallback>{displayName[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
               <div>
                 <p className="font-semibold text-white text-sm">{displayName}</p>
-                <p className="text-xs text-white/70">
-                  {formatDistanceToNow(new Date(currentPost.created_at), { addSuffix: true })}
-                </p>
+                <p className="text-xs text-white/60">@{username}</p>
               </div>
             </div>
             <button
@@ -215,13 +231,6 @@ export default function FullscreenMediaViewer({
             </button>
           </div>
         </div>
-
-        {/* Caption Overlay */}
-        {currentPost.content && (
-          <div className="absolute bottom-20 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
-            <p className="text-white text-sm">{currentPost.content}</p>
-          </div>
-        )}
 
         {/* Custom Video Controls */}
         {isVideo && (
