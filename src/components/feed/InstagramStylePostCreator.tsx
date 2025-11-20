@@ -131,32 +131,35 @@ export function InstagramStylePostCreator({
               </Button>
             </div>
             
-            <div className="flex-1 flex items-center justify-center p-8">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-2xl">
+            <div className="flex-1 flex items-center justify-center p-4">
+              <div className="grid grid-cols-1 gap-4 w-full max-w-sm">
+                {/* Camera */}
                 <button
                   onClick={() => handleMethodSelect('camera')}
-                  className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-border hover:border-primary transition-all hover:scale-105 bg-accent/50"
+                  className="flex flex-col items-center justify-center p-4 rounded-xl border border-border hover:border-primary transition-all hover:scale-105 bg-accent/40 text-center"
                 >
-                  <CameraIcon className="w-16 h-16 mb-4 text-primary" />
-                  <span className="text-lg font-semibold">Camera</span>
+                  <CameraIcon className="w-12 h-12 mb-2 text-primary" />
+                  <span className="text-base font-semibold">Camera</span>
                   <span className="text-sm text-muted-foreground mt-1">Take photo or video</span>
                 </button>
 
+                {/* Gallery */}
                 <button
                   onClick={() => handleMethodSelect('gallery')}
-                  className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-border hover:border-primary transition-all hover:scale-105 bg-accent/50"
+                  className="flex flex-col items-center justify-center p-4 rounded-xl border border-border hover:border-primary transition-all hover:scale-105 bg-accent/40 text-center"
                 >
-                  <ImageIcon className="w-16 h-16 mb-4 text-primary" />
-                  <span className="text-lg font-semibold">Gallery</span>
+                  <ImageIcon className="w-12 h-12 mb-2 text-primary" />
+                  <span className="text-base font-semibold">Gallery</span>
                   <span className="text-sm text-muted-foreground mt-1">Choose from device</span>
                 </button>
 
+                {/* Text */}
                 <button
                   onClick={() => handleMethodSelect('text')}
-                  className="flex flex-col items-center justify-center p-8 rounded-2xl border-2 border-border hover:border-primary transition-all hover:scale-105 bg-accent/50"
+                  className="flex flex-col items-center justify-center p-4 rounded-xl border border-border hover:border-primary transition-all hover:scale-105 bg-accent/40 text-center"
                 >
-                  <Type className="w-16 h-16 mb-4 text-primary" />
-                  <span className="text-lg font-semibold">Text</span>
+                  <Type className="w-12 h-12 mb-2 text-primary" />
+                  <span className="text-base font-semibold">Text</span>
                   <span className="text-sm text-muted-foreground mt-1">Write a post</span>
                 </button>
               </div>
