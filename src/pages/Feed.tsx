@@ -142,7 +142,7 @@ const Feed = () => {
 
       <div
         ref={feedContainerRef}
-        className="max-w-2xl mx-auto p-4"
+        className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {isLoading ? (
           <div className="space-y-4">
@@ -160,15 +160,16 @@ const Feed = () => {
             ))}
           </div>
         ) : posts && posts.length > 0 ? (
-          <div className="space-y-4">
+          <>
             {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                onLikeUpdate={() => refetch()}
-              />
+              <div key={post.id} className="snap-start snap-always h-[calc(100vh-8rem)] flex items-start">
+                <PostCard
+                  post={post}
+                  onLikeUpdate={() => refetch()}
+                />
+              </div>
             ))}
-          </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
             <p className="text-muted-foreground mb-2">No posts yet</p>
