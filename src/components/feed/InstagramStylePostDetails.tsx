@@ -182,13 +182,13 @@ export function InstagramStylePostDetails({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] bg-background flex items-start justify-center overflow-y-auto">
-      <div className="w-full max-w-sm flex flex-col p-4 min-h-full">
+    <div className="fixed inset-0 z-[100] bg-background flex items-center justify-center">
+      <div className="w-full max-w-sm h-full flex flex-col overflow-y-auto">
         <ProgressBar progress={progress} isVisible={isUploading} />
       
         {/* Header */}
-        <div className="w-full flex items-center justify-between mb-4 shrink-0">
-          <h2 className="text-lg font-bold text-foreground">
+        <div className="w-full flex items-center justify-between p-3 shrink-0 sticky top-0 bg-background z-10 border-b border-border">
+          <h2 className="text-base font-bold text-foreground">
             {quotePost ? 'Quote Feeds' : 'Post Details'}
           </h2>
           <button
@@ -196,105 +196,108 @@ export function InstagramStylePostDetails({
             className="text-muted-foreground hover:text-foreground transition"
             aria-label="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Caption */}
-        <textarea
-          placeholder="Write a caption..."
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          className="w-full p-3 border border-border rounded-lg text-sm resize-none mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
-          rows={3}
-        />
+        <div className="flex-1 p-3 space-y-3">
 
-        {/* Hashtags */}
-        <input
-          type="text"
-          placeholder="Add hashtags (e.g. #style #vibes)"
-          value={hashtags}
-          onChange={(e) => setHashtags(e.target.value)}
-          className="w-full p-3 border border-border rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-        {parsedHashtags.length > 0 && (
-          <div className="w-full mb-3 flex flex-wrap gap-2">
-            {parsedHashtags.map((tag) => (
-              <span key={tag} className="px-2 py-1 text-xs rounded-full bg-muted text-foreground">
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
+          {/* Caption */}
+          <textarea
+            placeholder="Write a caption..."
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            className="w-full p-2.5 border border-border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+            rows={3}
+          />
 
-        {/* Location */}
-        <input
-          type="text"
-          placeholder="Add location (optional)"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          className="w-full p-3 border border-border rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-primary"
-        />
-
-        {/* Privacy */}
-        <div className="w-full mb-3">
-          <label className="text-xs font-medium text-muted-foreground mb-2 block">Visibility</label>
-          <div className="flex flex-wrap gap-2">
-            {privacyOptions.map((opt) => {
-              const IconComponent = opt.icon;
-              return (
-                <button
-                  key={opt.value}
-                  onClick={() => setPrivacy(opt.value as Privacy)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition ${
-                    privacy === opt.value
-                      ? 'bg-primary text-white'
-                      : 'bg-muted text-foreground hover:bg-muted/80'
-                  }`}
-                >
-                  <IconComponent className="w-3 h-3" />
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Detect Faces Toggle */}
-        <button
-          onClick={() => setDetectFaces(!detectFaces)}
-          className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition ${
-            detectFaces ? 'border-primary bg-primary/10' : 'border-border hover:border-primary'
-          } mb-3`}
-        >
-          <span className="text-sm font-medium text-foreground">Detect Faces</span>
-          <Sparkles className="w-4 h-4 text-muted-foreground" />
-        </button>
-
-        {/* Add from Gallery */}
-        <button
-          onClick={() => console.log('Open gallery')}
-          className="w-full flex items-center justify-between p-2.5 rounded-lg border border-border hover:border-primary transition mb-4"
-        >
-          <span className="text-sm font-medium text-foreground">Add from Gallery</span>
-          <ImagePlus className="w-4 h-4 text-muted-foreground" />
-        </button>
-
-        {/* Post Button */}
-        <button
-          onClick={handlePost}
-          disabled={loading}
-          className="w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed mb-4"
-        >
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-          ) : (
-            'Post'
+          {/* Hashtags */}
+          <input
+            type="text"
+            placeholder="Add hashtags (e.g. #style #vibes)"
+            value={hashtags}
+            onChange={(e) => setHashtags(e.target.value)}
+            className="w-full p-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          {parsedHashtags.length > 0 && (
+            <div className="w-full flex flex-wrap gap-2">
+              {parsedHashtags.map((tag) => (
+                <span key={tag} className="px-2 py-1 text-xs rounded-full bg-muted text-foreground">
+                  #{tag}
+                </span>
+              ))}
+            </div>
           )}
-        </button>
 
-        {/* Safe area padding for mobile */}
-        <div className="h-4" />
+          {/* Location */}
+          <input
+            type="text"
+            placeholder="Add location (optional)"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            className="w-full p-2.5 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+
+          {/* Privacy */}
+          <div className="w-full">
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">Visibility</label>
+            <div className="flex flex-wrap gap-2">
+              {privacyOptions.map((opt) => {
+                const IconComponent = opt.icon;
+                return (
+                  <button
+                    key={opt.value}
+                    onClick={() => setPrivacy(opt.value as Privacy)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold transition ${
+                      privacy === opt.value
+                        ? 'bg-primary text-white'
+                        : 'bg-muted text-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    <IconComponent className="w-3 h-3" />
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Detect Faces Toggle */}
+          <button
+            onClick={() => setDetectFaces(!detectFaces)}
+            className={`w-full flex items-center justify-between p-2.5 rounded-lg border transition ${
+              detectFaces ? 'border-primary bg-primary/10' : 'border-border hover:border-primary'
+            }`}
+          >
+            <span className="text-sm font-medium text-foreground">Detect Faces</span>
+            <Sparkles className="w-4 h-4 text-muted-foreground" />
+          </button>
+
+          {/* Add from Gallery */}
+          <button
+            onClick={() => console.log('Open gallery')}
+            className="w-full flex items-center justify-between p-2.5 rounded-lg border border-border hover:border-primary transition"
+          >
+            <span className="text-sm font-medium text-foreground">Add from Gallery</span>
+            <ImagePlus className="w-4 h-4 text-muted-foreground" />
+          </button>
+
+          {/* Post Button */}
+          <button
+            onClick={handlePost}
+            disabled={loading}
+            className="w-full py-3 rounded-full bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+            ) : (
+              'Post'
+            )}
+          </button>
+
+          {/* Safe area padding for mobile */}
+          <div className="h-4" />
+        </div>
       </div>
     </div>
   );
