@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PostCard } from '@/components/feed/PostCard';
-import { InstagramStylePostCreator } from '@/components/feed/InstagramStylePostCreator';
+import { TikTokStylePostCreator } from '@/components/feed/TikTokStylePostCreator';
 import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { QuotePostComposer } from '@/components/feed/QuotePostComposer';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -556,7 +556,7 @@ const Feed = () => {
         onActionSelect={handleQuickAction}
       />
 
-      <InstagramStylePostCreator
+      <TikTokStylePostCreator
         open={showCreatePost}
         onClose={() => {
           setShowCreatePost(false);
@@ -564,8 +564,6 @@ const Feed = () => {
           setIsCreatingContent(false);
         }}
         onSuccess={handlePostCreated}
-        defaultTab={defaultPostTab === 'text' ? 'text' : defaultPostTab === 'image' ? 'gallery' : 'camera'}
-        initialImageUrl={sharedImageUrl || undefined}
       />
 
       {/* Quote Post Composer - Renders instantly without Dialog delays */}
