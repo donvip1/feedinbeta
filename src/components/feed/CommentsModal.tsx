@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Send, Heart, MoreVertical, X as XIcon } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatTextWithHashtagsAndMentions } from '@/lib/text-formatting-utils';
 
 interface CommentsModalProps {
   isOpen: boolean;
@@ -26,6 +28,7 @@ interface CommentsModalProps {
 }
 
 export default function CommentsModal({ isOpen, onClose, postId, postData }: CommentsModalProps) {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [comment, setComment] = useState('');
@@ -158,14 +161,38 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from('post_comments').insert({
-        post_id: postId,
-        user_id: user.id,
-        content: comment.trim(),
-        parent_comment_id: replyTo?.id || null,
-      });
+      const { data: newComment, error } = await supabase
+        .from('post_comments')
+        .insert({
+          post_id: postId,
+          user_id: user.id,
+          content: comment.trim(),
+          parent_comment_id: replyTo?.id || null,
+        })
+        .select(`
+          *,
+          profiles:user_id (
+            id,
+            display_name,
+            username,
+            avatar_url
+          ),
+          comment_likes (count)
+        `)
+        .single();
 
       if (error) throw error;
+
+      // Immediately add the new comment to the list
+      if (newComment) {
+        if (replyTo?.id) {
+          // If it's a reply, refetch to update the parent comment
+          fetchComments();
+        } else {
+          // If it's a top-level comment, add it to the beginning
+          setComments((prev) => [newComment, ...prev]);
+        }
+      }
 
       toast({ title: 'Comment posted!' });
       setComment('');
@@ -257,7 +284,39 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                   <div className="flex-1 min-w-0">
                     <div className="bg-muted rounded-2xl px-3 py-2">
                       <p className="text-sm font-semibold">{c.profiles?.display_name}</p>
-                      <p className="text-sm leading-relaxed break-words">{c.content}</p>
+                      <p className="text-sm leading-relaxed break-words">
+                        {formatTextWithHashtagsAndMentions(c.content).map((part: any) => {
+                          if (part.type === 'hashtag') {
+                            return (
+                              <span
+                                key={part.key}
+                                className="text-primary cursor-pointer hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/search?q=${encodeURIComponent(part.searchTerm)}`);
+                                }}
+                              >
+                                {part.text}
+                              </span>
+                            );
+                          }
+                          if (part.type === 'mention') {
+                            return (
+                              <span
+                                key={part.key}
+                                className="text-primary cursor-pointer hover:underline"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  navigate(`/profile/${part.username}`);
+                                }}
+                              >
+                                {part.text}
+                              </span>
+                            );
+                          }
+                          return <span key={part.key}>{part.text}</span>;
+                        })}
+                      </p>
                     </div>
                     <div className="flex items-center gap-4 mt-1 px-3">
                       <button
