@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import TikTokPortraitPostFlow from '@/components/post/TikTokPortraitPostFlow';
+import PostCreationSelector from '@/components/post/PostCreationSelector';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
@@ -20,7 +21,7 @@ const Feed = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const feedContainerRef = useRef<HTMLDivElement>(null);
-  const [postStep, setPostStep] = useState<'create' | 'story' | null>(null);
+  const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [showNav, setShowNav] = useState(true);
@@ -122,12 +123,30 @@ const Feed = () => {
   };
 
   const handleCreatePost = () => {
-    setPostStep('create');
+    setPostStep('selector');
   };
 
   const handlePostSubmit = () => {
     setPostStep(null);
     refetch();
+  };
+
+  const handleGallerySelect = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,video/*';
+    input.onchange = async (e: Event) => {
+      const target = e.target as HTMLInputElement;
+      const file = target.files?.[0];
+      if (file) {
+        // Handle gallery upload - you can expand this
+        toast({
+          title: 'Gallery selected',
+          description: 'Gallery upload functionality to be expanded',
+        });
+      }
+    };
+    input.click();
   };
 
   return (
@@ -233,7 +252,19 @@ const Feed = () => {
 
       <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen || !showNav || postStep !== null} />
 
-      {postStep === 'create' && (
+      {postStep === 'selector' && (
+        <PostCreationSelector
+          onCameraSelect={() => setPostStep('camera')}
+          onGallerySelect={() => {
+            setPostStep(null);
+            handleGallerySelect();
+          }}
+          onStorySelect={() => setPostStep('story')}
+          onClose={() => setPostStep(null)}
+        />
+      )}
+
+      {postStep === 'camera' && (
         <TikTokPortraitPostFlow
           onClose={() => setPostStep(null)}
           onSubmit={handlePostSubmit}
