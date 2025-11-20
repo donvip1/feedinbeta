@@ -5,73 +5,6 @@ import { useNavigate } from "react-router-dom";
 
 const SavedPosts = () => {
   const navigate = useNavigate();
-  const [selectedCollection, setSelectedCollection] = useState('default');
-
-  const { data: savedPosts, refetch } = useQuery({
-    queryKey: ["saved-posts", selectedCollection],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-
-      const { data, error } = await supabase
-        .from("saved_posts")
-        .select(`
-          *,
-          posts!inner (
-            *,
-            profiles!inner (
-              display_name,
-              username,
-              avatar_url
-            )
-          )
-        `)
-        .eq("user_id", user.id)
-        .eq("collection_name", selectedCollection)
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: collections } = useQuery({
-    queryKey: ["saved-collections"],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-
-      const { data, error } = await supabase
-        .from("saved_posts")
-        .select("collection_name")
-        .eq("user_id", user.id);
-      
-      if (error) throw error;
-      
-      // Get unique collection names
-      const uniqueCollections = [...new Set(data.map(item => item.collection_name))];
-      return uniqueCollections;
-    },
-  });
-
-  const handleUnsave = async (postId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { error } = await supabase
-      .from("saved_posts")
-      .delete()
-      .eq("user_id", user.id)
-      .eq("post_id", postId);
-
-    if (error) {
-      toast.error("Failed to unsave post");
-      return;
-    }
-
-    toast.success("Post removed from saved");
-    refetch();
-  };
 
   return (
     <>
@@ -93,55 +26,14 @@ const SavedPosts = () => {
             </div>
           </div>
 
-          {collections && collections.length > 1 && (
-            <Tabs value={selectedCollection} onValueChange={setSelectedCollection} className="mb-6">
-              <TabsList>
-                {collections.map((collection) => (
-                  <TabsTrigger key={collection} value={collection}>
-                    {collection}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          )}
-
-          <div className="space-y-6">
-            {savedPosts && savedPosts.length > 0 ? (
-              savedPosts.map((saved: any) => (
-                <div key={saved.id} className="relative">
-                  <PostCard
-                    post={{
-                      ...saved.posts,
-                      profiles: saved.posts.profiles,
-                    }}
-                    onUpdate={() => refetch()}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm"
-                    onClick={() => handleUnsave(saved.posts.id)}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-20">
-                <Bookmark className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">No saved posts yet</p>
-                <Button 
-                  className="mt-4"
-                  onClick={() => navigate('/feed')}
-                >
-                  Explore Feed
-                </Button>
-              </div>
-            )}
+          <div className="flex items-center justify-center h-96">
+            <p className="text-muted-foreground text-center">
+              Post system has been completely removed
+            </p>
           </div>
         </div>
-        <BottomNav />
       </div>
+      <BottomNav />
     </>
   );
 };
