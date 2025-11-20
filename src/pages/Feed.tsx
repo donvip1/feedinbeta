@@ -228,11 +228,15 @@ const Feed = () => {
         ) : posts && posts.length > 0 ? (
           <>
             {posts.map((post) => {
-              // Text posts with backgrounds should be full height like media posts
-              const isTextOnly = !post.media_url && post.content;
-              const wrapperClass = isTextOnly 
+              // Styled text posts and media posts should be full height
+              // Plain text posts without background should be compact
+              const isStyledText = post.media_type === 'text_styled' && post.media_url && post.content;
+              const isMedia = post.media_url && post.media_type !== 'text_styled';
+              const isPlainText = !post.media_url && post.content;
+              
+              const wrapperClass = (isStyledText || isMedia)
                 ? "snap-start snap-always h-[calc(100vh-8rem)] flex items-start" 
-                : "snap-start snap-always h-[calc(100vh-8rem)] flex items-start";
+                : "snap-start mb-4";
               
               return (
                 <div key={post.id} className={wrapperClass}>

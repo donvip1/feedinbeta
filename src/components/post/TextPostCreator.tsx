@@ -94,6 +94,9 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
     }
 
     try {
+      // Store background style in media_url for text posts with backgrounds
+      const backgroundStyle = background !== 'image' ? getBackgroundClass() : null;
+      
       const { error } = await supabase.from('posts').insert({
         user_id: user.id,
         feed_id: crypto.randomUUID(),
@@ -102,6 +105,8 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
         privacy: privacy,
         location: location || null,
         status: 'active',
+        media_url: backgroundStyle, // Store background class here
+        media_type: backgroundStyle ? 'text_styled' : null, // Mark as styled text post
       });
 
       if (error) throw error;

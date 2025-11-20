@@ -239,8 +239,8 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
           )}
         </div>
 
-        {/* Caption - Outside card */}
-        {post.content && (
+        {/* Caption - Outside card (only for posts without styled text background) */}
+        {post.content && post.media_type !== 'text_styled' && (
           <div className="mb-2 px-1">
             <CaptionText
               text={post.content}
@@ -258,16 +258,20 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
           </div>
         )}
 
-        {/* Text-only posts with styled background or Media Card */}
+        {/* Text posts with styled background (gradient/solid) */}
         {!post.media_url && post.content ? (
-          <div className="bg-gradient-to-br from-purple-600 to-pink-600 rounded-lg overflow-hidden border border-border relative">
+          // Plain text post without background - just show content
+          null
+        ) : post.media_type === 'text_styled' && post.media_url && post.content ? (
+          // Styled text post with background
+          <div className={`${post.media_url} rounded-lg overflow-hidden border border-border relative`}>
             <div className="w-full h-[55vh] flex items-center justify-center p-8">
               <p className="text-white text-2xl md:text-3xl font-bold text-center leading-relaxed">
                 {post.content}
               </p>
             </div>
           </div>
-        ) : post.media_url ? (
+        ) : post.media_url && post.media_type !== 'text_styled' ? (
           <div className="bg-card rounded-lg overflow-hidden border border-border relative">
             <div className="w-full relative group h-[55vh]" id={`media-${post.id}`}>
               {post.media_type === 'image' ? (
