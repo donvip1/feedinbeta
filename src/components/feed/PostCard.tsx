@@ -258,9 +258,9 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
           </div>
         )}
 
-        {/* Media Card */}
-        <div className="bg-card rounded-lg overflow-hidden border border-border relative">
-          {post.media_url && (
+        {/* Media Card - Only render if there's media */}
+        {post.media_url && (
+          <div className="bg-card rounded-lg overflow-hidden border border-border relative">
             <div className="w-full relative group h-[55vh]" id={`media-${post.id}`}>
               {post.media_type === 'image' ? (
                 <>
@@ -345,8 +345,8 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                 </>
               )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Actions - Outside below card */}
         <div className="px-1 py-2">
