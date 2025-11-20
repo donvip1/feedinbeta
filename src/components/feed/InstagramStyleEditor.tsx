@@ -138,36 +138,35 @@ export function InstagramStyleEditor({
   }
 
   return (
-    <div className="fixed inset-0 bg-background z-50 flex items-center justify-center">
-      <div className="w-full max-w-sm h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3 border-b border-border shrink-0">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h2 className="text-base font-semibold">Edit</h2>
-          <Button 
-            onClick={handleNext}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm"
-          >
-            Next
-          </Button>
-        </div>
+    <div className="fixed inset-0 z-50 bg-background flex flex-col items-center justify-start p-4 overflow-y-auto max-w-sm mx-auto">
+      {/* Header */}
+      <div className="w-full flex items-center justify-between mb-4 shrink-0">
+        <Button variant="ghost" size="icon" onClick={onBack}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <h2 className="text-base font-semibold">Edit</h2>
+        <Button 
+          onClick={handleNext}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 text-sm"
+        >
+          Next
+        </Button>
+      </div>
 
-        {/* Media Preview */}
-        <div ref={mediaContainerRef} className="flex-1 relative bg-black overflow-hidden">
+      {/* Media Preview */}
+      <div ref={mediaContainerRef} className="w-full mb-4 relative bg-black rounded-lg overflow-hidden" style={{ maxHeight: '400px' }}>
         {mediaType === 'image' ? (
           <img
             src={croppedImageUrl || mediaUrl}
             alt="Preview"
-            className="w-full h-full object-contain"
+            className="w-full rounded-lg object-cover max-h-96"
             style={{ filter: getFilterStyle() }}
           />
         ) : (
           <video
             ref={videoRef}
             src={mediaUrl}
-            className="w-full h-full object-contain"
+            className="w-full rounded-lg object-cover max-h-96"
             style={{ filter: getFilterStyle() }}
             controls
             muted={isMuted}
@@ -183,13 +182,13 @@ export function InstagramStyleEditor({
             {...overlay}
             onUpdate={(updates) => handleUpdateText(index, updates)}
             onRemove={() => handleRemoveText(index)}
-            containerWidth={mediaContainerRef.current?.offsetWidth || 600}
-            containerHeight={mediaContainerRef.current?.offsetHeight || 600}
+            containerWidth={mediaContainerRef.current?.offsetWidth || 400}
+            containerHeight={mediaContainerRef.current?.offsetHeight || 400}
           />
         ))}
 
-          {/* Right Side Tools */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+        {/* Right Side Tools */}
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-3">
             <button
               onClick={handleAddText}
               className="w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
@@ -218,14 +217,14 @@ export function InstagramStyleEditor({
                 onClick={() => setIsMuted(!isMuted)}
                 className="w-10 h-10 rounded-full bg-background/80 backdrop-blur-sm flex items-center justify-center hover:bg-background/90 transition-colors"
               >
-                {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-              </button>
-            )}
-          </div>
-        </div>
+            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+        )}
+      </div>
+      </div>
 
-        {/* Bottom Controls */}
-        <div className="border-t border-border bg-background shrink-0">
+      {/* Bottom Controls */}
+      <div className="w-full border-t border-border bg-background shrink-0">
           {/* Tabs */}
           <div className="flex border-b border-border">
             <button
@@ -250,9 +249,9 @@ export function InstagramStyleEditor({
             </button>
           </div>
 
-          {/* Filters Tab */}
-          {activeTab === 'filters' && (
-            <div className="p-3">
+        {/* Filters Tab */}
+        {activeTab === 'filters' && (
+          <div className="w-full p-3">
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
               {FILTERS.map((filter) => (
                 <button
@@ -288,9 +287,9 @@ export function InstagramStyleEditor({
           </div>
         )}
 
-          {/* Adjust Tab */}
-          {activeTab === 'adjust' && (
-            <div className="p-3 space-y-3">
+        {/* Adjust Tab */}
+        {activeTab === 'adjust' && (
+          <div className="w-full p-3 space-y-3">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -344,9 +343,8 @@ export function InstagramStyleEditor({
                 className="w-full"
               />
             </div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
