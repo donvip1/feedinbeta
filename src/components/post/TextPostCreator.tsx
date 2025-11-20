@@ -86,7 +86,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
         user_id: user.id,
         feed_id: crypto.randomUUID(),
         content: text,
-        post_type: 'text',
+        post_type: 'public',
         privacy: privacy,
         location: location || null,
         status: 'active',
