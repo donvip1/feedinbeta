@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import TikTokPortraitPostFlow from '@/components/post/TikTokPortraitPostFlow';
 import PostCreationSelector from '@/components/post/PostCreationSelector';
+import TextPostCreator from '@/components/post/TextPostCreator';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
@@ -21,7 +22,7 @@ const Feed = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const feedContainerRef = useRef<HTMLDivElement>(null);
-  const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | null>(null);
+  const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | null>(null);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [showNav, setShowNav] = useState(true);
@@ -260,6 +261,7 @@ const Feed = () => {
             handleGallerySelect();
           }}
           onStorySelect={() => setPostStep('story')}
+          onTextSelect={() => setPostStep('text')}
           onClose={() => setPostStep(null)}
         />
       )}
@@ -281,6 +283,12 @@ const Feed = () => {
               description: 'Your story has been shared.',
             });
           }}
+        />
+      )}
+      {postStep === 'text' && (
+        <TextPostCreator
+          onClose={() => setPostStep(null)}
+          onSubmit={handlePostSubmit}
         />
       )}
     </div>

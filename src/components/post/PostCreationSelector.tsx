@@ -1,9 +1,10 @@
-import { Camera, Image, Radio } from 'lucide-react';
+import { Camera, Image, Radio, Type } from 'lucide-react';
 
 interface PostCreationSelectorProps {
   onCameraSelect: () => void;
   onGallerySelect: () => void;
   onStorySelect: () => void;
+  onTextSelect: () => void;
   onClose: () => void;
 }
 
@@ -11,6 +12,7 @@ export default function PostCreationSelector({
   onCameraSelect,
   onGallerySelect,
   onStorySelect,
+  onTextSelect,
   onClose,
 }: PostCreationSelectorProps) {
   return (
@@ -54,6 +56,19 @@ export default function PostCreationSelector({
           <div className="flex-1 text-left">
             <h3 className="font-semibold text-foreground">Story</h3>
             <p className="text-sm text-muted-foreground">Share a 24-hour story</p>
+          </div>
+        </button>
+
+        <button
+          onClick={onTextSelect}
+          className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-muted transition-colors"
+        >
+          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+            <Type className="w-6 h-6 text-primary" />
+          </div>
+          <div className="flex-1 text-left">
+            <h3 className="font-semibold text-foreground">Text</h3>
+            <p className="text-sm text-muted-foreground">Create a text post</p>
           </div>
         </button>
 
