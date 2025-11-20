@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,6 +46,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   const { toast } = useToast();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [saved, setSaved] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -73,6 +74,37 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const username = post.profiles?.username || 'user';
+
+  // Check if post is liked and saved
+  useEffect(() => {
+    const checkStatus = async () => {
+      if (!user) return;
+
+      try {
+        const [likeCheck, saveCheck] = await Promise.all([
+          supabase
+            .from('post_likes')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('user_id', user.id)
+            .single(),
+          supabase
+            .from('saved_posts')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('user_id', user.id)
+            .single()
+        ]);
+
+        setLiked(!!likeCheck.data);
+        setSaved(!!saveCheck.data);
+      } catch (error) {
+        // Errors expected when not liked/saved
+      }
+    };
+
+    checkStatus();
+  }, [user, post.id]);
 
   // Record view when post is visible
   useEffect(() => {
@@ -200,6 +232,50 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
     }
   };
 
+  const handleSave = async () => {
+    if (!user) {
+      toast({
+        title: 'Sign in required',
+        description: 'Please sign in to save posts',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      if (saved) {
+        await supabase
+          .from('saved_posts')
+          .delete()
+          .eq('post_id', post.id)
+          .eq('user_id', user.id);
+        setSaved(false);
+        toast({
+          title: 'Post unsaved',
+          description: 'Post removed from your saved items',
+        });
+      } else {
+        await supabase.from('saved_posts').insert({
+          post_id: post.id,
+          user_id: user.id,
+        });
+        setSaved(true);
+        toast({
+          title: 'Post saved',
+          description: 'Post added to your saved items',
+        });
+      }
+      onLikeUpdate?.();
+    } catch (error) {
+      console.error('Error toggling save:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save post',
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <>
       <div className="mb-4 snap-start snap-always w-full px-4 py-2"
@@ -219,14 +295,18 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               <p className="text-xs text-muted-foreground">@{username}</p>
             </div>
           </div>
-          {canDeletePost && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="p-2 hover:bg-muted rounded-full">
-                  <MoreVertical className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="p-2 hover:bg-muted rounded-full">
+                <MoreVertical className="w-5 h-5 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleSave}>
+                <Bookmark className="w-4 h-4 mr-2" />
+                {saved ? 'Unsave Post' : 'Save Post'}
+              </DropdownMenuItem>
+              {canDeletePost && (
                 <DropdownMenuItem 
                   onClick={() => setShowDeleteDialog(true)}
                   className="text-destructive focus:text-destructive"
@@ -234,9 +314,9 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete Post
                 </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Caption - Outside card (only for posts without styled text background) */}
@@ -399,6 +479,15 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
                 <Share2 className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleSave}
+                className="p-2 hover:bg-muted rounded-full transition-colors"
+              >
+                <Bookmark
+                  className={`w-4 h-4 ${saved ? 'fill-primary text-primary' : ''}`}
+                />
               </button>
             </div>
           </div>
