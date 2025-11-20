@@ -245,7 +245,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
             <CaptionText
               text={post.content}
               showMore={showFullCaption}
-              onToggleMore={() => setShowFullCaption(true)}
+              onToggleMore={() => setShowFullCaption(!showFullCaption)}
             />
           </div>
         )}
