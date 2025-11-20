@@ -103,9 +103,9 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
 
   return (
     <>
-      <div className="bg-card rounded-lg overflow-hidden border border-border mb-4">
-        {/* Header */}
-        <div className="flex items-center justify-between p-3">
+      <div className="mb-4">
+        {/* Header - Outside card */}
+        <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-3">
             <Avatar className="w-10 h-10 cursor-pointer" onClick={() => navigate(`/profile/${post.user_id}`)}>
               <AvatarImage src={post.profiles?.avatar_url || ''} />
@@ -114,7 +114,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
             <div>
               <p className="font-semibold text-sm">{displayName}</p>
               <p className="text-xs text-muted-foreground">
-                @{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
               </p>
             </div>
           </div>
@@ -123,9 +123,9 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
           </button>
         </div>
 
-        {/* Caption */}
+        {/* Caption - Outside card */}
         {post.content && (
-          <div className="px-3 pb-2">
+          <div className="mb-2 px-1">
             <CaptionText
               text={post.content}
               showMore={showFullCaption}
@@ -134,36 +134,37 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
           </div>
         )}
 
-        {/* Location */}
+        {/* Location - Outside card */}
         {post.location && (
-          <div className="px-3 pb-2 flex items-center gap-1">
+          <div className="mb-2 px-1 flex items-center gap-1">
             <MapPin className="w-3 h-3 text-muted-foreground" />
             <p className="text-xs text-muted-foreground">{post.location}</p>
           </div>
         )}
 
-        {/* Media */}
-        {post.media_url && (
-          <div className="w-full">
-            {post.media_type === 'image' ? (
-              <img
-                src={post.media_url}
-                alt="Post content"
-                className="w-full object-cover max-h-96"
-              />
-            ) : (
-              <video
-                src={post.media_url}
-                className="w-full max-h-96"
-                controls
-                playsInline
-              />
-            )}
-          </div>
-        )}
+        {/* Media Card */}
+        <div className="bg-card rounded-lg overflow-hidden border border-border">
+          {post.media_url && (
+            <div className="w-full">
+              {post.media_type === 'image' ? (
+                <img
+                  src={post.media_url}
+                  alt="Post content"
+                  className="w-full object-cover max-h-96"
+                />
+              ) : (
+                <video
+                  src={post.media_url}
+                  className="w-full max-h-96"
+                  controls
+                  playsInline
+                />
+              )}
+            </div>
+          )}
 
-        {/* Actions */}
-        <div className="px-3 py-2 border-t border-border">
+          {/* Actions */}
+          <div className="px-3 py-2 border-t border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
               <button
@@ -212,11 +213,12 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
             </div>
           </div>
 
-          {/* Promote button on separate line */}
-          <button className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
-            <TrendingUp className="w-4 h-4" />
-            <span>Promote</span>
-          </button>
+            {/* Promote button on separate line */}
+            <button className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+              <TrendingUp className="w-4 h-4" />
+              <span>Promote</span>
+            </button>
+          </div>
         </div>
       </div>
 
