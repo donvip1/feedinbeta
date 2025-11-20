@@ -78,26 +78,37 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId }: Gift
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-sm">
-        <div className="flex items-center gap-2 mb-4">
-          <Gift className="w-5 h-5" />
-          <h2 className="text-lg font-semibold">Send a Gift</h2>
+      <DialogContent className="max-w-md">
+        <div className="flex flex-col items-center text-center mb-6">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center mb-3 animate-pulse">
+            <Gift className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold">Send a Gift</h2>
+          <p className="text-sm text-muted-foreground mt-1">Show your appreciation</p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {gifts.map((gift) => (
+        <div className="grid grid-cols-2 gap-4">
+          {gifts.map((gift, index) => (
             <Button
               key={gift.label}
               variant="outline"
-              className="flex flex-col items-center gap-2 h-auto py-4"
+              className="flex flex-col items-center gap-3 h-auto py-6 rounded-2xl border-2 hover:border-primary hover:scale-105 transition-all animate-in fade-in slide-in-from-bottom-4"
+              style={{ animationDelay: `${index * 100}ms` }}
               onClick={() => handleSendGift(gift.label, gift.cost)}
               disabled={sending}
             >
-              <gift.icon className="w-8 h-8" />
-              <span className="text-sm font-semibold">{gift.label}</span>
-              <span className="text-xs text-muted-foreground">{gift.cost} credits</span>
+              <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
+                <gift.icon className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <div className="text-sm font-bold">{gift.label}</div>
+                <div className="text-xs text-muted-foreground">{gift.cost} credits</div>
+              </div>
             </Button>
           ))}
         </div>
+        <p className="text-xs text-center text-muted-foreground mt-4">
+          Gifts support creators and show appreciation for their content
+        </p>
       </DialogContent>
     </Dialog>
   );

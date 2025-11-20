@@ -381,6 +381,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
         isOpen={refeedOpen}
         onClose={() => setRefeedOpen(false)}
         postId={post.id}
+        post={post}
       />
 
       {/* Delete Confirmation Dialog */}
