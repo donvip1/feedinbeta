@@ -13,6 +13,7 @@ import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import CaptionText from './CaptionText';
+import FullscreenMediaViewer from './FullscreenMediaViewer';
 
 interface PostCardProps {
   post: {
@@ -32,13 +33,14 @@ interface PostCardProps {
       avatar_url: string | null;
     };
   };
+  allPosts?: any[];
   onLikeUpdate?: () => void;
   onCommentsOpenChange?: (open: boolean) => void;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
 }
 
-export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd }: PostCardProps) {
+export default function PostCard({ post, allPosts = [], onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd }: PostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -65,6 +67,7 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
@@ -123,21 +126,8 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
   };
 
   const toggleFullscreen = () => {
-    const mediaElement = post.media_type === 'video' 
-      ? videoRef.current 
-      : document.querySelector(`#media-${post.id} img`) as HTMLElement;
-    
-    if (mediaElement) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-        mediaElement.style.objectFit = 'cover';
-      } else {
-        mediaElement.style.objectFit = 'contain';
-        mediaElement.requestFullscreen().catch(err => {
-          console.error('Error attempting to enable fullscreen:', err);
-        });
-      }
-    }
+    setShowFullscreenViewer(true);
+    onInteractionStart?.();
   };
 
   const handleDeletePost = async () => {
@@ -280,6 +270,7 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                     src={post.media_url}
                     alt="Post content"
                     className="w-full h-full object-cover"
+                    onContextMenu={(e) => e.preventDefault()}
                   />
                   {/* Fullscreen button for images */}
                   <button
@@ -288,16 +279,6 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                   >
                     <Maximize className="w-5 h-5" />
                   </button>
-
-                  {/* Exit fullscreen button for images - bottom left */}
-                  {isFullscreen && (
-                    <button
-                      onClick={() => document.exitFullscreen()}
-                      className="absolute bottom-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  )}
                 </>
               ) : (
                 <>
@@ -310,6 +291,9 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                     onClick={togglePlayPause}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
+                    onContextMenu={(e) => e.preventDefault()}
+                    controlsList="nodownload nofullscreen noremoteplayback"
+                    disablePictureInPicture
                   />
                   
                   {/* Play/Pause icon in center */}
@@ -344,16 +328,6 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                       <Maximize className="w-5 h-5" />
                     </button>
                   </div>
-
-                  {/* Exit fullscreen button for videos - bottom left */}
-                  {isFullscreen && (
-                    <button
-                      onClick={() => document.exitFullscreen()}
-                      className="absolute bottom-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  )}
                 </>
               )}
             </div>
@@ -483,6 +457,17 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Fullscreen Media Viewer */}
+      <FullscreenMediaViewer
+        post={post}
+        allPosts={allPosts}
+        isOpen={showFullscreenViewer}
+        onClose={() => {
+          setShowFullscreenViewer(false);
+          onInteractionEnd?.();
+        }}
+      />
     </>
   );
 }

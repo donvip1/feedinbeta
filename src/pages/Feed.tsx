@@ -242,6 +242,7 @@ const Feed = () => {
                 <div key={post.id} className={wrapperClass}>
                   <PostCard
                     post={post}
+                    allPosts={posts}
                     onLikeUpdate={() => refetch()}
                     onCommentsOpenChange={setIsCommentsOpen}
                     onInteractionStart={handleInteractionStart}
