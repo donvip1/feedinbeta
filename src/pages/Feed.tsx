@@ -7,9 +7,13 @@ import { FloatingActionButton } from '@/components/navigation/FloatingActionButt
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Search, TrendingUp, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import CameraCapture from '@/components/post/CameraCapture';
 import PostEditor from '@/components/post/PostEditor';
 import PostDetails from '@/components/post/PostDetails';
+import PostCard from '@/components/feed/PostCard';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -18,7 +22,46 @@ const Feed = () => {
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const [postStep, setPostStep] = useState<'camera' | 'editor' | 'details' | null>(null);
-  const [media, setMedia] = useState<{ url: string; type: 'image' | 'video' } | null>(null);
+  const [media, setMedia] = useState<{ url: string; type: 'image' | 'video'; file: File } | null>(null);
+
+  // Fetch posts
+  const { data: posts, isLoading, refetch } = useQuery({
+    queryKey: ['feed-posts', activeTab],
+    queryFn: async () => {
+      let query = supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            display_name,
+            avatar_url
+          )
+        `)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (activeTab === 'following' && user) {
+        const { data: following } = await supabase
+          .from('follows')
+          .select('following_id')
+          .eq('follower_id', user.id);
+
+        const followingIds = following?.map(f => f.following_id) || [];
+        if (followingIds.length > 0) {
+          query = query.in('user_id', followingIds);
+        } else {
+          return [];
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user,
+  });
 
   useEffect(() => {
     if (authLoading) return;
@@ -35,14 +78,10 @@ const Feed = () => {
     setPostStep('camera');
   };
 
-  const handlePostSubmit = (data: any) => {
-    console.log('Final post data:', { ...data, media });
-    toast({
-      title: 'Post Created',
-      description: 'Your post has been created successfully.',
-    });
+  const handlePostSubmit = () => {
     setPostStep(null);
     setMedia(null);
+    refetch();
   };
 
   return (
@@ -103,13 +142,43 @@ const Feed = () => {
 
       <div
         ref={feedContainerRef}
-        className="max-w-2xl mx-auto"
+        className="max-w-2xl mx-auto p-4"
       >
-        <div className="flex items-center justify-center h-[60vh]">
-          <p className="text-muted-foreground text-center px-4">
-            Post system has been completely removed
-          </p>
-        </div>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="bg-card rounded-lg p-4 border border-border">
+                <div className="flex items-center gap-3 mb-3">
+                  <Skeleton className="w-10 h-10 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+                <Skeleton className="h-64 w-full rounded-lg" />
+              </div>
+            ))}
+          </div>
+        ) : posts && posts.length > 0 ? (
+          <div className="space-y-4">
+            {posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onLikeUpdate={() => refetch()}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
+            <p className="text-muted-foreground mb-2">No posts yet</p>
+            <p className="text-sm text-muted-foreground">
+              {activeTab === 'following' 
+                ? 'Follow some users to see their posts here' 
+                : 'Be the first to create a post!'}
+            </p>
+          </div>
+        )}
       </div>
 
       <FloatingActionButton onClick={handleCreatePost} />
@@ -121,17 +190,31 @@ const Feed = () => {
             setMedia(m);
             setPostStep('editor');
           }}
+          onClose={() => setPostStep(null)}
         />
       )}
       {postStep === 'editor' && media && (
         <PostEditor
           media={media}
-          onRetake={() => setPostStep('camera')}
-          onNext={() => setPostStep('details')}
+          onRetake={() => {
+            setMedia(null);
+            setPostStep('camera');
+          }}
+          onNext={(editedMedia) => {
+            setMedia(editedMedia);
+            setPostStep('details');
+          }}
         />
       )}
-      {postStep === 'details' && (
-        <PostDetails onSubmit={handlePostSubmit} />
+      {postStep === 'details' && media && (
+        <PostDetails
+          media={media}
+          onSubmit={handlePostSubmit}
+          onClose={() => {
+            setPostStep(null);
+            setMedia(null);
+          }}
+        />
       )}
     </div>
   );
