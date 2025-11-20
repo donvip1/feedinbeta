@@ -11,7 +11,7 @@ import { InstagramStylePostDetails } from './InstagramStylePostDetails';
 interface TikTokStylePostCreatorProps {
   open: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (postId?: string) => void;
 }
 
 type Step = 'camera' | 'gallery' | 'text' | 'edit' | 'details';
