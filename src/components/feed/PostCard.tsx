@@ -277,11 +277,11 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                     <Maximize className="w-5 h-5" />
                   </button>
 
-                  {/* Exit fullscreen button for images */}
+                  {/* Exit fullscreen button for images - bottom left */}
                   {isFullscreen && (
                     <button
                       onClick={() => document.exitFullscreen()}
-                      className="absolute top-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
+                      className="absolute bottom-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -333,11 +333,11 @@ export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange, onI
                     </button>
                   </div>
 
-                  {/* Exit fullscreen button (shown when in fullscreen) */}
+                  {/* Exit fullscreen button for videos - bottom left */}
                   {isFullscreen && (
                     <button
                       onClick={() => document.exitFullscreen()}
-                      className="absolute top-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
+                      className="absolute bottom-4 left-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-50"
                     >
                       <X className="w-5 h-5" />
                     </button>
