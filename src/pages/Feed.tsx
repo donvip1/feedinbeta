@@ -1,18 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Skeleton } from '@/components/ui/skeleton';
-import { PostCard } from '@/components/feed/PostCard';
-import { TikTokStylePostCreator } from '@/components/feed/TikTokStylePostCreator';
-import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
-import { QuotePostComposer } from '@/components/feed/QuotePostComposer';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
-import { Search, X, TrendingUp, Radio } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Search, TrendingUp, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface Post {

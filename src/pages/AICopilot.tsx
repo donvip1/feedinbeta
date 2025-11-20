@@ -9,7 +9,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
-import { QuickActionsModal } from '@/components/feed/QuickActionsModal';
 import { ArrowLeft, Send, Sparkles, Loader2, Trash2 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 

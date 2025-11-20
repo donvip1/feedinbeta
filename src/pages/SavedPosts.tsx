@@ -1,12 +1,6 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PostCard } from "@/components/feed/PostCard";
 import { BottomNav } from "@/components/navigation/BottomNav";
-import { Bookmark, Trash2, ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { Bookmark, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const SavedPosts = () => {

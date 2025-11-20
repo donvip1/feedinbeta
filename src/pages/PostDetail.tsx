@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { PostCard } from '@/components/feed/PostCard';
-import { LoadingScreen } from '@/components/shared/LoadingScreen';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 

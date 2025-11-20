@@ -1,13 +1,7 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PostCard } from '@/components/feed/PostCard';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { TrendingUp, Hash, ArrowLeft } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { TrendingUp, ArrowLeft } from 'lucide-react';
 
 const Trending = () => {
   const navigate = useNavigate();

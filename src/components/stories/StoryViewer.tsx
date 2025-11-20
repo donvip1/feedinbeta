@@ -5,7 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX, Heart, Send } from 'lucide-react';
-import { ReactionPicker } from '@/components/feed/ReactionPicker';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -496,15 +495,14 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
             </div>
           ) : (
             <div className="flex justify-center gap-3">
-              <ReactionPicker onSelect={handleReaction}>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="bg-white/10 border-white/30 text-white hover:bg-white/20 rounded-full w-12 h-12"
-                >
-                  <Heart className="w-6 h-6" />
-                </Button>
-              </ReactionPicker>
+              <Button
+                onClick={() => handleReaction('heart')}
+                size="icon"
+                variant="outline"
+                className="bg-white/10 border-white/30 text-white hover:bg-white/20 rounded-full w-12 h-12"
+              >
+                <Heart className="w-6 h-6" />
+              </Button>
               <Button
                 onClick={() => setShowChat(true)}
                 size="icon"
