@@ -266,23 +266,25 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-        {/* Post Preview - Compact Media Display */}
+        {/* Post Preview - Compact Media Display (40% size) */}
         {postData && (
           <div className="flex-shrink-0 bg-background relative border-b">
             {postData.media_url && (
-              <div className="w-full max-h-[25vh] bg-black flex items-center justify-center">
+              <div className="w-full h-[20vh] bg-black flex items-center justify-center overflow-hidden">
                 {postData.media_type?.startsWith('video') ? (
                   <video 
                     src={postData.media_url} 
-                    className="w-full h-full object-contain"
+                    className="max-w-full max-h-full object-contain"
                     controls
                     playsInline
+                    style={{ width: '40%', height: 'auto' }}
                   />
                 ) : (
                   <img 
                     src={postData.media_url} 
                     alt="Post media" 
-                    className="w-full h-full object-contain"
+                    className="max-w-full max-h-full object-contain"
+                    style={{ width: '40%', height: 'auto' }}
                   />
                 )}
               </div>
