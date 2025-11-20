@@ -235,7 +235,7 @@ const Feed = () => {
         )}
       </div>
 
-      <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen || !showNav} />
+      <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen || !showNav || postStep !== null} />
 
       {postStep === 'camera' && (
         <CameraCapture
