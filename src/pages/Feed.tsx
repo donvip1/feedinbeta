@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Search, TrendingUp, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -251,7 +250,31 @@ const Feed = () => {
         )}
       </div>
 
-      <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen || !showNav || postStep !== null} />
+      <BottomNav hidden={isCommentsOpen || !showNav || postStep !== null} />
+      
+      {/* Quick Action Button - positioned below feed cards */}
+      {!isCommentsOpen && showNav && postStep === null && (
+        <button
+          onClick={handleCreatePost}
+          className="fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center"
+          aria-label="Create post"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+        </button>
+      )}
 
       {postStep === 'selector' && (
         <PostCreationSelector
