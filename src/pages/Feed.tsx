@@ -23,6 +23,7 @@ const Feed = () => {
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const [postStep, setPostStep] = useState<'camera' | 'editor' | 'details' | null>(null);
   const [media, setMedia] = useState<{ url: string; type: 'image' | 'video'; file: File } | null>(null);
+  const [isCommentsOpen, setIsCommentsOpen] = useState(false);
 
   // Fetch posts
   const { data: posts, isLoading, refetch } = useQuery({
@@ -166,6 +167,7 @@ const Feed = () => {
                 <PostCard
                   post={post}
                   onLikeUpdate={() => refetch()}
+                  onCommentsOpenChange={setIsCommentsOpen}
                 />
               </div>
             ))}
@@ -182,7 +184,7 @@ const Feed = () => {
         )}
       </div>
 
-      <BottomNav onCreatePost={handleCreatePost} />
+      <BottomNav onCreatePost={handleCreatePost} hidden={isCommentsOpen} />
 
       {postStep === 'camera' && (
         <CameraCapture

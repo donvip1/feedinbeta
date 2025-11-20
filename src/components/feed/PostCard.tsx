@@ -33,9 +33,10 @@ interface PostCardProps {
     };
   };
   onLikeUpdate?: () => void;
+  onCommentsOpenChange?: (open: boolean) => void;
 }
 
-export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
+export default function PostCard({ post, onLikeUpdate, onCommentsOpenChange }: PostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -44,6 +45,11 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
   const [hasViewed, setHasViewed] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+
+  const handleCommentsOpenChange = (open: boolean) => {
+    setCommentsOpen(open);
+    onCommentsOpenChange?.(open);
+  };
   const [shareOpen, setShareOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [refeedOpen, setRefeedOpen] = useState(false);
@@ -317,7 +323,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
               <span className="text-sm">{likesCount}</span>
 
               <button
-                onClick={() => setCommentsOpen(true)}
+                onClick={() => handleCommentsOpenChange(true)}
                 className="p-2 hover:bg-muted rounded-full transition-colors ml-2"
               >
                 <MessageCircle className="w-4 h-4" />
@@ -363,7 +369,7 @@ export default function PostCard({ post, onLikeUpdate }: PostCardProps) {
       {/* Modals */}
       <CommentsModal
         isOpen={commentsOpen}
-        onClose={() => setCommentsOpen(false)}
+        onClose={() => handleCommentsOpenChange(false)}
         postId={post.id}
         postData={{
           content: post.content,
