@@ -404,7 +404,10 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           </div>
 
           {/* Promote button on separate line */}
-          <button className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors">
+          <button 
+            onClick={() => navigate(`/promote/${post.id}`)}
+            className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+          >
             <TrendingUp className="w-4 h-4" />
             <span>Promote</span>
           </button>
