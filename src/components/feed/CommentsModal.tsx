@@ -235,32 +235,33 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-        {/* Post Preview Overlay */}
+        {/* Post Preview - Full Media Display */}
         {postData && (
-          <div className="flex-shrink-0 bg-muted/50 p-4 border-b">
-            <div className="flex gap-3">
-              <Avatar className="w-10 h-10">
-                <AvatarImage src={postData.profiles?.avatar_url || ''} />
-                <AvatarFallback>{postData.profiles?.display_name?.[0]}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm">{postData.profiles?.display_name}</p>
-                <p className="text-sm text-muted-foreground line-clamp-2">{postData.content}</p>
+          <div className="flex-shrink-0 bg-background relative">
+            {postData.media_url && (
+              <div className="w-full aspect-[9/16] max-h-[50vh] bg-black flex items-center justify-center">
+                {postData.media_type?.startsWith('video') ? (
+                  <video 
+                    src={postData.media_url} 
+                    className="w-full h-full object-contain"
+                    controls
+                    playsInline
+                  />
+                ) : (
+                  <img 
+                    src={postData.media_url} 
+                    alt="Post media" 
+                    className="w-full h-full object-contain"
+                  />
+                )}
               </div>
-              {postData.media_url && (
-                <img 
-                  src={postData.media_url} 
-                  alt="Post preview" 
-                  className="w-16 h-16 object-cover rounded"
-                />
-              )}
-            </div>
+            )}
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0">
-          <h2 className="text-lg font-semibold">Comments</h2>
+        {/* Comments Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 bg-background">
+          <h2 className="text-lg font-semibold">Comments ({comments.length})</h2>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <XIcon className="w-5 h-5" />
           </Button>
