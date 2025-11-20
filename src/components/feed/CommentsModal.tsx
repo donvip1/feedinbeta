@@ -295,9 +295,6 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
         {/* Comments Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 bg-background">
           <h2 className="text-lg font-semibold">Comments ({comments.length})</h2>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <XIcon className="w-5 h-5" />
-          </Button>
         </div>
 
         {/* Comments list - YouTube style */}

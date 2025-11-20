@@ -47,8 +47,14 @@ export default function CaptionText({ text, maxLength = 150, showMore = false, o
         }
         return <span key={part.key}>{part.text}</span>;
       })}
-      {shouldTruncate && (
-        <button onClick={onToggleMore} className="text-primary ml-1 font-medium">
+      {shouldTruncate && onToggleMore && (
+        <button 
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMore();
+          }} 
+          className="text-primary ml-1 font-medium"
+        >
           {showMore ? 'show less' : '... more'}
         </button>
       )}

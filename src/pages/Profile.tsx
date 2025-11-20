@@ -135,10 +135,15 @@ const Profile = () => {
       const { data: postCount } = await supabase
         .rpc('get_user_post_count', { user_uuid: userId });
 
+      // Get total likes
+      const { data: totalLikes } = await supabase
+        .rpc('get_user_total_likes', { user_uuid: userId });
+
       if (profileData) {
         setProfile({
           ...(profileData as any),
           post_count: postCount || 0,
+          total_views: totalLikes || 0, // Using total_views field to store total likes
         } as Profile);
       }
     } catch (error: any) {
@@ -618,7 +623,7 @@ const Profile = () => {
 
             <div className="flex flex-col items-center">
               <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
-              <p className="text-xs text-muted-foreground">Views</p>
+              <p className="text-xs text-muted-foreground">Likes</p>
             </div>
           </div>
 
