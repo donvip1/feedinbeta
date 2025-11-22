@@ -46,9 +46,10 @@ const PostDetail = () => {
         `)
         .eq('id', id)
         .eq('status', 'active')
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
+      if (!data) throw new Error('Post not found');
       return data;
     },
     enabled: !!id && !!user,
