@@ -49,6 +49,7 @@ const Feed = () => {
           ),
           original_post:original_post_id (
             id,
+            user_id,
             content,
             media_url,
             media_type,
