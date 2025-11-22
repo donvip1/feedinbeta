@@ -44,6 +44,8 @@ import LearnTech from "./pages/LearnTech";
 import Welcome from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
 import ProfileEdit from "./pages/ProfileEdit";
+import Search from "./pages/Search";
+import HashtagSearch from "./pages/HashtagSearch";
 
 const queryClient = new QueryClient();
 
@@ -114,6 +116,8 @@ const App = () => {
             <Route path="/trending" element={<Trending />} />
             <Route path="/wallet" element={<Wallet />} />
             <Route path="/learn-tech" element={<LearnTech />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/hashtag/:hashtag" element={<HashtagSearch />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
             </Routes>

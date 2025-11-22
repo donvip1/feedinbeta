@@ -242,6 +242,14 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  e.preventDefault();
+                  if (text.trim()) {
+                    setStage('details');
+                  }
+                }
+              }}
               placeholder="What's on your mind?"
               maxLength={500}
               className={`w-full bg-transparent text-xl font-semibold resize-none outline-none text-center placeholder:opacity-70 ${getTextColorClass()}`}

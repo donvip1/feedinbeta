@@ -26,11 +26,29 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
     if (!user) return;
 
     try {
-      await supabase.from('post_shares').insert({
+      // Check if already refeeded
+      const { data: existing } = await supabase
+        .from('post_shares')
+        .select('id')
+        .eq('post_id', postId)
+        .eq('user_id', user.id)
+        .eq('share_type', 'refeed')
+        .maybeSingle();
+
+      if (existing) {
+        toast({ 
+          title: 'Already refeeded',
+          description: 'You have already shared this post'
+        });
+        onClose();
+        return;
+      }
+
+      await supabase.from('post_shares').insert([{
         post_id: postId,
         user_id: user.id,
         share_type: 'refeed',
-      });
+      }]);
 
       // Increment refeed count
       const { data: currentPost } = await supabase
@@ -65,21 +83,23 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
     setIsPosting(true);
     try {
       // Create new post with quote
-      const { error } = await supabase.from('posts').insert({
+      const { data: newPost, error } = await supabase.from('posts').insert([{
         user_id: user.id,
+        feed_id: crypto.randomUUID(),
         content: quoteText.trim(),
         original_post_id: postId,
         post_type: 'quote',
-        feed_id: crypto.randomUUID(),
-      });
+        status: 'active',
+      }]).select().single();
 
       if (error) throw error;
 
-      await supabase.from('post_shares').insert({
+      // Insert share record
+      await supabase.from('post_shares').insert([{
         post_id: postId,
         user_id: user.id,
         share_type: 'quote',
-      });
+      }]);
 
       // Increment refeed count
       const { data: currentPost } = await supabase
@@ -102,9 +122,11 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
       onClose();
       setShowQuoteComposer(false);
       setQuoteText('');
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error posting quote:', error);
       toast({
         title: 'Error posting quote',
+        description: error.message || 'Failed to post quote',
         variant: 'destructive',
       });
     } finally {
