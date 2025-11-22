@@ -142,8 +142,9 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
       if (uploadedMedia.length > 1) {
         postData.media_urls = uploadedMedia.map(m => m.url);
         postData.media_types = uploadedMedia.map(m => m.type);
-        postData.media_url = null;
-        postData.media_type = null;
+        // Also set single fields to first item for backward compatibility
+        postData.media_url = uploadedMedia[0].url;
+        postData.media_type = uploadedMedia[0].type;
       } else if (uploadedMedia.length === 1) {
         postData.media_url = uploadedMedia[0].url;
         postData.media_type = uploadedMedia[0].type;

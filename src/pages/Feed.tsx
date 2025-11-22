@@ -188,7 +188,7 @@ const Feed = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => toast({ title: 'Search removed' })}
+              onClick={() => navigate('/search')}
             >
               <Search className="w-5 h-5" />
             </Button>

@@ -4,9 +4,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX, Heart, Send } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Trash2, MessageCircle, Volume2, VolumeX, Heart, Send, Eye } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
+import { StoryViewersList } from './StoryViewersList';
 
 interface Story {
   id: string;
@@ -52,10 +53,11 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
   const [isPaused, setIsPaused] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
-  const [isMuted, setIsMuted] = useState(true); // Start muted by default for better UX
+  const [isMuted, setIsMuted] = useState(false); // Enable sound by default
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [showViewersList, setShowViewersList] = useState(false);
   const progressInterval = useRef<NodeJS.Timeout>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const touchStartX = useRef<number>(0);
@@ -360,14 +362,24 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
         </div>
         <div className="flex items-center gap-2">
           {isOwn && (
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={handleDelete}
-              className="text-white hover:bg-white/20"
-            >
-              <Trash2 className="w-5 h-5" />
-            </Button>
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setShowViewersList(true)}
+                className="text-white hover:bg-white/20"
+              >
+                <Eye className="w-5 h-5" />
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={handleDelete}
+                className="text-white hover:bg-white/20"
+              >
+                <Trash2 className="w-5 h-5" />
+              </Button>
+            </>
           )}
           <Button
             size="icon"
@@ -395,19 +407,29 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
             className="w-full h-full object-contain"
           />
         ) : (
-          <video
-            ref={videoRef}
-            src={currentStory.media_url}
-            autoPlay
-            playsInline
-            muted={isMuted}
-            onLoadedMetadata={() => {
-              if (videoRef.current) {
-                videoRef.current.muted = isMuted;
-              }
-            }}
-            className="w-full h-full object-contain"
-          />
+          <>
+            <video
+              ref={videoRef}
+              src={currentStory.media_url}
+              autoPlay
+              playsInline
+              muted={isMuted}
+              onLoadedMetadata={() => {
+                if (videoRef.current) {
+                  videoRef.current.muted = isMuted;
+                }
+              }}
+              className="w-full h-full object-contain"
+            />
+            
+            {/* Mute/Unmute button for videos */}
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              className="absolute top-20 right-4 p-2.5 bg-black/50 backdrop-blur-sm rounded-full text-white hover:bg-black/70 transition z-10"
+            >
+              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </button>
+          </>
         )}
 
         {/* Navigation areas */}
@@ -428,14 +450,17 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
 
       {/* Comments Section */}
       {showComments && (
-        <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm rounded-t-3xl max-h-[60vh] overflow-hidden flex flex-col">
+        <div className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm rounded-t-3xl max-h-[60vh] overflow-hidden flex flex-col z-20">
           <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">Comments</h3>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setShowComments(false)}
+                onClick={() => {
+                  setShowComments(false);
+                  setIsPaused(false);
+                }}
               >
                 Close
               </Button>
@@ -473,8 +498,8 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
       )}
 
       {/* Reaction and Message bar */}
-      {!isOwn && (
-        <div className="absolute bottom-4 left-0 right-0 px-4">
+      {!isOwn && !showComments && (
+        <div className="absolute bottom-4 left-0 right-0 px-4 z-10">
           {showChat ? (
             <div className="flex gap-2 bg-black/50 backdrop-blur-sm rounded-full p-2">
               <input
@@ -495,6 +520,16 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
             </div>
           ) : (
             <div className="flex justify-center gap-3">
+              <Button
+                onClick={() => {
+                  setShowComments(true);
+                  setIsPaused(true);
+                }}
+                size="icon"
+                className="bg-black/50 backdrop-blur-sm rounded-full hover:bg-black/70"
+              >
+                <MessageCircle className="w-5 h-5 text-white" />
+              </Button>
               <Button
                 onClick={() => handleReaction('heart')}
                 size="icon"
@@ -521,8 +556,17 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white text-sm">
           👁️ {currentStory.views_count} views
         </div>
-      )}
+        )}
       </div>
+
+      {/* Story Viewers List */}
+      {isOwn && (
+        <StoryViewersList
+          storyId={currentStory.id}
+          isOpen={showViewersList}
+          onClose={() => setShowViewersList(false)}
+        />
+      )}
     </div>
   );
 };

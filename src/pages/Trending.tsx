@@ -1,7 +1,70 @@
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { TrendingUp, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import PostCard from '@/components/feed/PostCard';
+import { Skeleton } from '@/components/ui/skeleton';
+
+const TrendingContent = () => {
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadTrending();
+  }, []);
+
+  const loadTrending = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:user_id (
+            username,
+            display_name,
+            avatar_url
+          )
+        `)
+        .eq('status', 'active')
+        .order('likes_count', { ascending: false })
+        .order('views_count', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      setPosts(data || []);
+    } catch (error) {
+      console.error('Error loading trending:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-6 max-w-2xl space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-card rounded-lg p-4 border">
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-6 max-w-2xl space-y-4">
+      {posts.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">No trending posts yet</p>
+        </div>
+      ) : (
+        posts.map((post) => <PostCard key={post.id} post={post} />)
+      )}
+    </div>
+  );
+};
 
 const Trending = () => {
   const navigate = useNavigate();
@@ -29,13 +92,7 @@ const Trending = () => {
           </div>
         </header>
 
-        <div className="container mx-auto px-4 py-6 max-w-2xl">
-          <div className="flex items-center justify-center h-96">
-            <p className="text-muted-foreground text-center">
-              Post system has been completely removed
-            </p>
-          </div>
-        </div>
+        <TrendingContent />
       </div>
       <BottomNav />
     </>

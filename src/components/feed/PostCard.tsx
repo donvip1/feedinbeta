@@ -28,6 +28,7 @@ interface PostCardProps {
     likes_count: number | null;
     comments_count: number | null;
     views_count: number | null;
+    refeeds_count: number | null;
     location: string | null;
     profiles?: {
       username: string | null;
@@ -326,8 +327,13 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               <AvatarImage src={post.profiles?.avatar_url || ''} />
               <AvatarFallback>{displayName[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
-            <div>
-              <p className="font-semibold text-sm">{displayName}</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-semibold text-sm">{displayName}</p>
+                <span className="text-xs text-muted-foreground">
+                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                </span>
+              </div>
               <p className="text-xs text-muted-foreground">@{username}</p>
             </div>
           </div>
@@ -523,6 +529,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               >
                 <Repeat className="w-4 h-4" />
               </button>
+              <span className="text-sm">{post.refeeds_count || 0}</span>
 
               <button
                 onClick={() => {
@@ -542,15 +549,6 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
                 <Share2 className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={handleSave}
-                className="p-2 hover:bg-muted rounded-full transition-colors"
-              >
-                <Bookmark
-                  className={`w-4 h-4 ${saved ? 'fill-primary text-primary' : ''}`}
-                />
               </button>
             </div>
           </div>
