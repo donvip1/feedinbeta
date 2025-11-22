@@ -2437,6 +2437,9 @@ export type Database = {
           id: string
           media_type: string
           media_url: string
+          music_artist: string | null
+          music_title: string | null
+          music_url: string | null
           user_id: string
           views_count: number | null
         }
@@ -2446,6 +2449,9 @@ export type Database = {
           id?: string
           media_type: string
           media_url: string
+          music_artist?: string | null
+          music_title?: string | null
+          music_url?: string | null
           user_id: string
           views_count?: number | null
         }
@@ -2455,6 +2461,9 @@ export type Database = {
           id?: string
           media_type?: string
           media_url?: string
+          music_artist?: string | null
+          music_title?: string | null
+          music_url?: string | null
           user_id?: string
           views_count?: number | null
         }
