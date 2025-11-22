@@ -64,22 +64,33 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
       }
 
       // Create post with multiple media
+      const postData: any = {
+        user_id: user.id,
+        feed_id: crypto.randomUUID(),
+        content: caption,
+        location: location || null,
+        privacy,
+        post_type: 'public',
+        status: scheduledAt ? 'scheduled' : 'active',
+        scheduled_at: scheduledAt,
+      };
+
+      // For multiple media, only use arrays. For single media, use both single and array fields
+      if (uploadedMedia.length > 1) {
+        postData.media_urls = uploadedMedia.map(m => m.url);
+        postData.media_types = uploadedMedia.map(m => m.type);
+        postData.media_url = null;
+        postData.media_type = null;
+      } else if (uploadedMedia.length === 1) {
+        postData.media_url = uploadedMedia[0].url;
+        postData.media_type = uploadedMedia[0].type;
+        postData.media_urls = [uploadedMedia[0].url];
+        postData.media_types = [uploadedMedia[0].type];
+      }
+
       const { error: postError } = await supabase
         .from('posts')
-        .insert({
-          user_id: user.id,
-          feed_id: crypto.randomUUID(),
-          content: caption,
-          media_url: uploadedMedia.length === 1 ? uploadedMedia[0].url : null,
-          media_type: uploadedMedia.length === 1 ? uploadedMedia[0].type : null,
-          media_urls: uploadedMedia.map(m => m.url),
-          media_types: uploadedMedia.map(m => m.type),
-          location: location || null,
-          privacy,
-          post_type: 'public',
-          status: scheduledAt ? 'scheduled' : 'active',
-          scheduled_at: scheduledAt,
-        });
+        .insert(postData);
 
       if (postError) throw postError;
 
