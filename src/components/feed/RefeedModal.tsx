@@ -44,6 +44,18 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
         return;
       }
 
+      // Create a refeed post that shows in the feed
+      const { error: postError } = await supabase.from('posts').insert([{
+        user_id: user.id,
+        feed_id: crypto.randomUUID(),
+        original_post_id: postId,
+        post_type: 'refeed',
+        status: 'active',
+      }]);
+
+      if (postError) throw postError;
+
+      // Insert share record
       await supabase.from('post_shares').insert([{
         post_id: postId,
         user_id: user.id,
@@ -69,7 +81,9 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
         description: 'Post shared to your feed'
       });
       onClose();
+      window.location.reload();
     } catch (error) {
+      console.error('Refeed error:', error);
       toast({
         title: 'Error refeeding post',
         variant: 'destructive',
@@ -122,6 +136,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
       onClose();
       setShowQuoteComposer(false);
       setQuoteText('');
+      window.location.reload();
     } catch (error: any) {
       console.error('Error posting quote:', error);
       toast({

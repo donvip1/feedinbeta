@@ -30,6 +30,20 @@ interface PostCardProps {
     views_count: number | null;
     refeeds_count: number | null;
     location: string | null;
+    post_type: string | null;
+    original_post_id: string | null;
+    original_post?: {
+      id: string;
+      content: string | null;
+      media_url: string | null;
+      media_type: string | null;
+      created_at: string;
+      profiles?: {
+        username: string | null;
+        display_name: string | null;
+        avatar_url: string | null;
+      };
+    } | null;
     profiles?: {
       username: string | null;
       display_name: string | null;
@@ -315,8 +329,15 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
   return (
     <>
-      <div className="mb-4 snap-start snap-always w-full px-4 py-2"
->
+      <div className="mb-4 snap-start snap-always w-full px-4 py-2">
+        {/* Refeed indicator */}
+        {post.post_type === 'refeed' && (
+          <div className="flex items-center gap-2 mb-2 px-1 text-muted-foreground">
+            <Repeat className="w-4 h-4" />
+            <span className="text-xs">{displayName} refeeded</span>
+          </div>
+        )}
+
         {/* Header - Outside card */}
         <div className="flex items-center justify-between mb-2 px-1">
           <div 
@@ -361,8 +382,19 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           </DropdownMenu>
         </div>
 
-        {/* Caption - Outside card (only for posts without styled text background) */}
-        {post.content && post.media_type !== 'text_styled' && (
+        {/* Caption - Outside card (only for posts without styled text background and not refeeds) */}
+        {post.content && post.media_type !== 'text_styled' && post.post_type !== 'refeed' && (
+          <div className="mb-2 px-1">
+            <CaptionText
+              text={post.content}
+              showMore={showFullCaption}
+              onToggleMore={() => setShowFullCaption(!showFullCaption)}
+            />
+          </div>
+        )}
+
+        {/* Quote post caption */}
+        {post.post_type === 'quote' && post.content && (
           <div className="mb-2 px-1">
             <CaptionText
               text={post.content}
@@ -380,8 +412,38 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           </div>
         )}
 
+        {/* Original post for refeeds and quotes */}
+        {(post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post && (
+          <div className="border rounded-2xl p-3 bg-muted/30 mb-2">
+            <div className="flex items-center gap-2 mb-2">
+              <Avatar className="w-6 h-6">
+                <AvatarImage src={post.original_post.profiles?.avatar_url || ''} />
+                <AvatarFallback className="text-xs">
+                  {post.original_post.profiles?.display_name?.[0]}
+                </AvatarFallback>
+              </Avatar>
+              <span className="text-sm font-semibold">
+                {post.original_post.profiles?.display_name}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                @{post.original_post.profiles?.username}
+              </span>
+            </div>
+            {post.original_post.content && (
+              <p className="text-sm mb-2 line-clamp-3">{post.original_post.content}</p>
+            )}
+            {post.original_post.media_url && (
+              <img 
+                src={post.original_post.media_url} 
+                alt="Original post" 
+                className="rounded-lg w-full max-h-48 object-cover"
+              />
+            )}
+          </div>
+        )}
+
         {/* Text posts with styled background (gradient/solid) */}
-        {!post.media_url && post.content ? (
+        {!post.media_url && post.content && post.post_type !== 'refeed' && post.post_type !== 'quote' ? (
           // Plain text post without background - just show content
           null
         ) : post.media_type === 'text_styled' && post.media_url && post.content ? (
@@ -393,7 +455,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               </p>
             </div>
           </div>
-        ) : currentMediaUrl && post.media_type !== 'text_styled' ? (
+        ) : (currentMediaUrl || (post.post_type === 'refeed' && post.original_post?.media_url)) && post.media_type !== 'text_styled' ? (
           <div 
             className="bg-card rounded-lg overflow-hidden border border-border relative"
             onTouchStart={handleTouchStart}

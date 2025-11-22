@@ -34,7 +34,7 @@ const Feed = () => {
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
 
-  // Fetch posts
+  // Fetch posts with original post data for refeeds and quotes
   const { data: posts, isLoading, refetch } = useQuery({
     queryKey: ['feed-posts', activeTab],
     queryFn: async () => {
@@ -46,6 +46,18 @@ const Feed = () => {
             username,
             display_name,
             avatar_url
+          ),
+          original_post:original_post_id (
+            id,
+            content,
+            media_url,
+            media_type,
+            created_at,
+            profiles:user_id (
+              username,
+              display_name,
+              avatar_url
+            )
           )
         `)
         .eq('status', 'active')
