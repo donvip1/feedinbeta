@@ -328,7 +328,7 @@ const Feed = () => {
       )}
       {postStep === 'gallery' && selectedMedia.length > 0 && (
         <PostDetails
-          media={selectedMedia[currentMediaIndex]}
+          media={selectedMedia}
           onSubmit={handlePostSubmit}
           onClose={() => {
             setPostStep(null);
