@@ -71,6 +71,8 @@ export default function TikTokPortraitPostFlow({
   // Music selection
   const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
   const [showMusicPicker, setShowMusicPicker] = useState(false);
+  const [faceDetected, setFaceDetected] = useState(false);
+  const [detectingFace, setDetectingFace] = useState(false);
 
   // Post details
   const [caption, setCaption] = useState('');
