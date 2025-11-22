@@ -36,8 +36,16 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        } 
+      });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus',
+      });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -48,10 +56,11 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm;codecs=opus' });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioURL(url);
+        
         stream.getTracks().forEach(track => track.stop());
       };
 
