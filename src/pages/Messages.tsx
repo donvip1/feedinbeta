@@ -14,6 +14,7 @@ import { EnhancedChatInterface } from '@/components/messages/EnhancedChatInterfa
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
+import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { useToast } from '@/hooks/use-toast';
 
 interface Conversation {
@@ -30,6 +31,7 @@ interface Conversation {
     created_at: string;
     sender_id: string;
   };
+  unread_count?: number;
 }
 
 interface Group {
@@ -91,6 +93,37 @@ export default function Messages() {
     if (user) {
       loadConversations();
       loadGroups();
+      
+      // Subscribe to new messages to update unread counts
+      const channel = supabase
+        .channel('messages-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages'
+          },
+          () => {
+            loadConversations();
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages'
+          },
+          () => {
+            loadConversations();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
 
@@ -126,6 +159,14 @@ export default function Messages() {
             .limit(1)
             .maybeSingle();
 
+          // Count unread messages
+          const { count: unreadCount } = await supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('conversation_id', convId)
+            .neq('sender_id', user.id)
+            .eq('is_read', false);
+
           const conv = participantData?.find(p => p.conversation_id === convId);
 
           return {
@@ -138,6 +179,7 @@ export default function Messages() {
               avatar_url: participants?.participant?.avatar_url || null,
             },
             last_message: lastMessage || undefined,
+            unread_count: unreadCount || 0,
           };
         })
       );
@@ -316,17 +358,34 @@ export default function Messages() {
                 filteredConversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={() => setSelectedConversationId(conv.id)}
+                    onClick={async () => {
+                      setSelectedConversationId(conv.id);
+                      // Mark messages as read when conversation is opened
+                      if (user && conv.unread_count && conv.unread_count > 0) {
+                        await supabase
+                          .from('messages')
+                          .update({ is_read: true, read_at: new Date().toISOString() })
+                          .eq('conversation_id', conv.id)
+                          .neq('sender_id', user.id)
+                          .eq('is_read', false);
+                        loadConversations();
+                      }
+                    }}
                     className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors ${
                       selectedConversationId === conv.id ? 'bg-accent' : ''
                     }`}
                   >
-                    <Avatar>
-                      <AvatarImage src={conv.other_participant.avatar_url || ''} />
-                      <AvatarFallback>
-                        {conv.other_participant.display_name?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar>
+                        <AvatarImage src={conv.other_participant.avatar_url || ''} />
+                        <AvatarFallback>
+                          {conv.other_participant.display_name?.[0] || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      {conv.unread_count && conv.unread_count > 0 && (
+                        <UnreadBadge count={conv.unread_count} size="sm" />
+                      )}
+                    </div>
                     <div className="flex-1 text-left overflow-hidden">
                       <div className="flex items-center justify-between">
                         <p className="font-semibold truncate">
@@ -339,7 +398,7 @@ export default function Messages() {
                         )}
                       </div>
                       {conv.last_message && (
-                        <p className="text-sm text-muted-foreground truncate">
+                        <p className={`text-sm truncate ${conv.unread_count && conv.unread_count > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                           {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
                           {conv.last_message.content}
                         </p>
