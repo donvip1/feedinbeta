@@ -522,6 +522,11 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           onInteractionEnd?.();
         }}
         postId={post.id}
+        postData={{
+          media_url: post.media_url,
+          media_type: post.media_type,
+          content: post.content,
+        }}
       />
       <GiftModal
         isOpen={giftOpen}

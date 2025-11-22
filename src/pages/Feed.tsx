@@ -15,6 +15,7 @@ import TextPostCreator from '@/components/post/TextPostCreator';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
+import { StoriesBar } from '@/components/stories/StoriesBar';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -205,6 +206,9 @@ const Feed = () => {
           </div>
         </div>
       </div>
+
+      {/* Stories Bar */}
+      <StoriesBar />
 
       <div
         ref={feedContainerRef}

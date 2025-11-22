@@ -13,7 +13,22 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Upload, X } from 'lucide-react';
+import { Loader2, Upload, X, Music } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+interface CreateStoryModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+// Sample music library (in production, this would come from an API)
+const musicLibrary = [
+  { id: '1', title: 'Summer Vibes', artist: 'DJ Flow', url: '/music/sample1.mp3' },
+  { id: '2', title: 'Chill Beats', artist: 'Lo-Fi Master', url: '/music/sample2.mp3' },
+  { id: '3', title: 'Upbeat Energy', artist: 'Pop Stars', url: '/music/sample3.mp3' },
+  { id: '4', title: 'Relaxing Melody', artist: 'Ambient Sounds', url: '/music/sample4.mp3' },
+];
 
 interface CreateStoryModalProps {
   open: boolean;
@@ -28,6 +43,7 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -74,10 +90,16 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
         .getPublicUrl(fileName);
 
       updateProgress(80);
+      const isImage = file.type.startsWith('image/');
+      const music = isImage && selectedMusic ? musicLibrary.find(m => m.id === selectedMusic) : null;
+      
       const { error: insertError } = await supabase.from('stories').insert({
         user_id: user.id,
         media_url: publicUrl,
-        media_type: file.type.startsWith('image/') ? 'image' : 'video',
+        media_type: isImage ? 'image' : 'video',
+        music_url: music?.url || null,
+        music_title: music?.title || null,
+        music_artist: music?.artist || null,
       });
 
       if (insertError) throw insertError;
@@ -92,6 +114,7 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
       onSuccess();
       setFile(null);
       setPreview(null);
+      setSelectedMusic(null);
     } catch (error: any) {
       failUpload(error.message);
       toast({
@@ -108,6 +131,7 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
     if (!uploading) {
       setFile(null);
       setPreview(null);
+      setSelectedMusic(null);
       onClose();
     }
   };
@@ -148,6 +172,7 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
                   onClick={() => {
                     setFile(null);
                     setPreview(null);
+                    setSelectedMusic(null);
                   }}
                   className="absolute top-2 right-2 z-10 bg-black/50 rounded-full p-2 hover:bg-black/70"
                   disabled={uploading}
@@ -161,6 +186,29 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
                     <video src={preview} controls className="w-full h-full object-contain" />
                   )}
                 </div>
+                
+                {/* Music selection for images */}
+                {file?.type.startsWith('image/') && (
+                  <div className="mt-4">
+                    <Label htmlFor="music" className="flex items-center gap-2 mb-2">
+                      <Music className="w-4 h-4" />
+                      <span>Add Music (Optional)</span>
+                    </Label>
+                    <Select value={selectedMusic || ''} onValueChange={setSelectedMusic}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose a song" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No music</SelectItem>
+                        {musicLibrary.map((music) => (
+                          <SelectItem key={music.id} value={music.id}>
+                            {music.title} - {music.artist}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
             )}
 
