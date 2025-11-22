@@ -330,11 +330,13 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   return (
     <>
       <div className="mb-4 snap-start snap-always w-full px-4 py-2">
-        {/* Refeed indicator */}
-        {post.post_type === 'refeed' && (
-          <div className="flex items-center gap-2 mb-2 px-1 text-muted-foreground">
-            <Repeat className="w-4 h-4" />
-            <span className="text-xs">{displayName} refeeded</span>
+        {/* Refeed/Quote Refeed indicator */}
+        {(post.post_type === 'refeed' || post.post_type === 'quote') && (
+          <div className="flex items-center gap-1.5 mb-2 px-1">
+            <Repeat className="w-3.5 h-3.5 text-muted-foreground/70" />
+            <span className="text-xs font-medium text-muted-foreground/70">
+              Refeed
+            </span>
           </div>
         )}
 
