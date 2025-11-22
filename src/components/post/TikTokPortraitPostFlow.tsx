@@ -18,6 +18,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
 
 type Stage = 'camera' | 'filters' | 'details';
 type MediaType = 'image' | 'video';
@@ -61,12 +62,30 @@ export default function TikTokPortraitPostFlow({
   // Filters
   const [activeFilter, setActiveFilter] = useState<string>('none');
 
+  // Text overlay
+  const [overlayText, setOverlayText] = useState('');
+  const [showTextInput, setShowTextInput] = useState(false);
+  const [textColor, setTextColor] = useState('#ffffff');
+  const [textPosition, setTextPosition] = useState<'top' | 'center' | 'bottom'>('center');
+
+  // Music selection
+  const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
+  const [showMusicPicker, setShowMusicPicker] = useState(false);
+
   // Post details
   const [caption, setCaption] = useState('');
   const [hashtagsInput, setHashtagsInput] = useState('');
   const [location, setLocation] = useState('');
   const [privacy, setPrivacy] = useState<Privacy>('everyone');
   const [detectFaces, setDetectFaces] = useState(false);
+
+  const musicTracks = [
+    { id: 'none', name: 'No Music', artist: '' },
+    { id: 'upbeat', name: 'Summer Vibes', artist: 'Audio Library' },
+    { id: 'chill', name: 'Lo-Fi Dreams', artist: 'Audio Library' },
+    { id: 'energetic', name: 'High Energy', artist: 'Audio Library' },
+    { id: 'acoustic', name: 'Acoustic Sunset', artist: 'Audio Library' },
+  ];
 
   const parsedHashtags = hashtagsInput
     .split(/[,\s]+/)
@@ -394,7 +413,7 @@ export default function TikTokPortraitPostFlow({
       {/* FILTERS STAGE (preview + actions) */}
       {stage === 'filters' && (
         <div className="w-full flex flex-col items-center">
-          <div className="w-full rounded-lg overflow-hidden bg-black mb-4">
+          <div className="relative w-full rounded-lg overflow-hidden bg-black mb-4">
             {mediaType === 'image' ? (
               <img
                 src={mediaUrl ?? ''}
@@ -410,6 +429,97 @@ export default function TikTokPortraitPostFlow({
                 controls
                 playsInline
               />
+            )}
+            
+            {/* Text overlay preview */}
+            {overlayText && (
+              <div 
+                className={`absolute left-0 right-0 px-4 ${
+                  textPosition === 'top' ? 'top-4' : textPosition === 'bottom' ? 'bottom-4' : 'top-1/2 -translate-y-1/2'
+                }`}
+              >
+                <p 
+                  className="text-center font-bold text-2xl drop-shadow-lg"
+                  style={{ color: textColor }}
+                >
+                  {overlayText}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Enhancement options */}
+          <div className="w-full space-y-3 mb-3">
+            {/* Text overlay controls */}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={showTextInput ? 'default' : 'outline'}
+                onClick={() => setShowTextInput(!showTextInput)}
+                className="flex-1"
+              >
+                <ImagePlus className="w-4 h-4 mr-2" />
+                Add Text
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={showMusicPicker ? 'default' : 'outline'}
+                onClick={() => setShowMusicPicker(!showMusicPicker)}
+                className="flex-1"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Add Music
+              </Button>
+            </div>
+
+            {/* Text input panel */}
+            {showTextInput && (
+              <div className="p-3 border border-border rounded-lg bg-muted/50 space-y-2">
+                <input
+                  type="text"
+                  placeholder="Enter text..."
+                  value={overlayText}
+                  onChange={(e) => setOverlayText(e.target.value)}
+                  className="w-full p-2 border border-border rounded-lg text-sm bg-background"
+                />
+                <div className="flex gap-2">
+                  <select
+                    value={textPosition}
+                    onChange={(e) => setTextPosition(e.target.value as any)}
+                    className="flex-1 p-2 border border-border rounded-lg text-sm bg-background"
+                  >
+                    <option value="top">Top</option>
+                    <option value="center">Center</option>
+                    <option value="bottom">Bottom</option>
+                  </select>
+                  <input
+                    type="color"
+                    value={textColor}
+                    onChange={(e) => setTextColor(e.target.value)}
+                    className="w-12 h-9 border border-border rounded-lg cursor-pointer"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Music picker panel */}
+            {showMusicPicker && (
+              <div className="p-3 border border-border rounded-lg bg-muted/50 space-y-2">
+                {musicTracks.map((track) => (
+                  <button
+                    key={track.id}
+                    onClick={() => setSelectedMusic(track.id === 'none' ? null : track.id)}
+                    className={`w-full p-2 text-left rounded-lg transition-colors ${
+                      selectedMusic === track.id ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
+                    }`}
+                  >
+                    <p className="font-medium text-sm">{track.name}</p>
+                    {track.artist && <p className="text-xs opacity-70">{track.artist}</p>}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
 
