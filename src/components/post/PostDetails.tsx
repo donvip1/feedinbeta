@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X } from 'lucide-react';
+import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
 
 interface PostDetailsProps {
   media: { url: string; type: 'image' | 'video'; file: File };
@@ -17,6 +19,9 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
   const [location, setLocation] = useState('');
   const [privacy, setPrivacy] = useState<'everyone' | 'friends' | 'followers' | 'only_me'>('everyone');
   const [loading, setLoading] = useState(false);
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('');
 
   const privacyOptions = [
     { value: 'everyone' as const, label: 'Everyone', icon: Globe },
@@ -45,6 +50,12 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         .from(bucketName)
         .getPublicUrl(fileName);
 
+      // Prepare scheduled time if set
+      let scheduledAt = null;
+      if (scheduledDate && scheduledTime) {
+        scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+      }
+
       // Create post
       const { error: postError } = await supabase
         .from('posts')
@@ -57,7 +68,8 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
           location: location || null,
           privacy,
           post_type: 'public',
-          status: 'active',
+          status: scheduledAt ? 'scheduled' : 'active',
+          scheduled_at: scheduledAt,
         });
 
       if (postError) throw postError;
@@ -126,7 +138,7 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         />
       </div>
 
-      <div className="w-full mb-6">
+      <div className="w-full mb-4">
         <label className="text-sm font-medium mb-2 block">Privacy</label>
         <div className="flex flex-wrap gap-2">
           {privacyOptions.map((opt) => {
@@ -147,6 +159,54 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
             );
           })}
         </div>
+      </div>
+
+      {/* Schedule Post */}
+      <div className="w-full mb-6">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setShowSchedule(!showSchedule)}
+          className="w-full mb-3"
+        >
+          <Calendar className="w-4 h-4 mr-2" />
+          {showSchedule ? 'Remove Schedule' : 'Schedule Post'}
+        </Button>
+
+        {showSchedule && (
+          <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/50">
+            <div>
+              <label className="text-xs font-medium mb-1.5 block flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5" />
+                Date
+              </label>
+              <input
+                type="date"
+                value={scheduledDate}
+                onChange={(e) => setScheduledDate(e.target.value)}
+                min={format(new Date(), 'yyyy-MM-dd')}
+                className="w-full p-2 border border-border rounded-lg text-sm bg-background"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium mb-1.5 block flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Time
+              </label>
+              <input
+                type="time"
+                value={scheduledTime}
+                onChange={(e) => setScheduledTime(e.target.value)}
+                className="w-full p-2 border border-border rounded-lg text-sm bg-background"
+              />
+            </div>
+            {scheduledDate && scheduledTime && (
+              <p className="text-xs text-muted-foreground">
+                Will be posted on {format(new Date(`${scheduledDate}T${scheduledTime}`), 'PPp')}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <button
