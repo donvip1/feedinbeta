@@ -148,6 +148,57 @@ export default function TikTokPortraitPostFlow({
     }
   };
 
+  // Face detection function
+  const detectFacesInImage = async (imageUrl: string) => {
+    setDetectingFace(true);
+    try {
+      const img = new Image();
+      img.src = imageUrl;
+      await new Promise((resolve) => { img.onload = resolve; });
+
+      // Use FaceDetector API if available
+      if ('FaceDetector' in window) {
+        const faceDetector = new (window as any).FaceDetector();
+        const faces = await faceDetector.detect(img);
+        setFaceDetected(faces.length > 0);
+        if (faces.length > 0) {
+          toast({
+            title: "Face Detected",
+            description: `${faces.length} face(s) detected in the image`,
+          });
+        }
+      } else {
+        // Fallback: basic detection using canvas and image analysis
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx?.drawImage(img, 0, 0);
+        
+        // Simple heuristic: check for skin-tone colors in upper portion
+        const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height / 3);
+        if (imageData) {
+          let skinTonePixels = 0;
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            const r = imageData.data[i];
+            const g = imageData.data[i + 1];
+            const b = imageData.data[i + 2];
+            // Rough skin tone detection
+            if (r > 95 && g > 40 && b > 20 && r > g && r > b) {
+              skinTonePixels++;
+            }
+          }
+          const hasLikelyFace = skinTonePixels > (imageData.data.length / 4) * 0.02;
+          setFaceDetected(hasLikelyFace);
+        }
+      }
+    } catch (error) {
+      console.error('Face detection error:', error);
+    } finally {
+      setDetectingFace(false);
+    }
+  };
+
   // Capture photo
   const handleCapturePhoto = async () => {
     if (!videoRef.current) return;
@@ -163,6 +214,10 @@ export default function TikTokPortraitPostFlow({
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
     setMediaUrl(dataUrl);
     setMediaType('image');
+    
+    // Detect faces in the captured image
+    await detectFacesInImage(dataUrl);
+    
     // Move to filters stage (with preview)
     setStage('filters');
     stopStream();
@@ -475,6 +530,18 @@ export default function TikTokPortraitPostFlow({
                 Add Music
               </Button>
             </div>
+            
+            {/* Face detection indicator */}
+            {detectingFace && (
+              <div className="text-xs text-muted-foreground text-center">
+                Detecting faces...
+              </div>
+            )}
+            {faceDetected && (
+              <div className="text-xs text-green-600 flex items-center justify-center gap-1">
+                <span>✓</span> Face detected
+              </div>
+            )}
 
             {/* Text input panel */}
             {showTextInput && (
