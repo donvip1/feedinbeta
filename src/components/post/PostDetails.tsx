@@ -23,6 +23,8 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [detectingLocation, setDetectingLocation] = useState(false);
 
   const privacyOptions = [
     { value: 'everyone' as const, label: 'Everyone', icon: Globe },
@@ -30,6 +32,67 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
     { value: 'followers' as const, label: 'Followers', icon: UserCheck },
     { value: 'only_me' as const, label: 'Only Me', icon: Lock },
   ];
+
+  const detectLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            // Use reverse geocoding API (here using OpenStreetMap Nominatim)
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+            );
+            const data = await response.json();
+            
+            if (data.display_name) {
+              const locationName = data.address?.city || data.address?.town || data.address?.village || data.display_name;
+              setLocation(locationName);
+            }
+            setDetectingLocation(false);
+          },
+          (error) => {
+            console.error('Location error:', error);
+            toast({
+              title: 'Location Error',
+              description: 'Unable to detect your location. Please enter manually.',
+              variant: 'destructive',
+            });
+            setDetectingLocation(false);
+          }
+        );
+      } else {
+        toast({
+          title: 'Not Supported',
+          description: 'Geolocation is not supported by your browser.',
+          variant: 'destructive',
+        });
+        setDetectingLocation(false);
+      }
+    } catch (error) {
+      console.error('Error detecting location:', error);
+      setDetectingLocation(false);
+    }
+  };
+
+  const fetchLocationSuggestions = async (query: string) => {
+    if (query.length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
+      );
+      const data = await response.json();
+      const suggestions = data.map((item: any) => item.display_name);
+      setLocationSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error fetching location suggestions:', error);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!user) return;
@@ -189,14 +252,46 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         <div className="flex items-center gap-2 mb-2">
           <MapPin className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Location (optional)</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={detectLocation}
+            disabled={detectingLocation}
+            className="ml-auto text-xs"
+          >
+            {detectingLocation ? 'Detecting...' : 'Auto-detect'}
+          </Button>
         </div>
-        <input
-          type="text"
-          placeholder="Add location..."
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          className="w-full p-3 border border-border rounded-lg text-sm bg-background"
-        />
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Add location..."
+            value={location}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              fetchLocationSuggestions(e.target.value);
+            }}
+            className="w-full p-3 border border-border rounded-lg text-sm bg-background"
+          />
+          {locationSuggestions.length > 0 && (
+            <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              {locationSuggestions.map((suggestion, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => {
+                    setLocation(suggestion);
+                    setLocationSuggestions([]);
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="w-full mb-4">
