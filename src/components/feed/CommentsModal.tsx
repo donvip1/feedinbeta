@@ -310,13 +310,21 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                 <div key={c.id} className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
                   {/* Main Comment */}
                   <div className="flex gap-3 group">
-                    <Avatar className="w-10 h-10 flex-shrink-0">
+                    <Avatar 
+                      className="w-10 h-10 flex-shrink-0 cursor-pointer"
+                      onClick={() => navigate(`/profile/${c.user_id}`)}
+                    >
                       <AvatarImage src={c.profiles?.avatar_url} />
                       <AvatarFallback className="text-xs">{c.profiles?.display_name?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="text-sm font-semibold">{c.profiles?.display_name}</p>
+                        <p 
+                          className="text-sm font-semibold cursor-pointer hover:underline"
+                          onClick={() => navigate(`/profile/${c.user_id}`)}
+                        >
+                          {c.profiles?.display_name}
+                        </p>
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                         </span>
@@ -380,13 +388,21 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                     <div className="ml-12 space-y-3 border-l-2 border-border pl-4">
                       {c.replies.map((reply: any) => (
                         <div key={reply.id} className="flex gap-3 group">
-                          <Avatar className="w-8 h-8 flex-shrink-0">
+                          <Avatar 
+                            className="w-8 h-8 flex-shrink-0 cursor-pointer"
+                            onClick={() => navigate(`/profile/${reply.user_id}`)}
+                          >
                             <AvatarImage src={reply.profiles?.avatar_url} />
                             <AvatarFallback className="text-xs">{reply.profiles?.display_name?.[0]}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="text-sm font-semibold">{reply.profiles?.display_name}</p>
+                              <p 
+                                className="text-sm font-semibold cursor-pointer hover:underline"
+                                onClick={() => navigate(`/profile/${reply.user_id}`)}
+                              >
+                                {reply.profiles?.display_name}
+                              </p>
                               <span className="text-xs text-muted-foreground">
                                 {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}
                               </span>

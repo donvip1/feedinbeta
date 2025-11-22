@@ -637,12 +637,20 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <Avatar>
+        <Avatar 
+          className="cursor-pointer"
+          onClick={() => otherUser?.id && navigate(`/profile/${otherUser.id}`)}
+        >
           <AvatarImage src={otherUser?.avatar_url || ''} />
           <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
         </Avatar>
         <div className="flex-1">
-          <h2 className="font-semibold">{otherUser?.display_name || 'Loading...'}</h2>
+          <h2 
+            className="font-semibold cursor-pointer hover:underline"
+            onClick={() => otherUser?.id && navigate(`/profile/${otherUser.id}`)}
+          >
+            {otherUser?.display_name || 'Loading...'}
+          </h2>
           {isTyping ? (
             <p className="text-sm text-primary">typing...</p>
           ) : otherUser?.username ? (

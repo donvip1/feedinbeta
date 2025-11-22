@@ -34,6 +34,7 @@ interface PostCardProps {
     original_post_id: string | null;
     original_post?: {
       id: string;
+      user_id: string;
       content: string | null;
       media_url: string | null;
       media_type: string | null;
@@ -414,17 +415,36 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           </div>
         )}
 
-        {/* Original post for refeeds and quotes */}
+        {/* Original post for refeeds and quotes - Clickable */}
         {(post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post && (
-          <div className="border rounded-2xl p-3 bg-muted/30 mb-2">
+          <div 
+            className="border rounded-2xl p-3 bg-muted/30 mb-2 cursor-pointer hover:bg-muted/40 transition-colors"
+            onClick={() => navigate(`/post/${post.original_post_id}`)}
+          >
             <div className="flex items-center gap-2 mb-2">
-              <Avatar className="w-6 h-6">
+              <Avatar 
+                className="w-6 h-6 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (post.original_post?.user_id) {
+                    navigate(`/profile/${post.original_post.user_id}`);
+                  }
+                }}
+              >
                 <AvatarImage src={post.original_post.profiles?.avatar_url || ''} />
                 <AvatarFallback className="text-xs">
                   {post.original_post.profiles?.display_name?.[0]}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm font-semibold">
+              <span 
+                className="text-sm font-semibold cursor-pointer hover:underline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (post.original_post?.user_id) {
+                    navigate(`/profile/${post.original_post.user_id}`);
+                  }
+                }}
+              >
                 {post.original_post.profiles?.display_name}
               </span>
               <span className="text-xs text-muted-foreground">
