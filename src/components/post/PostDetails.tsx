@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 
 interface PostDetailsProps {
-  media: { url: string; type: 'image' | 'video'; file: File };
+  media: { url: string; type: 'image' | 'video'; file: File }[];
   onSubmit: () => void;
   onClose: () => void;
 }
@@ -22,6 +22,7 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledTime, setScheduledTime] = useState('');
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
 
   const privacyOptions = [
     { value: 'everyone' as const, label: 'Everyone', icon: Globe },
@@ -35,20 +36,26 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
     
     setLoading(true);
     try {
-      // Upload media to storage
-      const fileExt = media.file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      const bucketName = media.type === 'image' ? 'post-images' : 'post-videos';
+      // Upload all media files to storage
+      const uploadedMedia: { url: string; type: string }[] = [];
+      
+      for (const mediaItem of media) {
+        const fileExt = mediaItem.file.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const bucketName = mediaItem.type === 'image' ? 'post-images' : 'post-videos';
 
-      const { error: uploadError, data: uploadData } = await supabase.storage
-        .from(bucketName)
-        .upload(fileName, media.file);
+        const { error: uploadError } = await supabase.storage
+          .from(bucketName)
+          .upload(fileName, mediaItem.file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucketName)
-        .getPublicUrl(fileName);
+        const { data: { publicUrl } } = supabase.storage
+          .from(bucketName)
+          .getPublicUrl(fileName);
+
+        uploadedMedia.push({ url: publicUrl, type: mediaItem.type });
+      }
 
       // Prepare scheduled time if set
       let scheduledAt = null;
@@ -56,15 +63,17 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
       }
 
-      // Create post
+      // Create post with multiple media
       const { error: postError } = await supabase
         .from('posts')
         .insert({
           user_id: user.id,
           feed_id: crypto.randomUUID(),
           content: caption,
-          media_url: publicUrl,
-          media_type: media.type,
+          media_url: uploadedMedia.length === 1 ? uploadedMedia[0].url : null,
+          media_type: uploadedMedia.length === 1 ? uploadedMedia[0].type : null,
+          media_urls: uploadedMedia.map(m => m.url),
+          media_types: uploadedMedia.map(m => m.type),
           location: location || null,
           privacy,
           post_type: 'public',
@@ -102,11 +111,52 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         <div className="w-6" />
       </div>
 
-      <div className="w-full mb-4">
-        {media.type === 'image' ? (
-          <img src={media.url} className="w-full rounded-lg object-cover max-h-48" alt="Preview" />
+      {/* Media Preview with Counter */}
+      <div className="w-full mb-4 relative">
+        {media[currentPreviewIndex].type === 'image' ? (
+          <img src={media[currentPreviewIndex].url} className="w-full rounded-lg object-cover max-h-48" alt="Preview" />
         ) : (
-          <video src={media.url} className="w-full rounded-lg max-h-48" controls />
+          <video src={media[currentPreviewIndex].url} className="w-full rounded-lg max-h-48" controls />
+        )}
+        
+        {media.length > 1 && (
+          <>
+            {/* Counter */}
+            <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-sm text-white text-xs px-2 py-1 rounded-full">
+              {currentPreviewIndex + 1}/{media.length}
+            </div>
+            
+            {/* Navigation Dots */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+              {media.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentPreviewIndex(index)}
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${
+                    index === currentPreviewIndex ? 'bg-white w-4' : 'bg-white/50'
+                  }`}
+                />
+              ))}
+            </div>
+            
+            {/* Swipe Navigation */}
+            {currentPreviewIndex > 0 && (
+              <button
+                onClick={() => setCurrentPreviewIndex(prev => prev - 1)}
+                className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 backdrop-blur-sm text-white rounded-full p-2 hover:bg-black/70 transition"
+              >
+                <X className="w-4 h-4 rotate-90" />
+              </button>
+            )}
+            {currentPreviewIndex < media.length - 1 && (
+              <button
+                onClick={() => setCurrentPreviewIndex(prev => prev + 1)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 backdrop-blur-sm text-white rounded-full p-2 hover:bg-black/70 transition"
+              >
+                <X className="w-4 h-4 -rotate-90" />
+              </button>
+            )}
+          </>
         )}
       </div>
 

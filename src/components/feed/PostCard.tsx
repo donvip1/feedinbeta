@@ -22,6 +22,8 @@ interface PostCardProps {
     content: string | null;
     media_url: string | null;
     media_type: string | null;
+    media_urls: string[] | null;
+    media_types: string[] | null;
     created_at: string;
     likes_count: number | null;
     comments_count: number | null;
@@ -69,11 +71,45 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const currentVideoTime = useRef(0);
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
+
+  // Determine if this post has multiple media
+  const mediaUrls = post.media_urls && post.media_urls.length > 0 ? post.media_urls : (post.media_url ? [post.media_url] : []);
+  const mediaTypes = post.media_types && post.media_types.length > 0 ? post.media_types : (post.media_type ? [post.media_type] : []);
+  const hasMultipleMedia = mediaUrls.length > 1;
+  const currentMediaUrl = mediaUrls[currentMediaIndex];
+  const currentMediaType = mediaTypes[currentMediaIndex];
 
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const username = post.profiles?.username || 'user';
+
+  const handleSwipe = () => {
+    const swipeThreshold = 50;
+    const swipeDistance = touchStartX.current - touchEndX.current;
+
+    if (Math.abs(swipeDistance) > swipeThreshold) {
+      if (swipeDistance > 0 && currentMediaIndex < mediaUrls.length - 1) {
+        // Swipe left - next media
+        setCurrentMediaIndex(prev => prev + 1);
+      } else if (swipeDistance < 0 && currentMediaIndex > 0) {
+        // Swipe right - previous media
+        setCurrentMediaIndex(prev => prev - 1);
+      }
+    }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    handleSwipe();
+  };
 
   // Check if post is liked and saved
   useEffect(() => {
@@ -351,13 +387,24 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               </p>
             </div>
           </div>
-        ) : post.media_url && post.media_type !== 'text_styled' ? (
-          <div className="bg-card rounded-lg overflow-hidden border border-border relative">
+        ) : currentMediaUrl && post.media_type !== 'text_styled' ? (
+          <div 
+            className="bg-card rounded-lg overflow-hidden border border-border relative"
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
             <div className="w-full relative group h-[55vh]" id={`media-${post.id}`}>
-              {post.media_type === 'image' ? (
+              {/* Media Counter */}
+              {hasMultipleMedia && (
+                <div className="absolute top-3 right-3 z-20 bg-black/60 backdrop-blur-sm text-white text-xs px-2.5 py-1 rounded-full font-medium">
+                  {currentMediaIndex + 1}/{mediaUrls.length}
+                </div>
+              )}
+
+              {currentMediaType === 'image' ? (
                 <>
                   <img
-                    src={post.media_url}
+                    src={currentMediaUrl}
                     alt="Post content"
                     className="w-full h-full object-cover"
                     onContextMenu={(e) => e.preventDefault()}
@@ -365,7 +412,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   {/* Fullscreen button for images */}
                   <button
                     onClick={toggleFullscreen}
-                    className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
+                    className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-10"
                   >
                     <Maximize className="w-5 h-5" />
                   </button>
@@ -374,7 +421,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                 <>
                   <video
                     ref={videoRef}
-                    src={post.media_url}
+                    src={currentMediaUrl}
                     className="w-full h-full object-cover"
                     playsInline
                     muted={isMuted}
@@ -419,6 +466,22 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                     </button>
                   </div>
                 </>
+              )}
+
+              {/* Navigation Dots for Multiple Media */}
+              {hasMultipleMedia && (
+                <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                  {mediaUrls.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentMediaIndex(index)}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${
+                        index === currentMediaIndex ? 'bg-white w-4' : 'bg-white/50'
+                      }`}
+                      aria-label={`Go to media ${index + 1}`}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           </div>
