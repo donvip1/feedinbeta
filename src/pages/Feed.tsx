@@ -12,10 +12,12 @@ import { useQuery } from '@tanstack/react-query';
 import TikTokPortraitPostFlow from '@/components/post/TikTokPortraitPostFlow';
 import PostCreationSelector from '@/components/post/PostCreationSelector';
 import TextPostCreator from '@/components/post/TextPostCreator';
+import MediaGalleryPicker from '@/components/post/MediaGalleryPicker';
+import PostEditor from '@/components/post/PostEditor';
+import PostDetails from '@/components/post/PostDetails';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
-import { StoriesBar } from '@/components/stories/StoriesBar';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ const Feed = () => {
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
   const feedContainerRef = useRef<HTMLDivElement>(null);
   const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file: File }[]>([]);
+  const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [showNav, setShowNav] = useState(true);
@@ -133,22 +137,15 @@ const Feed = () => {
     refetch();
   };
 
-  const handleGallerySelect = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*,video/*';
-    input.onchange = async (e: Event) => {
-      const target = e.target as HTMLInputElement;
-      const file = target.files?.[0];
-      if (file) {
-        // Handle gallery upload - you can expand this
-        toast({
-          title: 'Gallery selected',
-          description: 'Gallery upload functionality to be expanded',
-        });
-      }
-    };
-    input.click();
+  const handleGalleryMediaSelect = (files: { url: string; type: 'image' | 'video'; file: File }[]) => {
+    setSelectedMedia(files);
+    setCurrentMediaIndex(0);
+    setPostStep('gallery');
+  };
+
+  const handleMediaEdit = (editedMedia: { url: string; type: 'image' | 'video'; file: File }) => {
+    // For now, just go to details - can add multi-media editing later
+    setPostStep('gallery');
   };
 
   return (
@@ -207,8 +204,6 @@ const Feed = () => {
         </div>
       </div>
 
-      {/* Stories Bar */}
-      <StoriesBar />
 
       <div
         ref={feedContainerRef}
@@ -280,8 +275,25 @@ const Feed = () => {
         <PostCreationSelector
           onCameraSelect={() => setPostStep('camera')}
           onGallerySelect={() => {
+            // Open the media gallery picker as a separate step
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*,video/*';
+            input.multiple = true;
+            input.onchange = (e: Event) => {
+              const target = e.target as HTMLInputElement;
+              const files = Array.from(target.files || []);
+              if (files.length > 0) {
+                const mediaFiles = files.map(file => ({
+                  url: URL.createObjectURL(file),
+                  type: (file.type.startsWith('video/') ? 'video' : 'image') as 'image' | 'video',
+                  file,
+                }));
+                handleGalleryMediaSelect(mediaFiles);
+              }
+            };
+            input.click();
             setPostStep(null);
-            handleGallerySelect();
           }}
           onStorySelect={() => setPostStep('story')}
           onTextSelect={() => setPostStep('text')}
@@ -312,6 +324,17 @@ const Feed = () => {
         <TextPostCreator
           onClose={() => setPostStep(null)}
           onSubmit={handlePostSubmit}
+        />
+      )}
+      {postStep === 'gallery' && selectedMedia.length > 0 && (
+        <PostDetails
+          media={selectedMedia[currentMediaIndex]}
+          onSubmit={handlePostSubmit}
+          onClose={() => {
+            setPostStep(null);
+            setSelectedMedia([]);
+            setCurrentMediaIndex(0);
+          }}
         />
       )}
     </div>
