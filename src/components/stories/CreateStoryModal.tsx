@@ -91,7 +91,7 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
 
       updateProgress(80);
       const isImage = file.type.startsWith('image/');
-      const music = isImage && selectedMusic ? musicLibrary.find(m => m.id === selectedMusic) : null;
+      const music = isImage && selectedMusic && selectedMusic !== 'none' ? musicLibrary.find(m => m.id === selectedMusic) : null;
       
       const { error: insertError } = await supabase.from('stories').insert({
         user_id: user.id,
@@ -194,12 +194,12 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
                       <Music className="w-4 h-4" />
                       <span>Add Music (Optional)</span>
                     </Label>
-                    <Select value={selectedMusic || ''} onValueChange={setSelectedMusic}>
+                    <Select value={selectedMusic || 'none'} onValueChange={setSelectedMusic}>
                       <SelectTrigger>
                         <SelectValue placeholder="Choose a song" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No music</SelectItem>
+                        <SelectItem value="none">No music</SelectItem>
                         {musicLibrary.map((music) => (
                           <SelectItem key={music.id} value={music.id}>
                             {music.title} - {music.artist}
