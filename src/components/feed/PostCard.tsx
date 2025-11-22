@@ -384,8 +384,8 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           </DropdownMenu>
         </div>
 
-        {/* Caption - Outside card (only for posts without styled text background and not refeeds) */}
-        {post.content && post.media_type !== 'text_styled' && post.post_type !== 'refeed' && (
+        {/* Caption - Outside card (only for regular posts, not styled text, not refeeds, not quotes) */}
+        {post.content && post.media_type !== 'text_styled' && post.post_type !== 'refeed' && post.post_type !== 'quote' && (
           <div className="mb-2 px-1">
             <CaptionText
               text={post.content}
@@ -395,7 +395,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           </div>
         )}
 
-        {/* Quote post caption */}
+        {/* Quote post caption - only for quote posts */}
         {post.post_type === 'quote' && post.content && (
           <div className="mb-2 px-1">
             <CaptionText
