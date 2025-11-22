@@ -419,7 +419,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
         {(post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post && (
           <div 
             className="border rounded-2xl p-3 bg-muted/30 mb-2 cursor-pointer hover:bg-muted/40 transition-colors"
-            onClick={() => navigate(`/post/${post.original_post_id}`)}
+            onClick={() => navigate(`/post/${post.original_post.id}`)}
           >
             <div className="flex items-center gap-2 mb-2">
               <Avatar 
