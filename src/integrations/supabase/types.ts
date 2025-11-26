@@ -3025,6 +3025,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_post_comments_count: {
+        Args: { post_id: string }
+        Returns: undefined
+      }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
