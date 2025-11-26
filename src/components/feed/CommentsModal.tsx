@@ -64,17 +64,16 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionStartPos = useRef<number>(0);
 
-  // Track IDs we have optimistically added to avoid double-appending on realtime INSERT
+  // Track IDs added optimistically to avoid realtime echo duplication
   const optimisticallyAddedIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isOpen) return;
 
-    // Initial load
     fetchComments();
     fetchUsers();
 
-    // Precise realtime listeners
+    // Subscribe precisely to INSERT/UPDATE/DELETE and merge changes locally
     const channel = supabase
       .channel(`comments:${postId}`)
       .on(
@@ -82,10 +81,9 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
         { event: "INSERT", schema: "public", table: "post_comments", filter: `post_id=eq.${postId}` },
         (payload) => {
           const newRow = payload.new as CommentRow;
-          // Ignore if we already added it optimistically
           if (optimisticallyAddedIds.current.has(newRow.id)) {
             optimisticallyAddedIds.current.delete(newRow.id);
-            return;
+            return; // ignore our own optimistic insert
           }
           mergeInsertedComment(newRow);
         },
@@ -94,8 +92,8 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "post_comments", filter: `post_id=eq.${postId}` },
         (payload) => {
-          const newRow = payload.new as CommentRow;
-          mergeUpdatedComment(newRow);
+          const updatedRow = payload.new as CommentRow;
+          mergeUpdatedComment(updatedRow);
         },
       )
       .on(
@@ -248,17 +246,8 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
 
       if (insertError) throw insertError;
 
-      // If top-level, increment post count here (ensure no DB trigger duplicates this)
-      if (newComment && !replyTo?.id) {
-        const { error: updateError } = await supabase.rpc("increment_post_comments_count", {
-          post_id: postId,
-        });
-        if (updateError) {
-          console.error("Error updating comment count:", updateError);
-        }
-      }
+      // Removed RPC increment: DB trigger handles comments_count automatically
 
-      // Optimistic merge: add immediately and mark ID so realtime INSERT won't duplicate it
       if (newComment) {
         optimisticallyAddedIds.current.add(newComment.id);
         if (replyTo?.id) {
@@ -297,14 +286,12 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
 
       if (existingLike) {
         await supabase.from("comment_likes").delete().eq("id", existingLike.id);
-        // Optimistically decrement
         updateLikeCount(commentId, -1);
       } else {
         await supabase.from("comment_likes").insert({
           comment_id: commentId,
           user_id: user.id,
         });
-        // Optimistically increment
         updateLikeCount(commentId, +1);
       }
     } catch (error) {
@@ -312,11 +299,10 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
     }
   };
 
-  // ----- Local state merge helpers -----
+  // ----- Local merge helpers -----
 
   function mergeInsertedComment(row: CommentRow) {
     setComments((prev) => {
-      // If it already exists, ignore
       const exists = prev.some((p) => p.id === row.id) || prev.some((p) => p.replies?.some((r) => r.id === row.id));
       if (exists) return prev;
 
@@ -370,6 +356,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
+        {/* Post preview */}
         {postData && (
           <div className="flex-shrink-0 bg-background relative border-b">
             {postData.media_url && (
@@ -384,7 +371,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                   />
                 ) : (
                   <img
-                    src={postData.media_url}
+                    src={postData.media_url ?? undefined}
                     alt="Post media"
                     className="max-w-full max-h-full object-contain"
                     style={{ width: "40%", height: "auto" }}
@@ -395,10 +382,12 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
           </div>
         )}
 
+        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b flex-shrink-0 bg-background">
           <h2 className="text-lg font-semibold">Comments ({topLevelCount})</h2>
         </div>
 
+        {/* List */}
         <ScrollArea className="flex-1 px-4">
           {comments.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
@@ -409,12 +398,13 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
             <div className="space-y-6 py-4">
               {comments.map((c) => (
                 <div key={c.id} className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                  {/* Main comment */}
                   <div className="flex gap-3 group">
                     <Avatar
                       className="w-10 h-10 flex-shrink-0 cursor-pointer"
                       onClick={() => navigate(`/profile/${c.user_id}`)}
                     >
-                      <AvatarImage src={c.profiles?.avatar_url || undefined} />
+                      <AvatarImage src={c.profiles?.avatar_url ?? undefined} />
                       <AvatarFallback className="text-xs">{c.profiles?.display_name?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -487,6 +477,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                     </Button>
                   </div>
 
+                  {/* Replies */}
                   {c.replies && c.replies.length > 0 && (
                     <div className="ml-12 space-y-3 border-l-2 border-border pl-4">
                       {c.replies.map((reply) => (
@@ -495,7 +486,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                             className="w-8 h-8 flex-shrink-0 cursor-pointer"
                             onClick={() => navigate(`/profile/${reply.user_id}`)}
                           >
-                            <AvatarImage src={reply.profiles?.avatar_url || undefined} />
+                            <AvatarImage src={reply.profiles?.avatar_url ?? undefined} />
                             <AvatarFallback className="text-xs">{reply.profiles?.display_name?.[0]}</AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
@@ -563,6 +554,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
           )}
         </ScrollArea>
 
+        {/* Add comment */}
         <div className="border-t px-4 py-3 bg-background flex-shrink-0">
           {replyTo && (
             <div className="flex items-center justify-between mb-2 p-2 bg-muted rounded-lg">
@@ -574,7 +566,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
           )}
           <div className="flex items-start gap-2">
             <Avatar className="w-8 h-8 flex-shrink-0 mt-1">
-              <AvatarImage src={user?.user_metadata?.avatar_url || undefined} />
+              <AvatarImage src={user?.user_metadata?.avatar_url ?? undefined} />
               <AvatarFallback className="text-xs">{user?.user_metadata?.display_name?.[0]}</AvatarFallback>
             </Avatar>
             <div className="flex-1 relative">
@@ -587,7 +579,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
                       className="w-full flex items-center gap-2 p-2 hover:bg-muted transition-colors"
                     >
                       <Avatar className="w-6 h-6">
-                        <AvatarImage src={u.avatar_url || undefined} />
+                        <AvatarImage src={u.avatar_url ?? undefined} />
                         <AvatarFallback className="text-xs">{u.display_name?.[0]}</AvatarFallback>
                       </Avatar>
                       <div className="text-left">
