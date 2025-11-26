@@ -30,6 +30,8 @@ const Promote = () => {
   const { toast } = useToast();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
+  const [credits, setCredits] = useState<number>(0);
+  const [promoting, setPromoting] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -38,8 +40,24 @@ const Promote = () => {
     }
     if (postId) {
       loadPost();
+      loadCredits();
     }
   }, [user, postId]);
+
+  const loadCredits = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) throw error;
+      setCredits(data?.balance || 0);
+    } catch (error) {
+      console.error('Error loading credits:', error);
+    }
+  };
 
   const loadPost = async () => {
     try {
@@ -69,11 +87,55 @@ const Promote = () => {
     }
   };
 
-  const handlePromote = (plan: string) => {
-    toast({
-      title: 'Coming Soon',
-      description: `${plan} promotion will be available soon!`,
-    });
+  const handlePromote = async (plan: string, cost: number) => {
+    if (promoting) return;
+
+    // Check if user has enough credits
+    if (credits < cost) {
+      toast({
+        title: 'Insufficient Credits',
+        description: `You need ${cost} credits to promote with ${plan}. You currently have ${credits} credits.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setPromoting(true);
+    try {
+      // Deduct credits
+      const { error: transactionError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: user?.id,
+          amount: -cost,
+          type: 'promotion',
+          description: `${plan} - Post promotion`,
+          related_id: postId,
+        });
+
+      if (transactionError) throw transactionError;
+
+      // Update credits display
+      setCredits(credits - cost);
+
+      toast({
+        title: 'Post Promoted!',
+        description: `Your post has been promoted with ${plan}. ${cost} credits deducted.`,
+      });
+
+      // Navigate back after short delay
+      setTimeout(() => {
+        navigate('/feed');
+      }, 2000);
+    } catch (error: any) {
+      toast({
+        title: 'Promotion Failed',
+        description: error.message || 'Failed to promote post',
+        variant: 'destructive',
+      });
+    } finally {
+      setPromoting(false);
+    }
   };
 
   if (loading) {
@@ -125,6 +187,23 @@ const Promote = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 max-w-2xl pb-20">
+        {/* Credits Display */}
+        <Card className="bg-gradient-to-r from-primary/20 to-accent/20 border-primary/50 p-4 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-muted-foreground">Available Credits</p>
+              <p className="text-2xl font-bold text-primary">{credits}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/wallet')}
+            >
+              Buy More
+            </Button>
+          </div>
+        </Card>
+
         {/* Post Preview */}
         <Card className="bg-gray-900 border-gray-800 p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4 text-gradient-primary">Your Post</h2>
@@ -204,10 +283,11 @@ const Promote = () => {
               </li>
             </ul>
             <Button
-              onClick={() => handlePromote('Basic Boost')}
+              onClick={() => handlePromote('Basic Boost', 50)}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+              disabled={promoting || credits < 50}
             >
-              Promote Now
+              {promoting ? 'Processing...' : credits < 50 ? 'Insufficient Credits' : 'Promote Now'}
             </Button>
           </Card>
 
@@ -240,10 +320,11 @@ const Promote = () => {
               </li>
             </ul>
             <Button
-              onClick={() => handlePromote('Pro Boost')}
+              onClick={() => handlePromote('Pro Boost', 100)}
               className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              disabled={promoting || credits < 100}
             >
-              Promote Now
+              {promoting ? 'Processing...' : credits < 100 ? 'Insufficient Credits' : 'Promote Now'}
             </Button>
           </Card>
 
@@ -280,10 +361,11 @@ const Promote = () => {
               </li>
             </ul>
             <Button
-              onClick={() => handlePromote('Premium Boost')}
+              onClick={() => handlePromote('Premium Boost', 200)}
               className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600"
+              disabled={promoting || credits < 200}
             >
-              Promote Now
+              {promoting ? 'Processing...' : credits < 200 ? 'Insufficient Credits' : 'Promote Now'}
             </Button>
           </Card>
         </div>
