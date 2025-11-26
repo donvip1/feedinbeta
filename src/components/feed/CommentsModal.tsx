@@ -182,7 +182,8 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
 
     setIsLoading(true);
     try {
-      const { data: newComment, error } = await supabase
+      // Insert comment
+      const { data: newComment, error: insertError } = await supabase
         .from('post_comments')
         .insert({
           post_id: postId,
@@ -202,12 +203,23 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
         `)
         .single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
 
-      // Immediately add the new comment to the list
+      // Update post comments count only for top-level comments
+      if (newComment && !replyTo?.id) {
+        const { error: updateError } = await supabase.rpc('increment_post_comments_count', {
+          post_id: postId
+        });
+        
+        if (updateError) {
+          console.error('Error updating comment count:', updateError);
+        }
+      }
+
+      // Immediately add the new comment to the list (realtime will also update, but this is instant)
       if (newComment) {
         if (replyTo?.id) {
-          // If it's a reply, add it to the parent's replies in real-time
+          // If it's a reply, add it to the parent's replies
           setComments((prev) => 
             prev.map((comment) => {
               if (comment.id === replyTo.id) {
@@ -229,6 +241,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
       setComment('');
       setReplyTo(null);
     } catch (error) {
+      console.error('Comment error:', error);
       toast({
         title: 'Error posting comment',
         variant: 'destructive',

@@ -211,9 +211,11 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   };
 
   const toggleFullscreen = () => {
-    // Save current video time before opening fullscreen
-    if (videoRef.current && post.media_type === 'video') {
+    // Save current video time and pause the feed video
+    if (videoRef.current && currentMediaType === 'video') {
       currentVideoTime.current = videoRef.current.currentTime;
+      videoRef.current.pause();
+      setIsPlaying(false);
     }
     setShowFullscreenViewer(true);
     onInteractionStart?.();
@@ -514,7 +516,9 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                     src={currentMediaUrl}
                     className="w-full h-full object-cover"
                     playsInline
+                    autoPlay
                     muted={isMuted}
+                    loop
                     onClick={togglePlayPause}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
@@ -537,9 +541,12 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   )}
 
                   {/* Video controls */}
-                  <div className="absolute bottom-4 left-4 right-4 flex justify-between">
+                  <div className="absolute bottom-4 left-4 right-4 flex justify-between z-10">
                     <button
-                      onClick={toggleMute}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMute();
+                      }}
                       className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
                     >
                       {isMuted ? (
@@ -549,7 +556,10 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                       )}
                     </button>
                     <button
-                      onClick={toggleFullscreen}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFullscreen();
+                      }}
                       className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
                     >
                       <Maximize className="w-5 h-5" />
@@ -717,6 +727,11 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
         isOpen={showFullscreenViewer}
         onClose={() => {
           setShowFullscreenViewer(false);
+          // Resume the feed video if it was playing
+          if (videoRef.current && currentMediaType === 'video') {
+            videoRef.current.currentTime = currentVideoTime.current;
+            videoRef.current.play().catch(() => {});
+          }
           onInteractionEnd?.();
         }}
         initialTime={currentVideoTime.current}

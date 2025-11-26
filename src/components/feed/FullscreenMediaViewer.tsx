@@ -156,7 +156,14 @@ export default function FullscreenMediaViewer({
     
     const rect = e.currentTarget.getBoundingClientRect();
     const percent = (e.clientX - rect.left) / rect.width;
-    videoRef.current.currentTime = percent * duration;
+    const newTime = percent * duration;
+    videoRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleProgressDrag = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.buttons !== 1 || !videoRef.current) return;
+    handleProgressClick(e);
   };
 
   const formatTime = (time: number) => {
@@ -237,12 +244,17 @@ export default function FullscreenMediaViewer({
           <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4">
             {/* Progress Bar */}
             <div 
-              className="w-full h-1 bg-white/30 rounded-full mb-4 cursor-pointer"
+              className="w-full h-2 bg-white/30 rounded-full mb-4 cursor-pointer relative"
               onClick={handleProgressClick}
+              onMouseMove={handleProgressDrag}
             >
               <div 
-                className="h-full bg-primary rounded-full transition-all"
+                className="h-full bg-primary rounded-full pointer-events-none"
                 style={{ width: `${(currentTime / duration) * 100}%` }}
+              />
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg pointer-events-none"
+                style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translate(-50%, -50%)' }}
               />
             </div>
 

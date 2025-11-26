@@ -31,38 +31,83 @@ const Search = () => {
 
     setLoading(true);
     try {
-      // Search posts by content or hashtags
-      const { data: postsData } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles:user_id (
-            username,
-            display_name,
-            avatar_url
-          )
-        `)
-        .ilike('content', `%${query}%`)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(20);
+      let postsData: any[] = [];
+
+      // Check if searching for a hashtag
+      if (query.trim().startsWith('#')) {
+        const hashtagName = query.trim().slice(1).toLowerCase();
+        
+        // Find hashtag
+        const { data: hashtagData } = await supabase
+          .from('hashtags')
+          .select('id')
+          .ilike('name', hashtagName)
+          .maybeSingle();
+
+        if (hashtagData) {
+          // Get posts with this hashtag
+          const { data: postHashtags } = await supabase
+            .from('post_hashtags')
+            .select('post_id')
+            .eq('hashtag_id', hashtagData.id);
+
+          if (postHashtags && postHashtags.length > 0) {
+            const postIds = postHashtags.map(ph => ph.post_id);
+            
+            const { data: posts } = await supabase
+              .from('posts')
+              .select(`
+                *,
+                profiles:user_id (
+                  username,
+                  display_name,
+                  avatar_url
+                )
+              `)
+              .in('id', postIds)
+              .eq('status', 'active')
+              .order('created_at', { ascending: false })
+              .limit(20);
+
+            postsData = posts || [];
+          }
+        }
+      } else {
+        // Search posts by content
+        const { data: posts } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles:user_id (
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .ilike('content', `%${query}%`)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        postsData = posts || [];
+      }
 
       // Search users
       const { data: usersData } = await supabase
         .from('profiles')
         .select('*')
-        .or(`username.ilike.%${query}%,display_name.ilike.%${query}%`)
+        .or(`username.ilike.%${query.replace('#', '')}%,display_name.ilike.%${query.replace('#', '')}%`)
         .limit(20);
 
       // Search hashtags
       const { data: hashtagsData } = await supabase
         .from('hashtags')
         .select('*')
-        .ilike('name', `%${query}%`)
+        .ilike('name', `%${query.replace('#', '')}%`)
         .order('posts_count', { ascending: false })
         .limit(20);
 
-      setPosts(postsData || []);
+      setPosts(postsData);
       setUsers(usersData || []);
       setHashtags(hashtagsData || []);
     } catch (error) {
@@ -155,7 +200,11 @@ const Search = () => {
                 hashtags.map((tag) => (
                   <div
                     key={tag.id}
-                    onClick={() => setQuery(`#${tag.name}`)}
+                    onClick={() => {
+                      setQuery(`#${tag.name}`);
+                      // Trigger search immediately
+                      setTimeout(() => handleSearch(), 0);
+                    }}
                     className="p-3 rounded-lg hover:bg-accent cursor-pointer"
                   >
                     <p className="font-semibold">#{tag.name}</p>
