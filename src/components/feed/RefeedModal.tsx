@@ -198,11 +198,21 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
                   </div>
                   <p className="text-sm line-clamp-3">{post.content}</p>
                   {post.media_url && (
-                    <img 
-                      src={post.media_url} 
-                      alt="Post" 
-                      className="mt-2 rounded-lg w-full max-h-48 object-cover"
-                    />
+                    post.media_type === 'video' ? (
+                      <video 
+                        src={post.media_url} 
+                        className="mt-2 rounded-lg w-full max-h-48 object-cover"
+                        muted
+                        playsInline
+                        preload="metadata"
+                      />
+                    ) : (
+                      <img 
+                        src={post.media_url} 
+                        alt="Post" 
+                        className="mt-2 rounded-lg w-full max-h-48 object-cover"
+                      />
+                    )
                   )}
                 </div>
               )}
