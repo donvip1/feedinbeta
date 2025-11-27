@@ -457,11 +457,22 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               <p className="text-sm mb-2 line-clamp-3">{post.original_post.content}</p>
             )}
             {post.original_post.media_url && (
-              <img 
-                src={post.original_post.media_url} 
-                alt="Original post" 
-                className="rounded-lg w-full max-h-48 object-cover"
-              />
+              post.original_post.media_type === 'video' ? (
+                <video 
+                  src={post.original_post.media_url} 
+                  className="rounded-lg w-full max-h-48 object-cover"
+                  muted
+                  playsInline
+                  preload="metadata"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <img 
+                  src={post.original_post.media_url} 
+                  alt="Original post" 
+                  className="rounded-lg w-full max-h-48 object-cover"
+                />
+              )
             )}
           </div>
         )}
