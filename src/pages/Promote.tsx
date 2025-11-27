@@ -108,7 +108,7 @@ const Promote = () => {
         .insert({
           user_id: user?.id,
           amount: -cost,
-          type: 'promotion',
+          type: 'spent',
           description: `${plan} - Post promotion`,
           related_id: postId,
         });
