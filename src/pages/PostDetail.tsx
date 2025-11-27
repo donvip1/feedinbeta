@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 const PostDetail = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
+  const { postId: id } = useParams<{ postId: string }>();
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
 
   const { data: post, isLoading, error } = useQuery({
