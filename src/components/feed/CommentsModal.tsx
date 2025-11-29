@@ -25,6 +25,7 @@ interface CommentsModalProps {
       avatar_url: string | null;
     };
   };
+  onCommentAdded?: () => void;
 }
 
 type Profile = {
@@ -47,7 +48,7 @@ type CommentRow = {
 
 type CommentNode = CommentRow & { replies: CommentNode[] };
 
-export default function CommentsModal({ isOpen, onClose, postId, postData }: CommentsModalProps) {
+export default function CommentsModal({ isOpen, onClose, postId, postData, onCommentAdded }: CommentsModalProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -264,6 +265,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData }: Com
       }
 
       toast({ title: "Comment posted!" });
+      onCommentAdded?.();
       setComment("");
       setReplyTo(null);
     } catch (error) {
