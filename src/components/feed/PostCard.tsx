@@ -64,6 +64,8 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   const { toast } = useToast();
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
+  const [refeedsCount, setRefeedsCount] = useState(post.refeeds_count || 0);
   const [saved, setSaved] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -188,6 +190,29 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
   }, []);
+
+  // Real-time subscription for post count updates
+  useEffect(() => {
+    const channel = supabase
+      .channel(`post-counts-${post.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'posts', filter: `id=eq.${post.id}` },
+        (payload) => {
+          const newData = payload.new as any;
+          if (newData) {
+            setLikesCount(newData.likes_count || 0);
+            setCommentsCount(newData.comments_count || 0);
+            setRefeedsCount(newData.refeeds_count || 0);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [post.id]);
 
   const togglePlayPause = () => {
     if (videoRef.current) {
@@ -618,7 +643,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               >
                 <MessageCircle className="w-4 h-4" />
               </button>
-              <span className="text-sm">{post.comments_count || 0}</span>
+              <span className="text-sm">{commentsCount}</span>
 
               <button className="p-2 hover:bg-muted rounded-full transition-colors ml-2">
                 <Eye className="w-4 h-4" />
@@ -634,7 +659,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               >
                 <Repeat className="w-4 h-4" />
               </button>
-              <span className="text-sm">{post.refeeds_count || 0}</span>
+              <span className="text-sm">{refeedsCount}</span>
 
               <button
                 onClick={() => {
@@ -680,6 +705,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           media_type: post.media_type,
           profiles: post.profiles,
         }}
+        onCommentAdded={() => setCommentsCount(prev => prev + 1)}
       />
       <ShareModal
         isOpen={shareOpen}
@@ -711,6 +737,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
         }}
         postId={post.id}
         post={post}
+        onRefeedAdded={() => setRefeedsCount(prev => prev + 1)}
       />
 
       {/* Delete Confirmation Dialog */}

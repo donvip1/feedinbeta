@@ -13,9 +13,10 @@ interface RefeedModalProps {
   onClose: () => void;
   postId: string;
   post?: any;
+  onRefeedAdded?: () => void;
 }
 
-export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedModalProps) {
+export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdded }: RefeedModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showQuoteComposer, setShowQuoteComposer] = useState(false);
@@ -80,8 +81,8 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
         title: 'Refeeded successfully!',
         description: 'Post shared to your feed'
       });
+      onRefeedAdded?.();
       onClose();
-      window.location.reload();
     } catch (error) {
       console.error('Refeed error:', error);
       toast({
@@ -133,10 +134,10 @@ export default function RefeedModal({ isOpen, onClose, postId, post }: RefeedMod
         title: 'Quote posted!',
         description: 'Your quote has been shared'
       });
+      onRefeedAdded?.();
       onClose();
       setShowQuoteComposer(false);
       setQuoteText('');
-      window.location.reload();
     } catch (error: any) {
       console.error('Error posting quote:', error);
       toast({
