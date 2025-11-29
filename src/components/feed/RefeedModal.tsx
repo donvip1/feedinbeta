@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Button } from '@/components/ui/button';
-import { Repeat, Quote, X } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { useState } from "react";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { Repeat, Quote, X } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface RefeedModalProps {
   isOpen: boolean;
@@ -20,7 +20,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
   const { user } = useAuth();
   const { toast } = useToast();
   const [showQuoteComposer, setShowQuoteComposer] = useState(false);
-  const [quoteText, setQuoteText] = useState('');
+  const [quoteText, setQuoteText] = useState("");
   const [isPosting, setIsPosting] = useState(false);
 
   const handleRefeed = async () => {
@@ -28,66 +28,88 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
 
     try {
       // Check if already refeeded
-      const { data: existing } = await supabase
-        .from('post_shares')
-        .select('id')
-        .eq('post_id', postId)
-        .eq('user_id', user.id)
-        .eq('share_type', 'refeed')
+      const { data: existing, error: existingError } = await supabase
+        .from("post_shares")
+        .select("id")
+        .eq("post_id", postId)
+        .eq("user_id", user.id)
+        .eq("share_type", "refeed")
         .maybeSingle();
 
+      if (existingError) throw existingError;
+
       if (existing) {
-        toast({ 
-          title: 'Already refeeded',
-          description: 'You have already shared this post'
+        toast({
+          title: "Already refeeded",
+          description: "You have already shared this post",
         });
         onClose();
         return;
       }
 
-      // Create a refeed post that shows in the feed
-      const { error: postError } = await supabase.from('posts').insert([{
-        user_id: user.id,
-        feed_id: crypto.randomUUID(),
-        original_post_id: postId,
-        post_type: 'refeed',
-        status: 'active',
-      }]);
+      // Fetch original post to copy media/content for the refeed
+      const { data: originalPost, error: fetchError } = await supabase
+        .from("posts")
+        .select("content, media_url, media_type")
+        .eq("id", postId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      // Create a refeed post that appears in the feed (carry over media/content)
+      const { error: postError } = await supabase.from("posts").insert([
+        {
+          user_id: user.id,
+          feed_id: crypto.randomUUID(),
+          original_post_id: postId,
+          post_type: "refeed",
+          status: "active",
+          content: originalPost?.content || null,
+          media_url: originalPost?.media_url || null,
+          media_type: originalPost?.media_type || null,
+        },
+      ]);
 
       if (postError) throw postError;
 
       // Insert share record
-      await supabase.from('post_shares').insert([{
-        post_id: postId,
-        user_id: user.id,
-        share_type: 'refeed',
-      }]);
+      const { error: shareError } = await supabase.from("post_shares").insert([
+        {
+          post_id: postId,
+          user_id: user.id,
+          share_type: "refeed",
+        },
+      ]);
+      if (shareError) throw shareError;
 
-      // Increment refeed count
-      const { data: currentPost } = await supabase
-        .from('posts')
-        .select('refeeds_count')
-        .eq('id', postId)
+      // Increment refeed count on the original post
+      const { data: currentPost, error: countFetchError } = await supabase
+        .from("posts")
+        .select("refeeds_count")
+        .eq("id", postId)
         .single();
 
-      if (currentPost) {
-        await supabase
-          .from('posts')
-          .update({ refeeds_count: (currentPost.refeeds_count || 0) + 1 })
-          .eq('id', postId);
-      }
+      if (countFetchError) throw countFetchError;
 
-      toast({ 
-        title: 'Refeeded successfully!',
-        description: 'Post shared to your feed'
+      const nextCount = (currentPost?.refeeds_count || 0) + 1;
+      const { error: countUpdateError } = await supabase
+        .from("posts")
+        .update({ refeeds_count: nextCount })
+        .eq("id", postId);
+
+      if (countUpdateError) throw countUpdateError;
+
+      toast({
+        title: "Refeeded successfully!",
+        description: "Post shared to your feed",
       });
       onRefeedAdded?.();
       onClose();
     } catch (error) {
-      console.error('Refeed error:', error);
+      console.error("Refeed error:", error);
       toast({
-        title: 'Error refeeding post',
-        variant: 'destructive',
+        title: "Error refeeding post",
+        variant: "destructive",
       });
     }
   };
@@ -97,53 +119,72 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
 
     setIsPosting(true);
     try {
-      // Create new post with quote
-      const { data: newPost, error } = await supabase.from('posts').insert([{
-        user_id: user.id,
-        feed_id: crypto.randomUUID(),
-        content: quoteText.trim(),
-        original_post_id: postId,
-        post_type: 'quote',
-        status: 'active',
-      }]).select().single();
-
-      if (error) throw error;
-
-      // Insert share record
-      await supabase.from('post_shares').insert([{
-        post_id: postId,
-        user_id: user.id,
-        share_type: 'quote',
-      }]);
-
-      // Increment refeed count
-      const { data: currentPost } = await supabase
-        .from('posts')
-        .select('refeeds_count')
-        .eq('id', postId)
+      // Fetch original media to attach to the quote post
+      const { data: originalPost, error: fetchError } = await supabase
+        .from("posts")
+        .select("media_url, media_type")
+        .eq("id", postId)
         .single();
 
-      if (currentPost) {
-        await supabase
-          .from('posts')
-          .update({ refeeds_count: (currentPost.refeeds_count || 0) + 1 })
-          .eq('id', postId);
-      }
+      if (fetchError) throw fetchError;
 
-      toast({ 
-        title: 'Quote posted!',
-        description: 'Your quote has been shared'
+      // Create new post with quote + original media
+      const { error: insertError } = await supabase.from("posts").insert([
+        {
+          user_id: user.id,
+          feed_id: crypto.randomUUID(),
+          content: quoteText.trim(),
+          original_post_id: postId,
+          post_type: "quote",
+          status: "active",
+          media_url: originalPost?.media_url || null,
+          media_type: originalPost?.media_type || null,
+        },
+      ]);
+
+      if (insertError) throw insertError;
+
+      // Insert share record
+      const { error: shareError } = await supabase.from("post_shares").insert([
+        {
+          post_id: postId,
+          user_id: user.id,
+          share_type: "quote",
+        },
+      ]);
+      if (shareError) throw shareError;
+
+      // Increment refeed count on the original post
+      const { data: currentPost, error: countFetchError } = await supabase
+        .from("posts")
+        .select("refeeds_count")
+        .eq("id", postId)
+        .single();
+
+      if (countFetchError) throw countFetchError;
+
+      const nextCount = (currentPost?.refeeds_count || 0) + 1;
+      const { error: countUpdateError } = await supabase
+        .from("posts")
+        .update({ refeeds_count: nextCount })
+        .eq("id", postId);
+
+      if (countUpdateError) throw countUpdateError;
+
+      toast({
+        title: "Quote posted!",
+        description: "Your quote has been shared",
       });
       onRefeedAdded?.();
       onClose();
       setShowQuoteComposer(false);
-      setQuoteText('');
+      setQuoteText("");
     } catch (error: any) {
-      console.error('Error posting quote:', error);
+      console.error("Error posting quote:", error);
       toast({
-        title: 'Error posting quote',
-        description: error.message || 'Failed to post quote',
-        variant: 'destructive',
+        title: "Error posting quote",
+        description: error.message || "Failed to post quote",
+        variant: "destructive",
       });
     } finally {
       setIsPosting(false);
@@ -161,11 +202,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
                 <X className="w-5 h-5" />
               </Button>
               <h2 className="text-lg font-semibold">Quote Post</h2>
-              <Button 
-                onClick={handleQuoteRefeed} 
-                disabled={isPosting || !quoteText.trim()}
-                className="rounded-full"
-              >
+              <Button onClick={handleQuoteRefeed} disabled={isPosting || !quoteText.trim()} className="rounded-full">
                 Post
               </Button>
             </div>
@@ -198,23 +235,18 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
                     <span className="text-xs text-muted-foreground">@{post.profiles?.username}</span>
                   </div>
                   <p className="text-sm line-clamp-3">{post.content}</p>
-                  {post.media_url && (
-                    post.media_type === 'video' ? (
-                      <video 
-                        src={post.media_url} 
+                  {post.media_url &&
+                    (post.media_type === "video" ? (
+                      <video
+                        src={post.media_url}
                         className="mt-2 rounded-lg w-full max-h-48 object-cover"
                         muted
                         playsInline
                         preload="metadata"
                       />
                     ) : (
-                      <img 
-                        src={post.media_url} 
-                        alt="Post" 
-                        className="mt-2 rounded-lg w-full max-h-48 object-cover"
-                      />
-                    )
-                  )}
+                      <img src={post.media_url} alt="Post" className="mt-2 rounded-lg w-full max-h-48 object-cover" />
+                    ))}
                 </div>
               )}
             </div>
