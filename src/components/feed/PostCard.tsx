@@ -515,7 +515,8 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               </p>
             </div>
           </div>
-        ) : (currentMediaUrl || (post.post_type === 'refeed' && post.original_post?.media_url)) && post.media_type !== 'text_styled' ? (
+        ) : (post.post_type !== 'refeed' && post.post_type !== 'quote') && currentMediaUrl && post.media_type !== 'text_styled' ? (
+          // Regular post with media (NOT refeed/quote - those show media in original_post preview only)
           <div 
             className="bg-card rounded-lg overflow-hidden border border-border relative"
             onTouchStart={handleTouchStart}
