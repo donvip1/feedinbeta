@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Volume2, VolumeX, Play, Pause, SkipForward, SkipBack } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
+import { Slider } from '@/components/ui/slider';
 
 interface Post {
   id: string;
@@ -43,6 +43,7 @@ export default function FullscreenMediaViewer({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
@@ -69,10 +70,10 @@ export default function FullscreenMediaViewer({
 
   useEffect(() => {
     if (isOpen && isVideo && videoRef.current) {
-      // Sync with the initial time and mute state from the feed video
       videoRef.current.currentTime = initialTime;
       videoRef.current.muted = initialMuted;
       setIsMuted(initialMuted);
+      setCurrentTime(initialTime);
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
@@ -82,21 +83,27 @@ export default function FullscreenMediaViewer({
     const video = videoRef.current;
     if (!video) return;
 
-    const updateTime = () => setCurrentTime(video.currentTime);
+    const updateTime = () => {
+      if (!isSeeking) {
+        setCurrentTime(video.currentTime);
+      }
+    };
     const updateDuration = () => setDuration(video.duration);
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
 
     video.addEventListener('timeupdate', updateTime);
     video.addEventListener('loadedmetadata', updateDuration);
-    video.addEventListener('play', () => setIsPlaying(true));
-    video.addEventListener('pause', () => setIsPlaying(false));
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
 
     return () => {
       video.removeEventListener('timeupdate', updateTime);
       video.removeEventListener('loadedmetadata', updateDuration);
-      video.removeEventListener('play', () => setIsPlaying(true));
-      video.removeEventListener('pause', () => setIsPlaying(false));
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePause);
     };
-  }, [currentPostIndex]);
+  }, [currentPostIndex, isSeeking]);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartY.current = e.touches[0].clientY;
@@ -106,15 +113,11 @@ export default function FullscreenMediaViewer({
     const touchEndY = e.changedTouches[0].clientY;
     const diff = touchStartY.current - touchEndY;
 
-    // Only allow swipe navigation for videos
     if (!isVideo) return;
 
-    // Swipe up - next video
     if (diff > 50 && currentPostIndex < navigablePosts.length - 1) {
       navigateToPost(currentPostIndex + 1);
-    }
-    // Swipe down - previous video
-    else if (diff < -50 && currentPostIndex > 0) {
+    } else if (diff < -50 && currentPostIndex > 0) {
       navigateToPost(currentPostIndex - 1);
     }
   };
@@ -129,7 +132,7 @@ export default function FullscreenMediaViewer({
     onNavigate?.(newPost.id);
   };
 
-  const togglePlayPause = (e?: React.MouseEvent) => {
+  const togglePlayPause = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (!videoRef.current) return;
     
@@ -140,52 +143,55 @@ export default function FullscreenMediaViewer({
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
-  };
+  }, [isPlaying]);
 
-  const toggleMute = (e?: React.MouseEvent) => {
+  const toggleMute = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (videoRef.current) {
       const newMuted = !isMuted;
       videoRef.current.muted = newMuted;
       setIsMuted(newMuted);
     }
-  };
+  }, [isMuted]);
 
-  const seekForward = (e?: React.MouseEvent) => {
+  const seekForward = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (videoRef.current) {
       const newTime = Math.min(videoRef.current.currentTime + 10, duration);
       videoRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     }
-  };
+  }, [duration]);
 
-  const seekBackward = (e?: React.MouseEvent) => {
+  const seekBackward = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (videoRef.current) {
       const newTime = Math.max(videoRef.current.currentTime - 10, 0);
       videoRef.current.currentTime = newTime;
       setCurrentTime(newTime);
     }
-  };
+  }, []);
 
-  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!videoRef.current) return;
-    
-    const rect = e.currentTarget.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    const newTime = percent * duration;
-    videoRef.current.currentTime = newTime;
+  const handleSeekChange = useCallback((value: number[]) => {
+    const newTime = value[0];
     setCurrentTime(newTime);
-  };
+    setIsSeeking(true);
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+    }
+  }, []);
 
-  const handleProgressDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.buttons !== 1 || !videoRef.current) return;
-    handleProgressClick(e);
-  };
+  const handleSeekEnd = useCallback((value: number[]) => {
+    setIsSeeking(false);
+    const newTime = value[0];
+    if (videoRef.current) {
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
+  }, []);
 
   const formatTime = (time: number) => {
-    if (!isFinite(time)) return '0:00';
+    if (!isFinite(time) || isNaN(time)) return '0:00';
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
@@ -209,7 +215,6 @@ export default function FullscreenMediaViewer({
       onTouchEnd={handleTouchEnd}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {/* Media Content */}
       <div className="relative w-full h-full flex items-center justify-center">
         {isVideo ? (
           <video
@@ -232,7 +237,7 @@ export default function FullscreenMediaViewer({
           />
         )}
 
-        {/* Top Overlay - User Info & Close */}
+        {/* Top Overlay */}
         <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 z-10">
           <div className="flex items-center justify-between">
             <div 
@@ -257,36 +262,36 @@ export default function FullscreenMediaViewer({
           </div>
         </div>
 
-        {/* Custom Video Controls */}
+        {/* Video Controls */}
         {isVideo && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4">
-            {/* Progress Bar */}
-            <div 
-              className="w-full h-2 bg-white/30 rounded-full mb-4 cursor-pointer relative"
-              onClick={handleProgressClick}
-              onMouseMove={handleProgressDrag}
-            >
-              <div 
-                className="h-full bg-primary rounded-full pointer-events-none"
-                style={{ width: `${(currentTime / duration) * 100}%` }}
-              />
-              <div 
-                className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg pointer-events-none"
-                style={{ left: `${(currentTime / duration) * 100}%`, transform: 'translate(-50%, -50%)' }}
-              />
-            </div>
-
+          <div 
+            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 z-20"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Time Display */}
-            <div className="flex justify-between text-white text-xs mb-3">
+            <div className="flex justify-between text-white text-xs mb-2 font-medium">
               <span>{formatTime(currentTime)}</span>
               <span>{formatTime(duration)}</span>
+            </div>
+
+            {/* Seek Slider */}
+            <div className="mb-4">
+              <Slider
+                value={[currentTime]}
+                min={0}
+                max={duration || 100}
+                step={0.1}
+                onValueChange={handleSeekChange}
+                onValueCommit={handleSeekEnd}
+                className="w-full cursor-pointer [&_[role=slider]]:h-4 [&_[role=slider]]:w-4 [&_[role=slider]]:bg-white [&_[role=slider]]:border-0 [&_[role=slider]]:shadow-lg [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/30 [&>span:first-child>span]:bg-primary"
+              />
             </div>
 
             {/* Control Buttons */}
             <div className="flex items-center justify-center gap-6">
               <button
                 onClick={(e) => seekBackward(e)}
-                className="p-3 hover:bg-white/10 rounded-full transition-all z-20"
+                className="p-3 hover:bg-white/10 rounded-full transition-all"
                 type="button"
               >
                 <SkipBack className="w-6 h-6 text-white" fill="white" />
@@ -294,7 +299,7 @@ export default function FullscreenMediaViewer({
 
               <button
                 onClick={(e) => togglePlayPause(e)}
-                className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all z-20"
+                className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all"
                 type="button"
               >
                 {isPlaying ? (
@@ -306,7 +311,7 @@ export default function FullscreenMediaViewer({
 
               <button
                 onClick={(e) => seekForward(e)}
-                className="p-3 hover:bg-white/10 rounded-full transition-all z-20"
+                className="p-3 hover:bg-white/10 rounded-full transition-all"
                 type="button"
               >
                 <SkipForward className="w-6 h-6 text-white" fill="white" />
@@ -314,7 +319,7 @@ export default function FullscreenMediaViewer({
 
               <button
                 onClick={(e) => toggleMute(e)}
-                className="p-3 hover:bg-white/10 rounded-full transition-all z-20"
+                className="p-3 hover:bg-white/10 rounded-full transition-all"
                 type="button"
               >
                 {isMuted ? (
@@ -327,11 +332,11 @@ export default function FullscreenMediaViewer({
           </div>
         )}
 
-        {/* Navigation Hints - only for videos */}
+        {/* Navigation Hints */}
         {isVideo && navigablePosts.length > 1 && (
           <>
             {currentPostIndex < navigablePosts.length - 1 && (
-              <div className="absolute bottom-32 right-4 text-white/50 text-xs">
+              <div className="absolute bottom-36 right-4 text-white/50 text-xs">
                 Swipe up for next
               </div>
             )}
