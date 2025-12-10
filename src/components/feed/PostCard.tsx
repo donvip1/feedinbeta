@@ -773,6 +773,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           onInteractionEnd?.();
         }}
         initialTime={currentVideoTime.current}
+        initialMuted={isMuted}
       />
     </>
   );

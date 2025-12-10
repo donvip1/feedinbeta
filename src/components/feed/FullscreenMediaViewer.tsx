@@ -25,6 +25,7 @@ interface FullscreenMediaViewerProps {
   onClose: () => void;
   onNavigate?: (postId: string) => void;
   initialTime?: number;
+  initialMuted?: boolean;
 }
 
 export default function FullscreenMediaViewer({ 
@@ -33,11 +34,12 @@ export default function FullscreenMediaViewer({
   isOpen, 
   onClose,
   onNavigate,
-  initialTime = 0
+  initialTime = 0,
+  initialMuted = true
 }: FullscreenMediaViewerProps) {
   const navigate = useNavigate();
   const [currentPostIndex, setCurrentPostIndex] = useState(0);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(initialMuted);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -60,14 +62,21 @@ export default function FullscreenMediaViewer({
     }
   }, [post.id, navigablePosts]);
 
+  // Sync mute state when it changes from parent
+  useEffect(() => {
+    setIsMuted(initialMuted);
+  }, [initialMuted]);
+
   useEffect(() => {
     if (isOpen && isVideo && videoRef.current) {
-      // Sync with the initial time from the feed video
+      // Sync with the initial time and mute state from the feed video
       videoRef.current.currentTime = initialTime;
+      videoRef.current.muted = initialMuted;
+      setIsMuted(initialMuted);
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
     }
-  }, [isOpen, currentPostIndex, isVideo, initialTime]);
+  }, [isOpen, currentPostIndex, isVideo, initialTime, initialMuted]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -120,7 +129,8 @@ export default function FullscreenMediaViewer({
     onNavigate?.(newPost.id);
   };
 
-  const togglePlayPause = () => {
+  const togglePlayPause = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!videoRef.current) return;
     
     if (isPlaying) {
@@ -132,22 +142,30 @@ export default function FullscreenMediaViewer({
     }
   };
 
-  const toggleMute = () => {
+  const toggleMute = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
+      const newMuted = !isMuted;
+      videoRef.current.muted = newMuted;
+      setIsMuted(newMuted);
     }
   };
 
-  const seekForward = () => {
+  const seekForward = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (videoRef.current) {
-      videoRef.current.currentTime = Math.min(videoRef.current.currentTime + 10, duration);
+      const newTime = Math.min(videoRef.current.currentTime + 10, duration);
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
     }
   };
 
-  const seekBackward = () => {
+  const seekBackward = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (videoRef.current) {
-      videoRef.current.currentTime = Math.max(videoRef.current.currentTime - 10, 0);
+      const newTime = Math.max(videoRef.current.currentTime - 10, 0);
+      videoRef.current.currentTime = newTime;
+      setCurrentTime(newTime);
     }
   };
 
@@ -200,7 +218,7 @@ export default function FullscreenMediaViewer({
             className="w-full h-full object-contain"
             playsInline
             muted={isMuted}
-            onClick={togglePlayPause}
+            onClick={() => togglePlayPause()}
             onContextMenu={(e) => e.preventDefault()}
             controlsList="nodownload nofullscreen noremoteplayback"
             disablePictureInPicture
@@ -267,15 +285,17 @@ export default function FullscreenMediaViewer({
             {/* Control Buttons */}
             <div className="flex items-center justify-center gap-6">
               <button
-                onClick={seekBackward}
-                className="p-3 hover:bg-white/10 rounded-full transition-all"
+                onClick={(e) => seekBackward(e)}
+                className="p-3 hover:bg-white/10 rounded-full transition-all z-20"
+                type="button"
               >
                 <SkipBack className="w-6 h-6 text-white" fill="white" />
               </button>
 
               <button
-                onClick={togglePlayPause}
-                className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all"
+                onClick={(e) => togglePlayPause(e)}
+                className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all z-20"
+                type="button"
               >
                 {isPlaying ? (
                   <Pause className="w-7 h-7 text-primary-foreground" fill="currentColor" />
@@ -285,15 +305,17 @@ export default function FullscreenMediaViewer({
               </button>
 
               <button
-                onClick={seekForward}
-                className="p-3 hover:bg-white/10 rounded-full transition-all"
+                onClick={(e) => seekForward(e)}
+                className="p-3 hover:bg-white/10 rounded-full transition-all z-20"
+                type="button"
               >
                 <SkipForward className="w-6 h-6 text-white" fill="white" />
               </button>
 
               <button
-                onClick={toggleMute}
-                className="p-3 hover:bg-white/10 rounded-full transition-all"
+                onClick={(e) => toggleMute(e)}
+                className="p-3 hover:bg-white/10 rounded-full transition-all z-20"
+                type="button"
               >
                 {isMuted ? (
                   <VolumeX className="w-6 h-6 text-white" />
