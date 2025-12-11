@@ -160,24 +160,39 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
     checkStatus();
   }, [user, post.id]);
 
-  // Record view when post is visible
+  // Track if post is visible using Intersection Observer
+  const postRef = useRef<HTMLDivElement>(null);
+  
+  // Record view only when post is actually visible on screen
   useEffect(() => {
-    const recordView = async () => {
-      if (!user || hasViewed) return;
-      
-      try {
-        await supabase.from('post_views').insert({
-          post_id: post.id,
-          user_id: user.id,
-        });
-        setHasViewed(true);
-      } catch (error) {
-        console.error('Error recording view:', error);
-      }
-    };
-
-    recordView();
-  }, [user, post.id, hasViewed]);
+    // Don't record if: no user, already viewed, or user is the post creator
+    if (!user || hasViewed || user.id === post.user_id) return;
+    
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        const [entry] = entries;
+        if (entry.isIntersecting && !hasViewed) {
+          try {
+            await supabase.from('post_views').insert({
+              post_id: post.id,
+              user_id: user.id,
+            });
+            setHasViewed(true);
+            observer.disconnect();
+          } catch (error) {
+            // Likely duplicate view, ignore
+          }
+        }
+      },
+      { threshold: 0.5 } // Post must be 50% visible
+    );
+    
+    if (postRef.current) {
+      observer.observe(postRef.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [user, post.id, post.user_id, hasViewed]);
 
   // Listen for fullscreen changes
   useEffect(() => {
@@ -357,7 +372,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
   return (
     <>
-      <div className="mb-4 snap-start snap-always w-full px-4 py-2">
+      <div ref={postRef} className="mb-4 snap-start snap-always w-full px-4 py-2">
         {/* Refeed/Quote Refeed indicator */}
         {(post.post_type === 'refeed' || post.post_type === 'quote') && (
           <div className="flex items-center gap-1.5 mb-2 px-1">
