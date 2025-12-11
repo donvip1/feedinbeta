@@ -444,11 +444,11 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
         {/* Original post for refeeds and quotes - Clickable */}
         {(post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post && (
-          <div 
-            className="border rounded-2xl p-3 bg-muted/30 mb-2 cursor-pointer hover:bg-muted/40 transition-colors"
-            onClick={() => navigate(`/post/${post.original_post.id}`)}
-          >
-            <div className="flex items-center gap-2 mb-2">
+          <div className="border rounded-2xl p-3 bg-muted/30 mb-2">
+            <div 
+              className="flex items-center gap-2 mb-2 cursor-pointer"
+              onClick={() => navigate(`/post/${post.original_post.id}`)}
+            >
               <Avatar 
                 className="w-6 h-6 cursor-pointer"
                 onClick={(e) => {
@@ -479,24 +479,74 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               </span>
             </div>
             {post.original_post.content && (
-              <p className="text-sm mb-2 line-clamp-3">{post.original_post.content}</p>
+              <p 
+                className="text-sm mb-2 line-clamp-3 cursor-pointer"
+                onClick={() => navigate(`/post/${post.original_post.id}`)}
+              >
+                {post.original_post.content}
+              </p>
             )}
             {post.original_post.media_url && (
               post.original_post.media_type === 'video' ? (
-                <video 
-                  src={post.original_post.media_url} 
-                  className="rounded-lg w-full max-h-48 object-cover"
-                  muted
-                  playsInline
-                  preload="metadata"
-                  onClick={(e) => e.stopPropagation()}
-                />
+                <div className="relative rounded-lg overflow-hidden">
+                  <video 
+                    ref={videoRef}
+                    src={post.original_post.media_url} 
+                    className="rounded-lg w-full max-h-[60vh] object-contain bg-black"
+                    muted={isMuted}
+                    playsInline
+                    loop
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePlayPause();
+                    }}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                  />
+                  {/* Play/Pause overlay */}
+                  {showPlayIcon && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="bg-black/50 rounded-full p-4">
+                        {isPlaying ? (
+                          <Pause className="w-8 h-8 text-white" />
+                        ) : (
+                          <Play className="w-8 h-8 text-white" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {/* Video controls */}
+                  <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleMute();
+                      }}
+                      className="p-2 bg-black/50 rounded-full"
+                    >
+                      {isMuted ? (
+                        <VolumeX className="w-4 h-4 text-white" />
+                      ) : (
+                        <Volume2 className="w-4 h-4 text-white" />
+                      )}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFullscreen();
+                      }}
+                      className="p-2 bg-black/50 rounded-full"
+                    >
+                      <Maximize className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <img 
                   src={post.original_post.media_url} 
                   alt="Original post" 
-                  className="rounded-lg w-full max-h-48 object-cover"
-                />
+                  className="rounded-lg w-full max-h-48 object-cover cursor-pointer"
+                  onClick={() => navigate(`/post/${post.original_post.id}`)}/>
               )
             )}
           </div>
@@ -761,7 +811,15 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
       {/* Fullscreen Media Viewer */}
       <FullscreenMediaViewer
-        post={post}
+        post={(post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post ? {
+          id: post.original_post.id,
+          user_id: post.original_post.user_id,
+          content: post.original_post.content,
+          media_url: post.original_post.media_url,
+          media_type: post.original_post.media_type,
+          created_at: post.original_post.created_at,
+          profiles: post.original_post.profiles
+        } : post}
         allPosts={allPosts}
         isOpen={showFullscreenViewer}
         onClose={() => {
