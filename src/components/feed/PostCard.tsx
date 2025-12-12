@@ -252,7 +252,12 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
   const toggleFullscreen = () => {
     // Save current video time and pause the feed video
-    if (videoRef.current && currentMediaType === 'video') {
+    // Check both regular video posts AND refeed/quote posts with video original_post
+    const isRefeedVideo = (post.post_type === 'refeed' || post.post_type === 'quote') && 
+                          post.original_post?.media_type === 'video';
+    const isRegularVideo = currentMediaType === 'video';
+    
+    if (videoRef.current && (isRegularVideo || isRefeedVideo)) {
       currentVideoTime.current = videoRef.current.currentTime;
       videoRef.current.pause();
       setIsPlaying(false);
@@ -839,8 +844,12 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
         isOpen={showFullscreenViewer}
         onClose={() => {
           setShowFullscreenViewer(false);
-          // Resume the feed video if it was playing
-          if (videoRef.current && currentMediaType === 'video') {
+          // Resume the feed video if it was playing (including refeed videos)
+          const isRefeedVideo = (post.post_type === 'refeed' || post.post_type === 'quote') && 
+                                post.original_post?.media_type === 'video';
+          const isRegularVideo = currentMediaType === 'video';
+          
+          if (videoRef.current && (isRegularVideo || isRefeedVideo)) {
             videoRef.current.currentTime = currentVideoTime.current;
             videoRef.current.play().catch(() => {});
           }
