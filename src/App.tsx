@@ -37,6 +37,7 @@ import NotificationSettings from "./pages/NotificationSettings";
 import CacheSettingsPage from "./pages/CacheSettingsPage";
 import BlockedUsers from "./pages/BlockedUsers";
 import P2PMarketplace from "./pages/P2PMarketplace";
+import P2PTransaction from "./pages/P2PTransaction";
 import InitializeGroups from "./pages/InitializeGroups";
 import Trending from "./pages/Trending";
 import Wallet from "./pages/Wallet";
@@ -112,6 +113,7 @@ const App = () => {
             <Route path="/settings/cache" element={<CacheSettingsPage />} />
             <Route path="/settings/blocked" element={<BlockedUsers />} />
             <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
+            <Route path="/p2p-transaction/:transactionId" element={<P2PTransaction />} />
             <Route path="/initialize-groups" element={<InitializeGroups />} />
             <Route path="/trending" element={<Trending />} />
             <Route path="/wallet" element={<Wallet />} />

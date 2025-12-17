@@ -30,45 +30,34 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId }: Gift
 
     setSending(true);
     try {
-      // Check user balance
-      const { data: credits } = await supabase
-        .from('user_credits')
-        .select('balance')
-        .eq('user_id', user.id)
-        .single();
+      // Use the secure database function to handle gift transaction
+      const { data, error } = await supabase.rpc('send_gift', {
+        p_sender_id: user.id,
+        p_recipient_id: recipientId,
+        p_post_id: postId,
+        p_gift_type: giftType,
+        p_cost: cost,
+      });
 
-      if (!credits || credits.balance < cost) {
-        toast({
-          title: 'Insufficient credits',
-          description: 'Please purchase more credits to send gifts',
-          variant: 'destructive',
-        });
+      if (error) {
+        if (error.message.includes('Insufficient credits')) {
+          toast({
+            title: 'Insufficient credits',
+            description: 'Please purchase more credits to send gifts',
+            variant: 'destructive',
+          });
+        } else {
+          throw error;
+        }
         return;
       }
 
-      // Deduct from sender
-      await supabase.from('credit_transactions').insert({
-        user_id: user.id,
-        type: 'spent',
-        amount: -cost,
-        description: `Sent ${giftType} gift`,
-        related_id: postId,
-      });
-
-      // Add to recipient
-      await supabase.from('credit_transactions').insert({
-        user_id: recipientId,
-        type: 'earned',
-        amount: cost,
-        description: `Received ${giftType} gift`,
-        related_id: postId,
-      });
-
       toast({ title: 'Gift sent successfully! 🎁' });
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: 'Error sending gift',
+        description: error.message || 'Failed to send gift',
         variant: 'destructive',
       });
     } finally {

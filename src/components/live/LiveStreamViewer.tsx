@@ -32,26 +32,30 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
   }, [streamId]);
 
   const fetchStream = async () => {
-    const { data, error } = await supabase
+    // First fetch the stream
+    const { data: streamData, error: streamError } = await supabase
       .from("live_streams")
-      .select(`
-        *,
-        profiles:user_id (
-          display_name,
-          username,
-          avatar_url
-        )
-      `)
+      .select("*")
       .eq("id", streamId)
       .single();
 
-    if (error) {
-      console.error("Error fetching stream:", error);
+    if (streamError) {
+      console.error("Error fetching stream:", streamError);
       toast.error("Failed to load stream");
       return;
     }
 
-    setStream(data);
+    // Then fetch the profile separately
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("display_name, username, avatar_url")
+      .eq("id", streamData.user_id)
+      .single();
+
+    setStream({
+      ...streamData,
+      profiles: profileData
+    });
   };
 
   const joinStream = async () => {
@@ -121,23 +125,30 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
   };
 
   const fetchComments = async () => {
-    const { data, error } = await supabase
+    const { data: commentsData, error } = await supabase
       .from("live_stream_comments")
-      .select(`
-        *,
-        profiles:user_id (
-          display_name,
-          username,
-          avatar_url
-        )
-      `)
+      .select("*")
       .eq("stream_id", streamId)
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (!error && data) {
-      setComments(data.reverse());
-    }
+    if (error || !commentsData) return;
+
+    // Fetch profiles for all comment authors
+    const userIds = [...new Set(commentsData.map(c => c.user_id))];
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, display_name, username, avatar_url")
+      .in("id", userIds);
+
+    const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+    const commentsWithProfiles = commentsData.map(comment => ({
+      ...comment,
+      profiles: profileMap.get(comment.user_id)
+    }));
+
+    setComments(commentsWithProfiles.reverse());
   };
 
   const sendComment = async () => {

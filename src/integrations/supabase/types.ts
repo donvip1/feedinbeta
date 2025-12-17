@@ -3049,6 +3049,20 @@ export type Database = {
         Args: { attachment_id: string }
         Returns: undefined
       }
+      send_gift: {
+        Args: {
+          p_cost: number
+          p_gift_type: string
+          p_post_id: string
+          p_recipient_id: string
+          p_sender_id: string
+        }
+        Returns: Json
+      }
+      transfer_credits: {
+        Args: { p_amount: number; p_recipient_username: string }
+        Returns: Json
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
