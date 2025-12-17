@@ -60,28 +60,29 @@ export default function Messages() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
+  const handledLocationStateRef = React.useRef(false);
 
-  // Handle shared image from location state
+  // Handle shared image from location state - only once on mount
   useEffect(() => {
+    if (handledLocationStateRef.current) return;
+    
     const state = location.state as { sharedImage?: string; conversationId?: string };
     if (state?.sharedImage) {
       setSharedImageUrl(state.sharedImage);
       setShowNewConversation(true);
-      // Clear the state
-      navigate(location.pathname, { replace: true });
+      handledLocationStateRef.current = true;
+      // Clear the state without causing navigation
+      window.history.replaceState({}, '', location.pathname);
     }
     
-    // Handle navigation from notification to specific conversation
-    if (state?.conversationId && conversations.length > 0) {
-      const conversation = conversations.find(c => c.id === state.conversationId);
-      if (conversation) {
-        setSelectedConversationId(state.conversationId);
-        setActiveTab('chats');
-      }
-      // Clear the state
-      navigate(location.pathname, { replace: true });
+    if (state?.conversationId) {
+      setSelectedConversationId(state.conversationId);
+      setActiveTab('chats');
+      handledLocationStateRef.current = true;
+      // Clear the state without causing navigation
+      window.history.replaceState({}, '', location.pathname);
     }
-  }, [location, navigate, conversations]);
+  }, [location.pathname, location.state]);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -94,7 +95,15 @@ export default function Messages() {
       loadConversations();
       loadGroups();
       
-      // Subscribe to new messages to update unread counts
+      // Subscribe to new messages to update unread counts - debounced
+      let reloadTimeout: NodeJS.Timeout | null = null;
+      const debouncedReload = () => {
+        if (reloadTimeout) clearTimeout(reloadTimeout);
+        reloadTimeout = setTimeout(() => {
+          loadConversations();
+        }, 1000); // Debounce to prevent rapid reloads
+      };
+
       const channel = supabase
         .channel('messages-updates')
         .on(
@@ -104,28 +113,22 @@ export default function Messages() {
             schema: 'public',
             table: 'messages'
           },
-          () => {
-            loadConversations();
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'messages'
-          },
-          () => {
-            loadConversations();
+          (payload: any) => {
+            // Only reload if the message is for a conversation we're tracking
+            const convId = payload?.new?.conversation_id;
+            if (convId && !selectedConversationId) {
+              debouncedReload();
+            }
           }
         )
         .subscribe();
 
       return () => {
+        if (reloadTimeout) clearTimeout(reloadTimeout);
         supabase.removeChannel(channel);
       };
     }
-  }, [user]);
+  }, [user, selectedConversationId]);
 
   const loadConversations = async () => {
     if (!user) return;
