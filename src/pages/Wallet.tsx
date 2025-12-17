@@ -126,7 +126,7 @@ const Wallet = () => {
     }
 
     const amount = parseInt(sendAmount);
-    if (amount <= 0 || !credits || amount > credits.balance) {
+    if (amount <= 0) {
       toast({
         title: 'Invalid Amount',
         description: 'Please enter a valid amount',
@@ -136,45 +136,36 @@ const Wallet = () => {
     }
 
     try {
-      // Find recipient
-      const { data: recipient, error: recipientError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', recipientUsername)
-        .single();
+      // Use the secure database function to handle transfer
+      const { data, error } = await supabase.rpc('transfer_credits', {
+        p_recipient_username: recipientUsername,
+        p_amount: amount,
+      });
 
-      if (recipientError || !recipient) {
-        toast({
-          title: 'User Not Found',
-          description: 'Could not find a user with that username',
-          variant: 'destructive',
-        });
+      if (error) {
+        if (error.message.includes('Insufficient credits')) {
+          toast({
+            title: 'Insufficient Credits',
+            description: 'You do not have enough credits for this transfer',
+            variant: 'destructive',
+          });
+        } else if (error.message.includes('User not found')) {
+          toast({
+            title: 'User Not Found',
+            description: 'Could not find a user with that username',
+            variant: 'destructive',
+          });
+        } else if (error.message.includes('Cannot transfer credits to yourself')) {
+          toast({
+            title: 'Invalid Transfer',
+            description: 'You cannot send credits to yourself',
+            variant: 'destructive',
+          });
+        } else {
+          throw error;
+        }
         return;
       }
-
-      // Deduct from sender
-      const { error: deductError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: user?.id,
-          amount: -amount,
-          type: 'transfer_sent',
-          description: `Sent to @${recipientUsername}`,
-        });
-
-      if (deductError) throw deductError;
-
-      // Add to recipient
-      const { error: addError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: recipient.id,
-          amount: amount,
-          type: 'transfer_received',
-          description: `Received from @${user?.user_metadata?.username || 'user'}`,
-        });
-
-      if (addError) throw addError;
 
       toast({
         title: 'Credits Sent',
@@ -187,7 +178,7 @@ const Wallet = () => {
     } catch (error: any) {
       toast({
         title: 'Transfer Failed',
-        description: error.message,
+        description: error.message || 'Failed to transfer credits',
         variant: 'destructive',
       });
     }
