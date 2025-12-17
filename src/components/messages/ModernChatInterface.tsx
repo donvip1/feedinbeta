@@ -204,15 +204,27 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
+      // First get the other participant's user_id
+      const { data: participant, error: participantError } = await supabase
         .from('conversation_participants')
-        .select('user_id, participant:profiles!conversation_participants_user_id_fkey(*)')
+        .select('user_id')
         .eq('conversation_id', conversationId)
         .neq('user_id', user.id)
         .maybeSingle();
 
-      if (error) throw error;
-      setOtherUser(data?.participant);
+      if (participantError) throw participantError;
+      
+      // Then fetch their profile separately
+      if (participant?.user_id) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', participant.user_id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+        setOtherUser(profile);
+      }
     } catch (error: any) {
       console.error('Error loading other user:', error);
     }

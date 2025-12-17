@@ -144,12 +144,24 @@ export default function Messages() {
       
       const conversationsWithDetails = await Promise.all(
         conversationIds.map(async (convId) => {
-          const { data: participants } = await supabase
+          // Get other participant's user_id first
+          const { data: otherParticipant } = await supabase
             .from('conversation_participants')
-            .select('user_id, participant:profiles!conversation_participants_user_id_fkey(id, display_name, username, avatar_url)')
+            .select('user_id')
             .eq('conversation_id', convId)
             .neq('user_id', user.id)
             .maybeSingle();
+
+          // Now fetch the profile separately using the user_id
+          let participantProfile = null;
+          if (otherParticipant?.user_id) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('id, display_name, username, avatar_url')
+              .eq('id', otherParticipant.user_id)
+              .maybeSingle();
+            participantProfile = profile;
+          }
 
           const { data: lastMessage } = await supabase
             .from('messages')
@@ -173,10 +185,10 @@ export default function Messages() {
             id: convId,
             updated_at: conv?.conversations?.updated_at || '',
             other_participant: {
-              id: participants?.participant?.id || '',
-              display_name: participants?.participant?.display_name || 'Unknown',
-              username: participants?.participant?.username || null,
-              avatar_url: participants?.participant?.avatar_url || null,
+              id: participantProfile?.id || otherParticipant?.user_id || '',
+              display_name: participantProfile?.display_name || 'Unknown',
+              username: participantProfile?.username || null,
+              avatar_url: participantProfile?.avatar_url || null,
             },
             last_message: lastMessage || undefined,
             unread_count: unreadCount || 0,
