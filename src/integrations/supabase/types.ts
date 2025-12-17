@@ -3406,34 +3406,82 @@ export type Database = {
       }
       public_profiles: {
         Row: {
+          age: number | null
           avatar_url: string | null
+          banner_url: string | null
           bio: string | null
+          country: string | null
+          cover_url: string | null
+          created_at: string | null
           display_name: string | null
+          facebook_url: string | null
           followers_count: number | null
           following_count: number | null
           id: string | null
+          instagram_url: string | null
           is_premium: boolean | null
+          linkedin_url: string | null
+          location: string | null
+          marital_status: string | null
+          phone_number: string | null
+          stripe_customer_id: string | null
+          tiktok_url: string | null
+          twitter_url: string | null
           username: string | null
+          website_url: string | null
+          youtube_url: string | null
         }
         Insert: {
+          age?: never
           avatar_url?: string | null
+          banner_url?: never
           bio?: string | null
+          country?: never
+          cover_url?: never
+          created_at?: string | null
           display_name?: string | null
+          facebook_url?: never
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
+          instagram_url?: never
           is_premium?: boolean | null
+          linkedin_url?: never
+          location?: never
+          marital_status?: never
+          phone_number?: never
+          stripe_customer_id?: never
+          tiktok_url?: never
+          twitter_url?: never
           username?: string | null
+          website_url?: never
+          youtube_url?: never
         }
         Update: {
+          age?: never
           avatar_url?: string | null
+          banner_url?: never
           bio?: string | null
+          country?: never
+          cover_url?: never
+          created_at?: string | null
           display_name?: string | null
+          facebook_url?: never
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
+          instagram_url?: never
           is_premium?: boolean | null
+          linkedin_url?: never
+          location?: never
+          marital_status?: never
+          phone_number?: never
+          stripe_customer_id?: never
+          tiktok_url?: never
+          twitter_url?: never
           username?: string | null
+          website_url?: never
+          youtube_url?: never
         }
         Relationships: []
       }
