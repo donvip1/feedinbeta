@@ -214,16 +214,19 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
 
       if (participantError) throw participantError;
       
-      // Then fetch their profile separately from public_profiles view
+      // Then fetch their profile separately
       if (participant?.user_id) {
         const { data: profile, error: profileError } = await supabase
-          .from('public_profiles')
-          .select('*')
+          .from('profiles')
+          .select('id, display_name, username, avatar_url, bio, is_premium')
           .eq('id', participant.user_id)
-          .maybeSingle();
+          .single();
 
-        if (profileError) throw profileError;
-        setOtherUser(profile);
+        if (profileError) {
+          console.error('Error fetching other user profile:', profileError);
+        } else {
+          setOtherUser(profile);
+        }
       }
     } catch (error: any) {
       console.error('Error loading other user:', error);

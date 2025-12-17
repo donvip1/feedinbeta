@@ -152,14 +152,18 @@ export default function Messages() {
             .neq('user_id', user.id)
             .maybeSingle();
 
-          // Now fetch the profile separately using the user_id from public_profiles view
+          // Now fetch the profile separately using the user_id
           let participantProfile = null;
           if (otherParticipant?.user_id) {
-            const { data: profile } = await supabase
-              .from('public_profiles')
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
               .select('id, display_name, username, avatar_url')
               .eq('id', otherParticipant.user_id)
-              .maybeSingle();
+              .single();
+            
+            if (profileError) {
+              console.error('Error fetching profile:', profileError);
+            }
             participantProfile = profile;
           }
 
