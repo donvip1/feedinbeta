@@ -508,11 +508,11 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
             )}
             {post.original_post.media_url && (
               post.original_post.media_type === 'video' ? (
-                <div className="relative rounded-lg overflow-hidden">
+                <div className="relative rounded-lg overflow-hidden h-[55vh]">
                   <video 
                     ref={videoRef}
                     src={post.original_post.media_url} 
-                    className="rounded-lg w-full max-h-[60vh] object-contain bg-black"
+                    className="rounded-lg w-full h-full object-cover"
                     muted={isMuted}
                     playsInline
                     loop
@@ -562,11 +562,14 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   </div>
                 </div>
               ) : (
-                <img 
-                  src={post.original_post.media_url} 
-                  alt="Original post" 
-                  className="rounded-lg w-full max-h-48 object-cover cursor-pointer"
-                  onClick={() => navigate(`/post/${post.original_post.id}`)}/>
+                <div className="relative rounded-lg overflow-hidden h-[55vh]">
+                  <img 
+                    src={post.original_post.media_url} 
+                    alt="Original post" 
+                    className="w-full h-full object-cover cursor-pointer"
+                    onClick={() => navigate(`/post/${post.original_post.id}`)}
+                  />
+                </div>
               )
             )}
           </div>
