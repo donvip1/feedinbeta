@@ -905,6 +905,110 @@ export type Database = {
           },
         ]
       }
+      live_stream_gifts: {
+        Row: {
+          created_at: string
+          credit_value: number
+          gift_type: string
+          id: string
+          receiver_id: string
+          sender_id: string
+          stream_id: string
+        }
+        Insert: {
+          created_at?: string
+          credit_value?: number
+          gift_type: string
+          id?: string
+          receiver_id: string
+          sender_id: string
+          stream_id: string
+        }
+        Update: {
+          created_at?: string
+          credit_value?: number
+          gift_type?: string
+          id?: string
+          receiver_id?: string
+          sender_id?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_stream_gifts_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_stream_gifts_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_stream_gifts_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_stream_invites: {
+        Row: {
+          created_at: string
+          host_id: string
+          id: string
+          invited_user_id: string
+          responded_at: string | null
+          status: string
+          stream_id: string
+        }
+        Insert: {
+          created_at?: string
+          host_id: string
+          id?: string
+          invited_user_id: string
+          responded_at?: string | null
+          status?: string
+          stream_id: string
+        }
+        Update: {
+          created_at?: string
+          host_id?: string
+          id?: string
+          invited_user_id?: string
+          responded_at?: string | null
+          status?: string
+          stream_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_stream_invites_host_id_fkey"
+            columns: ["host_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_stream_invites_invited_user_id_fkey"
+            columns: ["invited_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "live_stream_invites_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_stream_reactions: {
         Row: {
           created_at: string | null
@@ -3056,6 +3160,15 @@ export type Database = {
           p_post_id: string
           p_recipient_id: string
           p_sender_id: string
+        }
+        Returns: Json
+      }
+      send_live_gift: {
+        Args: {
+          p_credit_value: number
+          p_gift_type: string
+          p_receiver_id: string
+          p_stream_id: string
         }
         Returns: Json
       }
