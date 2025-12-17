@@ -3278,44 +3278,32 @@ export type Database = {
       public_profiles: {
         Row: {
           avatar_url: string | null
-          banner_url: string | null
           bio: string | null
-          cover_url: string | null
-          created_at: string | null
           display_name: string | null
           followers_count: number | null
           following_count: number | null
           id: string | null
           is_premium: boolean | null
-          total_views: number | null
           username: string | null
         }
         Insert: {
           avatar_url?: string | null
-          banner_url?: string | null
           bio?: string | null
-          cover_url?: string | null
-          created_at?: string | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
           is_premium?: boolean | null
-          total_views?: number | null
           username?: string | null
         }
         Update: {
           avatar_url?: string | null
-          banner_url?: string | null
           bio?: string | null
-          cover_url?: string | null
-          created_at?: string | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
           is_premium?: boolean | null
-          total_views?: number | null
           username?: string | null
         }
         Relationships: []
@@ -3426,16 +3414,12 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: {
           avatar_url: string
-          banner_url: string
           bio: string
-          cover_url: string
-          created_at: string
           display_name: string
           followers_count: number
           following_count: number
           id: string
           is_premium: boolean
-          total_views: number
           username: string
         }[]
       }
