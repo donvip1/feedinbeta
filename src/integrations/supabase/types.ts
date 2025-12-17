@@ -2500,6 +2500,30 @@ export type Database = {
           },
         ]
       }
+      profile_sensitive_data: {
+        Row: {
+          created_at: string | null
+          phone_number: string | null
+          stripe_customer_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          phone_number?: string | null
+          stripe_customer_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          phone_number?: string | null
+          stripe_customer_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           about: string | null
@@ -3493,6 +3517,13 @@ export type Database = {
           youtube_url: string
         }[]
       }
+      get_my_sensitive_data: {
+        Args: never
+        Returns: {
+          phone_number: string
+          stripe_customer_id: string
+        }[]
+      }
       get_my_stream_key: { Args: { p_stream_id: string }; Returns: string }
       get_personalized_feed: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
@@ -3598,6 +3629,7 @@ export type Database = {
         Args: { p_amount: number; p_recipient_username: string }
         Returns: Json
       }
+      update_my_phone_number: { Args: { new_phone: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
