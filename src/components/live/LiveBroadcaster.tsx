@@ -6,14 +6,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { 
   Video, VideoOff, Mic, MicOff, Camera, FlipHorizontal,
   Users, Send, Heart, X, Sparkles, Gift, MessageCircle,
-  Settings, Maximize, Minimize, Radio
+  Settings, Maximize, Minimize, Radio, UserPlus, Coins
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { LiveGiftModal } from "./LiveGiftModal";
+import { LiveInviteModal } from "./LiveInviteModal";
 
 interface LiveBroadcasterProps {
   streamId: string;
@@ -21,6 +24,7 @@ interface LiveBroadcasterProps {
 }
 
 export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => {
+  const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const viewersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -36,6 +40,10 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [reactions, setReactions] = useState<{ type: string; id: number }[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [viewers, setViewers] = useState<any[]>([]);
+  const [totalGiftsReceived, setTotalGiftsReceived] = useState(0);
 
   // Initialize media stream
   const initializeMedia = async () => {
@@ -283,8 +291,37 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     };
   }, [streamId]);
 
-  // Subscribe to viewer count updates
+  // Subscribe to viewer count updates and fetch viewer profiles
   useEffect(() => {
+    const fetchViewers = async () => {
+      const { data, count } = await supabase
+        .from("live_stream_viewers")
+        .select("user_id", { count: 'exact' })
+        .eq("stream_id", streamId)
+        .eq("is_active", true);
+
+      setViewerCount(count || 0);
+
+      if (data && data.length > 0) {
+        const userIds = data.map(v => v.user_id).filter(Boolean);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from("profiles")
+            .select("id, display_name, username, avatar_url")
+            .in("id", userIds);
+          setViewers(profiles || []);
+        }
+      }
+
+      // Update stream viewer count
+      await supabase
+        .from("live_streams")
+        .update({ viewer_count: count || 0 })
+        .eq("id", streamId);
+    };
+
+    fetchViewers();
+
     const channel = supabase
       .channel(`viewers-${streamId}`)
       .on('postgres_changes', {
@@ -292,27 +329,50 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         schema: 'public',
         table: 'live_stream_viewers',
         filter: `stream_id=eq.${streamId}`,
-      }, async () => {
-        const { count } = await supabase
-          .from("live_stream_viewers")
-          .select("*", { count: 'exact', head: true })
-          .eq("stream_id", streamId)
-          .eq("is_active", true);
-
-        setViewerCount(count || 0);
-
-        // Update stream viewer count
-        await supabase
-          .from("live_streams")
-          .update({ viewer_count: count || 0 })
-          .eq("id", streamId);
-      })
+      }, () => fetchViewers())
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [streamId]);
+
+  // Subscribe to gifts received
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchGifts = async () => {
+      const { data } = await supabase
+        .from("live_stream_gifts")
+        .select("credit_value")
+        .eq("stream_id", streamId)
+        .eq("receiver_id", user.id);
+
+      const total = data?.reduce((sum, g) => sum + (g.credit_value || 0), 0) || 0;
+      setTotalGiftsReceived(total);
+    };
+
+    fetchGifts();
+
+    const channel = supabase
+      .channel(`gifts-${streamId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'live_stream_gifts',
+        filter: `stream_id=eq.${streamId}`,
+      }, (payload: any) => {
+        if (payload.new.receiver_id === user.id) {
+          setTotalGiftsReceived(prev => prev + (payload.new.credit_value || 0));
+          toast.success(`Received ${payload.new.gift_type} gift! +${payload.new.credit_value} credits`);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId, user]);
 
   const sendComment = async () => {
     if (!newComment.trim()) return;
@@ -417,6 +477,36 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
             </div>
           ))}
         </div>
+
+        {/* Gifts Received Badge */}
+        {isLive && totalGiftsReceived > 0 && (
+          <div className="absolute top-4 right-16 flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-3 py-1 rounded-full">
+            <Coins className="w-4 h-4" />
+            <span className="font-bold">{totalGiftsReceived}</span>
+          </div>
+        )}
+
+        {/* Host Action Buttons */}
+        {isLive && (
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-pink-500/80 hover:bg-pink-600"
+              onClick={() => setShowGiftModal(true)}
+            >
+              <Gift className="w-5 h-5 text-white" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-blue-500/80 hover:bg-blue-600"
+              onClick={() => setShowInviteModal(true)}
+            >
+              <UserPlus className="w-5 h-5 text-white" />
+            </Button>
+          </div>
+        )}
 
         {/* Control Bar */}
         {isLive && (
@@ -526,6 +616,23 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           100% { opacity: 0; transform: translateY(-100px); }
         }
       `}</style>
+
+      {/* Gift Modal */}
+      <LiveGiftModal
+        isOpen={showGiftModal}
+        onClose={() => setShowGiftModal(false)}
+        streamId={streamId}
+        hostId={user?.id || ""}
+        viewers={viewers}
+        isHost={true}
+      />
+
+      {/* Invite Modal */}
+      <LiveInviteModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        streamId={streamId}
+      />
     </div>
   );
 };
