@@ -220,7 +220,7 @@ export default function FullscreenMediaViewer({
           <video
             ref={videoRef}
             src={currentPost.media_url || ''}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
             playsInline
             muted={isMuted}
             onClick={() => togglePlayPause()}
@@ -232,7 +232,7 @@ export default function FullscreenMediaViewer({
           <img
             src={currentPost.media_url || ''}
             alt="Post content"
-            className="w-full h-full object-contain"
+            className="w-full h-full object-cover"
             onContextMenu={(e) => e.preventDefault()}
           />
         )}
