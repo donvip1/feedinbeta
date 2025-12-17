@@ -1,29 +1,49 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Radio } from "lucide-react";
+import { Plus, Radio, Users } from "lucide-react";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateLiveStreamModal } from "@/components/live/CreateLiveStreamModal";
 import { LiveStreamCard } from "@/components/live/LiveStreamCard";
-import { LiveStreamViewer } from "@/components/live/LiveStreamViewer";
+import { LiveStreamViewerWebRTC } from "@/components/live/LiveStreamViewerWebRTC";
+import { LiveBroadcaster } from "@/components/live/LiveBroadcaster";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 
 const Live = () => {
+  const { user } = useAuth();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [broadcastStreamId, setBroadcastStreamId] = useState<string | null>(null);
 
   const { data: liveStreams, refetch: refetchLive } = useQuery({
     queryKey: ["live-streams", "live"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("live_streams")
-        .select("*, profiles!user_id(*)")
+        .select("*")
         .eq("status", "live")
         .order("viewer_count", { ascending: false });
       
       if (error) throw error;
-      return data as any;
+      
+      // Fetch profiles separately
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(s => s.user_id))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_url")
+          .in("id", userIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        return data.map(stream => ({
+          ...stream,
+          profiles: profileMap.get(stream.user_id)
+        }));
+      }
+      return data;
     },
   });
 
@@ -32,16 +52,30 @@ const Live = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("live_streams")
-        .select("*, profiles!user_id(*)")
+        .select("*")
         .eq("status", "scheduled")
         .order("scheduled_start", { ascending: true });
       
       if (error) throw error;
-      return data as any;
+      
+      if (data && data.length > 0) {
+        const userIds = [...new Set(data.map(s => s.user_id))];
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_url")
+          .in("id", userIds);
+        
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        return data.map(stream => ({
+          ...stream,
+          profiles: profileMap.get(stream.user_id)
+        }));
+      }
+      return data;
     },
   });
 
-  const { data: myStreams } = useQuery({
+  const { data: myStreams, refetch: refetchMyStreams } = useQuery({
     queryKey: ["live-streams", "my-streams"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -49,13 +83,26 @@ const Live = () => {
 
       const { data, error } = await supabase
         .from("live_streams")
-        .select("*, profiles!user_id(*)")
+        .select("*")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(10);
       
       if (error) throw error;
-      return data as any;
+      
+      if (data && data.length > 0) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_url")
+          .eq("id", user.id)
+          .single();
+        
+        return data.map(stream => ({
+          ...stream,
+          profiles: profile
+        }));
+      }
+      return data;
     },
   });
 
@@ -71,6 +118,7 @@ const Live = () => {
         },
         () => {
           refetchLive();
+          refetchMyStreams();
         }
       )
       .subscribe();
@@ -79,6 +127,27 @@ const Live = () => {
       supabase.removeChannel(channel);
     };
   }, []);
+
+  const handleStreamCreated = (streamId: string) => {
+    setBroadcastStreamId(streamId);
+    setIsBroadcasting(true);
+    refetchMyStreams();
+  };
+
+  const handleStreamClick = (stream: any) => {
+    // If it's the user's own stream and not live, open broadcaster
+    if (stream.user_id === user?.id && stream.status !== 'live') {
+      setBroadcastStreamId(stream.id);
+      setIsBroadcasting(true);
+    } else if (stream.user_id === user?.id && stream.status === 'live') {
+      // Own live stream - open broadcaster to manage
+      setBroadcastStreamId(stream.id);
+      setIsBroadcasting(true);
+    } else {
+      // Other's stream - open viewer
+      setSelectedStreamId(stream.id);
+    }
+  };
 
   return (
     <>
@@ -89,7 +158,7 @@ const Live = () => {
               <Radio className="w-8 h-8 text-primary" />
               Live Feeds
             </h1>
-            <Button size="sm" className="gap-2" onClick={() => setCreateModalOpen(true)}>
+            <Button size="sm" className="gap-2 bg-red-600 hover:bg-red-700" onClick={() => setCreateModalOpen(true)}>
               <Plus className="w-4 h-4" />
               Go Live
             </Button>
@@ -97,8 +166,9 @@ const Live = () => {
 
           <Tabs defaultValue="live" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="live">
-                Live Now ({liveStreams?.length || 0})
+              <TabsTrigger value="live" className="flex items-center gap-1">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                Live ({liveStreams?.length || 0})
               </TabsTrigger>
               <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
               <TabsTrigger value="my-streams">My Streams</TabsTrigger>
@@ -111,19 +181,26 @@ const Live = () => {
                     <LiveStreamCard
                       key={stream.id}
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      onClick={() => handleStreamClick(stream)}
                     />
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-20">
-                  <Radio className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No live streams at the moment</p>
+                  <div className="relative w-24 h-24 mx-auto mb-6">
+                    <Radio className="w-24 h-24 text-muted-foreground/30" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 bg-red-500/20 rounded-full animate-ping" />
+                    </div>
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">No Live Streams</h3>
+                  <p className="text-muted-foreground mb-6">Be the first to go live and share your moment!</p>
                   <Button 
-                    className="mt-4"
+                    className="bg-red-600 hover:bg-red-700"
                     onClick={() => setCreateModalOpen(true)}
                   >
-                    Be the first to go live!
+                    <Plus className="w-4 h-4 mr-2" />
+                    Start Streaming
                   </Button>
                 </div>
               )}
@@ -136,12 +213,13 @@ const Live = () => {
                     <LiveStreamCard
                       key={stream.id}
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      onClick={() => handleStreamClick(stream)}
                     />
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-20">
+                  <Radio className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">No scheduled streams</p>
                 </div>
               )}
@@ -154,15 +232,17 @@ const Live = () => {
                     <LiveStreamCard
                       key={stream.id}
                       stream={stream}
-                      onClick={() => setSelectedStreamId(stream.id)}
+                      onClick={() => handleStreamClick(stream)}
+                      isOwner
                     />
                   ))}
                 </div>
               ) : (
                 <div className="text-center py-20">
+                  <Radio className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">You haven't created any streams yet</p>
                   <Button 
-                    className="mt-4"
+                    className="mt-4 bg-red-600 hover:bg-red-700"
                     onClick={() => setCreateModalOpen(true)}
                   >
                     Create Your First Stream
@@ -178,16 +258,25 @@ const Live = () => {
       <CreateLiveStreamModal
         isOpen={createModalOpen}
         onClose={() => setCreateModalOpen(false)}
-        onStreamCreated={(streamId) => {
-          setSelectedStreamId(streamId);
-          refetchLive();
-        }}
+        onStreamCreated={handleStreamCreated}
       />
 
       {selectedStreamId && (
-        <LiveStreamViewer
+        <LiveStreamViewerWebRTC
           streamId={selectedStreamId}
           onClose={() => setSelectedStreamId(null)}
+        />
+      )}
+
+      {isBroadcasting && broadcastStreamId && (
+        <LiveBroadcaster
+          streamId={broadcastStreamId}
+          onClose={() => {
+            setIsBroadcasting(false);
+            setBroadcastStreamId(null);
+            refetchLive();
+            refetchMyStreams();
+          }}
         />
       )}
     </>
