@@ -6,22 +6,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Phone, User, Loader2 } from 'lucide-react';
+import { Mail, Phone, User, Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
 
 const emailSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
 });
 
 const phoneSchema = z.object({
-  phone: z.string().min(10, 'Invalid phone number'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  phone: z.string().trim().min(10, 'Invalid phone number').max(20, 'Phone number too long'),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
 });
 
 const usernameSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  username: z.string().trim().min(3, 'Username must be at least 3 characters').max(30, 'Username too long'),
+  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
 });
 
 interface SignInFormProps {
@@ -32,6 +32,7 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -42,29 +43,34 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const handleSignIn = async (method: 'email' | 'phone' | 'username') => {
     setLoading(true);
     try {
-      // Validate input
       if (method === 'email') {
-        emailSchema.parse({ email: formData.email, password: formData.password });
+        const validated = emailSchema.parse({ email: formData.email, password: formData.password });
         const { error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
+          email: validated.email,
+          password: validated.password,
         });
-        if (error) throw error;
+        if (error) {
+          // Don't reveal if email exists or not
+          throw new Error('Invalid email or password');
+        }
       } else if (method === 'phone') {
-        phoneSchema.parse({ phone: formData.phone, password: formData.password });
+        const validated = phoneSchema.parse({ phone: formData.phone, password: formData.password });
         const { error } = await supabase.auth.signInWithPassword({
-          phone: formData.phone,
-          password: formData.password,
+          phone: validated.phone,
+          password: validated.password,
         });
-        if (error) throw error;
+        if (error) {
+          throw new Error('Invalid phone number or password');
+        }
       } else if (method === 'username') {
         usernameSchema.parse({ username: formData.username, password: formData.password });
-        // Query profiles to find user with this username - note: this requires email to be stored
-        // For now, we'll show a helpful message
+        
+        // Username login is not directly supported by Supabase
+        // Users should use their email or phone number
         toast({
-          title: "Username sign-in coming soon",
-          description: "Please use your email or phone number to sign in",
-          variant: "destructive",
+          title: "Use Email or Phone",
+          description: "Please sign in with your email or phone number associated with your account",
+          variant: "default",
         });
         setLoading(false);
         return;
@@ -76,13 +82,28 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
       });
       navigate('/');
     } catch (error: any) {
-      toast({
-        title: "Sign in failed",
-        description: error.message || 'Invalid credentials',
-        variant: "destructive",
-      });
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Sign in failed",
+          description: error.message || 'Invalid credentials',
+          variant: "destructive",
+        });
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, method: 'email' | 'phone' | 'username') => {
+    if (e.key === 'Enter' && !loading) {
+      e.preventDefault();
+      handleSignIn(method);
     }
   };
 
@@ -113,18 +134,33 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
               placeholder="you@example.com"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 'email')}
               disabled={loading}
+              autoComplete="email"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email-password">Password</Label>
-            <Input
-              id="email-password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              disabled={loading}
-            />
+            <div className="relative">
+              <Input
+                id="email-password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 'email')}
+                disabled={loading}
+                autoComplete="current-password"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <Button
             onClick={() => handleSignIn('email')}
@@ -145,18 +181,33 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
               placeholder="+1234567890"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              onKeyDown={(e) => handleKeyDown(e, 'phone')}
               disabled={loading}
+              autoComplete="tel"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone-password">Password</Label>
-            <Input
-              id="phone-password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              disabled={loading}
-            />
+            <div className="relative">
+              <Input
+                id="phone-password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 'phone')}
+                disabled={loading}
+                autoComplete="current-password"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <Button
             onClick={() => handleSignIn('phone')}
@@ -176,19 +227,34 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
               type="text"
               placeholder="yourusername"
               value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
+              onKeyDown={(e) => handleKeyDown(e, 'username')}
               disabled={loading}
+              autoComplete="username"
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="username-password">Password</Label>
-            <Input
-              id="username-password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              disabled={loading}
-            />
+            <div className="relative">
+              <Input
+                id="username-password"
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                onKeyDown={(e) => handleKeyDown(e, 'username')}
+                disabled={loading}
+                autoComplete="current-password"
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <Button
             onClick={() => handleSignIn('username')}
