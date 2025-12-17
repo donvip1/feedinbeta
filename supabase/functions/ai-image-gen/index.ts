@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,6 +12,41 @@ serve(async (req) => {
   }
 
   try {
+    // Authentication check - require valid user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - no auth header" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("Auth error:", authError?.message || "No user found");
+      return new Response(
+        JSON.stringify({ error: "Unauthorized - invalid token" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("Authenticated user:", user.id);
+
     const { prompt, imageUrl: inputImageUrl, mode } = await req.json();
     
     if (!prompt || typeof prompt !== "string") {
@@ -28,7 +64,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Generating/Editing image with prompt:", prompt, "Mode:", mode);
+    console.log("User:", user.id, "- Generating/Editing image with prompt:", prompt, "Mode:", mode);
 
     // Build the message content based on whether we're editing or generating
     let messageContent;
@@ -71,7 +107,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI image generation error:", response.status, errorText);
+      console.error("AI image generation error for user:", user.id, "status:", response.status, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -103,15 +139,18 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log("AI response:", JSON.stringify(data));
+    console.log("AI response for user:", user.id);
     
     // Extract image URL from response - images are returned in the images array
     const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     
     if (!imageUrl) {
-      console.error("No image in response:", data);
+      console.error("No image in response for user:", user.id, data);
       throw new Error("No image generated");
     }
+
+    // Log usage for auditing
+    console.log("Image generated successfully for user:", user.id);
 
     return new Response(
       JSON.stringify({ imageUrl }),

@@ -3099,6 +3099,64 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_my_profile: {
+        Args: never
+        Returns: {
+          about: string | null
+          about_updated_at: string | null
+          about_visibility: string | null
+          age: number | null
+          avatar_url: string | null
+          banner_url: string | null
+          bio: string | null
+          country: string | null
+          cover_url: string | null
+          created_at: string
+          daily_ai_chat_count: number | null
+          daily_ai_eduqa_count: number | null
+          daily_ai_image_count: number | null
+          daily_ai_thesis_count: number | null
+          daily_ai_video_count: number | null
+          daily_enhancement_count: number | null
+          display_name: string | null
+          facebook_url: string | null
+          followers_count: number | null
+          following_count: number | null
+          id: string
+          instagram_url: string | null
+          interests: string[] | null
+          is_premium: boolean | null
+          last_ai_reset: string | null
+          last_ai_reset_date: string | null
+          last_enhancement_reset: string | null
+          last_free_enhancement: string | null
+          last_username_change: string | null
+          linkedin_url: string | null
+          location: string | null
+          marital_status: string | null
+          max_friends: number | null
+          phone_number: string | null
+          purpose: string[] | null
+          purpose_updated_at: string | null
+          status: string | null
+          status_updated_at: string | null
+          status_visibility: string | null
+          stripe_customer_id: string | null
+          tiktok_url: string | null
+          total_views: number | null
+          twitter_url: string | null
+          updated_at: string
+          username: string | null
+          website_url: string | null
+          youtube_url: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_personalized_feed: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
@@ -3121,6 +3179,25 @@ export type Database = {
         Returns: number
       }
       get_user_post_count: { Args: { user_uuid: string }; Returns: number }
+      get_user_public_profile: {
+        Args: { target_user_id: string }
+        Returns: {
+          about: string
+          avatar_url: string
+          banner_url: string
+          bio: string
+          cover_url: string
+          created_at: string
+          display_name: string
+          followers_count: number
+          following_count: number
+          id: string
+          purpose: string[]
+          status: string
+          total_views: number
+          username: string
+        }[]
+      }
       get_user_total_likes: { Args: { user_uuid: string }; Returns: number }
       has_role: {
         Args: {
