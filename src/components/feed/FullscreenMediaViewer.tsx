@@ -135,6 +135,73 @@ export default function FullscreenMediaViewer({
     }
   }, [isOpen, isVideo, currentPostIndex]);
 
+  // Keyboard navigation (Arrow Up/Down)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        if (currentPostIndex < navigablePosts.length - 1) {
+          navigateToPost(currentPostIndex + 1);
+        }
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        if (currentPostIndex > 0) {
+          navigateToPost(currentPostIndex - 1);
+        }
+      } else if (e.key === 'Escape') {
+        onClose();
+      } else if (e.key === ' ') {
+        e.preventDefault();
+        if (isVideo) {
+          togglePlayPause();
+        } else {
+          setShowControls(prev => !prev);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, currentPostIndex, navigablePosts.length, isVideo]);
+
+  // Mouse wheel navigation
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let wheelTimeout: NodeJS.Timeout | null = null;
+    let wheelDelta = 0;
+
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      wheelDelta += e.deltaY;
+
+      if (wheelTimeout) clearTimeout(wheelTimeout);
+
+      wheelTimeout = setTimeout(() => {
+        if (wheelDelta > 50 && currentPostIndex < navigablePosts.length - 1) {
+          navigateToPost(currentPostIndex + 1);
+        } else if (wheelDelta < -50 && currentPostIndex > 0) {
+          navigateToPost(currentPostIndex - 1);
+        }
+        wheelDelta = 0;
+      }, 100);
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', handleWheel, { passive: false });
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener('wheel', handleWheel);
+      }
+      if (wheelTimeout) clearTimeout(wheelTimeout);
+    };
+  }, [isOpen, currentPostIndex, navigablePosts.length]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
