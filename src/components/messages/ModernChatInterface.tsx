@@ -214,10 +214,10 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
 
       if (participantError) throw participantError;
       
-      // Then fetch their profile separately
+      // Then fetch their profile separately from public_profiles view
       if (participant?.user_id) {
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('public_profiles')
           .select('*')
           .eq('id', participant.user_id)
           .maybeSingle();
@@ -619,6 +619,42 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
     }
   };
 
+  // Function to initiate a call
+  const initiateCall = async (callType: 'voice' | 'video') => {
+    if (!user || !otherUser?.id) {
+      toast({
+        title: 'Cannot start call',
+        description: 'User information not available',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const { data: callData, error } = await supabase
+        .from('call_logs')
+        .insert({
+          caller_id: user.id,
+          receiver_id: otherUser.id,
+          call_type: callType,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      navigate(`/call?callId=${callData.id}&type=${callType}`);
+    } catch (error: any) {
+      console.error('Error initiating call:', error);
+      toast({
+        title: 'Failed to start call',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const formatDateHeader = (dateStr: string) => {
     const date = new Date(dateStr);
     if (isToday(date)) return 'Today';
@@ -707,7 +743,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
             variant="ghost"
             size="icon"
             className="hover:bg-primary/10"
-            onClick={() => navigate(`/call?userId=${otherUser?.id}&type=voice`)}
+            onClick={() => initiateCall('voice')}
           >
             <Phone className="w-5 h-5" />
           </Button>
@@ -715,7 +751,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
             variant="ghost"
             size="icon"
             className="hover:bg-primary/10"
-            onClick={() => navigate(`/call?userId=${otherUser?.id}&type=video`)}
+            onClick={() => initiateCall('video')}
           >
             <Video className="w-5 h-5" />
           </Button>
