@@ -841,9 +841,22 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           media_url: post.original_post.media_url,
           media_type: post.original_post.media_type,
           created_at: post.original_post.created_at,
+          likes_count: post.likes_count || 0,
+          comments_count: post.comments_count || 0,
+          refeeds_count: post.refeeds_count || 0,
           profiles: post.original_post.profiles
-        } : post}
-        allPosts={allPosts}
+        } : {
+          ...post,
+          likes_count: post.likes_count || 0,
+          comments_count: post.comments_count || 0,
+          refeeds_count: post.refeeds_count || 0
+        }}
+        allPosts={allPosts.map(p => ({
+          ...p,
+          likes_count: p.likes_count || 0,
+          comments_count: p.comments_count || 0,
+          refeeds_count: p.refeeds_count || 0
+        }))}
         isOpen={showFullscreenViewer}
         onClose={() => {
           setShowFullscreenViewer(false);
@@ -860,6 +873,22 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
         }}
         initialTime={currentVideoTime.current}
         initialMuted={isMuted}
+        onOpenComments={() => {
+          setShowFullscreenViewer(false);
+          setCommentsOpen(true);
+        }}
+        onOpenRefeed={() => {
+          setShowFullscreenViewer(false);
+          setRefeedOpen(true);
+        }}
+        onOpenGift={() => {
+          setShowFullscreenViewer(false);
+          setGiftOpen(true);
+        }}
+        onOpenShare={() => {
+          setShowFullscreenViewer(false);
+          setShareOpen(true);
+        }}
       />
     </>
   );

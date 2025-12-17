@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Volume2, VolumeX, Play, Pause, SkipForward, SkipBack } from 'lucide-react';
+import { X, Volume2, VolumeX, Play, Pause, SkipForward, SkipBack, Heart, MessageCircle, Repeat2, Gift, Share2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
 import { Slider } from '@/components/ui/slider';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface Post {
   id: string;
@@ -11,6 +13,10 @@ interface Post {
   media_url: string | null;
   media_type: string | null;
   created_at: string;
+  likes_count?: number;
+  comments_count?: number;
+  refeeds_count?: number;
+  shares_count?: number;
   profiles?: {
     username: string | null;
     display_name: string | null;
@@ -26,6 +32,10 @@ interface FullscreenMediaViewerProps {
   onNavigate?: (postId: string) => void;
   initialTime?: number;
   initialMuted?: boolean;
+  onOpenComments?: (postId: string) => void;
+  onOpenRefeed?: (postId: string) => void;
+  onOpenGift?: (postId: string) => void;
+  onOpenShare?: (postId: string) => void;
 }
 
 export default function FullscreenMediaViewer({ 
@@ -35,26 +45,64 @@ export default function FullscreenMediaViewer({
   onClose,
   onNavigate,
   initialTime = 0,
-  initialMuted = true
+  initialMuted = true,
+  onOpenComments,
+  onOpenRefeed,
+  onOpenGift,
+  onOpenShare
 }: FullscreenMediaViewerProps) {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [currentPostIndex, setCurrentPostIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(initialMuted);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likesCount, setLikesCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartY = useRef(0);
 
-  // Filter to only video posts for swipe navigation in video fullscreen
-  const navigablePosts = post.media_type === 'video' 
+  // Filter posts by media type - videos with videos, images with images
+  const isVideoPost = post.media_type === 'video';
+  const navigablePosts = isVideoPost 
     ? allPosts.filter(p => p.media_type === 'video')
-    : allPosts;
+    : allPosts.filter(p => p.media_type === 'image');
 
   const currentPost = navigablePosts[currentPostIndex];
   const isVideo = currentPost?.media_type === 'video';
+
+  // Get current user
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUserId(user?.id || null);
+    };
+    getUser();
+  }, []);
+
+  // Check if current post is liked and get likes count
+  useEffect(() => {
+    if (!currentPost || !currentUserId) return;
+    
+    const checkLikeStatus = async () => {
+      const { data: likeData } = await supabase
+        .from('post_likes')
+        .select('id')
+        .eq('post_id', currentPost.id)
+        .eq('user_id', currentUserId)
+        .maybeSingle();
+      
+      setIsLiked(!!likeData);
+    };
+    
+    setLikesCount(currentPost.likes_count || 0);
+    checkLikeStatus();
+  }, [currentPost?.id, currentUserId]);
 
   useEffect(() => {
     const index = navigablePosts.findIndex(p => p.id === post.id);
@@ -76,8 +124,16 @@ export default function FullscreenMediaViewer({
       setCurrentTime(initialTime);
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
+      setShowControls(false); // Hide controls when video starts playing
     }
   }, [isOpen, currentPostIndex, isVideo, initialTime, initialMuted]);
+
+  // For images, show controls by default
+  useEffect(() => {
+    if (isOpen && !isVideo) {
+      setShowControls(true);
+    }
+  }, [isOpen, isVideo, currentPostIndex]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -89,8 +145,14 @@ export default function FullscreenMediaViewer({
       }
     };
     const updateDuration = () => setDuration(video.duration);
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
+    const handlePlay = () => {
+      setIsPlaying(true);
+      setShowControls(false);
+    };
+    const handlePause = () => {
+      setIsPlaying(false);
+      setShowControls(true);
+    };
 
     video.addEventListener('timeupdate', updateTime);
     video.addEventListener('loadedmetadata', updateDuration);
@@ -113,8 +175,7 @@ export default function FullscreenMediaViewer({
     const touchEndY = e.changedTouches[0].clientY;
     const diff = touchStartY.current - touchEndY;
 
-    if (!isVideo) return;
-
+    // Swipe navigation for both video and image posts
     if (diff > 50 && currentPostIndex < navigablePosts.length - 1) {
       navigateToPost(currentPostIndex + 1);
     } else if (diff < -50 && currentPostIndex > 0) {
@@ -129,6 +190,8 @@ export default function FullscreenMediaViewer({
     setCurrentPostIndex(index);
     setCurrentTime(0);
     setIsPlaying(false);
+    setShowControls(true);
+    setLikesCount(newPost.likes_count || 0);
     onNavigate?.(newPost.id);
   };
 
@@ -139,11 +202,17 @@ export default function FullscreenMediaViewer({
     if (isPlaying) {
       videoRef.current.pause();
       setIsPlaying(false);
+      setShowControls(true);
     } else {
       videoRef.current.play().catch(() => {});
       setIsPlaying(true);
+      setShowControls(false);
     }
   }, [isPlaying]);
+
+  const handleImageTap = useCallback(() => {
+    setShowControls(prev => !prev);
+  }, []);
 
   const toggleMute = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -202,6 +271,63 @@ export default function FullscreenMediaViewer({
     navigate(`/profile/${currentPost.user_id}`);
   };
 
+  // Social actions
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentUserId || !currentPost) {
+      toast({ title: "Please sign in to like posts", variant: "destructive" });
+      return;
+    }
+
+    try {
+      if (isLiked) {
+        await supabase
+          .from('post_likes')
+          .delete()
+          .eq('post_id', currentPost.id)
+          .eq('user_id', currentUserId);
+        setIsLiked(false);
+        setLikesCount(prev => Math.max(0, prev - 1));
+      } else {
+        await supabase
+          .from('post_likes')
+          .insert({ post_id: currentPost.id, user_id: currentUserId });
+        setIsLiked(true);
+        setLikesCount(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+
+  const handleComments = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenComments && currentPost) {
+      onOpenComments(currentPost.id);
+    }
+  };
+
+  const handleRefeed = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenRefeed && currentPost) {
+      onOpenRefeed(currentPost.id);
+    }
+  };
+
+  const handleGift = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenGift && currentPost) {
+      onOpenGift(currentPost.id);
+    }
+  };
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenShare && currentPost) {
+      onOpenShare(currentPost.id);
+    }
+  };
+
   if (!isOpen || !currentPost) return null;
 
   const displayName = currentPost.profiles?.display_name || currentPost.profiles?.username || 'Anonymous';
@@ -223,6 +349,7 @@ export default function FullscreenMediaViewer({
             className="w-full h-full object-cover"
             playsInline
             muted={isMuted}
+            loop
             onClick={() => togglePlayPause()}
             onContextMenu={(e) => e.preventDefault()}
             controlsList="nodownload nofullscreen noremoteplayback"
@@ -233,11 +360,12 @@ export default function FullscreenMediaViewer({
             src={currentPost.media_url || ''}
             alt="Post content"
             className="w-full h-full object-cover"
+            onClick={handleImageTap}
             onContextMenu={(e) => e.preventDefault()}
           />
         )}
 
-        {/* Top Overlay */}
+        {/* Top Overlay - Always visible */}
         <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 z-10">
           <div className="flex items-center justify-between">
             <div 
@@ -262,8 +390,81 @@ export default function FullscreenMediaViewer({
           </div>
         </div>
 
-        {/* Video Controls */}
-        {isVideo && (
+        {/* Social Action Buttons - Show when paused (video) or tapped (image) */}
+        {showControls && (
+          <div 
+            className="absolute right-4 bottom-32 flex flex-col items-center gap-5 z-30"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Like */}
+            <button
+              onClick={handleLike}
+              className="flex flex-col items-center gap-1"
+            >
+              <div className={`p-3 rounded-full ${isLiked ? 'bg-red-500' : 'bg-black/50'} hover:bg-black/70 transition-all`}>
+                <Heart className={`w-6 h-6 ${isLiked ? 'text-white fill-white' : 'text-white'}`} />
+              </div>
+              <span className="text-white text-xs font-medium">{likesCount}</span>
+            </button>
+
+            {/* Comments */}
+            <button
+              onClick={handleComments}
+              className="flex flex-col items-center gap-1"
+            >
+              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                <MessageCircle className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-white text-xs font-medium">{currentPost.comments_count || 0}</span>
+            </button>
+
+            {/* Refeed/Quote */}
+            <button
+              onClick={handleRefeed}
+              className="flex flex-col items-center gap-1"
+            >
+              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                <Repeat2 className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-white text-xs font-medium">{currentPost.refeeds_count || 0}</span>
+            </button>
+
+            {/* Gift */}
+            <button
+              onClick={handleGift}
+              className="flex flex-col items-center gap-1"
+            >
+              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                <Gift className="w-6 h-6 text-white" />
+              </div>
+            </button>
+
+            {/* Share */}
+            <button
+              onClick={handleShare}
+              className="flex flex-col items-center gap-1"
+            >
+              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                <Share2 className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-white text-xs font-medium">{currentPost.shares_count || 0}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Play/Pause indicator for video when paused */}
+        {isVideo && !isPlaying && showControls && (
+          <div 
+            className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
+          >
+            <div className="p-5 bg-black/40 rounded-full">
+              <Play className="w-12 h-12 text-white" fill="white" />
+            </div>
+          </div>
+        )}
+
+        {/* Video Controls - Show when paused */}
+        {isVideo && showControls && (
           <div 
             className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 z-20"
             onClick={(e) => e.stopPropagation()}
@@ -333,16 +534,16 @@ export default function FullscreenMediaViewer({
         )}
 
         {/* Navigation Hints */}
-        {isVideo && navigablePosts.length > 1 && (
+        {navigablePosts.length > 1 && (
           <>
             {currentPostIndex < navigablePosts.length - 1 && (
-              <div className="absolute bottom-36 right-4 text-white/50 text-xs">
-                Swipe up for next
+              <div className="absolute bottom-36 left-4 text-white/50 text-xs">
+                Swipe up for next {isVideo ? 'video' : 'image'}
               </div>
             )}
             {currentPostIndex > 0 && (
-              <div className="absolute top-20 right-4 text-white/50 text-xs">
-                Swipe down for previous
+              <div className="absolute top-20 left-4 text-white/50 text-xs">
+                Swipe down for previous {isVideo ? 'video' : 'image'}
               </div>
             )}
           </>
