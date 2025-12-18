@@ -51,6 +51,7 @@ import Search from "./pages/Search";
 import HashtagSearch from "./pages/HashtagSearch";
 import StoryDetail from "./pages/StoryDetail";
 import LiveStreamDetail from "./pages/LiveStreamDetail";
+import AdminWallet from "./pages/AdminWallet";
 
 const queryClient = new QueryClient();
 
@@ -128,6 +129,7 @@ const App = () => {
             <Route path="/hashtag/:hashtag" element={<HashtagSearch />} />
             <Route path="/story/:storyId" element={<StoryDetail />} />
             <Route path="/stream/:streamId" element={<LiveStreamDetail />} />
+            <Route path="/admin-wallet" element={<AdminWallet />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
             </Routes>

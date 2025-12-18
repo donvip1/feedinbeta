@@ -548,6 +548,42 @@ export type Database = {
         }
         Relationships: []
       }
+      credit_supply: {
+        Row: {
+          circulating_supply: number
+          created_at: string | null
+          id: string
+          last_mint_amount: number | null
+          last_mint_at: string | null
+          last_mint_by: string | null
+          max_circulating: number
+          total_supply: number
+          updated_at: string | null
+        }
+        Insert: {
+          circulating_supply?: number
+          created_at?: string | null
+          id?: string
+          last_mint_amount?: number | null
+          last_mint_at?: string | null
+          last_mint_by?: string | null
+          max_circulating?: number
+          total_supply?: number
+          updated_at?: string | null
+        }
+        Update: {
+          circulating_supply?: number
+          created_at?: string | null
+          id?: string
+          last_mint_amount?: number | null
+          last_mint_at?: string | null
+          last_mint_by?: string | null
+          max_circulating?: number
+          total_supply?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       credit_transactions: {
         Row: {
           amount: number
@@ -2027,6 +2063,63 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          from_user_id: string | null
+          id: string
+          performed_by: string | null
+          to_user_id: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          from_user_id?: string | null
+          id?: string
+          performed_by?: string | null
+          to_user_id?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          from_user_id?: string | null
+          id?: string
+          performed_by?: string | null
+          to_user_id?: string | null
+          transaction_type?: string
+        }
+        Relationships: []
+      }
+      platform_wallet: {
+        Row: {
+          balance: number
+          created_at: string | null
+          id: string
+          total_earned: number
+          updated_at: string | null
+        }
+        Insert: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          total_earned?: number
+          updated_at?: string | null
+        }
+        Update: {
+          balance?: number
+          created_at?: string | null
+          id?: string
+          total_earned?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       post_comments: {
         Row: {
           content: string
@@ -3043,6 +3136,48 @@ export type Database = {
         }
         Relationships: []
       }
+      team_wallets: {
+        Row: {
+          balance: number
+          can_mint: boolean | null
+          can_transfer: boolean | null
+          can_withdraw: boolean | null
+          created_at: string | null
+          id: string
+          total_earned: number
+          total_withdrawn: number
+          updated_at: string | null
+          user_id: string
+          wallet_name: string
+        }
+        Insert: {
+          balance?: number
+          can_mint?: boolean | null
+          can_transfer?: boolean | null
+          can_withdraw?: boolean | null
+          created_at?: string | null
+          id?: string
+          total_earned?: number
+          total_withdrawn?: number
+          updated_at?: string | null
+          user_id: string
+          wallet_name?: string
+        }
+        Update: {
+          balance?: number
+          can_mint?: boolean | null
+          can_transfer?: boolean | null
+          can_withdraw?: boolean | null
+          created_at?: string | null
+          id?: string
+          total_earned?: number
+          total_withdrawn?: number
+          updated_at?: string | null
+          user_id?: string
+          wallet_name?: string
+        }
+        Relationships: []
+      }
       typing_indicators: {
         Row: {
           conversation_id: string
@@ -3448,6 +3583,18 @@ export type Database = {
     Functions: {
       admin_grant_credits: {
         Args: { credit_amount: number; reason?: string; target_user_id: string }
+        Returns: Json
+      }
+      admin_mint_credits: {
+        Args: { p_amount: number; p_reason?: string }
+        Returns: Json
+      }
+      admin_transfer_to_user: {
+        Args: { p_amount: number; p_reason?: string; p_user_id: string }
+        Returns: Json
+      }
+      admin_withdraw_to_team_wallet: {
+        Args: { p_amount: number; p_reason?: string }
         Returns: Json
       }
       are_mutual_friends: {
