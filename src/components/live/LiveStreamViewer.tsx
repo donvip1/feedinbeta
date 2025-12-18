@@ -225,7 +225,6 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
           <div className="text-white text-center">
             <Video className="w-16 h-16 mx-auto mb-4 opacity-50" />
             <p className="text-muted-foreground">Video player would be integrated here</p>
-            <p className="text-xs text-muted-foreground mt-2">Stream Key: {stream.stream_key}</p>
           </div>
         </div>
 
