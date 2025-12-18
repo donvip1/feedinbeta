@@ -267,7 +267,7 @@ const Promote = () => {
           : `Your post is now boosted with ${plan.name}. Reach: ${plan.reach} users for ${plan.duration}.`,
       });
 
-      setTimeout(() => navigate('/feed'), 2000);
+      setTimeout(() => navigate(`/feed/post/${postId}`), 2000);
     } catch (error: any) {
       toast({
         title: 'Promotion Failed',

@@ -54,6 +54,7 @@ import LiveStreamDetail from "./pages/LiveStreamDetail";
 import AdminWallet from "./pages/AdminWallet";
 import SessionManagement from "./pages/SessionManagement";
 import CreatorPayouts from "./pages/CreatorPayouts";
+import Promotions from "./pages/Promotions";
 
 const queryClient = new QueryClient();
 
@@ -139,6 +140,7 @@ const App = () => {
             
             {/* Posts & Content Management */}
             <Route path="/saved" element={<SavedPosts />} />
+            <Route path="/promotions" element={<Promotions />} />
             <Route path="/promote/:postId" element={<Promote />} />
             <Route path="/moderation" element={<Moderation />} />
             
