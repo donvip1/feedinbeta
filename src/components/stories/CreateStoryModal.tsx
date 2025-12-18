@@ -45,7 +45,9 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
   const [uploading, setUploading] = useState(false);
   const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const MAX_VIDEO_DURATION_SECONDS = 120; // 2 minutes
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
@@ -58,12 +60,43 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
       return;
     }
 
+    // Validate video duration (max 2 minutes)
+    if (selectedFile.type.startsWith('video/')) {
+      const isValidDuration = await validateVideoDuration(selectedFile);
+      if (!isValidDuration) {
+        toast({
+          title: 'Video too long',
+          description: 'Stories can only be up to 2 minutes long',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     setFile(selectedFile);
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreview(reader.result as string);
     };
     reader.readAsDataURL(selectedFile);
+  };
+
+  const validateVideoDuration = (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      
+      video.onloadedmetadata = () => {
+        window.URL.revokeObjectURL(video.src);
+        resolve(video.duration <= MAX_VIDEO_DURATION_SECONDS);
+      };
+      
+      video.onerror = () => {
+        resolve(false);
+      };
+      
+      video.src = URL.createObjectURL(file);
+    });
   };
 
   const handleUpload = async () => {
@@ -154,7 +187,7 @@ export const CreateStoryModal = ({ open, onClose, onSuccess }: CreateStoryModalP
                       Click to upload image or video
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Story will expire in 24 hours
+                      Videos max 2 minutes • Expires in 24 hours
                     </p>
                   </div>
                 </Label>
