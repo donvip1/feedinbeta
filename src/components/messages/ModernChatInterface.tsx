@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { AttachmentPicker } from './AttachmentPicker';
 import { ModernMessageBubble } from './ModernMessageBubble';
-import { TypingIndicator } from './TypingIndicator';
+import { TypingIndicator, getActivityText, getActivityIcon } from './TypingIndicator';
 import { VoiceRecorder } from './VoiceRecorder';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -85,6 +85,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [activityType, setActivityType] = useState<'typing' | 'emoji' | 'media_upload'>('typing');
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string; sender: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
@@ -203,6 +204,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           (payload: any) => {
             if (payload.new?.user_id !== user?.id) {
               setIsTyping(payload.new?.is_typing || false);
+              setActivityType(payload.new?.activity_type || 'typing');
             }
           }
         )
@@ -468,7 +470,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     }
   }, [user, conversationId, onMessagesRead]);
 
-  const handleTyping = async () => {
+  const handleTyping = async (activity: 'typing' | 'emoji' | 'media_upload' = 'typing') => {
     if (!user) return;
 
     if (typingTimeoutRef.current) {
@@ -481,6 +483,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         conversation_id: conversationId,
         user_id: user.id,
         is_typing: true,
+        activity_type: activity,
         updated_at: new Date().toISOString(),
       });
 
@@ -491,9 +494,28 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           conversation_id: conversationId,
           user_id: user.id,
           is_typing: false,
+          activity_type: 'typing',
           updated_at: new Date().toISOString(),
         });
-    }, 2000);
+    }, 3000);
+  };
+
+  const stopTyping = async () => {
+    if (!user) return;
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    await supabase
+      .from('typing_indicators')
+      .upsert({
+        conversation_id: conversationId,
+        user_id: user.id,
+        is_typing: false,
+        activity_type: 'typing',
+        updated_at: new Date().toISOString(),
+      });
   };
 
   const uploadFile = async (file: File): Promise<{ url: string; path: string }> => {
@@ -605,6 +627,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     if (!user) return;
 
     setUploadingFile(true);
+    handleTyping('media_upload');
     try {
       const { url, path } = await uploadFile(file);
       
@@ -621,6 +644,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       });
     } finally {
       setUploadingFile(false);
+      stopTyping();
     }
   };
 
@@ -792,7 +816,10 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             <h2 className="font-semibold truncate">{otherUser?.display_name || 'Loading...'}</h2>
             <p className="text-xs text-muted-foreground">
               {isTyping ? (
-                <span className="text-primary animate-pulse">typing...</span>
+                <span className="text-primary flex items-center gap-1 animate-pulse">
+                  {getActivityIcon(activityType)}
+                  {getActivityText(activityType)}
+                </span>
               ) : isOnline ? (
                 <span className="text-emerald-500">online</span>
               ) : lastSeen ? (
@@ -935,7 +962,10 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           
           {isTyping && (
             <div className="flex items-center gap-2 pl-10">
-              <TypingIndicator />
+              <TypingIndicator activityType={activityType} />
+              <span className="text-xs text-muted-foreground animate-pulse">
+                {otherUser?.display_name?.split(' ')[0] || 'User'} is {getActivityText(activityType).replace('...', '')}
+              </span>
             </div>
           )}
           
@@ -1021,7 +1051,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                 value={newMessage}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
-                  handleTyping();
+                  handleTyping('typing');
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -1036,7 +1066,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                 className="pr-10 rounded-full bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50"
                 disabled={sending || uploadingFile}
               />
-              <Popover>
+              <Popover onOpenChange={(open) => open && handleTyping('emoji')}>
                 <PopoverTrigger asChild>
                   <Button
                     variant="ghost"
@@ -1051,7 +1081,10 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                     {EMOJI_QUICK.map((emoji) => (
                       <button
                         key={emoji}
-                        onClick={() => setNewMessage(prev => prev + emoji)}
+                        onClick={() => {
+                          setNewMessage(prev => prev + emoji);
+                          handleTyping('typing');
+                        }}
                         className="text-2xl p-1.5 rounded-full hover:bg-accent transition-all"
                       >
                         {emoji}

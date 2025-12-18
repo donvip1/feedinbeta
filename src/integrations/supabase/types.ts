@@ -3590,6 +3590,7 @@ export type Database = {
       }
       typing_indicators: {
         Row: {
+          activity_type: string | null
           conversation_id: string
           id: string
           is_typing: boolean | null
@@ -3597,6 +3598,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activity_type?: string | null
           conversation_id: string
           id?: string
           is_typing?: boolean | null
@@ -3604,6 +3606,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activity_type?: string | null
           conversation_id?: string
           id?: string
           is_typing?: boolean | null
