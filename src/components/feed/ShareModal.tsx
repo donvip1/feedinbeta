@@ -1,5 +1,5 @@
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Share2, Bookmark, Link2, Download, Send, Users, ImageIcon } from 'lucide-react';
+import { Share2, Link2, Download, Send, Users, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -91,13 +91,6 @@ export default function ShareModal({ isOpen, onClose, postId, postData }: ShareM
     }
   };
 
-  const handleSavePost = async () => {
-    toast({ 
-      title: 'Post saved!',
-      description: 'Added to your saved posts'
-    });
-    onClose();
-  };
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/post/${postId}`);
@@ -318,14 +311,6 @@ export default function ShareModal({ isOpen, onClose, postId, postData }: ShareM
             <span className="font-medium">Share Externally</span>
           </Button>
 
-          <Button
-            onClick={handleSavePost}
-            className="w-full flex items-center justify-start gap-3 h-12 rounded-lg bg-card hover:bg-accent"
-            variant="ghost"
-          >
-            <Bookmark className="w-5 h-5" />
-            <span className="font-medium">Save Post</span>
-          </Button>
 
           <Button
             onClick={handleCopyLink}

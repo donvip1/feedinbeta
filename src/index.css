@@ -83,6 +83,23 @@
   }
 }
 
+/* Prevent downloads on media elements - only allow via in-app download feature */
+.no-download-media {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+  pointer-events: auto;
+}
+
+/* Disable long-press context menu on images/videos for mobile */
+img, video {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
