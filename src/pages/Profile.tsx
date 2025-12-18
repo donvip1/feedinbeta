@@ -15,6 +15,7 @@ import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus } from 'lucide-react';
 import { PostsGrid } from '@/components/profile/PostsGrid';
+import { ViewHistory } from '@/components/profile/ViewHistory';
 
 interface Profile {
   id: string;
@@ -769,6 +770,13 @@ const Profile = () => {
             </div>
             <PostsGrid userId={userId || ''} />
           </div>
+
+          {/* View History - Only for own profile */}
+          {isOwnProfile && (
+            <div className="mb-6">
+              <ViewHistory />
+            </div>
+          )}
 
           {/* Details Section */}
           <div className="space-y-4">

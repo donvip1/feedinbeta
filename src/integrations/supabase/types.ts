@@ -2302,6 +2302,35 @@ export type Database = {
           },
         ]
       }
+      post_view_history: {
+        Row: {
+          id: string
+          post_id: string
+          user_id: string
+          viewed_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          user_id: string
+          viewed_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          user_id?: string
+          viewed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_view_history_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_views: {
         Row: {
           created_at: string | null
@@ -3433,6 +3462,7 @@ export type Database = {
       }
       can_update_purpose: { Args: { user_id: string }; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
+      cleanup_old_view_history: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
@@ -3544,6 +3574,12 @@ export type Database = {
           views_count: number
         }[]
       }
+      get_today_viewed_posts: {
+        Args: never
+        Returns: {
+          post_id: string
+        }[]
+      }
       get_unread_message_count: {
         Args: { conv_id: string; uid: string }
         Returns: number
@@ -3563,6 +3599,18 @@ export type Database = {
         }[]
       }
       get_user_total_likes: { Args: { user_uuid: string }; Returns: number }
+      get_view_history: {
+        Args: { p_limit?: number }
+        Returns: {
+          author_avatar: string
+          author_name: string
+          author_username: string
+          content: string
+          media_url: string
+          post_id: string
+          viewed_at: string
+        }[]
+      }
       get_visible_profiles: {
         Args: { requesting_user_id: string }
         Returns: {
@@ -3627,6 +3675,7 @@ export type Database = {
             }
             Returns: Json
           }
+      record_post_view: { Args: { p_post_id: string }; Returns: undefined }
       send_gift: {
         Args: {
           p_cost: number
