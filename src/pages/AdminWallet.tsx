@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Coins, Users, TrendingUp, Wallet, Send, Plus, History, Shield } from "lucide-react";
+import { ArrowLeft, Coins, TrendingUp, Wallet, Send, Plus, History, Shield, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -15,7 +15,6 @@ import { format } from "date-fns";
 const AdminWallet = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [mintAmount, setMintAmount] = useState("");
   const [mintReason, setMintReason] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
@@ -24,30 +23,33 @@ const AdminWallet = () => {
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawReason, setWithdrawReason] = useState("");
 
-  // Check if user is admin
+  // Server-side permission check - can view admin wallet (admin OR moderator)
+  const { data: canViewWallet, isLoading: loadingViewPermission } = useQuery({
+    queryKey: ["can-view-admin-wallet"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("can_view_admin_wallet");
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
+  // Server-side permission check - can manage credits (admin ONLY)
+  const { data: canManageCredits, isLoading: loadingManagePermission } = useQuery({
+    queryKey: ["can-manage-credits"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("can_manage_credits");
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
+  // Redirect if no access
   useEffect(() => {
-    const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
-
-      const hasAdminAccess = roles?.some(r => r.role === 'admin' || r.role === 'moderator');
-      setIsAdmin(hasAdminAccess || false);
-      
-      if (!hasAdminAccess) {
-        toast.error("Access denied: Admin privileges required");
-        navigate("/feed");
-      }
-    };
-    checkAdmin();
-  }, [navigate]);
+    if (!loadingViewPermission && canViewWallet === false) {
+      toast.error("Access denied: Admin privileges required");
+      navigate("/feed");
+    }
+  }, [canViewWallet, loadingViewPermission, navigate]);
 
   // Fetch platform wallet
   const { data: platformWallet } = useQuery({
@@ -60,7 +62,7 @@ const AdminWallet = () => {
       if (error) throw error;
       return data;
     },
-    enabled: isAdmin === true,
+    enabled: canViewWallet === true,
   });
 
   // Fetch credit supply
@@ -74,7 +76,7 @@ const AdminWallet = () => {
       if (error) throw error;
       return data;
     },
-    enabled: isAdmin === true,
+    enabled: canViewWallet === true,
   });
 
   // Fetch team wallet
@@ -92,7 +94,7 @@ const AdminWallet = () => {
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     },
-    enabled: isAdmin === true,
+    enabled: canViewWallet === true,
   });
 
   // Fetch platform transactions
@@ -107,7 +109,7 @@ const AdminWallet = () => {
       if (error) throw error;
       return data;
     },
-    enabled: isAdmin === true,
+    enabled: canViewWallet === true,
   });
 
   // Mint credits mutation
@@ -180,7 +182,8 @@ const AdminWallet = () => {
     },
   });
 
-  if (isAdmin === null) {
+  // Loading state
+  if (loadingViewPermission || loadingManagePermission) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -188,12 +191,13 @@ const AdminWallet = () => {
     );
   }
 
-  if (!isAdmin) {
+  // No access
+  if (!canViewWallet) {
     return null;
   }
 
   const circulatingPercent = creditSupply 
-    ? ((creditSupply.circulating_supply / creditSupply.total_supply) * 100).toFixed(2) 
+    ? ((Number(creditSupply.circulating_supply) / Number(creditSupply.total_supply)) * 100).toFixed(2) 
     : "0";
 
   return (
@@ -213,7 +217,16 @@ const AdminWallet = () => {
               <Shield className="w-5 h-5 text-primary" />
               <h1 className="text-xl font-bold">Admin Wallet</h1>
             </div>
-            <Badge variant="outline" className="ml-auto">Admin Only</Badge>
+            <div className="ml-auto flex items-center gap-2">
+              {canManageCredits ? (
+                <Badge variant="default" className="bg-primary">Super Admin</Badge>
+              ) : (
+                <Badge variant="secondary">
+                  <Eye className="w-3 h-3 mr-1" />
+                  View Only
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -264,164 +277,172 @@ const AdminWallet = () => {
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">
-                {creditSupply?.circulating_supply?.toLocaleString() || 0}
+                {Number(creditSupply?.circulating_supply || 0).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
-                {circulatingPercent}% of {creditSupply?.total_supply?.toLocaleString() || 0} total
+                {circulatingPercent}% of {Number(creditSupply?.total_supply || 0).toLocaleString()} total
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Action Tabs */}
-        <Tabs defaultValue="mint" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="mint" className="gap-1">
-              <Plus className="w-3 h-3" /> Mint
-            </TabsTrigger>
-            <TabsTrigger value="transfer" className="gap-1">
-              <Send className="w-3 h-3" /> Transfer
-            </TabsTrigger>
-            <TabsTrigger value="withdraw" className="gap-1">
-              <Wallet className="w-3 h-3" /> Withdraw
-            </TabsTrigger>
+        {/* Action Tabs - Only show credit management tabs if user can manage credits */}
+        <Tabs defaultValue={canManageCredits ? "mint" : "history"} className="w-full">
+          <TabsList className={`grid w-full ${canManageCredits ? 'grid-cols-4' : 'grid-cols-1'}`}>
+            {canManageCredits && (
+              <>
+                <TabsTrigger value="mint" className="gap-1">
+                  <Plus className="w-3 h-3" /> Mint
+                </TabsTrigger>
+                <TabsTrigger value="transfer" className="gap-1">
+                  <Send className="w-3 h-3" /> Transfer
+                </TabsTrigger>
+                <TabsTrigger value="withdraw" className="gap-1">
+                  <Wallet className="w-3 h-3" /> Withdraw
+                </TabsTrigger>
+              </>
+            )}
             <TabsTrigger value="history" className="gap-1">
               <History className="w-3 h-3" /> History
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="mint" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Mint Credits</CardTitle>
-                <CardDescription>
-                  Create new credits and add to platform wallet. Max supply: {creditSupply?.total_supply?.toLocaleString()}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="mint-amount">Amount to Mint</Label>
-                  <Input
-                    id="mint-amount"
-                    type="number"
-                    placeholder="Enter amount"
-                    value={mintAmount}
-                    onChange={(e) => setMintAmount(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="mint-reason">Reason (optional)</Label>
-                  <Input
-                    id="mint-reason"
-                    placeholder="Enter reason for minting"
-                    value={mintReason}
-                    onChange={(e) => setMintReason(e.target.value)}
-                  />
-                </div>
-                <Button 
-                  onClick={() => mintMutation.mutate({ amount: parseInt(mintAmount), reason: mintReason })}
-                  disabled={!mintAmount || mintMutation.isPending}
-                  className="w-full"
-                >
-                  {mintMutation.isPending ? "Minting..." : "Mint Credits"}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {canManageCredits && (
+            <>
+              <TabsContent value="mint" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Mint Credits</CardTitle>
+                    <CardDescription>
+                      Create new credits and add to platform wallet. Max supply: {Number(creditSupply?.total_supply || 0).toLocaleString()}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="mint-amount">Amount to Mint</Label>
+                      <Input
+                        id="mint-amount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={mintAmount}
+                        onChange={(e) => setMintAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="mint-reason">Reason (optional)</Label>
+                      <Input
+                        id="mint-reason"
+                        placeholder="Enter reason for minting"
+                        value={mintReason}
+                        onChange={(e) => setMintReason(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => mintMutation.mutate({ amount: parseInt(mintAmount), reason: mintReason })}
+                      disabled={!mintAmount || mintMutation.isPending}
+                      className="w-full"
+                    >
+                      {mintMutation.isPending ? "Minting..." : "Mint Credits"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          <TabsContent value="transfer" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Transfer to User</CardTitle>
-                <CardDescription>
-                  Transfer credits from platform wallet to a user
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="transfer-user">User ID</Label>
-                  <Input
-                    id="transfer-user"
-                    placeholder="Enter user UUID"
-                    value={transferUserId}
-                    onChange={(e) => setTransferUserId(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transfer-amount">Amount</Label>
-                  <Input
-                    id="transfer-amount"
-                    type="number"
-                    placeholder="Enter amount"
-                    value={transferAmount}
-                    onChange={(e) => setTransferAmount(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="transfer-reason">Reason (optional)</Label>
-                  <Input
-                    id="transfer-reason"
-                    placeholder="Enter reason for transfer"
-                    value={transferReason}
-                    onChange={(e) => setTransferReason(e.target.value)}
-                  />
-                </div>
-                <Button 
-                  onClick={() => transferMutation.mutate({ 
-                    userId: transferUserId, 
-                    amount: parseInt(transferAmount), 
-                    reason: transferReason 
-                  })}
-                  disabled={!transferAmount || !transferUserId || transferMutation.isPending}
-                  className="w-full"
-                >
-                  {transferMutation.isPending ? "Transferring..." : "Transfer Credits"}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <TabsContent value="transfer" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Transfer to User</CardTitle>
+                    <CardDescription>
+                      Transfer credits from platform wallet to a user
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="transfer-user">User ID</Label>
+                      <Input
+                        id="transfer-user"
+                        placeholder="Enter user UUID"
+                        value={transferUserId}
+                        onChange={(e) => setTransferUserId(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="transfer-amount">Amount</Label>
+                      <Input
+                        id="transfer-amount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={transferAmount}
+                        onChange={(e) => setTransferAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="transfer-reason">Reason (optional)</Label>
+                      <Input
+                        id="transfer-reason"
+                        placeholder="Enter reason for transfer"
+                        value={transferReason}
+                        onChange={(e) => setTransferReason(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => transferMutation.mutate({ 
+                        userId: transferUserId, 
+                        amount: parseInt(transferAmount), 
+                        reason: transferReason 
+                      })}
+                      disabled={!transferAmount || !transferUserId || transferMutation.isPending}
+                      className="w-full"
+                    >
+                      {transferMutation.isPending ? "Transferring..." : "Transfer Credits"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-          <TabsContent value="withdraw" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Withdraw to Team Wallet</CardTitle>
-                <CardDescription>
-                  Move credits from platform wallet to your team wallet
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="withdraw-amount">Amount</Label>
-                  <Input
-                    id="withdraw-amount"
-                    type="number"
-                    placeholder="Enter amount"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="withdraw-reason">Reason (optional)</Label>
-                  <Input
-                    id="withdraw-reason"
-                    placeholder="Enter reason for withdrawal"
-                    value={withdrawReason}
-                    onChange={(e) => setWithdrawReason(e.target.value)}
-                  />
-                </div>
-                <Button 
-                  onClick={() => withdrawMutation.mutate({ 
-                    amount: parseInt(withdrawAmount), 
-                    reason: withdrawReason 
-                  })}
-                  disabled={!withdrawAmount || withdrawMutation.isPending}
-                  className="w-full"
-                >
-                  {withdrawMutation.isPending ? "Withdrawing..." : "Withdraw to Team Wallet"}
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
+              <TabsContent value="withdraw" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Withdraw to Team Wallet</CardTitle>
+                    <CardDescription>
+                      Move credits from platform wallet to your team wallet
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="withdraw-amount">Amount</Label>
+                      <Input
+                        id="withdraw-amount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={withdrawAmount}
+                        onChange={(e) => setWithdrawAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="withdraw-reason">Reason (optional)</Label>
+                      <Input
+                        id="withdraw-reason"
+                        placeholder="Enter reason for withdrawal"
+                        value={withdrawReason}
+                        onChange={(e) => setWithdrawReason(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => withdrawMutation.mutate({ 
+                        amount: parseInt(withdrawAmount), 
+                        reason: withdrawReason 
+                      })}
+                      disabled={!withdrawAmount || withdrawMutation.isPending}
+                      className="w-full"
+                    >
+                      {withdrawMutation.isPending ? "Withdrawing..." : "Withdraw to Team Wallet"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </>
+          )}
 
           <TabsContent value="history" className="space-y-4">
             <Card>
@@ -446,7 +467,7 @@ const AdminWallet = () => {
                         </p>
                       </div>
                       <Badge variant={tx.transaction_type === 'mint' ? 'default' : 'secondary'}>
-                        {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}
+                        {Number(tx.amount) > 0 ? '+' : ''}{Number(tx.amount).toLocaleString()}
                       </Badge>
                     </div>
                   ))}
@@ -455,6 +476,18 @@ const AdminWallet = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Info for moderators */}
+        {!canManageCredits && (
+          <Card className="border-yellow-500/30 bg-yellow-500/5">
+            <CardContent className="py-4">
+              <p className="text-sm text-muted-foreground text-center">
+                <Eye className="w-4 h-4 inline mr-2" />
+                You have view-only access. Contact a super admin to manage credits.
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -3607,7 +3607,9 @@ export type Database = {
         Args: { message_id: string; user_id: string }
         Returns: boolean
       }
+      can_manage_credits: { Args: never; Returns: boolean }
       can_update_purpose: { Args: { user_id: string }; Returns: boolean }
+      can_view_admin_wallet: { Args: never; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       cleanup_old_view_history: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
