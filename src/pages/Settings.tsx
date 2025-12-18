@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -24,13 +26,25 @@ import {
   Globe,
   HelpCircle,
   Users,
-  Radio
+  Radio,
+  ShieldCheck
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();
+
+  // Server-side check for admin wallet access
+  const { data: canViewAdminWallet } = useQuery({
+    queryKey: ["can-view-admin-wallet"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("can_view_admin_wallet");
+      if (error) return false;
+      return data as boolean;
+    },
+    enabled: !!user,
+  });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -138,6 +152,16 @@ const Settings = () => {
       description: 'Discover trending posts and hashtags',
       route: '/trending',
       color: 'text-orange-500'
+    }
+  ];
+
+  const adminOptions = [
+    {
+      icon: ShieldCheck,
+      title: 'Admin Wallet',
+      description: 'Platform wallet and credit management',
+      route: '/admin-wallet',
+      color: 'text-emerald-500'
     }
   ];
 
@@ -271,6 +295,19 @@ const Settings = () => {
             {renderOptionsList(supportOptions)}
           </div>
         </Card>
+
+        {/* Admin Section - Only visible to admins/moderators */}
+        {canViewAdminWallet && (
+          <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 backdrop-blur-sm border-emerald-500/30 shadow-xl mt-6">
+            <div className="p-6">
+              <h3 className="text-lg font-bold mb-4 text-emerald-500 flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5" />
+                Administration
+              </h3>
+              {renderOptionsList(adminOptions)}
+            </div>
+          </Card>
+        )}
 
         {/* Danger Zone */}
         <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 backdrop-blur-sm border-destructive/30 shadow-xl mt-6">
