@@ -41,7 +41,7 @@ const P2PTransaction = () => {
     queryKey: ['profile', transaction?.buyer_id],
     queryFn: async () => {
       const { data } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('display_name, username')
         .eq('id', transaction?.buyer_id)
         .single();
@@ -54,7 +54,7 @@ const P2PTransaction = () => {
     queryKey: ['profile', transaction?.seller_id],
     queryFn: async () => {
       const { data } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('display_name, username')
         .eq('id', transaction?.seller_id)
         .single();

@@ -71,11 +71,11 @@ const Friends = () => {
 
       if (error) throw error;
 
-      // Fetch sender profiles separately
+      // Fetch sender profiles separately using public_profiles (secure view)
       if (data && data.length > 0) {
         const senderIds = data.map(req => req.sender_id);
         const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
+          .from('public_profiles')
           .select('*')
           .in('id', senderIds);
 
@@ -127,7 +127,7 @@ const Friends = () => {
       }
 
       const { data: profiles, error: profilesError } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('*')
         .in('id', friendIds);
 
@@ -148,7 +148,7 @@ const Friends = () => {
     try {
       const safeQuery = sanitizeSearchQuery(query);
       const { data, error } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('*')
         .neq('id', user?.id)
         .or(`display_name.ilike.%${safeQuery}%,username.ilike.%${safeQuery}%`)

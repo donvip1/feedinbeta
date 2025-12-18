@@ -214,10 +214,10 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
 
       if (participantError) throw participantError;
       
-      // Then fetch their profile separately
+      // Then fetch their profile separately using public_profiles (secure view)
       if (participant?.user_id) {
         const { data: profile, error: profileError } = await supabase
-          .from('profiles')
+          .from('public_profiles')
           .select('id, display_name, username, avatar_url, bio, is_premium')
           .eq('id', participant.user_id)
           .single();

@@ -60,11 +60,11 @@ const BlockedUsers = () => {
 
       if (blockedError) throw blockedError;
 
-      // Fetch profile data for blocked users
+      // Fetch profile data for blocked users using public_profiles (secure view)
       const blockedWithProfiles = await Promise.all(
         (blocked || []).map(async (block) => {
           const { data: profile } = await supabase
-            .from('profiles')
+            .from('public_profiles')
             .select('display_name, username, avatar_url')
             .eq('id', block.blocked_id)
             .single();
@@ -84,11 +84,11 @@ const BlockedUsers = () => {
 
       if (mutedError) throw mutedError;
 
-      // Fetch profile data for muted users
+      // Fetch profile data for muted users using public_profiles (secure view)
       const mutedWithProfiles = await Promise.all(
         (muted || []).map(async (mute) => {
           const { data: profile } = await supabase
-            .from('profiles')
+            .from('public_profiles')
             .select('display_name, username, avatar_url')
             .eq('id', mute.muted_id)
             .single();

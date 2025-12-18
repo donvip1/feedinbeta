@@ -43,8 +43,9 @@ export const NewConversationModal = ({ open, onClose, onSelectUser, initialImage
 
     setLoading(true);
     try {
+      // Use public_profiles (secure view) for viewing other users
       const { data, error } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('id, display_name, username, avatar_url')
         .neq('id', user.id)
         .limit(50);

@@ -54,7 +54,7 @@ export const FollowersModal = ({ open, onClose, userId, defaultTab = 'followers'
       
       if (followerIds.length > 0) {
         const { data: followersProfiles } = await supabase
-          .from('profiles')
+          .from('public_profiles')
           .select('id, display_name, username, avatar_url, bio')
           .in('id', followerIds);
         
@@ -75,7 +75,7 @@ export const FollowersModal = ({ open, onClose, userId, defaultTab = 'followers'
       
       if (followingIds.length > 0) {
         const { data: followingProfiles } = await supabase
-          .from('profiles')
+          .from('public_profiles')
           .select('id, display_name, username, avatar_url, bio')
           .in('id', followingIds);
         

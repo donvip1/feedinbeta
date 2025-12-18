@@ -96,10 +96,10 @@ const Search = () => {
         postsData = posts || [];
       }
 
-      // Search users with sanitized query
+      // Search users with sanitized query using public_profiles (secure view)
       const safeUserQuery = sanitizeSearchQuery(query.replace('#', ''));
       const { data: usersData } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('*')
         .or(`username.ilike.%${safeUserQuery}%,display_name.ilike.%${safeUserQuery}%`)
         .limit(20);
