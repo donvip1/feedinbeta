@@ -88,6 +88,136 @@ All colors MUST be HSL.
 */
 
 /* Telegram-style emoji reaction animations */
+/* Gift emoji animations */
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  25% { transform: scale(1.2); }
+  50% { transform: scale(1); }
+  75% { transform: scale(1.15); }
+}
+
+@keyframes spin-slow {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes steam {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 1; }
+  50% { transform: translateY(-3px) scale(1.05); opacity: 0.9; }
+}
+
+@keyframes sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+
+@keyframes glow {
+  0%, 100% { filter: drop-shadow(0 0 5px hsl(45, 100%, 50%)) brightness(1); }
+  50% { filter: drop-shadow(0 0 15px hsl(45, 100%, 60%)) brightness(1.2); }
+}
+
+@keyframes bounce-note {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-5px) rotate(-10deg); }
+  75% { transform: translateY(-3px) rotate(10deg); }
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-8deg); }
+  75% { transform: rotate(8deg); }
+}
+
+@keyframes melt {
+  0%, 100% { transform: scaleY(1) translateY(0); }
+  50% { transform: scaleY(0.95) translateY(2px); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  50% { transform: translateY(-5px) rotate(5deg); }
+}
+
+@keyframes flash {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  25% { opacity: 0.5; transform: scale(1.2); }
+  50% { opacity: 1; transform: scale(1.1); }
+  75% { opacity: 0.7; transform: scale(1.15); }
+}
+
+@keyframes shine {
+  0%, 100% { filter: brightness(1) drop-shadow(0 0 5px gold); }
+  50% { filter: brightness(1.3) drop-shadow(0 0 15px gold); }
+}
+
+@keyframes flame {
+  0%, 100% { transform: scale(1) rotate(-3deg); filter: brightness(1); }
+  25% { transform: scale(1.1) rotate(2deg); filter: brightness(1.2); }
+  50% { transform: scale(1.05) rotate(-2deg); filter: brightness(1.1); }
+  75% { transform: scale(1.15) rotate(3deg); filter: brightness(1.3); }
+}
+
+@keyframes confetti {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.1) rotate(-10deg); }
+  50% { transform: scale(1.15) rotate(5deg); }
+  75% { transform: scale(1.05) rotate(-5deg); }
+}
+
+@keyframes candle {
+  0%, 100% { filter: brightness(1) drop-shadow(0 -5px 10px orange); }
+  50% { filter: brightness(1.1) drop-shadow(0 -8px 15px orange); }
+}
+
+@keyframes rainbow {
+  0% { filter: hue-rotate(0deg) brightness(1.1); }
+  100% { filter: hue-rotate(360deg) brightness(1.1); }
+}
+
+@keyframes launch {
+  0%, 100% { transform: translateY(0) rotate(-45deg); }
+  50% { transform: translateY(-8px) rotate(-45deg) scale(1.1); }
+}
+
+@keyframes royal {
+  0%, 100% { transform: translateY(0) scale(1); filter: drop-shadow(0 0 5px gold); }
+  50% { transform: translateY(-3px) scale(1.05); filter: drop-shadow(0 0 15px gold); }
+}
+
+@keyframes sparkle {
+  0%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+  25% { transform: scale(1.1) rotate(5deg); filter: brightness(1.3); }
+  50% { transform: scale(1.05) rotate(-3deg); filter: brightness(1.2); }
+  75% { transform: scale(1.15) rotate(3deg); filter: brightness(1.4); }
+}
+
+@keyframes cosmic {
+  0% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 8px purple); }
+  50% { transform: scale(1.2) rotate(180deg); filter: drop-shadow(0 0 15px magenta); }
+  100% { transform: scale(1) rotate(360deg); filter: drop-shadow(0 0 8px purple); }
+}
+
+.animate-heartbeat { animation: heartbeat 1s ease-in-out infinite; }
+.animate-spin-slow { animation: spin-slow 3s linear infinite; }
+.animate-steam { animation: steam 2s ease-in-out infinite; }
+.animate-sway { animation: sway 2s ease-in-out infinite; }
+.animate-glow { animation: glow 2s ease-in-out infinite; }
+.animate-bounce-note { animation: bounce-note 1.5s ease-in-out infinite; }
+.animate-wiggle { animation: wiggle 1s ease-in-out infinite; }
+.animate-melt { animation: melt 2s ease-in-out infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-flash { animation: flash 0.8s ease-in-out infinite; }
+.animate-shine { animation: shine 2s ease-in-out infinite; }
+.animate-flame { animation: flame 0.6s ease-in-out infinite; }
+.animate-confetti { animation: confetti 1s ease-in-out infinite; }
+.animate-candle { animation: candle 1.5s ease-in-out infinite; }
+.animate-rainbow { animation: rainbow 3s linear infinite; }
+.animate-launch { animation: launch 1.5s ease-in-out infinite; }
+.animate-royal { animation: royal 2s ease-in-out infinite; }
+.animate-sparkle { animation: sparkle 1.2s ease-in-out infinite; }
+.animate-cosmic { animation: cosmic 4s linear infinite; }
+
 @keyframes emoji-pop {
   0% {
     transform: scale(0) rotate(-15deg);

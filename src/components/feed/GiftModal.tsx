@@ -8,7 +8,7 @@ import { Gift, Heart, Trophy, Crown, Sparkles, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import LottieGiftEmoji from '@/components/shared/LottieGiftEmoji';
+import AnimatedGiftEmoji from '@/components/shared/AnimatedGiftEmoji';
 
 interface GiftModalProps {
   isOpen: boolean;
@@ -83,7 +83,7 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
 
   const addFloatingEmoji = (giftId: string) => {
     const id = Date.now() + Math.random();
-    const x = Math.random() * 80 + 10;
+    const x = Math.random() * 70 + 15;
     setFloatingEmojis(prev => [...prev, { id, giftId, x }]);
     setTimeout(() => {
       setFloatingEmojis(prev => prev.filter(e => e.id !== id));
@@ -189,7 +189,7 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
             className="floating-gift fixed pointer-events-none z-50"
             style={{ left: `${x}%`, bottom: '50%' }}
           >
-            <LottieGiftEmoji giftType={giftId} size={64} loop={false} />
+            <AnimatedGiftEmoji giftType={giftId} size={64} />
           </div>
         ))}
 
@@ -258,9 +258,9 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
                     >
                       <div className={`absolute inset-0 bg-gradient-to-br ${gift.color} opacity-10`} />
                       
-                      {/* 3D Animated Lottie Emoji */}
+                      {/* 3D Animated Emoji */}
                       <div className={`relative ${gift.animation || ''}`}>
-                        <LottieGiftEmoji giftType={gift.id} size={48} />
+                        <AnimatedGiftEmoji giftType={gift.id} size={48} />
                       </div>
                       
                       <div className="relative">

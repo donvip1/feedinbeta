@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Gift, Coins, Send } from "lucide-react";
-import LottieGiftEmoji from "@/components/shared/LottieGiftEmoji";
+import AnimatedGiftEmoji from "@/components/shared/AnimatedGiftEmoji";
 
 interface LiveGiftModalProps {
   isOpen: boolean;
@@ -155,9 +155,9 @@ export const LiveGiftModal = ({
                 >
                   <div className={`absolute inset-0 bg-gradient-to-br ${gift.color} opacity-10`} />
                   
-                  {/* 3D Animated Lottie Emoji */}
+                  {/* 3D Animated Emoji */}
                   <div className="relative">
-                    <LottieGiftEmoji giftType={gift.type} size={40} />
+                    <AnimatedGiftEmoji giftType={gift.type} size={40} />
                   </div>
                   
                   <span className="text-xs font-medium relative">{gift.label}</span>
