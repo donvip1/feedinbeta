@@ -301,17 +301,17 @@ const Call = () => {
         setCallStatus('ringing');
         callSounds.playRinging();
         
-        // Set a 30-second timeout for unanswered calls (only caller ends the call)
+        // Set a 60-second timeout for unanswered calls (only caller ends the call)
         const ringingTimeout = setTimeout(() => {
           if (!hasEndedRef.current && callStatus === 'ringing') {
-            console.log('[Call] Call not answered within 30 seconds');
+            console.log('[Call] Call not answered within 60 seconds');
             toast({
               title: 'No Answer',
               description: 'The call was not answered.',
             });
             endCall();
           }
-        }, 30000);
+        }, 60000);
         
         // Store timeout ref to clear on cleanup
         return () => clearTimeout(ringingTimeout);

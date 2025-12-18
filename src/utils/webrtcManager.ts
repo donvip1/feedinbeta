@@ -105,16 +105,17 @@ export class WebRTCManager {
       clearTimeout(this.connectionTimeout);
     }
 
-    // Set a 60-second timeout for connection establishment (increased from 30s)
-    // This gives enough time for signaling and ICE negotiation
+    // Set a 90-second timeout ONLY for initial connection establishment
+    // Once connected, there is no timeout - call only ends manually or by network failure
     this.connectionTimeout = setTimeout(() => {
+      // Only timeout if we never connected at all
       if (this.peerConnection?.connectionState !== 'connected' && 
           this.peerConnection?.iceConnectionState !== 'connected' &&
           this.peerConnection?.iceConnectionState !== 'completed') {
-        console.error('[WebRTC] Connection timeout - failed to connect within 60 seconds');
-        this.callbacks.onError(new Error('Connection timeout. The other user may not be available.'));
+        console.error('[WebRTC] Initial connection timeout - failed to connect within 90 seconds');
+        this.callbacks.onError(new Error('Connection timeout. Please check your network and try again.'));
       }
-    }, 60000);
+    }, 90000); // 90 seconds for initial connection only
   }
 
   private setupPeerConnectionHandlers() {
