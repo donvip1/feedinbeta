@@ -185,6 +185,152 @@ All colors MUST be HSL.
   transform-origin: bottom center;
 }
 
+/* Gift animations */
+@keyframes gift-sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1) rotate(180deg);
+  }
+}
+
+@keyframes gift-float {
+  0% {
+    transform: translateY(100%) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(0%) scale(1.2);
+  }
+  40% {
+    transform: translateY(-20%) scale(1);
+  }
+  100% {
+    transform: translateY(-200%) scale(0.8);
+    opacity: 0;
+  }
+}
+
+@keyframes gift-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 15px hsl(var(--primary) / 0);
+  }
+}
+
+@keyframes gift-shine {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes promote-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px hsl(var(--primary) / 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 0 25px hsl(var(--primary) / 0.8));
+  }
+}
+
+@keyframes card-hover-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100%) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.gift-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gift-card:hover {
+  animation: card-hover-float 0.6s ease-in-out infinite;
+}
+
+.gift-sparkle {
+  animation: gift-sparkle 1s ease-in-out infinite;
+}
+
+.gift-pulse {
+  animation: gift-pulse 2s ease-in-out infinite;
+}
+
+.gift-shine {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(var(--primary) / 0.2) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: gift-shine 2s linear infinite;
+}
+
+.promote-glow {
+  animation: promote-glow 2s ease-in-out infinite;
+}
+
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(0 0% 100% / 0.1) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+.floating-gift {
+  animation: gift-float 2s ease-out forwards;
+}
+
+.confetti {
+  animation: confetti-fall 3s linear forwards;
+}
+
 @layer base {
   * {
     @apply border-border;
