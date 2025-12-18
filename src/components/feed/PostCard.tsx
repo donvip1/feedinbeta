@@ -559,7 +559,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   <video 
                     ref={videoRef}
                     src={post.original_post.media_url} 
-                    className="rounded-lg w-full h-full object-cover"
+                    className="rounded-lg w-full h-full object-cover no-download-media"
                     muted={isMuted}
                     playsInline
                     loop
@@ -569,6 +569,9 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                     }}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
+                    onContextMenu={(e) => e.preventDefault()}
+                    controlsList="nodownload nofullscreen noremoteplayback"
+                    disablePictureInPicture
                   />
                   {/* Play/Pause overlay */}
                   {showPlayIcon && (
@@ -613,8 +616,10 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   <img 
                     src={post.original_post.media_url} 
                     alt="Original post" 
-                    className="w-full h-full object-cover cursor-pointer"
+                    className="w-full h-full object-cover cursor-pointer no-download-media"
                     onClick={() => navigate(`/post/${post.original_post.id}`)}
+                    onContextMenu={(e) => e.preventDefault()}
+                    draggable={false}
                   />
                 </div>
               )
@@ -655,7 +660,8 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   <img
                     src={currentMediaUrl}
                     alt="Post content"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover no-download-media"
+                    draggable={false}
                     onContextMenu={(e) => e.preventDefault()}
                   />
                   {/* Fullscreen button for images */}
@@ -671,7 +677,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                   <video
                     ref={videoRef}
                     src={currentMediaUrl}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover no-download-media"
                     playsInline
                     muted={isMuted}
                     loop
