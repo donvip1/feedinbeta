@@ -63,7 +63,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
 
       if (postError) throw postError;
 
-      // Insert share record
+      // Insert share record - trigger automatically updates refeeds_count
       const { error: shareError } = await supabase.from("post_shares").insert([
         {
           post_id: postId,
@@ -72,23 +72,6 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
         },
       ]);
       if (shareError) throw shareError;
-
-      // Increment refeed count on the original post
-      const { data: currentPost, error: countFetchError } = await supabase
-        .from("posts")
-        .select("refeeds_count")
-        .eq("id", postId)
-        .single();
-
-      if (countFetchError) throw countFetchError;
-
-      const nextCount = (currentPost?.refeeds_count || 0) + 1;
-      const { error: countUpdateError } = await supabase
-        .from("posts")
-        .update({ refeeds_count: nextCount })
-        .eq("id", postId);
-
-      if (countUpdateError) throw countUpdateError;
 
       toast({
         title: "Refeeded!",
@@ -126,7 +109,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
 
       if (insertError) throw insertError;
 
-      // Insert share record
+      // Insert share record - trigger automatically updates refeeds_count
       const { error: shareError } = await supabase.from("post_shares").insert([
         {
           post_id: postId,
@@ -135,23 +118,6 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
         },
       ]);
       if (shareError) throw shareError;
-
-      // Increment refeed count on the original post
-      const { data: currentPost, error: countFetchError } = await supabase
-        .from("posts")
-        .select("refeeds_count")
-        .eq("id", postId)
-        .single();
-
-      if (countFetchError) throw countFetchError;
-
-      const nextCount = (currentPost?.refeeds_count || 0) + 1;
-      const { error: countUpdateError } = await supabase
-        .from("posts")
-        .update({ refeeds_count: nextCount })
-        .eq("id", postId);
-
-      if (countUpdateError) throw countUpdateError;
 
       toast({
         title: "Quote posted!",
