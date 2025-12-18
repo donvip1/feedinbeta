@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { IncomingCall } from '@/components/calls/IncomingCall';
+import { callSounds } from '@/utils/callSounds';
 
 interface IncomingCallData {
   callId: string;
@@ -14,9 +15,17 @@ interface IncomingCallData {
 export const IncomingCallListener = () => {
   const { user } = useAuth();
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     if (!user) return;
+
+    console.log('[IncomingCallListener] Setting up listener for user:', user.id);
+
+    // Clean up any existing channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
 
     // Subscribe to incoming calls where we are the receiver
     const channel = supabase
@@ -31,12 +40,19 @@ export const IncomingCallListener = () => {
         },
         async (payload) => {
           const call = payload.new;
+          console.log('[IncomingCallListener] New call:', call);
           
           // Only show for pending calls
-          if (call.status !== 'pending') return;
+          if (call.status !== 'pending') {
+            console.log('[IncomingCallListener] Ignoring non-pending call');
+            return;
+          }
           
           // Don't show if we already have an incoming call
-          if (incomingCall) return;
+          if (incomingCall) {
+            console.log('[IncomingCallListener] Already have an incoming call');
+            return;
+          }
 
           try {
             // Fetch caller's profile
@@ -46,6 +62,8 @@ export const IncomingCallListener = () => {
               .eq('id', call.caller_id)
               .single();
 
+            console.log('[IncomingCallListener] Setting incoming call from:', callerProfile?.display_name);
+            
             setIncomingCall({
               callId: call.id,
               callerId: call.caller_id,
@@ -53,8 +71,23 @@ export const IncomingCallListener = () => {
               callerAvatar: callerProfile?.avatar_url || null,
               callType: call.call_type as 'video' | 'voice',
             });
+
+            // Show browser notification if permission granted
+            if ('Notification' in window && Notification.permission === 'granted') {
+              const notification = new Notification('Incoming Call', {
+                body: `${callerProfile?.display_name || 'Someone'} is calling you`,
+                icon: callerProfile?.avatar_url || '/favicon.png',
+                tag: `call-${call.id}`,
+                requireInteraction: true,
+              });
+
+              notification.onclick = () => {
+                window.focus();
+                notification.close();
+              };
+            }
           } catch (error) {
-            console.error('Error loading caller profile:', error);
+            console.error('[IncomingCallListener] Error loading caller profile:', error);
           }
         }
       )
@@ -68,27 +101,75 @@ export const IncomingCallListener = () => {
         },
         (payload) => {
           const call = payload.new;
+          console.log('[IncomingCallListener] Call updated:', call.status);
           
           // Clear incoming call if it's ended, rejected, or answered
-          if (incomingCall?.callId === call.id) {
-            if (call.status === 'ended' || call.status === 'rejected' || call.status === 'answered') {
-              setIncomingCall(null);
-            }
+          if (call.status === 'ended' || call.status === 'rejected' || call.status === 'answered') {
+            setIncomingCall(prev => {
+              if (prev?.callId === call.id) {
+                console.log('[IncomingCallListener] Clearing incoming call');
+                callSounds.stopAllSounds();
+                return null;
+              }
+              return prev;
+            });
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[IncomingCallListener] Channel status:', status);
+      });
+
+    channelRef.current = channel;
+
+    // Auto-dismiss call after 60 seconds if not answered
+    const checkCallTimeout = setInterval(() => {
+      if (incomingCall) {
+        // Check if call is still pending
+        supabase
+          .from('call_logs')
+          .select('status')
+          .eq('id', incomingCall.callId)
+          .single()
+          .then(({ data }) => {
+            if (data?.status !== 'pending') {
+              setIncomingCall(null);
+              callSounds.stopAllSounds();
+            }
+          });
+      }
+    }, 5000);
 
     return () => {
-      supabase.removeChannel(channel);
+      console.log('[IncomingCallListener] Cleaning up');
+      clearInterval(checkCallTimeout);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
-  }, [user, incomingCall]);
+  }, [user]);
+
+  // Handle visibility change - keep listening even when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && incomingCall) {
+        // Re-focus on incoming call when tab becomes visible
+        console.log('[IncomingCallListener] Tab visible, incoming call active');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [incomingCall]);
 
   const handleAccept = useCallback(() => {
+    console.log('[IncomingCallListener] Call accepted');
     setIncomingCall(null);
   }, []);
 
   const handleReject = useCallback(() => {
+    console.log('[IncomingCallListener] Call rejected');
     setIncomingCall(null);
   }, []);
 

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { usePresence, getStatusText, getStatusColor, formatLastSeen, PresenceStatus } from '@/hooks/usePresence';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -92,8 +93,6 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const [uploadingFile, setUploadingFile] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string } | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
-  const [isOnline, setIsOnline] = useState(false);
-  const [lastSeen, setLastSeen] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
@@ -104,6 +103,16 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const hasScrolledToUnread = useRef(false);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+
+  // Use the global presence hook to track other user's status
+  const { 
+    isOnline: otherUserOnline, 
+    status: otherUserStatus,
+    getUserStatus,
+    getUserSection,
+    isUserActive,
+    userStatuses
+  } = usePresence(otherUser?.id);
 
   // Track own presence so others know we're online
   useEffect(() => {
@@ -250,34 +259,11 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     };
   }, [conversationId, user?.id]);
 
-  // Subscribe to other user's presence when they're loaded
-  useEffect(() => {
-    if (!otherUser?.id) return;
-
-    const presenceChannel = supabase.channel(`user-presence:${otherUser.id}`)
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const isUserOnline = Object.keys(state).length > 0;
-        setIsOnline(isUserOnline);
-        
-        // Update last seen if going offline
-        if (!isUserOnline) {
-          setLastSeen(new Date().toISOString());
-        }
-      })
-      .on('presence', { event: 'join' }, () => {
-        setIsOnline(true);
-      })
-      .on('presence', { event: 'leave' }, () => {
-        setIsOnline(false);
-        setLastSeen(new Date().toISOString());
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(presenceChannel);
-    };
-  }, [otherUser?.id]);
+  // Get other user's presence data for display
+  const otherUserPresence = otherUser?.id ? userStatuses.get(otherUser.id) : null;
+  const isOnline = otherUserOnline;
+  const lastSeen = otherUserPresence?.last_seen || null;
+  const currentSection = otherUserPresence?.current_section || null;
 
   // Scroll to first unread message or bottom
   useEffect(() => {
@@ -809,7 +795,10 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
               </AvatarFallback>
             </Avatar>
             {isOnline && (
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-background" />
+              <div className={cn(
+                "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background",
+                currentSection === 'messages' ? 'bg-blue-500' : 'bg-emerald-500'
+              )} />
             )}
           </div>
           <div className="flex-1 min-w-0">
@@ -821,11 +810,13 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                   {getActivityText(activityType)}
                 </span>
               ) : isOnline ? (
-                <span className="text-emerald-500">online</span>
+                <span className={currentSection === 'messages' ? 'text-blue-500' : 'text-emerald-500'}>
+                  {currentSection === 'messages' ? 'Active now' : 'Online'}
+                </span>
               ) : lastSeen ? (
-                `last seen ${format(new Date(lastSeen), 'HH:mm')}`
+                `last seen ${formatLastSeen(lastSeen)}`
               ) : (
-                '@' + (otherUser?.username || 'user')
+                <span className="text-gray-400">Offline</span>
               )}
             </p>
           </div>
