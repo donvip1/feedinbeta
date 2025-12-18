@@ -816,11 +816,11 @@ const AdminWallet = () => {
                               {tx.transaction_type.replace('_', ' ')}
                             </Badge>
                           </TableCell>
-                          <TableCell className={`text-xs font-medium ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}
+                          <TableCell className={`text-xs font-medium ${(tx.amount ?? 0) > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {(tx.amount ?? 0) > 0 ? '+' : ''}{(tx.amount ?? 0).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground capitalize">{tx.source_type || '-'}</TableCell>
-                          <TableCell className="text-xs">{tx.balance_after.toLocaleString()}</TableCell>
+                          <TableCell className="text-xs">{(tx.balance_after ?? 0).toLocaleString()}</TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {tx.created_at ? format(new Date(tx.created_at), 'MMM d, HH:mm') : '-'}
                           </TableCell>
@@ -898,25 +898,25 @@ const AdminWallet = () => {
                             {format(new Date(day.date), 'MMM d')}
                           </TableCell>
                           <TableCell className="text-xs text-pink-500">
-                            {day.gift_earnings.toLocaleString()}
-                            <span className="text-muted-foreground ml-1">({day.gifts_count})</span>
+                            {(day.gift_earnings ?? 0).toLocaleString()}
+                            <span className="text-muted-foreground ml-1">({day.gifts_count ?? 0})</span>
                           </TableCell>
                           <TableCell className="text-xs text-red-500">
-                            {day.live_gift_earnings.toLocaleString()}
-                            <span className="text-muted-foreground ml-1">({day.live_gifts_count})</span>
+                            {(day.live_gift_earnings ?? 0).toLocaleString()}
+                            <span className="text-muted-foreground ml-1">({day.live_gifts_count ?? 0})</span>
                           </TableCell>
                           <TableCell className="text-xs text-yellow-500">
-                            {day.promotion_earnings.toLocaleString()}
-                            <span className="text-muted-foreground ml-1">({day.promotions_count})</span>
+                            {(day.promotion_earnings ?? 0).toLocaleString()}
+                            <span className="text-muted-foreground ml-1">({day.promotions_count ?? 0})</span>
                           </TableCell>
                           <TableCell className="text-xs font-bold text-foreground">
-                            {day.total_earnings.toLocaleString()}
+                            {(day.total_earnings ?? 0).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-xs text-green-500 font-medium">
-                            {day.platform_profit.toLocaleString()}
+                            {(day.platform_profit ?? 0).toLocaleString()}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
-                            {day.transactions_count}
+                            {day.transactions_count ?? 0}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1488,7 +1488,7 @@ const AdminWallet = () => {
                               : 'text-red-500'
                           }`}>
                             {['mint', 'gift_fee', 'promotion_fee', 'subscription_fee', 'p2p_fee'].includes(tx.transaction_type) ? '+' : '-'}
-                            {tx.amount?.toLocaleString()}
+                            {(tx.amount ?? 0).toLocaleString()}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {tx.created_at ? format(new Date(tx.created_at), 'MMM d, HH:mm') : '-'}
