@@ -530,6 +530,87 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_monetization: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_monetized: boolean | null
+          last_payout_at: string | null
+          minimum_balance_threshold: number | null
+          monetized_at: string | null
+          next_eligible_payout: string | null
+          total_earnings: number | null
+          total_withdrawn: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_monetized?: boolean | null
+          last_payout_at?: string | null
+          minimum_balance_threshold?: number | null
+          monetized_at?: string | null
+          next_eligible_payout?: string | null
+          total_earnings?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_monetized?: boolean | null
+          last_payout_at?: string | null
+          minimum_balance_threshold?: number | null
+          monetized_at?: string | null
+          next_eligible_payout?: string | null
+          total_earnings?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      creator_payout_requests: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          rejection_reason: string | null
+          requested_at: string | null
+          status: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string | null
+          status?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          rejection_reason?: string | null
+          requested_at?: string | null
+          status?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       creator_payouts: {
         Row: {
           bonus_amount: number
@@ -3893,6 +3974,7 @@ export type Database = {
         Returns: boolean
       }
       can_manage_credits: { Args: never; Returns: boolean }
+      can_request_payout: { Args: { p_user_id: string }; Returns: Json }
       can_update_purpose: { Args: { user_id: string }; Returns: boolean }
       can_view_admin_wallet: { Args: never; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
@@ -3966,6 +4048,7 @@ export type Database = {
         }[]
       }
       get_my_stream_key: { Args: { stream_id_param: string }; Returns: string }
+      get_payout_statistics: { Args: never; Returns: Json }
       get_personalized_feed: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
@@ -4171,6 +4254,10 @@ export type Database = {
         Args: { attachment_id: string }
         Returns: undefined
       }
+      process_payout_request: {
+        Args: { p_action: string; p_notes?: string; p_request_id: string }
+        Returns: Json
+      }
       promote_post:
         | {
             Args: {
@@ -4200,6 +4287,7 @@ export type Database = {
         Returns: undefined
       }
       record_post_view: { Args: { p_post_id: string }; Returns: undefined }
+      request_creator_payout: { Args: { p_amount: number }; Returns: Json }
       send_gift:
         | {
             Args: {
@@ -4242,6 +4330,10 @@ export type Database = {
             Returns: boolean
           }
       sync_credit_supply: { Args: never; Returns: undefined }
+      toggle_creator_monetization: {
+        Args: { p_monetize: boolean; p_user_id: string }
+        Returns: Json
+      }
       transfer_credits: {
         Args: { p_amount: number; p_recipient_username: string }
         Returns: undefined

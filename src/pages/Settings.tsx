@@ -28,7 +28,8 @@ import {
   Users,
   Radio,
   ShieldCheck,
-  Smartphone
+  Smartphone,
+  Banknote
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -183,8 +184,15 @@ const Settings = () => {
       icon: ShieldCheck,
       title: 'Admin Wallet',
       description: 'Platform wallet and credit management',
-      route: '/admin-wallet',
+      route: '/wallet/admin',
       color: 'text-emerald-500'
+    },
+    {
+      icon: Banknote,
+      title: 'Creator Payouts',
+      description: 'Manage creator monetization and payouts',
+      route: '/wallet/creator-payouts',
+      color: 'text-green-500'
     }
   ];
 
