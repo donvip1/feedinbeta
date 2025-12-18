@@ -26,6 +26,11 @@ interface CreditStatistics {
   team_wallets_total: number;
   gift_revenue: number;
   promotion_revenue: number;
+  subscription_revenue: number;
+  p2p_fee_revenue: number;
+  ai_feature_revenue: number;
+  platform_profit: number;
+  creator_payouts_total: number;
   total_minted: number;
   circulating_supply: number;
 }
@@ -276,8 +281,13 @@ const AdminWallet = () => {
 
   const totalRevenue = (creditStats?.gift_revenue || 0) + 
                        (creditStats?.promotion_revenue || 0) + 
-                       (platformWallet?.subscription_revenue || 0) +
-                       (platformWallet?.p2p_fee_revenue || 0);
+                       (creditStats?.subscription_revenue || 0) +
+                       (creditStats?.p2p_fee_revenue || 0) +
+                       (creditStats?.ai_feature_revenue || 0);
+  
+  const platformProfit = creditStats?.platform_profit || (totalRevenue * 0.70);
+  const creatorPayouts = creditStats?.creator_payouts_total || (totalRevenue * 0.30);
+  const profitMargin = totalRevenue > 0 ? ((platformProfit / totalRevenue) * 100).toFixed(1) : "70.0";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted pb-20">
@@ -414,63 +424,127 @@ const AdminWallet = () => {
           </Card>
         </div>
 
+        {/* 70/30 Profit Split Overview */}
+        <Card className="border-primary/30 bg-gradient-to-r from-primary/5 to-accent/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Profit Model (70/30 Split)
+            </CardTitle>
+            <CardDescription>FeedIn retains 70% • Creators receive 30%</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Visual Split Bar */}
+            <div className="relative h-8 rounded-full overflow-hidden bg-muted">
+              <div 
+                className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-500 to-green-600 flex items-center justify-center"
+                style={{ width: '70%' }}
+              >
+                <span className="text-xs font-bold text-white">Platform 70%</span>
+              </div>
+              <div 
+                className="absolute right-0 top-0 h-full bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center"
+                style={{ width: '30%' }}
+              >
+                <span className="text-xs font-bold text-white">Creators 30%</span>
+              </div>
+            </div>
+            
+            {/* Profit Stats */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="text-center p-3 rounded-lg bg-muted/50 border">
+                <p className="text-xs text-muted-foreground">Total Revenue</p>
+                <p className="text-xl font-bold text-foreground">{totalRevenue.toLocaleString()}</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-green-500/10 border border-green-500/30">
+                <p className="text-xs text-muted-foreground">Platform Profit</p>
+                <p className="text-xl font-bold text-green-500">{platformProfit.toLocaleString()}</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                <p className="text-xs text-muted-foreground">Creator Payouts</p>
+                <p className="text-xl font-bold text-blue-500">{creatorPayouts.toLocaleString()}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-center gap-2 p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+              <Shield className="w-4 h-4 text-green-500" />
+              <span className="text-sm font-medium text-green-500">
+                Current Profit Margin: {profitMargin}%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Revenue Breakdown */}
         <Card className="border-accent/20">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
               <DollarSign className="w-5 h-5 text-accent" />
-              Platform Revenue
+              Revenue Sources
             </CardTitle>
-            <CardDescription>Income from platform fees and commissions</CardDescription>
+            <CardDescription>Breakdown of income streams</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="text-center p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
-                <Gift className="w-5 h-5 text-pink-500 mx-auto mb-1" />
+                <Gift className="w-4 h-4 text-pink-500 mx-auto mb-1" />
                 <p className="text-lg font-bold text-pink-500">
                   {(creditStats?.gift_revenue || 0).toLocaleString()}
                 </p>
-                <p className="text-xs text-muted-foreground">Gift Fees (5%)</p>
+                <p className="text-xs text-muted-foreground">Gifts (70%)</p>
               </div>
               <div className="text-center p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                <Megaphone className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
+                <Megaphone className="w-4 h-4 text-yellow-500 mx-auto mb-1" />
                 <p className="text-lg font-bold text-yellow-500">
                   {(creditStats?.promotion_revenue || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground">Promotions</p>
               </div>
               <div className="text-center p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
-                <Award className="w-5 h-5 text-cyan-500 mx-auto mb-1" />
+                <Award className="w-4 h-4 text-cyan-500 mx-auto mb-1" />
                 <p className="text-lg font-bold text-cyan-500">
-                  {(platformWallet?.subscription_revenue || 0).toLocaleString()}
+                  {(creditStats?.subscription_revenue || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground">Subscriptions</p>
               </div>
               <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                <Coins className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
+                <Coins className="w-4 h-4 text-emerald-500 mx-auto mb-1" />
                 <p className="text-lg font-bold text-emerald-500">
-                  {(platformWallet?.p2p_fee_revenue || 0).toLocaleString()}
+                  {(creditStats?.p2p_fee_revenue || 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground">P2P Fees</p>
               </div>
-            </div>
-            <div className="mt-4 p-3 rounded-lg bg-accent/10 border border-accent/20 text-center">
-              <p className="text-sm text-muted-foreground">Total Revenue</p>
-              <p className="text-2xl font-bold text-accent">{totalRevenue.toLocaleString()} Credits</p>
+              <div className="text-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                <Target className="w-4 h-4 text-purple-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-purple-500">
+                  {(creditStats?.ai_feature_revenue || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">AI Features</p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Creator Incentive Tiers */}
-        <Card>
+        {/* Creator Incentive Tiers (30% Pool) */}
+        <Card className="border-blue-500/20">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Target className="w-5 h-5 text-primary" />
+              <Award className="w-5 h-5 text-blue-500" />
               Creator Incentive Tiers
             </CardTitle>
-            <CardDescription>Bonus payouts for top performing creators</CardDescription>
+            <CardDescription>
+              Bonus payouts from the 30% creator pool based on performance
+            </CardDescription>
           </CardHeader>
           <CardContent>
+            <div className="mb-4 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Creator Pool (30% of revenue)</span>
+                <span className="text-lg font-bold text-blue-500">{creatorPayouts.toLocaleString()} Credits</span>
+              </div>
+            </div>
+            
+            <p className="text-sm font-medium mb-2">Monthly Tiers</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {incentiveTiers?.filter(t => t.period_type === 'monthly').map((tier) => (
                 <div 
@@ -483,7 +557,7 @@ const AdminWallet = () => {
                       {tier.min_earnings.toLocaleString()} - {tier.max_earnings?.toLocaleString() || '∞'} credits/month
                     </p>
                   </div>
-                  <Badge variant="secondary" className="bg-primary/20 text-primary">
+                  <Badge variant="secondary" className="bg-blue-500/20 text-blue-500">
                     +{tier.bonus_percentage}%
                   </Badge>
                 </div>
@@ -491,7 +565,7 @@ const AdminWallet = () => {
             </div>
             {incentiveTiers?.filter(t => t.period_type === 'weekly').length ? (
               <>
-                <p className="text-sm font-medium mt-4 mb-2">Weekly Bonuses</p>
+                <p className="text-sm font-medium mt-4 mb-2">Weekly Tiers</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {incentiveTiers?.filter(t => t.period_type === 'weekly').map((tier) => (
                     <div 
@@ -512,6 +586,10 @@ const AdminWallet = () => {
                 </div>
               </>
             ) : null}
+            
+            <p className="text-xs text-muted-foreground mt-4 text-center">
+              * All creator incentives are paid from the 30% creator pool, ensuring platform maintains 70% profit margin
+            </p>
           </CardContent>
         </Card>
 
