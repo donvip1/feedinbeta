@@ -26,7 +26,23 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId }: Gift
   const [sending, setSending] = useState(false);
 
   const handleSendGift = async (giftType: string, cost: number) => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: 'Please sign in',
+        description: 'You need to be signed in to send gifts',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (user.id === recipientId) {
+      toast({
+        title: 'Cannot send gift',
+        description: 'You cannot send gifts to yourself',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setSending(true);
     try {
