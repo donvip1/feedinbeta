@@ -3697,7 +3697,7 @@ export type Database = {
       }
       transfer_credits: {
         Args: { p_amount: number; p_recipient_username: string }
-        Returns: Json
+        Returns: undefined
       }
       update_my_phone_number: { Args: { new_phone: string }; Returns: boolean }
     }
