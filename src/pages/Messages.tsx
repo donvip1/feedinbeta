@@ -32,6 +32,8 @@ interface Conversation {
     sender_id: string;
   };
   unread_count?: number;
+  isOnline?: boolean;
+  isTyping?: boolean;
 }
 
 interface Group {
@@ -90,13 +92,31 @@ export default function Messages() {
     }
   }, [user, authLoading, navigate]);
 
+  // Track my own presence so others know I'm online
+  useEffect(() => {
+    if (!user) return;
+
+    const presenceChannel = supabase.channel(`user-presence:${user.id}`)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            online_at: new Date().toISOString(),
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [user?.id]);
+
   useEffect(() => {
     if (user) {
       loadConversations();
       loadGroups();
       
       // Subscribe to new messages - update locally instead of reloading
-      const channel = supabase
+      const messageChannel = supabase
         .channel('messages-updates')
         .on(
           'postgres_changes',
@@ -140,11 +160,63 @@ export default function Messages() {
         )
         .subscribe();
 
+      // Subscribe to typing indicators for all conversations
+      const typingChannel = supabase
+        .channel('typing-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'typing_indicators'
+          },
+          (payload: any) => {
+            const typing = payload?.new;
+            if (!typing || typing.user_id === user.id) return;
+            
+            setConversations(prev => prev.map(conv => 
+              conv.id === typing.conversation_id 
+                ? { ...conv, isTyping: typing.is_typing } 
+                : conv
+            ));
+          }
+        )
+        .subscribe();
+
       return () => {
-        supabase.removeChannel(channel);
+        supabase.removeChannel(messageChannel);
+        supabase.removeChannel(typingChannel);
       };
     }
   }, [user, selectedConversationId]);
+
+  // Subscribe to presence for each conversation participant
+  useEffect(() => {
+    if (!user || conversations.length === 0) return;
+
+    const presenceChannels: ReturnType<typeof supabase.channel>[] = [];
+
+    conversations.forEach(conv => {
+      if (!conv.other_participant?.id) return;
+      
+      const channel = supabase.channel(`user-presence:${conv.other_participant.id}`)
+        .on('presence', { event: 'sync' }, () => {
+          const state = channel.presenceState();
+          const isOnline = Object.keys(state).length > 0;
+          
+          setConversations(prev => prev.map(c => 
+            c.id === conv.id ? { ...c, isOnline } : c
+          ));
+        })
+        .subscribe();
+      
+      presenceChannels.push(channel);
+    });
+
+    return () => {
+      presenceChannels.forEach(channel => supabase.removeChannel(channel));
+    };
+  }, [user?.id, conversations.length]);
 
   const loadConversations = async (showLoading = true) => {
     if (!user) return;
@@ -442,27 +514,38 @@ export default function Messages() {
                           {conv.other_participant.display_name?.[0] || 'U'}
                         </AvatarFallback>
                       </Avatar>
+                      {/* Online indicator */}
+                      {conv.isOnline && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background" />
+                      )}
                       {conv.unread_count && conv.unread_count > 0 && (
                         <UnreadBadge count={conv.unread_count} size="sm" />
                       )}
                     </div>
                     <div className="flex-1 text-left overflow-hidden">
                       <div className="flex items-center justify-between">
-                        <p className="font-semibold truncate">
-                          {conv.other_participant.display_name || 'Unknown User'}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold truncate">
+                            {conv.other_participant.display_name || 'Unknown User'}
+                          </p>
+                          {conv.isOnline && (
+                            <span className="text-[10px] text-emerald-500 font-medium">online</span>
+                          )}
+                        </div>
                         {conv.last_message && (
                           <span className="text-xs text-muted-foreground">
                             {new Date(conv.last_message.created_at).toLocaleDateString()}
                           </span>
                         )}
                       </div>
-                      {conv.last_message && (
+                      {conv.isTyping ? (
+                        <p className="text-sm text-primary animate-pulse">typing...</p>
+                      ) : conv.last_message ? (
                         <p className={`text-sm truncate ${conv.unread_count && conv.unread_count > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                           {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
                           {conv.last_message.content}
                         </p>
-                      )}
+                      ) : null}
                     </div>
                   </button>
                 ))
