@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ProfileSettings } from '@/components/profile/ProfileSettings';
+
 import { FollowersModal } from '@/components/profile/FollowersModal';
 import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
@@ -64,7 +64,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  
   const [uploading, setUploading] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
@@ -532,7 +532,7 @@ const Profile = () => {
               </Button>
               {isOwnProfile && (
                 <Button 
-                  onClick={() => setShowSettings(true)} 
+                  onClick={() => navigate('/settings')} 
                   variant="ghost" 
                   size="icon" 
                   className="bg-background/40 backdrop-blur-md hover:bg-background/60 border border-background/20 shadow-lg"
@@ -908,7 +908,7 @@ const Profile = () => {
       </div>
 
       {/* Settings Drawer */}
-      <ProfileSettings isOpen={showSettings} onClose={() => setShowSettings(false)} />
+      
       
       {/* Followers/Following Modal */}
       <FollowersModal
