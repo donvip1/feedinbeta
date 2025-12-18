@@ -432,18 +432,17 @@ export default function Messages() {
     if (!user) return;
     
     try {
-      // Get all conversation IDs for this user
-      const conversationIds = conversations.map(c => c.id);
+      // Get all conversation IDs with unread messages
+      const conversationsWithUnread = conversations.filter(c => (c.unread_count || 0) > 0);
       
-      if (conversationIds.length === 0) return;
+      if (conversationsWithUnread.length === 0) return;
       
-      // Mark all unread messages as read
-      await supabase
-        .from('messages')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .in('conversation_id', conversationIds)
-        .neq('sender_id', user.id)
-        .eq('is_read', false);
+      // Mark all unread messages as read using the RPC function for each conversation
+      await Promise.all(
+        conversationsWithUnread.map(conv => 
+          supabase.rpc('mark_conversation_read', { conv_id: conv.id })
+        )
+      );
       
       // Update local state
       setConversations(prev => prev.map(conv => ({ ...conv, unread_count: 0 })));

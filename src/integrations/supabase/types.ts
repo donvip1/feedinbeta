@@ -4333,6 +4333,7 @@ export type Database = {
         Args: { attachment_id: string }
         Returns: undefined
       }
+      mark_conversation_read: { Args: { conv_id: string }; Returns: undefined }
       process_payout_request: {
         Args: { p_action: string; p_notes?: string; p_request_id: string }
         Returns: Json
