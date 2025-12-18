@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { AttachmentPicker } from './AttachmentPicker';
 import { ModernMessageBubble } from './ModernMessageBubble';
+import { CallLogBubble } from './CallLogBubble';
 import { TypingIndicator, getActivityText, getActivityIcon } from './TypingIndicator';
 import { VoiceRecorder } from './VoiceRecorder';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -916,6 +917,23 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
               <div className="space-y-1">
                 {dateMessages.map((msg) => {
                   const isFirstUnread = msg.id === firstUnreadId;
+                  const isCallLog = msg.media_type === 'call_log' && msg.content.startsWith('CALL_LOG:');
+                  
+                  // Parse call log data
+                  let callLogData = null;
+                  if (isCallLog) {
+                    const parts = msg.content.split(':');
+                    // Format: CALL_LOG:type:status:duration:isOutgoing
+                    if (parts.length >= 5) {
+                      callLogData = {
+                        callType: parts[1] as 'voice' | 'video',
+                        callStatus: parts[2] as 'answered' | 'missed' | 'declined',
+                        duration: parseInt(parts[3]) || 0,
+                        isOutgoing: parts[4] === 'true',
+                      };
+                    }
+                  }
+                  
                   return (
                     <React.Fragment key={msg.id}>
                       {isFirstUnread && (
@@ -930,20 +948,37 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                           <div className="flex-1 h-px bg-primary/50" />
                         </div>
                       )}
-                      <ModernMessageBubble
-                        message={msg}
-                        isOwn={msg.sender_id === user?.id}
-                        showAvatar={true}
-                        isFirstInGroup={msg.isFirstInGroup}
-                        isLastInGroup={msg.isLastInGroup}
-                        onReply={(id, content) => setReplyingTo({ 
-                          id, 
-                          content, 
-                          sender: msg.profiles.display_name || 'Unknown' 
-                        })}
-                        onReact={handleReact}
-                        onDelete={handleDelete}
-                      />
+                      
+                      {isCallLog && callLogData ? (
+                        <div className={cn(
+                          "flex py-2",
+                          msg.sender_id === user?.id ? "justify-end" : "justify-start"
+                        )}>
+                          <CallLogBubble
+                            callType={callLogData.callType}
+                            callStatus={callLogData.callStatus}
+                            duration={callLogData.duration}
+                            isOutgoing={msg.sender_id === user?.id}
+                            createdAt={msg.created_at}
+                            isOwn={msg.sender_id === user?.id}
+                          />
+                        </div>
+                      ) : (
+                        <ModernMessageBubble
+                          message={msg}
+                          isOwn={msg.sender_id === user?.id}
+                          showAvatar={true}
+                          isFirstInGroup={msg.isFirstInGroup}
+                          isLastInGroup={msg.isLastInGroup}
+                          onReply={(id, content) => setReplyingTo({ 
+                            id, 
+                            content, 
+                            sender: msg.profiles.display_name || 'Unknown' 
+                          })}
+                          onReact={handleReact}
+                          onDelete={handleDelete}
+                        />
+                      )}
                     </React.Fragment>
                   );
                 })}

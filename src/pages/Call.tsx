@@ -73,6 +73,81 @@ const Call = () => {
     }, 1000);
   }, []);
 
+  // Helper function to get or create conversation between two users
+  const getOrCreateConversation = async (userId1: string, userId2: string): Promise<string | null> => {
+    try {
+      // Find existing conversation between the two users
+      const { data: existingConvs } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', userId1);
+      
+      if (existingConvs && existingConvs.length > 0) {
+        for (const conv of existingConvs) {
+          const { data: otherParticipant } = await supabase
+            .from('conversation_participants')
+            .select('user_id')
+            .eq('conversation_id', conv.conversation_id)
+            .eq('user_id', userId2)
+            .maybeSingle();
+          
+          if (otherParticipant) {
+            return conv.conversation_id;
+          }
+        }
+      }
+
+      // Create new conversation
+      const { data: newConv, error: convError } = await supabase
+        .from('conversations')
+        .insert({ updated_at: new Date().toISOString() })
+        .select()
+        .single();
+
+      if (convError || !newConv) return null;
+
+      // Add participants
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: newConv.id, user_id: userId1 },
+        { conversation_id: newConv.id, user_id: userId2 },
+      ]);
+
+      return newConv.id;
+    } catch (error) {
+      console.error('Error getting/creating conversation:', error);
+      return null;
+    }
+  };
+
+  // Helper to insert call log message into conversation
+  const insertCallLogMessage = async (status: 'answered' | 'missed' | 'declined', duration: number) => {
+    if (!callData || !user) return;
+
+    try {
+      const conversationId = await getOrCreateConversation(callData.caller_id, callData.receiver_id);
+      if (!conversationId) return;
+
+      // Create a special message format for call logs
+      // Format: CALL_LOG:type:status:duration:isOutgoing
+      const callLogContent = `CALL_LOG:${callTypeRef.current}:${status}:${duration}:${isCaller}`;
+
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: callLogContent,
+        media_type: 'call_log',
+      });
+
+      // Update conversation timestamp
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
+    } catch (error) {
+      console.error('Error inserting call log message:', error);
+    }
+  };
+
   const endCall = useCallback(async () => {
     if (hasEndedRef.current) return;
     hasEndedRef.current = true;
@@ -87,6 +162,9 @@ const Call = () => {
         ? Math.floor((Date.now() - startTimeRef.current) / 1000)
         : 0;
 
+      // Determine call status for the log
+      const callLogStatus = isConnected ? 'answered' : 'missed';
+
       // Update call log
       await supabase
         .from('call_logs')
@@ -96,6 +174,9 @@ const Call = () => {
           duration: duration,
         })
         .eq('id', callId);
+
+      // Insert call log message into conversation
+      await insertCallLogMessage(callLogStatus, duration);
 
       // Deduct credits if call was connected
       if (isConnected && duration > 0 && user?.id) {
@@ -142,7 +223,7 @@ const Call = () => {
     setTimeout(() => {
       navigate('/messages');
     }, 1500);
-  }, [callId, isConnected, user?.id, toast, navigate]);
+  }, [callId, isConnected, user?.id, toast, navigate, callData, isCaller]);
 
   // Initialize call
   useEffect(() => {
