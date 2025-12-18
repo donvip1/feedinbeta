@@ -148,7 +148,6 @@ export const SignUpForm = () => {
             data: {
               display_name: validated.displayName,
               username: validated.username,
-              phone_number: validated.phone,
             },
           },
         });
@@ -158,6 +157,14 @@ export const SignUpForm = () => {
             throw new Error('An account with this phone number already exists');
           }
           throw error;
+        }
+
+        // Store phone number in secure profile_sensitive_data table
+        if (data.user) {
+          await supabase.from('profile_sensitive_data').upsert({
+            user_id: data.user.id,
+            phone_number: validated.phone,
+          });
         }
 
         if (data.user && !data.session) {
