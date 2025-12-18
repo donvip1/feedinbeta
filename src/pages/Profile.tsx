@@ -56,7 +56,7 @@ const PURPOSE_OPTIONS: Record<string, string> = {
 };
 
 const Profile = () => {
-  const { userId } = useParams();
+  const { identifier } = useParams<{ identifier: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -64,6 +64,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
+  const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
   
   const [uploading, setUploading] = useState(false);
   const [uploadingCover, setUploadingCover] = useState(false);
@@ -80,33 +81,68 @@ const Profile = () => {
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [areMutualFriends, setAreMutualFriends] = useState(false);
 
+  // Helper to check if string is UUID
+  const isUUID = (str: string) => {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  };
+
+  // Resolve identifier to userId
+  useEffect(() => {
+    const resolveIdentifier = async () => {
+      if (!identifier) return;
+      
+      if (isUUID(identifier)) {
+        setResolvedUserId(identifier);
+      } else {
+        // It's a username, resolve to UUID
+        const { data, error } = await supabase
+          .rpc('get_user_by_username', { p_username: identifier });
+        
+        if (error || !data) {
+          toast({
+            title: 'User not found',
+            description: `No user with username "${identifier}" exists.`,
+            variant: 'destructive',
+          });
+          navigate('/feed');
+          return;
+        }
+        setResolvedUserId(data);
+      }
+    };
+    
+    resolveIdentifier();
+  }, [identifier]);
+
   useEffect(() => {
     if (!user) {
-      // Store the current path to redirect back after auth
       sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
       navigate('/welcome');
       return;
     }
     
-    const isOwn = user?.id === userId;
+    if (!resolvedUserId) return;
+    
+    const isOwn = user?.id === resolvedUserId;
     setIsOwnProfile(isOwn);
     
-    if (userId) {
-      loadProfile();
-      if (!isOwn && user) {
-        checkFollowStatus();
-        checkIfFollowingMe();
-        checkFriendRequestStatus();
-        checkMutualFriendStatus();
-      }
+    loadProfile();
+    if (!isOwn && user) {
+      checkFollowStatus();
+      checkIfFollowingMe();
+      checkFriendRequestStatus();
+      checkMutualFriendStatus();
     }
-  }, [userId, user?.id]);
+  }, [resolvedUserId, user?.id]);
 
   const loadProfile = async () => {
+    if (!resolvedUserId) return;
+    
     try {
       // Use public_profiles for viewing OTHER users' profiles (secure view)
       // Use profiles for viewing OWN profile (full access)
-      const isOwnProfile = userId === user?.id;
+      const isOwnProfile = resolvedUserId === user?.id;
       
       let profileData: any = null;
       let profileError: any = null;
@@ -115,7 +151,7 @@ const Profile = () => {
         const result = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', userId)
+          .eq('id', resolvedUserId)
           .maybeSingle();
         profileData = result.data;
         profileError = result.error;
@@ -123,7 +159,7 @@ const Profile = () => {
         const result = await supabase
           .from('public_profiles')
           .select('*')
-          .eq('id', userId)
+          .eq('id', resolvedUserId)
           .maybeSingle();
         profileData = result.data;
         profileError = result.error;
@@ -143,11 +179,11 @@ const Profile = () => {
 
       // Get post count
       const { data: postCount } = await supabase
-        .rpc('get_user_post_count', { user_uuid: userId });
+        .rpc('get_user_post_count', { user_uuid: resolvedUserId });
 
       // Get total likes
       const { data: totalLikes } = await supabase
-        .rpc('get_user_total_likes', { user_uuid: userId });
+        .rpc('get_user_total_likes', { user_uuid: resolvedUserId });
 
       if (profileData) {
         setProfile({
@@ -168,14 +204,14 @@ const Profile = () => {
   };
 
   const checkFollowStatus = async () => {
-    if (!user || !userId) return;
+    if (!user || !resolvedUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('follows')
         .select('id')
         .eq('follower_id', user.id)
-        .eq('following_id', userId)
+        .eq('following_id', resolvedUserId)
         .maybeSingle();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -186,13 +222,13 @@ const Profile = () => {
   };
 
   const checkIfFollowingMe = async () => {
-    if (!user || !userId) return;
+    if (!user || !resolvedUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('follows')
         .select('id')
-        .eq('follower_id', userId)
+        .eq('follower_id', resolvedUserId)
         .eq('following_id', user.id)
         .maybeSingle();
 
@@ -204,14 +240,14 @@ const Profile = () => {
   };
 
   const checkFriendRequestStatus = async () => {
-    if (!user) return;
+    if (!user || !resolvedUserId) return;
 
     try {
       const { data, error } = await supabase
         .from('friend_requests')
         .select('id')
         .eq('sender_id', user.id)
-        .eq('receiver_id', userId)
+        .eq('receiver_id', resolvedUserId)
         .eq('status', 'pending')
         .single();
 
@@ -223,12 +259,12 @@ const Profile = () => {
   };
 
   const checkMutualFriendStatus = async () => {
-    if (!user || !userId) return;
+    if (!user || !resolvedUserId) return;
 
     try {
       const { data, error } = await supabase.rpc('are_mutual_friends', {
         user_a: user.id,
-        user_b: userId
+        user_b: resolvedUserId
       });
 
       if (error) throw error;
@@ -258,7 +294,7 @@ const Profile = () => {
   };
 
   const toggleFollow = async () => {
-    if (!user) return;
+    if (!user || !resolvedUserId) return;
 
     try {
       if (isFollowing) {
@@ -266,12 +302,12 @@ const Profile = () => {
           .from('follows')
           .delete()
           .eq('follower_id', user.id)
-          .eq('following_id', userId);
+          .eq('following_id', resolvedUserId);
         setIsFollowing(false);
       } else {
         await supabase.from('follows').insert({
           follower_id: user.id,
-          following_id: userId,
+          following_id: resolvedUserId,
         });
         setIsFollowing(true);
       }
@@ -286,14 +322,14 @@ const Profile = () => {
   };
 
   const requestChat = async () => {
-    if (!user || !userId) return;
+    if (!user || !resolvedUserId) return;
 
     try {
       // First check if already mutual friends
       const { data: areFriends, error: friendCheckError } = await supabase
         .rpc('are_mutual_friends', {
           user_a: user.id,
-          user_b: userId
+          user_b: resolvedUserId
         });
 
       if (friendCheckError) throw friendCheckError;
@@ -301,7 +337,7 @@ const Profile = () => {
       if (areFriends) {
         // If already friends, create/open conversation
         const { data: conversationId, error } = await supabase.rpc('create_conversation', {
-          other_user_id: userId
+          other_user_id: resolvedUserId
         });
 
         if (error) throw error;
@@ -312,7 +348,7 @@ const Profile = () => {
           .from('friend_requests')
           .insert({
             sender_id: user.id,
-            receiver_id: userId,
+            receiver_id: resolvedUserId,
             status: 'pending'
           });
 
@@ -331,7 +367,7 @@ const Profile = () => {
           await supabase
             .from('notifications')
             .insert({
-              user_id: userId,
+              user_id: resolvedUserId,
               from_user_id: user.id,
               type: 'friend_request',
               title: 'New friend request',
@@ -359,11 +395,11 @@ const Profile = () => {
   };
 
   const startConversation = async () => {
-    if (!user || !userId) return;
+    if (!user || !resolvedUserId) return;
 
     try {
       const { data: conversationId, error } = await supabase.rpc('create_conversation', {
-        other_user_id: userId
+        other_user_id: resolvedUserId
       });
 
       if (error) throw error;
@@ -768,7 +804,7 @@ const Profile = () => {
                 Posts ({profile.post_count})
               </h3>
             </div>
-            <PostsGrid userId={userId || ''} />
+            <PostsGrid userId={resolvedUserId || ''} />
           </div>
 
           {/* View History - Only for own profile */}
@@ -914,7 +950,7 @@ const Profile = () => {
       <FollowersModal
         open={showFollowersModal}
         onClose={() => setShowFollowersModal(false)}
-        userId={userId || ''}
+        userId={resolvedUserId || ''}
         defaultTab={followersModalTab}
       />
 
