@@ -132,11 +132,9 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
 
     try {
       const { data, error } = await supabase.rpc('send_gift', {
-        p_sender_id: user.id,
-        p_recipient_id: recipientId,
         p_post_id: postId,
         p_gift_type: gift.label,
-        p_cost: gift.cost,
+        p_credit_value: gift.cost,
       });
 
       if (error) {
