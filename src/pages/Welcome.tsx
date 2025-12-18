@@ -1,13 +1,44 @@
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Users, Video, MessageCircle } from 'lucide-react';
+import { Sparkles, Users, Video, MessageCircle, Link2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const [sharedContent, setSharedContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check if user was redirected from a shared link
+    const redirectPath = sessionStorage.getItem('redirectAfterAuth');
+    if (redirectPath) {
+      if (redirectPath.includes('/post/')) {
+        setSharedContent('post');
+      } else if (redirectPath.includes('/story/')) {
+        setSharedContent('story');
+      } else if (redirectPath.includes('/live/')) {
+        setSharedContent('live stream');
+      } else if (redirectPath.includes('/profile/')) {
+        setSharedContent('profile');
+      }
+    }
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-background to-secondary/20 p-6">
       <div className="max-w-md w-full space-y-8 text-center">
+        {/* Shared Content Notice */}
+        {sharedContent && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-center gap-2 text-primary mb-2">
+              <Link2 className="w-5 h-5" />
+              <span className="font-semibold">Shared Content</span>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Sign in to view this {sharedContent}
+            </p>
+          </div>
+        )}
+
         {/* Logo/Brand */}
         <div className="space-y-2">
           <div className="flex justify-center">
@@ -50,7 +81,7 @@ export default function Welcome() {
             className="w-full h-12 text-base"
             size="lg"
           >
-            Sign Up
+            {sharedContent ? 'Sign Up to View' : 'Sign Up'}
           </Button>
           <Button 
             onClick={() => navigate('/auth')} 
@@ -58,7 +89,7 @@ export default function Welcome() {
             className="w-full h-12 text-base"
             size="lg"
           >
-            Sign In
+            {sharedContent ? 'Sign In to View' : 'Sign In'}
           </Button>
         </div>
 
