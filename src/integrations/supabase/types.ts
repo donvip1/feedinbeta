@@ -494,6 +494,92 @@ export type Database = {
         }
         Relationships: []
       }
+      creator_incentive_tiers: {
+        Row: {
+          bonus_percentage: number
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          max_earnings: number | null
+          min_earnings: number
+          period_type: string
+          tier_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          bonus_percentage?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_earnings?: number | null
+          min_earnings?: number
+          period_type?: string
+          tier_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          bonus_percentage?: number
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          max_earnings?: number | null
+          min_earnings?: number
+          period_type?: string
+          tier_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      creator_payouts: {
+        Row: {
+          bonus_amount: number
+          created_at: string | null
+          id: string
+          paid_at: string | null
+          period_end: string
+          period_start: string
+          status: string
+          tier_id: string | null
+          total_earnings: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          bonus_amount?: number
+          created_at?: string | null
+          id?: string
+          paid_at?: string | null
+          period_end: string
+          period_start: string
+          status?: string
+          tier_id?: string | null
+          total_earnings?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          bonus_amount?: number
+          created_at?: string | null
+          id?: string
+          paid_at?: string | null
+          period_end?: string
+          period_start?: string
+          status?: string
+          tier_id?: string | null
+          total_earnings?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creator_payouts_tier_id_fkey"
+            columns: ["tier_id"]
+            isOneToOne: false
+            referencedRelation: "creator_incentive_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_packages: {
         Row: {
           bonus_credits: number | null
@@ -2100,21 +2186,33 @@ export type Database = {
         Row: {
           balance: number
           created_at: string | null
+          gift_revenue: number | null
           id: string
+          p2p_fee_revenue: number | null
+          promotion_revenue: number | null
+          subscription_revenue: number | null
           total_earned: number
           updated_at: string | null
         }
         Insert: {
           balance?: number
           created_at?: string | null
+          gift_revenue?: number | null
           id?: string
+          p2p_fee_revenue?: number | null
+          promotion_revenue?: number | null
+          subscription_revenue?: number | null
           total_earned?: number
           updated_at?: string | null
         }
         Update: {
           balance?: number
           created_at?: string | null
+          gift_revenue?: number | null
           id?: string
+          p2p_fee_revenue?: number | null
+          promotion_revenue?: number | null
+          subscription_revenue?: number | null
           total_earned?: number
           updated_at?: string | null
         }
@@ -3616,6 +3714,7 @@ export type Database = {
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
+      get_credit_statistics: { Args: never; Returns: Json }
       get_expired_attachments: {
         Args: never
         Returns: {
@@ -3824,6 +3923,15 @@ export type Database = {
             }
             Returns: Json
           }
+      record_platform_revenue: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_from_user_id?: string
+          p_revenue_type: string
+        }
+        Returns: undefined
+      }
       record_post_view: { Args: { p_post_id: string }; Returns: undefined }
       send_gift: {
         Args: {
@@ -3844,6 +3952,7 @@ export type Database = {
         }
         Returns: Json
       }
+      sync_credit_supply: { Args: never; Returns: undefined }
       transfer_credits: {
         Args: { p_amount: number; p_recipient_username: string }
         Returns: undefined
