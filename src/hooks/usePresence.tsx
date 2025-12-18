@@ -64,6 +64,9 @@ export const usePresence = (userId?: string) => {
         presence: {
           key: user.id,
         },
+        broadcast: {
+          self: true, // Receive own broadcasts for immediate feedback
+        },
       },
     });
 
@@ -93,6 +96,7 @@ export const usePresence = (userId?: string) => {
         }
       })
       .on('presence', { event: 'join' }, ({ newPresences }) => {
+        console.log('[Presence] User joined:', newPresences);
         (newPresences as any[]).forEach((presence: any) => {
           const data = presence as PresenceData;
           if (data.user_id) {
@@ -110,6 +114,7 @@ export const usePresence = (userId?: string) => {
         });
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+        console.log('[Presence] User left:', leftPresences);
         (leftPresences as any[]).forEach((presence: any) => {
           const data = presence as PresenceData;
           if (data.user_id) {
@@ -132,6 +137,7 @@ export const usePresence = (userId?: string) => {
       })
       .subscribe(async (subscriptionStatus) => {
         if (subscriptionStatus === 'SUBSCRIBED') {
+          console.log('[Presence] Subscribed, tracking user');
           const currentSection = getCurrentSection();
           const presenceStatus: PresenceStatus = currentSection === 'messages' ? 'active' : 'online';
           
@@ -184,8 +190,8 @@ export const usePresence = (userId?: string) => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Heartbeat to keep presence alive
-    const heartbeatInterval = setInterval(updatePresence, 30000);
+    // Heartbeat to keep presence alive - more frequent for better responsiveness
+    const heartbeatInterval = setInterval(updatePresence, 15000);
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);

@@ -157,22 +157,24 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             filter: `conversation_id=eq.${conversationId}`,
           },
           async (payload: any) => {
-            console.log('[Realtime] New message received:', payload);
             const newMsg = payload?.new;
             if (!newMsg) return;
             
-            // Skip if we already have this message (optimistic update)
+            // Skip messages from current user - we handle those via optimistic update
+            // This prevents the flickering/duplicate issue
+            if (newMsg.sender_id === user?.id) {
+              console.log('[Realtime] Own message, handled optimistically');
+              return;
+            }
+            
+            console.log('[Realtime] New message from other user:', newMsg.id);
+            
+            // Add message from other user instantly
             setMessages(prev => {
+              // Double-check we don't already have it
               if (prev.some(m => m.id === newMsg.id)) {
-                console.log('[Realtime] Message already exists, skipping');
                 return prev;
               }
-              
-              // Fetch sender profile for the message
-              const isSelf = newMsg.sender_id === user?.id;
-              const senderProfile = isSelf 
-                ? { display_name: 'You', avatar_url: null }
-                : { display_name: otherUser?.display_name || 'Unknown', avatar_url: otherUser?.avatar_url || null };
               
               const formattedMsg: Message = {
                 id: newMsg.id,
@@ -183,24 +185,24 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                 media_type: newMsg.media_type || null,
                 reply_to_id: newMsg.reply_to_id || null,
                 reply_to_message: null,
-                profiles: senderProfile,
+                profiles: {
+                  display_name: otherUser?.display_name || 'Unknown',
+                  avatar_url: otherUser?.avatar_url || null
+                },
                 reactions: [],
                 read_receipts: [],
-                status: isSelf ? 'delivered' : 'sent',
+                status: 'sent',
                 is_pinned: false,
                 edited_at: null,
               };
               
-              console.log('[Realtime] Adding new message to state');
               return [...prev, formattedMsg];
             });
             
             scrollToBottom();
             
-            // Mark as read immediately if from other user (user is actively viewing)
-            if (newMsg.sender_id !== user?.id) {
-              markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
-            }
+            // Mark as read immediately since user is viewing the chat
+            markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
           }
         )
         .on(
