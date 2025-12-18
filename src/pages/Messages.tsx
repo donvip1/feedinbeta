@@ -158,6 +158,29 @@ export default function Messages() {
             });
           }
         )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages'
+          },
+          (payload: any) => {
+            const updatedMsg = payload?.new;
+            const oldMsg = payload?.old;
+            if (!updatedMsg) return;
+            
+            // If message was marked as read, decrement unread count
+            if (updatedMsg.is_read && !oldMsg?.is_read) {
+              const convId = updatedMsg.conversation_id;
+              setConversations(prev => prev.map(conv => 
+                conv.id === convId 
+                  ? { ...conv, unread_count: Math.max(0, (conv.unread_count || 0) - 1) }
+                  : conv
+              ));
+            }
+          }
+        )
         .subscribe();
 
       // Subscribe to typing indicators for all conversations
