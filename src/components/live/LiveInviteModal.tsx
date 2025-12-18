@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { UserPlus, Search, Clock, Check, X, Loader2 } from "lucide-react";
+import { sanitizeSearchQuery } from "@/lib/search-utils";
 
 interface LiveInviteModalProps {
   isOpen: boolean;
@@ -96,10 +97,11 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId }: LiveInviteModalPr
 
     setSearching(true);
     try {
+      const safeQuery = sanitizeSearchQuery(searchQuery);
       const { data } = await supabase
         .from("profiles")
         .select("id, display_name, username, avatar_url")
-        .or(`username.ilike.%${searchQuery}%,display_name.ilike.%${searchQuery}%`)
+        .or(`username.ilike.%${safeQuery}%,display_name.ilike.%${safeQuery}%`)
         .neq("id", user?.id)
         .limit(10);
 

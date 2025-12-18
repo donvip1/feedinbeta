@@ -12,6 +12,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { Search, UserPlus, Check, X, ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import feedinLogo from '@/assets/feedin-logo.png';
+import { sanitizeSearchQuery } from '@/lib/search-utils';
 
 interface Profile {
   id: string;
@@ -145,11 +146,12 @@ const Friends = () => {
 
     setSearching(true);
     try {
+      const safeQuery = sanitizeSearchQuery(query);
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .neq('id', user?.id)
-        .or(`display_name.ilike.%${query}%,username.ilike.%${query}%`)
+        .or(`display_name.ilike.%${safeQuery}%,username.ilike.%${safeQuery}%`)
         .limit(10);
 
       if (error) throw error;

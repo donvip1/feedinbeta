@@ -21,6 +21,15 @@ serve(async (req) => {
       );
     }
 
+    // Sanitize and validate query length to prevent DoS
+    const MAX_QUERY_LENGTH = 100;
+    const sanitizedQuery = query.trim().substring(0, MAX_QUERY_LENGTH);
+    
+    // Escape special ILIKE pattern characters
+    const sanitizeForIlike = (input: string): string => {
+      return input.replace(/[%_\\]/g, '\\$&');
+    };
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
@@ -115,28 +124,29 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(20);
 
-    // Apply filters based on intent
+    // Apply filters based on intent with sanitized inputs
     switch (searchIntent) {
       case 'username':
-        const userSearchTerm = extractedTerms[0] || query;
+        const userSearchTerm = sanitizeForIlike(extractedTerms[0] || sanitizedQuery);
         postsQuery = postsQuery.or(
           `profiles.username.ilike.%${userSearchTerm}%,profiles.display_name.ilike.%${userSearchTerm}%`
         );
         break;
       
       case 'hashtag':
-        const hashtagTerm = extractedTerms[0] || query.replace('#', '');
+        const hashtagTerm = sanitizeForIlike(extractedTerms[0] || sanitizedQuery.replace('#', ''));
         postsQuery = postsQuery.ilike('content', `%#${hashtagTerm}%`);
         break;
       
       case 'category':
       case 'general':
       default:
-        // Search across content, usernames, and display names
-        const searchTerms = extractedTerms.length > 0 ? extractedTerms : [query];
-        const orConditions = searchTerms.map(term => 
-          `content.ilike.%${term}%,profiles.username.ilike.%${term}%,profiles.display_name.ilike.%${term}%`
-        ).join(',');
+        // Search across content, usernames, and display names with sanitized terms
+        const searchTerms = extractedTerms.length > 0 ? extractedTerms : [sanitizedQuery];
+        const orConditions = searchTerms.map(term => {
+          const safeTerm = sanitizeForIlike(term);
+          return `content.ilike.%${safeTerm}%,profiles.username.ilike.%${safeTerm}%,profiles.display_name.ilike.%${safeTerm}%`;
+        }).join(',');
         postsQuery = postsQuery.or(orConditions);
         break;
     }

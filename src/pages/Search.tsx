@@ -9,6 +9,7 @@ import PostCard from '@/components/feed/PostCard';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { sanitizeSearchQuery } from '@/lib/search-utils';
 
 const Search = () => {
   const navigate = useNavigate();
@@ -33,9 +34,12 @@ const Search = () => {
     try {
       let postsData: any[] = [];
 
+      // Sanitize search input
+      const safeQuery = sanitizeSearchQuery(query);
+      
       // Check if searching for a hashtag
       if (query.trim().startsWith('#')) {
-        const hashtagName = query.trim().slice(1).toLowerCase();
+        const hashtagName = sanitizeSearchQuery(query.trim().slice(1).toLowerCase());
         
         // Find hashtag
         const { data: hashtagData } = await supabase
@@ -73,7 +77,7 @@ const Search = () => {
           }
         }
       } else {
-        // Search posts by content
+        // Search posts by content with sanitized query
         const { data: posts } = await supabase
           .from('posts')
           .select(`
@@ -84,7 +88,7 @@ const Search = () => {
               avatar_url
             )
           `)
-          .ilike('content', `%${query}%`)
+          .ilike('content', `%${safeQuery}%`)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(20);
@@ -92,18 +96,19 @@ const Search = () => {
         postsData = posts || [];
       }
 
-      // Search users
+      // Search users with sanitized query
+      const safeUserQuery = sanitizeSearchQuery(query.replace('#', ''));
       const { data: usersData } = await supabase
         .from('profiles')
         .select('*')
-        .or(`username.ilike.%${query.replace('#', '')}%,display_name.ilike.%${query.replace('#', '')}%`)
+        .or(`username.ilike.%${safeUserQuery}%,display_name.ilike.%${safeUserQuery}%`)
         .limit(20);
 
-      // Search hashtags
+      // Search hashtags with sanitized query
       const { data: hashtagsData } = await supabase
         .from('hashtags')
         .select('*')
-        .ilike('name', `%${query.replace('#', '')}%`)
+        .ilike('name', `%${safeUserQuery}%`)
         .order('posts_count', { ascending: false })
         .limit(20);
 
