@@ -13,7 +13,7 @@ import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus } from 'lucide-react';
+import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket } from 'lucide-react';
 import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
 
@@ -757,7 +757,15 @@ const Profile = () => {
                 className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg"
               >
                 <Bookmark className="w-4 h-4 mr-2" />
-                Saved Posts
+                Saved
+              </Button>
+              <Button
+                onClick={() => navigate('/promotions')}
+                variant="outline"
+                className="flex-1 border-primary/50 text-primary hover:bg-primary/10"
+              >
+                <Rocket className="w-4 h-4 mr-2" />
+                Promotions
               </Button>
             </div>
           ) : (

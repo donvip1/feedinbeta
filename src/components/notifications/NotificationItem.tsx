@@ -141,6 +141,16 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         }
         break;
         
+      case 'promotion':
+      case 'promotion_reward':
+        // Navigate to the promoted post
+        if (notification.related_id) {
+          navigate(`/post/${notification.related_id}`);
+        } else {
+          navigate('/promotions');
+        }
+        break;
+        
       case 'live_invite':
         // Navigate to live stream
         if (notification.related_id) {
