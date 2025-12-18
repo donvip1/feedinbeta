@@ -349,52 +349,6 @@ export type Database = {
           },
         ]
       }
-      comment_reactions: {
-        Row: {
-          comment_id: string
-          created_at: string | null
-          id: string
-          reaction_type: string
-          user_id: string
-        }
-        Insert: {
-          comment_id: string
-          created_at?: string | null
-          id?: string
-          reaction_type: string
-          user_id: string
-        }
-        Update: {
-          comment_id?: string
-          created_at?: string | null
-          id?: string
-          reaction_type?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "comment_reactions_comment_id_fkey"
-            columns: ["comment_id"]
-            isOneToOne: false
-            referencedRelation: "post_comments"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comment_reactions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "comment_reactions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "public_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       content_flags: {
         Row: {
           auto_action_taken: string | null
@@ -2073,44 +2027,6 @@ export type Database = {
         }
         Relationships: []
       }
-      post_analytics: {
-        Row: {
-          hourly_comments: number | null
-          hourly_likes: number | null
-          hourly_shares: number | null
-          hourly_views: number | null
-          id: string
-          last_calculated: string | null
-          post_id: string | null
-        }
-        Insert: {
-          hourly_comments?: number | null
-          hourly_likes?: number | null
-          hourly_shares?: number | null
-          hourly_views?: number | null
-          id?: string
-          last_calculated?: string | null
-          post_id?: string | null
-        }
-        Update: {
-          hourly_comments?: number | null
-          hourly_likes?: number | null
-          hourly_shares?: number | null
-          hourly_views?: number | null
-          id?: string
-          last_calculated?: string | null
-          post_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "post_analytics_post_id_fkey"
-            columns: ["post_id"]
-            isOneToOne: true
-            referencedRelation: "posts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       post_comments: {
         Row: {
           content: string
@@ -2716,35 +2632,6 @@ export type Database = {
         }
         Relationships: []
       }
-      refeeds: {
-        Row: {
-          created_at: string
-          id: string
-          original_post_id: string
-          refed_by_user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          original_post_id: string
-          refed_by_user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          original_post_id?: string
-          refed_by_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "refeeds_original_post_id_fkey"
-            columns: ["original_post_id"]
-            isOneToOne: false
-            referencedRelation: "posts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       referral_codes: {
         Row: {
           code: string
@@ -3082,38 +2969,6 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
-      }
-      trending_posts: {
-        Row: {
-          calculated_at: string | null
-          engagement_score: number | null
-          id: string
-          post_id: string | null
-          trending_rank: number | null
-        }
-        Insert: {
-          calculated_at?: string | null
-          engagement_score?: number | null
-          id?: string
-          post_id?: string | null
-          trending_rank?: number | null
-        }
-        Update: {
-          calculated_at?: string | null
-          engagement_score?: number | null
-          id?: string
-          post_id?: string | null
-          trending_rank?: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "trending_posts_post_id_fkey"
-            columns: ["post_id"]
-            isOneToOne: true
-            referencedRelation: "posts"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       typing_indicators: {
         Row: {
