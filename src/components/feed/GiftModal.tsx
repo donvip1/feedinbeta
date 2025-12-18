@@ -80,13 +80,13 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId }: Gift
             <Button
               key={gift.label}
               variant="outline"
-              className="flex flex-col items-center gap-3 h-auto py-6 rounded-2xl border-2 hover:border-primary hover:scale-105 transition-all animate-in fade-in slide-in-from-bottom-4"
-              style={{ animationDelay: `${index * 100}ms` }}
+              className="emoji-reaction-btn flex flex-col items-center gap-3 h-auto py-6 rounded-2xl border-2 hover:border-primary hover:scale-105 transition-all"
+              style={{ animationDelay: `${index * 50}ms` }}
               onClick={() => handleSendGift(gift.label, gift.cost)}
               disabled={sending}
             >
               <div className="w-14 h-14 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center">
-                <gift.icon className="w-8 h-8 text-primary" />
+                <gift.icon className="w-8 h-8 text-primary emoji-pop" />
               </div>
               <div>
                 <div className="text-sm font-bold">{gift.label}</div>

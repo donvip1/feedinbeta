@@ -13,6 +13,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { WaveformPlayer } from './WaveformPlayer';
 import { cn } from '@/lib/utils';
+import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
 
 interface MessageBubbleProps {
   message: {
@@ -68,7 +69,7 @@ interface MessageBubbleProps {
   onForward?: (messageId: string) => void;
 }
 
-const EMOJI_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥', '🎉', '💯'];
+// Using the system-wide DEFAULT_EMOJIS
 
 export const ModernMessageBubble = ({ 
   message, 
@@ -374,18 +375,19 @@ export const ModernMessageBubble = ({
                   <Smile className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-2 rounded-2xl" side={isOwn ? "left" : "right"}>
+              <PopoverContent className="w-auto p-1.5 rounded-full bg-background/95 backdrop-blur-xl border-border/50" side={isOwn ? "left" : "right"}>
                 <div className="flex gap-0.5">
-                  {EMOJI_REACTIONS.map((emoji) => (
+                  {DEFAULT_EMOJIS.map((emoji, index) => (
                     <button
                       key={emoji}
                       onClick={() => {
                         onReact(message.id, emoji);
                         setShowReactions(false);
                       }}
-                      className="text-xl p-1.5 rounded-full hover:bg-accent hover:scale-125 transition-all duration-200"
+                      className="emoji-reaction-btn text-xl p-1.5 rounded-full hover:bg-muted/50 hover:scale-125 active:scale-90 transition-all duration-200"
+                      style={{ animationDelay: `${index * 30}ms` }}
                     >
-                      {emoji}
+                      <span className="emoji-pop">{emoji}</span>
                     </button>
                   ))}
                 </div>
@@ -453,11 +455,11 @@ export const ModernMessageBubble = ({
                 <button
                   key={emoji}
                   onClick={() => onReact(message.id, emoji)}
-                  className="flex items-center gap-0.5 px-1.5 py-0.5 bg-background border border-border/50 rounded-full text-xs hover:scale-105 hover:border-primary/30 transition-all shadow-sm"
+                  className="reaction-sent flex items-center gap-0.5 px-1.5 py-0.5 bg-background/90 backdrop-blur-sm border border-border/50 rounded-full text-xs hover:scale-110 hover:border-primary/30 transition-all shadow-sm"
                   title={reactions.map(r => r.user.display_name).join(', ')}
                 >
-                  <span>{emoji}</span>
-                  <span className="text-muted-foreground">{reactions.length}</span>
+                  <span className="emoji-pop">{emoji}</span>
+                  <span className="text-muted-foreground font-medium">{reactions.length}</span>
                 </button>
               ))}
             </div>

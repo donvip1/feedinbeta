@@ -87,6 +87,103 @@
 All colors MUST be HSL.
 */
 
+/* Telegram-style emoji reaction animations */
+@keyframes emoji-pop {
+  0% {
+    transform: scale(0) rotate(-15deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.3) rotate(5deg);
+  }
+  70% {
+    transform: scale(0.9) rotate(-2deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes floating-emoji {
+  0% {
+    transform: scale(0.5) translateY(0);
+    opacity: 0;
+  }
+  20% {
+    transform: scale(1.2) translateY(-20px);
+    opacity: 1;
+  }
+  40% {
+    transform: scale(1) translateY(-60px);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.8) translateY(-150px);
+    opacity: 0;
+  }
+}
+
+@keyframes reaction-bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.3);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  75% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes emoji-wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(10deg);
+  }
+  75% {
+    transform: rotate(-5deg);
+  }
+}
+
+.emoji-reaction-btn {
+  animation: emoji-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  animation-fill-mode: backwards;
+}
+
+.emoji-pop {
+  display: inline-block;
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.emoji-reaction-btn:hover .emoji-pop {
+  animation: emoji-wiggle 0.4s ease-in-out;
+}
+
+.emoji-reaction-btn:active .emoji-pop {
+  transform: scale(0.85);
+}
+
+.floating-emoji {
+  animation: floating-emoji 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.reaction-sent {
+  animation: reaction-bounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Emoji picker container animations */
+.emoji-picker-container {
+  transform-origin: bottom center;
+}
 
 @layer base {
   * {

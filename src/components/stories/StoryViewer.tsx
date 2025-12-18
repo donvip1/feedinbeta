@@ -8,6 +8,7 @@ import { X, ChevronLeft, ChevronRight, Trash2, Volume2, VolumeX, Send, Eye, More
 import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { StoryViewersList } from './StoryViewersList';
+import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
 
 interface Story {
   id: string;
@@ -42,8 +43,7 @@ interface StoryViewerProps {
   onStoryChange: () => void;
 }
 
-// Telegram-style emoji reactions
-const EMOJI_REACTIONS = ['❤️', '🔥', '😍', '👏', '😂', '😮', '😢', '🎉'];
+// Using system-wide DEFAULT_EMOJIS
 
 export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: StoryViewerProps) => {
   const { user } = useAuth();
@@ -472,8 +472,8 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
 
         {/* Reaction animation overlay */}
         {sentReaction && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
-            <div className="animate-bounce text-8xl">{sentReaction}</div>
+          <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
+            <div className="floating-emoji text-8xl">{sentReaction}</div>
           </div>
         )}
 
@@ -493,14 +493,15 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
               {/* Emoji reaction bar - Telegram style */}
               {showEmojiPicker && (
                 <div className="flex justify-center animate-in slide-in-from-bottom-4 duration-200">
-                  <div className="flex gap-2 bg-black/60 backdrop-blur-md rounded-full px-3 py-2">
-                    {EMOJI_REACTIONS.map((emoji) => (
+                  <div className="flex gap-1 bg-black/70 backdrop-blur-xl rounded-full px-2 py-1.5 shadow-lg">
+                    {DEFAULT_EMOJIS.map((emoji, index) => (
                       <button
                         key={emoji}
                         onClick={() => handleReaction(emoji)}
-                        className="text-2xl hover:scale-125 transition-transform active:scale-90"
+                        className="emoji-reaction-btn text-2xl p-1.5 rounded-full hover:bg-white/10 hover:scale-125 active:scale-90 transition-all duration-200"
+                        style={{ animationDelay: `${index * 30}ms` }}
                       >
-                        {emoji}
+                        <span className="emoji-pop">{emoji}</span>
                       </button>
                     ))}
                   </div>
