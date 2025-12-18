@@ -26,11 +26,26 @@ interface Post {
   views_count: number;
   comments_count: number;
   shares_count: number;
+  post_type: string | null;
+  original_post_id: string | null;
+  user_id: string;
   profiles: {
     display_name: string | null;
     username: string | null;
     avatar_url: string | null;
   };
+  original_post?: {
+    id: string;
+    user_id: string;
+    content: string | null;
+    media_url: string | null;
+    media_type: string | null;
+    profiles?: {
+      display_name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+    };
+  } | null;
 }
 
 interface PromotionPlan {
@@ -167,7 +182,30 @@ const Promote = () => {
         .single();
 
       if (error) throw error;
-      setPost(data);
+      
+      // If it's a refeed/quote, fetch original post data
+      if (data.original_post_id) {
+        const { data: originalData } = await supabase
+          .from('posts')
+          .select(`
+            id,
+            user_id,
+            content,
+            media_url,
+            media_type,
+            profiles (
+              display_name,
+              username,
+              avatar_url
+            )
+          `)
+          .eq('id', data.original_post_id)
+          .single();
+        
+        (data as any).original_post = originalData;
+      }
+      
+      setPost(data as Post);
     } catch (error: any) {
       toast({
         title: 'Error loading post',
@@ -194,24 +232,39 @@ const Promote = () => {
 
     setPromoting(true);
     try {
+      // Determine if we're promoting someone else's content
+      const isPromotingOthersContent = post?.original_post && user?.id !== post.original_post.user_id;
+      const originalAuthorId = post?.original_post?.user_id || null;
+
       const { data, error } = await supabase.rpc('promote_post', {
         p_post_id: postId,
         p_plan_name: plan.name,
         p_cost: plan.cost,
+        p_original_author_id: originalAuthorId,
       });
 
       if (error) throw error;
 
-      const result = data as { success: boolean; new_balance?: number } | null;
+      const result = data as { 
+        success: boolean; 
+        new_balance?: number;
+        original_author_credited?: boolean;
+        author_credit?: number;
+      } | null;
+      
       if (result?.new_balance !== undefined) {
         setCredits(result.new_balance);
       } else {
         setCredits(credits - plan.cost);
       }
 
+      const authorName = post?.original_post?.profiles?.display_name || post?.original_post?.profiles?.username || 'the creator';
+      
       toast({
         title: '🚀 Post Promoted!',
-        description: `Your post is now boosted with ${plan.name}. Reach: ${plan.reach} users for ${plan.duration}.`,
+        description: isPromotingOthersContent 
+          ? `You promoted ${authorName}'s content! They earned ${result?.author_credit || Math.floor(plan.cost * 0.2)} credits. Reach: ${plan.reach} users.`
+          : `Your post is now boosted with ${plan.name}. Reach: ${plan.reach} users for ${plan.duration}.`,
       });
 
       setTimeout(() => navigate('/feed'), 2000);
@@ -295,33 +348,88 @@ const Promote = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-4xl">
+        {/* Attribution Notice for promoting others' content */}
+        {post.original_post && user?.id !== post.original_post.user_id && (
+          <Card className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-emerald-500/30 p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white">
+                <Users className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-2">
+                  <Heart className="w-4 h-4" />
+                  Supporting a Creator
+                </h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You're promoting <span className="font-semibold text-foreground">
+                    {post.original_post.profiles?.display_name || post.original_post.profiles?.username || 'a creator'}
+                  </span>'s content. They'll receive <span className="font-semibold text-emerald-600 dark:text-emerald-400">20% of your promotion cost</span> as attribution credits, plus all engagement benefits.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* Post Preview Card */}
         <Card className="bg-card/50 backdrop-blur border-border p-4 mb-6 overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-accent/5" />
           <div className="relative">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold">
-                {post.profiles?.display_name?.[0] || 'U'}
+            {/* Show original creator for refeeds */}
+            {post.original_post ? (
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold">
+                  {post.original_post.profiles?.display_name?.[0] || 'U'}
+                </div>
+                <div>
+                  <p className="font-semibold">{post.original_post.profiles?.display_name || 'Creator'}</p>
+                  <p className="text-xs text-muted-foreground">@{post.original_post.profiles?.username || 'user'} · Original Creator</p>
+                </div>
+                <Badge variant="secondary" className="ml-auto">Original Post</Badge>
               </div>
-              <div>
-                <p className="font-semibold">{post.profiles?.display_name || 'User'}</p>
-                <p className="text-xs text-muted-foreground">@{post.profiles?.username || 'user'}</p>
+            ) : (
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-bold">
+                  {post.profiles?.display_name?.[0] || 'U'}
+                </div>
+                <div>
+                  <p className="font-semibold">{post.profiles?.display_name || 'User'}</p>
+                  <p className="text-xs text-muted-foreground">@{post.profiles?.username || 'user'}</p>
+                </div>
+                <Badge variant="secondary" className="ml-auto">Preview</Badge>
               </div>
-              <Badge variant="secondary" className="ml-auto">Preview</Badge>
-            </div>
-            
-            {post.content && post.media_type !== 'text_styled' && (
-              <p className="text-sm mb-3 line-clamp-2">{post.content}</p>
             )}
             
-            {post.media_url && post.media_type !== 'text_styled' && (
-              <div className="relative h-40 rounded-xl overflow-hidden bg-muted mb-3">
-                {post.media_type === 'image' ? (
-                  <img src={post.media_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <video src={post.media_url} className="w-full h-full object-cover" />
+            {/* Show original content for refeeds */}
+            {post.original_post ? (
+              <>
+                {post.original_post.content && (
+                  <p className="text-sm mb-3 line-clamp-2">{post.original_post.content}</p>
                 )}
-              </div>
+                {post.original_post.media_url && (
+                  <div className="relative h-40 rounded-xl overflow-hidden bg-muted mb-3">
+                    {post.original_post.media_type === 'image' ? (
+                      <img src={post.original_post.media_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={post.original_post.media_url} className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {post.content && post.media_type !== 'text_styled' && (
+                  <p className="text-sm mb-3 line-clamp-2">{post.content}</p>
+                )}
+                {post.media_url && post.media_type !== 'text_styled' && (
+                  <div className="relative h-40 rounded-xl overflow-hidden bg-muted mb-3">
+                    {post.media_type === 'image' ? (
+                      <img src={post.media_url} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <video src={post.media_url} className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                )}
+              </>
             )}
             
             {/* Current Stats */}
@@ -580,7 +688,10 @@ const Promote = () => {
               ) : (
                 <span className="flex items-center gap-2">
                   <Rocket className="w-5 h-5" />
-                  Boost Now for {currentPlan?.cost} Credits
+                  {post?.original_post && user?.id !== post.original_post.user_id
+                    ? `Support Creator for ${currentPlan?.cost} Credits`
+                    : `Boost Now for ${currentPlan?.cost} Credits`
+                  }
                 </span>
               )}
             </Button>
