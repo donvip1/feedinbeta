@@ -29,7 +29,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
   const navigate = useNavigate();
 
   const handleClick = async () => {
-    // Mark as read
+    // Mark as read immediately
     if (!notification.is_read) {
       await supabase
         .from('notifications')
@@ -38,40 +38,125 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
       onUpdate();
     }
 
-    // Navigate based on type
-    if (notification.type === 'friend_request') {
-      // For friend requests, navigate to Friends page
-      navigate('/friends');
-    } else if (notification.type === 'like' && notification.related_id) {
-      // For likes, get the post ID and navigate to it
-      navigate('/feed', { state: { postId: notification.related_id } });
-    } else if ((notification.type === 'comment' || notification.type === 'reply') && notification.related_id) {
-      // For comments and replies, get the comment to find the post_id
-      try {
-        const { data: comment } = await supabase
-          .from('post_comments')
-          .select('post_id')
-          .eq('id', notification.related_id)
-          .single();
+    // Navigate directly to the exact content based on type
+    switch (notification.type) {
+      case 'friend_request':
+        navigate('/friends');
+        break;
         
-        if (comment?.post_id) {
-          navigate('/feed', { state: { postId: comment.post_id, commentId: notification.related_id } });
+      case 'like':
+        // Navigate directly to the post
+        if (notification.related_id) {
+          navigate(`/post/${notification.related_id}`);
         }
-      } catch (error) {
-        console.error('Error fetching comment:', error);
-        navigate('/feed');
-      }
-    } else if (notification.type === 'message' && notification.related_id) {
-      // For messages, navigate to the specific conversation
-      navigate('/messages', { state: { conversationId: notification.related_id } });
-    } else if ((notification.type === 'follow' || notification.related_type === 'profile') && notification.related_id) {
-      // For follows, navigate to the user's profile
-      navigate(`/profile/${notification.related_id}`);
-    } else if (notification.related_type === 'post' && notification.related_id) {
-      navigate('/feed', { state: { postId: notification.related_id } });
-    } else {
-      // Default navigation
-      navigate('/feed');
+        break;
+        
+      case 'comment':
+      case 'reply':
+        // Navigate to the post with the comment - fetch post_id from comment
+        if (notification.related_id) {
+          try {
+            const { data: comment } = await supabase
+              .from('post_comments')
+              .select('post_id')
+              .eq('id', notification.related_id)
+              .single();
+            
+            if (comment?.post_id) {
+              navigate(`/post/${comment.post_id}`, { 
+                state: { openComments: true, highlightComment: notification.related_id } 
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching comment:', error);
+          }
+        }
+        break;
+        
+      case 'message':
+        // Navigate directly to the conversation
+        if (notification.related_id) {
+          navigate('/messages', { state: { conversationId: notification.related_id } });
+        }
+        break;
+        
+      case 'story_reply':
+      case 'story_reaction':
+        // Navigate to the story
+        if (notification.related_id) {
+          navigate(`/story/${notification.related_id}`);
+        }
+        break;
+        
+      case 'follow':
+        // Navigate to the user's profile who followed
+        if (notification.related_id) {
+          navigate(`/profile/${notification.related_id}`);
+        }
+        break;
+        
+      case 'gift':
+      case 'gift_received':
+        // Navigate to the post where gift was sent
+        if (notification.related_id) {
+          navigate(`/post/${notification.related_id}`);
+        }
+        break;
+        
+      case 'live_gift':
+        // Navigate to live stream
+        if (notification.related_id) {
+          navigate(`/live/${notification.related_id}`);
+        }
+        break;
+        
+      case 'mention':
+        // Navigate to the post or comment where mentioned
+        if (notification.related_type === 'post' && notification.related_id) {
+          navigate(`/post/${notification.related_id}`);
+        } else if (notification.related_type === 'comment' && notification.related_id) {
+          try {
+            const { data: comment } = await supabase
+              .from('post_comments')
+              .select('post_id')
+              .eq('id', notification.related_id)
+              .single();
+            
+            if (comment?.post_id) {
+              navigate(`/post/${comment.post_id}`, { 
+                state: { openComments: true, highlightComment: notification.related_id } 
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching comment for mention:', error);
+          }
+        }
+        break;
+        
+      case 'refeed':
+      case 'quote':
+        // Navigate to the refeed/quote post
+        if (notification.related_id) {
+          navigate(`/post/${notification.related_id}`);
+        }
+        break;
+        
+      case 'live_invite':
+        // Navigate to live stream
+        if (notification.related_id) {
+          navigate(`/live/${notification.related_id}`);
+        }
+        break;
+        
+      default:
+        // Fallback: if related_type is post, navigate to post
+        if (notification.related_type === 'post' && notification.related_id) {
+          navigate(`/post/${notification.related_id}`);
+        } else if (notification.related_type === 'profile' && notification.related_id) {
+          navigate(`/profile/${notification.related_id}`);
+        } else {
+          navigate('/feed');
+        }
     }
     
     onClose();
@@ -94,7 +179,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
     <button
       onClick={handleClick}
       className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors text-left ${
-        !notification.is_read ? 'bg-accent/50' : ''
+        !notification.is_read ? 'bg-accent/50 font-semibold' : ''
       }`}
     >
       <Avatar className="w-10 h-10">
@@ -105,7 +190,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
       </Avatar>
 
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm">{notification.title}</p>
+        <p className={`text-sm ${!notification.is_read ? 'font-semibold' : ''}`}>{notification.title}</p>
         {notification.message && (
           <p className="text-sm text-muted-foreground line-clamp-2">
             {notification.message}
