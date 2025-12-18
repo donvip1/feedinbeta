@@ -35,6 +35,8 @@ const PostDetail = () => {
             content,
             media_url,
             media_type,
+            media_urls,
+            media_types,
             created_at,
             profiles:user_id (
               id,
