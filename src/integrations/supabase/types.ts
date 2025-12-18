@@ -3119,6 +3119,7 @@ export type Database = {
           description: string | null
           id: string
           source_id: string | null
+          source_type: string | null
           transaction_type: string
         }
         Insert: {
@@ -3127,6 +3128,7 @@ export type Database = {
           description?: string | null
           id?: string
           source_id?: string | null
+          source_type?: string | null
           transaction_type: string
         }
         Update: {
@@ -3135,6 +3137,7 @@ export type Database = {
           description?: string | null
           id?: string
           source_id?: string | null
+          source_type?: string | null
           transaction_type?: string
         }
         Relationships: []
