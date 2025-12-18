@@ -18,9 +18,13 @@ export class WebRTCManager {
   private iceCandidatesQueue: RTCIceCandidate[] = [];
   private isNegotiating = false;
   private hasReceivedOffer = false;
+  private hasReceivedAnswer = false;
   private connectionTimeout: NodeJS.Timeout | null = null;
+  private offerRetryTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 3;
+  private offerRetryCount = 0;
+  private maxOfferRetries = 3;
 
   private readonly rtcConfig: RTCConfiguration = {
     iceServers: [
@@ -290,6 +294,13 @@ export class WebRTCManager {
           return;
         }
         
+        // Clear offer retry timeout since we got an answer
+        if (this.offerRetryTimeout) {
+          clearTimeout(this.offerRetryTimeout);
+          this.offerRetryTimeout = null;
+        }
+        this.hasReceivedAnswer = true;
+        
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
         console.log('[WebRTC] Remote description set (answer)');
         
@@ -332,9 +343,14 @@ export class WebRTCManager {
       return;
     }
 
-    // Don't create offer if we already received one
+    // Don't create offer if we already received one or got an answer
     if (this.hasReceivedOffer) {
       console.log('[WebRTC] Already received offer, not creating one');
+      return;
+    }
+    
+    if (this.hasReceivedAnswer) {
+      console.log('[WebRTC] Already received answer, not resending offer');
       return;
     }
 
@@ -345,7 +361,7 @@ export class WebRTCManager {
 
     try {
       this.isNegotiating = true;
-      console.log('[WebRTC] Creating offer...');
+      console.log('[WebRTC] Creating offer (attempt', this.offerRetryCount + 1, ')...');
       
       const offer = await this.peerConnection.createOffer({
         offerToReceiveAudio: true,
@@ -360,6 +376,18 @@ export class WebRTCManager {
         sdp: { type: offer.type, sdp: offer.sdp },
         from: this.userId,
       });
+      
+      // Set up retry if no answer received within 5 seconds
+      if (this.offerRetryCount < this.maxOfferRetries) {
+        this.offerRetryTimeout = setTimeout(() => {
+          if (!this.hasReceivedAnswer && this.peerConnection) {
+            console.log('[WebRTC] No answer received, retrying offer...');
+            this.offerRetryCount++;
+            this.isNegotiating = false;
+            this.createAndSendOffer();
+          }
+        }, 5000);
+      }
       
     } catch (error) {
       console.error('[WebRTC] Error creating offer:', error);
@@ -398,10 +426,15 @@ export class WebRTCManager {
   async cleanup() {
     console.log('[WebRTC] Cleaning up...');
     
-    // Clear timeout
+    // Clear timeouts
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
+    }
+    
+    if (this.offerRetryTimeout) {
+      clearTimeout(this.offerRetryTimeout);
+      this.offerRetryTimeout = null;
     }
 
     // Stop all local tracks
@@ -424,7 +457,9 @@ export class WebRTCManager {
     this.localStream = null;
     this.iceCandidatesQueue = [];
     this.hasReceivedOffer = false;
+    this.hasReceivedAnswer = false;
     this.isNegotiating = false;
+    this.offerRetryCount = 0;
     
     console.log('[WebRTC] Cleanup complete');
   }

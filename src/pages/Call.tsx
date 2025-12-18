@@ -220,17 +220,17 @@ const Call = () => {
         setCallStatus('ringing');
         callSounds.playRinging();
         
-        // Set a 60-second timeout for unanswered calls (only caller ends the call)
+        // Set a 30-second timeout for unanswered calls (only caller ends the call)
         const ringingTimeout = setTimeout(() => {
-          if (!hasEndedRef.current && !isConnected) {
-            console.log('[Call] Call not answered within 60 seconds');
+          if (!hasEndedRef.current && callStatus === 'ringing') {
+            console.log('[Call] Call not answered within 30 seconds');
             toast({
               title: 'No Answer',
               description: 'The call was not answered.',
             });
             endCall();
           }
-        }, 60000);
+        }, 30000);
         
         // Store timeout ref to clear on cleanup
         return () => clearTimeout(ringingTimeout);
@@ -386,16 +386,20 @@ const Call = () => {
         localVideoRef.current.srcObject = localStream;
       }
 
-      // Small delay before sending offer to ensure both sides are ready
-      // The caller always sends the offer first
-      setTimeout(async () => {
-        if (data.caller_id === user?.id && webrtcRef.current) {
-          console.log('[Call] Caller creating and sending offer...');
-          await webrtcRef.current.createAndSendOffer();
-        } else {
-          console.log('[Call] Receiver waiting for offer from caller...');
-        }
-      }, 1000); // Increased delay to ensure channel is ready
+      // Delay before sending offer to ensure receiver has time to join signaling channel
+      // The caller sends offer, receiver waits and responds with answer
+      if (data.caller_id === user?.id) {
+        // Caller: wait 2 seconds before sending offer
+        setTimeout(async () => {
+          if (webrtcRef.current) {
+            console.log('[Call] Caller creating and sending offer...');
+            await webrtcRef.current.createAndSendOffer();
+          }
+        }, 2000);
+      } else {
+        // Receiver: just wait for the offer, no action needed
+        console.log('[Call] Receiver waiting for offer from caller...');
+      }
       
     } catch (error: any) {
       console.error('[Call] Error setting up WebRTC:', error);
@@ -409,31 +413,8 @@ const Call = () => {
     }
   };
 
-  // Handle presence changes for offline detection - only end call if we're SURE user is offline
-  // and we've been ringing for a while without answer
-  useEffect(() => {
-    if (!callData || isConnected || callStatus === 'ended') return;
-    
-    // Only check offline status after 15 seconds of ringing
-    // This gives time for the call to be answered and presence to sync
-    const offlineCheckTimeout = setTimeout(() => {
-      if (isOnline === false && callStatus === 'ringing' && !isConnected) {
-        console.log('[Call] User appears to be offline after waiting');
-        setCallStatus('offline');
-        callSounds.stopRinging();
-        callSounds.playBusy();
-        
-        // End call after showing offline status
-        setTimeout(() => {
-          if (!hasEndedRef.current) {
-            endCall();
-          }
-        }, 3000);
-      }
-    }, 15000); // Wait 15 seconds before checking offline status
-
-    return () => clearTimeout(offlineCheckTimeout);
-  }, [callData, isConnected, callStatus, endCall]);
+  // Removed aggressive offline detection - let the 30-second ringing timeout handle unanswered calls
+  // This prevents false "offline" detection when users are actually online
 
   const toggleMute = () => {
     if (webrtcRef.current) {
