@@ -33,7 +33,7 @@ const Call = () => {
   const { toast } = useToast();
   
   const callId = searchParams.get('callId');
-  const callType = searchParams.get('type') as 'video' | 'voice' || 'voice';
+  const callTypeParam = searchParams.get('type') as 'video' | 'voice';
   
   const [callData, setCallData] = useState<CallData | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -46,10 +46,13 @@ const Call = () => {
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const startTimeRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const webrtcRef = useRef<WebRTCManager | null>(null);
   const hasEndedRef = useRef(false);
+  const setupCompleteRef = useRef(false);
+  const callTypeRef = useRef<'video' | 'voice'>('voice');
 
   const isCaller = callData?.caller_id === user?.id;
   const otherUserId = isCaller ? callData?.receiver_id : callData?.caller_id;
@@ -97,7 +100,7 @@ const Call = () => {
       // Deduct credits if call was connected
       if (isConnected && duration > 0 && user?.id) {
         const durationMinutes = Math.max(1, Math.ceil(duration / 60));
-        const action = callType === 'video' ? 'video_call' : 'voice_call';
+        const action = callTypeRef.current === 'video' ? 'video_call' : 'voice_call';
         
         try {
           await supabase.functions.invoke('credit-deduction', {
@@ -111,7 +114,7 @@ const Call = () => {
             },
           });
 
-          const costPerMinute = callType === 'video' ? 30 : 20;
+          const costPerMinute = callTypeRef.current === 'video' ? 30 : 20;
           const totalCost = costPerMinute * durationMinutes;
           
           toast({
@@ -138,8 +141,8 @@ const Call = () => {
     // Navigate back after a short delay
     setTimeout(() => {
       navigate('/messages');
-    }, 1000);
-  }, [callId, isConnected, callType, user?.id, toast, navigate]);
+    }, 1500);
+  }, [callId, isConnected, user?.id, toast, navigate]);
 
   // Initialize call
   useEffect(() => {
@@ -174,6 +177,9 @@ const Call = () => {
         .single();
 
       if (error) throw error;
+
+      // Store the call type from DB
+      callTypeRef.current = data.call_type as 'video' | 'voice';
 
       // Get profiles for both users
       const [callerProfile, receiverProfile] = await Promise.all([
@@ -214,7 +220,7 @@ const Call = () => {
         setCallStatus('ringing');
         callSounds.playRinging();
       } 
-      // If we're the receiver and call is answered, setup connection
+      // If call is answered, setup WebRTC connection
       else if (callDataWithProfiles.status === 'answered') {
         setCallStatus('connecting');
         await setupWebRTC(callDataWithProfiles);
@@ -258,7 +264,7 @@ const Call = () => {
                 navigate('/messages');
               }, 1500);
             }
-          } else if (newStatus === 'answered') {
+          } else if (newStatus === 'answered' && !setupCompleteRef.current) {
             callSounds.stopRinging();
             setCallStatus('connecting');
             await setupWebRTC(data);
@@ -273,10 +279,17 @@ const Call = () => {
   };
 
   const setupWebRTC = async (data: CallData) => {
-    if (webrtcRef.current) return;
+    if (webrtcRef.current || setupCompleteRef.current) {
+      console.log('[Call] WebRTC already setup, skipping');
+      return;
+    }
+    
+    setupCompleteRef.current = true;
 
     const otherUserId = data.caller_id === user?.id ? data.receiver_id : data.caller_id;
-    const isVideo = callType === 'video';
+    const isVideo = callTypeRef.current === 'video';
+
+    console.log('[Call] Setting up WebRTC for', isVideo ? 'video' : 'voice', 'call');
 
     try {
       webrtcRef.current = new WebRTCManager(
@@ -285,13 +298,17 @@ const Call = () => {
         otherUserId,
         {
           onRemoteStream: (stream) => {
-            console.log('Got remote stream');
-            if (remoteVideoRef.current) {
+            console.log('[Call] Got remote stream with tracks:', stream.getTracks().map(t => t.kind));
+            
+            if (isVideo && remoteVideoRef.current) {
               remoteVideoRef.current.srcObject = stream;
+            } else if (remoteAudioRef.current) {
+              remoteAudioRef.current.srcObject = stream;
             }
             
             // Call is now connected
             if (!isConnected) {
+              callSounds.stopAllSounds();
               callSounds.playConnected();
               setIsConnected(true);
               setCallStatus('connected');
@@ -299,7 +316,7 @@ const Call = () => {
             }
           },
           onConnectionStateChange: (state) => {
-            console.log('Connection state:', state);
+            console.log('[Call] Connection state:', state);
             if (state === 'connected') {
               if (!isConnected) {
                 setIsConnected(true);
@@ -308,14 +325,20 @@ const Call = () => {
               }
             } else if (state === 'disconnected' || state === 'failed') {
               if (!hasEndedRef.current) {
+                toast({
+                  title: 'Connection Lost',
+                  description: 'The call connection was lost.',
+                  variant: 'destructive',
+                });
                 endCall();
               }
             }
           },
           onIceConnectionStateChange: (state) => {
-            console.log('ICE state:', state);
+            console.log('[Call] ICE state:', state);
             if (state === 'connected' || state === 'completed') {
               if (!isConnected) {
+                callSounds.stopAllSounds();
                 callSounds.playConnected();
                 setIsConnected(true);
                 setCallStatus('connected');
@@ -324,12 +347,15 @@ const Call = () => {
             }
           },
           onError: (error) => {
-            console.error('WebRTC error:', error);
+            console.error('[Call] WebRTC error:', error);
             toast({
               title: 'Connection Error',
-              description: 'Failed to establish call connection',
+              description: error.message || 'Failed to establish call connection',
               variant: 'destructive',
             });
+            if (!hasEndedRef.current) {
+              endCall();
+            }
           },
         }
       );
@@ -340,15 +366,21 @@ const Call = () => {
         localVideoRef.current.srcObject = localStream;
       }
 
-      // If we're the caller (who initiated), create and send offer
-      if (data.caller_id === user?.id) {
-        await webrtcRef.current.createAndSendOffer();
-      }
+      // Small delay before sending offer to ensure both sides are ready
+      setTimeout(async () => {
+        // If we're the caller (who initiated), create and send offer
+        if (data.caller_id === user?.id && webrtcRef.current) {
+          console.log('[Call] Caller creating offer...');
+          await webrtcRef.current.createAndSendOffer();
+        }
+      }, 500);
+      
     } catch (error: any) {
-      console.error('Error setting up WebRTC:', error);
+      console.error('[Call] Error setting up WebRTC:', error);
+      setupCompleteRef.current = false;
       toast({
         title: 'Media Access Error',
-        description: error.message || 'Failed to access camera/microphone',
+        description: error.message || 'Failed to access camera/microphone. Please check permissions.',
         variant: 'destructive',
       });
       endCall();
@@ -389,8 +421,6 @@ const Call = () => {
 
   const toggleSpeaker = () => {
     setIsSpeakerOn(!isSpeakerOn);
-    // Note: Web API doesn't have direct speaker control
-    // This would require platform-specific implementation
     toast({
       title: isSpeakerOn ? 'Speaker Off' : 'Speaker On',
       description: isSpeakerOn ? 'Switched to earpiece' : 'Switched to loudspeaker',
@@ -405,72 +435,26 @@ const Call = () => {
     );
   }
 
+  const isVideoCall = callTypeRef.current === 'video';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex flex-col relative overflow-hidden">
+      {/* Hidden audio element for voice calls */}
+      <audio ref={remoteAudioRef} autoPlay playsInline />
+      
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       </div>
 
-      {/* Header with user info */}
-      <div className="relative z-10 p-8 text-center space-y-6 flex-1 flex flex-col items-center justify-center">
-        <div className="flex flex-col items-center space-y-4">
-          <div className="relative">
-            {(callStatus === 'ringing' || callStatus === 'connecting') && (
-              <div className="absolute inset-0 rounded-full border-4 border-primary/50 animate-ping" />
-            )}
-            <Avatar className="w-32 h-32 border-4 border-primary shadow-2xl shadow-primary/50 relative">
-              <AvatarImage src={otherUserProfile?.avatar_url || ''} />
-              <AvatarFallback className="text-4xl bg-gradient-to-br from-purple-600 to-blue-600">
-                {otherUserProfile?.display_name?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-          
-          <div className="space-y-2">
-            <h2 className="text-3xl font-bold">{otherUserProfile?.display_name || 'Unknown User'}</h2>
-            <p className="text-lg text-gray-300">
-              {callStatus === 'offline' && (
-                <span className="flex items-center justify-center gap-2 text-red-400">
-                  <span className="w-2 h-2 bg-red-400 rounded-full" />
-                  User is offline
-                </span>
-              )}
-              {callStatus === 'connecting' && (
-                <span className="flex items-center justify-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Connecting...
-                </span>
-              )}
-              {callStatus === 'ringing' && (
-                <span className="flex items-center justify-center gap-2 text-primary">
-                  <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                  Ringing...
-                </span>
-              )}
-              {callStatus === 'connected' && (
-                <span className="text-green-400">{formatDuration(callDuration)}</span>
-              )}
-              {callStatus === 'ended' && (
-                <span className="text-gray-400">Call ended</span>
-              )}
-            </p>
-            {callStatus === 'offline' && (
-              <p className="text-sm text-gray-400 max-w-md mx-auto mt-4">
-                This user isn't available at the moment. Please try again later.
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Video area */}
-      <div className="relative z-10 flex-1 backdrop-blur-sm rounded-t-3xl overflow-hidden mx-4 mb-4">
-        {callType === 'video' ? (
-          <>
-            {/* Remote video (full screen) */}
-            <div className="w-full h-full bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl overflow-hidden">
+      {/* Main content area */}
+      <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6">
+        {isVideoCall ? (
+          /* Video call layout */
+          <div className="w-full h-full flex flex-col items-center">
+            {/* Remote video (main view) */}
+            <div className="relative w-full max-w-2xl aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl overflow-hidden shadow-2xl">
               <video 
                 ref={remoteVideoRef} 
                 autoPlay 
@@ -478,13 +462,24 @@ const Call = () => {
                 className="w-full h-full object-cover"
               />
               {!isConnected && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
+                  <Avatar className="w-24 h-24 border-4 border-primary shadow-xl">
+                    <AvatarImage src={otherUserProfile?.avatar_url || ''} />
+                    <AvatarFallback className="text-3xl bg-gradient-to-br from-purple-600 to-blue-600">
+                      {otherUserProfile?.display_name?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <p className="text-lg text-gray-300">{otherUserProfile?.display_name || 'Unknown User'}</p>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    {callStatus === 'ringing' ? 'Ringing...' : 'Connecting...'}
+                  </div>
                 </div>
               )}
             </div>
+            
             {/* Local video (picture-in-picture) */}
-            <div className="absolute top-6 right-6 w-32 h-48 bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
+            <div className="absolute top-8 right-8 w-28 h-40 bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
               <video 
                 ref={localVideoRef} 
                 autoPlay 
@@ -498,32 +493,85 @@ const Call = () => {
                 </div>
               )}
             </div>
-          </>
+            
+            {/* Call info */}
+            <div className="mt-6 text-center">
+              <h2 className="text-2xl font-bold">{otherUserProfile?.display_name || 'Unknown User'}</h2>
+              <p className="text-lg text-gray-300 mt-2">
+                {callStatus === 'connected' ? (
+                  <span className="text-green-400">{formatDuration(callDuration)}</span>
+                ) : callStatus === 'ended' ? (
+                  <span className="text-gray-400">Call ended</span>
+                ) : null}
+              </p>
+            </div>
+          </div>
         ) : (
-          /* Voice call - show avatar */
-          <div className="w-full h-full flex items-center justify-center">
+          /* Voice call layout - single avatar only */
+          <div className="flex flex-col items-center justify-center gap-8">
             <div className="relative">
+              {(callStatus === 'ringing' || callStatus === 'connecting') && (
+                <>
+                  <div className="absolute inset-0 rounded-full border-4 border-primary/50 animate-ping" />
+                  <div className="absolute inset-0 rounded-full border-4 border-primary/30 animate-ping" style={{ animationDelay: '300ms' }} />
+                </>
+              )}
               {isConnected && (
                 <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse" />
               )}
-              <Avatar className="w-48 h-48 border-8 border-primary/30 shadow-2xl shadow-primary/20 relative">
+              <Avatar className="w-40 h-40 border-8 border-primary/30 shadow-2xl shadow-primary/20 relative">
                 <AvatarImage src={otherUserProfile?.avatar_url || ''} />
-                <AvatarFallback className="text-6xl bg-gradient-to-br from-purple-600 to-blue-600">
+                <AvatarFallback className="text-5xl bg-gradient-to-br from-purple-600 to-blue-600">
                   {otherUserProfile?.display_name?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
+            </div>
+            
+            <div className="text-center space-y-3">
+              <h2 className="text-3xl font-bold">{otherUserProfile?.display_name || 'Unknown User'}</h2>
+              <p className="text-lg text-gray-300">
+                {callStatus === 'offline' && (
+                  <span className="flex items-center justify-center gap-2 text-red-400">
+                    <span className="w-2 h-2 bg-red-400 rounded-full" />
+                    User is offline
+                  </span>
+                )}
+                {callStatus === 'connecting' && (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Connecting...
+                  </span>
+                )}
+                {callStatus === 'ringing' && (
+                  <span className="flex items-center justify-center gap-2 text-primary">
+                    <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+                    Ringing...
+                  </span>
+                )}
+                {callStatus === 'connected' && (
+                  <span className="text-green-400 text-2xl font-mono">{formatDuration(callDuration)}</span>
+                )}
+                {callStatus === 'ended' && (
+                  <span className="text-gray-400">Call ended</span>
+                )}
+              </p>
+              {callStatus === 'offline' && (
+                <p className="text-sm text-gray-400 max-w-md mx-auto">
+                  This user isn't available at the moment. Please try again later.
+                </p>
+              )}
             </div>
           </div>
         )}
       </div>
 
       {/* Call controls */}
-      <div className="relative z-10 p-6 pb-8 bg-gradient-to-t from-black/50 to-transparent backdrop-blur-xl">
+      <div className="relative z-10 p-6 pb-10 bg-gradient-to-t from-black/50 to-transparent">
         <CallControls
           isMuted={isMuted}
           isVideoOff={isVideoOff}
           isSpeakerOn={isSpeakerOn}
-          isVideoCall={callType === 'video'}
+          isVideoCall={isVideoCall}
           onToggleMute={toggleMute}
           onToggleVideo={toggleVideo}
           onToggleSpeaker={toggleSpeaker}
