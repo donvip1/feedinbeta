@@ -36,6 +36,11 @@ interface FullscreenMediaViewerProps {
   onOpenRefeed?: (postId: string) => void;
   onOpenGift?: (postId: string) => void;
   onOpenShare?: (postId: string) => void;
+  // For syncing counts from parent
+  parentCommentsCount?: number;
+  parentRefeedsCount?: number;
+  parentLikesCount?: number;
+  actualPostId?: string; // The actual post ID for interactions (may differ from post.id for refeeds)
 }
 
 export default function FullscreenMediaViewer({ 
@@ -49,7 +54,11 @@ export default function FullscreenMediaViewer({
   onOpenComments,
   onOpenRefeed,
   onOpenGift,
-  onOpenShare
+  onOpenShare,
+  parentCommentsCount,
+  parentRefeedsCount,
+  parentLikesCount,
+  actualPostId
 }: FullscreenMediaViewerProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -62,6 +71,8 @@ export default function FullscreenMediaViewer({
   const [showControls, setShowControls] = useState(true);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [commentsCount, setCommentsCount] = useState(0);
+  const [refeedsCount, setRefeedsCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,16 +104,38 @@ export default function FullscreenMediaViewer({
       const { data: likeData } = await supabase
         .from('post_likes')
         .select('id')
-        .eq('post_id', currentPost.id)
+        .eq('post_id', actualPostId || currentPost.id)
         .eq('user_id', currentUserId)
         .maybeSingle();
       
       setIsLiked(!!likeData);
     };
     
-    setLikesCount(currentPost.likes_count || 0);
+    // Use parent counts if provided (for syncing), otherwise use post counts
+    setLikesCount(parentLikesCount ?? currentPost.likes_count ?? 0);
+    setCommentsCount(parentCommentsCount ?? currentPost.comments_count ?? 0);
+    setRefeedsCount(parentRefeedsCount ?? currentPost.refeeds_count ?? 0);
     checkLikeStatus();
-  }, [currentPost?.id, currentUserId]);
+  }, [currentPost?.id, currentUserId, actualPostId, parentLikesCount, parentCommentsCount, parentRefeedsCount]);
+
+  // Sync counts when parent props change (for real-time updates)
+  useEffect(() => {
+    if (parentCommentsCount !== undefined) {
+      setCommentsCount(parentCommentsCount);
+    }
+  }, [parentCommentsCount]);
+
+  useEffect(() => {
+    if (parentRefeedsCount !== undefined) {
+      setRefeedsCount(parentRefeedsCount);
+    }
+  }, [parentRefeedsCount]);
+
+  useEffect(() => {
+    if (parentLikesCount !== undefined) {
+      setLikesCount(parentLikesCount);
+    }
+  }, [parentLikesCount]);
 
   useEffect(() => {
     const index = navigablePosts.findIndex(p => p.id === post.id);
@@ -346,19 +379,20 @@ export default function FullscreenMediaViewer({
       return;
     }
 
+    const postIdForLike = actualPostId || currentPost.id;
     try {
       if (isLiked) {
         await supabase
           .from('post_likes')
           .delete()
-          .eq('post_id', currentPost.id)
+          .eq('post_id', postIdForLike)
           .eq('user_id', currentUserId);
         setIsLiked(false);
         setLikesCount(prev => Math.max(0, prev - 1));
       } else {
         await supabase
           .from('post_likes')
-          .insert({ post_id: currentPost.id, user_id: currentUserId });
+          .insert({ post_id: postIdForLike, user_id: currentUserId });
         setIsLiked(true);
         setLikesCount(prev => prev + 1);
       }
@@ -369,29 +403,30 @@ export default function FullscreenMediaViewer({
 
   const handleComments = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenComments && currentPost) {
-      onOpenComments(currentPost.id);
+    if (onOpenComments) {
+      // Use actualPostId for interactions (important for refeed/quote posts)
+      onOpenComments(actualPostId || currentPost?.id || '');
     }
   };
 
   const handleRefeed = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenRefeed && currentPost) {
-      onOpenRefeed(currentPost.id);
+    if (onOpenRefeed) {
+      onOpenRefeed(actualPostId || currentPost?.id || '');
     }
   };
 
   const handleGift = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onOpenGift && currentPost) {
-      onOpenGift(currentPost.id);
+      onOpenGift(actualPostId || currentPost.id);
     }
   };
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (onOpenShare && currentPost) {
-      onOpenShare(currentPost.id);
+      onOpenShare(actualPostId || currentPost.id);
     }
   };
 
@@ -482,7 +517,7 @@ export default function FullscreenMediaViewer({
               <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
                 <MessageCircle className="w-6 h-6 text-white" />
               </div>
-              <span className="text-white text-xs font-medium">{currentPost.comments_count || 0}</span>
+              <span className="text-white text-xs font-medium">{commentsCount}</span>
             </button>
 
             {/* Refeed/Quote */}
@@ -493,7 +528,7 @@ export default function FullscreenMediaViewer({
               <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
                 <Repeat2 className="w-6 h-6 text-white" />
               </div>
-              <span className="text-white text-xs font-medium">{currentPost.refeeds_count || 0}</span>
+              <span className="text-white text-xs font-medium">{refeedsCount}</span>
             </button>
 
             {/* Gift */}

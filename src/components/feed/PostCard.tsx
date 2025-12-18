@@ -885,15 +885,15 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           media_url: post.original_post.media_url,
           media_type: post.original_post.media_type,
           created_at: post.original_post.created_at,
-          likes_count: post.likes_count || 0,
-          comments_count: post.comments_count || 0,
-          refeeds_count: post.refeeds_count || 0,
+          likes_count: likesCount,
+          comments_count: commentsCount,
+          refeeds_count: refeedsCount,
           profiles: post.original_post.profiles
         } : {
           ...post,
-          likes_count: post.likes_count || 0,
-          comments_count: post.comments_count || 0,
-          refeeds_count: post.refeeds_count || 0
+          likes_count: likesCount,
+          comments_count: commentsCount,
+          refeeds_count: refeedsCount
         }}
         allPosts={allPosts.map(p => ({
           ...p,
@@ -917,6 +917,12 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
         }}
         initialTime={currentVideoTime.current}
         initialMuted={isMuted}
+        // Pass synced counts from PostCard state for proper synchronization
+        parentCommentsCount={commentsCount}
+        parentRefeedsCount={refeedsCount}
+        parentLikesCount={likesCount}
+        // For refeed/quote posts, use the refeed post ID for interactions
+        actualPostId={post.id}
         onOpenComments={() => {
           setShowFullscreenViewer(false);
           setCommentsOpen(true);
