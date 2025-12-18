@@ -82,6 +82,49 @@ interface LiveStreamStatistics {
   gift_types: { gift_type: string; count: number; total_value: number }[] | null;
 }
 
+interface DailyEarnings {
+  date: string;
+  gift_earnings: number;
+  promotion_earnings: number;
+  subscription_earnings: number;
+  p2p_fee_earnings: number;
+  ai_feature_earnings: number;
+  live_gift_earnings: number;
+  total_earnings: number;
+  platform_profit: number;
+  creator_payouts: number;
+  gifts_count: number;
+  live_gifts_count: number;
+  promotions_count: number;
+  transactions_count: number;
+}
+
+interface ProfitsWalletSummary {
+  balance: number;
+  total_deposited: number;
+  total_withdrawn: number;
+  gift_fees_collected: number;
+  live_gift_fees_collected: number;
+  promotion_fees_collected: number;
+  p2p_fees_collected: number;
+  subscription_fees_collected: number;
+  last_deposit_at: string | null;
+  last_withdrawal_at: string | null;
+  today_earnings: number;
+  week_earnings: number;
+  month_earnings: number;
+}
+
+interface ProfitsTransaction {
+  id: string;
+  transaction_type: string;
+  amount: number;
+  source_type: string | null;
+  description: string | null;
+  balance_after: number;
+  created_at: string;
+}
+
 const AdminWallet = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -92,6 +135,8 @@ const AdminWallet = () => {
   const [transferReason, setTransferReason] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawReason, setWithdrawReason] = useState("");
+  const [withdrawProfitsAmount, setWithdrawProfitsAmount] = useState("");
+  const [withdrawProfitsReason, setWithdrawProfitsReason] = useState("");
 
   // Server-side permission check - can view admin wallet (admin OR moderator)
   const { data: canViewWallet, isLoading: loadingViewPermission } = useQuery({
@@ -253,6 +298,62 @@ const AdminWallet = () => {
       return data;
     },
     enabled: canViewWallet === true,
+  });
+
+  // Fetch daily earnings statistics
+  const { data: dailyEarnings } = useQuery({
+    queryKey: ["daily-earnings-stats"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_daily_earnings_stats" as any, { p_days: 30 });
+      if (error) throw error;
+      return data as unknown as DailyEarnings[];
+    },
+    enabled: canViewWallet === true,
+    refetchInterval: 30000,
+  });
+
+  // Fetch profits wallet summary
+  const { data: profitsWallet, refetch: refetchProfits } = useQuery({
+    queryKey: ["profits-wallet-summary"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_profits_wallet_summary" as any);
+      if (error) throw error;
+      return data as unknown as ProfitsWalletSummary;
+    },
+    enabled: canViewWallet === true,
+    refetchInterval: 30000,
+  });
+
+  // Fetch recent profits transactions
+  const { data: profitsTransactions } = useQuery({
+    queryKey: ["recent-profits-transactions"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_recent_profits_transactions" as any, { p_limit: 50 });
+      if (error) throw error;
+      return data as unknown as ProfitsTransaction[];
+    },
+    enabled: canViewWallet === true,
+  });
+
+  // Withdraw from profits wallet mutation
+  const withdrawProfitsMutation = useMutation({
+    mutationFn: async ({ amount, reason }: { amount: number; reason: string }) => {
+      const { data, error } = await supabase.rpc("admin_withdraw_from_profits", {
+        p_amount: amount,
+        p_reason: reason || "Withdrawal from profits",
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Withdrawn from profits wallet successfully");
+      queryClient.invalidateQueries({ queryKey: ["profits-wallet-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-profits-transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-transactions"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to withdraw from profits");
+    },
   });
 
   // Sync credit supply mutation
@@ -608,6 +709,225 @@ const AdminWallet = () => {
           </CardContent>
         </Card>
 
+        {/* Profits Wallet - Team Earnings Tracker */}
+        <Card className="border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 to-green-500/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <PiggyBank className="w-5 h-5 text-emerald-500" />
+              Profits Wallet (Fee Collection)
+            </CardTitle>
+            <CardDescription>
+              Automatic fee collection from all transactions - 5% platform fee on gifts
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Profits Overview */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+                <p className="text-2xl font-bold text-emerald-500">
+                  {(profitsWallet?.balance || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Current Balance</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <p className="text-2xl font-bold text-green-500">
+                  {(profitsWallet?.total_deposited || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Collected</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <p className="text-2xl font-bold text-orange-500">
+                  {(profitsWallet?.total_withdrawn || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Withdrawn</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-2xl font-bold text-blue-500">
+                  {(profitsWallet?.today_earnings || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Today's Earnings</p>
+              </div>
+            </div>
+
+            {/* Fee Collection Breakdown */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+              <div className="p-2 rounded-lg bg-pink-500/10 border border-pink-500/20 text-center">
+                <Gift className="w-4 h-4 text-pink-500 mx-auto mb-1" />
+                <p className="text-sm font-bold text-pink-500">
+                  {(profitsWallet?.gift_fees_collected || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Gift Fees</p>
+              </div>
+              <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-center">
+                <Radio className="w-4 h-4 text-red-500 mx-auto mb-1" />
+                <p className="text-sm font-bold text-red-500">
+                  {(profitsWallet?.live_gift_fees_collected || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Live Gift Fees</p>
+              </div>
+              <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 text-center">
+                <Megaphone className="w-4 h-4 text-yellow-500 mx-auto mb-1" />
+                <p className="text-sm font-bold text-yellow-500">
+                  {(profitsWallet?.promotion_fees_collected || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Promo Fees</p>
+              </div>
+              <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-center">
+                <Coins className="w-4 h-4 text-cyan-500 mx-auto mb-1" />
+                <p className="text-sm font-bold text-cyan-500">
+                  {(profitsWallet?.p2p_fees_collected || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">P2P Fees</p>
+              </div>
+              <div className="p-2 rounded-lg bg-purple-500/10 border border-purple-500/20 text-center">
+                <Award className="w-4 h-4 text-purple-500 mx-auto mb-1" />
+                <p className="text-sm font-bold text-purple-500">
+                  {(profitsWallet?.subscription_fees_collected || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Sub Fees</p>
+              </div>
+            </div>
+
+            {/* Recent Profits Transactions */}
+            {profitsTransactions && profitsTransactions.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Recent Profit Transactions</p>
+                <div className="max-h-48 overflow-y-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Type</TableHead>
+                        <TableHead className="text-xs">Amount</TableHead>
+                        <TableHead className="text-xs">Source</TableHead>
+                        <TableHead className="text-xs">Balance</TableHead>
+                        <TableHead className="text-xs">Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {profitsTransactions.slice(0, 10).map((tx) => (
+                        <TableRow key={tx.id}>
+                          <TableCell className="text-xs capitalize">
+                            <Badge variant="outline" className={`text-xs ${
+                              tx.transaction_type.includes('gift') ? 'border-pink-500/30 text-pink-500' :
+                              tx.transaction_type.includes('promotion') ? 'border-yellow-500/30 text-yellow-500' :
+                              tx.transaction_type === 'withdrawal' ? 'border-orange-500/30 text-orange-500' :
+                              'border-emerald-500/30 text-emerald-500'
+                            }`}>
+                              {tx.transaction_type.replace('_', ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={`text-xs font-medium ${tx.amount > 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground capitalize">{tx.source_type || '-'}</TableCell>
+                          <TableCell className="text-xs">{tx.balance_after.toLocaleString()}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {tx.created_at ? format(new Date(tx.created_at), 'MMM d, HH:mm') : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Daily Earnings Statistics */}
+        <Card className="border-indigo-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Calendar className="w-5 h-5 text-indigo-500" />
+              Daily Earnings Statistics
+            </CardTitle>
+            <CardDescription>
+              Track daily revenue and performance metrics
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Time Period Stats */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-4 h-4 text-indigo-500" />
+                  <span className="text-xs text-muted-foreground">Today</span>
+                </div>
+                <p className="text-xl font-bold text-indigo-500">{(profitsWallet?.today_earnings || 0).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">credits earned</p>
+              </div>
+              <div className="p-3 rounded-lg bg-violet-500/10 border border-violet-500/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calendar className="w-4 h-4 text-violet-500" />
+                  <span className="text-xs text-muted-foreground">This Week</span>
+                </div>
+                <p className="text-xl font-bold text-violet-500">{(profitsWallet?.week_earnings || 0).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">credits earned</p>
+              </div>
+              <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity className="w-4 h-4 text-purple-500" />
+                  <span className="text-xs text-muted-foreground">This Month</span>
+                </div>
+                <p className="text-xl font-bold text-purple-500">{(profitsWallet?.month_earnings || 0).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">credits earned</p>
+              </div>
+            </div>
+
+            {/* Daily Breakdown Table */}
+            {dailyEarnings && dailyEarnings.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Daily Breakdown (Last 30 Days)</p>
+                <div className="max-h-64 overflow-y-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Date</TableHead>
+                        <TableHead className="text-xs">Gifts</TableHead>
+                        <TableHead className="text-xs">Live</TableHead>
+                        <TableHead className="text-xs">Promos</TableHead>
+                        <TableHead className="text-xs">Total</TableHead>
+                        <TableHead className="text-xs">Profit</TableHead>
+                        <TableHead className="text-xs">Txns</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {dailyEarnings.map((day) => (
+                        <TableRow key={day.date}>
+                          <TableCell className="text-xs font-medium">
+                            {format(new Date(day.date), 'MMM d')}
+                          </TableCell>
+                          <TableCell className="text-xs text-pink-500">
+                            {day.gift_earnings.toLocaleString()}
+                            <span className="text-muted-foreground ml-1">({day.gifts_count})</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-red-500">
+                            {day.live_gift_earnings.toLocaleString()}
+                            <span className="text-muted-foreground ml-1">({day.live_gifts_count})</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-yellow-500">
+                            {day.promotion_earnings.toLocaleString()}
+                            <span className="text-muted-foreground ml-1">({day.promotions_count})</span>
+                          </TableCell>
+                          <TableCell className="text-xs font-bold text-foreground">
+                            {day.total_earnings.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-xs text-green-500 font-medium">
+                            {day.platform_profit.toLocaleString()}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {day.transactions_count}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Creator Incentive Tiers (30% Pool) */}
         <Card className="border-blue-500/20">
           <CardHeader className="pb-2">
@@ -918,7 +1238,7 @@ const AdminWallet = () => {
 
         {/* Action Tabs */}
         <Tabs defaultValue={canManageCredits ? "mint" : "history"} className="w-full">
-          <TabsList className={`grid w-full ${canManageCredits ? 'grid-cols-4' : 'grid-cols-1'}`}>
+          <TabsList className={`grid w-full ${canManageCredits ? 'grid-cols-5' : 'grid-cols-1'}`}>
             {canManageCredits && (
               <>
                 <TabsTrigger value="mint" className="gap-1 text-xs">
@@ -928,7 +1248,10 @@ const AdminWallet = () => {
                   <Send className="w-3 h-3" /> Transfer
                 </TabsTrigger>
                 <TabsTrigger value="withdraw" className="gap-1 text-xs">
-                  <Wallet className="w-3 h-3" /> Withdraw
+                  <Wallet className="w-3 h-3" /> Team
+                </TabsTrigger>
+                <TabsTrigger value="profits" className="gap-1 text-xs">
+                  <PiggyBank className="w-3 h-3" /> Profits
                 </TabsTrigger>
               </>
             )}
@@ -1067,6 +1390,52 @@ const AdminWallet = () => {
                       className="w-full"
                     >
                       {withdrawMutation.isPending ? "Withdrawing..." : "Withdraw to Team Wallet"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="profits" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Withdraw from Profits Wallet</CardTitle>
+                    <CardDescription>
+                      Withdraw collected fees from the profits wallet. Current balance: {(profitsWallet?.balance || 0).toLocaleString()}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="profits-withdraw-amount">Amount</Label>
+                      <Input
+                        id="profits-withdraw-amount"
+                        type="number"
+                        placeholder="Enter amount"
+                        value={withdrawProfitsAmount}
+                        onChange={(e) => setWithdrawProfitsAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="profits-withdraw-reason">Reason (optional)</Label>
+                      <Input
+                        id="profits-withdraw-reason"
+                        placeholder="Enter reason for withdrawal"
+                        value={withdrawProfitsReason}
+                        onChange={(e) => setWithdrawProfitsReason(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => {
+                        withdrawProfitsMutation.mutate({ 
+                          amount: parseInt(withdrawProfitsAmount), 
+                          reason: withdrawProfitsReason 
+                        });
+                        setWithdrawProfitsAmount("");
+                        setWithdrawProfitsReason("");
+                      }}
+                      disabled={!withdrawProfitsAmount || withdrawProfitsMutation.isPending}
+                      className="w-full"
+                    >
+                      {withdrawProfitsMutation.isPending ? "Withdrawing..." : "Withdraw from Profits"}
                     </Button>
                   </CardContent>
                 </Card>
