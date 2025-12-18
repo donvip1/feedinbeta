@@ -102,21 +102,22 @@ const Promote = () => {
 
     setPromoting(true);
     try {
-      // Deduct credits
-      const { error: transactionError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: user?.id,
-          amount: -cost,
-          type: 'spent',
-          description: `${plan} - Post promotion`,
-          related_id: postId,
-        });
+      // Use secure database function for promotion
+      const { data, error } = await supabase.rpc('promote_post', {
+        p_post_id: postId,
+        p_plan_name: plan,
+        p_cost: cost,
+      });
 
-      if (transactionError) throw transactionError;
+      if (error) throw error;
 
-      // Update credits display
-      setCredits(credits - cost);
+      // Update credits display from response
+      const result = data as { success: boolean; new_balance?: number } | null;
+      if (result?.new_balance !== undefined) {
+        setCredits(result.new_balance);
+      } else {
+        setCredits(credits - cost);
+      }
 
       toast({
         title: 'Post Promoted!',

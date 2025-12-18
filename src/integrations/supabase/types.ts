@@ -3548,6 +3548,10 @@ export type Database = {
         Args: { attachment_id: string }
         Returns: undefined
       }
+      promote_post: {
+        Args: { p_cost: number; p_plan_name: string; p_post_id: string }
+        Returns: Json
+      }
       send_gift: {
         Args: {
           p_cost: number
