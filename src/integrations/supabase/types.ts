@@ -3525,7 +3525,12 @@ export type Database = {
         Returns: undefined
       }
       promote_post: {
-        Args: { p_cost: number; p_plan_name: string; p_post_id: string }
+        Args: {
+          p_cost: number
+          p_original_author_id?: string
+          p_plan_name: string
+          p_post_id: string
+        }
         Returns: Json
       }
       send_gift: {
