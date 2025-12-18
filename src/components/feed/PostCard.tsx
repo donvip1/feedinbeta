@@ -789,6 +789,11 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
               <button
                 onClick={() => {
+                  // Pause video when opening gift modal
+                  if (videoRef.current && isPlaying) {
+                    videoRef.current.pause();
+                    setIsPlaying(false);
+                  }
                   setGiftOpen(true);
                   onInteractionStart?.();
                 }}
@@ -799,6 +804,11 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
 
               <button
                 onClick={() => {
+                  // Pause video when opening share modal
+                  if (videoRef.current && isPlaying) {
+                    videoRef.current.pause();
+                    setIsPlaying(false);
+                  }
                   setShareOpen(true);
                   onInteractionStart?.();
                 }}

@@ -5,7 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Bell } from 'lucide-react';
 import { NotificationsPanel } from './NotificationsPanel';
 
-export const NotificationBell = () => {
+interface NotificationBellProps {
+  onPanelOpen?: () => void;
+  onPanelClose?: () => void;
+}
+
+export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBellProps) => {
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
@@ -58,13 +63,28 @@ export const NotificationBell = () => {
     };
   };
 
+  const handleTogglePanel = () => {
+    const newState = !showPanel;
+    setShowPanel(newState);
+    if (newState) {
+      onPanelOpen?.();
+    } else {
+      onPanelClose?.();
+    }
+  };
+
+  const handleClosePanel = () => {
+    setShowPanel(false);
+    onPanelClose?.();
+  };
+
   return (
     <>
       <div className="relative">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setShowPanel(!showPanel)}
+          onClick={handleTogglePanel}
           className="relative"
         >
           <Bell className="w-5 h-5" />
@@ -81,10 +101,10 @@ export const NotificationBell = () => {
           {/* Backdrop overlay */}
           <div 
             className="fixed inset-0 z-40" 
-            onClick={() => setShowPanel(false)}
+            onClick={handleClosePanel}
           />
           <NotificationsPanel
-            onClose={() => setShowPanel(false)}
+            onClose={handleClosePanel}
             onUpdate={loadUnreadCount}
           />
         </>

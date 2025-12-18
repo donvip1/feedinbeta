@@ -37,6 +37,9 @@ const Feed = () => {
   const { viewedPostIds, markAsViewed } = useViewedPosts();
   const initialViewedRef = useRef<string[]>([]);
   const hasInitializedRef = useRef(false);
+  const [displayPosts, setDisplayPosts] = useState<any[]>([]);
+  const allLoadedPostsRef = useRef<any[]>([]);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   // Capture viewed posts only once when component mounts or tab changes
   useEffect(() => {
@@ -91,7 +94,7 @@ const Feed = () => {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(100); // Fetch more posts for infinite scroll
 
       if (activeTab === 'following' && user) {
         const { data: following } = await supabase
@@ -132,19 +135,76 @@ const Feed = () => {
         });
       };
 
-      // Prioritize unviewed posts, then add viewed posts
+      // Prioritize unviewed posts - NO DUPLICATES
       let finalPosts = sortByPriority(unviewedPosts);
-      if (finalPosts.length < 20 && viewedPosts.length > 0) {
-        finalPosts = [...finalPosts, ...sortByPriority(viewedPosts)];
-      }
+      
+      // Store all posts for infinite scroll looping
+      allLoadedPostsRef.current = sortByPriority(allPosts);
 
-      return finalPosts.slice(0, 30);
+      return finalPosts;
     },
     enabled: !!user,
     staleTime: Infinity, // Don't refetch while on the page
     refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
+
+  // Initialize display posts and handle infinite scroll
+  useEffect(() => {
+    if (posts) {
+      setDisplayPosts(posts);
+    }
+  }, [posts]);
+
+  // Infinite scroll handler - when reaching end, append more posts seamlessly
+  useEffect(() => {
+    const container = feedContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const isNearBottom = scrollTop + clientHeight >= scrollHeight - 500;
+
+      if (isNearBottom && allLoadedPostsRef.current.length > 0) {
+        // Append posts from the beginning to create infinite loop
+        // User won't know they've reached the end
+        setDisplayPosts(prev => {
+          const currentIds = new Set(prev.map(p => p.id));
+          const postsToAdd = allLoadedPostsRef.current.filter(p => !currentIds.has(p.id));
+          
+          if (postsToAdd.length > 0) {
+            return [...prev, ...postsToAdd.slice(0, 10)];
+          }
+          
+          // If all posts are shown, start from beginning with unique keys
+          const startIndex = prev.length % allLoadedPostsRef.current.length;
+          const cyclePosts = allLoadedPostsRef.current.slice(startIndex, startIndex + 10).map((p, i) => ({
+            ...p,
+            _cycleKey: `${p.id}-cycle-${Date.now()}-${i}` // Unique key for each cycle
+          }));
+          return [...prev, ...cyclePosts];
+        });
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Pause all videos when notification panel opens
+  const handleNotificationPanelOpen = () => {
+    setIsNotificationOpen(true);
+    // Pause all videos by dispatching a custom event
+    document.querySelectorAll('video').forEach((video) => {
+      if (!video.paused) {
+        video.pause();
+      }
+    });
+  };
+
+  const handleNotificationPanelClose = () => {
+    setIsNotificationOpen(false);
+  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -225,7 +285,10 @@ const Feed = () => {
     <div className="min-h-screen bg-background pb-16">
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-3 py-2 max-w-2xl mx-auto">
-          <NotificationBell />
+          <NotificationBell 
+            onPanelOpen={handleNotificationPanelOpen}
+            onPanelClose={handleNotificationPanelClose}
+          />
           
           <div className="flex items-center gap-4">
             <button
@@ -297,9 +360,9 @@ const Feed = () => {
               </div>
             ))}
           </div>
-        ) : posts && posts.length > 0 ? (
+        ) : displayPosts && displayPosts.length > 0 ? (
           <>
-            {posts.map((post) => {
+            {displayPosts.map((post) => {
               // Styled text posts and media posts should be full height
               // Plain text posts without background should be compact
               const isStyledText = post.media_type === 'text_styled' && post.media_url && post.content;
@@ -310,11 +373,14 @@ const Feed = () => {
                 ? "snap-start snap-always h-[calc(100vh-8rem)] flex items-start" 
                 : "snap-start mb-4";
               
+              // Use _cycleKey if present (for infinite scroll cycles), otherwise use id
+              const uniqueKey = post._cycleKey || post.id;
+              
               return (
-                <div key={post.id} className={wrapperClass}>
+                <div key={uniqueKey} className={wrapperClass}>
                   <PostCard
                     post={post}
-                    allPosts={posts}
+                    allPosts={displayPosts}
                     onLikeUpdate={() => refetch()}
                     onCommentsOpenChange={setIsCommentsOpen}
                     onInteractionStart={handleInteractionStart}
