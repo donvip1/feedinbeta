@@ -8,11 +8,17 @@ interface TypingIndicatorProps {
 
 export const TypingIndicator = ({ activityType = 'typing', userName }: TypingIndicatorProps) => {
   return (
-    <div className="flex gap-2 items-center">
-      <div className="flex gap-1 px-4 py-3 rounded-2xl bg-accent">
-        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-        <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
+    <div className="flex gap-2 items-center animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-muted/80 backdrop-blur-sm border border-border/50">
+        <div className="flex gap-1">
+          <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+        </div>
+        <span className="text-xs text-muted-foreground ml-1">
+          {userName && <span className="font-medium text-foreground">{userName}</span>}
+          {' '}{getActivityText(activityType)}
+        </span>
       </div>
     </div>
   );
@@ -21,12 +27,12 @@ export const TypingIndicator = ({ activityType = 'typing', userName }: TypingInd
 export const getActivityText = (activityType: 'typing' | 'emoji' | 'media_upload' = 'typing'): string => {
   switch (activityType) {
     case 'emoji':
-      return 'finding emoji...';
+      return 'choosing emoji...';
     case 'media_upload':
       return 'uploading media...';
     case 'typing':
     default:
-      return 'typing...';
+      return 'is typing...';
   }
 };
 
