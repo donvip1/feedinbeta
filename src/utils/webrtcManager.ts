@@ -17,13 +17,22 @@ export class WebRTCManager {
   private signalChannel: ReturnType<typeof supabase.channel> | null = null;
   private iceCandidatesQueue: RTCIceCandidate[] = [];
   private isNegotiating = false;
+  private hasReceivedOffer = false;
+  private connectionTimeout: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 3;
 
   private readonly rtcConfig: RTCConfiguration = {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
     ],
+    iceCandidatePoolSize: 10,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require',
   };
 
   constructor(
@@ -40,15 +49,25 @@ export class WebRTCManager {
 
   async initialize(isVideo: boolean): Promise<MediaStream> {
     try {
+      console.log('[WebRTC] Initializing...');
+      
       // Get local media stream
       this.localStream = await navigator.mediaDevices.getUserMedia({
-        video: isVideo ? { width: 1280, height: 720, facingMode: 'user' } : false,
+        video: isVideo ? { 
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          facingMode: 'user',
+          frameRate: { ideal: 30, max: 60 }
+        } : false,
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          sampleRate: 48000,
         },
       });
+
+      console.log('[WebRTC] Got local stream with tracks:', this.localStream.getTracks().map(t => t.kind));
 
       // Create peer connection
       this.peerConnection = new RTCPeerConnection(this.rtcConfig);
@@ -58,18 +77,37 @@ export class WebRTCManager {
 
       // Add local tracks to peer connection
       this.localStream.getTracks().forEach(track => {
+        console.log('[WebRTC] Adding track:', track.kind);
         this.peerConnection!.addTrack(track, this.localStream!);
       });
 
-      // Set up signaling channel
+      // Set up signaling channel using Supabase Realtime broadcast
       await this.setupSignaling();
+
+      // Set connection timeout
+      this.setConnectionTimeout();
 
       return this.localStream;
     } catch (error) {
-      console.error('Error initializing WebRTC:', error);
+      console.error('[WebRTC] Error initializing:', error);
       this.callbacks.onError(error as Error);
       throw error;
     }
+  }
+
+  private setConnectionTimeout() {
+    // Clear any existing timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+    }
+
+    // Set a 30-second timeout for connection establishment
+    this.connectionTimeout = setTimeout(() => {
+      if (this.peerConnection?.connectionState !== 'connected') {
+        console.error('[WebRTC] Connection timeout - failed to connect within 30 seconds');
+        this.callbacks.onError(new Error('Connection timeout. Please try again.'));
+      }
+    }, 30000);
   }
 
   private setupPeerConnectionHandlers() {
@@ -78,18 +116,27 @@ export class WebRTCManager {
     // Handle ICE candidates
     this.peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
-        console.log('Sending ICE candidate');
+        console.log('[WebRTC] Sending ICE candidate:', event.candidate.candidate.substring(0, 50));
         await this.sendSignal({
           type: 'ice-candidate',
           candidate: event.candidate.toJSON(),
+          from: this.userId,
         });
+      } else {
+        console.log('[WebRTC] ICE gathering complete');
       }
+    };
+
+    // Handle ICE gathering state
+    this.peerConnection.onicegatheringstatechange = () => {
+      console.log('[WebRTC] ICE gathering state:', this.peerConnection?.iceGatheringState);
     };
 
     // Handle remote track
     this.peerConnection.ontrack = (event) => {
-      console.log('Received remote track');
+      console.log('[WebRTC] Received remote track:', event.track.kind);
       if (event.streams[0]) {
+        console.log('[WebRTC] Remote stream has', event.streams[0].getTracks().length, 'tracks');
         this.callbacks.onRemoteStream(event.streams[0]);
       }
     };
@@ -97,7 +144,17 @@ export class WebRTCManager {
     // Handle connection state changes
     this.peerConnection.onconnectionstatechange = () => {
       const state = this.peerConnection?.connectionState;
-      console.log('Connection state:', state);
+      console.log('[WebRTC] Connection state:', state);
+      
+      if (state === 'connected') {
+        // Clear timeout on successful connection
+        if (this.connectionTimeout) {
+          clearTimeout(this.connectionTimeout);
+          this.connectionTimeout = null;
+        }
+        this.reconnectAttempts = 0;
+      }
+      
       if (state) {
         this.callbacks.onConnectionStateChange(state);
       }
@@ -106,125 +163,194 @@ export class WebRTCManager {
     // Handle ICE connection state changes
     this.peerConnection.oniceconnectionstatechange = () => {
       const state = this.peerConnection?.iceConnectionState;
-      console.log('ICE connection state:', state);
+      console.log('[WebRTC] ICE connection state:', state);
+      
+      if (state === 'connected' || state === 'completed') {
+        if (this.connectionTimeout) {
+          clearTimeout(this.connectionTimeout);
+          this.connectionTimeout = null;
+        }
+      }
+      
+      // Handle disconnection - attempt reconnection
+      if (state === 'disconnected' && this.reconnectAttempts < this.maxReconnectAttempts) {
+        console.log('[WebRTC] Attempting to recover connection...');
+        this.reconnectAttempts++;
+      }
+      
       if (state) {
         this.callbacks.onIceConnectionStateChange(state);
       }
     };
 
-    // Handle negotiation needed
-    this.peerConnection.onnegotiationneeded = async () => {
-      if (this.isNegotiating) return;
-      this.isNegotiating = true;
-      
-      try {
-        await this.createAndSendOffer();
-      } catch (error) {
-        console.error('Error during negotiation:', error);
-      } finally {
-        this.isNegotiating = false;
-      }
+    // Handle signaling state changes
+    this.peerConnection.onsignalingstatechange = () => {
+      console.log('[WebRTC] Signaling state:', this.peerConnection?.signalingState);
+      this.isNegotiating = this.peerConnection?.signalingState !== 'stable';
     };
   }
 
   private async setupSignaling() {
-    // Subscribe to incoming signals via Supabase Realtime
+    console.log('[WebRTC] Setting up Realtime signaling channel for call:', this.callId);
+    
+    // Use Supabase Realtime broadcast for signaling - much faster than database inserts
     this.signalChannel = supabase
-      .channel(`call-signals:${this.callId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_signals',
-          filter: `call_id=eq.${this.callId}`,
-        },
-        async (payload) => {
-          const signal = payload.new;
-          // Only process signals meant for us
-          if (signal.to_user_id === this.userId) {
-            await this.handleSignal(signal.signal_data);
-          }
+      .channel(`call-signal:${this.callId}`, {
+        config: {
+          broadcast: { self: false },
         }
-      )
-      .subscribe();
+      })
+      .on('broadcast', { event: 'signal' }, async (payload) => {
+        const signal = payload.payload;
+        // Only process signals meant for us
+        if (signal.from !== this.userId) {
+          console.log('[WebRTC] Received signal:', signal.type);
+          await this.handleSignal(signal);
+        }
+      })
+      .subscribe((status) => {
+        console.log('[WebRTC] Signal channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('[WebRTC] Ready to exchange signals');
+        }
+      });
   }
 
   private async sendSignal(data: any) {
+    if (!this.signalChannel) {
+      console.error('[WebRTC] No signal channel available');
+      return;
+    }
+
     try {
-      await supabase.from('call_signals').insert({
-        call_id: this.callId,
-        from_user_id: this.userId,
-        to_user_id: this.otherUserId,
-        signal_data: data,
+      await this.signalChannel.send({
+        type: 'broadcast',
+        event: 'signal',
+        payload: data,
       });
+      console.log('[WebRTC] Signal sent:', data.type);
     } catch (error) {
-      console.error('Error sending signal:', error);
+      console.error('[WebRTC] Error sending signal:', error);
     }
   }
 
   private async handleSignal(data: any) {
-    if (!this.peerConnection) return;
+    if (!this.peerConnection) {
+      console.error('[WebRTC] No peer connection available');
+      return;
+    }
 
     try {
-      console.log('Handling signal:', data.type);
-
       if (data.type === 'offer') {
+        console.log('[WebRTC] Processing offer');
+        
+        // Check if we can accept this offer
+        if (this.peerConnection.signalingState !== 'stable') {
+          console.log('[WebRTC] Ignoring offer - not in stable state');
+          return;
+        }
+        
+        this.hasReceivedOffer = true;
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        console.log('[WebRTC] Remote description set (offer)');
+        
         const answer = await this.peerConnection.createAnswer();
         await this.peerConnection.setLocalDescription(answer);
+        console.log('[WebRTC] Local description set (answer)');
+        
         await this.sendSignal({
           type: 'answer',
           sdp: { type: answer.type, sdp: answer.sdp },
+          from: this.userId,
         });
         
         // Process queued ICE candidates
-        this.processQueuedCandidates();
+        await this.processQueuedCandidates();
+        
       } else if (data.type === 'answer') {
+        console.log('[WebRTC] Processing answer');
+        
+        if (this.peerConnection.signalingState !== 'have-local-offer') {
+          console.log('[WebRTC] Ignoring answer - not in have-local-offer state');
+          return;
+        }
+        
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
+        console.log('[WebRTC] Remote description set (answer)');
         
         // Process queued ICE candidates
-        this.processQueuedCandidates();
+        await this.processQueuedCandidates();
+        
       } else if (data.type === 'ice-candidate') {
         const candidate = new RTCIceCandidate(data.candidate);
         
-        if (this.peerConnection.remoteDescription) {
+        if (this.peerConnection.remoteDescription && this.peerConnection.remoteDescription.type) {
+          console.log('[WebRTC] Adding ICE candidate directly');
           await this.peerConnection.addIceCandidate(candidate);
         } else {
-          // Queue candidates if remote description not set yet
+          console.log('[WebRTC] Queueing ICE candidate');
           this.iceCandidatesQueue.push(candidate);
         }
       }
     } catch (error) {
-      console.error('Error handling signal:', error);
+      console.error('[WebRTC] Error handling signal:', error);
     }
   }
 
   private async processQueuedCandidates() {
+    console.log('[WebRTC] Processing', this.iceCandidatesQueue.length, 'queued ICE candidates');
+    
     while (this.iceCandidatesQueue.length > 0) {
       const candidate = this.iceCandidatesQueue.shift()!;
       try {
         await this.peerConnection?.addIceCandidate(candidate);
+        console.log('[WebRTC] Added queued ICE candidate');
       } catch (error) {
-        console.error('Error adding queued ICE candidate:', error);
+        console.error('[WebRTC] Error adding queued ICE candidate:', error);
       }
     }
   }
 
   async createAndSendOffer() {
-    if (!this.peerConnection) return;
+    if (!this.peerConnection) {
+      console.error('[WebRTC] No peer connection available');
+      return;
+    }
+
+    // Don't create offer if we already received one
+    if (this.hasReceivedOffer) {
+      console.log('[WebRTC] Already received offer, not creating one');
+      return;
+    }
+
+    if (this.isNegotiating) {
+      console.log('[WebRTC] Already negotiating, skipping offer');
+      return;
+    }
 
     try {
-      const offer = await this.peerConnection.createOffer();
+      this.isNegotiating = true;
+      console.log('[WebRTC] Creating offer...');
+      
+      const offer = await this.peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
+      
       await this.peerConnection.setLocalDescription(offer);
+      console.log('[WebRTC] Local description set (offer)');
       
       await this.sendSignal({
         type: 'offer',
         sdp: { type: offer.type, sdp: offer.sdp },
+        from: this.userId,
       });
+      
     } catch (error) {
-      console.error('Error creating offer:', error);
+      console.error('[WebRTC] Error creating offer:', error);
       throw error;
+    } finally {
+      this.isNegotiating = false;
     }
   }
 
@@ -255,6 +381,14 @@ export class WebRTCManager {
   }
 
   async cleanup() {
+    console.log('[WebRTC] Cleaning up...');
+    
+    // Clear timeout
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+
     // Stop all local tracks
     this.localStream?.getTracks().forEach(track => {
       track.stop();
@@ -273,5 +407,10 @@ export class WebRTCManager {
     }
 
     this.localStream = null;
+    this.iceCandidatesQueue = [];
+    this.hasReceivedOffer = false;
+    this.isNegotiating = false;
+    
+    console.log('[WebRTC] Cleanup complete');
   }
 }
