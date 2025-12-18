@@ -2,16 +2,45 @@ import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { SessionManager } from '@/lib/session-manager';
+import { CookieManager } from '@/lib/cookie-manager';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  signOutAllDevices: () => Promise<void>;
   refreshSession: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);
+
+// Clear all local storage related to auth and app state
+const clearAllLocalData = () => {
+  // Clear localStorage
+  const keysToPreserve = ['theme', 'device_fp']; // Keep theme preference and device fingerprint
+  const allKeys = Object.keys(localStorage);
+  allKeys.forEach(key => {
+    if (!keysToPreserve.includes(key)) {
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Clear sessionStorage completely
+  sessionStorage.clear();
+  
+  // Clear all session-related cookies
+  SessionManager.clearAll();
+  
+  // Clear any auth-related cookies
+  const cookies = CookieManager.getAll();
+  Object.keys(cookies).forEach(name => {
+    if (name.startsWith('sb-') || name.includes('supabase') || name.includes('auth')) {
+      CookieManager.remove(name);
+    }
+  });
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -54,11 +83,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             }, 0);
           }
         } else if (event === 'SIGNED_OUT') {
-          // Clear any cached data on sign out
+          // Clear all local data on sign out
+          clearAllLocalData();
           setUser(null);
           setSession(null);
         } else if (event === 'TOKEN_REFRESHED') {
-          console.log('Token refreshed successfully');
+          // Token refreshed successfully - session extended
         } else if (event === 'USER_UPDATED') {
           // User data was updated, sync profile if needed
           if (session?.user) {
@@ -130,13 +160,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  // Standard sign out - clears current device session
   const signOut = async () => {
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signOut();
+      
+      // Invalidate current session in database
+      try {
+        await supabase.rpc('invalidate_all_sessions');
+      } catch (e) {
+        // Continue even if this fails
+      }
+      
+      // Sign out from Supabase
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) throw error;
       
-      // Clear state immediately
+      // Clear all local data
+      clearAllLocalData();
+      
+      // Clear state
       setUser(null);
       setSession(null);
       
@@ -145,10 +188,55 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
     } catch (error: any) {
       console.error('Sign out error:', error);
+      // Force clear anyway
+      clearAllLocalData();
+      setUser(null);
+      setSession(null);
       toast({
-        title: "Error signing out",
-        description: error.message,
-        variant: "destructive",
+        title: "Signed out",
+        description: "Your session has been cleared",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Sign out from all devices
+  const signOutAllDevices = async () => {
+    try {
+      setLoading(true);
+      
+      // Invalidate all sessions in database
+      try {
+        await supabase.rpc('invalidate_all_sessions');
+      } catch (e) {
+        // Continue even if this fails
+      }
+      
+      // Sign out from Supabase globally
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      if (error) throw error;
+      
+      // Clear all local data
+      clearAllLocalData();
+      
+      // Clear state
+      setUser(null);
+      setSession(null);
+      
+      toast({
+        title: "Signed out from all devices",
+        description: "All your sessions have been terminated",
+      });
+    } catch (error: any) {
+      console.error('Sign out all devices error:', error);
+      // Force clear anyway
+      clearAllLocalData();
+      setUser(null);
+      setSession(null);
+      toast({
+        title: "Signed out",
+        description: "Your sessions have been cleared",
       });
     } finally {
       setLoading(false);
@@ -156,7 +244,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signOut, refreshSession }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      loading, 
+      signOut, 
+      signOutAllDevices,
+      refreshSession 
+    }}>
       {children}
     </AuthContext.Provider>
   );

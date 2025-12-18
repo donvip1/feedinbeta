@@ -8,3 +8,6 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// Re-export types for convenience
+export type { User, Session } from '@supabase/supabase-js';
