@@ -2217,6 +2217,56 @@ export type Database = {
           },
         ]
       }
+      post_promotions: {
+        Row: {
+          boost_level: string
+          clicks: number | null
+          created_at: string | null
+          credits_spent: number
+          expires_at: string
+          id: string
+          impressions: number | null
+          is_active: boolean | null
+          post_id: string
+          started_at: string
+          user_id: string
+        }
+        Insert: {
+          boost_level?: string
+          clicks?: number | null
+          created_at?: string | null
+          credits_spent?: number
+          expires_at: string
+          id?: string
+          impressions?: number | null
+          is_active?: boolean | null
+          post_id: string
+          started_at?: string
+          user_id: string
+        }
+        Update: {
+          boost_level?: string
+          clicks?: number | null
+          created_at?: string | null
+          credits_spent?: number
+          expires_at?: string
+          id?: string
+          impressions?: number | null
+          is_active?: boolean | null
+          post_id?: string
+          started_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_promotions_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_shares: {
         Row: {
           created_at: string | null
@@ -3460,6 +3510,40 @@ export type Database = {
         }[]
       }
       get_post_view_count: { Args: { post_id_param: string }; Returns: number }
+      get_prioritized_feed: {
+        Args: {
+          p_feed_type?: string
+          p_limit?: number
+          p_user_id: string
+          p_viewed_post_ids?: string[]
+        }
+        Returns: {
+          allow_comments: boolean
+          allow_refeed: boolean
+          comments_count: number
+          content: string
+          created_at: string
+          feed_id: string
+          id: string
+          is_promoted: boolean
+          likes_count: number
+          location: string
+          media_type: string
+          media_types: string[]
+          media_url: string
+          media_urls: string[]
+          original_post_id: string
+          post_type: string
+          privacy: string
+          promotion_boost_level: string
+          refeeds_count: number
+          shares_count: number
+          status: string
+          updated_at: string
+          user_id: string
+          views_count: number
+        }[]
+      }
       get_unread_message_count: {
         Args: { conv_id: string; uid: string }
         Returns: number
@@ -3524,15 +3608,25 @@ export type Database = {
         Args: { attachment_id: string }
         Returns: undefined
       }
-      promote_post: {
-        Args: {
-          p_cost: number
-          p_original_author_id?: string
-          p_plan_name: string
-          p_post_id: string
-        }
-        Returns: Json
-      }
+      promote_post:
+        | {
+            Args: {
+              p_boost_type?: string
+              p_credits: number
+              p_original_author_id?: string
+              p_post_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_cost: number
+              p_original_author_id?: string
+              p_plan_name: string
+              p_post_id: string
+            }
+            Returns: Json
+          }
       send_gift: {
         Args: {
           p_cost: number
