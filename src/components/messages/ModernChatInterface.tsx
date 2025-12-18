@@ -72,11 +72,12 @@ interface Message {
 interface ChatInterfaceProps {
   conversationId: string;
   onBack: () => void;
+  onMessagesRead?: () => void;
 }
 
 const EMOJI_QUICK = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
-export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfaceProps) => {
+export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: ChatInterfaceProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -99,6 +100,9 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
+  const firstUnreadRef = useRef<HTMLDivElement>(null);
+  const hasScrolledToUnread = useRef(false);
+  const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
 
   // Track own presence so others know we're online
   useEffect(() => {
@@ -273,9 +277,21 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
     };
   }, [otherUser?.id]);
 
+  // Scroll to first unread message or bottom
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    if (messages.length === 0) return;
+    
+    // If we have unread messages and haven't scrolled to them yet
+    if (firstUnreadId && firstUnreadRef.current && !hasScrolledToUnread.current) {
+      hasScrolledToUnread.current = true;
+      setTimeout(() => {
+        firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    } else if (!firstUnreadId) {
+      // No unread messages, scroll to bottom
+      scrollToBottom();
+    }
+  }, [messages, firstUnreadId]);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -283,11 +299,22 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
     }
   };
 
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+  const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
     setShowScrollButton(!isNearBottom);
-  };
+    
+    // Mark messages as read when user scrolls to bottom
+    if (isNearBottom && messages.length > 0) {
+      const unreadMessages = messages.filter(
+        msg => msg.sender_id !== user?.id && 
+        !msg.read_receipts?.some(receipt => receipt.user_id === user?.id)
+      );
+      if (unreadMessages.length > 0) {
+        markMessagesAsRead(unreadMessages);
+      }
+    }
+  }, [messages, user?.id]);
 
   const loadMessages = async () => {
     if (!conversationId) return;
@@ -352,8 +379,16 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
       setMessages(formattedMessages);
       setPinnedMessages(formattedMessages.filter(m => m.is_pinned));
       
-      if (user) {
-        markMessagesAsRead(formattedMessages);
+      // Find first unread message to scroll to
+      const firstUnread = formattedMessages.find(
+        msg => msg.sender_id !== user?.id && 
+        !msg.read_receipts?.some(r => r.user_id === user?.id)
+      );
+      
+      if (firstUnread && !hasScrolledToUnread.current) {
+        setFirstUnreadId(firstUnread.id);
+      } else {
+        setFirstUnreadId(null);
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
@@ -393,7 +428,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
     }
   };
 
-  const markMessagesAsRead = async (messagesToMark: Message[]) => {
+  const markMessagesAsRead = useCallback(async (messagesToMark: Message[]) => {
     if (!user) return;
 
     try {
@@ -424,10 +459,16 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
           .select()
           .maybeSingle();
       }
+      
+      // Clear the unread indicator
+      setFirstUnreadId(null);
+      
+      // Notify parent that messages were read
+      onMessagesRead?.();
     } catch (error: any) {
       console.debug('Mark as read info:', error);
     }
-  };
+  }, [user, onMessagesRead]);
 
   const handleTyping = async () => {
     if (!user) return;
@@ -857,23 +898,39 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
               
               {/* Messages */}
               <div className="space-y-1">
-                {dateMessages.map((msg) => (
-                  <ModernMessageBubble
-                    key={msg.id}
-                    message={msg}
-                    isOwn={msg.sender_id === user?.id}
-                    showAvatar={true}
-                    isFirstInGroup={msg.isFirstInGroup}
-                    isLastInGroup={msg.isLastInGroup}
-                    onReply={(id, content) => setReplyingTo({ 
-                      id, 
-                      content, 
-                      sender: msg.profiles.display_name || 'Unknown' 
-                    })}
-                    onReact={handleReact}
-                    onDelete={handleDelete}
-                  />
-                ))}
+                {dateMessages.map((msg) => {
+                  const isFirstUnread = msg.id === firstUnreadId;
+                  return (
+                    <React.Fragment key={msg.id}>
+                      {isFirstUnread && (
+                        <div 
+                          ref={firstUnreadRef}
+                          className="flex items-center gap-3 py-2 my-2"
+                        >
+                          <div className="flex-1 h-px bg-primary/50" />
+                          <span className="text-xs font-medium text-primary px-2">
+                            Unread messages
+                          </span>
+                          <div className="flex-1 h-px bg-primary/50" />
+                        </div>
+                      )}
+                      <ModernMessageBubble
+                        message={msg}
+                        isOwn={msg.sender_id === user?.id}
+                        showAvatar={true}
+                        isFirstInGroup={msg.isFirstInGroup}
+                        isLastInGroup={msg.isLastInGroup}
+                        onReply={(id, content) => setReplyingTo({ 
+                          id, 
+                          content, 
+                          sender: msg.profiles.display_name || 'Unknown' 
+                        })}
+                        onReact={handleReact}
+                        onDelete={handleDelete}
+                      />
+                    </React.Fragment>
+                  );
+                })}
               </div>
             </div>
           ))}

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck } from 'lucide-react';
 import { ChatInterface } from '@/components/messages/ChatInterface';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
@@ -428,6 +428,36 @@ export default function Messages() {
     }
   };
 
+  const markAllMessagesAsRead = async () => {
+    if (!user) return;
+    
+    try {
+      // Get all conversation IDs for this user
+      const conversationIds = conversations.map(c => c.id);
+      
+      if (conversationIds.length === 0) return;
+      
+      // Mark all unread messages as read
+      await supabase
+        .from('messages')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .in('conversation_id', conversationIds)
+        .neq('sender_id', user.id)
+        .eq('is_read', false);
+      
+      // Update local state
+      setConversations(prev => prev.map(conv => ({ ...conv, unread_count: 0 })));
+      
+      toast({
+        title: 'All messages marked as read',
+      });
+    } catch (error) {
+      console.error('Error marking all messages as read:', error);
+    }
+  };
+
+  const totalUnreadCount = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
+
   const filteredConversations = conversations.filter(conv =>
     conv.other_participant.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.other_participant.username?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -463,13 +493,25 @@ export default function Messages() {
               <ArrowLeft className="w-5 h-5" />
             </Button>
             <h1 className="text-xl font-bold">Chats & Groups</h1>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
-            >
-              <Plus className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              {activeTab === 'chats' && totalUnreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={markAllMessagesAsRead}
+                  title="Mark all as read"
+                >
+                  <CheckCheck className="w-5 h-5" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -482,7 +524,14 @@ export default function Messages() {
           </div>
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="chats">Chats</TabsTrigger>
+              <TabsTrigger value="chats" className="relative">
+                Chats
+                {totalUnreadCount > 0 && (
+                  <span className="ml-1 bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 rounded-full">
+                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="groups">Groups</TabsTrigger>
               <TabsTrigger value="stories">Stories</TabsTrigger>
             </TabsList>
@@ -662,6 +711,14 @@ export default function Messages() {
           <ModernChatInterface
             conversationId={selectedConversationId}
             onBack={() => setSelectedConversationId(null)}
+            onMessagesRead={() => {
+              // Clear unread count for this conversation
+              setConversations(prev => prev.map(conv => 
+                conv.id === selectedConversationId 
+                  ? { ...conv, unread_count: 0 }
+                  : conv
+              ));
+            }}
           />
         ) : (
           <div className="hidden md:flex items-center justify-center h-full">
