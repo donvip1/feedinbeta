@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Phone, PhoneOff, Video } from 'lucide-react';
 import { callSounds } from '@/utils/callSounds';
+import { useAuth } from '@/hooks/useAuth';
 
 interface IncomingCallProps {
   callId: string;
@@ -25,6 +26,7 @@ export const IncomingCall = ({
   onReject,
 }: IncomingCallProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [isRinging, setIsRinging] = useState(true);
 
   useEffect(() => {
@@ -35,6 +37,76 @@ export const IncomingCall = ({
       callSounds.stopAllSounds();
     };
   }, []);
+
+  // Helper function to get or create conversation between two users
+  const getOrCreateConversation = async (userId1: string, userId2: string): Promise<string | null> => {
+    try {
+      const { data: existingConvs } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', userId1);
+      
+      if (existingConvs && existingConvs.length > 0) {
+        for (const conv of existingConvs) {
+          const { data: otherParticipant } = await supabase
+            .from('conversation_participants')
+            .select('user_id')
+            .eq('conversation_id', conv.conversation_id)
+            .eq('user_id', userId2)
+            .maybeSingle();
+          
+          if (otherParticipant) {
+            return conv.conversation_id;
+          }
+        }
+      }
+
+      const { data: newConv, error: convError } = await supabase
+        .from('conversations')
+        .insert({ updated_at: new Date().toISOString() })
+        .select()
+        .single();
+
+      if (convError || !newConv) return null;
+
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: newConv.id, user_id: userId1 },
+        { conversation_id: newConv.id, user_id: userId2 },
+      ]);
+
+      return newConv.id;
+    } catch (error) {
+      console.error('Error getting/creating conversation:', error);
+      return null;
+    }
+  };
+
+  // Insert call log message for declined calls
+  const insertDeclinedCallLog = async () => {
+    if (!user) return;
+    
+    try {
+      const conversationId = await getOrCreateConversation(callerId, user.id);
+      if (!conversationId) return;
+
+      // Format: CALL_LOG:type:status:duration:isOutgoing (isOutgoing from receiver's perspective = false)
+      const callLogContent = `CALL_LOG:${callType}:declined:0:false`;
+
+      await supabase.from('messages').insert({
+        conversation_id: conversationId,
+        sender_id: callerId, // The caller initiated the call
+        content: callLogContent,
+        media_type: 'call_log',
+      });
+
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', conversationId);
+    } catch (error) {
+      console.error('Error inserting declined call log:', error);
+    }
+  };
 
   const handleAccept = async () => {
     setIsRinging(false);
@@ -68,6 +140,9 @@ export const IncomingCall = ({
         .from('call_logs')
         .update({ status: 'rejected', ended_at: new Date().toISOString() })
         .eq('id', callId);
+
+      // Insert declined call log into conversation
+      await insertDeclinedCallLog();
 
       onReject();
     } catch (error) {
