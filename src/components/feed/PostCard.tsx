@@ -801,21 +801,19 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
             </div>
           </div>
 
-          {/* Promote button - visible to post author OR refeed/quote authors */}
+          {/* Promote button - visible to all logged-in users */}
           {user && (
-            user.id === post.user_id || 
-            ((post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post)
-          ) && (
             <button 
               onClick={() => navigate(`/promote/${post.id}`)}
               className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               <TrendingUp className="w-4 h-4" />
               <span>
-                {(post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post && user.id !== post.original_post.user_id
-                  ? 'Promote Creator'
-                  : 'Promote'
-                }
+                {(() => {
+                  // Determine the original author for attribution
+                  const originalAuthorId = post.original_post?.user_id || post.user_id;
+                  return user.id === originalAuthorId ? 'Promote' : 'Promote Creator';
+                })()}
               </span>
             </button>
           )}
