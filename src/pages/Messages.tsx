@@ -95,15 +95,7 @@ export default function Messages() {
       loadConversations();
       loadGroups();
       
-      // Subscribe to new messages to update unread counts - debounced
-      let reloadTimeout: NodeJS.Timeout | null = null;
-      const debouncedReload = () => {
-        if (reloadTimeout) clearTimeout(reloadTimeout);
-        reloadTimeout = setTimeout(() => {
-          loadConversations();
-        }, 1000); // Debounce to prevent rapid reloads
-      };
-
+      // Subscribe to new messages - update locally instead of reloading
       const channel = supabase
         .channel('messages-updates')
         .on(
@@ -114,26 +106,50 @@ export default function Messages() {
             table: 'messages'
           },
           (payload: any) => {
-            // Only reload if the message is for a conversation we're tracking
-            const convId = payload?.new?.conversation_id;
-            if (convId && !selectedConversationId) {
-              debouncedReload();
-            }
+            const newMsg = payload?.new;
+            if (!newMsg) return;
+            
+            const convId = newMsg.conversation_id;
+            // Update conversation list instantly without reload
+            setConversations(prev => {
+              const updated = prev.map(conv => {
+                if (conv.id === convId) {
+                  const isFromOther = newMsg.sender_id !== user.id;
+                  return {
+                    ...conv,
+                    updated_at: newMsg.created_at,
+                    last_message: {
+                      content: newMsg.content,
+                      created_at: newMsg.created_at,
+                      sender_id: newMsg.sender_id,
+                    },
+                    // Only increment unread if message is from other user and not viewing this conversation
+                    unread_count: isFromOther && selectedConversationId !== convId 
+                      ? (conv.unread_count || 0) + 1 
+                      : conv.unread_count,
+                  };
+                }
+                return conv;
+              });
+              // Sort by most recent
+              return updated.sort((a, b) => 
+                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+              );
+            });
           }
         )
         .subscribe();
 
       return () => {
-        if (reloadTimeout) clearTimeout(reloadTimeout);
         supabase.removeChannel(channel);
       };
     }
   }, [user, selectedConversationId]);
 
-  const loadConversations = async () => {
+  const loadConversations = async (showLoading = true) => {
     if (!user) return;
 
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const { data: participantData, error } = await supabase
         .from('conversation_participants')
@@ -246,7 +262,27 @@ export default function Messages() {
 
       if (error) throw error;
 
-      await loadConversations();
+      // Fetch the new user's profile for local state update
+      const { data: newUserProfile } = await supabase
+        .from('public_profiles')
+        .select('id, display_name, username, avatar_url')
+        .eq('id', userId)
+        .single();
+
+      // Add new conversation to state without reloading
+      const newConversation: Conversation = {
+        id: conversationId,
+        updated_at: new Date().toISOString(),
+        other_participant: {
+          id: userId,
+          display_name: newUserProfile?.display_name || 'Unknown',
+          username: newUserProfile?.username || null,
+          avatar_url: newUserProfile?.avatar_url || null,
+        },
+        unread_count: 0,
+      };
+
+      setConversations(prev => [newConversation, ...prev]);
       setSelectedConversationId(conversationId);
       setShowNewConversation(false);
     } catch (error: any) {
@@ -377,17 +413,22 @@ export default function Messages() {
                 filteredConversations.map((conv) => (
                   <button
                     key={conv.id}
-                    onClick={async () => {
+                    onClick={() => {
                       setSelectedConversationId(conv.id);
-                      // Mark messages as read when conversation is opened
+                      // Mark messages as read locally and in database without reloading
                       if (user && conv.unread_count && conv.unread_count > 0) {
-                        await supabase
+                        // Update local state immediately
+                        setConversations(prev => prev.map(c => 
+                          c.id === conv.id ? { ...c, unread_count: 0 } : c
+                        ));
+                        // Update database in background (no await)
+                        supabase
                           .from('messages')
                           .update({ is_read: true, read_at: new Date().toISOString() })
                           .eq('conversation_id', conv.id)
                           .neq('sender_id', user.id)
-                          .eq('is_read', false);
-                        loadConversations();
+                          .eq('is_read', false)
+                          .then(() => {});
                       }
                     }}
                     className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors ${
