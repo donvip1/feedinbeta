@@ -22,6 +22,7 @@ const ProfileEdit = () => {
   const [aboutVisibility, setAboutVisibility] = useState('public');
   const [canChangeAbout, setCanChangeAbout] = useState(true);
   const [lastAboutChange, setLastAboutChange] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -33,13 +34,14 @@ const ProfileEdit = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('status, status_visibility, about, about_visibility, about_updated_at')
+        .select('username, status, status_visibility, about, about_visibility, about_updated_at')
         .eq('id', user?.id)
         .single();
 
       if (error) throw error;
 
       if (data) {
+        setUsername(data.username);
         setStatus(data.status || '');
         setStatusVisibility(data.status_visibility || 'public');
         setAbout(data.about || '');
@@ -105,7 +107,7 @@ const ProfileEdit = () => {
         description: 'Your status and about have been saved',
       });
 
-      navigate(`/profile/${user?.id}`);
+      navigate(`/profile/${username || user?.id}`);
     } catch (error: any) {
       toast({
         title: 'Error updating profile',

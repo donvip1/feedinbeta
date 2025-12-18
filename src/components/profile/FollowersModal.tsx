@@ -150,7 +150,7 @@ export const FollowersModal = ({ open, onClose, userId, defaultTab = 'followers'
         <div 
           className="flex items-center gap-3 flex-1 cursor-pointer"
           onClick={() => {
-            navigate(`/profile/${userData.id}`);
+            navigate(`/profile/${userData.username || userData.id}`);
             onClose();
           }}
         >

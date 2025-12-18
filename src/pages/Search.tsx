@@ -180,7 +180,7 @@ const Search = () => {
                 users.map((profile) => (
                   <div
                     key={profile.id}
-                    onClick={() => navigate(`/profile/${profile.id}`)}
+                    onClick={() => navigate(`/profile/${profile.username || profile.id}`)}
                     className="flex items-center gap-3 p-3 rounded-lg hover:bg-accent cursor-pointer"
                   >
                     <Avatar>

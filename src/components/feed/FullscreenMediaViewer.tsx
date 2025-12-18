@@ -368,7 +368,7 @@ export default function FullscreenMediaViewer({
 
   const handleProfileClick = () => {
     onClose();
-    navigate(`/profile/${currentPost.user_id}`);
+    navigate(`/profile/${currentPost.profiles?.username || currentPost.user_id}`);
   };
 
   // Social actions
