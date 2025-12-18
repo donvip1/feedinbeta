@@ -3569,7 +3569,7 @@ export type Database = {
           stripe_customer_id: string
         }[]
       }
-      get_my_stream_key: { Args: { p_stream_id: string }; Returns: string }
+      get_my_stream_key: { Args: { stream_id_param: string }; Returns: string }
       get_personalized_feed: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {

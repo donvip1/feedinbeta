@@ -33,8 +33,9 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
 
   const loadProfile = async () => {
     try {
+      // Use public_profiles for viewing OTHER users' profiles (secure view)
       const { data, error } = await supabase
-        .from('profiles')
+        .from('public_profiles')
         .select('*')
         .eq('id', userId)
         .single();

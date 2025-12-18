@@ -103,21 +103,30 @@ const Profile = () => {
 
   const loadProfile = async () => {
     try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select(`
-          *,
-          instagram_url,
-          twitter_url,
-          linkedin_url,
-          facebook_url,
-          tiktok_url,
-          youtube_url,
-          website_url,
-          cover_url
-        `)
-        .eq('id', userId)
-        .maybeSingle();
+      // Use public_profiles for viewing OTHER users' profiles (secure view)
+      // Use profiles for viewing OWN profile (full access)
+      const isOwnProfile = userId === user?.id;
+      
+      let profileData: any = null;
+      let profileError: any = null;
+      
+      if (isOwnProfile) {
+        const result = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        profileData = result.data;
+        profileError = result.error;
+      } else {
+        const result = await supabase
+          .from('public_profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        profileData = result.data;
+        profileError = result.error;
+      }
 
       if (profileError) throw profileError;
       
