@@ -2921,21 +2921,27 @@ export type Database = {
         Row: {
           created_at: string | null
           phone_number: string | null
+          phone_number_encrypted: string | null
           stripe_customer_id: string | null
+          stripe_customer_id_encrypted: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
           phone_number?: string | null
+          phone_number_encrypted?: string | null
           stripe_customer_id?: string | null
+          stripe_customer_id_encrypted?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
           phone_number?: string | null
+          phone_number_encrypted?: string | null
           stripe_customer_id?: string | null
+          stripe_customer_id_encrypted?: string | null
           updated_at?: string | null
           user_id?: string
         }
@@ -4112,6 +4118,7 @@ export type Database = {
         Returns: {
           phone_number: string
           stripe_customer_id: string
+          user_id: string
         }[]
       }
       get_my_stream_key: { Args: { stream_id_param: string }; Returns: string }
