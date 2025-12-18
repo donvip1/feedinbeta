@@ -2514,14 +2514,12 @@ export type Database = {
           location: string | null
           marital_status: string | null
           max_friends: number | null
-          phone_number: string | null
           preferred_language: string | null
           purpose: string[] | null
           purpose_updated_at: string | null
           status: string | null
           status_updated_at: string | null
           status_visibility: string | null
-          stripe_customer_id: string | null
           tiktok_url: string | null
           total_views: number | null
           twitter_url: string | null
@@ -2564,14 +2562,12 @@ export type Database = {
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
-          phone_number?: string | null
           preferred_language?: string | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
           status?: string | null
           status_updated_at?: string | null
           status_visibility?: string | null
-          stripe_customer_id?: string | null
           tiktok_url?: string | null
           total_views?: number | null
           twitter_url?: string | null
@@ -2614,14 +2610,12 @@ export type Database = {
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
-          phone_number?: string | null
           preferred_language?: string | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
           status?: string | null
           status_updated_at?: string | null
           status_visibility?: string | null
-          stripe_customer_id?: string | null
           tiktok_url?: string | null
           total_views?: number | null
           twitter_url?: string | null
@@ -3300,82 +3294,64 @@ export type Database = {
       }
       public_profiles: {
         Row: {
-          age: number | null
+          about: string | null
+          about_visibility: string | null
           avatar_url: string | null
           banner_url: string | null
           bio: string | null
-          country: string | null
           cover_url: string | null
           created_at: string | null
           display_name: string | null
-          facebook_url: string | null
           followers_count: number | null
           following_count: number | null
           id: string | null
-          instagram_url: string | null
+          interests: string[] | null
           is_premium: boolean | null
-          linkedin_url: string | null
-          location: string | null
-          marital_status: string | null
-          phone_number: string | null
-          stripe_customer_id: string | null
-          tiktok_url: string | null
-          twitter_url: string | null
+          purpose: string[] | null
+          status: string | null
+          status_visibility: string | null
+          total_views: number | null
           username: string | null
-          website_url: string | null
-          youtube_url: string | null
         }
         Insert: {
-          age?: never
+          about?: string | null
+          about_visibility?: string | null
           avatar_url?: string | null
-          banner_url?: never
+          banner_url?: string | null
           bio?: string | null
-          country?: never
-          cover_url?: never
+          cover_url?: string | null
           created_at?: string | null
           display_name?: string | null
-          facebook_url?: never
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
-          instagram_url?: never
+          interests?: string[] | null
           is_premium?: boolean | null
-          linkedin_url?: never
-          location?: never
-          marital_status?: never
-          phone_number?: never
-          stripe_customer_id?: never
-          tiktok_url?: never
-          twitter_url?: never
+          purpose?: string[] | null
+          status?: string | null
+          status_visibility?: string | null
+          total_views?: number | null
           username?: string | null
-          website_url?: never
-          youtube_url?: never
         }
         Update: {
-          age?: never
+          about?: string | null
+          about_visibility?: string | null
           avatar_url?: string | null
-          banner_url?: never
+          banner_url?: string | null
           bio?: string | null
-          country?: never
-          cover_url?: never
+          cover_url?: string | null
           created_at?: string | null
           display_name?: string | null
-          facebook_url?: never
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
-          instagram_url?: never
+          interests?: string[] | null
           is_premium?: boolean | null
-          linkedin_url?: never
-          location?: never
-          marital_status?: never
-          phone_number?: never
-          stripe_customer_id?: never
-          tiktok_url?: never
-          twitter_url?: never
+          purpose?: string[] | null
+          status?: string | null
+          status_visibility?: string | null
+          total_views?: number | null
           username?: string | null
-          website_url?: never
-          youtube_url?: never
         }
         Relationships: []
       }
