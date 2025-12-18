@@ -2920,27 +2920,21 @@ export type Database = {
       profile_sensitive_data: {
         Row: {
           created_at: string | null
-          phone_number: string | null
           phone_number_encrypted: string | null
-          stripe_customer_id: string | null
           stripe_customer_id_encrypted: string | null
           updated_at: string | null
           user_id: string
         }
         Insert: {
           created_at?: string | null
-          phone_number?: string | null
           phone_number_encrypted?: string | null
-          stripe_customer_id?: string | null
           stripe_customer_id_encrypted?: string | null
           updated_at?: string | null
           user_id: string
         }
         Update: {
           created_at?: string | null
-          phone_number?: string | null
           phone_number_encrypted?: string | null
-          stripe_customer_id?: string | null
           stripe_customer_id_encrypted?: string | null
           updated_at?: string | null
           user_id?: string
