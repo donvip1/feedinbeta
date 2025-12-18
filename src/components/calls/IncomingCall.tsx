@@ -28,16 +28,17 @@ export const IncomingCall = ({
   const [isRinging, setIsRinging] = useState(true);
 
   useEffect(() => {
+    callSounds.reset();
     callSounds.playRinging();
 
     return () => {
-      callSounds.stopRinging();
+      callSounds.stopAllSounds();
     };
   }, []);
 
   const handleAccept = async () => {
     setIsRinging(false);
-    callSounds.stopRinging();
+    callSounds.stopAllSounds();
     callSounds.playConnected();
     
     try {
@@ -58,7 +59,7 @@ export const IncomingCall = ({
 
   const handleReject = async () => {
     setIsRinging(false);
-    callSounds.stopRinging();
+    callSounds.stopAllSounds();
     callSounds.playDisconnected();
     
     try {

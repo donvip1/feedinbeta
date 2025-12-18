@@ -1,11 +1,10 @@
 import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
-
-
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
+import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -86,7 +85,7 @@ const App = () => {
         <BrowserRouter>
             <AuthProvider>
               <Toaster />
-
+              <IncomingCallListener />
             <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />
