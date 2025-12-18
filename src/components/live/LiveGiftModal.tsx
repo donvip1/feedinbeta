@@ -10,7 +10,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { Gift, Coins, Send, Heart, Star, Trophy, Zap, Crown, Diamond, Sparkles } from "lucide-react";
+import { Gift, Coins, Send } from "lucide-react";
+import LottieGiftEmoji from "@/components/shared/LottieGiftEmoji";
 
 interface LiveGiftModalProps {
   isOpen: boolean;
@@ -21,14 +22,15 @@ interface LiveGiftModalProps {
   isHost: boolean;
 }
 
+// Unique 3D animated gift types for live streaming
 const GIFTS = [
-  { type: "heart", icon: Heart, label: "Heart", value: 10, color: "text-red-500" },
-  { type: "star", icon: Star, label: "Star", value: 25, color: "text-yellow-500" },
-  { type: "trophy", icon: Trophy, label: "Trophy", value: 50, color: "text-amber-500" },
-  { type: "zap", icon: Zap, label: "Lightning", value: 100, color: "text-blue-500" },
-  { type: "crown", icon: Crown, label: "Crown", value: 250, color: "text-purple-500" },
-  { type: "diamond", icon: Diamond, label: "Diamond", value: 500, color: "text-cyan-500" },
-  { type: "sparkles", icon: Sparkles, label: "Universe", value: 1000, color: "text-pink-500" },
+  { type: "heart", label: "Heart", value: 10, color: "from-red-400 to-pink-500" },
+  { type: "star", label: "Star", value: 25, color: "from-yellow-400 to-amber-500" },
+  { type: "trophy", label: "Trophy", value: 50, color: "from-amber-500 to-yellow-600" },
+  { type: "lightning", label: "Lightning", value: 100, color: "from-blue-400 to-indigo-500" },
+  { type: "crown", label: "Crown", value: 250, color: "from-purple-400 to-violet-500" },
+  { type: "diamond", label: "Diamond", value: 500, color: "from-cyan-400 to-blue-500" },
+  { type: "universe", label: "Universe", value: 1000, color: "from-pink-400 to-purple-500" },
 ];
 
 export const LiveGiftModal = ({
@@ -147,13 +149,19 @@ export const LiveGiftModal = ({
                 <Button
                   key={gift.type}
                   variant="outline"
-                  className="flex flex-col items-center gap-1 h-auto py-3 hover:border-primary"
+                  className={`flex flex-col items-center gap-1 h-auto py-3 hover:border-primary relative overflow-hidden`}
                   onClick={() => handleSendGift(gift.type, gift.value)}
                   disabled={sending || (isHost && !selectedRecipient)}
                 >
-                  <gift.icon className={`w-6 h-6 ${gift.color}`} />
-                  <span className="text-xs font-medium">{gift.label}</span>
-                  <Badge variant="secondary" className="text-xs">
+                  <div className={`absolute inset-0 bg-gradient-to-br ${gift.color} opacity-10`} />
+                  
+                  {/* 3D Animated Lottie Emoji */}
+                  <div className="relative">
+                    <LottieGiftEmoji giftType={gift.type} size={40} />
+                  </div>
+                  
+                  <span className="text-xs font-medium relative">{gift.label}</span>
+                  <Badge variant="secondary" className="text-xs relative">
                     {gift.value}
                   </Badge>
                 </Button>
