@@ -2787,6 +2787,9 @@ export type Database = {
           preferred_language: string | null
           purpose: string[] | null
           purpose_updated_at: string | null
+          referral_code: string | null
+          referral_count: number | null
+          referred_by: string | null
           status: string | null
           status_updated_at: string | null
           status_visibility: string | null
@@ -2794,7 +2797,7 @@ export type Database = {
           total_views: number | null
           twitter_url: string | null
           updated_at: string
-          username: string | null
+          username: string
           website_url: string | null
           youtube_url: string | null
         }
@@ -2835,6 +2838,9 @@ export type Database = {
           preferred_language?: string | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
+          referral_code?: string | null
+          referral_count?: number | null
+          referred_by?: string | null
           status?: string | null
           status_updated_at?: string | null
           status_visibility?: string | null
@@ -2842,7 +2848,7 @@ export type Database = {
           total_views?: number | null
           twitter_url?: string | null
           updated_at?: string
-          username?: string | null
+          username: string
           website_url?: string | null
           youtube_url?: string | null
         }
@@ -2883,6 +2889,9 @@ export type Database = {
           preferred_language?: string | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
+          referral_code?: string | null
+          referral_count?: number | null
+          referred_by?: string | null
           status?: string | null
           status_updated_at?: string | null
           status_visibility?: string | null
@@ -2890,11 +2899,26 @@ export type Database = {
           total_views?: number | null
           twitter_url?: string | null
           updated_at?: string
-          username?: string | null
+          username?: string
           website_url?: string | null
           youtube_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       referral_codes: {
         Row: {
@@ -3832,6 +3856,7 @@ export type Database = {
         Args: { conv_id: string; uid: string }
         Returns: number
       }
+      get_user_by_username: { Args: { p_username: string }; Returns: string }
       get_user_post_count: { Args: { user_uuid: string }; Returns: number }
       get_user_public_profile: {
         Args: { target_user_id: string }
@@ -3900,6 +3925,7 @@ export type Database = {
         Args: { muted: string; muter: string }
         Returns: boolean
       }
+      is_username_available: { Args: { p_username: string }; Returns: boolean }
       mark_attachment_downloaded: {
         Args: { attachment_id: string }
         Returns: undefined

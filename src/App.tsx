@@ -85,32 +85,61 @@ const App = () => {
               <Toaster />
 
             <Routes>
+            {/* Main */}
             <Route path="/" element={<Index />} />
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/auth" element={<Auth />} />
+            
+            {/* Feed & Content */}
             <Route path="/feed" element={<Feed />} />
+            <Route path="/feed/post/:postId" element={<PostDetail />} />
+            <Route path="/feed/trending" element={<Trending />} />
+            <Route path="/feed/search" element={<Search />} />
+            <Route path="/feed/hashtag/:hashtag" element={<HashtagSearch />} />
+            
+            {/* Profile - supports both username and UUID */}
+            <Route path="/profile/:identifier" element={<Profile />} />
+            <Route path="/profile/:identifier/edit" element={<ProfileEdit />} />
+            
+            {/* Social */}
             <Route path="/messages" element={<Messages />} />
             <Route path="/friends" element={<Friends />} />
-            <Route path="/profile/:userId" element={<Profile />} />
-            <Route path="/profile-edit" element={<ProfileEdit />} />
             <Route path="/call" element={<Call />} />
-            <Route path="/call-history" element={<CallHistory />} />
+            <Route path="/call/history" element={<CallHistory />} />
+            
+            {/* Live & Stories */}
             <Route path="/live" element={<Live />} />
-            <Route path="/ai-copilot" element={<AICopilot />} />
-            <Route path="/thesis-writer" element={<ThesisWriter />} />
-            <Route path="/video-creation" element={<VideoCreation />} />
-            <Route path="/educational-qa" element={<EducationalQA />} />
-            <Route path="/project-writing" element={<ProjectWriting />} />
-            <Route path="/image-generation" element={<ImageGeneration />} />
-            <Route path="/image-enhancement" element={<ImageEnhancement />} />
+            <Route path="/live/stream/:streamId" element={<LiveStreamDetail />} />
+            <Route path="/story/:storyId" element={<StoryDetail />} />
+            
+            {/* AI Features */}
+            <Route path="/ai/copilot" element={<AICopilot />} />
+            <Route path="/ai/thesis" element={<ThesisWriter />} />
+            <Route path="/ai/video" element={<VideoCreation />} />
+            <Route path="/ai/education" element={<EducationalQA />} />
+            <Route path="/ai/project" element={<ProjectWriting />} />
+            <Route path="/ai/image-gen" element={<ImageGeneration />} />
+            <Route path="/ai/enhance" element={<ImageEnhancement />} />
+            <Route path="/ai/learn" element={<LearnTech />} />
+            
+            {/* Groups */}
             <Route path="/groups" element={<Groups />} />
             <Route path="/groups/:groupId" element={<GroupDetail />} />
-            <Route path="/subscription" element={<Subscription />} />
-            <Route path="/credits" element={<Credits />} />
+            
+            {/* Wallet & Credits */}
+            <Route path="/wallet" element={<Wallet />} />
+            <Route path="/wallet/credits" element={<Credits />} />
+            <Route path="/wallet/subscription" element={<Subscription />} />
+            <Route path="/wallet/p2p" element={<P2PMarketplace />} />
+            <Route path="/wallet/p2p/:transactionId" element={<P2PTransaction />} />
+            <Route path="/wallet/admin" element={<AdminWallet />} />
+            
+            {/* Posts & Content Management */}
             <Route path="/saved" element={<SavedPosts />} />
             <Route path="/promote/:postId" element={<Promote />} />
-            <Route path="/post/:postId" element={<PostDetail />} />
             <Route path="/moderation" element={<Moderation />} />
+            
+            {/* Settings */}
             <Route path="/settings" element={<Settings />} />
             <Route path="/settings/account" element={<AccountSettings />} />
             <Route path="/settings/privacy" element={<PrivacySettings />} />
@@ -119,18 +148,31 @@ const App = () => {
             <Route path="/settings/blocked" element={<BlockedUsers />} />
             <Route path="/settings/language" element={<LanguageSettings />} />
             <Route path="/settings/help" element={<HelpSupport />} />
+            
+            {/* Legacy routes for backwards compatibility */}
+            <Route path="/post/:postId" element={<PostDetail />} />
+            <Route path="/profile-edit" element={<ProfileEdit />} />
+            <Route path="/call-history" element={<CallHistory />} />
+            <Route path="/ai-copilot" element={<AICopilot />} />
+            <Route path="/thesis-writer" element={<ThesisWriter />} />
+            <Route path="/video-creation" element={<VideoCreation />} />
+            <Route path="/educational-qa" element={<EducationalQA />} />
+            <Route path="/project-writing" element={<ProjectWriting />} />
+            <Route path="/image-generation" element={<ImageGeneration />} />
+            <Route path="/image-enhancement" element={<ImageEnhancement />} />
+            <Route path="/subscription" element={<Subscription />} />
+            <Route path="/credits" element={<Credits />} />
             <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
             <Route path="/p2p-transaction/:transactionId" element={<P2PTransaction />} />
-            <Route path="/initialize-groups" element={<InitializeGroups />} />
             <Route path="/trending" element={<Trending />} />
-            <Route path="/wallet" element={<Wallet />} />
-            <Route path="/learn-tech" element={<LearnTech />} />
             <Route path="/search" element={<Search />} />
             <Route path="/hashtag/:hashtag" element={<HashtagSearch />} />
-            <Route path="/story/:storyId" element={<StoryDetail />} />
             <Route path="/stream/:streamId" element={<LiveStreamDetail />} />
             <Route path="/admin-wallet" element={<AdminWallet />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="/learn-tech" element={<LearnTech />} />
+            <Route path="/initialize-groups" element={<InitializeGroups />} />
+            
+            {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
