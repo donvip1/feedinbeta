@@ -8,9 +8,18 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Shield, Eye, Lock, Users, Moon, Sun } from 'lucide-react';
+import { ArrowLeft, Shield, Eye, Lock, Users, Moon, Sun, Loader2, MessageCircle, Activity } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useTheme } from 'next-themes';
+
+interface PrivacySettingsData {
+  profile_visible: boolean;
+  show_online_status: boolean;
+  allow_friend_requests: boolean;
+  allow_messages_from_strangers: boolean;
+  show_read_receipts: boolean;
+  show_activity_status: boolean;
+}
 
 const PrivacySettings = () => {
   const navigate = useNavigate();
@@ -18,43 +27,84 @@ const PrivacySettings = () => {
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState({
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [settings, setSettings] = useState<PrivacySettingsData>({
     profile_visible: true,
     show_online_status: true,
     allow_friend_requests: true,
-    allow_messages: true,
+    allow_messages_from_strangers: false,
+    show_read_receipts: true,
+    show_activity_status: true,
   });
 
   useEffect(() => {
-    if (!user) {
-      return;
-    }
+    if (!user) return;
     loadSettings();
   }, [user]);
 
   const loadSettings = async () => {
-    // Load privacy settings from profiles or a dedicated privacy_settings table
-    // For now, using default values
-    setSettings({
-      profile_visible: true,
-      show_online_status: true,
-      allow_friend_requests: true,
-      allow_messages: true,
-    });
+    try {
+      const { data, error } = await supabase
+        .from('privacy_settings')
+        .select('*')
+        .eq('user_id', user?.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          // No settings found, create default settings
+          const { error: insertError } = await supabase
+            .from('privacy_settings')
+            .insert([{ user_id: user?.id }]);
+          
+          if (insertError) throw insertError;
+        } else {
+          throw error;
+        }
+      } else if (data) {
+        setSettings({
+          profile_visible: data.profile_visible ?? true,
+          show_online_status: data.show_online_status ?? true,
+          allow_friend_requests: data.allow_friend_requests ?? true,
+          allow_messages_from_strangers: data.allow_messages_from_strangers ?? false,
+          show_read_receipts: data.show_read_receipts ?? true,
+          show_activity_status: data.show_activity_status ?? true,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error loading privacy settings:', error);
+      toast({
+        title: 'Error loading settings',
+        description: 'Using default privacy settings.',
+        variant: 'destructive',
+      });
+    } finally {
+      setInitialLoading(false);
+    }
   };
 
-  const handleToggle = (key: keyof typeof settings) => {
+  const handleToggle = (key: keyof PrivacySettingsData) => {
     setSettings({ ...settings, [key]: !settings[key] });
   };
 
   const handleSave = async () => {
+    if (!user) return;
+
     setLoading(true);
     try {
-      // In production, save to a privacy_settings table
-      // For now, just show success
+      const { error } = await supabase
+        .from('privacy_settings')
+        .upsert({
+          user_id: user.id,
+          ...settings,
+          updated_at: new Date().toISOString(),
+        });
+
+      if (error) throw error;
+
       toast({
         title: 'Privacy settings updated',
-        description: 'Your privacy preferences have been saved',
+        description: 'Your privacy preferences have been saved.',
       });
     } catch (error: any) {
       toast({
@@ -77,9 +127,9 @@ const PrivacySettings = () => {
     },
     {
       key: 'show_online_status' as const,
-      icon: Users,
+      icon: Activity,
       title: 'Show Online Status',
-      description: 'Let friends see when you\'re online',
+      description: "Let friends see when you're online",
       color: 'text-green-500',
     },
     {
@@ -90,11 +140,25 @@ const PrivacySettings = () => {
       color: 'text-purple-500',
     },
     {
-      key: 'allow_messages' as const,
-      icon: Lock,
-      title: 'Allow Messages',
-      description: 'Let non-friends send you messages',
+      key: 'allow_messages_from_strangers' as const,
+      icon: MessageCircle,
+      title: 'Messages from Non-Friends',
+      description: 'Allow non-friends to send you messages',
       color: 'text-pink-500',
+    },
+    {
+      key: 'show_read_receipts' as const,
+      icon: Eye,
+      title: 'Read Receipts',
+      description: 'Show when you have read messages',
+      color: 'text-cyan-500',
+    },
+    {
+      key: 'show_activity_status' as const,
+      icon: Activity,
+      title: 'Activity Status',
+      description: 'Show your recent activity to others',
+      color: 'text-orange-500',
     },
   ];
 
@@ -107,7 +171,7 @@ const PrivacySettings = () => {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <Shield className="w-5 h-5 text-purple-500" />
-            <span className="text-xl font-bold">Privacy Settings</span>
+            <span className="text-xl font-bold">Privacy & Security</span>
           </div>
         </div>
       </header>
@@ -115,39 +179,45 @@ const PrivacySettings = () => {
       <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">
         <Card className="bg-card border-border p-6">
           <div className="mb-6">
-            <h2 className="text-2xl font-bold mb-2">Privacy & Security</h2>
+            <h2 className="text-2xl font-bold mb-2">Privacy Settings</h2>
             <p className="text-muted-foreground">
               Control who can see your content and interact with you
             </p>
           </div>
 
-          <div className="space-y-6">
-            {privacyOptions.map((option, index) => (
-              <div key={option.key}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className={option.color}>
-                      <option.icon className="w-5 h-5" />
+          {initialLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {privacyOptions.map((option, index) => (
+                <div key={option.key}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-4">
+                      <div className={option.color}>
+                        <option.icon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <Label htmlFor={option.key} className="font-semibold cursor-pointer">
+                          {option.title}
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {option.description}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <Label htmlFor={option.key} className="font-semibold cursor-pointer">
-                        {option.title}
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        {option.description}
-                      </p>
-                    </div>
+                    <Switch
+                      id={option.key}
+                      checked={settings[option.key]}
+                      onCheckedChange={() => handleToggle(option.key)}
+                    />
                   </div>
-                  <Switch
-                    id={option.key}
-                    checked={settings[option.key]}
-                    onCheckedChange={() => handleToggle(option.key)}
-                  />
+                  {index < privacyOptions.length - 1 && <Separator className="mt-6" />}
                 </div>
-                {index < privacyOptions.length - 1 && <Separator className="mt-6" />}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <Separator className="my-6" />
 
@@ -174,10 +244,17 @@ const PrivacySettings = () => {
 
           <Button
             onClick={handleSave}
-            disabled={loading}
+            disabled={loading || initialLoading}
             className="w-full mt-8 bg-gradient-primary"
           >
-            {loading ? 'Saving...' : 'Save Privacy Settings'}
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Privacy Settings'
+            )}
           </Button>
         </Card>
 

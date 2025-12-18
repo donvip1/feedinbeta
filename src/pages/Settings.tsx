@@ -18,10 +18,13 @@ import {
   UsersRound,
   Wallet,
   Coins,
-  Layers,
   Crown,
   Bookmark,
-  HardDrive
+  HardDrive,
+  Globe,
+  HelpCircle,
+  Users,
+  Radio
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -35,7 +38,7 @@ const Settings = () => {
     }
   }, [loading, user, navigate]);
 
-  const settingsOptions = [
+  const accountOptions = [
     {
       icon: User,
       title: 'Account Settings',
@@ -45,7 +48,7 @@ const Settings = () => {
     },
     {
       icon: Shield,
-      title: 'Privacy Settings',
+      title: 'Privacy & Security',
       description: 'Control who can see your content',
       route: '/settings/privacy',
       color: 'text-purple-500'
@@ -65,11 +68,66 @@ const Settings = () => {
       color: 'text-red-500'
     },
     {
-      icon: HardDrive,
-      title: 'Cache & Storage',
-      description: 'Manage app cache and cookies',
-      route: '/settings/cache',
-      color: 'text-cyan-500'
+      icon: Globe,
+      title: 'Language',
+      description: 'Choose your preferred language',
+      route: '/settings/language',
+      color: 'text-teal-500'
+    }
+  ];
+
+  const walletOptions = [
+    {
+      icon: Wallet,
+      title: 'Wallet & Credits',
+      description: 'View balance, buy and send credits',
+      route: '/wallet',
+      color: 'text-green-500'
+    },
+    {
+      icon: Crown,
+      title: 'Subscription Plans',
+      description: 'Upgrade to premium features',
+      route: '/subscription',
+      color: 'text-yellow-500'
+    },
+    {
+      icon: Coins,
+      title: 'Buy Credits',
+      description: 'Purchase credit packages',
+      route: '/credits',
+      color: 'text-amber-500'
+    }
+  ];
+
+  const socialOptions = [
+    {
+      icon: Users,
+      title: 'Friends',
+      description: 'Manage friends and requests',
+      route: '/friends',
+      color: 'text-blue-500'
+    },
+    {
+      icon: UsersRound,
+      title: 'Groups',
+      description: 'Your communities and groups',
+      route: '/groups',
+      color: 'text-indigo-500'
+    },
+    {
+      icon: Bookmark,
+      title: 'Saved Posts',
+      description: 'View your saved content',
+      route: '/saved',
+      color: 'text-orange-500'
+    },
+    {
+      icon: Radio,
+      title: 'Live Streaming',
+      description: 'Go live and watch streams',
+      route: '/live',
+      color: 'text-red-500'
     }
   ];
 
@@ -83,6 +141,54 @@ const Settings = () => {
     }
   ];
 
+  const supportOptions = [
+    {
+      icon: HelpCircle,
+      title: 'Help & Support',
+      description: 'FAQ, contact support, report issues',
+      route: '/settings/help',
+      color: 'text-cyan-500'
+    },
+    {
+      icon: HardDrive,
+      title: 'Cache & Storage',
+      description: 'Manage app cache and cookies',
+      route: '/settings/cache',
+      color: 'text-slate-500'
+    }
+  ];
+
+  const renderOptionsList = (options: typeof accountOptions) => (
+    <div className="space-y-1">
+      {options.map((option, index) => (
+        <div key={option.route}>
+          <button
+            onClick={() => navigate(option.route)}
+            className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-gradient-to-r hover:from-secondary/50 hover:to-accent/20 transition-all duration-300 group border border-transparent hover:border-border/50"
+          >
+            <div className="flex items-center space-x-4">
+              <div className={`${option.color} bg-gradient-to-br from-secondary/40 to-secondary/20 p-3 rounded-xl shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                <option.icon className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <h3 className={`font-semibold ${option.color} transition-colors`}>
+                  {option.title}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {option.description}
+                </p>
+              </div>
+            </div>
+            <ChevronRight className={`w-5 h-5 ${option.color} group-hover:translate-x-1 transition-all`} />
+          </button>
+          {index < options.length - 1 && (
+            <Separator className="my-1 bg-border/30" />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -91,7 +197,7 @@ const Settings = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Button
-                onClick={() => navigate(`/profile/${user.id}`)}
+                onClick={() => navigate(`/profile/${user?.id}`)}
                 size="sm"
                 variant="ghost"
                 className="hover:bg-secondary"
@@ -109,76 +215,60 @@ const Settings = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">
-        {/* Main Settings Card */}
+        {/* Account Settings Card */}
         <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl">
           <div className="p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold mb-2 text-foreground">Settings</h2>
-              <p className="text-muted-foreground">
-                Manage your account and preferences
-              </p>
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                Account & Privacy
+              </h2>
             </div>
+            {renderOptionsList(accountOptions)}
+          </div>
+        </Card>
 
-            <div className="space-y-1">
-              {settingsOptions.map((option, index) => (
-                <div key={option.route}>
-                  <button
-                    onClick={() => navigate(option.route)}
-                    className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-gradient-to-r hover:from-secondary/50 hover:to-accent/20 transition-all duration-300 group border border-transparent hover:border-border/50"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className={`${option.color} bg-gradient-to-br from-secondary/40 to-secondary/20 p-3 rounded-xl shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                        <option.icon className="w-5 h-5" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className={`font-semibold ${option.color} transition-colors`}>
-                          {option.title}
-                        </h3>
-                        <p className="text-sm text-gray-300">
-                          {option.description}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight className={`w-5 h-5 ${option.color} group-hover:translate-x-1 transition-all`} />
-                  </button>
-                  {index < settingsOptions.length - 1 && (
-                    <Separator className="my-1 bg-border/30" />
-                  )}
-                </div>
-              ))}
-            </div>
+        {/* Wallet & Subscription Card */}
+        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
+          <div className="p-6">
+            <h3 className="text-lg font-bold mb-4 text-foreground flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-green-500" />
+              Wallet & Subscription
+            </h3>
+            {renderOptionsList(walletOptions)}
+          </div>
+        </Card>
+
+        {/* Social & Content Card */}
+        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
+          <div className="p-6">
+            <h3 className="text-lg font-bold mb-4 text-foreground flex items-center gap-2">
+              <Users className="w-5 h-5 text-blue-500" />
+              Social & Content
+            </h3>
+            {renderOptionsList(socialOptions)}
           </div>
         </Card>
 
         {/* Content & Discovery Card */}
         <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
           <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4 text-foreground flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              Content & Discovery
+            <h3 className="text-lg font-bold mb-4 text-foreground flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-orange-500" />
+              Discover
             </h3>
-            <div className="space-y-1">
-              {contentOptions.map((option) => (
-                <button
-                  key={option.route}
-                  onClick={() => navigate(option.route)}
-                  className="w-full flex items-center justify-between p-4 rounded-xl hover:bg-gradient-to-r hover:from-secondary/50 hover:to-accent/20 transition-all duration-300 group border border-transparent hover:border-border/50"
-                >
-                  <div className="flex items-center space-x-4">
-                    <div className={`${option.color} bg-gradient-to-br from-secondary/40 to-secondary/20 p-3 rounded-xl shadow-md group-hover:scale-110 transition-transform duration-300`}>
-                      <option.icon className="w-5 h-5" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className={`font-semibold ${option.color} transition-colors`}>
-                        {option.title}
-                      </h3>
-                      <p className="text-sm text-gray-300">{option.description}</p>
-                    </div>
-                  </div>
-                  <ChevronRight className={`w-5 h-5 ${option.color} group-hover:translate-x-1 transition-all`} />
-                </button>
-              ))}
-            </div>
+            {renderOptionsList(contentOptions)}
+          </div>
+        </Card>
+
+        {/* Support & Storage Card */}
+        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
+          <div className="p-6">
+            <h3 className="text-lg font-bold mb-4 text-foreground flex items-center gap-2">
+              <HelpCircle className="w-5 h-5 text-cyan-500" />
+              Support & Storage
+            </h3>
+            {renderOptionsList(supportOptions)}
           </div>
         </Card>
 

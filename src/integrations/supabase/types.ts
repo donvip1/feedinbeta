@@ -2500,6 +2500,45 @@ export type Database = {
           },
         ]
       }
+      privacy_settings: {
+        Row: {
+          allow_friend_requests: boolean | null
+          allow_messages_from_strangers: boolean | null
+          created_at: string | null
+          id: string
+          profile_visible: boolean | null
+          show_activity_status: boolean | null
+          show_online_status: boolean | null
+          show_read_receipts: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          allow_friend_requests?: boolean | null
+          allow_messages_from_strangers?: boolean | null
+          created_at?: string | null
+          id?: string
+          profile_visible?: boolean | null
+          show_activity_status?: boolean | null
+          show_online_status?: boolean | null
+          show_read_receipts?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          allow_friend_requests?: boolean | null
+          allow_messages_from_strangers?: boolean | null
+          created_at?: string | null
+          id?: string
+          profile_visible?: boolean | null
+          show_activity_status?: boolean | null
+          show_online_status?: boolean | null
+          show_read_receipts?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profile_sensitive_data: {
         Row: {
           created_at: string | null
@@ -2560,6 +2599,7 @@ export type Database = {
           marital_status: string | null
           max_friends: number | null
           phone_number: string | null
+          preferred_language: string | null
           purpose: string[] | null
           purpose_updated_at: string | null
           status: string | null
@@ -2609,6 +2649,7 @@ export type Database = {
           marital_status?: string | null
           max_friends?: number | null
           phone_number?: string | null
+          preferred_language?: string | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
           status?: string | null
@@ -2658,6 +2699,7 @@ export type Database = {
           marital_status?: string | null
           max_friends?: number | null
           phone_number?: string | null
+          preferred_language?: string | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
           status?: string | null
