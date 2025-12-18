@@ -3874,6 +3874,10 @@ export type Database = {
         Args: { p_amount: number; p_reason?: string; p_user_id: string }
         Returns: Json
       }
+      admin_withdraw_from_profits: {
+        Args: { p_amount: number; p_reason?: string }
+        Returns: boolean
+      }
       admin_withdraw_to_team_wallet: {
         Args: { p_amount: number; p_reason?: string }
         Returns: Json
@@ -4196,16 +4200,27 @@ export type Database = {
         Returns: undefined
       }
       record_post_view: { Args: { p_post_id: string }; Returns: undefined }
-      send_gift: {
-        Args: {
-          p_cost: number
-          p_gift_type: string
-          p_post_id: string
-          p_recipient_id: string
-          p_sender_id: string
-        }
-        Returns: Json
-      }
+      send_gift:
+        | {
+            Args: {
+              p_credit_value: number
+              p_gift_type: string
+              p_receiver_id: string
+              p_source_id?: string
+              p_source_type?: string
+            }
+            Returns: boolean
+          }
+        | {
+            Args: {
+              p_cost: number
+              p_gift_type: string
+              p_post_id: string
+              p_recipient_id: string
+              p_sender_id: string
+            }
+            Returns: Json
+          }
       send_live_gift:
         | {
             Args: {
@@ -4224,7 +4239,7 @@ export type Database = {
               p_receiver_id: string
               p_stream_id: string
             }
-            Returns: Json
+            Returns: boolean
           }
       sync_credit_supply: { Args: never; Returns: undefined }
       transfer_credits: {
