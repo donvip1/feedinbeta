@@ -101,13 +101,16 @@ export class WebRTCManager {
       clearTimeout(this.connectionTimeout);
     }
 
-    // Set a 30-second timeout for connection establishment
+    // Set a 60-second timeout for connection establishment (increased from 30s)
+    // This gives enough time for signaling and ICE negotiation
     this.connectionTimeout = setTimeout(() => {
-      if (this.peerConnection?.connectionState !== 'connected') {
-        console.error('[WebRTC] Connection timeout - failed to connect within 30 seconds');
-        this.callbacks.onError(new Error('Connection timeout. Please try again.'));
+      if (this.peerConnection?.connectionState !== 'connected' && 
+          this.peerConnection?.iceConnectionState !== 'connected' &&
+          this.peerConnection?.iceConnectionState !== 'completed') {
+        console.error('[WebRTC] Connection timeout - failed to connect within 60 seconds');
+        this.callbacks.onError(new Error('Connection timeout. The other user may not be available.'));
       }
-    }, 30000);
+    }, 60000);
   }
 
   private setupPeerConnectionHandlers() {
@@ -190,30 +193,42 @@ export class WebRTCManager {
     };
   }
 
-  private async setupSignaling() {
+  private async setupSignaling(): Promise<void> {
     console.log('[WebRTC] Setting up Realtime signaling channel for call:', this.callId);
     
-    // Use Supabase Realtime broadcast for signaling - much faster than database inserts
-    this.signalChannel = supabase
-      .channel(`call-signal:${this.callId}`, {
-        config: {
-          broadcast: { self: false },
+    return new Promise((resolve, reject) => {
+      // Use Supabase Realtime broadcast for signaling - much faster than database inserts
+      this.signalChannel = supabase
+        .channel(`call-signal:${this.callId}`, {
+          config: {
+            broadcast: { self: false },
+          }
+        })
+        .on('broadcast', { event: 'signal' }, async (payload) => {
+          const signal = payload.payload;
+          // Only process signals meant for us
+          if (signal.from !== this.userId) {
+            console.log('[WebRTC] Received signal:', signal.type);
+            await this.handleSignal(signal);
+          }
+        })
+        .subscribe((status) => {
+          console.log('[WebRTC] Signal channel status:', status);
+          if (status === 'SUBSCRIBED') {
+            console.log('[WebRTC] Ready to exchange signals');
+            resolve();
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            reject(new Error('Failed to setup signaling channel'));
+          }
+        });
+      
+      // Timeout after 10 seconds if channel doesn't subscribe
+      setTimeout(() => {
+        if (this.signalChannel) {
+          resolve(); // Proceed anyway after timeout
         }
-      })
-      .on('broadcast', { event: 'signal' }, async (payload) => {
-        const signal = payload.payload;
-        // Only process signals meant for us
-        if (signal.from !== this.userId) {
-          console.log('[WebRTC] Received signal:', signal.type);
-          await this.handleSignal(signal);
-        }
-      })
-      .subscribe((status) => {
-        console.log('[WebRTC] Signal channel status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('[WebRTC] Ready to exchange signals');
-        }
-      });
+      }, 10000);
+    });
   }
 
   private async sendSignal(data: any) {

@@ -122,7 +122,7 @@ export const IncomingCallListener = () => {
 
     channelRef.current = channel;
 
-    // Auto-dismiss call after 60 seconds if not answered
+    // Check call status periodically (less frequently to avoid race conditions)
     const checkCallTimeout = setInterval(() => {
       if (incomingCall) {
         // Check if call is still pending
@@ -132,13 +132,16 @@ export const IncomingCallListener = () => {
           .eq('id', incomingCall.callId)
           .single()
           .then(({ data }) => {
-            if (data?.status !== 'pending') {
+            // Only dismiss if call has been explicitly ended or rejected
+            // Don't dismiss on 'answered' because we navigate to call page
+            if (data?.status === 'ended' || data?.status === 'rejected') {
+              console.log('[IncomingCallListener] Call status changed to:', data?.status);
               setIncomingCall(null);
               callSounds.stopAllSounds();
             }
           });
       }
-    }, 5000);
+    }, 10000); // Check every 10 seconds instead of 5
 
     return () => {
       console.log('[IncomingCallListener] Cleaning up');
