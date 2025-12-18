@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import Stripe from 'https://esm.sh/stripe@14.21.0';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 
 const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   apiVersion: '2023-10-16',
@@ -10,6 +11,19 @@ const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
+
+// Strict validation schemas for metadata
+const uuidSchema = z.string().uuid();
+const creditsSchema = z.coerce.number().int().positive().max(1000000);
+const typeSchema = z.enum(['subscription', 'credits']);
+
+const checkoutMetadataSchema = z.object({
+  user_id: uuidSchema,
+  type: typeSchema,
+  tier_id: uuidSchema.optional(),
+  credits: z.string().regex(/^\d+$/).optional(),
+  description: z.string().max(500).optional(),
+});
 
 serve(async (req) => {
   // Validate webhook secret is configured
@@ -51,14 +65,32 @@ serve(async (req) => {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const userId = session.metadata?.user_id;
-        const type = session.metadata?.type;
+        
+        // Validate metadata strictly
+        const metadataResult = checkoutMetadataSchema.safeParse(session.metadata);
+        if (!metadataResult.success) {
+          console.error('Invalid checkout metadata:', metadataResult.error.errors);
+          return new Response(
+            JSON.stringify({ error: 'Invalid metadata format' }), 
+            { status: 400, headers: { 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const { user_id: userId, type, tier_id: tierId, credits, description } = metadataResult.data;
 
         console.log('Checkout completed:', { userId, type, sessionId: session.id });
 
         if (type === 'subscription' && session.subscription) {
+          // Validate tier_id is present for subscriptions
+          if (!tierId) {
+            console.error('Missing tier_id for subscription');
+            return new Response(
+              JSON.stringify({ error: 'Missing tier_id' }), 
+              { status: 400, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+
           const subscription = await stripe.subscriptions.retrieve(session.subscription as string);
-          const tierId = session.metadata?.tier_id;
 
           await supabaseAdmin.from('user_subscriptions').insert({
             user_id: userId,
@@ -72,7 +104,17 @@ serve(async (req) => {
 
           console.log('Subscription created for user:', userId);
         } else if (type === 'credits' && session.payment_intent) {
-          const creditsAmount = parseInt(session.metadata?.credits || '0');
+          // Validate and parse credits amount
+          const creditsResult = creditsSchema.safeParse(credits);
+          if (!creditsResult.success) {
+            console.error('Invalid credits amount:', credits);
+            return new Response(
+              JSON.stringify({ error: 'Invalid credits amount' }), 
+              { status: 400, headers: { 'Content-Type': 'application/json' } }
+            );
+          }
+
+          const creditsAmount = creditsResult.data;
           
           await supabaseAdmin.from('credit_transactions').insert({
             user_id: userId,
@@ -85,14 +127,14 @@ serve(async (req) => {
           console.log('Credits added for user:', userId, creditsAmount);
         }
 
-        // Record payment
+        // Record payment with validated data
         await supabaseAdmin.from('payment_history').insert({
           user_id: userId,
           stripe_payment_intent_id: session.payment_intent as string,
           amount: (session.amount_total || 0) / 100,
           currency: session.currency || 'usd',
           status: 'succeeded',
-          description: session.metadata?.description || 'Payment',
+          description: description || 'Payment',
           type: type,
         });
 
