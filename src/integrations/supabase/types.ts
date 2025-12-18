@@ -3956,6 +3956,7 @@ export type Database = {
           scheduled_start: string | null
           started_at: string | null
           status: string | null
+          stream_key: string | null
           tags: string[] | null
           thumbnail_url: string | null
           title: string | null
@@ -3975,6 +3976,7 @@ export type Database = {
           scheduled_start?: string | null
           started_at?: string | null
           status?: string | null
+          stream_key?: never
           tags?: string[] | null
           thumbnail_url?: string | null
           title?: string | null
@@ -3994,6 +3996,7 @@ export type Database = {
           scheduled_start?: string | null
           started_at?: string | null
           status?: string | null
+          stream_key?: never
           tags?: string[] | null
           thumbnail_url?: string | null
           title?: string | null
