@@ -35,6 +35,21 @@ const Settings = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();
 
+  // Fetch user profile for username
+  const { data: userProfile } = useQuery({
+    queryKey: ["user-profile-settings", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', user?.id)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   // Server-side check for admin wallet access
   const { data: canViewAdminWallet } = useQuery({
     queryKey: ["can-view-admin-wallet"],
@@ -221,7 +236,7 @@ const Settings = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <Button
-                onClick={() => navigate(`/profile/${user?.id}`)}
+                onClick={() => navigate(`/profile/${userProfile?.username || user?.id}`)}
                 size="sm"
                 variant="ghost"
                 className="hover:bg-secondary"

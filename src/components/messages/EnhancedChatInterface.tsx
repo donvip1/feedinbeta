@@ -639,7 +639,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         </Button>
         <Avatar 
           className="cursor-pointer"
-          onClick={() => otherUser?.id && navigate(`/profile/${otherUser.id}`)}
+          onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
         >
           <AvatarImage src={otherUser?.avatar_url || ''} />
           <AvatarFallback>{otherUser?.display_name?.[0] || 'U'}</AvatarFallback>
@@ -647,7 +647,7 @@ export const EnhancedChatInterface = ({ conversationId, onBack }: ChatInterfaceP
         <div className="flex-1">
           <h2 
             className="font-semibold cursor-pointer hover:underline"
-            onClick={() => otherUser?.id && navigate(`/profile/${otherUser.id}`)}
+            onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
           >
             {otherUser?.display_name || 'Loading...'}
           </h2>

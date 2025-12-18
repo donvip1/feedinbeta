@@ -404,7 +404,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                   <div className="flex gap-3 group">
                     <Avatar
                       className="w-10 h-10 flex-shrink-0 cursor-pointer"
-                      onClick={() => navigate(`/profile/${c.user_id}`)}
+                      onClick={() => navigate(`/profile/${c.profiles?.username || c.user_id}`)}
                     >
                       <AvatarImage src={c.profiles?.avatar_url ?? undefined} />
                       <AvatarFallback className="text-xs">{c.profiles?.display_name?.[0]}</AvatarFallback>
@@ -413,7 +413,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                       <div className="flex items-center gap-2 mb-1">
                         <p
                           className="text-sm font-semibold cursor-pointer hover:underline"
-                          onClick={() => navigate(`/profile/${c.user_id}`)}
+                          onClick={() => navigate(`/profile/${c.profiles?.username || c.user_id}`)}
                         >
                           {c.profiles?.display_name}
                         </p>
@@ -486,7 +486,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                         <div key={reply.id} className="flex gap-3 group">
                           <Avatar
                             className="w-8 h-8 flex-shrink-0 cursor-pointer"
-                            onClick={() => navigate(`/profile/${reply.user_id}`)}
+                            onClick={() => navigate(`/profile/${reply.profiles?.username || reply.user_id}`)}
                           >
                             <AvatarImage src={reply.profiles?.avatar_url ?? undefined} />
                             <AvatarFallback className="text-xs">{reply.profiles?.display_name?.[0]}</AvatarFallback>
@@ -495,7 +495,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                             <div className="flex items-center gap-2 mb-1">
                               <p
                                 className="text-sm font-semibold cursor-pointer hover:underline"
-                                onClick={() => navigate(`/profile/${reply.user_id}`)}
+                                onClick={() => navigate(`/profile/${reply.profiles?.username || reply.user_id}`)}
                               >
                                 {reply.profiles?.display_name}
                               </p>

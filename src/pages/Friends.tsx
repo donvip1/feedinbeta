@@ -357,7 +357,7 @@ const Friends = () => {
                 <div
                   key={friend.id}
                   className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg hover:bg-gray-800 cursor-pointer"
-                  onClick={() => navigate(`/profile/${friend.id}`)}
+                  onClick={() => navigate(`/profile/${friend.username || friend.id}`)}
                 >
                   <Avatar className="w-12 h-12">
                     <AvatarImage src={friend.avatar_url || ''} />
@@ -469,7 +469,7 @@ const Friends = () => {
                   </Avatar>
                   <div
                     className="flex-1 cursor-pointer"
-                    onClick={() => navigate(`/profile/${profile.id}`)}
+                    onClick={() => navigate(`/profile/${profile.username || profile.id}`)}
                   >
                     <p className="font-semibold">{profile.display_name || 'Unknown'}</p>
                     <p className="text-sm text-gray-400">@{profile.username || 'user'}</p>

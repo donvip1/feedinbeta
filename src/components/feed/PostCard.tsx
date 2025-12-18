@@ -314,7 +314,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   };
 
   const handleProfileClick = () => {
-    navigate(`/profile/${post.user_id}`);
+    navigate(`/profile/${username}`);
   };
 
   const handleDeletePost = async () => {
@@ -520,8 +520,8 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                 className="w-6 h-6 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (post.original_post?.user_id) {
-                    navigate(`/profile/${post.original_post.user_id}`);
+                  if (post.original_post?.profiles?.username || post.original_post?.user_id) {
+                    navigate(`/profile/${post.original_post.profiles?.username || post.original_post.user_id}`);
                   }
                 }}
               >
@@ -534,8 +534,8 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                 className="text-sm font-semibold cursor-pointer hover:underline"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (post.original_post?.user_id) {
-                    navigate(`/profile/${post.original_post.user_id}`);
+                  if (post.original_post?.profiles?.username || post.original_post?.user_id) {
+                    navigate(`/profile/${post.original_post.profiles?.username || post.original_post.user_id}`);
                   }
                 }}
               >

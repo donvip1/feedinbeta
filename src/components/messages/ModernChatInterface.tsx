@@ -736,7 +736,7 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
         
         <div 
           className="flex items-center gap-3 flex-1 cursor-pointer"
-          onClick={() => otherUser && navigate(`/profile/${otherUser.id}`)}
+          onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
         >
           <div className="relative">
             <Avatar className="w-10 h-10 ring-2 ring-primary/20">
