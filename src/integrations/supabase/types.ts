@@ -3963,63 +3963,33 @@ export type Database = {
       }
       public_profiles: {
         Row: {
-          about: string | null
-          about_visibility: string | null
           avatar_url: string | null
-          banner_url: string | null
           bio: string | null
-          cover_url: string | null
-          created_at: string | null
           display_name: string | null
           followers_count: number | null
           following_count: number | null
           id: string | null
-          interests: string[] | null
           is_premium: boolean | null
-          purpose: string[] | null
-          status: string | null
-          status_visibility: string | null
-          total_views: number | null
           username: string | null
         }
         Insert: {
-          about?: string | null
-          about_visibility?: string | null
           avatar_url?: string | null
-          banner_url?: string | null
           bio?: string | null
-          cover_url?: string | null
-          created_at?: string | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
-          interests?: string[] | null
           is_premium?: boolean | null
-          purpose?: string[] | null
-          status?: string | null
-          status_visibility?: string | null
-          total_views?: number | null
           username?: string | null
         }
         Update: {
-          about?: string | null
-          about_visibility?: string | null
           avatar_url?: string | null
-          banner_url?: string | null
           bio?: string | null
-          cover_url?: string | null
-          created_at?: string | null
           display_name?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
-          interests?: string[] | null
           is_premium?: boolean | null
-          purpose?: string[] | null
-          status?: string | null
-          status_visibility?: string | null
-          total_views?: number | null
           username?: string | null
         }
         Relationships: []
