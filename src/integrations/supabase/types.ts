@@ -780,6 +780,57 @@ export type Database = {
           },
         ]
       }
+      gift_analytics: {
+        Row: {
+          created_at: string | null
+          credit_value: number
+          gift_type: string
+          id: string
+          platform_fee: number | null
+          receiver_id: string
+          sender_id: string | null
+          source_id: string | null
+          source_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          credit_value: number
+          gift_type: string
+          id?: string
+          platform_fee?: number | null
+          receiver_id: string
+          sender_id?: string | null
+          source_id?: string | null
+          source_type: string
+        }
+        Update: {
+          created_at?: string | null
+          credit_value?: number
+          gift_type?: string
+          id?: string
+          platform_fee?: number | null
+          receiver_id?: string
+          sender_id?: string | null
+          source_id?: string | null
+          source_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gift_analytics_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gift_analytics_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_join_requests: {
         Row: {
           created_at: string | null
@@ -2574,6 +2625,7 @@ export type Database = {
           content: string | null
           created_at: string | null
           feed_id: string
+          gifts_count: number | null
           has_blur_background: boolean | null
           id: string
           is_original_audio: boolean | null
@@ -2606,6 +2658,7 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           feed_id: string
+          gifts_count?: number | null
           has_blur_background?: boolean | null
           id?: string
           is_original_audio?: boolean | null
@@ -2638,6 +2691,7 @@ export type Database = {
           content?: string | null
           created_at?: string | null
           feed_id?: string
+          gifts_count?: number | null
           has_blur_background?: boolean | null
           id?: string
           is_original_audio?: boolean | null
@@ -3747,6 +3801,8 @@ export type Database = {
           message_id: string
         }[]
       }
+      get_gift_statistics: { Args: never; Returns: Json }
+      get_live_stream_statistics: { Args: never; Returns: Json }
       get_message_read_receipts: {
         Args: { message_ids: string[] }
         Returns: {
@@ -3846,6 +3902,37 @@ export type Database = {
           views_count: number
         }[]
       }
+      get_recent_gift_transactions: {
+        Args: { p_limit?: number }
+        Returns: {
+          created_at: string
+          credit_value: number
+          gift_type: string
+          id: string
+          platform_fee: number
+          receiver_id: string
+          receiver_username: string
+          sender_id: string
+          sender_username: string
+          source_id: string
+          source_type: string
+        }[]
+      }
+      get_recent_live_gifts: {
+        Args: { p_limit?: number }
+        Returns: {
+          created_at: string
+          credit_value: number
+          gift_type: string
+          id: string
+          receiver_id: string
+          receiver_username: string
+          sender_id: string
+          sender_username: string
+          stream_id: string
+          stream_title: string
+        }[]
+      }
       get_today_viewed_posts: {
         Args: never
         Returns: {
@@ -3926,6 +4013,18 @@ export type Database = {
         Returns: boolean
       }
       is_username_available: { Args: { p_username: string }; Returns: boolean }
+      log_gift_analytics: {
+        Args: {
+          p_credit_value: number
+          p_gift_type: string
+          p_platform_fee?: number
+          p_receiver_id: string
+          p_sender_id: string
+          p_source_id: string
+          p_source_type: string
+        }
+        Returns: string
+      }
       mark_attachment_downloaded: {
         Args: { attachment_id: string }
         Returns: undefined
@@ -3969,15 +4068,26 @@ export type Database = {
         }
         Returns: Json
       }
-      send_live_gift: {
-        Args: {
-          p_credit_value: number
-          p_gift_type: string
-          p_receiver_id: string
-          p_stream_id: string
-        }
-        Returns: Json
-      }
+      send_live_gift:
+        | {
+            Args: {
+              p_credit_value: number
+              p_gift_type: string
+              p_receiver_id: string
+              p_sender_id: string
+              p_stream_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_credit_value: number
+              p_gift_type: string
+              p_receiver_id: string
+              p_stream_id: string
+            }
+            Returns: Json
+          }
       sync_credit_supply: { Args: never; Returns: undefined }
       transfer_credits: {
         Args: { p_amount: number; p_recipient_username: string }

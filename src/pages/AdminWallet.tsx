@@ -11,8 +11,10 @@ import { Progress } from "@/components/ui/progress";
 import { 
   ArrowLeft, Coins, TrendingUp, Wallet, Send, Plus, History, 
   Shield, Eye, Users, Lock, Gift, Megaphone, DollarSign, 
-  Award, Target, RefreshCw, PiggyBank
+  Award, Target, RefreshCw, PiggyBank, Radio, Activity, 
+  ArrowUpRight, ArrowDownRight, Clock, Calendar
 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
@@ -43,6 +45,41 @@ interface IncentiveTier {
   bonus_percentage: number;
   period_type: string;
   is_active: boolean;
+}
+
+interface GiftStatistics {
+  total_gifts_sent: number;
+  total_gift_credits: number;
+  total_platform_fees: number;
+  gifts_today: number;
+  gifts_this_week: number;
+  gifts_this_month: number;
+  credits_today: number;
+  credits_this_week: number;
+  credits_this_month: number;
+  unique_senders: number;
+  unique_receivers: number;
+  top_gift_types: { gift_type: string; count: number; total_value: number }[] | null;
+  gifts_by_source: { source_type: string; count: number; total_value: number }[] | null;
+}
+
+interface LiveStreamStatistics {
+  total_streams: number;
+  active_streams: number;
+  ended_streams: number;
+  total_viewers: number;
+  total_gifts_sent: number;
+  total_gift_credits: number;
+  gifts_today: number;
+  credits_today: number;
+  gifts_this_week: number;
+  credits_this_week: number;
+  unique_gifters: number;
+  unique_receivers: number;
+  peak_concurrent_viewers: number;
+  avg_stream_duration: number;
+  top_streamers: { receiver_id: string; gift_count: number; total_credits: number }[] | null;
+  gift_types: { gift_type: string; count: number; total_value: number }[] | null;
 }
 
 const AdminWallet = () => {
@@ -166,6 +203,52 @@ const AdminWallet = () => {
         .select("*")
         .order("created_at", { ascending: false })
         .limit(50);
+      if (error) throw error;
+      return data;
+    },
+    enabled: canViewWallet === true,
+  });
+
+  // Fetch gift statistics
+  const { data: giftStats } = useQuery({
+    queryKey: ["gift-statistics"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_gift_statistics");
+      if (error) throw error;
+      return data as unknown as GiftStatistics;
+    },
+    enabled: canViewWallet === true,
+    refetchInterval: 30000,
+  });
+
+  // Fetch live stream statistics
+  const { data: liveStats } = useQuery({
+    queryKey: ["live-stream-statistics"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_live_stream_statistics");
+      if (error) throw error;
+      return data as unknown as LiveStreamStatistics;
+    },
+    enabled: canViewWallet === true,
+    refetchInterval: 30000,
+  });
+
+  // Fetch recent gift transactions
+  const { data: recentGifts } = useQuery({
+    queryKey: ["recent-gift-transactions"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_recent_gift_transactions", { p_limit: 30 });
+      if (error) throw error;
+      return data;
+    },
+    enabled: canViewWallet === true,
+  });
+
+  // Fetch recent live stream gifts
+  const { data: recentLiveGifts } = useQuery({
+    queryKey: ["recent-live-gifts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_recent_live_gifts", { p_limit: 30 });
       if (error) throw error;
       return data;
     },
@@ -590,6 +673,246 @@ const AdminWallet = () => {
             <p className="text-xs text-muted-foreground mt-4 text-center">
               * All creator incentives are paid from the 30% creator pool, ensuring platform maintains 70% profit margin
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Gift Analytics Section */}
+        <Card className="border-pink-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Gift className="w-5 h-5 text-pink-500" />
+              Gift Analytics & Tracking
+            </CardTitle>
+            <CardDescription>
+              Comprehensive gift activity across posts, stories, and profiles
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Gift Overview Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="text-center p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                <p className="text-2xl font-bold text-pink-500">
+                  {(giftStats?.total_gifts_sent || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Gifts</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+                <p className="text-2xl font-bold text-purple-500">
+                  {(giftStats?.total_gift_credits || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Credits</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+                <p className="text-2xl font-bold text-green-500">
+                  {(giftStats?.unique_senders || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Unique Senders</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                <p className="text-2xl font-bold text-blue-500">
+                  {(giftStats?.unique_receivers || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Unique Receivers</p>
+              </div>
+            </div>
+
+            {/* Time-based Stats */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Today</span>
+                </div>
+                <p className="text-lg font-bold">{(giftStats?.gifts_today || 0).toLocaleString()} gifts</p>
+                <p className="text-sm text-pink-500">+{(giftStats?.credits_today || 0).toLocaleString()} credits</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">This Week</span>
+                </div>
+                <p className="text-lg font-bold">{(giftStats?.gifts_this_week || 0).toLocaleString()} gifts</p>
+                <p className="text-sm text-pink-500">+{(giftStats?.credits_this_week || 0).toLocaleString()} credits</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">This Month</span>
+                </div>
+                <p className="text-lg font-bold">{(giftStats?.gifts_this_month || 0).toLocaleString()} gifts</p>
+                <p className="text-sm text-pink-500">+{(giftStats?.credits_this_month || 0).toLocaleString()} credits</p>
+              </div>
+            </div>
+
+            {/* Gift by Source Breakdown */}
+            {giftStats?.gifts_by_source && giftStats.gifts_by_source.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Gifts by Source</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {giftStats.gifts_by_source.map((source) => (
+                    <div key={source.source_type} className="p-2 rounded-lg bg-muted/30 border text-center">
+                      <p className="text-xs text-muted-foreground capitalize">{source.source_type}</p>
+                      <p className="font-bold">{source.count}</p>
+                      <p className="text-xs text-pink-500">{source.total_value} credits</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Gift Transactions */}
+            {recentGifts && recentGifts.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Recent Gift Transactions</p>
+                <div className="max-h-64 overflow-y-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Sender</TableHead>
+                        <TableHead className="text-xs">Receiver</TableHead>
+                        <TableHead className="text-xs">Gift</TableHead>
+                        <TableHead className="text-xs">Credits</TableHead>
+                        <TableHead className="text-xs">Source</TableHead>
+                        <TableHead className="text-xs">Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentGifts.slice(0, 10).map((gift: any) => (
+                        <TableRow key={gift.id}>
+                          <TableCell className="text-xs">@{gift.sender_username || 'Unknown'}</TableCell>
+                          <TableCell className="text-xs">@{gift.receiver_username || 'Unknown'}</TableCell>
+                          <TableCell className="text-xs">{gift.gift_type}</TableCell>
+                          <TableCell className="text-xs text-pink-500 font-medium">{gift.credit_value}</TableCell>
+                          <TableCell className="text-xs capitalize">{gift.source_type}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {gift.created_at ? format(new Date(gift.created_at), 'MMM d, HH:mm') : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Live Stream Analytics Section */}
+        <Card className="border-red-500/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Radio className="w-5 h-5 text-red-500" />
+              Live Stream Analytics
+            </CardTitle>
+            <CardDescription>
+              Live streaming activity and gift revenue tracking
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Live Stream Overview Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="text-center p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                <p className="text-2xl font-bold text-red-500">
+                  {(liveStats?.active_streams || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Live Now</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                <p className="text-2xl font-bold text-orange-500">
+                  {(liveStats?.total_streams || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Total Streams</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <p className="text-2xl font-bold text-yellow-500">
+                  {(liveStats?.total_gift_credits || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Gifted Credits</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                <p className="text-2xl font-bold text-cyan-500">
+                  {(liveStats?.peak_concurrent_viewers || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Peak Viewers</p>
+              </div>
+            </div>
+
+            {/* Live Gift Stats */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Today</span>
+                </div>
+                <p className="text-lg font-bold">{(liveStats?.gifts_today || 0).toLocaleString()} gifts</p>
+                <p className="text-sm text-red-500">+{(liveStats?.credits_today || 0).toLocaleString()} credits</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Calendar className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">This Week</span>
+                </div>
+                <p className="text-lg font-bold">{(liveStats?.gifts_this_week || 0).toLocaleString()} gifts</p>
+                <p className="text-sm text-red-500">+{(liveStats?.credits_this_week || 0).toLocaleString()} credits</p>
+              </div>
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <div className="flex items-center gap-2 mb-1">
+                  <Users className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Participants</span>
+                </div>
+                <p className="text-lg font-bold">{(liveStats?.unique_gifters || 0).toLocaleString()} gifters</p>
+                <p className="text-sm text-muted-foreground">{(liveStats?.unique_receivers || 0).toLocaleString()} streamers</p>
+              </div>
+            </div>
+
+            {/* Gift Type Breakdown */}
+            {liveStats?.gift_types && liveStats.gift_types.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Gift Types Distribution</p>
+                <div className="flex flex-wrap gap-2">
+                  {liveStats.gift_types.map((giftType) => (
+                    <Badge key={giftType.gift_type} variant="outline" className="px-3 py-1">
+                      {giftType.gift_type}: {giftType.count} ({giftType.total_value} credits)
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Live Stream Gifts */}
+            {recentLiveGifts && recentLiveGifts.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">Recent Live Stream Gifts</p>
+                <div className="max-h-64 overflow-y-auto rounded-lg border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Stream</TableHead>
+                        <TableHead className="text-xs">Sender</TableHead>
+                        <TableHead className="text-xs">Streamer</TableHead>
+                        <TableHead className="text-xs">Gift</TableHead>
+                        <TableHead className="text-xs">Credits</TableHead>
+                        <TableHead className="text-xs">Time</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {recentLiveGifts.slice(0, 10).map((gift: any) => (
+                        <TableRow key={gift.id}>
+                          <TableCell className="text-xs max-w-[100px] truncate">{gift.stream_title || 'Stream'}</TableCell>
+                          <TableCell className="text-xs">@{gift.sender_username || 'Unknown'}</TableCell>
+                          <TableCell className="text-xs">@{gift.receiver_username || 'Unknown'}</TableCell>
+                          <TableCell className="text-xs">{gift.gift_type}</TableCell>
+                          <TableCell className="text-xs text-red-500 font-medium">{gift.credit_value}</TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {gift.created_at ? format(new Date(gift.created_at), 'MMM d, HH:mm') : '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -67,6 +67,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
   const [refeedsCount, setRefeedsCount] = useState(post.refeeds_count || 0);
+  const [giftsCount, setGiftsCount] = useState((post as any).gifts_count || 0);
   const [saved, setSaved] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
@@ -801,6 +802,9 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               >
                 <Gift className="w-4 h-4" />
               </button>
+              {giftsCount > 0 && (
+                <span className="text-sm text-pink-500 font-medium">{giftsCount}</span>
+              )}
 
               <button
                 onClick={() => {
