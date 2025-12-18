@@ -83,8 +83,9 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   const [shareOpen, setShareOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [refeedOpen, setRefeedOpen] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false); // Start unmuted - sound on by default
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isVideoVisible, setIsVideoVisible] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -193,6 +194,50 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
     
     return () => observer.disconnect();
   }, [user, post.id, post.user_id, hasViewed]);
+
+  // Video visibility tracking - auto-play when visible, pause when not
+  useEffect(() => {
+    const isVideoPost = currentMediaType === 'video' || 
+      ((post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post?.media_type === 'video');
+    
+    if (!isVideoPost || !videoRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries;
+        setIsVideoVisible(entry.isIntersecting);
+        
+        if (entry.isIntersecting) {
+          // Video is visible - play with sound
+          if (videoRef.current) {
+            videoRef.current.muted = isMuted;
+            videoRef.current.play().catch(() => {
+              // Autoplay blocked - try muted
+              if (videoRef.current) {
+                videoRef.current.muted = true;
+                setIsMuted(true);
+                videoRef.current.play().catch(() => {});
+              }
+            });
+            setIsPlaying(true);
+          }
+        } else {
+          // Video is not visible - pause
+          if (videoRef.current) {
+            videoRef.current.pause();
+            setIsPlaying(false);
+          }
+        }
+      },
+      { threshold: 0.6 } // Video must be 60% visible to play
+    );
+    
+    if (postRef.current) {
+      observer.observe(postRef.current);
+    }
+    
+    return () => observer.disconnect();
+  }, [currentMediaType, post.post_type, post.original_post?.media_type, isMuted]);
 
   // Listen for fullscreen changes
   useEffect(() => {
@@ -626,7 +671,6 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                     src={currentMediaUrl}
                     className="w-full h-full object-cover"
                     playsInline
-                    autoPlay
                     muted={isMuted}
                     loop
                     onClick={togglePlayPause}
