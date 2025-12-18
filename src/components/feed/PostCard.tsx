@@ -68,6 +68,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
   const [refeedsCount, setRefeedsCount] = useState(post.refeeds_count || 0);
   const [saved, setSaved] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
+  const [hasEngaged, setHasEngaged] = useState(false); // User has refeeded/quoted this post
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
 
@@ -130,13 +131,13 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
     handleSwipe();
   };
 
-  // Check if post is liked and saved
+  // Check if post is liked, saved, and if user has engaged (refeeded/quoted)
   useEffect(() => {
     const checkStatus = async () => {
       if (!user) return;
 
       try {
-        const [likeCheck, saveCheck] = await Promise.all([
+        const [likeCheck, saveCheck, engagementCheck] = await Promise.all([
           supabase
             .from('post_likes')
             .select('id')
@@ -148,11 +149,20 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
             .select('id')
             .eq('post_id', post.id)
             .eq('user_id', user.id)
-            .single()
+            .single(),
+          // Check if user has refeeded or quoted this post
+          supabase
+            .from('posts')
+            .select('id')
+            .eq('original_post_id', post.id)
+            .eq('user_id', user.id)
+            .in('post_type', ['refeed', 'quote'])
+            .limit(1)
         ]);
 
         setLiked(!!likeCheck.data);
         setSaved(!!saveCheck.data);
+        setHasEngaged(engagementCheck.data && engagementCheck.data.length > 0);
       } catch (error) {
         // Errors expected when not liked/saved
       }
@@ -801,14 +811,16 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
             </div>
           </div>
 
-          {/* Promote button on separate line */}
-          <button 
-            onClick={() => navigate(`/promote/${post.id}`)}
-            className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>Promote</span>
-          </button>
+          {/* Promote button - only visible to post author or users who refeeded/quoted */}
+          {user && (user.id === post.user_id || hasEngaged) && (
+            <button 
+              onClick={() => navigate(`/promote/${post.id}`)}
+              className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
+            >
+              <TrendingUp className="w-4 h-4" />
+              <span>Promote</span>
+            </button>
+          )}
         </div>
       </div>
 
