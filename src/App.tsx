@@ -52,6 +52,7 @@ import HashtagSearch from "./pages/HashtagSearch";
 import StoryDetail from "./pages/StoryDetail";
 import LiveStreamDetail from "./pages/LiveStreamDetail";
 import AdminWallet from "./pages/AdminWallet";
+import SessionManagement from "./pages/SessionManagement";
 
 const queryClient = new QueryClient();
 
@@ -148,6 +149,7 @@ const App = () => {
             <Route path="/settings/blocked" element={<BlockedUsers />} />
             <Route path="/settings/language" element={<LanguageSettings />} />
             <Route path="/settings/help" element={<HelpSupport />} />
+            <Route path="/settings/sessions" element={<SessionManagement />} />
             
             {/* Legacy routes for backwards compatibility */}
             <Route path="/post/:postId" element={<PostDetail />} />

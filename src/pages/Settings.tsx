@@ -27,7 +27,8 @@ import {
   HelpCircle,
   Users,
   Radio,
-  ShieldCheck
+  ShieldCheck,
+  Smartphone
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -88,6 +89,13 @@ const Settings = () => {
       description: 'Manage notification preferences',
       route: '/settings/notifications',
       color: 'text-pink-500'
+    },
+    {
+      icon: Smartphone,
+      title: 'Session Management',
+      description: 'View and manage active sessions',
+      route: '/settings/sessions',
+      color: 'text-cyan-500'
     },
     {
       icon: Lock,

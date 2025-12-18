@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Phone, User, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Mail, Phone, User, Loader2, Eye, EyeOff, Shield } from 'lucide-react';
 import { z } from 'zod';
+import { getOrCreateFingerprint, getDeviceName } from '@/lib/device-fingerprint';
 
 const emailSchema = z.object({
   email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
@@ -24,6 +25,49 @@ const usernameSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
 });
 
+// Rate limiting state (in-memory for client-side)
+const loginAttempts = new Map<string, { count: number; lastAttempt: number }>();
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
+
+function checkRateLimit(identifier: string): { allowed: boolean; waitTime: number } {
+  const now = Date.now();
+  const attempts = loginAttempts.get(identifier);
+  
+  if (!attempts) {
+    return { allowed: true, waitTime: 0 };
+  }
+  
+  // Reset if lockout has passed
+  if (now - attempts.lastAttempt > LOCKOUT_DURATION) {
+    loginAttempts.delete(identifier);
+    return { allowed: true, waitTime: 0 };
+  }
+  
+  if (attempts.count >= MAX_ATTEMPTS) {
+    const waitTime = LOCKOUT_DURATION - (now - attempts.lastAttempt);
+    return { allowed: false, waitTime };
+  }
+  
+  return { allowed: true, waitTime: 0 };
+}
+
+function recordLoginAttempt(identifier: string, success: boolean): void {
+  const now = Date.now();
+  
+  if (success) {
+    loginAttempts.delete(identifier);
+    return;
+  }
+  
+  const attempts = loginAttempts.get(identifier);
+  if (attempts) {
+    loginAttempts.set(identifier, { count: attempts.count + 1, lastAttempt: now });
+  } else {
+    loginAttempts.set(identifier, { count: 1, lastAttempt: now });
+  }
+}
+
 interface SignInFormProps {
   onForgotPassword: () => void;
 }
@@ -33,6 +77,8 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
+  const [lockoutTime, setLockoutTime] = useState(0);
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -41,8 +87,26 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   });
 
   const handleSignIn = async (method: 'email' | 'phone' | 'username') => {
+    const identifier = method === 'email' ? formData.email : method === 'phone' ? formData.phone : formData.username;
+    
+    // Check rate limiting
+    const { allowed, waitTime } = checkRateLimit(identifier);
+    if (!allowed) {
+      setIsLocked(true);
+      setLockoutTime(Math.ceil(waitTime / 60000));
+      toast({
+        title: "Too many attempts",
+        description: `Please wait ${Math.ceil(waitTime / 60000)} minutes before trying again`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
+      // Generate device fingerprint for session tracking
+      const fingerprint = await getOrCreateFingerprint();
+      
       if (method === 'email') {
         const validated = emailSchema.parse({ email: formData.email, password: formData.password });
         const { error } = await supabase.auth.signInWithPassword({
@@ -50,9 +114,11 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
           password: validated.password,
         });
         if (error) {
+          recordLoginAttempt(identifier, false);
           // Don't reveal if email exists or not
           throw new Error('Invalid email or password');
         }
+        recordLoginAttempt(identifier, true);
       } else if (method === 'phone') {
         const validated = phoneSchema.parse({ phone: formData.phone, password: formData.password });
         const { error } = await supabase.auth.signInWithPassword({
@@ -60,13 +126,14 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
           password: validated.password,
         });
         if (error) {
+          recordLoginAttempt(identifier, false);
           throw new Error('Invalid phone number or password');
         }
+        recordLoginAttempt(identifier, true);
       } else if (method === 'username') {
         usernameSchema.parse({ username: formData.username, password: formData.password });
         
         // Username login is not directly supported by Supabase
-        // Users should use their email or phone number
         toast({
           title: "Use Email or Phone",
           description: "Please sign in with your email or phone number associated with your account",
@@ -76,6 +143,9 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
         return;
       }
 
+      // Clear password from memory
+      setFormData(prev => ({ ...prev, password: '' }));
+      
       toast({
         title: "Welcome back!",
         description: "Successfully signed in",

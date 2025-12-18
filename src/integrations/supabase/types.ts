@@ -1409,6 +1409,33 @@ export type Database = {
         }
         Relationships: []
       }
+      login_attempts: {
+        Row: {
+          attempt_at: string | null
+          failure_reason: string | null
+          id: string
+          identifier: string
+          ip_address: string | null
+          success: boolean | null
+        }
+        Insert: {
+          attempt_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          identifier: string
+          ip_address?: string | null
+          success?: boolean | null
+        }
+        Update: {
+          attempt_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          identifier?: string
+          ip_address?: string | null
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       message_attachments: {
         Row: {
           created_at: string | null
@@ -3060,6 +3087,36 @@ export type Database = {
           },
         ]
       }
+      security_events: {
+        Row: {
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       stories: {
         Row: {
           created_at: string
@@ -3500,6 +3557,48 @@ export type Database = {
         }
         Relationships: []
       }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          device_fingerprint: string | null
+          device_info: Json | null
+          expires_at: string | null
+          id: string
+          ip_address: string | null
+          is_active: boolean | null
+          is_trusted: boolean | null
+          last_active_at: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          device_fingerprint?: string | null
+          device_info?: Json | null
+          expires_at?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          is_trusted?: boolean | null
+          last_active_at?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          device_fingerprint?: string | null
+          device_info?: Json | null
+          expires_at?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean | null
+          is_trusted?: boolean | null
+          last_active_at?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_strikes: {
         Row: {
           expires_at: string | null
@@ -3802,6 +3901,7 @@ export type Database = {
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
+      get_active_sessions_count: { Args: never; Returns: number }
       get_credit_statistics: { Args: never; Returns: Json }
       get_expired_attachments: {
         Args: never
@@ -4011,6 +4111,9 @@ export type Database = {
         Args: { post_id: string }
         Returns: undefined
       }
+      invalidate_all_sessions: { Args: never; Returns: undefined }
+      invalidate_session: { Args: { p_session_id: string }; Returns: boolean }
+      is_account_locked: { Args: { p_identifier: string }; Returns: boolean }
       is_admin: { Args: never; Returns: boolean }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
@@ -4041,6 +4144,24 @@ export type Database = {
           p_source_type: string
         }
         Returns: string
+      }
+      log_login_attempt: {
+        Args: {
+          p_failure_reason?: string
+          p_identifier: string
+          p_ip_address?: string
+          p_success?: boolean
+        }
+        Returns: undefined
+      }
+      log_security_event: {
+        Args: {
+          p_event_data?: Json
+          p_event_type: string
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: undefined
       }
       mark_attachment_downloaded: {
         Args: { attachment_id: string }
@@ -4111,6 +4232,15 @@ export type Database = {
         Returns: undefined
       }
       update_my_phone_number: { Args: { new_phone: string }; Returns: boolean }
+      upsert_user_session: {
+        Args: {
+          p_device_fingerprint: string
+          p_device_info?: Json
+          p_ip_address?: string
+          p_user_agent?: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
