@@ -227,13 +227,26 @@ const Call = () => {
 
   // Initialize call
   useEffect(() => {
-    if (!callId || !user) {
+    // Wait for auth to load - user might be null initially while loading
+    if (user === undefined) return;
+    
+    if (!callId) {
       toast({
         title: 'Invalid call',
         description: 'No call ID provided',
         variant: 'destructive',
       });
       navigate('/messages');
+      return;
+    }
+
+    if (!user) {
+      toast({
+        title: 'Authentication required',
+        description: 'Please sign in to make calls',
+        variant: 'destructive',
+      });
+      navigate('/auth');
       return;
     }
 
