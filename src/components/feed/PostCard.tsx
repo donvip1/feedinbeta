@@ -38,6 +38,8 @@ interface PostCardProps {
       content: string | null;
       media_url: string | null;
       media_type: string | null;
+      media_urls: string[] | null;
+      media_types: string[] | null;
       created_at: string;
       profiles?: {
         username: string | null;
@@ -554,12 +556,20 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                 {post.original_post.content}
               </p>
             )}
-            {post.original_post.media_url && (
-              post.original_post.media_type === 'video' ? (
+            {/* Original post media - check both media_url and media_urls */}
+            {(() => {
+              const opMediaUrl = post.original_post.media_url || 
+                (post.original_post.media_urls && post.original_post.media_urls.length > 0 ? post.original_post.media_urls[0] : null);
+              const opMediaType = post.original_post.media_type || 
+                (post.original_post.media_types && post.original_post.media_types.length > 0 ? post.original_post.media_types[0] : null);
+              
+              if (!opMediaUrl) return null;
+              
+              return opMediaType === 'video' ? (
                 <div className="relative rounded-lg overflow-hidden h-[55vh]">
                   <video 
                     ref={videoRef}
-                    src={post.original_post.media_url} 
+                    src={opMediaUrl} 
                     className="rounded-lg w-full h-full object-cover no-download-media"
                     muted={isMuted}
                     playsInline
@@ -615,7 +625,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               ) : (
                 <div className="relative rounded-lg overflow-hidden h-[55vh]">
                   <img 
-                    src={post.original_post.media_url} 
+                    src={opMediaUrl} 
                     alt="Original post" 
                     className="w-full h-full object-cover cursor-pointer no-download-media"
                     onClick={() => navigate(`/post/${post.original_post.id}`)}
@@ -623,8 +633,8 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
                     draggable={false}
                   />
                 </div>
-              )
-            )}
+              );
+            })()}
           </div>
         )}
 

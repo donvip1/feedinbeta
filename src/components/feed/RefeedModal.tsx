@@ -198,21 +198,29 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
                       <p className="text-sm line-clamp-3 mb-2">{post.content}</p>
                     )}
                   </div>
-                  {post.media_url && (
-                    <div className="border-t">
-                      {post.media_type === "video" ? (
-                        <video
-                          src={post.media_url}
-                          className="w-full max-h-40 object-cover"
-                          muted
-                          playsInline
-                          preload="metadata"
-                        />
-                      ) : (
-                        <img src={post.media_url} alt="Post" className="w-full max-h-40 object-cover" />
-                      )}
-                    </div>
-                  )}
+                  {/* Show media from media_url or media_urls */}
+                  {(() => {
+                    const mediaUrl = post.media_url || (post.media_urls && post.media_urls.length > 0 ? post.media_urls[0] : null);
+                    const mediaType = post.media_type || (post.media_types && post.media_types.length > 0 ? post.media_types[0] : null);
+                    
+                    if (!mediaUrl) return null;
+                    
+                    return (
+                      <div className="border-t">
+                        {mediaType === "video" ? (
+                          <video
+                            src={mediaUrl}
+                            className="w-full max-h-40 object-cover"
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        ) : (
+                          <img src={mediaUrl} alt="Post" className="w-full max-h-40 object-cover" />
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
