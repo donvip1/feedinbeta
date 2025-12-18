@@ -380,13 +380,17 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       setPinnedMessages(formattedMessages.filter(m => m.is_pinned));
       
       // Find first unread message to scroll to
-      const firstUnread = formattedMessages.find(
+      const unreadMessages = formattedMessages.filter(
         msg => msg.sender_id !== user?.id && 
         !msg.read_receipts?.some(r => r.user_id === user?.id)
       );
       
-      if (firstUnread && !hasScrolledToUnread.current) {
-        setFirstUnreadId(firstUnread.id);
+      if (unreadMessages.length > 0 && !hasScrolledToUnread.current) {
+        setFirstUnreadId(unreadMessages[0].id);
+        // Mark all messages as read after a short delay (user is viewing the chat)
+        setTimeout(() => {
+          markMessagesAsRead(unreadMessages);
+        }, 1500);
       } else {
         setFirstUnreadId(null);
       }
@@ -439,14 +443,8 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
 
       if (unreadMessages.length === 0) return;
 
-      const messageIds = unreadMessages.map(msg => msg.id);
-
-      // Update messages.is_read in the messages table (for unread counts)
-      await supabase
-        .from('messages')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .in('id', messageIds)
-        .neq('sender_id', user.id);
+      // Use the efficient database function to mark all messages as read
+      await supabase.rpc('mark_conversation_read', { conv_id: conversationId });
 
       // Also insert read receipts for detailed tracking
       for (const msg of unreadMessages) {
@@ -468,7 +466,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     } catch (error: any) {
       console.debug('Mark as read info:', error);
     }
-  }, [user, onMessagesRead]);
+  }, [user, conversationId, onMessagesRead]);
 
   const handleTyping = async () => {
     if (!user) return;
