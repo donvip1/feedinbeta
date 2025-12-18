@@ -35,10 +35,25 @@ const Feed = () => {
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
   const { viewedPostIds, markAsViewed } = useViewedPosts();
+  const initialViewedRef = useRef<string[]>([]);
+  const hasInitializedRef = useRef(false);
 
-  // Fetch posts with promoted content prioritized and viewed posts filtered
+  // Capture viewed posts only once when component mounts or tab changes
+  useEffect(() => {
+    if (!hasInitializedRef.current) {
+      initialViewedRef.current = [...viewedPostIds];
+      hasInitializedRef.current = true;
+    }
+  }, []);
+
+  // Reset when tab changes
+  useEffect(() => {
+    initialViewedRef.current = [...viewedPostIds];
+  }, [activeTab]);
+
+  // Fetch posts - only refetch on tab change, not on view updates
   const { data: posts, isLoading, refetch } = useQuery({
-    queryKey: ['feed-posts', activeTab, viewedPostIds.length],
+    queryKey: ['feed-posts', activeTab],
     queryFn: async () => {
       // Get active promotions first
       const { data: promotions } = await supabase
@@ -76,7 +91,7 @@ const Feed = () => {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(50); // Fetch more to filter
+        .limit(50);
 
       if (activeTab === 'following' && user) {
         const { data: following } = await supabase
@@ -96,14 +111,15 @@ const Feed = () => {
       if (error) throw error;
 
       const allPosts = data || [];
+      const viewedAtLoad = initialViewedRef.current;
       
-      // Separate unviewed and viewed posts
-      const unviewedPosts = allPosts.filter(p => !viewedPostIds.includes(p.id));
-      const viewedPosts = allPosts.filter(p => viewedPostIds.includes(p.id));
+      // Separate unviewed and viewed posts based on initial state
+      const unviewedPosts = allPosts.filter(p => !viewedAtLoad.includes(p.id));
+      const viewedPosts = allPosts.filter(p => viewedAtLoad.includes(p.id));
 
       // Sort by promotion priority, then by date
-      const sortByPriority = (posts: typeof allPosts) => {
-        return posts.sort((a, b) => {
+      const sortByPriority = (postsToSort: typeof allPosts) => {
+        return [...postsToSort].sort((a, b) => {
           const aPriority = promotedPostIds.has(a.id) 
             ? (promotionLevels[a.id] === 'premium' ? 3 : promotionLevels[a.id] === 'standard' ? 2 : 1) 
             : 0;
@@ -116,15 +132,18 @@ const Feed = () => {
         });
       };
 
-      // If we have enough unviewed posts, use those; otherwise include viewed
+      // Prioritize unviewed posts, then add viewed posts
       let finalPosts = sortByPriority(unviewedPosts);
       if (finalPosts.length < 20 && viewedPosts.length > 0) {
         finalPosts = [...finalPosts, ...sortByPriority(viewedPosts)];
       }
 
-      return finalPosts.slice(0, 20);
+      return finalPosts.slice(0, 30);
     },
     enabled: !!user,
+    staleTime: Infinity, // Don't refetch while on the page
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
   });
 
   useEffect(() => {
