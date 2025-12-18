@@ -7,10 +7,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Coins, TrendingUp, Wallet, Send, Plus, History, Shield, Eye } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { 
+  ArrowLeft, Coins, TrendingUp, Wallet, Send, Plus, History, 
+  Shield, Eye, Users, Lock, Gift, Megaphone, DollarSign, 
+  Award, Target, RefreshCw, PiggyBank
+} from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+
+interface CreditStatistics {
+  user_credits_total: number;
+  user_count: number;
+  p2p_escrow_locked: number;
+  p2p_active_listings: number;
+  platform_balance: number;
+  team_wallets_total: number;
+  gift_revenue: number;
+  promotion_revenue: number;
+  total_minted: number;
+  circulating_supply: number;
+}
+
+interface IncentiveTier {
+  id: string;
+  tier_name: string;
+  min_earnings: number;
+  max_earnings: number | null;
+  bonus_percentage: number;
+  period_type: string;
+  is_active: boolean;
+}
 
 const AdminWallet = () => {
   const navigate = useNavigate();
@@ -50,6 +78,18 @@ const AdminWallet = () => {
       navigate("/feed");
     }
   }, [canViewWallet, loadingViewPermission, navigate]);
+
+  // Fetch comprehensive credit statistics
+  const { data: creditStats, refetch: refetchStats } = useQuery({
+    queryKey: ["credit-statistics"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_credit_statistics");
+      if (error) throw error;
+      return data as unknown as CreditStatistics;
+    },
+    enabled: canViewWallet === true,
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
+  });
 
   // Fetch platform wallet
   const { data: platformWallet } = useQuery({
@@ -97,6 +137,21 @@ const AdminWallet = () => {
     enabled: canViewWallet === true,
   });
 
+  // Fetch incentive tiers
+  const { data: incentiveTiers } = useQuery({
+    queryKey: ["incentive-tiers"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("creator_incentive_tiers")
+        .select("*")
+        .eq("is_active", true)
+        .order("min_earnings", { ascending: true });
+      if (error) throw error;
+      return data as IncentiveTier[];
+    },
+    enabled: canViewWallet === true,
+  });
+
   // Fetch platform transactions
   const { data: transactions } = useQuery({
     queryKey: ["platform-transactions"],
@@ -110,6 +165,22 @@ const AdminWallet = () => {
       return data;
     },
     enabled: canViewWallet === true,
+  });
+
+  // Sync credit supply mutation
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("sync_credit_supply");
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Credit supply synced successfully");
+      queryClient.invalidateQueries({ queryKey: ["credit-statistics"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-supply"] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to sync credit supply");
+    },
   });
 
   // Mint credits mutation
@@ -126,6 +197,7 @@ const AdminWallet = () => {
       toast.success("Credits minted successfully");
       queryClient.invalidateQueries({ queryKey: ["platform-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["credit-supply"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-statistics"] });
       queryClient.invalidateQueries({ queryKey: ["platform-transactions"] });
       setMintAmount("");
       setMintReason("");
@@ -149,6 +221,7 @@ const AdminWallet = () => {
     onSuccess: () => {
       toast.success("Credits transferred successfully");
       queryClient.invalidateQueries({ queryKey: ["platform-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-statistics"] });
       queryClient.invalidateQueries({ queryKey: ["platform-transactions"] });
       setTransferAmount("");
       setTransferUserId("");
@@ -173,6 +246,7 @@ const AdminWallet = () => {
       toast.success("Withdrawn to team wallet successfully");
       queryClient.invalidateQueries({ queryKey: ["platform-wallet"] });
       queryClient.invalidateQueries({ queryKey: ["team-wallet"] });
+      queryClient.invalidateQueries({ queryKey: ["credit-statistics"] });
       queryClient.invalidateQueries({ queryKey: ["platform-transactions"] });
       setWithdrawAmount("");
       setWithdrawReason("");
@@ -196,9 +270,14 @@ const AdminWallet = () => {
     return null;
   }
 
-  const circulatingPercent = creditSupply 
-    ? ((Number(creditSupply.circulating_supply) / Number(creditSupply.total_supply)) * 100).toFixed(2) 
-    : "0";
+  const maxSupply = Number(creditSupply?.total_supply || 100000000);
+  const circulatingSupply = creditStats?.circulating_supply || 0;
+  const circulatingPercent = ((circulatingSupply / maxSupply) * 100).toFixed(4);
+
+  const totalRevenue = (creditStats?.gift_revenue || 0) + 
+                       (creditStats?.promotion_revenue || 0) + 
+                       (platformWallet?.subscription_revenue || 0) +
+                       (platformWallet?.p2p_fee_revenue || 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted pb-20">
@@ -218,6 +297,17 @@ const AdminWallet = () => {
               <h1 className="text-xl font-bold">Admin Wallet</h1>
             </div>
             <div className="ml-auto flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  refetchStats();
+                  syncMutation.mutate();
+                }}
+                disabled={syncMutation.isPending}
+              >
+                <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+              </Button>
               {canManageCredits ? (
                 <Badge variant="default" className="bg-primary">Super Admin</Badge>
               ) : (
@@ -232,77 +322,216 @@ const AdminWallet = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-primary/30 bg-primary/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Wallet className="w-4 h-4 text-primary" />
+        {/* Credit Circulation Overview */}
+        <Card className="border-primary/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              Credit Circulation Overview
+            </CardTitle>
+            <CardDescription>Real-time credit distribution across the platform</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Circulating Supply</span>
+              <span className="text-2xl font-bold text-primary">
+                {circulatingSupply.toLocaleString()} / {maxSupply.toLocaleString()}
+              </span>
+            </div>
+            <Progress value={parseFloat(circulatingPercent)} className="h-3" />
+            <p className="text-xs text-muted-foreground text-right">{circulatingPercent}% of max supply</p>
+          </CardContent>
+        </Card>
+
+        {/* Distribution Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="border-blue-500/30 bg-blue-500/5">
+            <CardHeader className="pb-1 pt-3 px-3">
+              <CardTitle className="flex items-center gap-1.5 text-xs">
+                <Users className="w-3.5 h-3.5 text-blue-500" />
+                User Wallets
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <p className="text-xl font-bold text-blue-500">
+                {(creditStats?.user_credits_total || 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {creditStats?.user_count || 0} users
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-orange-500/30 bg-orange-500/5">
+            <CardHeader className="pb-1 pt-3 px-3">
+              <CardTitle className="flex items-center gap-1.5 text-xs">
+                <Lock className="w-3.5 h-3.5 text-orange-500" />
+                P2P Escrow
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <p className="text-xl font-bold text-orange-500">
+                {(creditStats?.p2p_escrow_locked || 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {(creditStats?.p2p_active_listings || 0).toLocaleString()} in listings
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-green-500/30 bg-green-500/5">
+            <CardHeader className="pb-1 pt-3 px-3">
+              <CardTitle className="flex items-center gap-1.5 text-xs">
+                <Wallet className="w-3.5 h-3.5 text-green-500" />
                 Platform Wallet
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-primary">
-                {platformWallet?.balance?.toLocaleString() || 0}
+            <CardContent className="px-3 pb-3">
+              <p className="text-xl font-bold text-green-500">
+                {(creditStats?.platform_balance || 0).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
-                Total earned: {platformWallet?.total_earned?.toLocaleString() || 0}
+                Earned: {platformWallet?.total_earned?.toLocaleString() || 0}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-accent/30 bg-accent/5">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Coins className="w-4 h-4 text-accent" />
-                Your Team Wallet
+          <Card className="border-purple-500/30 bg-purple-500/5">
+            <CardHeader className="pb-1 pt-3 px-3">
+              <CardTitle className="flex items-center gap-1.5 text-xs">
+                <PiggyBank className="w-3.5 h-3.5 text-purple-500" />
+                Team Wallets
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-accent">
-                {teamWallet?.balance?.toLocaleString() || 0}
+            <CardContent className="px-3 pb-3">
+              <p className="text-xl font-bold text-purple-500">
+                {(creditStats?.team_wallets_total || 0).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
-                Withdrawn: {teamWallet?.total_withdrawn?.toLocaleString() || 0}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <TrendingUp className="w-4 h-4" />
-                Credit Supply
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">
-                {Number(creditSupply?.circulating_supply || 0).toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {circulatingPercent}% of {Number(creditSupply?.total_supply || 0).toLocaleString()} total
+                Your wallet: {teamWallet?.balance?.toLocaleString() || 0}
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Action Tabs - Only show credit management tabs if user can manage credits */}
+        {/* Revenue Breakdown */}
+        <Card className="border-accent/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <DollarSign className="w-5 h-5 text-accent" />
+              Platform Revenue
+            </CardTitle>
+            <CardDescription>Income from platform fees and commissions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-3 rounded-lg bg-pink-500/10 border border-pink-500/20">
+                <Gift className="w-5 h-5 text-pink-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-pink-500">
+                  {(creditStats?.gift_revenue || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Gift Fees (5%)</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <Megaphone className="w-5 h-5 text-yellow-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-yellow-500">
+                  {(creditStats?.promotion_revenue || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Promotions</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
+                <Award className="w-5 h-5 text-cyan-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-cyan-500">
+                  {(platformWallet?.subscription_revenue || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">Subscriptions</p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                <Coins className="w-5 h-5 text-emerald-500 mx-auto mb-1" />
+                <p className="text-lg font-bold text-emerald-500">
+                  {(platformWallet?.p2p_fee_revenue || 0).toLocaleString()}
+                </p>
+                <p className="text-xs text-muted-foreground">P2P Fees</p>
+              </div>
+            </div>
+            <div className="mt-4 p-3 rounded-lg bg-accent/10 border border-accent/20 text-center">
+              <p className="text-sm text-muted-foreground">Total Revenue</p>
+              <p className="text-2xl font-bold text-accent">{totalRevenue.toLocaleString()} Credits</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Creator Incentive Tiers */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Target className="w-5 h-5 text-primary" />
+              Creator Incentive Tiers
+            </CardTitle>
+            <CardDescription>Bonus payouts for top performing creators</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {incentiveTiers?.filter(t => t.period_type === 'monthly').map((tier) => (
+                <div 
+                  key={tier.id} 
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
+                >
+                  <div>
+                    <p className="font-medium text-sm">{tier.tier_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {tier.min_earnings.toLocaleString()} - {tier.max_earnings?.toLocaleString() || '∞'} credits/month
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="bg-primary/20 text-primary">
+                    +{tier.bonus_percentage}%
+                  </Badge>
+                </div>
+              ))}
+            </div>
+            {incentiveTiers?.filter(t => t.period_type === 'weekly').length ? (
+              <>
+                <p className="text-sm font-medium mt-4 mb-2">Weekly Bonuses</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {incentiveTiers?.filter(t => t.period_type === 'weekly').map((tier) => (
+                    <div 
+                      key={tier.id} 
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
+                    >
+                      <div>
+                        <p className="font-medium text-sm">{tier.tier_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {tier.min_earnings.toLocaleString()} - {tier.max_earnings?.toLocaleString() || '∞'} credits/week
+                        </p>
+                      </div>
+                      <Badge variant="secondary" className="bg-accent/20 text-accent">
+                        +{tier.bonus_percentage}%
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
+          </CardContent>
+        </Card>
+
+        {/* Action Tabs */}
         <Tabs defaultValue={canManageCredits ? "mint" : "history"} className="w-full">
           <TabsList className={`grid w-full ${canManageCredits ? 'grid-cols-4' : 'grid-cols-1'}`}>
             {canManageCredits && (
               <>
-                <TabsTrigger value="mint" className="gap-1">
+                <TabsTrigger value="mint" className="gap-1 text-xs">
                   <Plus className="w-3 h-3" /> Mint
                 </TabsTrigger>
-                <TabsTrigger value="transfer" className="gap-1">
+                <TabsTrigger value="transfer" className="gap-1 text-xs">
                   <Send className="w-3 h-3" /> Transfer
                 </TabsTrigger>
-                <TabsTrigger value="withdraw" className="gap-1">
+                <TabsTrigger value="withdraw" className="gap-1 text-xs">
                   <Wallet className="w-3 h-3" /> Withdraw
                 </TabsTrigger>
               </>
             )}
-            <TabsTrigger value="history" className="gap-1">
+            <TabsTrigger value="history" className="gap-1 text-xs">
               <History className="w-3 h-3" /> History
             </TabsTrigger>
           </TabsList>
@@ -314,7 +543,7 @@ const AdminWallet = () => {
                   <CardHeader>
                     <CardTitle>Mint Credits</CardTitle>
                     <CardDescription>
-                      Create new credits and add to platform wallet. Max supply: {Number(creditSupply?.total_supply || 0).toLocaleString()}
+                      Create new credits and add to platform wallet. Max supply: {maxSupply.toLocaleString()}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -449,40 +678,71 @@ const AdminWallet = () => {
               <CardHeader>
                 <CardTitle>Transaction History</CardTitle>
                 <CardDescription>
-                  Recent platform wallet transactions
+                  Recent platform transactions and credit movements
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {transactions?.length === 0 && (
-                    <p className="text-center text-muted-foreground py-4">No transactions yet</p>
-                  )}
-                  {transactions?.map((tx) => (
-                    <div key={tx.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                      <div>
-                        <p className="font-medium capitalize">{tx.transaction_type.replace('_', ' ')}</p>
-                        <p className="text-xs text-muted-foreground">{tx.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {format(new Date(tx.created_at), 'MMM d, yyyy HH:mm')}
-                        </p>
+                {transactions && transactions.length > 0 ? (
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {transactions.map((tx: any) => (
+                      <div 
+                        key={tx.id} 
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${
+                            tx.transaction_type === 'mint' ? 'bg-green-500/20' :
+                            tx.transaction_type === 'transfer' ? 'bg-blue-500/20' :
+                            tx.transaction_type === 'withdraw' ? 'bg-orange-500/20' :
+                            tx.transaction_type === 'gift_fee' ? 'bg-pink-500/20' :
+                            tx.transaction_type === 'promotion_fee' ? 'bg-yellow-500/20' :
+                            'bg-muted'
+                          }`}>
+                            {tx.transaction_type === 'mint' && <Plus className="w-4 h-4 text-green-500" />}
+                            {tx.transaction_type === 'transfer' && <Send className="w-4 h-4 text-blue-500" />}
+                            {tx.transaction_type === 'withdraw' && <Wallet className="w-4 h-4 text-orange-500" />}
+                            {tx.transaction_type === 'gift_fee' && <Gift className="w-4 h-4 text-pink-500" />}
+                            {tx.transaction_type === 'promotion_fee' && <Megaphone className="w-4 h-4 text-yellow-500" />}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm capitalize">{tx.transaction_type.replace('_', ' ')}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {tx.description || 'No description'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`font-bold ${
+                            ['mint', 'gift_fee', 'promotion_fee', 'subscription_fee', 'p2p_fee'].includes(tx.transaction_type) 
+                              ? 'text-green-500' 
+                              : 'text-red-500'
+                          }`}>
+                            {['mint', 'gift_fee', 'promotion_fee', 'subscription_fee', 'p2p_fee'].includes(tx.transaction_type) ? '+' : '-'}
+                            {tx.amount?.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {tx.created_at ? format(new Date(tx.created_at), 'MMM d, HH:mm') : '-'}
+                          </p>
+                        </div>
                       </div>
-                      <Badge variant={tx.transaction_type === 'mint' ? 'default' : 'secondary'}>
-                        {Number(tx.amount) > 0 ? '+' : ''}{Number(tx.amount).toLocaleString()}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <History className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>No transactions yet</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
 
-        {/* Info for moderators */}
+        {/* View-only notice for moderators */}
         {!canManageCredits && (
-          <Card className="border-yellow-500/30 bg-yellow-500/5">
+          <Card className="border-muted">
             <CardContent className="py-4">
               <p className="text-sm text-muted-foreground text-center">
-                <Eye className="w-4 h-4 inline mr-2" />
                 You have view-only access. Contact a super admin to manage credits.
               </p>
             </CardContent>
