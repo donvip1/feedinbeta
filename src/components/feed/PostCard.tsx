@@ -56,9 +56,10 @@ interface PostCardProps {
   onCommentsOpenChange?: (open: boolean) => void;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
+  onView?: () => void;
 }
 
-export default function PostCard({ post, allPosts = [], onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd }: PostCardProps) {
+export default function PostCard({ post, allPosts = [], onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd, onView }: PostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -179,6 +180,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
               user_id: user.id,
             });
             setHasViewed(true);
+            onView?.(); // Track as viewed for feed filtering
             observer.disconnect();
           } catch (error) {
             // Likely duplicate view, ignore
@@ -193,7 +195,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
     }
     
     return () => observer.disconnect();
-  }, [user, post.id, post.user_id, hasViewed]);
+  }, [user, post.id, post.user_id, hasViewed, onView]);
 
   // Video visibility tracking - auto-play when visible, pause when not
   useEffect(() => {

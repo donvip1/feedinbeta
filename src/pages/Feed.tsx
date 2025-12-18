@@ -18,6 +18,7 @@ import PostDetails from '@/components/post/PostDetails';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
+import { useViewedPosts } from '@/hooks/useViewedPosts';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -33,11 +34,23 @@ const Feed = () => {
   const [showNav, setShowNav] = useState(true);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
+  const { viewedPostIds, markAsViewed } = useViewedPosts();
 
-  // Fetch posts with original post data for refeeds and quotes
+  // Fetch posts with promoted content prioritized and viewed posts filtered
   const { data: posts, isLoading, refetch } = useQuery({
-    queryKey: ['feed-posts', activeTab],
+    queryKey: ['feed-posts', activeTab, viewedPostIds.length],
     queryFn: async () => {
+      // Get active promotions first
+      const { data: promotions } = await supabase
+        .from('post_promotions')
+        .select('post_id, boost_level')
+        .eq('is_active', true)
+        .gt('expires_at', new Date().toISOString());
+
+      const promotedPostIds = new Set(promotions?.map(p => p.post_id) || []);
+      const promotionLevels: Record<string, string> = {};
+      promotions?.forEach(p => { promotionLevels[p.post_id] = p.boost_level; });
+
       let query = supabase
         .from('posts')
         .select(`
@@ -63,7 +76,7 @@ const Feed = () => {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(50); // Fetch more to filter
 
       if (activeTab === 'following' && user) {
         const { data: following } = await supabase
@@ -81,7 +94,35 @@ const Feed = () => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+
+      const allPosts = data || [];
+      
+      // Separate unviewed and viewed posts
+      const unviewedPosts = allPosts.filter(p => !viewedPostIds.includes(p.id));
+      const viewedPosts = allPosts.filter(p => viewedPostIds.includes(p.id));
+
+      // Sort by promotion priority, then by date
+      const sortByPriority = (posts: typeof allPosts) => {
+        return posts.sort((a, b) => {
+          const aPriority = promotedPostIds.has(a.id) 
+            ? (promotionLevels[a.id] === 'premium' ? 3 : promotionLevels[a.id] === 'standard' ? 2 : 1) 
+            : 0;
+          const bPriority = promotedPostIds.has(b.id) 
+            ? (promotionLevels[b.id] === 'premium' ? 3 : promotionLevels[b.id] === 'standard' ? 2 : 1) 
+            : 0;
+          
+          if (aPriority !== bPriority) return bPriority - aPriority;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+      };
+
+      // If we have enough unviewed posts, use those; otherwise include viewed
+      let finalPosts = sortByPriority(unviewedPosts);
+      if (finalPosts.length < 20 && viewedPosts.length > 0) {
+        finalPosts = [...finalPosts, ...sortByPriority(viewedPosts)];
+      }
+
+      return finalPosts.slice(0, 20);
     },
     enabled: !!user,
   });
@@ -259,6 +300,7 @@ const Feed = () => {
                     onCommentsOpenChange={setIsCommentsOpen}
                     onInteractionStart={handleInteractionStart}
                     onInteractionEnd={handleInteractionEnd}
+                    onView={() => markAsViewed(post.id)}
                   />
                 </div>
               );
