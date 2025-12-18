@@ -145,9 +145,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       await loadOtherUser();
       await loadMessages();
       
-      // Subscribe to real-time message updates
+      // Subscribe to real-time message updates with unique channel name
       messageChannel = supabase
-        .channel(`messages:${conversationId}`)
+        .channel(`chat-messages-${conversationId}-${Date.now()}`)
         .on(
           'postgres_changes',
           {
@@ -157,12 +157,16 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             filter: `conversation_id=eq.${conversationId}`,
           },
           async (payload: any) => {
+            console.log('[Realtime] New message received:', payload);
             const newMsg = payload?.new;
             if (!newMsg) return;
             
             // Skip if we already have this message (optimistic update)
             setMessages(prev => {
-              if (prev.some(m => m.id === newMsg.id)) return prev;
+              if (prev.some(m => m.id === newMsg.id)) {
+                console.log('[Realtime] Message already exists, skipping');
+                return prev;
+              }
               
               // Fetch sender profile for the message
               const isSelf = newMsg.sender_id === user?.id;
@@ -187,22 +191,40 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                 edited_at: null,
               };
               
+              console.log('[Realtime] Adding new message to state');
               return [...prev, formattedMsg];
             });
             
             scrollToBottom();
             
-            // Mark as read if from other user
+            // Mark as read immediately if from other user (user is actively viewing)
             if (newMsg.sender_id !== user?.id) {
               markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
             }
           }
         )
-        .subscribe();
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload: any) => {
+            const deletedMsg = payload?.old;
+            if (deletedMsg?.id) {
+              setMessages(prev => prev.filter(m => m.id !== deletedMsg.id));
+            }
+          }
+        )
+        .subscribe((status) => {
+          console.log('[Realtime] Messages channel status:', status);
+        });
 
-      // Subscribe to typing indicators
+      // Subscribe to typing indicators with unique channel name
       typingChannel = supabase
-        .channel(`typing:${conversationId}`)
+        .channel(`chat-typing-${conversationId}-${Date.now()}`)
         .on(
           'postgres_changes',
           {
@@ -212,17 +234,20 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             filter: `conversation_id=eq.${conversationId}`,
           },
           (payload: any) => {
+            console.log('[Realtime] Typing indicator:', payload);
             if (payload.new?.user_id !== user?.id) {
               setIsTyping(payload.new?.is_typing || false);
               setActivityType(payload.new?.activity_type || 'typing');
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Realtime] Typing channel status:', status);
+        });
 
-      // Subscribe to reactions
+      // Subscribe to reactions with unique channel name
       reactionsChannel = supabase
-        .channel(`reactions:${conversationId}`)
+        .channel(`chat-reactions-${conversationId}-${Date.now()}`)
         .on(
           'postgres_changes',
           { event: '*', schema: 'public', table: 'message_reactions' },
@@ -230,13 +255,14 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         )
         .subscribe();
 
-      // Subscribe to read receipts
+      // Subscribe to read receipts with unique channel name
       receiptsChannel = supabase
-        .channel(`read_receipts:${conversationId}`)
+        .channel(`chat-receipts-${conversationId}-${Date.now()}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'message_read_receipts' },
           (payload: any) => {
+            console.log('[Realtime] Read receipt:', payload);
             const receipt = payload?.new;
             if (!receipt || receipt.user_id === user?.id) return;
             
@@ -253,12 +279,13 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     init();
 
     return () => {
+      console.log('[Realtime] Cleaning up channels');
       if (messageChannel) supabase.removeChannel(messageChannel);
       if (typingChannel) supabase.removeChannel(typingChannel);
       if (reactionsChannel) supabase.removeChannel(reactionsChannel);
       if (receiptsChannel) supabase.removeChannel(receiptsChannel);
     };
-  }, [conversationId, user?.id]);
+  }, [conversationId, user?.id, otherUser]);
 
   // Get other user's presence data for display
   const otherUserPresence = otherUser?.id ? userStatuses.get(otherUser.id) : null;
@@ -987,11 +1014,11 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           ))}
           
           {isTyping && (
-            <div className="flex items-center gap-2 pl-10">
-              <TypingIndicator activityType={activityType} />
-              <span className="text-xs text-muted-foreground animate-pulse">
-                {otherUser?.display_name?.split(' ')[0] || 'User'} is {getActivityText(activityType).replace('...', '')}
-              </span>
+            <div className="flex items-center pl-4 pb-2">
+              <TypingIndicator 
+                activityType={activityType} 
+                userName={otherUser?.display_name?.split(' ')[0] || 'User'} 
+              />
             </div>
           )}
           

@@ -117,7 +117,7 @@ export default function Messages() {
       
       // Subscribe to new messages - update locally instead of reloading
       const messageChannel = supabase
-        .channel('messages-updates')
+        .channel(`messages-list-${user.id}-${Date.now()}`)
         .on(
           'postgres_changes',
           {
@@ -126,6 +126,7 @@ export default function Messages() {
             table: 'messages'
           },
           (payload: any) => {
+            console.log('[Messages Page] New message received:', payload);
             const newMsg = payload?.new;
             if (!newMsg) return;
             
@@ -181,11 +182,13 @@ export default function Messages() {
             }
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Messages Page] Message channel status:', status);
+        });
 
       // Subscribe to typing indicators for all conversations
       const typingChannel = supabase
-        .channel('typing-updates')
+        .channel(`typing-list-${user.id}-${Date.now()}`)
         .on(
           'postgres_changes',
           {
@@ -194,6 +197,7 @@ export default function Messages() {
             table: 'typing_indicators'
           },
           (payload: any) => {
+            console.log('[Messages Page] Typing indicator:', payload);
             const typing = payload?.new;
             if (!typing || typing.user_id === user.id) return;
             
@@ -204,7 +208,9 @@ export default function Messages() {
             ));
           }
         )
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[Messages Page] Typing channel status:', status);
+        });
 
       return () => {
         supabase.removeChannel(messageChannel);
