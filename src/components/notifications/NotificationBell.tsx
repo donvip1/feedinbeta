@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -15,14 +15,7 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
   const [unreadCount, setUnreadCount] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadUnreadCount();
-      subscribeToNotifications();
-    }
-  }, [user]);
-
-  const loadUnreadCount = async () => {
+  const loadUnreadCount = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -37,22 +30,54 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
     } catch (error) {
       console.error('Error loading unread count:', error);
     }
-  };
+  }, [user]);
 
-  const subscribeToNotifications = () => {
+  useEffect(() => {
     if (!user) return;
 
+    loadUnreadCount();
+
+    // Subscribe to real-time notification updates for instant badge sync
     const channel = supabase
-      .channel(`notifications:${user.id}`)
+      .channel(`notifications-bell:${user.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
         () => {
+          // New notification arrived - increment count
+          setUnreadCount(prev => prev + 1);
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload: any) => {
+          // Notification updated - refresh count if read status changed
+          if (payload.new?.is_read !== payload.old?.is_read) {
+            loadUnreadCount();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          // Notification deleted - refresh count
           loadUnreadCount();
         }
       )
@@ -61,7 +86,7 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
     return () => {
       supabase.removeChannel(channel);
     };
-  };
+  }, [user, loadUnreadCount]);
 
   const handleTogglePanel = () => {
     const newState = !showPanel;
@@ -78,6 +103,10 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
     onPanelClose?.();
   };
 
+  const handleUpdate = useCallback(() => {
+    loadUnreadCount();
+  }, [loadUnreadCount]);
+
   return (
     <>
       <div className="relative">
@@ -89,8 +118,8 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
         >
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-              {unreadCount > 9 ? '9+' : unreadCount}
+            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </Button>
@@ -105,7 +134,7 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
           />
           <NotificationsPanel
             onClose={handleClosePanel}
-            onUpdate={loadUnreadCount}
+            onUpdate={handleUpdate}
           />
         </>
       )}

@@ -404,6 +404,16 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
 
       if (unreadMessages.length === 0) return;
 
+      const messageIds = unreadMessages.map(msg => msg.id);
+
+      // Update messages.is_read in the messages table (for unread counts)
+      await supabase
+        .from('messages')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .in('id', messageIds)
+        .neq('sender_id', user.id);
+
+      // Also insert read receipts for detailed tracking
       for (const msg of unreadMessages) {
         await supabase
           .from('message_read_receipts' as any)
