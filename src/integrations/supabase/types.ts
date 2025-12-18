@@ -4373,63 +4373,18 @@ export type Database = {
         Returns: undefined
       }
       request_creator_payout: { Args: { p_amount: number }; Returns: Json }
-      send_gift:
-        | {
-            Args: {
-              p_credit_value: number
-              p_gift_type: string
-              p_post_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_credit_value: number
-              p_gift_type: string
-              p_receiver_id: string
-              p_source_id?: string
-              p_source_type?: string
-            }
-            Returns: boolean
-          }
-        | {
-            Args: {
-              p_cost: number
-              p_gift_type: string
-              p_post_id: string
-              p_recipient_id: string
-              p_sender_id: string
-            }
-            Returns: Json
-          }
-      send_live_gift:
-        | {
-            Args: {
-              p_credit_value: number
-              p_gift_type: string
-              p_receiver_id: string
-              p_sender_id: string
-              p_stream_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_credit_value: number
-              p_gift_type: string
-              p_stream_id: string
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_credit_value: number
-              p_gift_type: string
-              p_receiver_id: string
-              p_stream_id: string
-            }
-            Returns: boolean
-          }
+      send_gift: {
+        Args: { p_credit_value: number; p_gift_type: string; p_post_id: string }
+        Returns: Json
+      }
+      send_live_gift: {
+        Args: {
+          p_credit_value: number
+          p_gift_type: string
+          p_stream_id: string
+        }
+        Returns: Json
+      }
       sync_credit_supply: { Args: never; Returns: undefined }
       toggle_creator_monetization: {
         Args: { p_monetize: boolean; p_user_id: string }

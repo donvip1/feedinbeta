@@ -59,7 +59,6 @@ export const LiveGiftModal = ({
     try {
       const { data, error } = await supabase.rpc('send_live_gift', {
         p_stream_id: streamId,
-        p_receiver_id: recipientId,
         p_gift_type: giftType,
         p_credit_value: creditValue,
       });
