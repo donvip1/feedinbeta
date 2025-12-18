@@ -784,6 +784,36 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_earnings: {
+        Row: {
+          created_at: string | null
+          date: string
+          gift_fees: number | null
+          id: string
+          other_fees: number | null
+          promotion_fees: number | null
+          total: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          gift_fees?: number | null
+          id?: string
+          other_fees?: number | null
+          promotion_fees?: number | null
+          total?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          gift_fees?: number | null
+          id?: string
+          other_fees?: number | null
+          promotion_fees?: number | null
+          total?: number | null
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           created_at: string
@@ -3082,6 +3112,69 @@ export type Database = {
           },
         ]
       }
+      profits_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          description: string | null
+          id: string
+          source_id: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          source_id?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          source_id?: string | null
+          transaction_type?: string
+        }
+        Relationships: []
+      }
+      profits_wallet: {
+        Row: {
+          balance: number | null
+          created_at: string | null
+          gift_fees: number | null
+          id: string
+          other_fees: number | null
+          promotion_fees: number | null
+          total_collected: number | null
+          total_withdrawn: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          balance?: number | null
+          created_at?: string | null
+          gift_fees?: number | null
+          id?: string
+          other_fees?: number | null
+          promotion_fees?: number | null
+          total_collected?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          balance?: number | null
+          created_at?: string | null
+          gift_fees?: number | null
+          id?: string
+          other_fees?: number | null
+          promotion_fees?: number | null
+          total_collected?: number | null
+          total_withdrawn?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       referral_codes: {
         Row: {
           code: string
@@ -3989,6 +4082,9 @@ export type Database = {
       generate_stream_key: { Args: never; Returns: string }
       get_active_sessions_count: { Args: never; Returns: number }
       get_credit_statistics: { Args: never; Returns: Json }
+      get_daily_earnings_stats:
+        | { Args: never; Returns: Json }
+        | { Args: { p_days?: number }; Returns: Json }
       get_expired_attachments: {
         Args: never
         Returns: {
@@ -3997,6 +4093,7 @@ export type Database = {
           message_id: string
         }[]
       }
+      get_gift_analytics_summary: { Args: never; Returns: Json }
       get_gift_statistics: { Args: never; Returns: Json }
       get_live_stream_statistics: { Args: never; Returns: Json }
       get_message_read_receipts: {
@@ -4100,6 +4197,7 @@ export type Database = {
           views_count: number
         }[]
       }
+      get_profits_wallet_summary: { Args: never; Returns: Json }
       get_recent_gift_transactions: {
         Args: { p_limit?: number }
         Returns: {
@@ -4130,6 +4228,10 @@ export type Database = {
           stream_id: string
           stream_title: string
         }[]
+      }
+      get_recent_profits_transactions: {
+        Args: { p_limit?: number }
+        Returns: Json
       }
       get_today_viewed_posts: {
         Args: never
@@ -4287,6 +4389,15 @@ export type Database = {
         Returns: undefined
       }
       record_post_view: { Args: { p_post_id: string }; Returns: undefined }
+      record_profit: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_source_id?: string
+          p_type: string
+        }
+        Returns: undefined
+      }
       request_creator_payout: { Args: { p_amount: number }; Returns: Json }
       send_gift:
         | {
