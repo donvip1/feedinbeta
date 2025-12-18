@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { WaveformPlayer } from './WaveformPlayer';
+import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
 
 interface MessageBubbleProps {
   message: {
@@ -60,7 +61,7 @@ interface MessageBubbleProps {
   onSwipeEnd?: () => void;
 }
 
-const EMOJI_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍', '👎', '🙏'];
+// Using system-wide DEFAULT_EMOJIS
 
 export const EnhancedMessageBubble = ({ 
   message, 
@@ -251,18 +252,19 @@ export const EnhancedMessageBubble = ({
                   <Smile className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-2">
-                <div className="flex gap-1">
-                  {EMOJI_REACTIONS.map((emoji) => (
+              <PopoverContent className="w-auto p-1.5 rounded-full bg-background/95 backdrop-blur-xl border-border/50">
+                <div className="flex gap-0.5">
+                  {DEFAULT_EMOJIS.map((emoji, index) => (
                     <button
                       key={emoji}
                       onClick={() => {
                         onReact(message.id, emoji);
                         setShowReactions(false);
                       }}
-                      className="text-2xl hover:scale-125 transition-transform"
+                      className="emoji-reaction-btn text-xl p-1.5 rounded-full hover:bg-muted/50 hover:scale-125 active:scale-90 transition-all duration-200"
+                      style={{ animationDelay: `${index * 30}ms` }}
                     >
-                      {emoji}
+                      <span className="emoji-pop">{emoji}</span>
                     </button>
                   ))}
                 </div>
