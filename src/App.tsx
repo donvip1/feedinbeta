@@ -53,6 +53,7 @@ import StoryDetail from "./pages/StoryDetail";
 import LiveStreamDetail from "./pages/LiveStreamDetail";
 import AdminWallet from "./pages/AdminWallet";
 import SessionManagement from "./pages/SessionManagement";
+import CreatorPayouts from "./pages/CreatorPayouts";
 
 const queryClient = new QueryClient();
 
@@ -134,6 +135,7 @@ const App = () => {
             <Route path="/wallet/p2p" element={<P2PMarketplace />} />
             <Route path="/wallet/p2p/:transactionId" element={<P2PTransaction />} />
             <Route path="/wallet/admin" element={<AdminWallet />} />
+            <Route path="/wallet/creator-payouts" element={<CreatorPayouts />} />
             
             {/* Posts & Content Management */}
             <Route path="/saved" element={<SavedPosts />} />
