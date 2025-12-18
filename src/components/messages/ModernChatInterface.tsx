@@ -100,18 +100,178 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Track own presence so others know we're online
   useEffect(() => {
+    if (!user || !conversationId) return;
+
+    const presenceChannel = supabase.channel(`user-presence:${user.id}`)
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({
+            online_at: new Date().toISOString(),
+            conversation_id: conversationId,
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [user?.id, conversationId]);
+
+  // Initialize data and subscriptions
+  useEffect(() => {
+    let messageChannel: ReturnType<typeof supabase.channel> | null = null;
+    let typingChannel: ReturnType<typeof supabase.channel> | null = null;
+    let reactionsChannel: ReturnType<typeof supabase.channel> | null = null;
+    let receiptsChannel: ReturnType<typeof supabase.channel> | null = null;
+
     const init = async () => {
       await loadOtherUser();
       await loadMessages();
-      subscribeToMessages();
-      subscribeToTyping();
-      subscribeToReactions();
-      subscribeToReadReceipts();
-      subscribeToPresence();
+      
+      // Subscribe to real-time message updates
+      messageChannel = supabase
+        .channel(`messages:${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          async (payload: any) => {
+            const newMsg = payload?.new;
+            if (!newMsg) return;
+            
+            // Skip if we already have this message (optimistic update)
+            setMessages(prev => {
+              if (prev.some(m => m.id === newMsg.id)) return prev;
+              
+              // Fetch sender profile for the message
+              const isSelf = newMsg.sender_id === user?.id;
+              const senderProfile = isSelf 
+                ? { display_name: 'You', avatar_url: null }
+                : { display_name: otherUser?.display_name || 'Unknown', avatar_url: otherUser?.avatar_url || null };
+              
+              const formattedMsg: Message = {
+                id: newMsg.id,
+                content: newMsg.content,
+                sender_id: newMsg.sender_id,
+                created_at: newMsg.created_at,
+                media_url: newMsg.media_url || null,
+                media_type: newMsg.media_type || null,
+                reply_to_id: newMsg.reply_to_id || null,
+                reply_to_message: null,
+                profiles: senderProfile,
+                reactions: [],
+                read_receipts: [],
+                status: isSelf ? 'delivered' : 'sent',
+                is_pinned: false,
+                edited_at: null,
+              };
+              
+              return [...prev, formattedMsg];
+            });
+            
+            scrollToBottom();
+            
+            // Mark as read if from other user
+            if (newMsg.sender_id !== user?.id) {
+              markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
+            }
+          }
+        )
+        .subscribe();
+
+      // Subscribe to typing indicators
+      typingChannel = supabase
+        .channel(`typing:${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'typing_indicators',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          (payload: any) => {
+            if (payload.new?.user_id !== user?.id) {
+              setIsTyping(payload.new?.is_typing || false);
+            }
+          }
+        )
+        .subscribe();
+
+      // Subscribe to reactions
+      reactionsChannel = supabase
+        .channel(`reactions:${conversationId}`)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'message_reactions' },
+          () => loadMessages()
+        )
+        .subscribe();
+
+      // Subscribe to read receipts
+      receiptsChannel = supabase
+        .channel(`read_receipts:${conversationId}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'message_read_receipts' },
+          (payload: any) => {
+            const receipt = payload?.new;
+            if (!receipt || receipt.user_id === user?.id) return;
+            
+            setMessages(prev => prev.map(msg =>
+              msg.id === receipt.message_id
+                ? { ...msg, status: 'read', read_receipts: [...(msg.read_receipts || []), { user_id: receipt.user_id, read_at: receipt.read_at }] }
+                : msg
+            ));
+          }
+        )
+        .subscribe();
     };
+
     init();
-  }, [conversationId]);
+
+    return () => {
+      if (messageChannel) supabase.removeChannel(messageChannel);
+      if (typingChannel) supabase.removeChannel(typingChannel);
+      if (reactionsChannel) supabase.removeChannel(reactionsChannel);
+      if (receiptsChannel) supabase.removeChannel(receiptsChannel);
+    };
+  }, [conversationId, user?.id]);
+
+  // Subscribe to other user's presence when they're loaded
+  useEffect(() => {
+    if (!otherUser?.id) return;
+
+    const presenceChannel = supabase.channel(`user-presence:${otherUser.id}`)
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const isUserOnline = Object.keys(state).length > 0;
+        setIsOnline(isUserOnline);
+        
+        // Update last seen if going offline
+        if (!isUserOnline) {
+          setLastSeen(new Date().toISOString());
+        }
+      })
+      .on('presence', { event: 'join' }, () => {
+        setIsOnline(true);
+      })
+      .on('presence', { event: 'leave' }, () => {
+        setIsOnline(false);
+        setLastSeen(new Date().toISOString());
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [otherUser?.id]);
 
   useEffect(() => {
     scrollToBottom();
@@ -231,144 +391,6 @@ export const ModernChatInterface = ({ conversationId, onBack }: ChatInterfacePro
     } catch (error: any) {
       console.error('Error loading other user:', error);
     }
-  };
-
-  const subscribeToMessages = () => {
-    const channel = supabase
-      .channel(`messages:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        (payload: any) => {
-          const row = payload?.new;
-          if (!row) return;
-
-          const profile = row.sender_id === user?.id
-            ? { display_name: 'You', avatar_url: null }
-            : { display_name: otherUser?.display_name || 'Unknown User', avatar_url: otherUser?.avatar_url || null };
-
-          const incoming = {
-            id: row.id,
-            content: row.content,
-            sender_id: row.sender_id,
-            created_at: row.created_at,
-            media_url: row.media_url || null,
-            media_type: row.media_type || null,
-            reply_to_id: row.reply_to_id || null,
-            reply_to_message: null,
-            profiles: profile,
-            reactions: [],
-            read_receipts: [],
-            status: (row.sender_id === user?.id ? 'delivered' : 'sent') as Message['status'],
-            is_pinned: false,
-            edited_at: null,
-          } as Message;
-
-          setMessages((prev) => (prev.some((m) => m.id === incoming.id) ? prev : [...prev, incoming]));
-          scrollToBottom();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToTyping = () => {
-    const channel = supabase
-      .channel(`typing:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'typing_indicators',
-          filter: `conversation_id=eq.${conversationId}`,
-        },
-        async (payload: any) => {
-          if (payload.new?.user_id !== user?.id) {
-            setIsTyping(payload.new?.is_typing || false);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToReactions = () => {
-    const channel = supabase
-      .channel(`reactions:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'message_reactions',
-        },
-        () => {
-          loadMessages();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToReadReceipts = () => {
-    const channel = supabase
-      .channel(`read_receipts:${conversationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'message_read_receipts',
-        },
-        async (payload: any) => {
-          const receipt = payload?.new;
-          if (!receipt) return;
-
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === receipt.message_id && receipt.user_id !== user?.id
-                ? { ...msg, status: 'read' as Message['status'], read_receipts: [...(msg.read_receipts || []), { user_id: receipt.user_id, read_at: receipt.read_at }] }
-                : msg
-            )
-          );
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  };
-
-  const subscribeToPresence = () => {
-    if (!otherUser?.id) return;
-
-    const channel = supabase.channel(`presence:${otherUser.id}`)
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const isUserOnline = Object.keys(state).length > 0;
-        setIsOnline(isUserOnline);
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   };
 
   const markMessagesAsRead = async (messagesToMark: Message[]) => {
