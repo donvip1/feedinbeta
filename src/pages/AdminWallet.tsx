@@ -402,7 +402,7 @@ const AdminWallet = () => {
                 <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
               </Button>
               {canManageCredits ? (
-                <Badge variant="default" className="bg-primary">Super Admin</Badge>
+                <Badge variant="default" className="bg-primary">Full Access</Badge>
               ) : (
                 <Badge variant="secondary">
                   <Eye className="w-3 h-3 mr-1" />
@@ -1144,7 +1144,7 @@ const AdminWallet = () => {
           <Card className="border-muted">
             <CardContent className="py-4">
               <p className="text-sm text-muted-foreground text-center">
-                You have view-only access. Contact a super admin to manage credits.
+                You have view-only access. Contact platform management for elevated permissions.
               </p>
             </CardContent>
           </Card>

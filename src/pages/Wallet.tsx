@@ -35,14 +35,26 @@ const Wallet = () => {
   const { data: credits } = useQuery({
     queryKey: ['user-credits', user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get the base data
+      const { data: baseData, error: baseError } = await supabase
         .from('user_credits')
         .select('*')
         .eq('user_id', user?.id)
         .single();
-        
-      if (error) throw error;
-      return data;
+      
+      if (baseError && baseError.code !== 'PGRST116') throw baseError;
+      
+      // Then get the secure credit amount (handles unlimited access)
+      const { data: secureCredits } = await supabase.rpc('get_user_credits', { 
+        p_user_id: user?.id 
+      });
+      
+      // Return data with secure balance
+      return {
+        balance: secureCredits ?? baseData?.balance ?? 0,
+        total_earned: baseData?.total_earned ?? 0,
+        total_spent: baseData?.total_spent ?? 0,
+      };
     },
     enabled: !!user,
   });

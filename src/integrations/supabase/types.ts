@@ -3478,18 +3478,24 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          created_at: string | null
           id: string
-          role: Database["public"]["Enums"]["app_role"]
+          role: string
+          updated_at: string | null
           user_id: string
         }
         Insert: {
+          created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: string
+          updated_at?: string | null
           user_id: string
         }
         Update: {
+          created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
+          role?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
@@ -3789,6 +3795,10 @@ export type Database = {
       cleanup_expired_stories: { Args: never; Returns: undefined }
       cleanup_old_view_history: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
+      deduct_credits_safe: {
+        Args: { p_amount: number; p_description?: string; p_user_id: string }
+        Returns: boolean
+      }
       delete_expired_stories: { Args: never; Returns: undefined }
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
@@ -3843,6 +3853,7 @@ export type Database = {
           youtube_url: string
         }[]
       }
+      get_my_role: { Args: never; Returns: string }
       get_my_sensitive_data: {
         Args: never
         Returns: {
@@ -3944,6 +3955,7 @@ export type Database = {
         Returns: number
       }
       get_user_by_username: { Args: { p_username: string }; Returns: string }
+      get_user_credits: { Args: { p_user_id: string }; Returns: number }
       get_user_post_count: { Args: { user_uuid: string }; Returns: number }
       get_user_public_profile: {
         Args: { target_user_id: string }
@@ -3985,17 +3997,21 @@ export type Database = {
           username: string
         }[]
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | { Args: { _role: string; _user_id: string }; Returns: boolean }
+      has_unlimited_access: { Args: never; Returns: boolean }
       increment_post_comments_count: {
         Args: { post_id: string }
         Returns: undefined
       }
+      is_admin: { Args: never; Returns: boolean }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
@@ -4004,6 +4020,7 @@ export type Database = {
         Args: { p_group_id: string; p_user_id: string }
         Returns: boolean
       }
+      is_super_admin: { Args: never; Returns: boolean }
       is_user_blocked: {
         Args: { user_a: string; user_b: string }
         Returns: boolean
