@@ -616,7 +616,7 @@ export default function Messages() {
                     onClick={() => {
                       setSelectedConversationId(conv.id);
                       // Mark messages as read locally and in database without reloading
-                      if (user && conv.unread_count && conv.unread_count > 0) {
+                      if (user && conv.unread_count != null && conv.unread_count > 0) {
                         // Update local state immediately
                         setConversations(prev => prev.map(c => 
                           c.id === conv.id ? { ...c, unread_count: 0 } : c
@@ -646,9 +646,9 @@ export default function Messages() {
                       {conv.isOnline && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background" />
                       )}
-                      {conv.unread_count && conv.unread_count > 0 && (
+                      {conv.unread_count != null && conv.unread_count > 0 ? (
                         <UnreadBadge count={conv.unread_count} size="sm" />
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex-1 text-left overflow-hidden">
                       <div className="flex items-center justify-between">
@@ -669,7 +669,7 @@ export default function Messages() {
                       {conv.isTyping ? (
                         <p className="text-sm text-primary animate-pulse">typing...</p>
                       ) : conv.last_message ? (
-                        <p className={`text-sm truncate ${conv.unread_count && conv.unread_count > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+                        <p className={`text-sm truncate ${conv.unread_count != null && conv.unread_count > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                           {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
                           {conv.last_message.content}
                         </p>
