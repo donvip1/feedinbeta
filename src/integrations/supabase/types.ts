@@ -4060,6 +4060,21 @@ export type Database = {
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
       get_active_sessions_count: { Args: never; Returns: number }
+      get_conversations_with_details: {
+        Args: { p_user_id: string }
+        Returns: {
+          conversation_id: string
+          last_message_content: string
+          last_message_created_at: string
+          last_message_sender_id: string
+          other_user_avatar_url: string
+          other_user_display_name: string
+          other_user_id: string
+          other_user_username: string
+          unread_count: number
+          updated_at: string
+        }[]
+      }
       get_credit_statistics: { Args: never; Returns: Json }
       get_daily_earnings_stats:
         | { Args: never; Returns: Json }
