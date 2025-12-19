@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import { 
   ArrowLeft, Send, Smile, Phone, Video, Mic, X, Image as ImageIcon, 
   Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin
@@ -17,6 +18,8 @@ import { ModernMessageBubble } from './ModernMessageBubble';
 import { CallLogBubble } from './CallLogBubble';
 import { TypingIndicator, getActivityText, getActivityIcon, ActivityType } from './TypingIndicator';
 import { VoiceRecorder } from './VoiceRecorder';
+import { MediaUploadModal } from './MediaUploadModal';
+import { DeleteMessageModal, DeleteOption } from './DeleteMessageModal';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -27,7 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay, differenceInHours } from 'date-fns';
 
 interface Message {
   id: string;
@@ -92,19 +95,30 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string; sender: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string } | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  
+  // Media upload modal state
+  const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
+  const [mediaUploadType, setMediaUploadType] = useState<'image' | 'video' | 'file'>('image');
+  const [showMediaUpload, setShowMediaUpload] = useState(false);
+  
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
+  
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const hasScrolledToUnread = useRef(false);
-  const isUserScrolling = useRef(false); // Track if user is manually scrolling
-  const isNearBottomRef = useRef(true); // Track if user is near bottom
+  const isUserScrolling = useRef(false);
+  const isNearBottomRef = useRef(true);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
 
   // Use the global presence hook to track other user's status
@@ -575,15 +589,17 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     return { url: publicUrl, path: filePath };
   };
 
-  const handleSend = async (mediaUrl?: string, mediaType?: string) => {
-    if (!user || (!newMessage.trim() && !mediaUrl)) return;
+  const handleSend = async (mediaUrl?: string, mediaType?: string, customContent?: string) => {
+    if (!user || (!newMessage.trim() && !mediaUrl && !customContent)) return;
 
     setSending(true);
+    
+    const messageContent = customContent || newMessage.trim() || (mediaType?.startsWith('audio') ? '🎤 Voice message' : '📎 Attachment');
     
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage: Message = {
       id: tempId,
-      content: newMessage.trim() || (mediaType?.startsWith('audio') ? '🎤 Voice message' : '📎 Attachment'),
+      content: messageContent,
       sender_id: user.id,
       created_at: new Date().toISOString(),
       media_url: mediaUrl || null,
@@ -615,7 +631,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         .insert({
           conversation_id: conversationId,
           sender_id: user.id,
-          content: newMessage.trim() || (mediaType?.startsWith('audio') ? '🎤 Voice message' : '📎 Attachment'),
+          content: messageContent,
           media_url: mediaUrl,
           media_type: mediaType,
           reply_to_id: replyingTo?.id,
@@ -665,23 +681,43 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const handleFileSelect = async (file: File, type: 'image' | 'video' | 'file') => {
     if (!user) return;
 
-    setUploadingFile(true);
-    // Set appropriate activity type based on file type
+    // Show media upload modal for preview/editing
+    setMediaUploadFile(file);
+    setMediaUploadType(type);
+    setShowMediaUpload(true);
+    
+    // Set activity type
     const activityMap: Record<string, ActivityType> = {
       'image': 'uploading_image',
       'video': 'uploading_video',
       'file': 'uploading_file',
     };
     handleTyping(activityMap[type] || 'uploading_file');
+  };
+
+  const handleMediaSend = async (file: File, caption: string) => {
+    if (!user) return;
+
+    setUploadingFile(true);
+    setUploadProgress(0);
     
     try {
-      const { url, path } = await uploadFile(file);
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
       
-      if (type === 'image' || type === 'video') {
-        setPreviewMedia({ url, type: file.type });
-      } else {
-        await handleSend(url, 'file');
-      }
+      const { url } = await uploadFile(file);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      // Send with caption if provided
+      const content = caption || (file.type.startsWith('audio') ? '🎤 Voice message' : '📎 Attachment');
+      await handleSend(url, file.type, content);
+      
+      setShowMediaUpload(false);
+      setMediaUploadFile(null);
     } catch (error: any) {
       toast({
         title: 'Upload failed',
@@ -690,6 +726,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       });
     } finally {
       setUploadingFile(false);
+      setUploadProgress(0);
       stopTyping();
     }
   };
@@ -743,23 +780,75 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     }
   };
 
-  const handleDelete = async (messageId: string) => {
-    if (!user) return;
+  const openDeleteModal = (msg: Message) => {
+    setMessageToDelete(msg);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDeleteWithOption = async (option: DeleteOption) => {
+    if (!user || !messageToDelete) return;
 
     try {
-      await supabase
-        .from('messages')
-        .delete()
-        .eq('id', messageId)
-        .eq('sender_id', user.id);
+      const isOwnMessage = messageToDelete.sender_id === user.id;
+      
+      if (option === 'for_me') {
+        // Mark as deleted for sender only
+        await supabase
+          .from('messages')
+          .update({ deleted_for_sender: true })
+          .eq('id', messageToDelete.id);
+      } else if (option === 'for_everyone') {
+        // Delete message and notify other user
+        await supabase
+          .from('messages')
+          .update({ 
+            content: 'This message was deleted',
+            deleted_at: new Date().toISOString(),
+            media_url: null,
+            media_type: null,
+          })
+          .eq('id', messageToDelete.id);
+      } else if (option === 'for_everyone_silent') {
+        // Check if message is unread
+        const isUnread = !messageToDelete.read_receipts?.some(r => r.user_id !== user.id);
+        if (isUnread) {
+          // Completely delete
+          await supabase
+            .from('messages')
+            .delete()
+            .eq('id', messageToDelete.id);
+        } else {
+          // Show regular delete notification
+          await supabase
+            .from('messages')
+            .update({ 
+              content: 'This message was deleted',
+              deleted_at: new Date().toISOString(),
+              media_url: null,
+              media_type: null,
+            })
+            .eq('id', messageToDelete.id);
+        }
+      }
 
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      setMessages((prev) => prev.filter((m) => m.id !== messageToDelete.id));
+      setDeleteModalOpen(false);
+      setMessageToDelete(null);
+      
+      toast({ title: 'Message deleted' });
     } catch (error: any) {
       toast({
         title: 'Delete failed',
         description: error.message,
         variant: 'destructive',
       });
+    }
+  };
+
+  const handleDelete = (messageId: string) => {
+    const msg = messages.find(m => m.id === messageId);
+    if (msg) {
+      openDeleteModal(msg);
     }
   };
 
@@ -831,9 +920,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     : messages;
 
   return (
-    <div className="flex flex-col h-full max-h-[100dvh] bg-gradient-to-b from-background to-background/95 overflow-hidden">
-      {/* Header - always visible */}
-      <div className="flex items-center gap-3 p-3 border-b border-border/50 bg-background/95 backdrop-blur-lg shrink-0 z-20">
+    <div className="flex flex-col h-[100dvh] bg-gradient-to-b from-background to-background/95 fixed inset-0 md:relative md:h-full">
+      {/* Header - sticky at top, never hides on keyboard */}
+      <header className="sticky top-0 flex items-center gap-3 p-3 border-b border-border/50 bg-background/95 backdrop-blur-lg z-50 min-h-[60px]">
         <Button
           variant="ghost"
           size="icon"
@@ -929,7 +1018,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      </div>
+      </header>
 
       {/* Search Bar */}
       {showSearch && (
@@ -1127,9 +1216,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Input Area - always visible at bottom */}
+      {/* Input Area - sticky at bottom for mobile keyboards */}
       {!showVoiceRecorder && (
-        <div className="p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg shrink-0 pb-safe">
+        <div className="sticky bottom-0 p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40 pb-[env(safe-area-inset-bottom,12px)]">
           <div className="flex items-end gap-2">
             <AttachmentPicker onFileSelect={handleFileSelect} />
             
@@ -1227,6 +1316,38 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Media Upload Modal */}
+      <MediaUploadModal
+        open={showMediaUpload}
+        onClose={() => {
+          setShowMediaUpload(false);
+          setMediaUploadFile(null);
+          stopTyping();
+        }}
+        file={mediaUploadFile}
+        fileType={mediaUploadType}
+        onSend={handleMediaSend}
+        uploading={uploadingFile}
+        uploadProgress={uploadProgress}
+      />
+
+      {/* Delete Message Modal */}
+      <DeleteMessageModal
+        open={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setMessageToDelete(null);
+        }}
+        onDelete={handleDeleteWithOption}
+        isOwnMessage={messageToDelete?.sender_id === user?.id}
+        messageContent={messageToDelete?.content || ''}
+        canDeleteForEveryone={
+          messageToDelete 
+            ? differenceInHours(new Date(), new Date(messageToDelete.created_at)) < 24 
+            : false
+        }
+      />
     </div>
   );
 };
