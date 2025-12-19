@@ -10,7 +10,9 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import TikTokPortraitPostFlow from '@/components/post/TikTokPortraitPostFlow';
-import PostCreationSelector from '@/components/post/PostCreationSelector';
+import NativeCreationSheet from '@/components/post/NativeCreationSheet';
+import NativeCameraView from '@/components/post/NativeCameraView';
+import NativeGalleryPicker from '@/components/post/NativeGalleryPicker';
 import TextPostCreator from '@/components/post/TextPostCreator';
 import PostDetails from '@/components/post/PostDetails';
 import PostCard from '@/components/feed/PostCard';
@@ -408,40 +410,37 @@ const Feed = () => {
         hidden={isCommentsOpen || !showNav || postStep !== null}
       />
 
-      {postStep === 'selector' && (
-        <PostCreationSelector
-          onCameraSelect={() => setPostStep('camera')}
-          onGallerySelect={() => {
-            // Open the media gallery picker as a separate step
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*,video/*';
-            input.multiple = true;
-            input.onchange = (e: Event) => {
-              const target = e.target as HTMLInputElement;
-              const files = Array.from(target.files || []);
-              if (files.length > 0) {
-                const mediaFiles = files.map(file => ({
-                  url: URL.createObjectURL(file),
-                  type: (file.type.startsWith('video/') ? 'video' : 'image') as 'image' | 'video',
-                  file,
-                }));
-                handleGalleryMediaSelect(mediaFiles);
-              }
-            };
-            input.click();
-            setPostStep(null);
+      {/* Native Creation Sheet */}
+      <NativeCreationSheet
+        open={postStep === 'selector'}
+        onClose={() => setPostStep(null)}
+        onCameraSelect={() => setPostStep('camera')}
+        onGallerySelect={() => setPostStep('gallery')}
+        onStorySelect={() => setPostStep('story')}
+        onTextSelect={() => setPostStep('text')}
+      />
+
+      {/* Native Camera */}
+      {postStep === 'camera' && (
+        <NativeCameraView
+          onCapture={(media) => {
+            setSelectedMedia([media]);
+            setPostStep('gallery');
           }}
-          onStorySelect={() => setPostStep('story')}
-          onTextSelect={() => setPostStep('text')}
           onClose={() => setPostStep(null)}
+          onGalleryOpen={() => setPostStep('gallery')}
         />
       )}
 
-      {postStep === 'camera' && (
-        <TikTokPortraitPostFlow
+      {/* Native Gallery Picker */}
+      {postStep === 'gallery' && selectedMedia.length === 0 && (
+        <NativeGalleryPicker
+          open={true}
           onClose={() => setPostStep(null)}
-          onSubmit={handlePostSubmit}
+          onSelect={(items) => {
+            setSelectedMedia(items);
+          }}
+          onCameraOpen={() => setPostStep('camera')}
         />
       )}
       {postStep === 'story' && (

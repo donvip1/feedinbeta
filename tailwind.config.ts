@@ -131,6 +131,24 @@ export default {
           from: { transform: "rotate(0deg)" },
           to: { transform: "rotate(360deg)" },
         },
+        "flip-camera": {
+          "0%": { transform: "rotateY(0deg) scale(1)" },
+          "50%": { transform: "rotateY(90deg) scale(0.9)" },
+          "100%": { transform: "rotateY(180deg) scale(1)" },
+        },
+        "focus-ring": {
+          "0%": { transform: "scale(1.5)", opacity: "0" },
+          "50%": { transform: "scale(1)", opacity: "1" },
+          "100%": { transform: "scale(0.85)", opacity: "0" },
+        },
+        "record-pulse": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(239, 68, 68, 0.7)" },
+          "50%": { boxShadow: "0 0 0 12px rgba(239, 68, 68, 0)" },
+        },
+        "flash": {
+          from: { opacity: "1" },
+          to: { opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -146,6 +164,10 @@ export default {
         "bounce-in": "bounce-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
         "pulse-scale": "pulse-scale 2s ease-in-out infinite",
         "spin": "spin 0.8s linear infinite",
+        "flip-camera": "flip-camera 0.3s ease-out",
+        "focus-ring": "focus-ring 0.8s ease-out forwards",
+        "record-pulse": "record-pulse 1.5s ease-in-out infinite",
+        "flash": "flash 0.1s ease-out forwards",
       },
     },
   },

@@ -1,4 +1,6 @@
+import { useCallback, useState } from 'react';
 import editIcon from '@/assets/edit-icon.png';
+import { cn } from '@/lib/utils';
 
 interface FloatingActionButtonProps {
   onClick: () => void;
@@ -6,17 +8,59 @@ interface FloatingActionButtonProps {
 }
 
 export const FloatingActionButton = ({ onClick, hidden = false }: FloatingActionButtonProps) => {
+  const [isPressed, setIsPressed] = useState(false);
+
+  const triggerHaptic = useCallback(async () => {
+    try {
+      const { Capacitor } = await import('@capacitor/core');
+      if (Capacitor.isNativePlatform()) {
+        const { Haptics, ImpactStyle } = await import('@capacitor/haptics');
+        await Haptics.impact({ style: ImpactStyle.Medium });
+      } else if (navigator.vibrate) {
+        navigator.vibrate(15);
+      }
+    } catch {}
+  }, []);
+
+  const handleClick = useCallback(() => {
+    triggerHaptic();
+    onClick();
+  }, [onClick, triggerHaptic]);
+
   if (hidden) {
     return null;
   }
 
   return (
     <button
-      onClick={onClick}
-      className="fixed bottom-[72px] right-4 md:bottom-20 md:right-8 z-[80] hover:scale-110 active:scale-95 transition-all duration-200 flex items-center justify-center"
+      onClick={handleClick}
+      onPointerDown={() => setIsPressed(true)}
+      onPointerUp={() => setIsPressed(false)}
+      onPointerLeave={() => setIsPressed(false)}
+      className={cn(
+        'fixed bottom-[72px] right-4 md:bottom-20 md:right-8 z-[80]',
+        'flex items-center justify-center',
+        'transition-all duration-200 ease-out',
+        'touch-manipulation',
+        isPressed ? 'scale-90' : 'hover:scale-110 active:scale-95',
+        // Subtle shadow for depth
+        'drop-shadow-lg'
+      )}
+      style={{ WebkitTapHighlightColor: 'transparent' }}
       aria-label="Create post"
     >
-      <img src={editIcon} alt="Create post" className="w-12 h-12 md:w-14 md:h-14 object-contain" />
+      {/* Pulse ring effect */}
+      <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
+      
+      {/* Icon */}
+      <img 
+        src={editIcon} 
+        alt="Create post" 
+        className={cn(
+          'w-12 h-12 md:w-14 md:h-14 object-contain relative z-10',
+          'transition-transform duration-150'
+        )} 
+      />
     </button>
   );
 };
