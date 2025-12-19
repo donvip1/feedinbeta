@@ -1037,7 +1037,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
 
       {/* Search Bar - FIXED below header */}
       {showSearch && (
-        <div className="fixed top-[60px] left-0 right-0 p-2 border-b border-border/50 bg-background/50 backdrop-blur-sm z-40">
+        <div className="fixed top-[60px] left-0 md:left-80 right-0 p-2 border-b border-border/50 bg-background/50 backdrop-blur-sm z-40">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
