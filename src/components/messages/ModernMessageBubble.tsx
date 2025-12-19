@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { WaveformPlayer } from './WaveformPlayer';
+import { MediaMessageBubble } from './MediaMessageBubble';
 import { cn } from '@/lib/utils';
 import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
 
@@ -23,6 +24,7 @@ interface MessageBubbleProps {
     created_at: string;
     media_url?: string | null;
     media_type?: string | null;
+    file_size?: number | null;
     reply_to_id?: string | null;
     reply_to_message?: {
       content: string;
@@ -121,28 +123,15 @@ export const ModernMessageBubble = ({
   const renderMedia = () => {
     if (!message.media_url) return null;
 
-    if (message.media_type?.startsWith('image')) {
+    // Use MediaMessageBubble for images and videos (tap to download like WhatsApp)
+    if (message.media_type?.startsWith('image') || message.media_type?.startsWith('video')) {
       return (
-        <div className="relative group/media overflow-hidden rounded-xl mb-1">
-          <img 
-            src={message.media_url} 
-            alt="Shared" 
-            className="max-w-[280px] max-h-[320px] object-cover rounded-xl transition-transform duration-200 group-hover/media:scale-[1.02]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity" />
-        </div>
-      );
-    }
-
-    if (message.media_type?.startsWith('video')) {
-      return (
-        <div className="relative overflow-hidden rounded-xl mb-1">
-          <video 
-            src={message.media_url} 
-            controls 
-            className="max-w-[280px] max-h-[320px] rounded-xl"
-          />
-        </div>
+        <MediaMessageBubble
+          mediaUrl={message.media_url}
+          mediaType={message.media_type}
+          fileSize={message.file_size || undefined}
+          isOwn={isOwn}
+        />
       );
     }
 
@@ -154,29 +143,14 @@ export const ModernMessageBubble = ({
       );
     }
 
+    // Generic file attachment
     return (
-      <a 
-        href={message.media_url} 
-        download 
-        className={cn(
-          "flex items-center gap-3 p-3 rounded-xl mb-1 transition-all",
-          isOwn 
-            ? "bg-white/10 hover:bg-white/20" 
-            : "bg-primary/5 hover:bg-primary/10"
-        )}
-      >
-        <div className={cn(
-          "w-10 h-10 rounded-lg flex items-center justify-center",
-          isOwn ? "bg-white/20" : "bg-primary/10"
-        )}>
-          <FileText className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{message.content}</p>
-          <p className="text-xs opacity-70">Tap to download</p>
-        </div>
-        <Download className="w-5 h-5 opacity-70" />
-      </a>
+      <MediaMessageBubble
+        mediaUrl={message.media_url}
+        mediaType={message.media_type || 'application/octet-stream'}
+        fileSize={message.file_size || undefined}
+        isOwn={isOwn}
+      />
     );
   };
 
