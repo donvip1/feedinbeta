@@ -15,7 +15,7 @@ import {
 import { AttachmentPicker } from './AttachmentPicker';
 import { ModernMessageBubble } from './ModernMessageBubble';
 import { CallLogBubble } from './CallLogBubble';
-import { TypingIndicator, getActivityText, getActivityIcon } from './TypingIndicator';
+import { TypingIndicator, getActivityText, getActivityIcon, ActivityType } from './TypingIndicator';
 import { VoiceRecorder } from './VoiceRecorder';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -87,7 +87,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [activityType, setActivityType] = useState<'typing' | 'emoji' | 'media_upload'>('typing');
+  const [activityType, setActivityType] = useState<ActivityType>('typing');
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string; sender: string } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
@@ -486,7 +486,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     }
   }, [user, conversationId, onMessagesRead]);
 
-  const handleTyping = async (activity: 'typing' | 'emoji' | 'media_upload' = 'typing') => {
+  const handleTyping = async (activity: ActivityType = 'typing') => {
     if (!user) return;
 
     if (typingTimeoutRef.current) {
@@ -503,6 +503,11 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         updated_at: new Date().toISOString(),
       });
 
+    // Auto-stop after 3 seconds for typing, longer for other activities
+    const timeout = ['voice_recording', 'uploading_image', 'uploading_video', 'uploading_file'].includes(activity) 
+      ? 30000 
+      : 3000;
+
     typingTimeoutRef.current = setTimeout(async () => {
       await supabase
         .from('typing_indicators')
@@ -513,7 +518,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           activity_type: 'typing',
           updated_at: new Date().toISOString(),
         });
-    }, 3000);
+    }, timeout);
   };
 
   const stopTyping = async () => {
@@ -643,7 +648,14 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     if (!user) return;
 
     setUploadingFile(true);
-    handleTyping('media_upload');
+    // Set appropriate activity type based on file type
+    const activityMap: Record<string, ActivityType> = {
+      'image': 'uploading_image',
+      'video': 'uploading_video',
+      'file': 'uploading_file',
+    };
+    handleTyping(activityMap[type] || 'uploading_file');
+    
     try {
       const { url, path } = await uploadFile(file);
       
@@ -1088,7 +1100,11 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         <div className="px-4 py-3 bg-muted/50 border-t border-border/50">
           <VoiceRecorder
             onSend={handleVoiceSend}
-            onCancel={() => setShowVoiceRecorder(false)}
+            onCancel={() => {
+              setShowVoiceRecorder(false);
+              stopTyping();
+            }}
+            onStartRecording={() => handleTyping('voice_recording')}
           />
         </div>
       )}
@@ -1104,9 +1120,15 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                 ref={inputRef}
                 placeholder="Type a message..."
                 value={newMessage}
+                onFocus={() => handleTyping('focused')}
+                onBlur={() => {
+                  if (!newMessage.trim()) stopTyping();
+                }}
                 onChange={(e) => {
                   setNewMessage(e.target.value);
-                  handleTyping('typing');
+                  if (e.target.value.trim()) {
+                    handleTyping('typing');
+                  }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {

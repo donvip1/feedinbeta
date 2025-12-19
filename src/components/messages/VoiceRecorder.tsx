@@ -7,9 +7,10 @@ import { WaveformPlayer } from './WaveformPlayer';
 interface VoiceRecorderProps {
   onSend: (audioBlob: Blob, duration: number) => void;
   onCancel: () => void;
+  onStartRecording?: () => void;
 }
 
-export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
+export const VoiceRecorder = ({ onSend, onCancel, onStartRecording }: VoiceRecorderProps) => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -67,6 +68,9 @@ export const VoiceRecorder = ({ onSend, onCancel }: VoiceRecorderProps) => {
       mediaRecorder.start();
       setIsRecording(true);
       setDuration(0);
+      
+      // Notify parent that recording started
+      onStartRecording?.();
 
       timerRef.current = setInterval(() => {
         setDuration(prev => prev + 1);
