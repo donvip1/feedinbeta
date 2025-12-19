@@ -5,7 +5,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -16,7 +17,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
+  const { haptic } = useNativeFeatures();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [pressedId, setPressedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -47,6 +50,18 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   const isActive = (path: string) => location.pathname === path;
 
+  const handleNavClick = useCallback((path: string, itemId: string) => {
+    // Trigger haptic feedback
+    haptic('light');
+    
+    // Visual feedback
+    setPressedId(itemId);
+    setTimeout(() => setPressedId(null), 150);
+    
+    // Navigate
+    navigate(path);
+  }, [haptic, navigate]);
+
   // Hide navigation completely when hidden prop is true
   if (hidden) {
     return null;
@@ -54,25 +69,37 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   return (
     <TooltipProvider>
-      <nav className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-border/50">
+      <nav 
+        className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-border/50 native-bottom-nav"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          transform: 'translateZ(0)',
+          WebkitTransform: 'translateZ(0)',
+        }}
+      >
         <div className="max-w-screen-xl mx-auto px-2">
           <div className="flex items-center justify-between py-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
+              const isPressed = pressedId === item.id;
               return (
                 <Tooltip key={item.id}>
                   <TooltipTrigger asChild>
                     <Button
-                      onClick={() => navigate(item.path)}
+                      onClick={() => handleNavClick(item.path, item.id)}
                       variant="ghost"
                       size="icon"
-                      className={`h-12 w-12 hover:bg-transparent transition-colors ${
+                      className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${
                         active ? 'text-primary' : 'text-foreground/80 hover:text-foreground'
                       }`}
+                      style={{
+                        transform: isPressed ? 'scale(0.9)' : 'scale(1)',
+                        transition: 'transform 0.1s ease-out',
+                      }}
                     >
                       {item.isProfile && avatarUrl ? (
-                        <div className={`rounded-full ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}>
+                        <div className={`rounded-full transition-all duration-150 ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}>
                           <Avatar className="w-7 h-7">
                             <AvatarImage src={avatarUrl} />
                             <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
@@ -82,7 +109,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                         <Icon 
                           size={24}
                           strokeWidth={2.5}
-                          className="transition-transform hover:scale-110"
+                          className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
                         />
                       )}
                     </Button>
@@ -93,7 +120,6 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                 </Tooltip>
               );
             })}
-
           </div>
         </div>
       </nav>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -12,20 +12,21 @@ import { useQuery } from '@tanstack/react-query';
 import TikTokPortraitPostFlow from '@/components/post/TikTokPortraitPostFlow';
 import PostCreationSelector from '@/components/post/PostCreationSelector';
 import TextPostCreator from '@/components/post/TextPostCreator';
-import MediaGalleryPicker from '@/components/post/MediaGalleryPicker';
-import PostEditor from '@/components/post/PostEditor';
 import PostDetails from '@/components/post/PostDetails';
 import PostCard from '@/components/feed/PostCard';
-import { Skeleton } from '@/components/ui/skeleton';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { useViewedPosts } from '@/hooks/useViewedPosts';
+import { useScrollPosition } from '@/hooks/useScrollPosition';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import { FeedSkeleton, PullToRefreshIndicator } from '@/components/native/NativeLoadingSpinner';
+import { feedCache } from '@/lib/feed-cache';
 
 const Feed = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
-  const feedContainerRef = useRef<HTMLDivElement>(null);
+  const { containerRef } = useScrollPosition('feed');
   const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file: File }[]>([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -54,10 +55,15 @@ const Feed = () => {
     initialViewedRef.current = [...viewedPostIds];
   }, [activeTab]);
 
-  // Fetch posts - only refetch on tab change, not on view updates
+  // Fetch posts with cache-first strategy
   const { data: posts, isLoading, refetch } = useQuery({
     queryKey: ['feed-posts', activeTab],
     queryFn: async () => {
+      // Try cache first for instant display
+      const cached = await feedCache.get(activeTab);
+      if (cached && cached.length > 0) {
+        setDisplayPosts(cached);
+      }
       // Get active promotions first
       const { data: promotions } = await supabase
         .from('post_promotions')
@@ -142,6 +148,8 @@ const Feed = () => {
       
       // Store all posts for infinite scroll looping
       allLoadedPostsRef.current = sortByPriority(allPosts);
+      // Cache the results
+      feedCache.set(activeTab, sortByPriority(allPosts));
 
       return finalPosts;
     },
@@ -158,9 +166,9 @@ const Feed = () => {
     }
   }, [posts]);
 
-  // Infinite scroll handler - when reaching end, append more posts seamlessly
+  // Infinite scroll handler
   useEffect(() => {
-    const container = feedContainerRef.current;
+    const container = containerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
@@ -284,7 +292,7 @@ const Feed = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16">
+    <div className="min-h-screen bg-background pb-16 native-feed-container">
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-3 py-2 max-w-2xl mx-auto">
           <NotificationBell 
@@ -342,26 +350,13 @@ const Feed = () => {
         </div>
       </div>
 
-
       <div
-        ref={feedContainerRef}
-        className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        ref={containerRef}
+        className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth native-scroll-container"
+        data-scrollable="true"
       >
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-card rounded-lg p-4 border border-border">
-                <div className="flex items-center gap-3 mb-3">
-                  <Skeleton className="w-10 h-10 rounded-full" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                </div>
-                <Skeleton className="h-64 w-full rounded-lg" />
-              </div>
-            ))}
-          </div>
+        {isLoading && displayPosts.length === 0 ? (
+          <FeedSkeleton />
         ) : displayPosts && displayPosts.length > 0 ? (
           <>
             {displayPosts.map((post) => {
