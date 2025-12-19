@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -16,6 +16,8 @@ import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
 import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { useToast } from '@/hooks/use-toast';
+import { useConversationCache, useGroupCache } from '@/hooks/useConversationCache';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface Conversation {
   id: string;
@@ -52,17 +54,25 @@ export default function Messages() {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  
+  // Cache hooks for instant loading
+  const { cachedConversations, hasCachedData, saveToCache } = useConversationCache();
+  const { cachedGroups, cachedMyGroups, hasGroupCache, saveGroupsToCache } = useGroupCache();
+  
+  // Initialize with cached data for instant display
+  const [conversations, setConversations] = useState<Conversation[]>(cachedConversations);
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasCachedData); // Only show loading if no cache
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNewConversation, setShowNewConversation] = useState(false);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<Group[]>(cachedGroups);
+  const [myGroups, setMyGroups] = useState<Group[]>(cachedMyGroups);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [activeTab, setActiveTab] = useState('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
-  const handledLocationStateRef = React.useRef(false);
+  const handledLocationStateRef = useRef(false);
+  const initialLoadDoneRef = useRef(false);
 
   // Handle shared image from location state - only once on mount
   useEffect(() => {
@@ -110,9 +120,27 @@ export default function Messages() {
     };
   }, [user?.id]);
 
+  // Update conversations state when cache loads
   useEffect(() => {
-    if (user) {
-      loadConversations();
+    if (hasCachedData && cachedConversations.length > 0 && conversations.length === 0) {
+      setConversations(cachedConversations);
+      setLoading(false);
+    }
+  }, [hasCachedData, cachedConversations]);
+
+  // Update groups state when cache loads
+  useEffect(() => {
+    if (hasGroupCache) {
+      if (cachedGroups.length > 0 && groups.length === 0) setGroups(cachedGroups);
+      if (cachedMyGroups.length > 0 && myGroups.length === 0) setMyGroups(cachedMyGroups);
+    }
+  }, [hasGroupCache, cachedGroups, cachedMyGroups]);
+
+  useEffect(() => {
+    if (user && !initialLoadDoneRef.current) {
+      initialLoadDoneRef.current = true;
+      // Load fresh data in background (don't show loading if we have cache)
+      loadConversations(!hasCachedData);
       loadGroups();
       
       // Subscribe to new messages - update locally instead of reloading
@@ -320,13 +348,17 @@ export default function Messages() {
         })
       );
 
-      setConversations(conversationsWithDetails.sort((a, b) => 
+      const sortedConversations = conversationsWithDetails.sort((a, b) => 
         new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      ));
+      );
+      setConversations(sortedConversations);
+      // Save to cache for instant loading next time
+      saveToCache(sortedConversations);
     } catch (error: any) {
       console.error('Error loading conversations:', error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
@@ -429,6 +461,8 @@ export default function Messages() {
 
       setMyGroups(userGroups);
       setGroups(otherGroups);
+      // Save to cache
+      saveGroupsToCache(otherGroups, userGroups);
     } catch (error) {
       console.error('Error loading groups:', error);
     }
@@ -476,13 +510,17 @@ export default function Messages() {
     g.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (authLoading || loading) {
+  // Only show full loading screen if no cached data and still loading
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
+
+  // Show skeleton only if loading and no cached conversations
+  const showSkeleton = loading && conversations.length === 0;
 
   return (
     <div className="flex h-screen bg-background">
@@ -546,7 +584,20 @@ export default function Messages() {
         <ScrollArea className="flex-1">
           <Tabs value={activeTab} className="w-full">
             <TabsContent value="chats" className="m-0">
-              {filteredConversations.length === 0 ? (
+              {showSkeleton ? (
+                // Skeleton loading for instant perceived performance
+                <div className="space-y-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="w-full p-4 flex items-start gap-3">
+                      <Skeleton className="w-10 h-10 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-48" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : filteredConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center">
                   <MessageSquarePlus className="w-12 h-12 mb-4 text-muted-foreground" />
                   <p className="text-muted-foreground">No conversations yet</p>
