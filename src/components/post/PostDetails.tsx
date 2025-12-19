@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock } from 'lucide-react';
+import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock, CheckCircle2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 interface PostDetailsProps {
   media: { url: string; type: 'image' | 'video'; file: File }[];
@@ -15,6 +17,7 @@ interface PostDetailsProps {
 export default function PostDetails({ media, onSubmit, onClose }: PostDetailsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [caption, setCaption] = useState('');
   const [location, setLocation] = useState('');
   const [privacy, setPrivacy] = useState<'everyone' | 'friends' | 'followers' | 'only_me'>('everyone');
@@ -25,6 +28,8 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
   const [detectingLocation, setDetectingLocation] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStage, setUploadStage] = useState<'idle' | 'uploading' | 'creating' | 'done'>('idle');
 
   const privacyOptions = [
     { value: 'everyone' as const, label: 'Everyone', icon: Globe },
@@ -98,14 +103,23 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
     if (!user) return;
     
     setLoading(true);
+    setUploadStage('uploading');
+    setUploadProgress(0);
+    
     try {
-      // Upload all media files to storage
+      // Upload all media files to storage with progress tracking
       const uploadedMedia: { url: string; type: string }[] = [];
+      const totalFiles = media.length;
       
-      for (const mediaItem of media) {
+      for (let i = 0; i < media.length; i++) {
+        const mediaItem = media[i];
         const fileExt = mediaItem.file.name.split('.').pop();
         const fileName = `${user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
         const bucketName = mediaItem.type === 'image' ? 'post-images' : 'post-videos';
+
+        // Calculate progress based on file index
+        const baseProgress = (i / totalFiles) * 80; // 80% for uploads
+        setUploadProgress(Math.round(baseProgress));
 
         const { error: uploadError } = await supabase.storage
           .from(bucketName)
@@ -118,7 +132,15 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
           .getPublicUrl(fileName);
 
         uploadedMedia.push({ url: publicUrl, type: mediaItem.type });
+        
+        // Update progress after each file
+        const progressAfterFile = ((i + 1) / totalFiles) * 80;
+        setUploadProgress(Math.round(progressAfterFile));
       }
+
+      // Creating post stage
+      setUploadStage('creating');
+      setUploadProgress(85);
 
       // Prepare scheduled time if set
       let scheduledAt = null;
@@ -142,7 +164,6 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
       if (uploadedMedia.length > 1) {
         postData.media_urls = uploadedMedia.map(m => m.url);
         postData.media_types = uploadedMedia.map(m => m.type);
-        // Also set single fields to first item for backward compatibility
         postData.media_url = uploadedMedia[0].url;
         postData.media_type = uploadedMedia[0].type;
       } else if (uploadedMedia.length === 1) {
@@ -152,26 +173,40 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         postData.media_types = [uploadedMedia[0].type];
       }
 
-      const { error: postError } = await supabase
+      setUploadProgress(90);
+
+      const { data: newPost, error: postError } = await supabase
         .from('posts')
-        .insert(postData);
+        .insert(postData)
+        .select('id')
+        .single();
 
       if (postError) throw postError;
+
+      setUploadProgress(100);
+      setUploadStage('done');
 
       toast({
         title: 'Post created!',
         description: 'Your post has been published successfully.',
       });
 
-      onSubmit();
+      // Short delay to show 100% then navigate to the new post
+      setTimeout(() => {
+        onSubmit();
+        if (newPost?.id) {
+          navigate(`/post/${newPost.id}`);
+        }
+      }, 500);
     } catch (error: any) {
       console.error('Error creating post:', error);
+      setUploadStage('idle');
+      setUploadProgress(0);
       toast({
         title: 'Error',
         description: error.message || 'Failed to create post',
         variant: 'destructive',
       });
-    } finally {
       setLoading(false);
     }
   };
@@ -365,6 +400,60 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
           </div>
         )}
       </div>
+
+      {/* Upload Progress Overlay */}
+      {loading && (
+        <div className="fixed inset-0 z-[110] bg-background/95 backdrop-blur-sm flex flex-col items-center justify-center p-8">
+          <div className="w-full max-w-xs space-y-6">
+            {/* Progress Circle or Check */}
+            <div className="flex justify-center">
+              {uploadStage === 'done' ? (
+                <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center animate-scale-in">
+                  <CheckCircle2 className="w-12 h-12 text-green-500" />
+                </div>
+              ) : (
+                <div className="relative w-20 h-20">
+                  <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="36"
+                      fill="none"
+                      stroke="hsl(var(--muted))"
+                      strokeWidth="6"
+                    />
+                    <circle
+                      cx="40"
+                      cy="40"
+                      r="36"
+                      fill="none"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth="6"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 36}`}
+                      strokeDashoffset={`${2 * Math.PI * 36 * (1 - uploadProgress / 100)}`}
+                      className="transition-all duration-300"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-lg font-bold">{uploadProgress}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-2">
+              <Progress value={uploadProgress} className="h-2" />
+              <p className="text-center text-sm text-muted-foreground">
+                {uploadStage === 'uploading' && 'Uploading media...'}
+                {uploadStage === 'creating' && 'Creating your post...'}
+                {uploadStage === 'done' && 'Post created successfully!'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <button
         onClick={handleSubmit}
