@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
+import { InstallAppPrompt } from "@/components/pwa/InstallAppPrompt";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -54,6 +55,7 @@ import AdminWallet from "./pages/AdminWallet";
 import SessionManagement from "./pages/SessionManagement";
 import CreatorPayouts from "./pages/CreatorPayouts";
 import Promotions from "./pages/Promotions";
+import Install from "./pages/Install";
 
 const queryClient = new QueryClient();
 
@@ -86,11 +88,13 @@ const App = () => {
             <AuthProvider>
               <Toaster />
               <IncomingCallListener />
+              <InstallAppPrompt />
             <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/install" element={<Install />} />
             
             {/* Feed & Content */}
             <Route path="/feed" element={<Feed />} />
