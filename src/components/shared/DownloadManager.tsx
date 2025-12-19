@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Download, Check, X, Share2, FolderOpen } from 'lucide-react';
 import { downloadManager, DownloadProgress } from '@/lib/download-manager';
 import { cn } from '@/lib/utils';
@@ -11,18 +10,15 @@ export const DownloadNotifications = () => {
   useEffect(() => {
     const unsubscribe = downloadManager.subscribe(setDownloads);
     return () => { unsubscribe(); };
-    return unsubscribe;
   }, []);
 
   if (downloads.length === 0) return null;
 
   return (
     <div className="fixed bottom-20 left-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
-      <AnimatePresence mode="popLayout">
-        {downloads.map((download) => (
-          <DownloadCard key={download.id} download={download} />
-        ))}
-      </AnimatePresence>
+      {downloads.map((download) => (
+        <DownloadCard key={download.id} download={download} />
+      ))}
     </div>
   );
 };
@@ -53,15 +49,9 @@ const DownloadCard = ({ download }: { download: DownloadProgress }) => {
   };
 
   const isImage = download.fileType.startsWith('image');
-  const isVideo = download.fileType.startsWith('video');
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 50, scale: 0.9 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: -100, scale: 0.9 }}
-      className="pointer-events-auto"
-    >
+    <div className="pointer-events-auto animate-in slide-in-from-bottom-4 fade-in duration-300">
       <div className={cn(
         "rounded-2xl p-3 shadow-lg backdrop-blur-xl border",
         "bg-card/95 border-border"
@@ -79,13 +69,9 @@ const DownloadCard = ({ download }: { download: DownloadProgress }) => {
                 className="w-full h-full object-cover"
               />
             ) : download.status === 'completed' ? (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', bounce: 0.5 }}
-              >
+              <div className="animate-in zoom-in duration-300">
                 <Check className="w-6 h-6 text-green-500" />
-              </motion.div>
+              </div>
             ) : download.status === 'error' ? (
               <X className="w-6 h-6 text-destructive" />
             ) : (
@@ -103,11 +89,9 @@ const DownloadCard = ({ download }: { download: DownloadProgress }) => {
             {download.status === 'downloading' && (
               <div className="mt-1.5">
                 <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                  <motion.div 
-                    className="h-full bg-primary rounded-full"
-                    initial={{ width: 0 }}
-                    animate={{ width: `${download.progress}%` }}
-                    transition={{ duration: 0.3 }}
+                  <div 
+                    className="h-full bg-primary rounded-full transition-all duration-300"
+                    style={{ width: `${download.progress}%` }}
                   />
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -151,6 +135,6 @@ const DownloadCard = ({ download }: { download: DownloadProgress }) => {
           </Button>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
