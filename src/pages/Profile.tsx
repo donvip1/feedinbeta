@@ -541,7 +541,9 @@ const Profile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="fixed inset-0 bg-background flex flex-col">
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto overscroll-y-contain scroll-smooth pb-20" style={{ WebkitOverflowScrolling: 'touch' }}>
       {/* Profile Header */}
       <div className="relative">
         {/* Cover photo or gradient - extends to top */}
@@ -949,6 +951,7 @@ const Profile = () => {
             )}
           </div>
         </div>
+      </div>
       </div>
 
       {/* Settings Drawer */}
