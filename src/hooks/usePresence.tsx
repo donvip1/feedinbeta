@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { useLocation } from 'react-router-dom';
 
-export type PresenceStatus = 'online' | 'active' | 'offline';
+export type PresenceStatus = 'online' | 'active' | 'away' | 'offline';
 
 interface PresenceData {
   user_id: string;
@@ -23,6 +23,8 @@ export const usePresence = (userId?: string) => {
   // Determine current section based on route
   const getCurrentSection = useCallback(() => {
     const path = location.pathname;
+    // Check if user is in a specific DM conversation (has conversation ID)
+    if (path.match(/^\/messages\/[a-zA-Z0-9-]+$/)) return 'dm';
     if (path.startsWith('/messages')) return 'messages';
     if (path.startsWith('/feed')) return 'feed';
     if (path.startsWith('/live')) return 'live';
@@ -32,8 +34,20 @@ export const usePresence = (userId?: string) => {
     if (path.startsWith('/ai')) return 'ai';
     if (path.startsWith('/settings')) return 'settings';
     if (path.startsWith('/wallet')) return 'wallet';
+    if (path.startsWith('/trending')) return 'trending';
+    if (path.startsWith('/search')) return 'search';
     return 'app';
   }, [location.pathname]);
+
+  // Determine presence status based on section
+  const getPresenceStatus = useCallback((section: string): PresenceStatus => {
+    // In a specific DM conversation = active
+    if (section === 'dm') return 'active';
+    // In messages list/chat tab = online
+    if (section === 'messages') return 'online';
+    // Everywhere else = away
+    return 'away';
+  }, []);
 
   // Get user's presence status
   const getUserStatus = useCallback((targetUserId: string): PresenceStatus => {
@@ -49,11 +63,18 @@ export const usePresence = (userId?: string) => {
     return data.current_section;
   }, [userStatuses]);
 
-  // Check if user is in messages section (active)
+  // Check if user is in messages/DM section (active or online in chat)
   const isUserActive = useCallback((targetUserId: string): boolean => {
     const data = userStatuses.get(targetUserId);
     if (!data) return false;
-    return data.status === 'active' || data.current_section === 'messages';
+    return data.status === 'active' || data.current_section === 'dm';
+  }, [userStatuses]);
+
+  // Check if user is in messages area (either list or DM)
+  const isUserInChat = useCallback((targetUserId: string): boolean => {
+    const data = userStatuses.get(targetUserId);
+    if (!data) return false;
+    return data.current_section === 'messages' || data.current_section === 'dm';
   }, [userStatuses]);
 
   useEffect(() => {
@@ -139,7 +160,7 @@ export const usePresence = (userId?: string) => {
         if (subscriptionStatus === 'SUBSCRIBED') {
           console.log('[Presence] Subscribed, tracking user');
           const currentSection = getCurrentSection();
-          const presenceStatus: PresenceStatus = currentSection === 'messages' ? 'active' : 'online';
+          const presenceStatus = getPresenceStatus(currentSection);
           
           await channel.track({
             user_id: user.id,
@@ -153,7 +174,7 @@ export const usePresence = (userId?: string) => {
     // Update presence when route changes
     const updatePresence = async () => {
       const currentSection = getCurrentSection();
-      const presenceStatus: PresenceStatus = currentSection === 'messages' ? 'active' : 'online';
+      const presenceStatus = getPresenceStatus(currentSection);
       
       try {
         await channel.track({
@@ -200,7 +221,7 @@ export const usePresence = (userId?: string) => {
       clearInterval(heartbeatInterval);
       supabase.removeChannel(channel);
     };
-  }, [user, userId, getCurrentSection]);
+  }, [user, userId, getCurrentSection, getPresenceStatus]);
 
   // Re-track when location changes
   useEffect(() => {
@@ -209,7 +230,7 @@ export const usePresence = (userId?: string) => {
     const updateLocationPresence = async () => {
       const channel = supabase.channel('online-users');
       const currentSection = getCurrentSection();
-      const presenceStatus: PresenceStatus = currentSection === 'messages' ? 'active' : 'online';
+      const presenceStatus = getPresenceStatus(currentSection);
       
       try {
         await channel.track({
@@ -224,7 +245,7 @@ export const usePresence = (userId?: string) => {
     };
 
     updateLocationPresence();
-  }, [location.pathname, user, getCurrentSection]);
+  }, [location.pathname, user, getCurrentSection, getPresenceStatus]);
 
   return { 
     isOnline, 
@@ -234,6 +255,7 @@ export const usePresence = (userId?: string) => {
     getUserStatus,
     getUserSection,
     isUserActive,
+    isUserInChat,
   };
 };
 
@@ -255,14 +277,16 @@ export const formatLastSeen = (lastSeen: string): string => {
 
 // Helper to get status text
 export const getStatusText = (status: PresenceStatus, section?: string): string => {
-  if (status === 'active' || section === 'messages') return 'Active now';
-  if (status === 'online') return 'Online';
+  if (status === 'active' || section === 'dm') return 'Active now';
+  if (status === 'online' || section === 'messages') return 'Online';
+  if (status === 'away') return 'Away';
   return 'Offline';
 };
 
 // Helper to get status color class
 export const getStatusColor = (status: PresenceStatus, section?: string): string => {
-  if (status === 'active' || section === 'messages') return 'bg-blue-500';
-  if (status === 'online') return 'bg-green-500';
+  if (status === 'active' || section === 'dm') return 'bg-blue-500';
+  if (status === 'online' || section === 'messages') return 'bg-green-500';
+  if (status === 'away') return 'bg-yellow-500';
   return 'bg-gray-400';
 };
