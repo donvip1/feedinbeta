@@ -79,40 +79,110 @@
     @apply border-border;
   }
   
-  /* Prevent viewport resize on mobile keyboards */
-  html, body {
+  /* Native App Shell - Prevent viewport resize on mobile keyboards */
+  html {
     height: 100%;
+    height: -webkit-fill-available;
     overflow: hidden;
     overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
   
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    height: 100%;
+    height: -webkit-fill-available;
+    overflow: hidden;
+    overscroll-behavior: none;
+    position: fixed;
+    width: 100%;
+    /* Safe area support */
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
   
-  /* Fixed chat elements - won't move with keyboard */
+  /* Root app container */
+  #root {
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+  
+  /* Fixed chat elements - won't move with keyboard - GPU accelerated */
   .chat-header-fixed {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    transform: none !important;
-    will-change: auto;
+    z-index: 100 !important;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
   }
   
   .chat-input-fixed {
     position: fixed !important;
-    bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    transform: none !important;
-    will-change: auto;
+    z-index: 90 !important;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: transform, bottom;
+    transition: bottom 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .chat-messages-area {
     position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
     overflow-y: auto !important;
+    overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: scroll-position;
+  }
+  
+  /* Native scrolling behavior */
+  .native-scroll {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+  }
+  
+  /* Prevent pull-to-refresh */
+  .no-overscroll {
+    overscroll-behavior: none;
+  }
+  
+  /* Hardware acceleration for animations */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  
+  /* Touch action optimization */
+  .touch-pan-y {
+    touch-action: pan-y;
+  }
+  
+  /* Native list item for fast touch response */
+  .native-list-item {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  .native-list-item:active {
+    background-color: hsl(var(--accent) / 0.1);
   }
 }
 

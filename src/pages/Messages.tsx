@@ -286,77 +286,29 @@ export default function Messages() {
 
     if (showLoading) setLoading(true);
     try {
-      const { data: participantData, error } = await supabase
-        .from('conversation_participants')
-        .select('conversation_id, conversations!inner(id, updated_at)')
-        .eq('user_id', user.id);
+      // Use optimized RPC function - single query instead of 4+ per conversation
+      const { data, error } = await supabase
+        .rpc('get_conversations_with_details', { p_user_id: user.id });
 
       if (error) throw error;
 
-      // Deduplicate conversation IDs
-      const conversationIds = [...new Set(participantData?.map(p => p.conversation_id) || [])];
-      
-      const conversationsWithDetails = await Promise.all(
-        conversationIds.map(async (convId) => {
-          // Get other participant's user_id first
-          const { data: otherParticipant } = await supabase
-            .from('conversation_participants')
-            .select('user_id')
-            .eq('conversation_id', convId)
-            .neq('user_id', user.id)
-            .maybeSingle();
+      const sortedConversations = (data || []).map((row: any) => ({
+        id: row.conversation_id,
+        updated_at: row.updated_at,
+        other_participant: {
+          id: row.other_user_id || '',
+          display_name: row.other_user_display_name || 'Unknown',
+          username: row.other_user_username || null,
+          avatar_url: row.other_user_avatar_url || null,
+        },
+        last_message: row.last_message_content ? {
+          content: row.last_message_content,
+          created_at: row.last_message_created_at,
+          sender_id: row.last_message_sender_id,
+        } : undefined,
+        unread_count: row.unread_count || 0,
+      }));
 
-          // Now fetch the profile separately using public_profiles (secure view)
-          let participantProfile = null;
-          if (otherParticipant?.user_id) {
-            const { data: profile, error: profileError } = await supabase
-              .from('public_profiles')
-              .select('id, display_name, username, avatar_url')
-              .eq('id', otherParticipant.user_id)
-              .single();
-            
-            if (profileError) {
-              console.error('Error fetching profile:', profileError);
-            }
-            participantProfile = profile;
-          }
-
-          const { data: lastMessage } = await supabase
-            .from('messages')
-            .select('content, created_at, sender_id')
-            .eq('conversation_id', convId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          // Count unread messages
-          const { count: unreadCount } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('conversation_id', convId)
-            .neq('sender_id', user.id)
-            .eq('is_read', false);
-
-          const conv = participantData?.find(p => p.conversation_id === convId);
-
-          return {
-            id: convId,
-            updated_at: conv?.conversations?.updated_at || '',
-            other_participant: {
-              id: participantProfile?.id || otherParticipant?.user_id || '',
-              display_name: participantProfile?.display_name || 'Unknown',
-              username: participantProfile?.username || null,
-              avatar_url: participantProfile?.avatar_url || null,
-            },
-            last_message: lastMessage || undefined,
-            unread_count: unreadCount || 0,
-          };
-        })
-      );
-
-      const sortedConversations = conversationsWithDetails.sort((a, b) => 
-        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-      );
       setConversations(sortedConversations);
       // Save to cache for instant loading next time
       saveToCache(sortedConversations);
