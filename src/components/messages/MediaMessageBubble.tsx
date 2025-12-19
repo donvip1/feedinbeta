@@ -1,24 +1,21 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { Download, Image as ImageIcon, Film, FileText, Mic, X, RefreshCw, Play, Pause, Eye } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Download, Image as ImageIcon, Film, FileText, Mic, RefreshCw, Eye } from 'lucide-react';
+import { ChatMediaViewer } from './ChatMediaViewer';
+import { CreateStickerModal } from './CreateStickerModal';
+import { downloadManager, formatFileSize } from '@/lib/download-manager';
+import { toast } from 'sonner';
 
 interface MediaMessageBubbleProps {
   mediaUrl: string;
   mediaType: string;
   fileSize?: number;
   isOwn: boolean;
+  senderName?: string;
+  timestamp?: string;
   onDownloadComplete?: () => void;
+  onDelete?: () => void;
 }
-
-const formatFileSize = (bytes?: number): string => {
-  if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
 
 const getMediaTypeLabel = (type: string): string => {
   if (type.startsWith('image')) return 'Photo';
@@ -39,12 +36,16 @@ export const MediaMessageBubble = ({
   mediaType,
   fileSize,
   isOwn,
+  senderName,
+  timestamp,
   onDownloadComplete,
+  onDelete,
 }: MediaMessageBubbleProps) => {
   const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [loadedMediaUrl, setLoadedMediaUrl] = useState<string | null>(null);
-  const [showFullscreen, setShowFullscreen] = useState(false);
+  const [showViewer, setShowViewer] = useState(false);
+  const [showStickerModal, setShowStickerModal] = useState(false);
   const [estimatedSize, setEstimatedSize] = useState<number | undefined>(fileSize);
 
   const MediaIcon = getMediaIcon(mediaType);
@@ -111,7 +112,7 @@ export const MediaMessageBubble = ({
         <>
           <div 
             className="relative group/media overflow-hidden rounded-xl mb-1 cursor-pointer"
-            onClick={() => setShowFullscreen(true)}
+            onClick={() => setShowViewer(true)}
           >
             <img 
               src={loadedMediaUrl} 
@@ -125,38 +126,75 @@ export const MediaMessageBubble = ({
             </div>
           </div>
           
-          {/* Fullscreen viewer */}
-          <Dialog open={showFullscreen} onOpenChange={setShowFullscreen}>
-            <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 bg-black/95 border-none">
-              <img 
-                src={loadedMediaUrl} 
-                alt="Fullscreen" 
-                className="w-full h-full object-contain"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-4 right-4 text-white hover:bg-white/20"
-                onClick={() => setShowFullscreen(false)}
-              >
-                <X className="w-6 h-6" />
-              </Button>
-            </DialogContent>
-          </Dialog>
+          {/* WhatsApp-style fullscreen viewer with actions */}
+          <ChatMediaViewer
+            isOpen={showViewer}
+            onClose={() => setShowViewer(false)}
+            mediaUrl={loadedMediaUrl}
+            mediaType={mediaType}
+            senderName={senderName}
+            timestamp={timestamp}
+            fileSize={estimatedSize}
+            isOwn={isOwn}
+            onEdit={() => {
+              toast.info('Image editor coming soon');
+            }}
+            onDelete={onDelete}
+            onCreateSticker={() => {
+              setShowViewer(false);
+              setShowStickerModal(true);
+            }}
+          />
+
+          {/* Sticker creation modal */}
+          <CreateStickerModal
+            isOpen={showStickerModal}
+            onClose={() => setShowStickerModal(false)}
+            imageUrl={loadedMediaUrl}
+            onStickerCreated={(url) => {
+              toast.success('Sticker saved!');
+            }}
+          />
         </>
       );
     }
 
     if (mediaType.startsWith('video')) {
       return (
-        <div className="relative overflow-hidden rounded-xl mb-1">
-          <video 
-            src={loadedMediaUrl} 
-            controls 
-            className="max-w-[280px] max-h-[320px] rounded-xl"
-            playsInline
+        <>
+          <div 
+            className="relative overflow-hidden rounded-xl mb-1 cursor-pointer"
+            onClick={() => setShowViewer(true)}
+          >
+            <video 
+              src={loadedMediaUrl} 
+              className="max-w-[280px] max-h-[320px] rounded-xl"
+              playsInline
+              muted
+            />
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                <Film className="w-6 h-6 text-white" />
+              </div>
+            </div>
+            <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white/80 text-xs bg-black/40 px-2 py-1 rounded-full backdrop-blur-sm">
+              <Eye className="w-3 h-3" />
+              <span>Tap to play</span>
+            </div>
+          </div>
+
+          <ChatMediaViewer
+            isOpen={showViewer}
+            onClose={() => setShowViewer(false)}
+            mediaUrl={loadedMediaUrl}
+            mediaType={mediaType}
+            senderName={senderName}
+            timestamp={timestamp}
+            fileSize={estimatedSize}
+            isOwn={isOwn}
+            onDelete={onDelete}
           />
-        </div>
+        </>
       );
     }
 
@@ -170,11 +208,17 @@ export const MediaMessageBubble = ({
 
     // Generic file - offer download
     return (
-      <a 
-        href={loadedMediaUrl}
-        download
+      <button 
+        onClick={() => {
+          if (loadedMediaUrl) {
+            downloadManager.saveToDevice(
+              new Blob([loadedMediaUrl]), 
+              `FeedIn_file_${Date.now()}`
+            );
+          }
+        }}
         className={cn(
-          "flex items-center gap-3 p-3 rounded-xl mb-1 transition-all",
+          "flex items-center gap-3 p-3 rounded-xl mb-1 transition-all w-full text-left",
           isOwn 
             ? "bg-white/10 hover:bg-white/20" 
             : "bg-primary/5 hover:bg-primary/10"
@@ -191,7 +235,7 @@ export const MediaMessageBubble = ({
           {sizeText && <p className="text-xs opacity-70">{sizeText}</p>}
         </div>
         <Download className="w-5 h-5 opacity-70" />
-      </a>
+      </button>
     );
   }
 
