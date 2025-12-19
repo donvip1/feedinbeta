@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState, useCallback } from 'react';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
+import { UnreadBadge } from '@/components/shared/UnreadBadge';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -20,12 +21,61 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
   const { haptic } = useNativeFeatures();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     if (user) {
       loadAvatar();
+      loadUnreadMessages();
+      
+      // Subscribe to new messages for real-time updates
+      const channel = supabase
+        .channel('unread-messages')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+          },
+          () => {
+            loadUnreadMessages();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [user]);
+
+  const loadUnreadMessages = async () => {
+    if (!user) return;
+    
+    // Get all conversations where user is a participant
+    const { data: conversations } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', user.id);
+    
+    if (!conversations || conversations.length === 0) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const conversationIds = conversations.map(c => c.conversation_id);
+    
+    // Count unread messages (not sent by current user and not read)
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .in('conversation_id', conversationIds)
+      .neq('sender_id', user.id)
+      .eq('is_read', false);
+    
+    setUnreadCount(count || 0);
+  };
 
   const loadAvatar = async () => {
     if (!user) return;
@@ -106,11 +156,16 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                           </Avatar>
                         </div>
                       ) : (
-                        <Icon 
-                          size={24}
-                          strokeWidth={2.5}
-                          className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
-                        />
+                        <div className="relative">
+                          <Icon 
+                            size={24}
+                            strokeWidth={2.5}
+                            className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
+                          />
+                          {item.id === 'chats' && unreadCount > 0 && (
+                            <UnreadBadge count={unreadCount} size="sm" />
+                          )}
+                        </div>
                       )}
                     </Button>
                   </TooltipTrigger>
