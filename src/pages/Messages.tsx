@@ -18,6 +18,7 @@ import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { useToast } from '@/hooks/use-toast';
 import { useConversationCache, useGroupCache } from '@/hooks/useConversationCache';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ActivityBadge, ActivityType, getActivityIcon, getActivityColor } from '@/components/messages/TypingIndicator';
 
 interface Conversation {
   id: string;
@@ -36,6 +37,7 @@ interface Conversation {
   unread_count?: number;
   isOnline?: boolean;
   isTyping?: boolean;
+  activityType?: ActivityType;
 }
 
 interface Group {
@@ -225,13 +227,17 @@ export default function Messages() {
             table: 'typing_indicators'
           },
           (payload: any) => {
-            console.log('[Messages Page] Typing indicator:', payload);
+            console.log('[Messages Page] Activity indicator:', payload);
             const typing = payload?.new;
             if (!typing || typing.user_id === user.id) return;
             
             setConversations(prev => prev.map(conv => 
               conv.id === typing.conversation_id 
-                ? { ...conv, isTyping: typing.is_typing } 
+                ? { 
+                    ...conv, 
+                    isTyping: typing.is_typing,
+                    activityType: typing.activity_type as ActivityType || 'typing'
+                  } 
                 : conv
             ));
           }
@@ -667,7 +673,22 @@ export default function Messages() {
                         )}
                       </div>
                       {conv.isTyping ? (
-                        <p className="text-sm text-primary animate-pulse">typing...</p>
+                        <div className="flex items-center gap-1.5 animate-pulse">
+                          <span className={getActivityColor(conv.activityType || 'typing')}>
+                            {getActivityIcon(conv.activityType || 'typing')}
+                          </span>
+                          <span className={`text-xs ${getActivityColor(conv.activityType || 'typing')}`}>
+                            {conv.activityType === 'typing' ? 'typing...' :
+                             conv.activityType === 'emoji' ? 'choosing emoji...' :
+                             conv.activityType === 'sticker' ? 'picking sticker...' :
+                             conv.activityType === 'voice_recording' ? 'recording voice...' :
+                             conv.activityType === 'uploading_image' ? 'sending image...' :
+                             conv.activityType === 'uploading_video' ? 'sending video...' :
+                             conv.activityType === 'uploading_file' ? 'sending file...' :
+                             conv.activityType === 'focused' ? 'composing...' :
+                             'typing...'}
+                          </span>
+                        </div>
                       ) : conv.last_message ? (
                         <p className={`text-sm truncate ${conv.unread_count != null && conv.unread_count > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
                           {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
