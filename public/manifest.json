@@ -1,32 +1,41 @@
 {
-  "name": "FEEDIN - Social Media Platform",
-  "short_name": "FEEDIN",
+  "name": "FeedIn - Social Media Platform",
+  "short_name": "FeedIn",
   "description": "Connect, Share, and Engage with AI-Powered Social Experiences",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#ec4899",
   "orientation": "portrait-primary",
+  "id": "/",
+  "scope": "/",
   "icons": [
     {
       "src": "/favicon.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/favicon.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["social", "entertainment"],
-  "screenshots": [
-    {
-      "src": "/favicon.png",
-      "sizes": "540x720",
-      "type": "image/png"
-    }
-  ]
+  "prefer_related_applications": false,
+  "related_applications": []
 }
