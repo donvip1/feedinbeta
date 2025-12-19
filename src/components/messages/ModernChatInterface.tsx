@@ -339,6 +339,16 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     // Don't auto-scroll on subsequent message updates - let user control
   }, [firstUnreadId]); // Remove messages dependency to stop auto-scrolling on new messages
 
+  // Scroll to bottom when keyboard opens to keep messages visible
+  useEffect(() => {
+    if (isKeyboardOpen && isNearBottomRef.current) {
+      // Give keyboard animation time to complete
+      setTimeout(() => {
+        scrollToBottom();
+      }, 150);
+    }
+  }, [isKeyboardOpen]);
+
   // Only scroll to bottom for own messages or if user is near bottom
   const scrollToBottomIfNeeded = useCallback(() => {
     if (isNearBottomRef.current) {
@@ -1250,7 +1260,13 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                 ref={inputRef}
                 placeholder="Type a message..."
                 value={newMessage}
-                onFocus={() => handleTyping('focused')}
+                onFocus={() => {
+                  handleTyping('focused');
+                  // Scroll to bottom when input is focused to keep messages visible
+                  setTimeout(() => {
+                    scrollToBottom();
+                  }, 300);
+                }}
                 onBlur={() => {
                   if (!newMessage.trim()) stopTyping();
                 }}
