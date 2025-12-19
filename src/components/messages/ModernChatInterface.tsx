@@ -103,6 +103,8 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const inputRef = useRef<HTMLInputElement>(null);
   const firstUnreadRef = useRef<HTMLDivElement>(null);
   const hasScrolledToUnread = useRef(false);
+  const isUserScrolling = useRef(false); // Track if user is manually scrolling
+  const isNearBottomRef = useRef(true); // Track if user is near bottom
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
 
   // Use the global presence hook to track other user's status
@@ -199,10 +201,18 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
               return [...prev, formattedMsg];
             });
             
-            scrollToBottom();
+            // Only scroll to bottom if user is near the bottom
+            if (isNearBottomRef.current) {
+              setTimeout(() => scrollToBottom(), 100);
+            } else {
+              // Show scroll button to indicate new messages
+              setShowScrollButton(true);
+            }
             
-            // Mark as read immediately since user is viewing the chat
-            markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
+            // Mark as read if near bottom
+            if (isNearBottomRef.current) {
+              markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
+            }
           }
         )
         .on(
@@ -295,21 +305,30 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const lastSeen = otherUserPresence?.last_seen || null;
   const currentSection = otherUserPresence?.current_section || null;
 
-  // Scroll to first unread message or bottom
+  // Scroll to first unread message or bottom - only on initial load
   useEffect(() => {
     if (messages.length === 0) return;
     
-    // If we have unread messages and haven't scrolled to them yet
+    // Only auto-scroll on initial load or if user is near bottom
     if (firstUnreadId && firstUnreadRef.current && !hasScrolledToUnread.current) {
       hasScrolledToUnread.current = true;
       setTimeout(() => {
         firstUnreadRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }, 100);
-    } else if (!firstUnreadId) {
-      // No unread messages, scroll to bottom
+    } else if (!firstUnreadId && !hasScrolledToUnread.current) {
+      // Initial load, scroll to bottom
+      hasScrolledToUnread.current = true;
       scrollToBottom();
     }
-  }, [messages, firstUnreadId]);
+    // Don't auto-scroll on subsequent message updates - let user control
+  }, [firstUnreadId]); // Remove messages dependency to stop auto-scrolling on new messages
+
+  // Only scroll to bottom for own messages or if user is near bottom
+  const scrollToBottomIfNeeded = useCallback(() => {
+    if (isNearBottomRef.current) {
+      scrollToBottom();
+    }
+  }, []);
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
@@ -319,20 +338,19 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
-    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
-    setShowScrollButton(!isNearBottom);
+    const scrollTop = target.scrollTop;
+    const scrollHeight = target.scrollHeight;
+    const clientHeight = target.clientHeight;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
     
-    // Mark messages as read when user scrolls to bottom
-    if (isNearBottom && messages.length > 0) {
-      const unreadMessages = messages.filter(
-        msg => msg.sender_id !== user?.id && 
-        !msg.read_receipts?.some(receipt => receipt.user_id === user?.id)
-      );
-      if (unreadMessages.length > 0) {
-        markMessagesAsRead(unreadMessages);
-      }
-    }
-  }, [messages, user?.id]);
+    // User is "near bottom" if within 150px of the bottom
+    const nearBottom = distanceFromBottom < 150;
+    isNearBottomRef.current = nearBottom;
+    setShowScrollButton(!nearBottom);
+    
+    // Track that user is actively scrolling
+    isUserScrolling.current = true;
+  }, []);
 
   const loadMessages = async () => {
     if (!conversationId) return;
@@ -813,9 +831,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     : messages;
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-background to-background/95">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-3 border-b border-border/50 bg-background/80 backdrop-blur-lg sticky top-0 z-10">
+    <div className="flex flex-col h-full max-h-[100dvh] bg-gradient-to-b from-background to-background/95 overflow-hidden">
+      {/* Header - always visible */}
+      <div className="flex items-center gap-3 p-3 border-b border-border/50 bg-background/95 backdrop-blur-lg shrink-0 z-20">
         <Button
           variant="ghost"
           size="icon"
@@ -939,9 +957,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Messages */}
+      {/* Messages - scrollable area */}
       <ScrollArea 
-        className="flex-1 px-3"
+        className="flex-1 min-h-0 px-3 overflow-y-auto"
         onScrollCapture={handleScroll}
       >
         <div className="py-4 space-y-4">
@@ -1109,9 +1127,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Input Area */}
+      {/* Input Area - always visible at bottom */}
       {!showVoiceRecorder && (
-        <div className="p-3 border-t border-border/50 bg-background/80 backdrop-blur-lg">
+        <div className="p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg shrink-0 pb-safe">
           <div className="flex items-end gap-2">
             <AttachmentPicker onFileSelect={handleFileSelect} />
             
