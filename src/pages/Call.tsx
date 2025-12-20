@@ -4,11 +4,13 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CallControls } from '@/components/calls/CallControls';
+import { ConnectionStatus } from '@/components/calls/ConnectionStatus';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePresence } from '@/hooks/usePresence';
 import { callSounds } from '@/utils/callSounds';
-import { WebRTCManager } from '@/utils/webrtcManager';
-import { Loader2 } from 'lucide-react';
+import { WebRTCManager, ConnectionStatus as ConnectionStatusType } from '@/utils/webrtcManager';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface CallData {
   id: string;
@@ -33,7 +35,6 @@ const Call = () => {
   const { toast } = useToast();
   
   const callId = searchParams.get('callId');
-  const callTypeParam = searchParams.get('type') as 'video' | 'voice';
   
   const [callData, setCallData] = useState<CallData | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -43,6 +44,9 @@ const Call = () => {
   const [callDuration, setCallDuration] = useState(0);
   const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'offline' | 'ended'>('connecting');
   const [otherUserProfile, setOtherUserProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('initializing');
+  const [connectionMessage, setConnectionMessage] = useState('Starting call...');
+  const [showRetry, setShowRetry] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -76,7 +80,6 @@ const Call = () => {
   // Helper function to get or create conversation between two users
   const getOrCreateConversation = async (userId1: string, userId2: string): Promise<string | null> => {
     try {
-      // Find existing conversation between the two users
       const { data: existingConvs } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
@@ -97,7 +100,6 @@ const Call = () => {
         }
       }
 
-      // Create new conversation
       const { data: newConv, error: convError } = await supabase
         .from('conversations')
         .insert({ updated_at: new Date().toISOString() })
@@ -106,7 +108,6 @@ const Call = () => {
 
       if (convError || !newConv) return null;
 
-      // Add participants
       await supabase.from('conversation_participants').insert([
         { conversation_id: newConv.id, user_id: userId1 },
         { conversation_id: newConv.id, user_id: userId2 },
@@ -119,7 +120,6 @@ const Call = () => {
     }
   };
 
-  // Helper to insert call log message into conversation
   const insertCallLogMessage = async (status: 'answered' | 'missed' | 'declined', duration: number) => {
     if (!callData || !user) return;
 
@@ -127,8 +127,6 @@ const Call = () => {
       const conversationId = await getOrCreateConversation(callData.caller_id, callData.receiver_id);
       if (!conversationId) return;
 
-      // Create a special message format for call logs
-      // Format: CALL_LOG:type:status:duration:isOutgoing
       const callLogContent = `CALL_LOG:${callTypeRef.current}:${status}:${duration}:${isCaller}`;
 
       await supabase.from('messages').insert({
@@ -138,7 +136,6 @@ const Call = () => {
         media_type: 'call_log',
       });
 
-      // Update conversation timestamp
       await supabase
         .from('conversations')
         .update({ updated_at: new Date().toISOString() })
@@ -162,10 +159,8 @@ const Call = () => {
         ? Math.floor((Date.now() - startTimeRef.current) / 1000)
         : 0;
 
-      // Determine call status for the log
       const callLogStatus = isConnected ? 'answered' : 'missed';
 
-      // Update call log
       await supabase
         .from('call_logs')
         .update({
@@ -175,10 +170,8 @@ const Call = () => {
         })
         .eq('id', callId);
 
-      // Insert call log message into conversation
       await insertCallLogMessage(callLogStatus, duration);
 
-      // Deduct credits if call was connected
       if (isConnected && duration > 0 && user?.id) {
         const durationMinutes = Math.max(1, Math.ceil(duration / 60));
         const action = callTypeRef.current === 'video' ? 'video_call' : 'voice_call';
@@ -210,7 +203,6 @@ const Call = () => {
       console.error('Error ending call:', error);
     }
 
-    // Cleanup
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -219,15 +211,29 @@ const Call = () => {
     await webrtcRef.current?.cleanup();
     webrtcRef.current = null;
 
-    // Navigate back after a short delay
     setTimeout(() => {
       navigate('/messages');
     }, 1500);
   }, [callId, isConnected, user?.id, toast, navigate, callData, isCaller]);
 
+  const retryConnection = useCallback(async () => {
+    if (!callData || !user) return;
+    
+    setShowRetry(false);
+    setConnectionStatus('initializing');
+    setConnectionMessage('Retrying connection...');
+    setupCompleteRef.current = false;
+    
+    // Cleanup existing connection
+    await webrtcRef.current?.cleanup();
+    webrtcRef.current = null;
+    
+    // Re-setup WebRTC
+    await setupWebRTC(callData);
+  }, [callData, user]);
+
   // Initialize call
   useEffect(() => {
-    // Wait for auth to load - user might be null initially while loading
     if (user === undefined) return;
     
     if (!callId) {
@@ -263,7 +269,6 @@ const Call = () => {
 
   const loadCallData = async () => {
     try {
-      // Get call data with both caller and receiver profiles
       const { data, error } = await supabase
         .from('call_logs')
         .select('*')
@@ -272,10 +277,8 @@ const Call = () => {
 
       if (error) throw error;
 
-      // Store the call type from DB
       callTypeRef.current = data.call_type as 'video' | 'voice';
 
-      // Get profiles for both users
       const [callerProfile, receiverProfile] = await Promise.all([
         supabase.from('profiles').select('display_name, avatar_url').eq('id', data.caller_id).single(),
         supabase.from('profiles').select('display_name, avatar_url').eq('id', data.receiver_id).single(),
@@ -293,13 +296,11 @@ const Call = () => {
 
       setCallData(callDataWithProfiles);
       
-      // Set the other user's profile
       const otherProfile = data.caller_id === user?.id 
         ? receiverProfile.data 
         : callerProfile.data;
       setOtherUserProfile(otherProfile);
 
-      // Handle existing call status
       if (data.status === 'ended' || data.status === 'rejected') {
         toast({
           title: 'Call unavailable',
@@ -309,12 +310,10 @@ const Call = () => {
         return;
       }
 
-      // If we're the caller, start ringing
       if (callDataWithProfiles.caller_id === user?.id && callDataWithProfiles.status === 'pending') {
         setCallStatus('ringing');
         callSounds.playRinging();
         
-        // Set a 60-second timeout for unanswered calls (only caller ends the call)
         const ringingTimeout = setTimeout(() => {
           if (!hasEndedRef.current && callStatus === 'ringing') {
             console.log('[Call] Call not answered within 60 seconds');
@@ -326,21 +325,14 @@ const Call = () => {
           }
         }, 60000);
         
-        // Store timeout ref to clear on cleanup
         return () => clearTimeout(ringingTimeout);
-      } 
-      // If we're the receiver and call is pending, also wait (we'll see IncomingCall UI)
-      else if (callDataWithProfiles.receiver_id === user?.id && callDataWithProfiles.status === 'pending') {
+      } else if (callDataWithProfiles.receiver_id === user?.id && callDataWithProfiles.status === 'pending') {
         setCallStatus('ringing');
-        // Receiver will see IncomingCall popup, so just wait
-      }
-      // If call is answered, setup WebRTC connection for both caller and receiver
-      else if (callDataWithProfiles.status === 'answered') {
+      } else if (callDataWithProfiles.status === 'answered') {
         setCallStatus('connecting');
         await setupWebRTC(callDataWithProfiles);
       }
 
-      // Subscribe to call status changes
       subscribeToCallUpdates(callDataWithProfiles);
     } catch (error: any) {
       console.error('Error loading call:', error);
@@ -420,7 +412,6 @@ const Call = () => {
               remoteAudioRef.current.srcObject = stream;
             }
             
-            // Call is now connected
             if (!isConnected) {
               callSounds.stopAllSounds();
               callSounds.playConnected();
@@ -437,14 +428,12 @@ const Call = () => {
                 setCallStatus('connected');
                 startTimer();
               }
+              setShowRetry(false);
             } else if (state === 'disconnected' || state === 'failed') {
               if (!hasEndedRef.current) {
-                toast({
-                  title: 'Connection Lost',
-                  description: 'The call connection was lost.',
-                  variant: 'destructive',
-                });
-                endCall();
+                if (state === 'failed') {
+                  setShowRetry(true);
+                }
               }
             }
           },
@@ -458,18 +447,26 @@ const Call = () => {
                 setCallStatus('connected');
                 startTimer();
               }
+            } else if (state === 'failed') {
+              setShowRetry(true);
+            }
+          },
+          onDetailedStatusChange: (status, message) => {
+            setConnectionStatus(status);
+            setConnectionMessage(message);
+            
+            if (status === 'failed') {
+              setShowRetry(true);
             }
           },
           onError: (error) => {
             console.error('[Call] WebRTC error:', error);
+            setShowRetry(true);
             toast({
               title: 'Connection Error',
               description: error.message || 'Failed to establish call connection',
               variant: 'destructive',
             });
-            if (!hasEndedRef.current) {
-              endCall();
-            }
           },
         }
       );
@@ -480,35 +477,32 @@ const Call = () => {
         localVideoRef.current.srcObject = localStream;
       }
 
-      // Delay before sending offer to ensure receiver has time to join signaling channel
-      // The caller sends offer, receiver waits and responds with answer
+      // Improved synchronization: receiver signals ready, then caller sends offer
       if (data.caller_id === user?.id) {
-        // Caller: wait 2 seconds before sending offer
-        setTimeout(async () => {
-          if (webrtcRef.current) {
-            console.log('[Call] Caller creating and sending offer...');
-            await webrtcRef.current.createAndSendOffer();
-          }
-        }, 2000);
+        // Caller: wait for receiver ready signal, then send offer
+        console.log('[Call] Caller waiting for receiver ready signal...');
+        await webrtcRef.current.waitForReceiverReady(5000);
+        
+        console.log('[Call] Caller creating and sending offer...');
+        await webrtcRef.current.createAndSendOffer();
       } else {
-        // Receiver: just wait for the offer, no action needed
+        // Receiver: signal ready, then wait for offer
+        console.log('[Call] Receiver signaling ready...');
+        await webrtcRef.current.sendReceiverReady();
         console.log('[Call] Receiver waiting for offer from caller...');
       }
       
     } catch (error: any) {
       console.error('[Call] Error setting up WebRTC:', error);
       setupCompleteRef.current = false;
+      setShowRetry(true);
       toast({
         title: 'Media Access Error',
         description: error.message || 'Failed to access camera/microphone. Please check permissions.',
         variant: 'destructive',
       });
-      endCall();
     }
   };
-
-  // Removed aggressive offline detection - let the 30-second ringing timeout handle unanswered calls
-  // This prevents false "offline" detection when users are actually online
 
   const toggleMute = () => {
     if (webrtcRef.current) {
@@ -552,6 +546,18 @@ const Call = () => {
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       </div>
+
+      {/* Connection Status Overlay */}
+      {callStatus === 'connecting' && connectionStatus !== 'connected' && (
+        <div className="absolute top-4 left-4 right-4 z-20">
+          <ConnectionStatus 
+            status={connectionStatus}
+            message={connectionMessage}
+            showRetry={showRetry}
+            onRetry={retryConnection}
+          />
+        </div>
+      )}
 
       {/* Main content area */}
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6">
@@ -664,6 +670,18 @@ const Call = () => {
                 <p className="text-sm text-gray-400 max-w-md mx-auto">
                   This user isn't available at the moment. Please try again later.
                 </p>
+              )}
+              
+              {/* Retry button for failed connections */}
+              {showRetry && callStatus !== 'connected' && callStatus !== 'ended' && (
+                <Button
+                  onClick={retryConnection}
+                  variant="outline"
+                  className="mt-4 border-primary/50 text-primary hover:bg-primary/20"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry Connection
+                </Button>
               )}
             </div>
           </div>
