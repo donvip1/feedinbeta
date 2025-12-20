@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { UserPlus, MessageCircle, Users, Heart, Eye, X } from 'lucide-react';
+import { UserPlus, MessageCircle, Users, Heart, Eye, X, Clock, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface ProfilePreviewModalProps {
@@ -14,13 +14,16 @@ interface ProfilePreviewModalProps {
   userId: string;
 }
 
+type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'accepted';
+
 export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<any>(null);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [friendRequestStatus, setFriendRequestStatus] = useState<'none' | 'pending' | 'accepted'>('none');
+  const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus>('none');
+  const [pendingRequestId, setPendingRequestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,7 +36,6 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
 
   const loadProfile = async () => {
     try {
-      // Use public_profiles for viewing OTHER users' profiles (secure view)
       const { data, error } = await supabase
         .from('public_profiles')
         .select('*')
@@ -70,15 +72,24 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
     try {
       const { data } = await supabase
         .from('friend_requests')
-        .select('status')
+        .select('id, status, sender_id, receiver_id')
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
         .single();
 
-      if (data && (data.status === 'pending' || data.status === 'accepted')) {
-        setFriendRequestStatus(data.status as 'pending' | 'accepted');
+      if (data) {
+        setPendingRequestId(data.id);
+        if (data.status === 'accepted') {
+          setFriendshipStatus('accepted');
+        } else if (data.status === 'pending') {
+          setFriendshipStatus(data.sender_id === user.id ? 'pending_sent' : 'pending_received');
+        }
+      } else {
+        setFriendshipStatus('none');
+        setPendingRequestId(null);
       }
     } catch (error) {
-      // No friend request
+      setFriendshipStatus('none');
+      setPendingRequestId(null);
     }
   };
 
@@ -113,13 +124,55 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
   const handleAddFriend = async () => {
     if (!user) return;
 
-    try {
-      if (friendRequestStatus === 'pending') {
-        toast({ title: 'Friend request already sent' });
-        return;
-      }
+    // Handle different states
+    if (friendshipStatus === 'pending_sent') {
+      toast({ title: 'Friend request already sent' });
+      return;
+    }
 
-      await supabase
+    if (friendshipStatus === 'pending_received' && pendingRequestId) {
+      // Accept the incoming request
+      try {
+        const { error } = await supabase
+          .from('friend_requests')
+          .update({ status: 'accepted', updated_at: new Date().toISOString() })
+          .eq('id', pendingRequestId);
+
+        if (error) throw error;
+
+        // Notify the other user
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: userId,
+            from_user_id: user.id,
+            type: 'friend_request_accepted',
+            title: 'Friend request accepted',
+            message: 'You can now start chatting!',
+            related_id: user.id,
+            related_type: 'profile'
+          });
+
+        setFriendshipStatus('accepted');
+        toast({ title: 'Friend request accepted!' });
+      } catch (error: any) {
+        toast({
+          title: 'Error accepting request',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
+      return;
+    }
+
+    if (friendshipStatus === 'accepted') {
+      toast({ title: 'You are already friends' });
+      return;
+    }
+
+    // Send new friend request
+    try {
+      const { error } = await supabase
         .from('friend_requests')
         .insert({
           sender_id: user.id,
@@ -127,7 +180,32 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
           status: 'pending',
         });
 
-      setFriendRequestStatus('pending');
+      if (error) {
+        if (error.code === '23505') {
+          toast({
+            title: 'Request already exists',
+            description: 'A friend request already exists between you and this user',
+          });
+          await checkFriendStatus(); // Refresh status
+          return;
+        }
+        throw error;
+      }
+
+      // Create notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: userId,
+          from_user_id: user.id,
+          type: 'friend_request',
+          title: 'New friend request',
+          message: `${profile?.display_name || 'Someone'} sent you a friend request`,
+          related_id: user.id,
+          related_type: 'profile'
+        });
+
+      setFriendshipStatus('pending_sent');
       toast({ title: 'Friend request sent' });
     } catch (error: any) {
       toast({
@@ -139,7 +217,7 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
   };
 
   const handleMessage = async () => {
-    if (friendRequestStatus !== 'accepted') {
+    if (friendshipStatus !== 'accepted') {
       toast({
         title: 'Cannot send message',
         description: "This person isn't on your friends list. Send a friend request to chat.",
@@ -149,7 +227,6 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
     }
 
     try {
-      // Create or get existing conversation
       const { data: existingConv } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
@@ -169,7 +246,6 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
         }
       }
 
-      // Create new conversation
       const { data: newConv, error } = await supabase.rpc('create_conversation', {
         other_user_id: userId,
       });
@@ -186,6 +262,19 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
     }
   };
 
+  const getFriendButtonContent = () => {
+    switch (friendshipStatus) {
+      case 'accepted':
+        return { icon: <UserCheck className="w-4 h-4 mr-2" />, text: 'Friends', disabled: true };
+      case 'pending_sent':
+        return { icon: <Clock className="w-4 h-4 mr-2" />, text: 'Request Sent', disabled: true };
+      case 'pending_received':
+        return { icon: <UserPlus className="w-4 h-4 mr-2" />, text: 'Accept Request', disabled: false };
+      default:
+        return { icon: <UserPlus className="w-4 h-4 mr-2" />, text: 'Add Friend', disabled: false };
+    }
+  };
+
   if (loading || !profile) {
     return (
       <Dialog open={open} onOpenChange={onClose}>
@@ -199,7 +288,8 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
   }
 
   const displayName = profile.display_name || profile.username || 'Anonymous';
-  const username = profile.username ? `@@${profile.username}` : '@@anonymous';
+  const username = profile.username ? `@${profile.username}` : '@anonymous';
+  const friendButton = getFriendButtonContent();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -240,18 +330,12 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
             </div>
             <div className="bg-gray-800 rounded-xl p-4 text-center">
               <Heart className="w-6 h-6 mx-auto mb-2 text-pink-500" />
-              <p className="text-2xl font-bold text-white">
-                {/* Calculate total likes from posts */}
-                0
-              </p>
+              <p className="text-2xl font-bold text-white">0</p>
               <p className="text-xs text-gray-400">Likes</p>
             </div>
             <div className="bg-gray-800 rounded-xl p-4 text-center">
               <Eye className="w-6 h-6 mx-auto mb-2 text-blue-500" />
-              <p className="text-2xl font-bold text-white">
-                {/* Calculate total views from posts */}
-                0
-              </p>
+              <p className="text-2xl font-bold text-white">0</p>
               <p className="text-xs text-gray-400">Views</p>
             </div>
           </div>
@@ -275,14 +359,10 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
                 onClick={handleAddFriend}
                 variant="outline"
                 className="w-full border-gray-700 hover:bg-gray-800"
-                disabled={friendRequestStatus === 'pending' || friendRequestStatus === 'accepted'}
+                disabled={friendButton.disabled}
               >
-                <UserPlus className="w-4 h-4 mr-2" />
-                {friendRequestStatus === 'accepted'
-                  ? 'Friends'
-                  : friendRequestStatus === 'pending'
-                  ? 'Request Sent'
-                  : 'Add Friend'}
+                {friendButton.icon}
+                {friendButton.text}
               </Button>
 
               <Button

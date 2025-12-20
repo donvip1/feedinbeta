@@ -10,7 +10,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Search } from 'lucide-react';
+import { Search, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface User {
   id: string;
@@ -28,38 +29,57 @@ interface NewConversationModalProps {
 
 export const NewConversationModal = ({ open, onClose, onSelectUser, initialImageUrl }: NewConversationModalProps) => {
   const { user } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const navigate = useNavigate();
+  const [friends, setFriends] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (open) {
-      loadUsers();
+      loadFriends();
     }
   }, [open]);
 
-  const loadUsers = async () => {
+  const loadFriends = async () => {
     if (!user) return;
 
     setLoading(true);
     try {
-      // Use public_profiles (secure view) for viewing other users
-      const { data, error } = await supabase
+      // Get accepted friend requests where user is either sender or receiver
+      const { data: acceptedRequests, error: requestsError } = await supabase
+        .from('friend_requests')
+        .select('sender_id, receiver_id')
+        .eq('status', 'accepted')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
+
+      if (requestsError) throw requestsError;
+
+      // Extract friend IDs
+      const friendIds = acceptedRequests?.map((req) =>
+        req.sender_id === user.id ? req.receiver_id : req.sender_id
+      ) || [];
+
+      if (friendIds.length === 0) {
+        setFriends([]);
+        return;
+      }
+
+      // Fetch friend profiles
+      const { data: profiles, error: profilesError } = await supabase
         .from('public_profiles')
         .select('id, display_name, username, avatar_url')
-        .neq('id', user.id)
-        .limit(50);
+        .in('id', friendIds);
 
-      if (error) throw error;
-      setUsers(data || []);
+      if (profilesError) throw profilesError;
+      setFriends(profiles || []);
     } catch (error: any) {
-      console.error('Error loading users:', error);
+      console.error('Error loading friends:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredUsers = users.filter(
+  const filteredFriends = friends.filter(
     u =>
       u.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       u.username?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -87,7 +107,7 @@ export const NewConversationModal = ({ open, onClose, onSelectUser, initialImage
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="Search users..."
+            placeholder="Search friends..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -99,13 +119,32 @@ export const NewConversationModal = ({ open, onClose, onSelectUser, initialImage
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
-          ) : filteredUsers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No users found
+          ) : filteredFriends.length === 0 ? (
+            <div className="text-center py-8 space-y-4">
+              <Users className="w-12 h-12 mx-auto text-muted-foreground" />
+              <div className="text-muted-foreground">
+                {friends.length === 0 ? (
+                  <>
+                    <p className="font-medium">No friends yet</p>
+                    <p className="text-sm mt-1">Add friends to start chatting with them</p>
+                    <button
+                      onClick={() => {
+                        onClose();
+                        navigate('/friends');
+                      }}
+                      className="mt-3 text-primary hover:underline text-sm"
+                    >
+                      Find Friends
+                    </button>
+                  </>
+                ) : (
+                  <p>No friends found matching "{searchQuery}"</p>
+                )}
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredUsers.map((u) => (
+              {filteredFriends.map((u) => (
                 <button
                   key={u.id}
                   onClick={() => handleSelectUser(u.id)}
