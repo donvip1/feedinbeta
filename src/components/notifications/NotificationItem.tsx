@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { X } from 'lucide-react';
+import { X, Check, UserPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 
 interface NotificationItemProps {
   notification: {
@@ -27,6 +29,87 @@ interface NotificationItemProps {
 
 export const NotificationItem = ({ notification, onUpdate, onClose }: NotificationItemProps) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [responding, setResponding] = useState(false);
+
+  const handleFriendRequestResponse = async (e: React.MouseEvent, accept: boolean) => {
+    e.stopPropagation();
+    if (!user?.id || !notification.related_id) return;
+
+    setResponding(true);
+    try {
+      // Find the friend request
+      const { data: request, error: findError } = await supabase
+        .from('friend_requests')
+        .select('id')
+        .eq('sender_id', notification.related_id)
+        .eq('receiver_id', user.id)
+        .eq('status', 'pending')
+        .single();
+
+      if (findError || !request) {
+        toast({
+          title: 'Request not found',
+          description: 'This friend request may have been cancelled',
+          variant: 'destructive',
+        });
+        // Mark notification as read and refresh
+        await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('id', notification.id);
+        onUpdate();
+        return;
+      }
+
+      // Update the friend request status
+      const newStatus = accept ? 'accepted' : 'rejected';
+      const { error: updateError } = await supabase
+        .from('friend_requests')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', request.id);
+
+      if (updateError) throw updateError;
+
+      // If accepted, notify the sender
+      if (accept) {
+        await supabase
+          .from('notifications')
+          .insert({
+            user_id: notification.related_id,
+            from_user_id: user.id,
+            type: 'friend_request_accepted',
+            title: 'Friend request accepted',
+            message: 'You can now start chatting!',
+            related_id: user.id,
+            related_type: 'profile'
+          });
+      }
+
+      // Mark this notification as read
+      await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('id', notification.id);
+
+      toast({
+        title: accept ? 'Friend request accepted!' : 'Friend request declined',
+        description: accept ? 'You can now chat with each other' : undefined,
+      });
+
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error responding to friend request:', error);
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setResponding(false);
+    }
+  };
 
   const handleClick = async () => {
     // Mark as read immediately
@@ -45,7 +128,6 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         break;
         
       case 'like':
-        // Navigate directly to the post
         if (notification.related_id) {
           navigate(`/post/${notification.related_id}`);
         }
@@ -53,7 +135,6 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'comment':
       case 'reply':
-        // Navigate to the post with the comment - fetch post_id from comment
         if (notification.related_id) {
           try {
             const { data: comment } = await supabase
@@ -74,7 +155,6 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         break;
         
       case 'message':
-        // Navigate directly to the conversation
         if (notification.related_id) {
           navigate('/messages', { state: { conversationId: notification.related_id } });
         }
@@ -82,14 +162,13 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'story_reply':
       case 'story_reaction':
-        // Navigate to the story
         if (notification.related_id) {
           navigate(`/story/${notification.related_id}`);
         }
         break;
         
       case 'follow':
-        // Navigate to the user's profile who followed
+      case 'friend_request_accepted':
         if (notification.related_id) {
           navigate(`/profile/${notification.related_id}`);
         }
@@ -97,21 +176,18 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'gift':
       case 'gift_received':
-        // Navigate to the post where gift was sent
         if (notification.related_id) {
           navigate(`/post/${notification.related_id}`);
         }
         break;
         
       case 'live_gift':
-        // Navigate to live stream
         if (notification.related_id) {
           navigate(`/live/${notification.related_id}`);
         }
         break;
         
       case 'mention':
-        // Navigate to the post or comment where mentioned
         if (notification.related_type === 'post' && notification.related_id) {
           navigate(`/post/${notification.related_id}`);
         } else if (notification.related_type === 'comment' && notification.related_id) {
@@ -135,7 +211,6 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'refeed':
       case 'quote':
-        // Navigate to the refeed/quote post
         if (notification.related_id) {
           navigate(`/post/${notification.related_id}`);
         }
@@ -143,7 +218,6 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'promotion':
       case 'promotion_reward':
-        // Navigate to the promoted post
         if (notification.related_id) {
           navigate(`/post/${notification.related_id}`);
         } else {
@@ -152,14 +226,12 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         break;
         
       case 'live_invite':
-        // Navigate to live stream
         if (notification.related_id) {
           navigate(`/live/${notification.related_id}`);
         }
         break;
         
       default:
-        // Fallback: if related_type is post, navigate to post
         if (notification.related_type === 'post' && notification.related_id) {
           navigate(`/post/${notification.related_id}`);
         } else if (notification.related_type === 'profile' && notification.related_id) {
@@ -184,6 +256,71 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
       console.error('Error deleting notification:', error);
     }
   };
+
+  // Special rendering for friend request notifications with inline accept/reject
+  if (notification.type === 'friend_request' && !notification.is_read) {
+    return (
+      <div
+        className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors ${
+          !notification.is_read ? 'bg-accent/50' : ''
+        }`}
+      >
+        <Avatar className="w-10 h-10">
+          <AvatarImage src={notification.from_user?.avatar_url || ''} />
+          <AvatarFallback>
+            {notification.from_user?.display_name?.[0] || '?'}
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <UserPlus className="w-4 h-4 text-primary" />
+            <p className="text-sm font-semibold">{notification.title}</p>
+          </div>
+          {notification.message && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {notification.message}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+          </p>
+          
+          {/* Inline Accept/Reject Buttons */}
+          <div className="flex gap-2 mt-3">
+            <Button
+              size="sm"
+              onClick={(e) => handleFriendRequestResponse(e, true)}
+              disabled={responding}
+              className="bg-primary hover:bg-primary/90 h-8 px-4"
+            >
+              <Check className="w-4 h-4 mr-1" />
+              Accept
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => handleFriendRequestResponse(e, false)}
+              disabled={responding}
+              className="border-border h-8 px-4"
+            >
+              <X className="w-4 h-4 mr-1" />
+              Decline
+            </Button>
+          </div>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 flex-shrink-0"
+          onClick={handleDelete}
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <button

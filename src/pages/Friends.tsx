@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { Search, UserPlus, Check, X, ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
+import { Search, UserPlus, Check, X, ArrowLeft, Settings as SettingsIcon, Clock, UserCheck, Users } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { sanitizeSearchQuery } from '@/lib/search-utils';
@@ -33,6 +33,8 @@ interface FriendRequest {
   profiles: Profile;
 }
 
+type FriendshipStatus = 'none' | 'pending_sent' | 'pending_received' | 'accepted';
+
 const Friends = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -40,49 +42,52 @@ const Friends = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
+  const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [friendshipStatuses, setFriendshipStatuses] = useState<Record<string, FriendshipStatus>>({});
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
-    loadFriendRequests();
-    loadFriends();
-  }, [user, authLoading, navigate]);
-
-  const loadFriendRequests = async () => {
+  const loadFriendRequests = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
-      const { data, error } = await supabase
+      // Load incoming requests
+      const { data: incomingData, error: incomingError } = await supabase
         .from('friend_requests')
-        .select(`
-          id,
-          sender_id,
-          receiver_id,
-          status,
-          created_at
-        `)
-        .eq('receiver_id', user?.id)
+        .select('id, sender_id, receiver_id, status, created_at')
+        .eq('receiver_id', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (incomingError) throw incomingError;
 
-      // Fetch sender profiles separately using public_profiles (secure view)
-      if (data && data.length > 0) {
-        const senderIds = data.map(req => req.sender_id);
+      // Load outgoing requests
+      const { data: outgoingData, error: outgoingError } = await supabase
+        .from('friend_requests')
+        .select('id, sender_id, receiver_id, status, created_at')
+        .eq('sender_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (outgoingError) throw outgoingError;
+
+      // Fetch profiles for all requests
+      const allUserIds = [
+        ...(incomingData || []).map(req => req.sender_id),
+        ...(outgoingData || []).map(req => req.receiver_id)
+      ];
+
+      if (allUserIds.length > 0) {
         const { data: profiles, error: profilesError } = await supabase
           .from('public_profiles')
           .select('*')
-          .in('id', senderIds);
+          .in('id', allUserIds);
 
         if (profilesError) throw profilesError;
 
-        // Combine data
-        const requestsWithProfiles = data.map(req => ({
+        // Combine incoming requests with profiles
+        const incomingWithProfiles = (incomingData || []).map(req => ({
           ...req,
           profiles: profiles?.find(p => p.id === req.sender_id) || {
             id: req.sender_id,
@@ -95,30 +100,47 @@ const Friends = () => {
           }
         }));
 
-        setFriendRequests(requestsWithProfiles);
+        // Combine outgoing requests with profiles
+        const outgoingWithProfiles = (outgoingData || []).map(req => ({
+          ...req,
+          profiles: profiles?.find(p => p.id === req.receiver_id) || {
+            id: req.receiver_id,
+            display_name: null,
+            username: null,
+            avatar_url: null,
+            bio: null,
+            followers_count: 0,
+            following_count: 0,
+          }
+        }));
+
+        setFriendRequests(incomingWithProfiles);
+        setOutgoingRequests(outgoingWithProfiles);
       } else {
         setFriendRequests([]);
+        setOutgoingRequests([]);
       }
     } catch (error: any) {
       console.error('Error loading friend requests:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  const loadFriends = async () => {
+  const loadFriends = useCallback(async () => {
+    if (!user?.id) return;
+    
     try {
-      // Get accepted friend requests where user is either sender or receiver
       const { data: acceptedRequests, error } = await supabase
         .from('friend_requests')
         .select('sender_id, receiver_id')
         .eq('status', 'accepted')
-        .or(`sender_id.eq.${user?.id},receiver_id.eq.${user?.id}`);
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
       if (error) throw error;
 
       const friendIds = acceptedRequests?.map((req) =>
-        req.sender_id === user?.id ? req.receiver_id : req.sender_id
+        req.sender_id === user.id ? req.receiver_id : req.sender_id
       ) || [];
 
       if (friendIds.length === 0) {
@@ -136,11 +158,106 @@ const Friends = () => {
     } catch (error: any) {
       console.error('Error loading friends:', error);
     }
+  }, [user?.id]);
+
+  // Initial load and realtime subscription
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    loadFriendRequests();
+    loadFriends();
+
+    // Subscribe to realtime updates for friend_requests
+    const channel = supabase
+      .channel('friend-requests-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friend_requests',
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Friend request change (receiver):', payload);
+          if (payload.eventType === 'INSERT') {
+            toast({
+              title: 'New friend request!',
+              description: 'Someone sent you a friend request',
+            });
+          }
+          loadFriendRequests();
+          loadFriends();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friend_requests',
+          filter: `sender_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Friend request change (sender):', payload);
+          if (payload.eventType === 'UPDATE' && payload.new.status === 'accepted') {
+            toast({
+              title: 'Friend request accepted!',
+              description: 'You are now friends',
+            });
+          }
+          loadFriendRequests();
+          loadFriends();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, authLoading, navigate, loadFriendRequests, loadFriends, toast]);
+
+  // Check friendship status for search results
+  const checkFriendshipStatus = async (userIds: string[]) => {
+    if (!user?.id || userIds.length === 0) return;
+    
+    try {
+      const { data: requests } = await supabase
+        .from('friend_requests')
+        .select('sender_id, receiver_id, status')
+        .or(
+          userIds.map(id => 
+            `and(sender_id.eq.${user.id},receiver_id.eq.${id}),and(sender_id.eq.${id},receiver_id.eq.${user.id})`
+          ).join(',')
+        );
+
+      const statuses: Record<string, FriendshipStatus> = {};
+      userIds.forEach(id => {
+        statuses[id] = 'none';
+      });
+
+      requests?.forEach(req => {
+        const otherId = req.sender_id === user.id ? req.receiver_id : req.sender_id;
+        if (req.status === 'accepted') {
+          statuses[otherId] = 'accepted';
+        } else if (req.status === 'pending') {
+          statuses[otherId] = req.sender_id === user.id ? 'pending_sent' : 'pending_received';
+        }
+      });
+
+      setFriendshipStatuses(statuses);
+    } catch (error) {
+      console.error('Error checking friendship statuses:', error);
+    }
   };
 
   const searchUsers = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
+      setFriendshipStatuses({});
       return;
     }
 
@@ -156,6 +273,11 @@ const Friends = () => {
 
       if (error) throw error;
       setSearchResults(data || []);
+      
+      // Check friendship status for all results
+      if (data && data.length > 0) {
+        await checkFriendshipStatus(data.map(p => p.id));
+      }
     } catch (error: any) {
       toast({
         title: 'Error searching users',
@@ -168,12 +290,27 @@ const Friends = () => {
   };
 
   const sendFriendRequest = async (receiverId: string) => {
+    if (!user?.id) return;
+    
+    // Check if request already exists
+    const existingStatus = friendshipStatuses[receiverId];
+    if (existingStatus && existingStatus !== 'none') {
+      const messages: Record<FriendshipStatus, string> = {
+        'pending_sent': 'Friend request already sent',
+        'pending_received': 'This user already sent you a friend request. Check your requests tab!',
+        'accepted': 'You are already friends',
+        'none': ''
+      };
+      toast({ title: messages[existingStatus] });
+      return;
+    }
+
     try {
       // Deduct credits first (5 credits)
       const { error: creditError } = await supabase.functions.invoke('credit-deduction', {
         body: {
           action: 'friend_request',
-          userId: user?.id,
+          userId: user.id,
           targetUserId: receiverId,
         },
       });
@@ -188,17 +325,26 @@ const Friends = () => {
       }
 
       const { error } = await supabase.from('friend_requests').insert({
-        sender_id: user?.id,
+        sender_id: user.id,
         receiver_id: receiverId,
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          toast({
+            title: 'Friend request already exists',
+            description: 'A request between you and this user already exists',
+          });
+          return;
+        }
+        throw error;
+      }
 
       // Get sender profile for notification
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('display_name, username')
-        .eq('id', user?.id)
+        .eq('id', user.id)
         .single();
 
       // Create notification for the receiver
@@ -206,18 +352,24 @@ const Friends = () => {
         .from('notifications')
         .insert({
           user_id: receiverId,
-          from_user_id: user?.id,
+          from_user_id: user.id,
           type: 'friend_request',
           title: 'New friend request',
           message: `${senderProfile?.display_name || senderProfile?.username || 'Someone'} sent you a friend request`,
-          related_id: user?.id,
+          related_id: user.id,
           related_type: 'profile'
         });
+
+      // Update local status
+      setFriendshipStatuses(prev => ({ ...prev, [receiverId]: 'pending_sent' }));
 
       toast({
         title: 'Friend request sent',
         description: '5 credits deducted',
       });
+      
+      // Reload outgoing requests
+      loadFriendRequests();
     } catch (error: any) {
       toast({
         title: 'Error sending friend request',
@@ -227,9 +379,29 @@ const Friends = () => {
     }
   };
 
+  const cancelOutgoingRequest = async (requestId: string, receiverId: string) => {
+    try {
+      const { error } = await supabase
+        .from('friend_requests')
+        .delete()
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast({ title: 'Friend request cancelled' });
+      setFriendshipStatuses(prev => ({ ...prev, [receiverId]: 'none' }));
+      loadFriendRequests();
+    } catch (error: any) {
+      toast({
+        title: 'Error cancelling request',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const respondToRequest = async (requestId: string, status: 'accepted' | 'rejected') => {
     try {
-      // Get the request details first to know the sender
       const { data: request } = await supabase
         .from('friend_requests')
         .select('sender_id')
@@ -243,7 +415,6 @@ const Friends = () => {
 
       if (error) throw error;
 
-      // Create notification for the sender if request was accepted
       if (status === 'accepted' && request?.sender_id) {
         await supabase
           .from('notifications')
@@ -275,6 +446,20 @@ const Friends = () => {
     }
   };
 
+  const getFriendshipButtonContent = (profileId: string) => {
+    const status = friendshipStatuses[profileId] || 'none';
+    switch (status) {
+      case 'accepted':
+        return { icon: <UserCheck className="w-4 h-4" />, text: 'Friends', disabled: true };
+      case 'pending_sent':
+        return { icon: <Clock className="w-4 h-4" />, text: 'Pending', disabled: true };
+      case 'pending_received':
+        return { icon: <Users className="w-4 h-4" />, text: 'Accept', disabled: false };
+      default:
+        return { icon: <UserPlus className="w-4 h-4" />, text: '', disabled: false };
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-black">
@@ -282,6 +467,8 @@ const Friends = () => {
       </div>
     );
   }
+
+  const totalPendingRequests = friendRequests.length;
 
   return (
     <div className="min-h-screen bg-black text-white pb-24">
@@ -325,9 +512,9 @@ const Friends = () => {
             <TabsTrigger value="friends">Friends</TabsTrigger>
             <TabsTrigger value="requests">
               Requests
-              {friendRequests.length > 0 && (
+              {totalPendingRequests > 0 && (
                 <span className="ml-2 bg-primary text-white rounded-full px-2 py-0.5 text-xs">
-                  {friendRequests.length}
+                  {totalPendingRequests}
                 </span>
               )}
             </TabsTrigger>
@@ -375,54 +562,98 @@ const Friends = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="requests" className="mt-6 space-y-4">
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2].map((i) => (
-                  <div key={i} className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg">
-                    <Skeleton className="w-12 h-12 rounded-full" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-3 w-24" />
+          <TabsContent value="requests" className="mt-6 space-y-6">
+            {/* Incoming Requests */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Incoming Requests</h3>
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg">
+                      <Skeleton className="w-12 h-12 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : friendRequests.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-gray-400">No pending friend requests</p>
-              </div>
-            ) : (
-              friendRequests.map((request) => (
-                <div key={request.id} className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg">
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={request.profiles.avatar_url || ''} />
-                    <AvatarFallback>{request.profiles.display_name?.[0] || 'U'}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-semibold">{request.profiles.display_name || 'Unknown'}</p>
-                    <p className="text-sm text-gray-400">@{request.profiles.username || 'user'}</p>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      size="sm"
-                      onClick={() => respondToRequest(request.id, 'accepted')}
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      <Check className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => respondToRequest(request.id, 'rejected')}
-                      className="border-gray-700"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  ))}
                 </div>
-              ))
-            )}
+              ) : friendRequests.length === 0 ? (
+                <div className="text-center py-8 bg-gray-900 rounded-lg">
+                  <p className="text-gray-400">No pending friend requests</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {friendRequests.map((request) => (
+                    <div key={request.id} className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={request.profiles.avatar_url || ''} />
+                        <AvatarFallback>{request.profiles.display_name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-semibold">{request.profiles.display_name || 'Unknown'}</p>
+                        <p className="text-sm text-gray-400">@{request.profiles.username || 'user'}</p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          onClick={() => respondToRequest(request.id, 'accepted')}
+                          className="bg-primary hover:bg-primary/90"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => respondToRequest(request.id, 'rejected')}
+                          className="border-gray-700"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Outgoing Requests */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-400 mb-3">Sent Requests</h3>
+              {outgoingRequests.length === 0 ? (
+                <div className="text-center py-8 bg-gray-900 rounded-lg">
+                  <p className="text-gray-400">No pending sent requests</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {outgoingRequests.map((request) => (
+                    <div key={request.id} className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg">
+                      <Avatar className="w-12 h-12">
+                        <AvatarImage src={request.profiles.avatar_url || ''} />
+                        <AvatarFallback>{request.profiles.display_name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-semibold">{request.profiles.display_name || 'Unknown'}</p>
+                        <p className="text-sm text-gray-400">@{request.profiles.username || 'user'}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-yellow-500 flex items-center gap-1">
+                          <Clock className="w-3 h-3" /> Pending
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => cancelOutgoingRequest(request.id, request.receiver_id)}
+                          className="border-gray-700 text-red-400 hover:text-red-300"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="search" className="mt-6 space-y-4">
@@ -458,34 +689,51 @@ const Friends = () => {
                 </p>
               </div>
             ) : (
-              searchResults.map((profile) => (
-                <div
-                  key={profile.id}
-                  className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg"
-                >
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={profile.avatar_url || ''} />
-                    <AvatarFallback>{profile.display_name?.[0] || 'U'}</AvatarFallback>
-                  </Avatar>
+              searchResults.map((profile) => {
+                const buttonContent = getFriendshipButtonContent(profile.id);
+                return (
                   <div
-                    className="flex-1 cursor-pointer"
-                    onClick={() => navigate(`/profile/${profile.username || profile.id}`)}
+                    key={profile.id}
+                    className="flex items-center space-x-3 p-4 bg-gray-900 rounded-lg"
                   >
-                    <p className="font-semibold">{profile.display_name || 'Unknown'}</p>
-                    <p className="text-sm text-gray-400">@{profile.username || 'user'}</p>
-                    {profile.bio && (
-                      <p className="text-sm text-gray-500 mt-1">{profile.bio}</p>
-                    )}
+                    <Avatar className="w-12 h-12">
+                      <AvatarImage src={profile.avatar_url || ''} />
+                      <AvatarFallback>{profile.display_name?.[0] || 'U'}</AvatarFallback>
+                    </Avatar>
+                    <div
+                      className="flex-1 cursor-pointer"
+                      onClick={() => navigate(`/profile/${profile.username || profile.id}`)}
+                    >
+                      <p className="font-semibold">{profile.display_name || 'Unknown'}</p>
+                      <p className="text-sm text-gray-400">@{profile.username || 'user'}</p>
+                      {profile.bio && (
+                        <p className="text-sm text-gray-500 mt-1">{profile.bio}</p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (friendshipStatuses[profile.id] === 'pending_received') {
+                          // Find the request and accept it
+                          const request = friendRequests.find(r => r.sender_id === profile.id);
+                          if (request) respondToRequest(request.id, 'accepted');
+                        } else {
+                          sendFriendRequest(profile.id);
+                        }
+                      }}
+                      disabled={buttonContent.disabled}
+                      className={`${
+                        buttonContent.disabled 
+                          ? 'bg-gray-700 text-gray-400' 
+                          : 'bg-primary hover:bg-primary/90'
+                      }`}
+                    >
+                      {buttonContent.icon}
+                      {buttonContent.text && <span className="ml-1">{buttonContent.text}</span>}
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={() => sendFriendRequest(profile.id)}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    <UserPlus className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))
+                );
+              })
             )}
           </TabsContent>
         </Tabs>
