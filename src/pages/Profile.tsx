@@ -13,7 +13,7 @@ import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket } from 'lucide-react';
+import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket, UserCheck, X } from 'lucide-react';
 import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
 
@@ -80,6 +80,16 @@ const Profile = () => {
 
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [areMutualFriends, setAreMutualFriends] = useState(false);
+  const [pendingFriendRequests, setPendingFriendRequests] = useState<{
+    id: string;
+    sender_id: string;
+    created_at: string;
+    sender_profile: {
+      display_name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+    } | null;
+  }[]>([]);
 
   // Helper to check if string is UUID
   const isUUID = (str: string) => {
@@ -128,6 +138,12 @@ const Profile = () => {
     setIsOwnProfile(isOwn);
     
     loadProfile();
+    
+    // Load friend requests for own profile
+    if (isOwn) {
+      loadPendingFriendRequests();
+    }
+    
     if (!isOwn && user) {
       checkFollowStatus();
       checkIfFollowingMe();
@@ -271,6 +287,103 @@ const Profile = () => {
       setAreMutualFriends(!!data);
     } catch (error: any) {
       console.error('Error checking mutual friend status:', error);
+    }
+  };
+
+  const loadPendingFriendRequests = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('friend_requests')
+        .select('id, sender_id, created_at')
+        .eq('receiver_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch sender profiles
+      if (data && data.length > 0) {
+        const senderIds = data.map(r => r.sender_id);
+        const { data: profiles } = await supabase
+          .from('public_profiles')
+          .select('id, display_name, username, avatar_url')
+          .in('id', senderIds);
+
+        const requestsWithProfiles = data.map(request => ({
+          ...request,
+          sender_profile: profiles?.find(p => p.id === request.sender_id) || null
+        }));
+
+        setPendingFriendRequests(requestsWithProfiles);
+      } else {
+        setPendingFriendRequests([]);
+      }
+    } catch (error: any) {
+      console.error('Error loading pending friend requests:', error);
+    }
+  };
+
+  const handleAcceptFriendRequest = async (requestId: string, senderId: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('friend_requests')
+        .update({ status: 'accepted', updated_at: new Date().toISOString() })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      // Create notification for sender
+      await supabase.from('notifications').insert({
+        user_id: senderId,
+        from_user_id: user.id,
+        type: 'friend_accepted',
+        title: 'Friend request accepted',
+        message: `${profile?.display_name || profile?.username || 'Someone'} accepted your friend request`,
+        related_id: user.id,
+        related_type: 'profile'
+      });
+
+      toast({
+        title: 'Friend request accepted!',
+        description: 'You can now chat with this user.',
+      });
+
+      // Reload requests
+      loadPendingFriendRequests();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleDeclineFriendRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from('friend_requests')
+        .update({ status: 'declined', updated_at: new Date().toISOString() })
+        .eq('id', requestId);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Friend request declined',
+      });
+
+      // Reload requests
+      loadPendingFriendRequests();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -749,6 +862,67 @@ const Profile = () => {
           {/* Bio */}
           {profile.bio && (
             <p className="text-foreground mb-4 leading-relaxed">{profile.bio}</p>
+          )}
+
+          {/* Friend Requests Section - Only for own profile */}
+          {isOwnProfile && pendingFriendRequests.length > 0 && (
+            <Card className="mb-6 p-4 border-primary/20 bg-primary/5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-foreground flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-primary" />
+                  Friend Requests
+                </h3>
+                <Badge variant="secondary" className="bg-primary text-primary-foreground">
+                  {pendingFriendRequests.length}
+                </Badge>
+              </div>
+              <div className="space-y-3">
+                {pendingFriendRequests.map((request) => (
+                  <div 
+                    key={request.id} 
+                    className="flex items-center justify-between p-3 bg-background rounded-lg border border-border"
+                  >
+                    <div 
+                      className="flex items-center gap-3 cursor-pointer flex-1"
+                      onClick={() => navigate(`/profile/${request.sender_id}`)}
+                    >
+                      <Avatar className="w-10 h-10">
+                        <AvatarImage src={request.sender_profile?.avatar_url || ''} />
+                        <AvatarFallback className="bg-primary/20 text-primary">
+                          {request.sender_profile?.display_name?.[0] || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-foreground truncate">
+                          {request.sender_profile?.display_name || 'Unknown'}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          @{request.sender_profile?.username || 'user'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        size="sm"
+                        onClick={() => handleAcceptFriendRequest(request.id, request.sender_id)}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                      >
+                        <UserCheck className="w-4 h-4 mr-1" />
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDeclineFriendRequest(request.id)}
+                        className="text-muted-foreground hover:text-destructive hover:border-destructive"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
           )}
 
           {/* Action Buttons - Centered, BEFORE Posts */}
