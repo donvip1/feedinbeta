@@ -2702,18 +2702,21 @@ export type Database = {
           id: string
           post_id: string
           user_id: string
+          view_date: string
           viewed_at: string
         }
         Insert: {
           id?: string
           post_id: string
           user_id: string
+          view_date?: string
           viewed_at?: string
         }
         Update: {
           id?: string
           post_id?: string
           user_id?: string
+          view_date?: string
           viewed_at?: string
         }
         Relationships: [
@@ -4094,6 +4097,7 @@ export type Database = {
       can_request_payout: { Args: { p_user_id: string }; Returns: Json }
       can_update_purpose: { Args: { user_id: string }; Returns: boolean }
       can_view_admin_wallet: { Args: never; Returns: boolean }
+      check_all_posts_viewed: { Args: never; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       cleanup_old_view_history: { Args: never; Returns: undefined }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
@@ -4272,6 +4276,15 @@ export type Database = {
       get_recent_profits_transactions: {
         Args: { p_limit?: number }
         Returns: Json
+      }
+      get_smart_feed_posts: {
+        Args: { p_limit?: number; p_tab?: string }
+        Returns: {
+          boost_level: string
+          is_promoted: boolean
+          is_viewed: boolean
+          post_id: string
+        }[]
       }
       get_today_viewed_posts: {
         Args: never

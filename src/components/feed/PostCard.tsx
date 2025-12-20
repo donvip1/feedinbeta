@@ -54,14 +54,16 @@ interface PostCardProps {
     };
   };
   allPosts?: any[];
+  allVideoPosts?: any[]; // All video posts for TikTok-style fullscreen navigation
   onLikeUpdate?: () => void;
   onCommentsOpenChange?: (open: boolean) => void;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
   onView?: () => void;
+  onMarkAsViewed?: (postId: string) => void; // Callback to mark posts as viewed in fullscreen
 }
 
-export default function PostCard({ post, allPosts = [], onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd, onView }: PostCardProps) {
+export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd, onView, onMarkAsViewed }: PostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -941,6 +943,29 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           comments_count: p.comments_count || 0,
           refeeds_count: p.refeeds_count || 0
         }))}
+        allVideoPosts={allVideoPosts.map(p => {
+          // Handle refeed/quote posts - extract original post's video
+          if ((p.post_type === 'refeed' || p.post_type === 'quote') && p.original_post?.media_type === 'video') {
+            return {
+              id: p.original_post.id,
+              user_id: p.original_post.user_id,
+              content: p.original_post.content,
+              media_url: p.original_post.media_url,
+              media_type: p.original_post.media_type,
+              created_at: p.original_post.created_at,
+              likes_count: p.likes_count || 0,
+              comments_count: p.comments_count || 0,
+              refeeds_count: p.refeeds_count || 0,
+              profiles: p.original_post.profiles
+            };
+          }
+          return {
+            ...p,
+            likes_count: p.likes_count || 0,
+            comments_count: p.comments_count || 0,
+            refeeds_count: p.refeeds_count || 0
+          };
+        })}
         isOpen={showFullscreenViewer}
         onClose={() => {
           setShowFullscreenViewer(false);
@@ -955,6 +980,7 @@ export default function PostCard({ post, allPosts = [], onLikeUpdate, onComments
           }
           onInteractionEnd?.();
         }}
+        onMarkAsViewed={onMarkAsViewed}
         initialTime={currentVideoTime.current}
         initialMuted={isMuted}
         // Pass synced counts from PostCard state for proper synchronization
