@@ -27,9 +27,11 @@ interface Post {
 interface FullscreenMediaViewerProps {
   post: Post;
   allPosts: Post[];
+  allVideoPosts?: Post[]; // All video posts for TikTok-style navigation
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (postId: string) => void;
+  onMarkAsViewed?: (postId: string) => void; // Callback to mark posts as viewed
   initialTime?: number;
   initialMuted?: boolean;
   onOpenComments?: (postId: string) => void;
@@ -46,9 +48,11 @@ interface FullscreenMediaViewerProps {
 export default function FullscreenMediaViewer({ 
   post, 
   allPosts, 
+  allVideoPosts,
   isOpen, 
   onClose,
   onNavigate,
+  onMarkAsViewed,
   initialTime = 0,
   initialMuted = true,
   onOpenComments,
@@ -79,13 +83,21 @@ export default function FullscreenMediaViewer({
   const touchStartY = useRef(0);
 
   // Filter posts by media type - videos with videos, images with images
+  // For videos, use allVideoPosts if provided (contains ALL video posts for TikTok-style navigation)
   const isVideoPost = post.media_type === 'video';
   const navigablePosts = isVideoPost 
-    ? allPosts.filter(p => p.media_type === 'video')
+    ? (allVideoPosts && allVideoPosts.length > 0 ? allVideoPosts : allPosts.filter(p => p.media_type === 'video'))
     : allPosts.filter(p => p.media_type === 'image');
 
   const currentPost = navigablePosts[currentPostIndex];
   const isVideo = currentPost?.media_type === 'video';
+
+  // Mark post as viewed when navigating to it
+  useEffect(() => {
+    if (isOpen && currentPost && onMarkAsViewed) {
+      onMarkAsViewed(currentPost.id);
+    }
+  }, [isOpen, currentPost?.id, onMarkAsViewed]);
 
   // Get current user
   useEffect(() => {
@@ -639,13 +651,15 @@ export default function FullscreenMediaViewer({
         {navigablePosts.length > 1 && (
           <>
             {currentPostIndex < navigablePosts.length - 1 && (
-              <div className="absolute bottom-36 left-4 text-white/50 text-xs">
-                Swipe up for next {isVideo ? 'video' : 'image'}
+              <div className="absolute bottom-36 left-4 text-white/50 text-xs flex items-center gap-1">
+                <span className="animate-bounce">↑</span>
+                Swipe up for next {isVideo ? 'video' : 'image'} ({currentPostIndex + 1}/{navigablePosts.length})
               </div>
             )}
             {currentPostIndex > 0 && (
-              <div className="absolute top-20 left-4 text-white/50 text-xs">
-                Swipe down for previous {isVideo ? 'video' : 'image'}
+              <div className="absolute top-20 left-4 text-white/50 text-xs flex items-center gap-1">
+                <span className="animate-bounce">↓</span>
+                Swipe down for previous
               </div>
             )}
           </>

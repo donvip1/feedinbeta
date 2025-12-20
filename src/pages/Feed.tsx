@@ -38,12 +38,13 @@ const Feed = () => {
   const [showNav, setShowNav] = useState(true);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
-  const { viewedPostIds, markAsViewed } = useViewedPosts();
+  const { viewedPostIds, markAsViewed, hasViewedAllPosts, canCountView } = useViewedPosts();
   const initialViewedRef = useRef<string[]>([]);
   const hasInitializedRef = useRef(false);
   const [displayPosts, setDisplayPosts] = useState<any[]>([]);
   const allLoadedPostsRef = useRef<any[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const allVideoPostsRef = useRef<any[]>([]); // Store all video posts for fullscreen navigation
 
   // Capture viewed posts only once when component mounts or tab changes
   useEffect(() => {
@@ -58,7 +59,7 @@ const Feed = () => {
     initialViewedRef.current = [...viewedPostIds];
   }, [activeTab]);
 
-  // Fetch posts with cache-first strategy
+  // Fetch posts with smart deduplication and priority sorting
   const { data: posts, isLoading, refetch } = useQuery({
     queryKey: ['feed-posts', activeTab],
     queryFn: async () => {
@@ -67,17 +68,23 @@ const Feed = () => {
       if (cached && cached.length > 0) {
         setDisplayPosts(cached);
       }
-      // Get active promotions first
-      const { data: promotions } = await supabase
-        .from('post_promotions')
-        .select('post_id, boost_level')
-        .eq('is_active', true)
-        .gt('expires_at', new Date().toISOString());
 
-      const promotedPostIds = new Set(promotions?.map(p => p.post_id) || []);
-      const promotionLevels: Record<string, string> = {};
-      promotions?.forEach(p => { promotionLevels[p.post_id] = p.boost_level; });
+      // Use the smart feed function that handles priority and deduplication
+      const { data: smartFeed, error: smartError } = await supabase.rpc('get_smart_feed_posts', {
+        p_limit: 100,
+        p_tab: activeTab
+      });
 
+      if (smartError) {
+        console.error('Smart feed error, falling back:', smartError);
+      }
+
+      // Get the post IDs from smart feed
+      const smartPostIds = smartFeed?.map((p: any) => p.post_id) || [];
+      const viewedMap = new Map(smartFeed?.map((p: any) => [p.post_id, p.is_viewed]) || []);
+      const promotedMap = new Map(smartFeed?.map((p: any) => [p.post_id, { is_promoted: p.is_promoted, boost_level: p.boost_level }]) || []);
+
+      // Fetch full post data
       let query = supabase
         .from('posts')
         .select(`
@@ -105,7 +112,7 @@ const Feed = () => {
         `)
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(100); // Fetch more posts for infinite scroll
+        .limit(100);
 
       if (activeTab === 'following' && user) {
         const { data: following } = await supabase
@@ -125,39 +132,71 @@ const Feed = () => {
       if (error) throw error;
 
       const allPosts = data || [];
-      const viewedAtLoad = initialViewedRef.current;
-      
-      // Separate unviewed and viewed posts based on initial state
-      const unviewedPosts = allPosts.filter(p => !viewedAtLoad.includes(p.id));
-      const viewedPosts = allPosts.filter(p => viewedAtLoad.includes(p.id));
 
-      // Sort by promotion priority, then by date
-      const sortByPriority = (postsToSort: typeof allPosts) => {
-        return [...postsToSort].sort((a, b) => {
-          const aPriority = promotedPostIds.has(a.id) 
-            ? (promotionLevels[a.id] === 'premium' ? 3 : promotionLevels[a.id] === 'standard' ? 2 : 1) 
-            : 0;
-          const bPriority = promotedPostIds.has(b.id) 
-            ? (promotionLevels[b.id] === 'premium' ? 3 : promotionLevels[b.id] === 'standard' ? 2 : 1) 
-            : 0;
-          
-          if (aPriority !== bPriority) return bPriority - aPriority;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-      };
+      // Store all video posts for fullscreen navigation
+      allVideoPostsRef.current = allPosts.filter(p => 
+        p.media_type === 'video' || 
+        ((p.post_type === 'refeed' || p.post_type === 'quote') && p.original_post?.media_type === 'video')
+      );
 
-      // Prioritize unviewed posts - NO DUPLICATES
-      let finalPosts = sortByPriority(unviewedPosts);
+      // Sort posts: unviewed promoted first, then unviewed, then viewed
+      const sortedPosts = [...allPosts].sort((a, b) => {
+        const aViewed = viewedMap.get(a.id) || initialViewedRef.current.includes(a.id);
+        const bViewed = viewedMap.get(b.id) || initialViewedRef.current.includes(b.id);
+        const aPromo = promotedMap.get(a.id);
+        const bPromo = promotedMap.get(b.id);
+
+        // Priority scoring
+        const getScore = (isViewed: boolean, promo: any) => {
+          if (!isViewed && promo?.is_promoted) {
+            if (promo.boost_level === 'premium') return 1;
+            if (promo.boost_level === 'standard') return 2;
+            if (promo.boost_level === 'basic') return 3;
+          }
+          if (!isViewed) return 4;
+          if (promo?.is_promoted) {
+            if (promo.boost_level === 'premium') return 5;
+            if (promo.boost_level === 'standard') return 6;
+            if (promo.boost_level === 'basic') return 7;
+          }
+          return 8;
+        };
+
+        const aScore = getScore(aViewed, aPromo);
+        const bScore = getScore(bViewed, bPromo);
+
+        if (aScore !== bScore) return aScore - bScore;
+
+        // Add randomness within same priority tier
+        return Math.random() - 0.5;
+      });
+
+      // Store all posts for infinite scroll
+      allLoadedPostsRef.current = sortedPosts;
       
-      // Store all posts for infinite scroll looping
-      allLoadedPostsRef.current = sortByPriority(allPosts);
       // Cache the results
-      feedCache.set(activeTab, sortByPriority(allPosts));
+      feedCache.set(activeTab, sortedPosts);
 
-      return finalPosts;
+      // If all posts have been viewed, show all posts (cycle)
+      // Otherwise, prioritize unviewed posts
+      if (hasViewedAllPosts) {
+        return sortedPosts;
+      }
+
+      // Return unviewed posts first, then append viewed if needed
+      const unviewedPosts = sortedPosts.filter(p => 
+        !viewedMap.get(p.id) && !initialViewedRef.current.includes(p.id)
+      );
+
+      if (unviewedPosts.length >= 5) {
+        return unviewedPosts;
+      }
+
+      // If few unviewed posts, append some viewed ones
+      return sortedPosts;
     },
     enabled: !!user,
-    staleTime: 30000, // Allow refetch after 30 seconds
+    staleTime: 30000,
     refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
@@ -387,11 +426,13 @@ const Feed = () => {
                   <PostCard
                     post={post}
                     allPosts={displayPosts}
+                    allVideoPosts={allVideoPostsRef.current}
                     onLikeUpdate={() => refetch()}
                     onCommentsOpenChange={setIsCommentsOpen}
                     onInteractionStart={handleInteractionStart}
                     onInteractionEnd={handleInteractionEnd}
                     onView={() => markAsViewed(post.id)}
+                    onMarkAsViewed={markAsViewed}
                   />
                 </div>
               );
