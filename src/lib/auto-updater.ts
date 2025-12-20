@@ -186,14 +186,40 @@ class AutoUpdater {
   }
 }
 
-// Initialize and export singleton
-export const autoUpdater = AutoUpdater.getInstance();
+// Lazy initialization to avoid module-level side effects
+let _autoUpdater: AutoUpdater | null = null;
 
-// Track user activity on common events
-if (typeof window !== 'undefined') {
-  ['click', 'touchstart', 'keydown', 'scroll'].forEach(event => {
-    window.addEventListener(event, () => {
-      autoUpdater.trackActivity();
-    }, { passive: true });
-  });
-}
+export const getAutoUpdater = (): AutoUpdater => {
+  if (!_autoUpdater) {
+    _autoUpdater = AutoUpdater.getInstance();
+    
+    // Track user activity on common events
+    if (typeof window !== 'undefined') {
+      ['click', 'touchstart', 'keydown', 'scroll'].forEach(event => {
+        window.addEventListener(event, () => {
+          _autoUpdater?.trackActivity();
+        }, { passive: true });
+      });
+    }
+  }
+  return _autoUpdater;
+};
+
+// Export for backwards compatibility - but lazy
+export const autoUpdater = {
+  get instance() {
+    return getAutoUpdater();
+  },
+  trackActivity() {
+    getAutoUpdater().trackActivity();
+  },
+  checkForUpdates() {
+    return getAutoUpdater().checkForUpdates();
+  },
+  applyUpdate() {
+    getAutoUpdater().applyUpdate();
+  },
+  destroy() {
+    getAutoUpdater().destroy();
+  }
+};
