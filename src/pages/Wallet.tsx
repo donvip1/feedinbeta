@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Wallet as WalletIcon, Send, ArrowUpRight, ArrowDownLeft, Crown, Check, Zap, Star, ShoppingCart, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, Wallet as WalletIcon, Send, ArrowUpRight, ArrowDownLeft, Crown, Check, Zap, Star, ShoppingCart, ShoppingBag, Gift } from 'lucide-react';
 import { format } from 'date-fns';
+import { GiftsTab } from '@/components/wallet/GiftsTab';
 
 const Wallet = () => {
   const navigate = useNavigate();
@@ -355,11 +356,15 @@ const Wallet = () => {
 
       <div className="container mx-auto px-4 py-6 space-y-6">
         <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="buy">Buy Credits</TabsTrigger>
+            <TabsTrigger value="gifts" className="flex items-center gap-1">
+              <Gift className="w-3 h-3" />
+              Gifts
+            </TabsTrigger>
+            <TabsTrigger value="buy">Buy</TabsTrigger>
             <TabsTrigger value="subscribe">Subscribe</TabsTrigger>
-            <TabsTrigger value="marketplace">Marketplace</TabsTrigger>
+            <TabsTrigger value="marketplace">Market</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
@@ -432,6 +437,11 @@ const Wallet = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Gifts Tab */}
+          <TabsContent value="gifts" className="space-y-6 mt-6">
+            <GiftsTab />
           </TabsContent>
 
           {/* Buy Credits Tab */}

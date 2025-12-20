@@ -4440,10 +4440,32 @@ export type Database = {
         Returns: undefined
       }
       request_creator_payout: { Args: { p_amount: number }; Returns: Json }
-      send_gift: {
-        Args: { p_credit_value: number; p_gift_type: string; p_post_id: string }
-        Returns: Json
+      send_direct_gift: {
+        Args: {
+          p_credit_value: number
+          p_gift_type: string
+          p_recipient_identifier: string
+        }
+        Returns: string
       }
+      send_gift:
+        | {
+            Args: {
+              p_credit_value: number
+              p_gift_type: string
+              p_post_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_credit_value: number
+              p_gift_type: string
+              p_post_id: string
+              p_recipient_id: string
+            }
+            Returns: undefined
+          }
       send_live_gift: {
         Args: {
           p_credit_value: number
