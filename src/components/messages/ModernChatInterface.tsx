@@ -382,6 +382,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     if (!conversationId) return;
     
     try {
+      // Load ALL messages without limit - important for full history
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -401,7 +402,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           )
         `)
         .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true });
+        .is('deleted_at', null) // Exclude soft-deleted messages
+        .order('created_at', { ascending: true })
+        .limit(1000); // Explicitly set high limit to get all messages
 
       if (error) throw error;
       

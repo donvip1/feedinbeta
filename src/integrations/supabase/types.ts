@@ -2000,9 +2000,14 @@ export type Database = {
           comments_enabled: boolean | null
           created_at: string
           email_enabled: boolean | null
+          follows_enabled: boolean | null
+          friend_requests_enabled: boolean | null
+          gifts_enabled: boolean | null
           id: string
           likes_enabled: boolean | null
+          live_enabled: boolean | null
           messages_enabled: boolean | null
+          push_enabled: boolean | null
           stories_enabled: boolean | null
           updated_at: string
           user_id: string
@@ -2011,9 +2016,14 @@ export type Database = {
           comments_enabled?: boolean | null
           created_at?: string
           email_enabled?: boolean | null
+          follows_enabled?: boolean | null
+          friend_requests_enabled?: boolean | null
+          gifts_enabled?: boolean | null
           id?: string
           likes_enabled?: boolean | null
+          live_enabled?: boolean | null
           messages_enabled?: boolean | null
+          push_enabled?: boolean | null
           stories_enabled?: boolean | null
           updated_at?: string
           user_id: string
@@ -2022,9 +2032,14 @@ export type Database = {
           comments_enabled?: boolean | null
           created_at?: string
           email_enabled?: boolean | null
+          follows_enabled?: boolean | null
+          friend_requests_enabled?: boolean | null
+          gifts_enabled?: boolean | null
           id?: string
           likes_enabled?: boolean | null
+          live_enabled?: boolean | null
           messages_enabled?: boolean | null
+          push_enabled?: boolean | null
           stories_enabled?: boolean | null
           updated_at?: string
           user_id?: string
@@ -3175,6 +3190,36 @@ export type Database = {
           total_collected?: number | null
           total_withdrawn?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
