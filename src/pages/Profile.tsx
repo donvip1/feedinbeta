@@ -289,8 +289,8 @@ const Profile = () => {
 
     try {
       const { data, error } = await supabase.rpc('are_mutual_friends', {
-        user_a: user.id,
-        user_b: resolvedUserId
+        user1_id: user.id,
+        user2_id: resolvedUserId
       });
 
       if (error) throw error;
@@ -451,8 +451,8 @@ const Profile = () => {
       // First check if already mutual friends
       const { data: areFriends, error: friendCheckError } = await supabase
         .rpc('are_mutual_friends', {
-          user_a: user.id,
-          user_b: resolvedUserId
+          user1_id: user.id,
+          user2_id: resolvedUserId
         });
 
       if (friendCheckError) throw friendCheckError;

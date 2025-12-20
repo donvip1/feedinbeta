@@ -4084,7 +4084,7 @@ export type Database = {
         Returns: Json
       }
       are_mutual_friends: {
-        Args: { user_a: string; user_b: string }
+        Args: { user1_id: string; user2_id: string }
         Returns: boolean
       }
       calculate_trending_posts: { Args: never; Returns: undefined }
@@ -4094,9 +4094,26 @@ export type Database = {
         Returns: boolean
       }
       can_manage_credits: { Args: never; Returns: boolean }
+      can_message_stranger: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       can_request_payout: { Args: { p_user_id: string }; Returns: Json }
+      can_send_friend_request: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       can_update_purpose: { Args: { user_id: string }; Returns: boolean }
+      can_view_activity_status: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       can_view_admin_wallet: { Args: never; Returns: boolean }
+      can_view_online_status: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
+      can_view_profile: { Args: { target_user_id: string }; Returns: boolean }
       check_all_posts_viewed: { Args: never; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       cleanup_old_view_history: { Args: never; Returns: undefined }
