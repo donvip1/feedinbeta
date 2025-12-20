@@ -6,7 +6,7 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { RefreshProvider } from "@/context/RefreshContext";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
-import { InstallAppPrompt } from "@/components/pwa/InstallAppPrompt";
+import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -61,7 +61,7 @@ import Install from "./pages/Install";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Set dark mode by default and initialize offline manager
+  // Set dark mode by default and initialize offline manager + auto-updater
   useEffect(() => {
     document.documentElement.classList.add('dark');
     
@@ -69,6 +69,11 @@ const App = () => {
     import('@/lib/offline-manager').then(({ offlineManager: manager }) => {
       // Manager auto-initializes as singleton
       console.log('Offline manager ready');
+    });
+
+    // Initialize auto-updater for background updates
+    import('@/lib/auto-updater').then(({ autoUpdater }) => {
+      console.log('Auto-updater ready');
     });
     
     // Request notification permission on app load
@@ -90,7 +95,7 @@ const App = () => {
             <AuthProvider>
               <Toaster />
               <IncomingCallListener />
-              <InstallAppPrompt />
+              <MobileInstallModal />
             <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />

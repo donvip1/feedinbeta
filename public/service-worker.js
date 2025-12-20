@@ -1,9 +1,12 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
 const CACHE_IMAGES = `${CACHE_NAME}-images`;
+
+// Build timestamp for version tracking
+const BUILD_TIMESTAMP = Date.now();
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -17,14 +20,18 @@ const STATIC_ASSETS = [
 const MAX_DYNAMIC_CACHE = 50;
 const MAX_IMAGE_CACHE = 100;
 
+// Update check interval (5 minutes)
+const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
+
 // Install - cache static assets
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing service worker...');
+  console.log('[SW] Installing service worker v' + CACHE_VERSION);
   event.waitUntil(
     caches.open(CACHE_STATIC).then((cache) => {
       console.log('[SW] Caching static assets');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => {
+      // Immediately take over (for faster updates)
       return self.skipWaiting();
     })
   );
@@ -32,7 +39,7 @@ self.addEventListener('install', (event) => {
 
 // Activate - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating service worker...');
+  console.log('[SW] Activating service worker v' + CACHE_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -44,9 +51,70 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
+      // Take control of all clients immediately
       return self.clients.claim();
+    }).then(() => {
+      // Notify all clients that a new version is active
+      return self.clients.matchAll().then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ 
+            action: 'versionUpdate', 
+            version: CACHE_VERSION,
+            timestamp: BUILD_TIMESTAMP
+          });
+        });
+      });
     })
   );
+});
+
+// Periodic update check using message loop
+let lastUpdateCheck = Date.now();
+
+self.addEventListener('message', (event) => {
+  if (event.data.action === 'skipWaiting') {
+    console.log('[SW] Received skipWaiting message');
+    self.skipWaiting().then(() => {
+      return self.clients.claim();
+    }).then(() => {
+      console.log('[SW] Claimed all clients');
+    });
+  }
+  
+  if (event.data.action === 'clearCache') {
+    event.waitUntil(
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => caches.delete(cacheName))
+        );
+      }).then(() => {
+        return self.clients.matchAll();
+      }).then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ action: 'cacheCleared' });
+        });
+      })
+    );
+  }
+
+  if (event.data.action === 'checkForUpdate') {
+    // Respond with current version info
+    event.source.postMessage({
+      action: 'versionInfo',
+      version: CACHE_VERSION,
+      timestamp: BUILD_TIMESTAMP,
+      lastCheck: lastUpdateCheck
+    });
+    lastUpdateCheck = Date.now();
+  }
+
+  if (event.data.action === 'getVersion') {
+    event.source.postMessage({
+      action: 'versionInfo',
+      version: CACHE_VERSION,
+      timestamp: BUILD_TIMESTAMP
+    });
+  }
 });
 
 // Handle Push Notifications
@@ -292,31 +360,3 @@ async function limitCacheSize(cacheName, maxItems) {
     }
   }
 }
-
-// Handle messages from clients
-self.addEventListener('message', (event) => {
-  if (event.data.action === 'skipWaiting') {
-    console.log('[SW] Received skipWaiting message');
-    self.skipWaiting().then(() => {
-      return self.clients.claim();
-    }).then(() => {
-      console.log('[SW] Claimed all clients');
-    });
-  }
-  
-  if (event.data.action === 'clearCache') {
-    event.waitUntil(
-      caches.keys().then((cacheNames) => {
-        return Promise.all(
-          cacheNames.map((cacheName) => caches.delete(cacheName))
-        );
-      }).then(() => {
-        return self.clients.matchAll();
-      }).then((clients) => {
-        clients.forEach((client) => {
-          client.postMessage({ action: 'cacheCleared' });
-        });
-      })
-    );
-  }
-});
