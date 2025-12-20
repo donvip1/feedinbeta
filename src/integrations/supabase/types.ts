@@ -4213,11 +4213,16 @@ export type Database = {
           comments_count: number
           content: string
           created_at: string
-          feed_id: string
           id: string
           likes_count: number
+          location: string
           media_type: string
+          media_types: string[]
           media_url: string
+          media_urls: string[]
+          original_post_id: string
+          post_type: string
+          refeeds_count: number
           relevance_score: number
           user_id: string
           views_count: number
