@@ -2,7 +2,14 @@
  * Cache Manager - Handles app caching and service worker registration
  */
 
+// Update check interval (5 minutes)
+const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
+
 export const CacheManager = {
+  currentVersion: '',
+  lastUpdateCheck: 0,
+  registration: null as ServiceWorkerRegistration | null,
+
   /**
    * Register service worker
    */
@@ -13,6 +20,7 @@ export const CacheManager = {
           scope: '/',
         });
 
+        this.registration = registration;
         console.log('[Cache] Service Worker registered:', registration.scope);
 
         // Check for updates on page load
@@ -29,10 +37,25 @@ export const CacheManager = {
           }
         });
 
-        // Check for updates every hour
+        // Check for updates every 5 minutes
         setInterval(() => {
-          registration.update();
-        }, 60 * 60 * 1000);
+          this.checkForUpdates();
+        }, UPDATE_CHECK_INTERVAL);
+
+        // Initial update check after 30 seconds
+        setTimeout(() => this.checkForUpdates(), 30000);
+
+        // Check on visibility change
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            this.checkForUpdates();
+          }
+        });
+
+        // Check when coming back online
+        window.addEventListener('online', () => {
+          setTimeout(() => this.checkForUpdates(), 2000);
+        });
 
         return registration;
       } catch (error) {
@@ -40,6 +63,33 @@ export const CacheManager = {
       }
     }
     return undefined;
+  },
+
+  /**
+   * Check for updates
+   */
+  async checkForUpdates(): Promise<boolean> {
+    if (!this.registration) return false;
+    if (!navigator.onLine) return false;
+    
+    // Rate limit checks to once per minute
+    if (Date.now() - this.lastUpdateCheck < 60000) return false;
+    this.lastUpdateCheck = Date.now();
+
+    try {
+      await this.registration.update();
+      console.log('[Cache] Update check completed');
+      
+      if (this.registration.waiting) {
+        console.log('[Cache] Update available');
+        this.updateToNewVersionSilently(this.registration);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('[Cache] Update check failed:', error);
+      return false;
+    }
   },
 
   /**
