@@ -14,11 +14,14 @@ import {
   Hash,
   MapPin,
   X,
+  Music,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { MusicPicker } from './MusicPicker';
+import { MusicUploader } from './MusicUploader';
 
 type Stage = 'camera' | 'filters' | 'details';
 type MediaType = 'image' | 'video';
@@ -69,10 +72,18 @@ export default function TikTokPortraitPostFlow({
   const [textPosition, setTextPosition] = useState<'top' | 'center' | 'bottom'>('center');
 
   // Music selection
-  const [selectedMusic, setSelectedMusic] = useState<string | null>(null);
+  const [selectedMusic, setSelectedMusic] = useState<{
+    id: string;
+    title: string;
+    artist: string | null;
+    audio_url: string;
+    duration_seconds: number | null;
+  } | null>(null);
   const [showMusicPicker, setShowMusicPicker] = useState(false);
+  const [showMusicUploader, setShowMusicUploader] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [detectingFace, setDetectingFace] = useState(false);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // Post details
   const [caption, setCaption] = useState('');
@@ -80,14 +91,6 @@ export default function TikTokPortraitPostFlow({
   const [location, setLocation] = useState('');
   const [privacy, setPrivacy] = useState<Privacy>('everyone');
   const [detectFaces, setDetectFaces] = useState(false);
-
-  const musicTracks = [
-    { id: 'none', name: 'No Music', artist: '' },
-    { id: 'upbeat', name: 'Summer Vibes', artist: 'Audio Library' },
-    { id: 'chill', name: 'Lo-Fi Dreams', artist: 'Audio Library' },
-    { id: 'energetic', name: 'High Energy', artist: 'Audio Library' },
-    { id: 'acoustic', name: 'Acoustic Sunset', artist: 'Audio Library' },
-  ];
 
   const parsedHashtags = hashtagsInput
     .split(/[,\s]+/)
@@ -522,14 +525,53 @@ export default function TikTokPortraitPostFlow({
               <Button
                 type="button"
                 size="sm"
-                variant={showMusicPicker ? 'default' : 'outline'}
-                onClick={() => setShowMusicPicker(!showMusicPicker)}
+                variant={selectedMusic ? 'default' : 'outline'}
+                onClick={() => setShowMusicPicker(true)}
                 className="flex-1"
               >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Add Music
+                <Music className="w-4 h-4 mr-2" />
+                {selectedMusic ? selectedMusic.title : 'Add Music'}
               </Button>
             </div>
+            
+            {/* Selected music preview */}
+            {selectedMusic && (
+              <div className="p-3 border border-primary/50 rounded-lg bg-primary/5 flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    if (musicAudioRef.current) {
+                      if (musicAudioRef.current.paused) {
+                        musicAudioRef.current.play();
+                      } else {
+                        musicAudioRef.current.pause();
+                      }
+                    } else {
+                      musicAudioRef.current = new Audio(selectedMusic.audio_url);
+                      musicAudioRef.current.play();
+                    }
+                  }}
+                  className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center"
+                >
+                  <Play className="w-4 h-4 text-primary" />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm truncate">{selectedMusic.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">{selectedMusic.artist || 'Unknown Artist'}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (musicAudioRef.current) {
+                      musicAudioRef.current.pause();
+                      musicAudioRef.current = null;
+                    }
+                    setSelectedMusic(null);
+                  }}
+                  className="p-1 rounded-full hover:bg-muted"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
             
             {/* Face detection indicator */}
             {detectingFace && (
@@ -570,24 +612,6 @@ export default function TikTokPortraitPostFlow({
                     className="w-12 h-9 border border-border rounded-lg cursor-pointer"
                   />
                 </div>
-              </div>
-            )}
-
-            {/* Music picker panel */}
-            {showMusicPicker && (
-              <div className="p-3 border border-border rounded-lg bg-muted/50 space-y-2">
-                {musicTracks.map((track) => (
-                  <button
-                    key={track.id}
-                    onClick={() => setSelectedMusic(track.id === 'none' ? null : track.id)}
-                    className={`w-full p-2 text-left rounded-lg transition-colors ${
-                      selectedMusic === track.id ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-                    }`}
-                  >
-                    <p className="font-medium text-sm">{track.name}</p>
-                    {track.artist && <p className="text-xs opacity-70">{track.artist}</p>}
-                  </button>
-                ))}
               </div>
             )}
           </div>
@@ -741,6 +765,42 @@ export default function TikTokPortraitPostFlow({
           <div className="h-6" />
         </div>
       )}
+
+      {/* Music Picker Modal */}
+      <MusicPicker
+        isOpen={showMusicPicker}
+        onClose={() => setShowMusicPicker(false)}
+        onSelect={(track) => {
+          setSelectedMusic({
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            audio_url: track.audio_url,
+            duration_seconds: track.duration_seconds,
+          });
+          setShowMusicPicker(false);
+        }}
+        onUpload={() => {
+          setShowMusicPicker(false);
+          setShowMusicUploader(true);
+        }}
+      />
+
+      {/* Music Uploader Modal */}
+      <MusicUploader
+        isOpen={showMusicUploader}
+        onClose={() => setShowMusicUploader(false)}
+        onUploadComplete={(track) => {
+          setSelectedMusic({
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            audio_url: track.audio_url,
+            duration_seconds: track.duration_seconds,
+          });
+          setShowMusicUploader(false);
+        }}
+      />
     </div>
   );
 }
