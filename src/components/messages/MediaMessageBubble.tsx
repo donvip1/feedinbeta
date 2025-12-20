@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { Download, Image as ImageIcon, Film, FileText, Mic, RefreshCw, Eye } from 'lucide-react';
+import { Download, Image as ImageIcon, Film, FileText, Mic, RefreshCw, Maximize2 } from 'lucide-react';
 import { ChatMediaViewer } from './ChatMediaViewer';
 import { CreateStickerModal } from './CreateStickerModal';
 import { downloadManager, formatFileSize } from '@/lib/download-manager';
@@ -41,12 +41,20 @@ export const MediaMessageBubble = ({
   onDownloadComplete,
   onDelete,
 }: MediaMessageBubbleProps) => {
-  const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>('idle');
+  const [downloadState, setDownloadState] = useState<'idle' | 'downloading' | 'downloaded' | 'error'>(isOwn ? 'downloaded' : 'idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const [loadedMediaUrl, setLoadedMediaUrl] = useState<string | null>(null);
+  const [loadedMediaUrl, setLoadedMediaUrl] = useState<string | null>(isOwn ? mediaUrl : null);
   const [showViewer, setShowViewer] = useState(false);
   const [showStickerModal, setShowStickerModal] = useState(false);
   const [estimatedSize, setEstimatedSize] = useState<number | undefined>(fileSize);
+
+  // Auto-display media for sender's own messages
+  useEffect(() => {
+    if (isOwn && mediaUrl) {
+      setLoadedMediaUrl(mediaUrl);
+      setDownloadState('downloaded');
+    }
+  }, [isOwn, mediaUrl]);
 
   const MediaIcon = getMediaIcon(mediaType);
   const label = getMediaTypeLabel(mediaType);
@@ -120,10 +128,16 @@ export const MediaMessageBubble = ({
               className="max-w-[280px] max-h-[320px] object-cover rounded-xl transition-transform duration-200 group-hover/media:scale-[1.02]"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity" />
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white/80 text-xs bg-black/40 px-2 py-1 rounded-full backdrop-blur-sm">
-              <Eye className="w-3 h-3" />
-              <span>Tap to view</span>
-            </div>
+            {/* Fullscreen icon button */}
+            <button 
+              className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm hover:bg-black/70 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewer(true);
+              }}
+            >
+              <Maximize2 className="w-4 h-4 text-white" />
+            </button>
           </div>
           
           {/* WhatsApp-style fullscreen viewer with actions */}
@@ -172,15 +186,21 @@ export const MediaMessageBubble = ({
               playsInline
               muted
             />
-            <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
               <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
                 <Film className="w-6 h-6 text-white" />
               </div>
             </div>
-            <div className="absolute bottom-2 left-2 flex items-center gap-1 text-white/80 text-xs bg-black/40 px-2 py-1 rounded-full backdrop-blur-sm">
-              <Eye className="w-3 h-3" />
-              <span>Tap to play</span>
-            </div>
+            {/* Fullscreen icon button */}
+            <button 
+              className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm hover:bg-black/70 transition-colors z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowViewer(true);
+              }}
+            >
+              <Maximize2 className="w-4 h-4 text-white" />
+            </button>
           </div>
 
           <ChatMediaViewer

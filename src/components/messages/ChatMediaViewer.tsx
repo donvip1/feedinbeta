@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { 
   ArrowLeft, 
   MoreVertical, 
@@ -52,9 +52,128 @@ export const ChatMediaViewer = ({
   const [showControls, setShowControls] = useState(true);
   const { haptic } = useNativeFeatures();
   const videoRef = useRef<HTMLVideoElement>(null);
+  
+  // Pinch-to-zoom state
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [lastTouchDistance, setLastTouchDistance] = useState(0);
+  const [lastTouchCenter, setLastTouchCenter] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [lastTap, setLastTap] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const isImage = mediaType.startsWith('image');
   const isVideo = mediaType.startsWith('video');
+
+  // Reset zoom when opening/closing
+  useEffect(() => {
+    if (isOpen) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    }
+  }, [isOpen]);
+
+  // Calculate distance between two touch points
+  const getTouchDistance = (touches: React.TouchList): number => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Calculate center point between two touches
+  const getTouchCenter = (touches: React.TouchList): { x: number; y: number } => {
+    if (touches.length < 2) return { x: touches[0]?.clientX || 0, y: touches[0]?.clientY || 0 };
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  };
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // Pinch start
+      e.preventDefault();
+      setLastTouchDistance(getTouchDistance(e.touches));
+      setLastTouchCenter(getTouchCenter(e.touches));
+      setIsDragging(false);
+    } else if (e.touches.length === 1 && scale > 1) {
+      // Pan start when zoomed
+      setIsDragging(true);
+      setLastTouchCenter({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  }, [scale]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      // Pinch zoom
+      e.preventDefault();
+      const newDistance = getTouchDistance(e.touches);
+      const newCenter = getTouchCenter(e.touches);
+      
+      if (lastTouchDistance > 0) {
+        const scaleChange = newDistance / lastTouchDistance;
+        const newScale = Math.max(1, Math.min(5, scale * scaleChange));
+        setScale(newScale);
+        
+        // Adjust position based on pinch center movement
+        if (newScale > 1) {
+          const dx = newCenter.x - lastTouchCenter.x;
+          const dy = newCenter.y - lastTouchCenter.y;
+          setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+        }
+      }
+      
+      setLastTouchDistance(newDistance);
+      setLastTouchCenter(newCenter);
+    } else if (e.touches.length === 1 && isDragging && scale > 1) {
+      // Pan when zoomed
+      const dx = e.touches[0].clientX - lastTouchCenter.x;
+      const dy = e.touches[0].clientY - lastTouchCenter.y;
+      
+      setPosition(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+      setLastTouchCenter({ x: e.touches[0].clientX, y: e.touches[0].clientY });
+    }
+  }, [lastTouchDistance, lastTouchCenter, scale, isDragging]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    setLastTouchDistance(0);
+    setIsDragging(false);
+    
+    // Snap back if zoomed out too much
+    if (scale < 1) {
+      setScale(1);
+      setPosition({ x: 0, y: 0 });
+    }
+    
+    // Reset position if at 1x scale
+    if (scale === 1) {
+      setPosition({ x: 0, y: 0 });
+    }
+
+    // Double-tap to zoom
+    if (e.touches.length === 0 && e.changedTouches.length === 1) {
+      const now = Date.now();
+      if (now - lastTap < 300) {
+        // Double tap detected
+        if (scale > 1) {
+          setScale(1);
+          setPosition({ x: 0, y: 0 });
+        } else {
+          setScale(2.5);
+          // Center zoom on tap position
+          const rect = containerRef.current?.getBoundingClientRect();
+          if (rect) {
+            const x = e.changedTouches[0].clientX - rect.left - rect.width / 2;
+            const y = e.changedTouches[0].clientY - rect.top - rect.height / 2;
+            setPosition({ x: -x * 0.5, y: -y * 0.5 });
+          }
+        }
+        haptic('light');
+      }
+      setLastTap(now);
+    }
+  }, [scale, lastTap, haptic]);
 
   const handleSave = async () => {
     haptic('medium');
@@ -113,7 +232,10 @@ export const ChatMediaViewer = ({
   };
 
   const toggleControls = () => {
-    setShowControls(!showControls);
+    // Only toggle controls if not zoomed in (to avoid accidental toggles during pan)
+    if (scale === 1) {
+      setShowControls(!showControls);
+    }
   };
 
   if (!isOpen) return null;
@@ -202,19 +324,36 @@ export const ChatMediaViewer = ({
         </div>
       )}
 
-      {/* Media Content */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      {/* Media Content with Pinch-to-Zoom */}
+      <div 
+        ref={containerRef}
+        className="absolute inset-0 flex items-center justify-center overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        style={{ touchAction: scale > 1 ? 'none' : 'pan-y' }}
+      >
         {isImage && (
           <img
             src={mediaUrl}
             alt="Media"
             className="max-w-full max-h-full object-contain select-none animate-in zoom-in-95 duration-200"
+            style={{
+              transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+              transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+            }}
             draggable={false}
           />
         )}
         
         {isVideo && (
-          <div className="relative w-full h-full flex items-center justify-center">
+          <div 
+            className="relative w-full h-full flex items-center justify-center"
+            style={{
+              transform: `scale(${scale}) translate(${position.x / scale}px, ${position.y / scale}px)`,
+              transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+            }}
+          >
             <video
               ref={videoRef}
               src={mediaUrl}
@@ -244,6 +383,13 @@ export const ChatMediaViewer = ({
           </div>
         )}
       </div>
+
+      {/* Zoom indicator */}
+      {scale > 1 && showControls && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-black/60 px-3 py-1 rounded-full text-white text-sm backdrop-blur-sm">
+          {Math.round(scale * 100)}%
+        </div>
+      )}
 
       {/* Bottom Action Bar */}
       {showControls && (
