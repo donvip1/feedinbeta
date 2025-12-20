@@ -66,7 +66,7 @@ export const MusicPicker: React.FC<MusicPickerProps> = ({
         .limit(50);
 
       if (systemError) throw systemError;
-      setTracks((systemTracks as MusicTrack[]) || []);
+      setTracks((systemTracks as unknown as MusicTrack[]) || []);
 
       // Fetch user's uploaded tracks
       if (user) {
@@ -77,7 +77,7 @@ export const MusicPicker: React.FC<MusicPickerProps> = ({
           .order('created_at', { ascending: false });
 
         if (!userError) {
-          setUserTracks((userUploadedTracks as MusicTrack[]) || []);
+          setUserTracks((userUploadedTracks as unknown as MusicTrack[]) || []);
         }
       }
     } catch (error) {
