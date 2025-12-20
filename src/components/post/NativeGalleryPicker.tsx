@@ -23,8 +23,8 @@ export default function NativeGalleryPicker({
   onClose,
   onSelect,
   onCameraOpen,
-  maxSelection = 10,
-  allowMultiple = true,
+  maxSelection = 1,
+  allowMultiple = false,
 }: NativeGalleryPickerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedItems, setSelectedItems] = useState<MediaItem[]>([]);

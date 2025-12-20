@@ -5,6 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { usePresence, getStatusText, getStatusColor, formatLastSeen, PresenceStatus } from '@/hooks/usePresence';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { useMessageCache } from '@/hooks/useMessageCache';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -88,6 +89,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const { toast } = useToast();
   const navigate = useNavigate();
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
+  const { cachedMessages, hasCachedData, saveToCache, appendMessage } = useMessageCache(conversationId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [otherUser, setOtherUser] = useState<any>(null);
@@ -103,6 +105,8 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [newMessagesCount, setNewMessagesCount] = useState(0);
   
   // Media upload modal state
   const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
@@ -122,6 +126,26 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const isUserScrolling = useRef(false);
   const isNearBottomRef = useRef(true);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+
+  // Load cached messages immediately on mount
+  useEffect(() => {
+    if (hasCachedData && cachedMessages.length > 0 && messages.length === 0) {
+      // Show cached messages immediately while loading fresh data
+      const formattedCached = cachedMessages.map(msg => ({
+        ...msg,
+        reactions: [],
+        read_receipts: [],
+        status: 'delivered' as Message['status'],
+        is_pinned: false,
+        edited_at: null,
+        reply_to_id: null,
+        reply_to_message: null,
+      }));
+      setMessages(formattedCached);
+      setIsLoading(false);
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }, [hasCachedData, cachedMessages]);
 
   // Use the global presence hook to track other user's status
   const { 
@@ -217,17 +241,29 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
               return [...prev, formattedMsg];
             });
             
+            // Also append to cache
+            appendMessage({
+              id: newMsg.id,
+              content: newMsg.content,
+              sender_id: newMsg.sender_id,
+              created_at: newMsg.created_at,
+              media_url: newMsg.media_url || null,
+              media_type: newMsg.media_type || null,
+              profiles: {
+                display_name: otherUser?.display_name || 'Unknown',
+                avatar_url: otherUser?.avatar_url || null
+              },
+            });
+            
             // Only scroll to bottom if user is near the bottom
             if (isNearBottomRef.current) {
               setTimeout(() => scrollToBottom(), 100);
-            } else {
-              // Show scroll button to indicate new messages
-              setShowScrollButton(true);
-            }
-            
-            // Mark as read if near bottom
-            if (isNearBottomRef.current) {
+              // Mark as read immediately
               markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
+            } else {
+              // Show scroll button with count to indicate new messages
+              setShowScrollButton(true);
+              setNewMessagesCount(prev => prev + 1);
             }
           }
         )
@@ -374,6 +410,11 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     isNearBottomRef.current = nearBottom;
     setShowScrollButton(!nearBottom);
     
+    // Reset new messages count when user scrolls to bottom
+    if (nearBottom) {
+      setNewMessagesCount(0);
+    }
+    
     // Track that user is actively scrolling
     isUserScrolling.current = true;
   }, []);
@@ -392,13 +433,6 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             emoji,
             user_id,
             user:profiles(display_name)
-          ),
-          reply_to:messages!messages_reply_to_id_fkey(
-            id,
-            content,
-            media_url,
-            media_type,
-            sender:profiles!messages_sender_id_fkey(display_name)
           )
         `)
         .eq('conversation_id', conversationId)
@@ -424,18 +458,6 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         const isRead = msgReceipts.length > 0 && msgReceipts.some(r => r.user_id !== user?.id);
         const isDelivered = msg.sender_id === user?.id;
         
-        // Build reply_to_message from the joined reply_to data
-        // reply_to can be an array (from join) or null
-        const replyToData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
-        const replyToMessage = replyToData ? {
-          content: replyToData.content || '',
-          sender: {
-            display_name: replyToData.sender?.display_name || 'Unknown'
-          },
-          media_url: replyToData.media_url || null,
-          media_type: replyToData.media_type || null,
-        } : null;
-        
         return {
           id: msg.id,
           content: msg.content,
@@ -444,7 +466,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           media_url: msg.media_url || null,
           media_type: msg.media_type || null,
           reply_to_id: msg.reply_to_id || null,
-          reply_to_message: replyToMessage,
+          reply_to_message: null, // Loaded separately if needed
           profiles: {
             display_name: msg.sender?.display_name || 'Unknown User',
             avatar_url: msg.sender?.avatar_url || null,
@@ -462,6 +484,18 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       
       setMessages(formattedMessages);
       setPinnedMessages(formattedMessages.filter(m => m.is_pinned));
+      setIsLoading(false);
+      
+      // Save to cache for instant load next time
+      saveToCache(formattedMessages.map(m => ({
+        id: m.id,
+        content: m.content,
+        sender_id: m.sender_id,
+        created_at: m.created_at,
+        media_url: m.media_url,
+        media_type: m.media_type,
+        profiles: m.profiles,
+      })));
       
       // Scroll to bottom to show recent messages (most important fix)
       setTimeout(() => {
@@ -485,6 +519,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       }
     } catch (error: any) {
       console.error('Error loading messages:', error);
+      setIsLoading(false);
     }
   };
 
@@ -1194,16 +1229,24 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       </div>
 
-      {/* Scroll to bottom button */}
+      {/* Scroll to bottom button with new messages count */}
       {showScrollButton && (
         <Button
           variant="secondary"
-          size="icon"
-          className="fixed right-4 rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2 z-50"
+          size="sm"
+          className="fixed right-4 rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2 z-50 gap-1 px-3"
           style={{ bottom: (showVoiceRecorder ? 100 : 96) + inputBottom }}
-          onClick={scrollToBottom}
+          onClick={() => {
+            scrollToBottom();
+            setNewMessagesCount(0);
+          }}
         >
-          <ChevronDown className="w-5 h-5" />
+          {newMessagesCount > 0 && (
+            <span className="bg-primary text-primary-foreground text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+              {newMessagesCount}
+            </span>
+          )}
+          <ChevronDown className="w-4 h-4" />
         </Button>
       )}
 
