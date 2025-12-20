@@ -2,12 +2,12 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Coins, Gift, TrendingUp, ArrowLeft } from "lucide-react";
+import { Coins, Gift, TrendingUp, ArrowLeft, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/BottomNav";
+import { PackageCard } from "@/components/wallet/PackageCard";
 
 const Credits = () => {
   const navigate = useNavigate();
@@ -44,7 +44,7 @@ const Credits = () => {
     },
   });
 
-  const handlePurchase = async (packageId: string, priceId: string, credits: number) => {
+  const handlePurchase = async (packageId: string, priceId: string) => {
     try {
       setLoading(packageId);
       const { data: { user } } = await supabase.auth.getUser();
@@ -77,127 +77,99 @@ const Credits = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted pb-20">
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-sm border-b border-border/50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-background pb-24">
+      {/* Compact Header */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
+        <div className="px-4 py-3">
+          <div className="flex items-center gap-3">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => navigate(-1)}
-              className="text-gray-400 hover:text-white"
+              className="h-9 w-9"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <h1 className="text-xl font-bold">Credits Store</h1>
+            <Coins className="w-5 h-5 text-primary" />
+            <h1 className="text-lg font-bold">Credits Store</h1>
           </div>
         </div>
       </header>
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+
+      <div className="px-4 py-5 space-y-6">
+        {/* Header section */}
+        <div className="text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Buy Credits
           </h1>
-          <p className="text-muted-foreground max-w-2xl mx-auto mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             Use credits for AI generations, premium features, and more
           </p>
           <Button
             variant="outline"
+            size="sm"
             onClick={() => navigate('/p2p-marketplace')}
             className="gap-2"
           >
             <TrendingUp className="w-4 h-4" />
-            Trade Credits on P2P Marketplace
+            Trade on P2P Marketplace
           </Button>
         </div>
 
+        {/* User Credits Card */}
         {userCredits && (
-          <Card className="mb-8 border-primary/50 bg-primary/5">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-primary" />
-                Your Credits
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Balance</p>
-                  <p className="text-2xl font-bold text-primary">{userCredits.balance}</p>
+          <div className="rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20 border border-primary/30 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Coins className="w-4 h-4 text-primary" />
+              <span className="text-sm font-medium text-muted-foreground">Your Credits</span>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs text-muted-foreground">Balance</p>
+                <p className="text-xl font-bold text-primary">{userCredits.balance}</p>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="p-1 rounded-full bg-green-500/20">
+                  <ArrowDownLeft className="w-3 h-3 text-green-500" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Earned</p>
-                  <p className="text-2xl font-bold">{userCredits.total_earned}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Spent</p>
-                  <p className="text-2xl font-bold">{userCredits.total_spent}</p>
+                  <p className="text-xs text-muted-foreground">Earned</p>
+                  <p className="text-sm font-semibold">{userCredits.total_earned}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="flex items-center gap-1.5">
+                <div className="p-1 rounded-full bg-red-500/20">
+                  <ArrowUpRight className="w-3 h-3 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Spent</p>
+                  <p className="text-sm font-semibold">{userCredits.total_spent}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {packages?.map((pkg) => {
-            const totalCredits = pkg.credits + (pkg.bonus_credits || 0);
-            const savingsPercent = pkg.bonus_credits ? Math.round((pkg.bonus_credits / pkg.credits) * 100) : 0;
-
-            return (
-              <Card 
-                key={pkg.id} 
-                className={`relative ${pkg.name.includes('Popular') ? 'border-primary shadow-lg' : ''}`}
-              >
-                {savingsPercent > 0 && (
-                  <Badge className="absolute -top-3 right-4 bg-gradient-to-r from-green-500 to-emerald-500">
-                    +{savingsPercent}% Bonus
-                  </Badge>
-                )}
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>{pkg.name}</span>
-                    {pkg.bonus_credits > 0 && <Gift className="w-5 h-5 text-green-500" />}
-                  </CardTitle>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-bold">{totalCredits}</span>
-                    <span className="text-muted-foreground text-sm">credits</span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Base Credits:</span>
-                      <span className="font-semibold">{pkg.credits}</span>
-                    </div>
-                    {pkg.bonus_credits > 0 && (
-                      <div className="flex justify-between text-sm text-green-500">
-                        <span>Bonus:</span>
-                        <span className="font-semibold">+{pkg.bonus_credits}</span>
-                      </div>
-                    )}
-                    <div className="pt-2 border-t">
-                      <div className="text-2xl font-bold text-primary">${pkg.price}</div>
-                      <div className="text-xs text-muted-foreground">
-                        ${(pkg.price / totalCredits).toFixed(3)} per credit
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button
-                    className="w-full"
-                    variant={pkg.name.includes('Popular') ? 'default' : 'outline'}
-                    onClick={() => handlePurchase(pkg.id, pkg.stripe_price_id, totalCredits)}
-                    disabled={loading === pkg.id}
-                  >
-                    {loading === pkg.id ? 'Processing...' : 'Buy Now'}
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+        {/* Credit Packages - Horizontal scroll on mobile, grid on desktop */}
+        <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+          <div className="flex gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-4 min-w-max sm:min-w-0">
+            {packages?.map((pkg) => (
+              <PackageCard
+                key={pkg.id}
+                id={pkg.id}
+                name={pkg.name}
+                credits={pkg.credits}
+                bonusCredits={pkg.bonus_credits || 0}
+                price={pkg.price}
+                isPopular={pkg.name.toLowerCase().includes('popular')}
+                isLoading={loading === pkg.id}
+                onPurchase={() => handlePurchase(pkg.id, pkg.stripe_price_id)}
+              />
+            ))}
+          </div>
         </div>
       </div>
+      
       <BottomNav />
     </div>
   );
