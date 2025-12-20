@@ -28,18 +28,35 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
       loadAvatar();
       loadUnreadMessages();
       
-      // Subscribe to new messages for real-time updates
+      // Subscribe to new messages for INSTANT real-time updates
       const channel = supabase
-        .channel('unread-messages')
+        .channel(`unread-messages-${user.id}-${Date.now()}`)
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'INSERT',
             schema: 'public',
             table: 'messages',
           },
-          () => {
-            loadUnreadMessages();
+          (payload: any) => {
+            // Instantly increment if message is from another user
+            if (payload.new?.sender_id !== user.id) {
+              setUnreadCount(prev => prev + 1);
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages',
+          },
+          (payload: any) => {
+            // Decrement when message is marked as read
+            if (payload.new?.is_read && !payload.old?.is_read && payload.new?.sender_id !== user.id) {
+              setUnreadCount(prev => Math.max(0, prev - 1));
+            }
           }
         )
         .subscribe();
