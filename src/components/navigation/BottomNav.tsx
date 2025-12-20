@@ -5,9 +5,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useContext } from 'react';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 import { UnreadBadge } from '@/components/shared/UnreadBadge';
+import { RefreshContext, RefreshContextType, RefreshPage } from '@/context/RefreshContext';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -117,6 +118,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Get refresh context (may be null if not wrapped)
+  const refreshContext = useContext(RefreshContext);
+
   const handleNavClick = useCallback((path: string, itemId: string) => {
     // Trigger haptic feedback
     haptic('light');
@@ -125,9 +129,25 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     setPressedId(itemId);
     setTimeout(() => setPressedId(null), 150);
     
-    // Navigate
-    navigate(path);
-  }, [haptic, navigate]);
+    const isCurrentPage = isActive(path);
+    
+    if (isCurrentPage) {
+      // Already on this page - scroll to top smoothly
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Also scroll any scroll containers
+      document.querySelectorAll('[data-scrollable="true"]').forEach(el => {
+        el.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    } else {
+      // Navigate to the page
+      navigate(path);
+    }
+    
+    // Trigger silent background refresh
+    if (refreshContext) {
+      refreshContext.triggerRefresh(itemId as RefreshPage);
+    }
+  }, [haptic, navigate, isActive, refreshContext]);
 
   // Hide navigation completely when hidden prop is true
   if (hidden) {

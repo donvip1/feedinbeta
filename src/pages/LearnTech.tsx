@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, BookOpen, Code, Laptop, Smartphone, Database, Cloud, Lock, TrendingUp, Clock, Users, Star, Play, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePageRefresh } from '@/context/RefreshContext';
 
 interface Course {
   id: string;
@@ -141,6 +142,12 @@ export default function LearnTech() {
       loadEnrolledCourses();
     }
   }, [user]);
+
+  // Subscribe to silent refresh from navigation
+  usePageRefresh('learn', useCallback(() => {
+    // Silent background refresh
+    loadEnrolledCourses();
+  }, []));
 
   const loadEnrolledCourses = async () => {
     // In a real app, fetch from database

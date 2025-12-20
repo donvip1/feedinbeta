@@ -22,6 +22,7 @@ import { useScrollPosition } from '@/hooks/useScrollPosition';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { FeedSkeleton, PullToRefreshIndicator } from '@/components/native/NativeLoadingSpinner';
 import { feedCache } from '@/lib/feed-cache';
+import { usePageRefresh } from '@/context/RefreshContext';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -156,10 +157,16 @@ const Feed = () => {
       return finalPosts;
     },
     enabled: !!user,
-    staleTime: Infinity, // Don't refetch while on the page
+    staleTime: 30000, // Allow refetch after 30 seconds
     refetchOnWindowFocus: false,
     refetchOnMount: true,
   });
+
+  // Subscribe to silent refresh from navigation
+  usePageRefresh('feed', useCallback(() => {
+    // Silent background refetch - no loading indicators
+    refetch();
+  }, [refetch]));
 
   // Initialize display posts and handle infinite scroll
   useEffect(() => {
