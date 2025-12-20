@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,17 +19,27 @@ import { BalanceCard } from '@/components/wallet/BalanceCard';
 import { PackageCard } from '@/components/wallet/PackageCard';
 import { SubscriptionCard } from '@/components/wallet/SubscriptionCard';
 import { TransactionList } from '@/components/wallet/TransactionList';
+import { usePageRefresh } from '@/context/RefreshContext';
 
 const Wallet = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('overview');
   const [sendAmount, setSendAmount] = useState('');
   const [recipientUsername, setRecipientUsername] = useState('');
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   const [loadingPackage, setLoadingPackage] = useState<string | null>(null);
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
+
+  // Subscribe to silent refresh from navigation
+  usePageRefresh('wallet', useCallback(() => {
+    // Silent background refresh - no loading indicators
+    queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+    queryClient.invalidateQueries({ queryKey: ['credit-transactions'] });
+    queryClient.invalidateQueries({ queryKey: ['user-subscription'] });
+  }, [queryClient]));
 
   useEffect(() => {
     if (authLoading) return;

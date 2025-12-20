@@ -19,6 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useConversationCache, useGroupCache } from '@/hooks/useConversationCache';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ActivityBadge, ActivityType, getActivityIcon, getActivityColor } from '@/components/messages/TypingIndicator';
+import { usePageRefresh } from '@/context/RefreshContext';
 
 interface Conversation {
   id: string;
@@ -75,6 +76,13 @@ export default function Messages() {
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
   const handledLocationStateRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
+
+  // Subscribe to silent refresh from navigation
+  usePageRefresh('chats', useCallback(() => {
+    // Silent background refresh - no loading indicator
+    loadConversations(false);
+    loadGroups();
+  }, []));
 
   // Handle shared image from location state - only once on mount
   useEffect(() => {

@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
+import { RefreshProvider } from "@/context/RefreshContext";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import { InstallAppPrompt } from "@/components/pwa/InstallAppPrompt";
 import Index from "./pages/Index";
@@ -85,6 +86,7 @@ const App = () => {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <RefreshProvider>
             <AuthProvider>
               <Toaster />
               <IncomingCallListener />
@@ -185,11 +187,8 @@ const App = () => {
             <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
-
-
-
-        
-      </BrowserRouter>
+          </RefreshProvider>
+        </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>
   );

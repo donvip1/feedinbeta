@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket, UserCheck, X } from 'lucide-react';
 import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
+import { usePageRefresh } from '@/context/RefreshContext';
 
 interface Profile {
   id: string;
@@ -151,6 +152,15 @@ const Profile = () => {
       checkMutualFriendStatus();
     }
   }, [resolvedUserId, user?.id]);
+
+  // Subscribe to silent refresh from navigation
+  usePageRefresh('profile', useCallback(() => {
+    // Silent background refresh
+    loadProfile();
+    if (isOwnProfile) {
+      loadPendingFriendRequests();
+    }
+  }, [isOwnProfile]));
 
   const loadProfile = async () => {
     if (!resolvedUserId) return;

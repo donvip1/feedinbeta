@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +11,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { ArrowLeft, Send, Sparkles, Loader2, Trash2 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
+import { usePageRefresh } from '@/context/RefreshContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -34,6 +35,12 @@ const AICopilot = () => {
     }
     loadChatHistory();
   }, [user, loading, navigate]);
+
+  // Subscribe to silent refresh from navigation
+  usePageRefresh('ai', useCallback(() => {
+    // Silent background refresh
+    loadChatHistory();
+  }, []));
 
   useEffect(() => {
     if (scrollRef.current) {
