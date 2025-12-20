@@ -391,6 +391,13 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             emoji,
             user_id,
             user:profiles(display_name)
+          ),
+          reply_to:messages!messages_reply_to_id_fkey(
+            id,
+            content,
+            media_url,
+            media_type,
+            sender:profiles!messages_sender_id_fkey(display_name)
           )
         `)
         .eq('conversation_id', conversationId)
@@ -414,6 +421,18 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         const isRead = msgReceipts.length > 0 && msgReceipts.some(r => r.user_id !== user?.id);
         const isDelivered = msg.sender_id === user?.id;
         
+        // Build reply_to_message from the joined reply_to data
+        // reply_to can be an array (from join) or null
+        const replyToData = Array.isArray(msg.reply_to) ? msg.reply_to[0] : msg.reply_to;
+        const replyToMessage = replyToData ? {
+          content: replyToData.content || '',
+          sender: {
+            display_name: replyToData.sender?.display_name || 'Unknown'
+          },
+          media_url: replyToData.media_url || null,
+          media_type: replyToData.media_type || null,
+        } : null;
+        
         return {
           id: msg.id,
           content: msg.content,
@@ -422,7 +441,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           media_url: msg.media_url || null,
           media_type: msg.media_type || null,
           reply_to_id: msg.reply_to_id || null,
-          reply_to_message: null,
+          reply_to_message: replyToMessage,
           profiles: {
             display_name: msg.sender?.display_name || 'Unknown User',
             avatar_url: msg.sender?.avatar_url || null,
@@ -440,6 +459,11 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       
       setMessages(formattedMessages);
       setPinnedMessages(formattedMessages.filter(m => m.is_pinned));
+      
+      // Scroll to bottom to show recent messages (most important fix)
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
       
       // Find first unread message to scroll to
       const unreadMessages = formattedMessages.filter(

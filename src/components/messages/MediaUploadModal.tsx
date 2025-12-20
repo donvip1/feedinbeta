@@ -39,6 +39,16 @@ const QUALITY_OPTIONS = [
   { label: 'Low', value: 0.5, description: 'Reduced quality, fast upload' },
 ];
 
+// Aspect ratio options for freehand cropping like WhatsApp
+const ASPECT_RATIO_OPTIONS = [
+  { label: 'Free', value: undefined, icon: '⬜' },
+  { label: '1:1', value: 1, icon: '⏹️' },
+  { label: '4:3', value: 4/3, icon: '📺' },
+  { label: '3:4', value: 3/4, icon: '📱' },
+  { label: '16:9', value: 16/9, icon: '🎬' },
+  { label: '9:16', value: 9/16, icon: '📲' },
+];
+
 export const MediaUploadModal = ({
   open,
   onClose,
@@ -56,6 +66,7 @@ export const MediaUploadModal = ({
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<CropArea | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
   const [processedFile, setProcessedFile] = useState<File | null>(null);
+  const [aspectRatio, setAspectRatio] = useState<number | undefined>(undefined); // Free crop by default
   
   // Video controls
   const [videoPreview, setVideoPreview] = useState<string>('');
@@ -86,6 +97,7 @@ export const MediaUploadModal = ({
     setCrop({ x: 0, y: 0 });
     setFlipH(false);
     setFlipV(false);
+    setAspectRatio(undefined); // Reset to free crop
     
     return () => URL.revokeObjectURL(url);
   }, [file, fileType]);
@@ -225,21 +237,38 @@ export const MediaUploadModal = ({
           {fileType === 'image' && (
             <div className="relative">
               {showCropper ? (
-                <div className="h-[300px] relative bg-black">
+                <div className="h-[350px] relative bg-black">
                   <Cropper
                     image={imagePreview}
                     crop={crop}
                     zoom={zoom}
                     rotation={rotation}
-                    aspect={undefined}
+                    aspect={aspectRatio}
                     onCropChange={setCrop}
                     onCropComplete={onCropComplete}
                     onZoomChange={setZoom}
                   />
                   
                   {/* Crop Controls */}
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-                    <div className="flex items-center gap-3 mb-3">
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 space-y-3">
+                    {/* Aspect Ratio Selector - WhatsApp style */}
+                    <div className="flex items-center justify-center gap-1 overflow-x-auto pb-1">
+                      {ASPECT_RATIO_OPTIONS.map((option) => (
+                        <Button
+                          key={option.label}
+                          size="sm"
+                          variant={aspectRatio === option.value ? 'default' : 'secondary'}
+                          onClick={() => setAspectRatio(option.value)}
+                          className="h-8 px-3 text-xs whitespace-nowrap"
+                        >
+                          <span className="mr-1">{option.icon}</span>
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    {/* Zoom slider */}
+                    <div className="flex items-center gap-3">
                       <ZoomOut className="w-4 h-4 text-white" />
                       <Slider
                         value={[zoom]}
@@ -252,6 +281,7 @@ export const MediaUploadModal = ({
                       <ZoomIn className="w-4 h-4 text-white" />
                     </div>
                     
+                    {/* Transform controls */}
                     <div className="flex items-center justify-center gap-2">
                       <Button
                         size="sm"
@@ -277,7 +307,8 @@ export const MediaUploadModal = ({
                       </Button>
                     </div>
                     
-                    <div className="flex items-center justify-center gap-2 mt-3">
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-center gap-2">
                       <Button variant="outline" onClick={() => setShowCropper(false)}>
                         Cancel
                       </Button>
