@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Gift, Send, ArrowDownLeft, Sparkles } from 'lucide-react';
 import { ReceivedGifts } from './ReceivedGifts';
@@ -50,83 +49,75 @@ export const GiftsTab = () => {
   });
 
   return (
-    <div className="space-y-6">
-      {/* Gift Stats Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card className="bg-gradient-to-br from-green-500/20 to-emerald-500/10 border-green-500/30">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <ArrowDownLeft className="w-3 h-3" />
-              Received
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-500">
-              {giftStats?.receivedCount || 0}
-              <span className="text-sm font-normal text-muted-foreground ml-1">gifts</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              +{giftStats?.receivedTotal || 0} credits
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+      {/* Gift Stats Cards - Compact on mobile */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/10 border border-green-500/30 p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <ArrowDownLeft className="w-3.5 h-3.5 text-green-500" />
+            <span className="text-xs text-muted-foreground">Received</span>
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-green-500">
+            {giftStats?.receivedCount || 0}
+            <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-1">gifts</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            +{giftStats?.receivedTotal || 0} credits
+          </p>
+        </div>
 
-        <Card className="bg-gradient-to-br from-primary/20 to-accent/10 border-primary/30">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-1">
-              <Send className="w-3 h-3" />
-              Sent
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">
-              {giftStats?.sentCount || 0}
-              <span className="text-sm font-normal text-muted-foreground ml-1">gifts</span>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              -{giftStats?.sentTotal || 0} credits
-            </p>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl bg-gradient-to-br from-primary/20 to-accent/10 border border-primary/30 p-3">
+          <div className="flex items-center gap-1.5 mb-2">
+            <Send className="w-3.5 h-3.5 text-primary" />
+            <span className="text-xs text-muted-foreground">Sent</span>
+          </div>
+          <div className="text-xl sm:text-2xl font-bold text-primary">
+            {giftStats?.sentCount || 0}
+            <span className="text-xs sm:text-sm font-normal text-muted-foreground ml-1">gifts</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            -{giftStats?.sentTotal || 0} credits
+          </p>
+        </div>
       </div>
 
       {/* Send Gift Button */}
       <Button 
         onClick={() => setShowSendGiftModal(true)} 
         className="w-full"
-        size="lg"
+        size="default"
       >
         <Gift className="w-4 h-4 mr-2" />
         Send Gift to Someone
       </Button>
 
-      {/* Gifts Tabs */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-primary" />
-            Gift History
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Gifts Tabs - Card with compact styling */}
+      <div className="rounded-xl border border-border bg-card">
+        <div className="p-3 border-b border-border">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" />
+            <h3 className="font-semibold text-sm">Gift History</h3>
+          </div>
+        </div>
+        <div className="p-3">
           <Tabs defaultValue="received">
-            <TabsList className="w-full">
-              <TabsTrigger value="received" className="flex-1">
+            <TabsList className="w-full h-10">
+              <TabsTrigger value="received" className="flex-1 text-xs sm:text-sm">
                 Received ({giftStats?.receivedCount || 0})
               </TabsTrigger>
-              <TabsTrigger value="sent" className="flex-1">
+              <TabsTrigger value="sent" className="flex-1 text-xs sm:text-sm">
                 Sent ({giftStats?.sentCount || 0})
               </TabsTrigger>
             </TabsList>
-            <TabsContent value="received" className="mt-4">
+            <TabsContent value="received" className="mt-3">
               <ReceivedGifts />
             </TabsContent>
-            <TabsContent value="sent" className="mt-4">
+            <TabsContent value="sent" className="mt-3">
               <SentGifts />
             </TabsContent>
           </Tabs>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Send Gift Modal */}
       <SendDirectGiftModal 
