@@ -98,6 +98,14 @@ export default function Messages() {
     }
   }, [location.pathname, location.state]);
 
+  // Enable chat mode for fixed positioning
+  useEffect(() => {
+    document.body.classList.add('chat-mode');
+    return () => {
+      document.body.classList.remove('chat-mode');
+    };
+  }, []);
+
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
