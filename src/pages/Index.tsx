@@ -20,7 +20,7 @@ const Index = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-black text-white">
+      <div className="min-h-screen bg-black text-white overflow-y-auto">
         <main className="container mx-auto px-4 py-16">
           {/* Hero Section */}
           <div className="text-center max-w-4xl mx-auto mb-16 animate-fade-in">
@@ -121,7 +121,7 @@ const Index = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
+    <div className="min-h-screen bg-gradient-subtle overflow-y-auto">
       <header className="container mx-auto px-4 py-6 border-b border-border">
         <nav className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
