@@ -72,7 +72,8 @@ const App = () => {
     });
 
     // Initialize auto-updater for background updates
-    import('@/lib/auto-updater').then(({ autoUpdater }) => {
+    import('@/lib/auto-updater').then(({ getAutoUpdater }) => {
+      getAutoUpdater();
       console.log('Auto-updater ready');
     });
     
