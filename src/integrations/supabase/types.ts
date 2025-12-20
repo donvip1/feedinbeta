@@ -1947,6 +1947,60 @@ export type Database = {
           },
         ]
       }
+      music_tracks: {
+        Row: {
+          artist: string | null
+          audio_url: string
+          cover_image_url: string | null
+          created_at: string | null
+          duration_seconds: number | null
+          genre: string | null
+          id: string
+          is_copyright_free: boolean | null
+          is_trending: boolean | null
+          play_count: number | null
+          preview_url: string | null
+          source: string | null
+          title: string
+          updated_at: string | null
+          uploader_id: string | null
+        }
+        Insert: {
+          artist?: string | null
+          audio_url: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          genre?: string | null
+          id?: string
+          is_copyright_free?: boolean | null
+          is_trending?: boolean | null
+          play_count?: number | null
+          preview_url?: string | null
+          source?: string | null
+          title: string
+          updated_at?: string | null
+          uploader_id?: string | null
+        }
+        Update: {
+          artist?: string | null
+          audio_url?: string
+          cover_image_url?: string | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          genre?: string | null
+          id?: string
+          is_copyright_free?: boolean | null
+          is_trending?: boolean | null
+          play_count?: number | null
+          preview_url?: string | null
+          source?: string | null
+          title?: string
+          updated_at?: string | null
+          uploader_id?: string | null
+        }
+        Relationships: []
+      }
       muted_users: {
         Row: {
           created_at: string | null
