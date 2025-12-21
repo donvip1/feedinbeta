@@ -25,9 +25,26 @@ interface UseProfileResult {
 
 export const useProfileWithCache = (identifier: string | undefined): UseProfileResult => {
   const [profile, setProfile] = useState<FullProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Start false - assume cached
   const [isFreshLoading, setIsFreshLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [cacheChecked, setCacheChecked] = useState(false);
+
+  // INSTANT: Check cache synchronously on mount - before any async operations
+  useEffect(() => {
+    if (!identifier || cacheChecked) return;
+    
+    // Check cache immediately
+    profileCache.get(identifier).then(cached => {
+      setCacheChecked(true);
+      if (cached) {
+        setProfile(cached as FullProfile);
+        setIsLoading(false);
+      } else {
+        setIsLoading(true); // Only show loading if no cache
+      }
+    });
+  }, [identifier, cacheChecked]);
 
   const fetchProfile = useCallback(async (showLoading = true) => {
     if (!identifier) {
@@ -36,12 +53,8 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
     }
 
     try {
-      // Check cache first - show immediately without loading
-      const cached = await profileCache.get(identifier);
-      if (cached) {
-        setProfile(cached as FullProfile);
-        setIsLoading(false);
-        // Continue to fetch fresh data in background
+      // If we already have cached data, just refresh in background
+      if (profile) {
         setIsFreshLoading(true);
       } else if (showLoading) {
         setIsLoading(true);
@@ -126,9 +139,12 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
     }
   }, [identifier]);
 
+  // Fetch fresh data in background after cache check
   useEffect(() => {
-    fetchProfile();
-  }, [fetchProfile]);
+    if (cacheChecked) {
+      fetchProfile(false); // Always background fetch, never show loading if we checked cache
+    }
+  }, [cacheChecked, fetchProfile]);
 
   return {
     profile,
