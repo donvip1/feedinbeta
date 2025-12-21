@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { Slider } from '@/components/ui/slider';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useVideoPreloader } from '@/hooks/useVideoPreloader';
+import { videoPreloadManager } from '@/lib/video-preload-manager';
 
 interface Post {
   id: string;
@@ -33,22 +35,21 @@ interface Post {
 interface FullscreenMediaViewerProps {
   post: Post;
   allPosts: Post[];
-  allVideoPosts?: Post[]; // All video posts for TikTok-style navigation
+  allVideoPosts?: Post[];
   isOpen: boolean;
   onClose: () => void;
   onNavigate?: (postId: string) => void;
-  onMarkAsViewed?: (postId: string) => void; // Callback to mark posts as viewed
+  onMarkAsViewed?: (postId: string) => void;
   initialTime?: number;
   initialMuted?: boolean;
   onOpenComments?: (postId: string) => void;
   onOpenRefeed?: (postId: string) => void;
   onOpenGift?: (postId: string) => void;
   onOpenShare?: (postId: string) => void;
-  // For syncing counts from parent
   parentCommentsCount?: number;
   parentRefeedsCount?: number;
   parentLikesCount?: number;
-  actualPostId?: string; // The actual post ID for interactions (may differ from post.id for refeeds)
+  actualPostId?: string;
 }
 
 export default function FullscreenMediaViewer({ 
@@ -84,47 +85,113 @@ export default function FullscreenMediaViewer({
   const [commentsCount, setCommentsCount] = useState(0);
   const [refeedsCount, setRefeedsCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const touchStartY = useRef(0);
+  
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const isScrolling = useRef(false);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Filter posts by media type - videos with videos, images with images
-  // For videos, use allVideoPosts if provided (contains ALL video posts for TikTok-style navigation)
+  // Filter posts by media type
   const isVideoPost = post.media_type === 'video' || 
     ((post as any).post_type === 'refeed' && (post as any).original_post?.media_type === 'video') ||
     ((post as any).post_type === 'quote' && (post as any).original_post?.media_type === 'video');
   
-  // Build navigable posts list - ensure we have the correct media type filter
   const navigablePosts = (() => {
     if (isVideoPost) {
-      // For video posts, prefer allVideoPosts if available
       if (allVideoPosts && allVideoPosts.length > 0) {
         return allVideoPosts;
       }
-      // Fallback: filter allPosts for video content
       return allPosts.filter(p => 
         p.media_type === 'video' || 
         (p.post_type === 'refeed' && p.original_post?.media_type === 'video') ||
         (p.post_type === 'quote' && p.original_post?.media_type === 'video')
       );
     }
-    // For image posts, filter for images
     return allPosts.filter(p => p.media_type === 'image' && p.media_url);
   })();
+
+  // Use video preloader hook
+  useVideoPreloader(navigablePosts, currentPostIndex, isOpen && isVideoPost);
 
   const currentPost = navigablePosts[currentPostIndex] || post;
   const isVideo = currentPost?.media_type === 'video' || 
     (currentPost?.post_type === 'refeed' && currentPost?.original_post?.media_type === 'video') ||
     (currentPost?.post_type === 'quote' && currentPost?.original_post?.media_type === 'video');
   
-  // Get the actual media URL for the current post (handle refeeds)
   const getMediaUrl = (p: Post) => {
     if (p.media_url) return p.media_url;
     if ((p as any).original_post?.media_url) return (p as any).original_post.media_url;
     return null;
   };
 
-  // Mark post as viewed when navigating to it
+  // Get visible posts for rendering (current + adjacent)
+  const getVisiblePosts = useCallback(() => {
+    const visible: { post: Post; index: number }[] = [];
+    const start = Math.max(0, currentPostIndex - 1);
+    const end = Math.min(navigablePosts.length - 1, currentPostIndex + 2);
+    
+    for (let i = start; i <= end; i++) {
+      if (navigablePosts[i]) {
+        visible.push({ post: navigablePosts[i], index: i });
+      }
+    }
+    return visible;
+  }, [currentPostIndex, navigablePosts]);
+
+  // Handle scroll snap to detect which post is in view
+  const handleScroll = useCallback(() => {
+    if (!scrollContainerRef.current || isScrolling.current) return;
+
+    const container = scrollContainerRef.current;
+    const scrollTop = container.scrollTop;
+    const itemHeight = container.clientHeight;
+    const newIndex = Math.round(scrollTop / itemHeight);
+
+    if (newIndex !== currentPostIndex && newIndex >= 0 && newIndex < navigablePosts.length) {
+      setCurrentPostIndex(newIndex);
+      onNavigate?.(navigablePosts[newIndex].id);
+      
+      // Pause previous video, play new one
+      const prevVideo = videoRefs.current.get(navigablePosts[currentPostIndex]?.id);
+      if (prevVideo) {
+        prevVideo.pause();
+      }
+    }
+  }, [currentPostIndex, navigablePosts, onNavigate]);
+
+  // Scroll to specific index
+  const scrollToIndex = useCallback((index: number) => {
+    if (!scrollContainerRef.current) return;
+    
+    isScrolling.current = true;
+    const container = scrollContainerRef.current;
+    const targetTop = index * container.clientHeight;
+    
+    container.scrollTo({
+      top: targetTop,
+      behavior: 'smooth'
+    });
+
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
+    scrollTimeout.current = setTimeout(() => {
+      isScrolling.current = false;
+    }, 300);
+  }, []);
+
+  // Initialize scroll position
+  useEffect(() => {
+    if (!isOpen || !scrollContainerRef.current) return;
+
+    const index = navigablePosts.findIndex(p => p.id === post.id);
+    if (index !== -1) {
+      setCurrentPostIndex(index);
+      // Scroll to correct position without animation on initial load
+      const container = scrollContainerRef.current;
+      container.scrollTop = index * container.clientHeight;
+    }
+  }, [isOpen, post.id, navigablePosts]);
+
+  // Mark post as viewed
   useEffect(() => {
     if (isOpen && currentPost && onMarkAsViewed) {
       onMarkAsViewed(currentPost.id);
@@ -140,7 +207,7 @@ export default function FullscreenMediaViewer({
     getUser();
   }, []);
 
-  // Check if current post is liked and get likes count
+  // Check like status and counts
   useEffect(() => {
     if (!currentPost || !currentUserId) return;
     
@@ -155,64 +222,51 @@ export default function FullscreenMediaViewer({
       setIsLiked(!!likeData);
     };
     
-    // Use parent counts if provided (for syncing), otherwise use post counts
     setLikesCount(parentLikesCount ?? currentPost.likes_count ?? 0);
     setCommentsCount(parentCommentsCount ?? currentPost.comments_count ?? 0);
     setRefeedsCount(parentRefeedsCount ?? currentPost.refeeds_count ?? 0);
     checkLikeStatus();
   }, [currentPost?.id, currentUserId, actualPostId, parentLikesCount, parentCommentsCount, parentRefeedsCount]);
 
-  // Sync counts when parent props change (for real-time updates)
+  // Sync counts
   useEffect(() => {
-    if (parentCommentsCount !== undefined) {
-      setCommentsCount(parentCommentsCount);
-    }
+    if (parentCommentsCount !== undefined) setCommentsCount(parentCommentsCount);
   }, [parentCommentsCount]);
 
   useEffect(() => {
-    if (parentRefeedsCount !== undefined) {
-      setRefeedsCount(parentRefeedsCount);
-    }
+    if (parentRefeedsCount !== undefined) setRefeedsCount(parentRefeedsCount);
   }, [parentRefeedsCount]);
 
   useEffect(() => {
-    if (parentLikesCount !== undefined) {
-      setLikesCount(parentLikesCount);
-    }
+    if (parentLikesCount !== undefined) setLikesCount(parentLikesCount);
   }, [parentLikesCount]);
 
-  useEffect(() => {
-    const index = navigablePosts.findIndex(p => p.id === post.id);
-    if (index !== -1) {
-      setCurrentPostIndex(index);
-    }
-  }, [post.id, navigablePosts]);
-
-  // Sync mute state when it changes from parent
   useEffect(() => {
     setIsMuted(initialMuted);
   }, [initialMuted]);
 
+  // Auto-play current video
   useEffect(() => {
-    if (isOpen && isVideo && videoRef.current) {
-      videoRef.current.currentTime = initialTime;
-      videoRef.current.muted = initialMuted;
-      setIsMuted(initialMuted);
-      setCurrentTime(initialTime);
-      videoRef.current.play().catch(() => {});
-      setIsPlaying(true);
-      setShowControls(false); // Hide controls when video starts playing
-    }
-  }, [isOpen, currentPostIndex, isVideo, initialTime, initialMuted]);
+    if (!isOpen || !isVideo) return;
 
-  // For images, show controls by default
+    const video = videoRefs.current.get(currentPost?.id);
+    if (video) {
+      video.currentTime = currentPostIndex === navigablePosts.findIndex(p => p.id === post.id) ? initialTime : 0;
+      video.muted = isMuted;
+      video.play().catch(() => {});
+      setIsPlaying(true);
+      setShowControls(false);
+    }
+  }, [isOpen, currentPostIndex, currentPost?.id, isVideo]);
+
+  // Show controls for images
   useEffect(() => {
     if (isOpen && !isVideo) {
       setShowControls(true);
     }
   }, [isOpen, isVideo, currentPostIndex]);
 
-  // Keyboard navigation (Arrow Up/Down)
+  // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
 
@@ -220,12 +274,12 @@ export default function FullscreenMediaViewer({
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault();
         if (currentPostIndex < navigablePosts.length - 1) {
-          navigateToPost(currentPostIndex + 1);
+          scrollToIndex(currentPostIndex + 1);
         }
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
         if (currentPostIndex > 0) {
-          navigateToPost(currentPostIndex - 1);
+          scrollToIndex(currentPostIndex - 1);
         }
       } else if (e.key === 'Escape') {
         onClose();
@@ -233,60 +287,21 @@ export default function FullscreenMediaViewer({
         e.preventDefault();
         if (isVideo) {
           togglePlayPause();
-        } else {
-          setShowControls(prev => !prev);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentPostIndex, navigablePosts.length, isVideo]);
+  }, [isOpen, currentPostIndex, navigablePosts.length, isVideo, scrollToIndex, onClose]);
 
-  // Mouse wheel navigation
+  // Video time update
   useEffect(() => {
-    if (!isOpen) return;
-
-    let wheelTimeout: NodeJS.Timeout | null = null;
-    let wheelDelta = 0;
-
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      wheelDelta += e.deltaY;
-
-      if (wheelTimeout) clearTimeout(wheelTimeout);
-
-      wheelTimeout = setTimeout(() => {
-        if (wheelDelta > 50 && currentPostIndex < navigablePosts.length - 1) {
-          navigateToPost(currentPostIndex + 1);
-        } else if (wheelDelta < -50 && currentPostIndex > 0) {
-          navigateToPost(currentPostIndex - 1);
-        }
-        wheelDelta = 0;
-      }, 100);
-    };
-
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false });
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener('wheel', handleWheel);
-      }
-      if (wheelTimeout) clearTimeout(wheelTimeout);
-    };
-  }, [isOpen, currentPostIndex, navigablePosts.length]);
-
-  useEffect(() => {
-    const video = videoRef.current;
+    const video = videoRefs.current.get(currentPost?.id);
     if (!video) return;
 
     const updateTime = () => {
-      if (!isSeeking) {
-        setCurrentTime(video.currentTime);
-      }
+      if (!isSeeking) setCurrentTime(video.currentTime);
     };
     const updateDuration = () => setDuration(video.duration);
     const handlePlay = () => {
@@ -309,50 +324,19 @@ export default function FullscreenMediaViewer({
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
     };
-  }, [currentPostIndex, isSeeking]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const touchEndY = e.changedTouches[0].clientY;
-    const diff = touchStartY.current - touchEndY;
-
-    // Swipe navigation for both video and image posts
-    if (diff > 50 && currentPostIndex < navigablePosts.length - 1) {
-      navigateToPost(currentPostIndex + 1);
-    } else if (diff < -50 && currentPostIndex > 0) {
-      navigateToPost(currentPostIndex - 1);
-    }
-  };
-
-  const navigateToPost = (index: number) => {
-    const newPost = navigablePosts[index];
-    if (!newPost) return;
-
-    setCurrentPostIndex(index);
-    setCurrentTime(0);
-    setIsPlaying(false);
-    setShowControls(true);
-    setLikesCount(newPost.likes_count || 0);
-    onNavigate?.(newPost.id);
-  };
+  }, [currentPost?.id, isSeeking]);
 
   const togglePlayPause = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!videoRef.current) return;
+    const video = videoRefs.current.get(currentPost?.id);
+    if (!video) return;
     
     if (isPlaying) {
-      videoRef.current.pause();
-      setIsPlaying(false);
-      setShowControls(true);
+      video.pause();
     } else {
-      videoRef.current.play().catch(() => {});
-      setIsPlaying(true);
-      setShowControls(false);
+      video.play().catch(() => {});
     }
-  }, [isPlaying]);
+  }, [isPlaying, currentPost?.id]);
 
   const handleImageTap = useCallback(() => {
     setShowControls(prev => !prev);
@@ -360,48 +344,51 @@ export default function FullscreenMediaViewer({
 
   const toggleMute = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (videoRef.current) {
+    const video = videoRefs.current.get(currentPost?.id);
+    if (video) {
       const newMuted = !isMuted;
-      videoRef.current.muted = newMuted;
+      video.muted = newMuted;
       setIsMuted(newMuted);
     }
-  }, [isMuted]);
+  }, [isMuted, currentPost?.id]);
 
   const seekForward = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (videoRef.current) {
-      const newTime = Math.min(videoRef.current.currentTime + 10, duration);
-      videoRef.current.currentTime = newTime;
+    const video = videoRefs.current.get(currentPost?.id);
+    if (video) {
+      const newTime = Math.min(video.currentTime + 10, duration);
+      video.currentTime = newTime;
       setCurrentTime(newTime);
     }
-  }, [duration]);
+  }, [duration, currentPost?.id]);
 
   const seekBackward = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (videoRef.current) {
-      const newTime = Math.max(videoRef.current.currentTime - 10, 0);
-      videoRef.current.currentTime = newTime;
+    const video = videoRefs.current.get(currentPost?.id);
+    if (video) {
+      const newTime = Math.max(video.currentTime - 10, 0);
+      video.currentTime = newTime;
       setCurrentTime(newTime);
     }
-  }, []);
+  }, [currentPost?.id]);
 
   const handleSeekChange = useCallback((value: number[]) => {
     const newTime = value[0];
     setCurrentTime(newTime);
     setIsSeeking(true);
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime;
-    }
-  }, []);
+    const video = videoRefs.current.get(currentPost?.id);
+    if (video) video.currentTime = newTime;
+  }, [currentPost?.id]);
 
   const handleSeekEnd = useCallback((value: number[]) => {
     setIsSeeking(false);
     const newTime = value[0];
-    if (videoRef.current) {
-      videoRef.current.currentTime = newTime;
+    const video = videoRefs.current.get(currentPost?.id);
+    if (video) {
+      video.currentTime = newTime;
       setCurrentTime(newTime);
     }
-  }, []);
+  }, [currentPost?.id]);
 
   const formatTime = (time: number) => {
     if (!isFinite(time) || isNaN(time)) return '0:00';
@@ -447,244 +434,214 @@ export default function FullscreenMediaViewer({
 
   const handleComments = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenComments) {
-      // Use actualPostId for interactions (important for refeed/quote posts)
-      onOpenComments(actualPostId || currentPost?.id || '');
-    }
+    if (onOpenComments) onOpenComments(actualPostId || currentPost?.id || '');
   };
 
   const handleRefeed = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenRefeed) {
-      onOpenRefeed(actualPostId || currentPost?.id || '');
-    }
+    if (onOpenRefeed) onOpenRefeed(actualPostId || currentPost?.id || '');
   };
 
   const handleGift = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenGift && currentPost) {
-      onOpenGift(actualPostId || currentPost.id);
-    }
+    if (onOpenGift && currentPost) onOpenGift(actualPostId || currentPost.id);
   };
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenShare && currentPost) {
-      onOpenShare(actualPostId || currentPost.id);
-    }
+    if (onOpenShare && currentPost) onOpenShare(actualPostId || currentPost.id);
   };
 
   if (!isOpen || !currentPost) return null;
 
   const displayName = currentPost.profiles?.display_name || currentPost.profiles?.username || 'Anonymous';
   const username = currentPost.profiles?.username || 'anonymous';
+  const visiblePosts = getVisiblePosts();
 
   return (
-    <div 
-      ref={containerRef}
-      className="fixed inset-0 z-[100] bg-black"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onContextMenu={(e) => e.preventDefault()}
-    >
-      <div className="relative w-full h-full flex items-center justify-center">
-        {isVideo ? (
-          <video
-            ref={videoRef}
-            src={getMediaUrl(currentPost) || ''}
-            className="w-full h-full object-cover"
-            playsInline
-            muted={isMuted}
-            loop
-            onClick={() => togglePlayPause()}
-            onContextMenu={(e) => e.preventDefault()}
-            controlsList="nodownload nofullscreen noremoteplayback"
-            disablePictureInPicture
-          />
-        ) : (
-          <img
-            src={getMediaUrl(currentPost) || ''}
-            alt="Post content"
-            className="w-full h-full object-cover"
-            onClick={handleImageTap}
-            onContextMenu={(e) => e.preventDefault()}
-          />
-        )}
+    <div className="fixed inset-0 z-[100] bg-black">
+      {/* Scroll Container with snap */}
+      <div 
+        ref={scrollContainerRef}
+        className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+        onScroll={handleScroll}
+        style={{ scrollBehavior: 'smooth' }}
+      >
+        {navigablePosts.map((p, index) => {
+          const mediaUrl = getMediaUrl(p);
+          const isCurrentVideo = p.media_type === 'video' || 
+            (p.post_type === 'refeed' && p.original_post?.media_type === 'video') ||
+            (p.post_type === 'quote' && p.original_post?.media_type === 'video');
+          const isCurrent = index === currentPostIndex;
+          const postDisplayName = p.profiles?.display_name || p.profiles?.username || 'Anonymous';
+          const postUsername = p.profiles?.username || 'anonymous';
+          
+          // Check if video is preloaded
+          const isPreloaded = mediaUrl ? videoPreloadManager.isReady(mediaUrl) : false;
 
-        {/* Top Overlay - Always visible */}
-        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 z-10">
-          <div className="flex items-center justify-between">
+          return (
             <div 
-              className="flex items-center gap-3 cursor-pointer"
-              onClick={handleProfileClick}
+              key={p.id}
+              className="w-full h-full snap-start snap-always relative flex items-center justify-center"
+              style={{ height: '100dvh', minHeight: '100dvh' }}
             >
-              <Avatar className="w-10 h-10">
-                <AvatarImage src={currentPost.profiles?.avatar_url || ''} />
-                <AvatarFallback>{displayName[0]?.toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-semibold text-white text-sm">{displayName}</p>
-                <p className="text-xs text-white/60">@{username}</p>
-              </div>
+              {/* Media */}
+              {isCurrentVideo ? (
+                <video
+                  ref={(el) => {
+                    if (el) videoRefs.current.set(p.id, el);
+                  }}
+                  src={mediaUrl || ''}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted={isMuted}
+                  loop
+                  preload={isPreloaded ? 'auto' : 'metadata'}
+                  onClick={() => isCurrent && togglePlayPause()}
+                  onContextMenu={(e) => e.preventDefault()}
+                  controlsList="nodownload nofullscreen noremoteplayback"
+                  disablePictureInPicture
+                />
+              ) : (
+                <img
+                  src={mediaUrl || ''}
+                  alt="Post content"
+                  className="w-full h-full object-cover"
+                  onClick={handleImageTap}
+                  onContextMenu={(e) => e.preventDefault()}
+                />
+              )}
+
+              {/* Overlays - only show for current post */}
+              {isCurrent && (
+                <>
+                  {/* Top Overlay */}
+                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 z-10">
+                    <div className="flex items-center justify-between">
+                      <div 
+                        className="flex items-center gap-3 cursor-pointer"
+                        onClick={handleProfileClick}
+                      >
+                        <Avatar className="w-10 h-10">
+                          <AvatarImage src={p.profiles?.avatar_url || ''} />
+                          <AvatarFallback>{postDisplayName[0]?.toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-semibold text-white text-sm">{postDisplayName}</p>
+                          <p className="text-xs text-white/60">@{postUsername}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={onClose}
+                        className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
+                      >
+                        <X className="w-6 h-6" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Social Action Buttons */}
+                  {showControls && (
+                    <div 
+                      className="absolute right-4 bottom-32 flex flex-col items-center gap-5 z-30"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button onClick={handleLike} className="flex flex-col items-center gap-1">
+                        <div className={`p-3 rounded-full ${isLiked ? 'bg-red-500' : 'bg-black/50'} hover:bg-black/70 transition-all`}>
+                          <Heart className={`w-6 h-6 ${isLiked ? 'text-white fill-white' : 'text-white'}`} />
+                        </div>
+                        <span className="text-white text-xs font-medium">{likesCount}</span>
+                      </button>
+
+                      <button onClick={handleComments} className="flex flex-col items-center gap-1">
+                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                          <MessageCircle className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-white text-xs font-medium">{commentsCount}</span>
+                      </button>
+
+                      <button onClick={handleRefeed} className="flex flex-col items-center gap-1">
+                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                          <Repeat2 className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-white text-xs font-medium">{refeedsCount}</span>
+                      </button>
+
+                      <button onClick={handleGift} className="flex flex-col items-center gap-1">
+                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                          <Gift className="w-6 h-6 text-white" />
+                        </div>
+                      </button>
+
+                      <button onClick={handleShare} className="flex flex-col items-center gap-1">
+                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                          <Share2 className="w-6 h-6 text-white" />
+                        </div>
+                        <span className="text-white text-xs font-medium">{p.shares_count || 0}</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Play/Pause indicator */}
+                  {isCurrentVideo && !isPlaying && showControls && (
+                    <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                      <div className="p-5 bg-black/40 rounded-full">
+                        <Play className="w-12 h-12 text-white" fill="white" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Video Controls */}
+                  {isCurrentVideo && showControls && (
+                    <div 
+                      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 z-20"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex justify-between text-white text-xs mb-2 font-medium">
+                        <span>{formatTime(currentTime)}</span>
+                        <span>{formatTime(duration)}</span>
+                      </div>
+
+                      <div className="mb-4">
+                        <Slider
+                          value={[currentTime]}
+                          min={0}
+                          max={duration || 100}
+                          step={0.1}
+                          onValueChange={handleSeekChange}
+                          onValueCommit={handleSeekEnd}
+                          className="w-full cursor-pointer [&_[role=slider]]:h-4 [&_[role=slider]]:w-4 [&_[role=slider]]:bg-white [&_[role=slider]]:border-0 [&_[role=slider]]:shadow-lg [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/30 [&>span:first-child>span]:bg-primary"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-center gap-6">
+                        <button onClick={seekBackward} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
+                          <SkipBack className="w-6 h-6 text-white" fill="white" />
+                        </button>
+
+                        <button onClick={togglePlayPause} className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all" type="button">
+                          {isPlaying ? (
+                            <Pause className="w-7 h-7 text-primary-foreground" fill="currentColor" />
+                          ) : (
+                            <Play className="w-7 h-7 text-primary-foreground" fill="currentColor" />
+                          )}
+                        </button>
+
+                        <button onClick={seekForward} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
+                          <SkipForward className="w-6 h-6 text-white" fill="white" />
+                        </button>
+
+                        <button onClick={toggleMute} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
+                          {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
-
-        {/* Social Action Buttons - Show when paused (video) or tapped (image) */}
-        {showControls && (
-          <div 
-            className="absolute right-4 bottom-32 flex flex-col items-center gap-5 z-30"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Like */}
-            <button
-              onClick={handleLike}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className={`p-3 rounded-full ${isLiked ? 'bg-red-500' : 'bg-black/50'} hover:bg-black/70 transition-all`}>
-                <Heart className={`w-6 h-6 ${isLiked ? 'text-white fill-white' : 'text-white'}`} />
-              </div>
-              <span className="text-white text-xs font-medium">{likesCount}</span>
-            </button>
-
-            {/* Comments */}
-            <button
-              onClick={handleComments}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                <MessageCircle className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-white text-xs font-medium">{commentsCount}</span>
-            </button>
-
-            {/* Refeed/Quote */}
-            <button
-              onClick={handleRefeed}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                <Repeat2 className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-white text-xs font-medium">{refeedsCount}</span>
-            </button>
-
-            {/* Gift */}
-            <button
-              onClick={handleGift}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                <Gift className="w-6 h-6 text-white" />
-              </div>
-            </button>
-
-            {/* Share */}
-            <button
-              onClick={handleShare}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                <Share2 className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-white text-xs font-medium">{currentPost.shares_count || 0}</span>
-            </button>
-          </div>
-        )}
-
-        {/* Play/Pause indicator for video when paused */}
-        {isVideo && !isPlaying && showControls && (
-          <div 
-            className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
-          >
-            <div className="p-5 bg-black/40 rounded-full">
-              <Play className="w-12 h-12 text-white" fill="white" />
-            </div>
-          </div>
-        )}
-
-        {/* Video Controls - Show when paused */}
-        {isVideo && showControls && (
-          <div 
-            className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 z-20"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Time Display */}
-            <div className="flex justify-between text-white text-xs mb-2 font-medium">
-              <span>{formatTime(currentTime)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-
-            {/* Seek Slider */}
-            <div className="mb-4">
-              <Slider
-                value={[currentTime]}
-                min={0}
-                max={duration || 100}
-                step={0.1}
-                onValueChange={handleSeekChange}
-                onValueCommit={handleSeekEnd}
-                className="w-full cursor-pointer [&_[role=slider]]:h-4 [&_[role=slider]]:w-4 [&_[role=slider]]:bg-white [&_[role=slider]]:border-0 [&_[role=slider]]:shadow-lg [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/30 [&>span:first-child>span]:bg-primary"
-              />
-            </div>
-
-            {/* Control Buttons */}
-            <div className="flex items-center justify-center gap-6">
-              <button
-                onClick={(e) => seekBackward(e)}
-                className="p-3 hover:bg-white/10 rounded-full transition-all"
-                type="button"
-              >
-                <SkipBack className="w-6 h-6 text-white" fill="white" />
-              </button>
-
-              <button
-                onClick={(e) => togglePlayPause(e)}
-                className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all"
-                type="button"
-              >
-                {isPlaying ? (
-                  <Pause className="w-7 h-7 text-primary-foreground" fill="currentColor" />
-                ) : (
-                  <Play className="w-7 h-7 text-primary-foreground" fill="currentColor" />
-                )}
-              </button>
-
-              <button
-                onClick={(e) => seekForward(e)}
-                className="p-3 hover:bg-white/10 rounded-full transition-all"
-                type="button"
-              >
-                <SkipForward className="w-6 h-6 text-white" fill="white" />
-              </button>
-
-              <button
-                onClick={(e) => toggleMute(e)}
-                className="p-3 hover:bg-white/10 rounded-full transition-all"
-                type="button"
-              >
-                {isMuted ? (
-                  <VolumeX className="w-6 h-6 text-white" />
-                ) : (
-                  <Volume2 className="w-6 h-6 text-white" />
-                )}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Post counter - minimal indicator */}
-        {navigablePosts.length > 1 && (
-          <div className="absolute bottom-36 left-4 text-white/40 text-xs">
-            {currentPostIndex + 1}/{navigablePosts.length}
-          </div>
-        )}
+          );
+        })}
       </div>
     </div>
   );
