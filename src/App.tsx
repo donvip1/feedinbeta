@@ -41,7 +41,6 @@ import LanguageSettings from "./pages/LanguageSettings";
 import HelpSupport from "./pages/HelpSupport";
 import P2PMarketplace from "./pages/P2PMarketplace";
 import P2PTransaction from "./pages/P2PTransaction";
-import InitializeGroups from "./pages/InitializeGroups";
 import Trending from "./pages/Trending";
 import Wallet from "./pages/Wallet";
 import LearnTech from "./pages/LearnTech";
@@ -58,9 +57,7 @@ import CreatorPayouts from "./pages/CreatorPayouts";
 import Promotions from "./pages/Promotions";
 import Install from "./pages/Install";
 import MusicDiscovery from "./pages/MusicDiscovery";
-import Investors from "./pages/Investors";
 import AdminAnalytics from "./pages/AdminAnalytics";
-import CompetitiveAnalysis from "./pages/CompetitiveAnalysis";
 
 const queryClient = new QueryClient();
 
@@ -170,32 +167,7 @@ const App = () => {
             <Route path="/settings/language" element={<LanguageSettings />} />
             <Route path="/settings/help" element={<HelpSupport />} />
             <Route path="/settings/sessions" element={<SessionManagement />} />
-            <Route path="/investors" element={<Investors />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
-            <Route path="/competitive-analysis" element={<CompetitiveAnalysis />} />
-            
-            {/* Legacy routes for backwards compatibility */}
-            <Route path="/post/:postId" element={<PostDetail />} />
-            <Route path="/profile-edit" element={<ProfileEdit />} />
-            <Route path="/call-history" element={<CallHistory />} />
-            <Route path="/ai-copilot" element={<AICopilot />} />
-            <Route path="/thesis-writer" element={<ThesisWriter />} />
-            <Route path="/video-creation" element={<VideoCreation />} />
-            <Route path="/educational-qa" element={<EducationalQA />} />
-            <Route path="/project-writing" element={<ProjectWriting />} />
-            <Route path="/image-generation" element={<ImageGeneration />} />
-            <Route path="/image-enhancement" element={<ImageEnhancement />} />
-            <Route path="/subscription" element={<Subscription />} />
-            <Route path="/credits" element={<Credits />} />
-            <Route path="/p2p-marketplace" element={<P2PMarketplace />} />
-            <Route path="/p2p-transaction/:transactionId" element={<P2PTransaction />} />
-            <Route path="/trending" element={<Trending />} />
-            <Route path="/search" element={<Search />} />
-            <Route path="/hashtag/:hashtag" element={<HashtagSearch />} />
-            <Route path="/stream/:streamId" element={<LiveStreamDetail />} />
-            <Route path="/admin-wallet" element={<AdminWallet />} />
-            <Route path="/learn-tech" element={<LearnTech />} />
-            <Route path="/initialize-groups" element={<InitializeGroups />} />
             
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />

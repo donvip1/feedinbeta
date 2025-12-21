@@ -9,7 +9,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck } from 'lucide-react';
-import { ChatInterface } from '@/components/messages/ChatInterface';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
