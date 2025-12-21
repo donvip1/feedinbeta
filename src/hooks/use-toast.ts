@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { toast as sonnerToast } from "sonner";
 
 // Minimal compatibility wrapper over our previous API
@@ -40,16 +39,21 @@ function toast({ title, description, variant = "default" }: ToastOptions) {
   };
 }
 
+function dismiss(toastId?: string) {
+  if (toastId) {
+    sonnerToast.dismiss(toastId);
+  } else {
+    sonnerToast.dismiss();
+  }
+}
+
 function useToast() {
-  // Keep the same shape used across the app
-  return useMemo(
-    () => ({
-      toasts: [],
-      toast,
-      dismiss: (toastId?: string) => (toastId ? sonnerToast.dismiss(toastId) : sonnerToast.dismiss()),
-    }),
-    [],
-  );
+  // Return stable object without hooks - toast is already a stable function
+  return {
+    toasts: [] as any[],
+    toast,
+    dismiss,
+  };
 }
 
 export { useToast, toast };
