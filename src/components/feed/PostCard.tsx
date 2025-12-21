@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark, Music, Disc3 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +32,10 @@ interface PostCardProps {
     location: string | null;
     post_type: string | null;
     original_post_id: string | null;
+    music_title?: string | null;
+    music_artist?: string | null;
+    music_url?: string | null;
+    is_original_audio?: boolean | null;
     original_post?: {
       id: string;
       user_id: string;
@@ -97,10 +101,17 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const musicAudioRef = useRef<HTMLAudioElement>(null);
   const currentVideoTime = useRef(0);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+
+  // Check if post has music attached
+  const hasMusic = !!post.music_url;
+  const musicDisplayTitle = post.music_title || 'Original Audio';
+  const musicDisplayArtist = post.music_artist || '';
 
   // Determine if this post has multiple media
   const mediaUrls = post.media_urls && post.media_urls.length > 0 ? post.media_urls : (post.media_url ? [post.media_url] : []);
@@ -301,6 +312,50 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
       setIsMuted(!isMuted);
     }
   };
+
+  const toggleMusicPlayback = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (!musicAudioRef.current) return;
+    
+    if (isMusicPlaying) {
+      musicAudioRef.current.pause();
+      setIsMusicPlaying(false);
+    } else {
+      // If there's a video, mute it when playing music
+      if (videoRef.current) {
+        videoRef.current.muted = true;
+        setIsMuted(true);
+      }
+      musicAudioRef.current.play().catch(() => {
+        console.log('Music autoplay blocked');
+      });
+      setIsMusicPlaying(true);
+    }
+  };
+
+  // Sync music playback with visibility
+  useEffect(() => {
+    if (!hasMusic || !musicAudioRef.current) return;
+    
+    if (isVideoVisible && currentMediaType === 'image') {
+      // Auto-play music for image posts when visible
+      musicAudioRef.current.play().catch(() => {});
+      setIsMusicPlaying(true);
+    } else if (!isVideoVisible) {
+      // Pause music when not visible
+      musicAudioRef.current.pause();
+      setIsMusicPlaying(false);
+    }
+  }, [isVideoVisible, hasMusic, currentMediaType]);
+
+  // Cleanup music on unmount
+  useEffect(() => {
+    return () => {
+      if (musicAudioRef.current) {
+        musicAudioRef.current.pause();
+      }
+    };
+  }, []);
 
   const toggleFullscreen = () => {
     // Save current video time and pause the feed video
@@ -677,13 +732,15 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
                     draggable={false}
                     onContextMenu={(e) => e.preventDefault()}
                   />
-                  {/* Fullscreen button for images */}
-                  <button
-                    onClick={toggleFullscreen}
-                    className="absolute bottom-4 right-4 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all z-10"
-                  >
-                    <Maximize className="w-5 h-5" />
-                  </button>
+                  {/* Controls for images - positioned to not overlap with music indicator */}
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2 z-10">
+                    <button
+                      onClick={toggleFullscreen}
+                      className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
+                    >
+                      <Maximize className="w-5 h-5" />
+                    </button>
+                  </div>
                 </>
               ) : (
                 <>
@@ -757,6 +814,43 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
                     />
                   ))}
                 </div>
+              )}
+
+              {/* Music Indicator - TikTok style */}
+              {hasMusic && (
+                <button
+                  onClick={toggleMusicPlayback}
+                  className="absolute bottom-4 left-4 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5 z-20 hover:bg-black/70 transition-all max-w-[200px]"
+                >
+                  <div className={`flex-shrink-0 ${isMusicPlaying ? 'animate-spin-slow' : ''}`}>
+                    <Disc3 className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex items-center gap-1 overflow-hidden">
+                    <Music className="w-3 h-3 text-white/80 flex-shrink-0" />
+                    <span className="text-white text-xs font-medium truncate">
+                      {musicDisplayTitle}
+                      {musicDisplayArtist && ` • ${musicDisplayArtist}`}
+                    </span>
+                  </div>
+                  <div className="flex-shrink-0 ml-1">
+                    {isMusicPlaying ? (
+                      <Pause className="w-3 h-3 text-white" />
+                    ) : (
+                      <Play className="w-3 h-3 text-white" />
+                    )}
+                  </div>
+                </button>
+              )}
+
+              {/* Hidden audio element for music playback */}
+              {hasMusic && (
+                <audio
+                  ref={musicAudioRef}
+                  src={post.music_url!}
+                  loop
+                  preload="metadata"
+                  onEnded={() => setIsMusicPlaying(false)}
+                />
               )}
             </div>
           </div>
