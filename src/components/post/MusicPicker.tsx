@@ -238,7 +238,7 @@ export const MusicPicker: React.FC<MusicPickerProps> = ({
   return (
     <>
       <Dialog open={isOpen && !showTrimmer} onOpenChange={onClose}>
-        <DialogContent className="max-w-md max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-md max-h-[80vh] flex flex-col z-[200]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Music className="w-5 h-5" />

@@ -213,7 +213,7 @@ export const MusicTrimmer: React.FC<MusicTrimmerProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md z-[200]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Scissors className="w-5 h-5 text-primary" />
