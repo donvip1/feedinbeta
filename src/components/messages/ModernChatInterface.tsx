@@ -90,7 +90,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
+  const { keyboardHeight, isKeyboardOpen, visualViewportOffset } = useKeyboardHeight();
   const { cachedMessages, hasCachedData, saveToCache, appendMessage } = useMessageCache(conversationId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -127,7 +127,12 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const hasScrolledToUnread = useRef(false);
   const isUserScrolling = useRef(false);
   const isNearBottomRef = useRef(true);
+  const lastScrollPositionRef = useRef<number>(0);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+
+  // Calculate input bottom position - only use keyboard height
+  // Don't add extra offset that causes blank screen
+  const inputBottom = keyboardHeight;
 
   // Load cached messages immediately on mount
   useEffect(() => {
@@ -304,12 +309,27 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   }, [firstUnreadId]); // Remove messages dependency to stop auto-scrolling on new messages
 
   // Scroll to bottom when keyboard opens to keep messages visible
+  // Store scroll position before keyboard opens, restore relative position after
   useEffect(() => {
-    if (isKeyboardOpen && isNearBottomRef.current) {
-      // Give keyboard animation time to complete
-      setTimeout(() => {
-        scrollToBottom();
-      }, 150);
+    if (isKeyboardOpen) {
+      // Keyboard opened - scroll to bottom immediately to keep messages visible
+      // Use requestAnimationFrame for smoother scroll
+      requestAnimationFrame(() => {
+        if (isNearBottomRef.current) {
+          scrollToBottom();
+        } else if (scrollAreaRef.current) {
+          // Maintain relative scroll position from bottom
+          const container = scrollAreaRef.current;
+          const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+          // After keyboard opens, maintain same distance from bottom
+          requestAnimationFrame(() => {
+            if (scrollAreaRef.current) {
+              const newScrollTop = scrollAreaRef.current.scrollHeight - scrollAreaRef.current.clientHeight - distanceFromBottom;
+              scrollAreaRef.current.scrollTop = Math.max(0, newScrollTop);
+            }
+          });
+        }
+      });
     }
   }, [isKeyboardOpen]);
 
@@ -921,8 +941,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     ? messages.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()))
     : messages;
 
-  // Calculate input bottom position based on keyboard
-  const inputBottom = isKeyboardOpen ? keyboardHeight : 0;
+  // inputBottom is already calculated at the top of the component
 
   return (
     <div className="relative h-screen w-full bg-gradient-to-b from-background to-background/95">
