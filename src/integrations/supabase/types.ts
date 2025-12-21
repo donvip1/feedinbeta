@@ -1114,22 +1114,28 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          is_trending: boolean | null
           name: string
           posts_count: number | null
+          trending_score: number | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
+          is_trending?: boolean | null
           name: string
           posts_count?: number | null
+          trending_score?: number | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
+          is_trending?: boolean | null
           name?: string
           posts_count?: number | null
+          trending_score?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -2896,6 +2902,7 @@ export type Database = {
           scheduled_at: string | null
           shares_count: number | null
           status: string | null
+          trending_score: number | null
           updated_at: string | null
           user_id: string
           views_count: number | null
@@ -2932,6 +2939,7 @@ export type Database = {
           scheduled_at?: string | null
           shares_count?: number | null
           status?: string | null
+          trending_score?: number | null
           updated_at?: string | null
           user_id: string
           views_count?: number | null
@@ -2968,6 +2976,7 @@ export type Database = {
           scheduled_at?: string | null
           shares_count?: number | null
           status?: string | null
+          trending_score?: number | null
           updated_at?: string | null
           user_id?: string
           views_count?: number | null
@@ -3743,6 +3752,27 @@ export type Database = {
         }
         Relationships: []
       }
+      trending_searches: {
+        Row: {
+          id: string
+          last_searched_at: string | null
+          query: string
+          search_count: number | null
+        }
+        Insert: {
+          id?: string
+          last_searched_at?: string | null
+          query: string
+          search_count?: number | null
+        }
+        Update: {
+          id?: string
+          last_searched_at?: string | null
+          query?: string
+          search_count?: number | null
+        }
+        Relationships: []
+      }
       typing_indicators: {
         Row: {
           activity_type: string | null
@@ -3838,6 +3868,74 @@ export type Database = {
           total_spent?: number
           updated_at?: string | null
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_engagement_signals: {
+        Row: {
+          created_at: string | null
+          engagement_type: string
+          full_watch: boolean | null
+          id: string
+          post_id: string | null
+          user_id: string
+          watch_duration_seconds: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          engagement_type: string
+          full_watch?: boolean | null
+          id?: string
+          post_id?: string | null
+          user_id: string
+          watch_duration_seconds?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          engagement_type?: string
+          full_watch?: boolean | null
+          id?: string
+          post_id?: string | null
+          user_id?: string
+          watch_duration_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_engagement_signals_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_interests: {
+        Row: {
+          created_at: string | null
+          id: string
+          interest_type: string
+          interest_value: string
+          updated_at: string | null
+          user_id: string
+          weight: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          interest_type: string
+          interest_value: string
+          updated_at?: string | null
+          user_id: string
+          weight?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          interest_type?: string
+          interest_value?: string
+          updated_at?: string | null
+          user_id?: string
+          weight?: number | null
         }
         Relationships: []
       }
@@ -4195,6 +4293,7 @@ export type Database = {
         Returns: boolean
       }
       calculate_trending_posts: { Args: never; Returns: undefined }
+      calculate_trending_scores: { Args: never; Returns: undefined }
       can_change_username: { Args: { user_id: string }; Returns: boolean }
       can_delete_for_everyone: {
         Args: { message_id: string; user_id: string }
@@ -4333,6 +4432,13 @@ export type Database = {
           relevance_score: number
           user_id: string
           views_count: number
+        }[]
+      }
+      get_personalized_feed_v2: {
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
+        Returns: {
+          post_id: string
+          relevance_score: number
         }[]
       }
       get_post_view_count: { Args: { post_id_param: string }; Returns: number }
