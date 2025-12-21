@@ -17,6 +17,8 @@ import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagra
 import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
 import { usePageRefresh } from '@/context/RefreshContext';
+import { useProfileWithCache } from '@/hooks/useProfileWithCache';
+import { indexedDBCache } from '@/lib/indexed-db-cache';
 
 interface Profile {
   id: string;
@@ -92,11 +94,40 @@ const Profile = () => {
     } | null;
   }[]>([]);
 
+  // Use cached profile hook for instant loading
+  const { profile: cachedProfile, isLoading: cacheLoading, refetch: refetchCached } = useProfileWithCache(identifier);
+
   // Helper to check if string is UUID
   const isUUID = (str: string) => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     return uuidRegex.test(str);
   };
+
+  // Load cached data immediately on mount
+  useEffect(() => {
+    if (identifier) {
+      // Try to load from cache immediately for instant display
+      indexedDBCache.get<Profile>(`profile:${identifier}`).then(cached => {
+        if (cached) {
+          setProfile(cached);
+          setLoading(false);
+        }
+      });
+    }
+  }, [identifier]);
+
+  // Update profile from cached hook when available
+  useEffect(() => {
+    if (cachedProfile) {
+      setProfile(prev => ({
+        ...prev,
+        ...cachedProfile,
+        post_count: prev?.post_count || cachedProfile.posts_count || 0,
+        total_views: prev?.total_views || 0,
+      } as Profile));
+      setLoading(false);
+    }
+  }, [cachedProfile]);
 
   // Resolve identifier to userId
   useEffect(() => {
@@ -138,7 +169,8 @@ const Profile = () => {
     const isOwn = user?.id === resolvedUserId;
     setIsOwnProfile(isOwn);
     
-    loadProfile();
+    // Load fresh profile in background (cache already shown)
+    loadProfile(false);
     
     // Load friend requests for own profile
     if (isOwn) {
@@ -146,54 +178,51 @@ const Profile = () => {
     }
     
     if (!isOwn && user) {
-      checkFollowStatus();
-      checkIfFollowingMe();
-      checkFriendRequestStatus();
-      checkMutualFriendStatus();
+      // Run all status checks in parallel
+      Promise.all([
+        checkFollowStatus(),
+        checkIfFollowingMe(),
+        checkFriendRequestStatus(),
+        checkMutualFriendStatus()
+      ]);
     }
   }, [resolvedUserId, user?.id]);
 
   // Subscribe to silent refresh from navigation
   usePageRefresh('profile', useCallback(() => {
     // Silent background refresh
-    loadProfile();
+    loadProfile(false);
+    refetchCached();
     if (isOwnProfile) {
       loadPendingFriendRequests();
     }
-  }, [isOwnProfile]));
+  }, [isOwnProfile, refetchCached]));
 
-  const loadProfile = async () => {
+  const loadProfile = async (showLoading = true) => {
     if (!resolvedUserId) return;
+    
+    // Only show loading if no cached data
+    if (showLoading && !profile) {
+      setLoading(true);
+    }
     
     try {
       // Use public_profiles for viewing OTHER users' profiles (secure view)
       // Use profiles for viewing OWN profile (full access)
       const isOwnProfile = resolvedUserId === user?.id;
       
-      let profileData: any = null;
-      let profileError: any = null;
-      
-      if (isOwnProfile) {
-        const result = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', resolvedUserId)
-          .maybeSingle();
-        profileData = result.data;
-        profileError = result.error;
-      } else {
-        const result = await supabase
-          .from('public_profiles')
-          .select('*')
-          .eq('id', resolvedUserId)
-          .maybeSingle();
-        profileData = result.data;
-        profileError = result.error;
-      }
+      // Fetch profile and counts in parallel
+      const [profileResult, postCountResult, totalLikesResult] = await Promise.all([
+        isOwnProfile 
+          ? supabase.from('profiles').select('*').eq('id', resolvedUserId).maybeSingle()
+          : supabase.from('public_profiles').select('*').eq('id', resolvedUserId).maybeSingle(),
+        supabase.rpc('get_user_post_count', { user_uuid: resolvedUserId }),
+        supabase.rpc('get_user_total_likes', { user_uuid: resolvedUserId })
+      ]);
 
-      if (profileError) throw profileError;
+      if (profileResult.error) throw profileResult.error;
       
-      if (!profileData) {
+      if (!profileResult.data) {
         toast({
           title: 'Profile not found',
           description: 'This profile does not exist.',
@@ -203,27 +232,28 @@ const Profile = () => {
         return;
       }
 
-      // Get post count
-      const { data: postCount } = await supabase
-        .rpc('get_user_post_count', { user_uuid: resolvedUserId });
+      const fullProfile = {
+        ...(profileResult.data as any),
+        post_count: postCountResult.data || 0,
+        total_views: totalLikesResult.data || 0,
+      } as Profile;
 
-      // Get total likes
-      const { data: totalLikes } = await supabase
-        .rpc('get_user_total_likes', { user_uuid: resolvedUserId });
-
-      if (profileData) {
-        setProfile({
-          ...(profileData as any),
-          post_count: postCount || 0,
-          total_views: totalLikes || 0, // Using total_views field to store total likes
-        } as Profile);
+      setProfile(fullProfile);
+      
+      // Cache the profile for instant access next time
+      await indexedDBCache.set(`profile:${identifier}`, fullProfile, 10 * 60 * 1000);
+      if (resolvedUserId !== identifier) {
+        await indexedDBCache.set(`profile:${resolvedUserId}`, fullProfile, 10 * 60 * 1000);
       }
     } catch (error: any) {
-      toast({
-        title: 'Error loading profile',
-        description: error.message,
-        variant: 'destructive',
-      });
+      // Only show error if we don't have cached data
+      if (!profile) {
+        toast({
+          title: 'Error loading profile',
+          description: error.message,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
     }
