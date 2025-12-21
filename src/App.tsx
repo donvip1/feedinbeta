@@ -5,7 +5,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { RefreshProvider } from "@/context/RefreshContext";
+import { CallProvider } from "@/context/CallContext";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
+import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
+import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -95,10 +98,13 @@ const App = () => {
         <BrowserRouter>
           <RefreshProvider>
             <AuthProvider>
-              <Toaster />
-              <IncomingCallListener />
-              <MobileInstallModal />
-            <Routes>
+              <CallProvider>
+                <Toaster />
+                <IncomingCallListener />
+                <FloatingCallWidget />
+                <ActiveCallIndicator />
+                <MobileInstallModal />
+              <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />
             <Route path="/welcome" element={<Welcome />} />
@@ -172,7 +178,8 @@ const App = () => {
             {/* Catch-all */}
             <Route path="*" element={<NotFound />} />
             </Routes>
-          </AuthProvider>
+              </CallProvider>
+            </AuthProvider>
           </RefreshProvider>
         </BrowserRouter>
       </QueryClientProvider>
