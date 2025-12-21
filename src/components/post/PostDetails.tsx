@@ -29,6 +29,7 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
   const { toast } = useToast();
   const navigate = useNavigate();
   const [caption, setCaption] = useState('');
+  const [hashtagsInput, setHashtagsInput] = useState('');
   const [location, setLocation] = useState('');
   const [privacy, setPrivacy] = useState<'everyone' | 'friends' | 'followers' | 'only_me'>('everyone');
   const [loading, setLoading] = useState(false);
@@ -209,11 +210,26 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         scheduledAt = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
       }
 
+      // Parse hashtags from input
+      const parsedHashtags = hashtagsInput
+        .split(/[,\s]+/)
+        .map((tag) => tag.replace(/^#/, '').trim().toLowerCase())
+        .filter((tag) => tag.length > 0);
+      
+      // Combine caption with hashtags
+      const fullContent = parsedHashtags.length > 0 
+        ? `${caption}\n\n${parsedHashtags.map(tag => `#${tag}`).join(' ')}`
+        : caption;
+
+      // Determine effective media type - posts with music attached should be treated as video-type
+      const baseMediaType = uploadedMedia.length > 0 ? uploadedMedia[0].type : 'image';
+      const effectiveMediaType = selectedMusic ? 'video' : baseMediaType;
+
       // Create post with multiple media
       const postData: any = {
         user_id: user.id,
         feed_id: crypto.randomUUID(),
-        content: caption,
+        content: fullContent,
         location: location || null,
         privacy,
         post_type: 'public',
@@ -226,16 +242,19 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
       };
 
       // For multiple media, only use arrays. For single media, use both single and array fields
+      // If music is attached to images, treat as video-type for proper playback
       if (uploadedMedia.length > 1) {
         postData.media_urls = uploadedMedia.map(m => m.url);
-        postData.media_types = uploadedMedia.map(m => m.type);
+        postData.media_types = selectedMusic 
+          ? uploadedMedia.map(() => 'video') // Mark all as video if music attached
+          : uploadedMedia.map(m => m.type);
         postData.media_url = uploadedMedia[0].url;
-        postData.media_type = uploadedMedia[0].type;
+        postData.media_type = effectiveMediaType;
       } else if (uploadedMedia.length === 1) {
         postData.media_url = uploadedMedia[0].url;
-        postData.media_type = uploadedMedia[0].type;
+        postData.media_type = effectiveMediaType;
         postData.media_urls = [uploadedMedia[0].url];
-        postData.media_types = [uploadedMedia[0].type];
+        postData.media_types = [effectiveMediaType];
       }
 
       setUploadProgress(90);
@@ -247,6 +266,13 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         .single();
 
       if (postError) throw postError;
+
+      // Process hashtags in background (don't wait)
+      if (newPost?.id && parsedHashtags.length > 0) {
+        supabase.functions.invoke('process-hashtags', {
+          body: { postId: newPost.id, content: fullContent }
+        }).catch(err => console.error('Error processing hashtags:', err));
+      }
 
       setUploadProgress(100);
       setUploadStage('done');
@@ -347,6 +373,34 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
           className="w-full p-3 border border-border rounded-lg text-sm resize-none bg-background"
           rows={3}
         />
+      </div>
+
+      {/* Hashtags Input */}
+      <div className="w-full mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Hash className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Hashtags</span>
+        </div>
+        <input
+          type="text"
+          placeholder="#fashion #vibes #trending"
+          value={hashtagsInput}
+          onChange={(e) => setHashtagsInput(e.target.value)}
+          className="w-full p-3 border border-border rounded-lg text-sm bg-background"
+        />
+        {hashtagsInput.trim() && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {hashtagsInput
+              .split(/[,\s]+/)
+              .map((tag) => tag.replace(/^#/, '').trim().toLowerCase())
+              .filter((tag) => tag.length > 0)
+              .map((tag, idx) => (
+                <span key={idx} className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
+                  #{tag}
+                </span>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Music Selection - TikTok/Instagram Style */}
