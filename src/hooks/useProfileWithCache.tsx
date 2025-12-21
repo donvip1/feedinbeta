@@ -4,7 +4,7 @@ import { profileCache, CachedProfile } from '@/lib/feed-cache';
 
 interface FullProfile extends Omit<CachedProfile, 'posts_count'> {
   posts_count?: number;
-  purpose?: string;
+  purpose?: string[] | null;
   linkedin_url?: string;
   twitter_url?: string;
   website_url?: string;
@@ -92,7 +92,7 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
           linkedin_url: data.linkedin_url,
           twitter_url: data.twitter_url,
           website_url: data.website_url,
-          location: (Array.isArray(data.location) ? data.location[0] : data.location) as string | undefined,
+          location: Array.isArray(data.location) ? data.location[0] : data.location,
           is_premium: data.is_premium,
           status: data.status,
           status_visibility: data.status_visibility,
