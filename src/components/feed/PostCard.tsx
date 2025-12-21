@@ -214,11 +214,14 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
   }, [user, post.id, post.user_id, hasViewed, onView]);
 
   // Video visibility tracking - auto-play when visible, pause when not
+  // Treat posts with music as video-like posts (need playback controls)
   useEffect(() => {
-    const isVideoPost = currentMediaType === 'video' || 
+    const isVideoPost = currentMediaType === 'video' || hasMusic ||
       ((post.post_type === 'refeed' || post.post_type === 'quote') && post.original_post?.media_type === 'video');
     
-    if (!isVideoPost || !videoRef.current) return;
+    // For posts with music but image media, we still want to track visibility for music playback
+    if (!isVideoPost) return;
+    if (!videoRef.current && !hasMusic) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
