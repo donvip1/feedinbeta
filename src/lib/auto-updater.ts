@@ -8,8 +8,9 @@ class AutoUpdater {
   private checkInterval: number | null = null;
   private isChecking = false;
   private lastCheck = 0;
-  private readonly CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
-  private readonly MIN_CHECK_GAP = 60 * 1000; // 1 minute minimum between checks
+  private readonly CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes for faster updates
+  private readonly MIN_CHECK_GAP = 30 * 1000; // 30 seconds minimum between checks
+  private readonly IDLE_THRESHOLD = 5 * 1000; // 5 seconds of inactivity to apply update
 
   private constructor() {
     this.init();
@@ -46,14 +47,14 @@ class AutoUpdater {
         this.registration.addEventListener('updatefound', this.handleUpdateFound);
       }
 
-      // Listen for controller change
+      // Listen for controller change - apply silently
       let refreshing = false;
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (refreshing) return;
         refreshing = true;
-        console.log('[AutoUpdater] Controller changed, reloading...');
-        // Small delay to ensure smooth transition
-        setTimeout(() => window.location.reload(), 100);
+        console.log('[AutoUpdater] Controller changed, applying update silently...');
+        // Reload silently - the service worker will serve new content
+        window.location.reload();
       });
 
       console.log('[AutoUpdater] Initialized');
@@ -67,18 +68,25 @@ class AutoUpdater {
       clearInterval(this.checkInterval);
     }
     
-    // Check every 5 minutes
+    // Check every 2 minutes for faster updates
     this.checkInterval = window.setInterval(() => {
       this.checkForUpdates();
     }, this.CHECK_INTERVAL);
 
-    // Initial check after 30 seconds
-    setTimeout(() => this.checkForUpdates(), 30000);
+    // Initial check after 10 seconds (faster initial check)
+    setTimeout(() => this.checkForUpdates(), 10000);
   }
 
   private handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
+      // Check for updates when app becomes visible
       this.checkForUpdates();
+    } else if (document.visibilityState === 'hidden') {
+      // Perfect time to apply pending updates when user leaves
+      if (this.registration?.waiting) {
+        console.log('[AutoUpdater] App hidden, applying pending update...');
+        this.registration.waiting.postMessage({ action: 'skipWaiting' });
+      }
     }
   };
 
@@ -140,15 +148,16 @@ class AutoUpdater {
       return;
     }
 
-    // Check if user is idle (no interaction in last 10 seconds)
+    // Check if user is idle or tab is hidden - perfect time to update
     const isIdle = this.isUserIdle();
+    const isHidden = document.visibilityState === 'hidden';
     
-    if (isIdle) {
-      console.log('[AutoUpdater] User is idle, applying update now');
+    if (isIdle || isHidden) {
+      console.log('[AutoUpdater] Applying update silently (idle/hidden)');
       this.registration.waiting.postMessage({ action: 'skipWaiting' });
     } else {
-      console.log('[AutoUpdater] User is active, will apply on next visibility change');
-      // Apply on next visibility change or after a timeout
+      console.log('[AutoUpdater] User active, scheduling background update');
+      // Apply on next visibility change or idle
       const applyOnIdle = () => {
         if (document.visibilityState === 'hidden' || this.isUserIdle()) {
           document.removeEventListener('visibilitychange', applyOnIdle);
@@ -158,17 +167,20 @@ class AutoUpdater {
       
       document.addEventListener('visibilitychange', applyOnIdle);
       
-      // Fallback: apply after 5 minutes regardless
+      // Fallback: apply after 60 seconds regardless (reduced from 5 minutes)
       setTimeout(() => {
         document.removeEventListener('visibilitychange', applyOnIdle);
-        this.registration?.waiting?.postMessage({ action: 'skipWaiting' });
-      }, 5 * 60 * 1000);
+        if (this.registration?.waiting) {
+          console.log('[AutoUpdater] Applying update (timeout)');
+          this.registration.waiting.postMessage({ action: 'skipWaiting' });
+        }
+      }, 60 * 1000);
     }
   }
 
   private isUserIdle(): boolean {
     const lastActivity = parseInt(sessionStorage.getItem('lastUserActivity') || '0', 10);
-    return Date.now() - lastActivity > 10000; // 10 seconds of inactivity
+    return Date.now() - lastActivity > this.IDLE_THRESHOLD;
   }
 
   // Track user activity

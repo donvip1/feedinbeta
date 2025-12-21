@@ -2,8 +2,8 @@
  * Cache Manager - Handles app caching and service worker registration
  */
 
-// Update check interval (5 minutes)
-const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
+// Update check interval (2 minutes for faster updates)
+const UPDATE_CHECK_INTERVAL = 2 * 60 * 1000;
 
 export const CacheManager = {
   currentVersion: '',
@@ -37,24 +37,28 @@ export const CacheManager = {
           }
         });
 
-        // Check for updates every 5 minutes
+        // Check for updates every 2 minutes
         setInterval(() => {
           this.checkForUpdates();
         }, UPDATE_CHECK_INTERVAL);
 
-        // Initial update check after 30 seconds
-        setTimeout(() => this.checkForUpdates(), 30000);
+        // Initial update check after 10 seconds (faster)
+        setTimeout(() => this.checkForUpdates(), 10000);
 
         // Check on visibility change
         document.addEventListener('visibilitychange', () => {
           if (document.visibilityState === 'visible') {
             this.checkForUpdates();
+          } else if (document.visibilityState === 'hidden' && this.registration?.waiting) {
+            // Apply pending updates when user leaves
+            console.log('[Cache] App hidden, applying pending update...');
+            this.updateToNewVersionSilently(this.registration);
           }
         });
 
         // Check when coming back online
         window.addEventListener('online', () => {
-          setTimeout(() => this.checkForUpdates(), 2000);
+          setTimeout(() => this.checkForUpdates(), 1000);
         });
 
         return registration;
@@ -72,8 +76,8 @@ export const CacheManager = {
     if (!this.registration) return false;
     if (!navigator.onLine) return false;
     
-    // Rate limit checks to once per minute
-    if (Date.now() - this.lastUpdateCheck < 60000) return false;
+    // Rate limit checks to once per 30 seconds
+    if (Date.now() - this.lastUpdateCheck < 30000) return false;
     this.lastUpdateCheck = Date.now();
 
     try {
@@ -157,7 +161,7 @@ export const CacheManager = {
   },
 
   /**
-   * Update to new version silently (automatic)
+   * Update to new version silently (automatic - no user prompt)
    */
   async updateToNewVersionSilently(registration: ServiceWorkerRegistration): Promise<void> {
     if (registration.waiting) {
@@ -167,13 +171,12 @@ export const CacheManager = {
         if (refreshing) return;
         refreshing = true;
         console.log('[Cache] Controller changed, reloading silently...');
-        // Delay reload slightly to ensure smooth transition
-        setTimeout(() => {
-          window.location.reload();
-        }, 100);
+        // Reload immediately - user won't notice in most cases
+        window.location.reload();
       });
 
       // Tell the service worker to skip waiting
+      console.log('[Cache] Applying update silently...');
       registration.waiting.postMessage({ action: 'skipWaiting' });
     }
   },

@@ -1,4 +1,4 @@
-import { ArrowLeft, TrendingUp, Shield, Scale, Server, Users, HelpCircle, Mail, ExternalLink, BarChart3 } from "lucide-react";
+import { ArrowLeft, TrendingUp, Shield, Scale, Server, Users, HelpCircle, Mail, ExternalLink, BarChart3, GraduationCap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -78,15 +78,19 @@ const Investors = () => {
   const faqs = [
     {
       question: "What makes FeedIn different from TikTok/Instagram?",
-      answer: "FeedIn prioritizes creator monetization from day one with our built-in credit economy. Unlike platforms that require follower thresholds, any creator can earn immediately through gifts, tips, and premium content. We also integrate AI tools directly into the platform."
+      answer: "FeedIn prioritizes creator monetization from day one with our built-in credit economy. Unlike platforms that require follower thresholds, any creator can earn immediately through gifts, tips, and premium content. We also integrate AI tools and Learn Tech education directly into the platform."
     },
     {
       question: "How does the credit economy work?",
-      answer: "Users purchase credits which can be used to send gifts to creators, access premium content, use AI features, and promote posts. Creators earn credits from their audience and can cash out. The platform takes a small transaction fee, creating sustainable revenue."
+      answer: "Users purchase credits which can be used to send gifts to creators, access premium content, use AI features, enroll in Learn Tech courses, and promote posts. Creators earn credits from their audience and can cash out. The platform takes a small transaction fee, creating sustainable revenue."
+    },
+    {
+      question: "What is Learn Tech and how does it generate revenue?",
+      answer: "Learn Tech is our integrated education platform offering courses in Web Development, Data Science, AI/ML, Mobile Development, Cybersecurity, and more. Revenue comes from premium course fees, certificates, and increased user engagement/retention. It differentiates us from competitors who lack educational features."
     },
     {
       question: "What's the monetization strategy?",
-      answer: "Multiple revenue streams: credit package purchases (primary), premium subscriptions, transaction fees on gifts and P2P trading, promoted content, and AI feature usage fees. This diversified approach reduces dependency on any single revenue source."
+      answer: "Multiple revenue streams: credit package purchases (primary), premium subscriptions, transaction fees on gifts and P2P trading, promoted content, AI feature usage fees, and Learn Tech premium courses/certificates. This diversified approach reduces dependency on any single revenue source."
     },
     {
       question: "How is user data protected?",
@@ -94,11 +98,11 @@ const Investors = () => {
     },
     {
       question: "What's the current traction?",
-      answer: "FeedIn is in active development with a fully functional MVP including social feed, stories, live streaming, messaging, groups, and AI features. We're preparing for beta launch and initial user acquisition."
+      answer: "FeedIn is in active development with a fully functional MVP including social feed, stories, live streaming, messaging, groups, AI features, and Learn Tech education platform. We're preparing for beta launch and initial user acquisition."
     },
     {
       question: "What are potential exit strategies?",
-      answer: "Possible exits include acquisition by larger social/tech companies seeking creator-focused platforms, strategic acquisition by media companies, or growth toward IPO. The creator economy space has seen significant M&A activity."
+      answer: "Possible exits include acquisition by larger social/tech companies seeking creator-focused platforms, strategic acquisition by media or EdTech companies interested in our Learn Tech platform, or growth toward IPO. The creator economy and EdTech spaces have seen significant M&A activity."
     },
     {
       question: "What's the investment being used for?",
@@ -106,7 +110,7 @@ const Investors = () => {
     },
     {
       question: "What's the competitive moat?",
-      answer: "Our moat includes: integrated credit economy creating switching costs, AI-powered features enhancing user experience, early mover advantage in creator-first monetization, and a unified platform reducing fragmentation for users."
+      answer: "Our moat includes: integrated credit economy creating switching costs, AI-powered features enhancing user experience, Learn Tech education platform (unique to social media), early mover advantage in creator-first monetization, and a unified platform reducing fragmentation for users."
     }
   ];
 
@@ -139,6 +143,10 @@ const Investors = () => {
             <Button variant="outline" onClick={() => navigate('/competitive-analysis')}>
               <TrendingUp className="h-4 w-4 mr-2" />
               Competitive Analysis
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/learn-tech')}>
+              <GraduationCap className="h-4 w-4 mr-2" />
+              Learn Tech
             </Button>
             {isAdmin && (
               <Button variant="outline" onClick={() => navigate('/admin/analytics')}>
