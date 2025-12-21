@@ -1,4 +1,4 @@
-import { Mic, MicOff, Video, VideoOff, PhoneOff, Volume2, SwitchCamera, Monitor, MonitorOff } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, Volume2, SwitchCamera, Monitor, MonitorOff, Minimize2, PictureInPicture } from 'lucide-react';
 
 interface CallControlsProps {
   isMuted: boolean;
@@ -6,12 +6,16 @@ interface CallControlsProps {
   isVideoCall: boolean;
   isSpeakerOn: boolean;
   isScreenSharing?: boolean;
+  isPiPSupported?: boolean;
+  isPiPActive?: boolean;
   onToggleMute: () => void;
   onToggleVideo: () => void;
   onToggleSpeaker: () => void;
   onEndCall: () => void;
   onFlipCamera?: () => void;
   onToggleScreenShare?: () => void;
+  onMinimize?: () => void;
+  onTogglePiP?: () => void;
 }
 
 export const CallControls = ({
@@ -20,12 +24,16 @@ export const CallControls = ({
   isVideoCall,
   isSpeakerOn,
   isScreenSharing = false,
+  isPiPSupported = false,
+  isPiPActive = false,
   onToggleMute,
   onToggleVideo,
   onToggleSpeaker,
   onEndCall,
   onFlipCamera,
   onToggleScreenShare,
+  onMinimize,
+  onTogglePiP,
 }: CallControlsProps) => {
   return (
     <div className="flex items-center justify-center gap-3 px-4 flex-wrap">
@@ -92,6 +100,32 @@ export const CallControls = ({
           ) : (
             <Monitor className="w-5 h-5" />
           )}
+        </button>
+      )}
+
+      {/* Picture-in-Picture (only for video calls when supported) */}
+      {isVideoCall && isPiPSupported && onTogglePiP && (
+        <button
+          onClick={onTogglePiP}
+          className={`rounded-full w-14 h-14 flex items-center justify-center transition-all ${
+            isPiPActive
+              ? 'bg-primary/20 text-primary hover:bg-primary/30'
+              : 'bg-white/10 text-white hover:bg-white/20'
+          }`}
+          title={isPiPActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
+        >
+          <PictureInPicture className="w-5 h-5" />
+        </button>
+      )}
+
+      {/* Minimize Button */}
+      {onMinimize && (
+        <button
+          onClick={onMinimize}
+          className="rounded-full w-14 h-14 flex items-center justify-center bg-white/10 text-white hover:bg-white/20 transition-all"
+          title="Minimize call"
+        >
+          <Minimize2 className="w-5 h-5" />
         </button>
       )}
 

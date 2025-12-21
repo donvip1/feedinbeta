@@ -136,23 +136,35 @@ self.addEventListener('push', (event) => {
     };
   }
   
+  const isCall = data.type === 'incoming_call' || data.data?.type === 'incoming_call';
+  
   const title = data.title || 'FeedIn';
   const options = {
     body: data.body || 'You have a new notification',
-    icon: '/favicon.png',
+    icon: data.icon || '/favicon.png',
     badge: '/favicon.png',
-    vibrate: [200, 100, 200],
+    // Long vibration for calls, short for regular notifications
+    vibrate: isCall ? [200, 100, 200, 100, 200, 100, 200, 100, 200] : [200, 100, 200],
     tag: data.tag || 'feedin-notification',
     renotify: true,
-    requireInteraction: false,
+    // Keep call notifications visible until user interacts
+    requireInteraction: isCall,
     data: {
-      url: data.url || '/',
-      type: data.type,
+      url: data.url || data.data?.url || '/',
+      type: data.type || data.data?.type,
+      callId: data.callId || data.data?.callId,
+      callerId: data.callerId || data.data?.callerId,
+      callType: data.callType || data.data?.callType,
       related_id: data.related_id,
       related_type: data.related_type,
       ...data,
     },
-    actions: getActionsForType(data.type),
+    actions: isCall 
+      ? [
+          { action: 'answer', title: '📞 Answer' },
+          { action: 'decline', title: '❌ Decline' }
+        ]
+      : getActionsForType(data.type),
   };
 
   event.waitUntil(
@@ -187,11 +199,44 @@ self.addEventListener('notificationclick', (event) => {
   
   event.notification.close();
   
+  const notificationData = event.notification.data || {};
+  const isCall = notificationData.type === 'incoming_call';
+  
+  // Handle call notification actions
+  if (isCall) {
+    if (event.action === 'decline') {
+      // Decline the call via API
+      event.waitUntil(
+        fetch(`${self.location.origin}/api/decline-call`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callId: notificationData.callId })
+        }).catch(err => console.log('[SW] Failed to decline call:', err))
+      );
+      return;
+    }
+    
+    // Answer or just clicked - navigate to call page
+    const callUrl = `/call?callId=${notificationData.callId}`;
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.focus();
+            client.navigate(callUrl);
+            return;
+          }
+        }
+        return clients.openWindow(callUrl);
+      })
+    );
+    return;
+  }
+  
   if (event.action === 'dismiss') {
     return;
   }
   
-  const notificationData = event.notification.data || {};
   let targetUrl = '/';
   
   // Determine the target URL based on notification type
