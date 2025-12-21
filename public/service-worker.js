@@ -1,5 +1,5 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
@@ -23,7 +23,7 @@ const MAX_IMAGE_CACHE = 100;
 // Update check interval (5 minutes)
 const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
 
-// Install - cache static assets
+// Install - cache static assets and activate immediately
 self.addEventListener('install', (event) => {
   console.log('[SW] Installing service worker v' + CACHE_VERSION);
   event.waitUntil(
@@ -31,13 +31,14 @@ self.addEventListener('install', (event) => {
       console.log('[SW] Caching static assets');
       return cache.addAll(STATIC_ASSETS);
     }).then(() => {
-      // Immediately take over (for faster updates)
+      // Skip waiting immediately to take over faster
+      console.log('[SW] Skipping waiting to activate immediately');
       return self.skipWaiting();
     })
   );
 });
 
-// Activate - clean up old caches
+// Activate - clean up old caches and take control immediately
 self.addEventListener('activate', (event) => {
   console.log('[SW] Activating service worker v' + CACHE_VERSION);
   event.waitUntil(
@@ -51,7 +52,8 @@ self.addEventListener('activate', (event) => {
         })
       );
     }).then(() => {
-      // Take control of all clients immediately
+      // Take control of all clients immediately - this is key for silent updates
+      console.log('[SW] Claiming all clients');
       return self.clients.claim();
     }).then(() => {
       // Notify all clients that a new version is active
@@ -60,9 +62,11 @@ self.addEventListener('activate', (event) => {
           client.postMessage({ 
             action: 'versionUpdate', 
             version: CACHE_VERSION,
-            timestamp: BUILD_TIMESTAMP
+            timestamp: BUILD_TIMESTAMP,
+            silent: true
           });
         });
+        console.log('[SW] Notified', clients.length, 'clients of update');
       });
     })
   );

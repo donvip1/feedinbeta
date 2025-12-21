@@ -27,7 +27,8 @@ import {
   Shield,
   Coins,
   Video,
-  Users
+  Users,
+  GraduationCap
 } from 'lucide-react';
 
 const HelpSupport = () => {
@@ -58,6 +59,16 @@ const HelpSupport = () => {
       question: 'How do I add friends?',
       answer: 'Go to the Friends section, search for users by username, and send them a friend request. Once accepted, you can message each other directly.',
       icon: Users,
+    },
+    {
+      question: 'What is Learn Tech?',
+      answer: 'Learn Tech is our integrated education platform where you can learn programming, web development, data science, AI/ML, mobile development, and more through structured courses and hands-on projects.',
+      icon: GraduationCap,
+    },
+    {
+      question: 'How do I enroll in Learn Tech courses?',
+      answer: 'Go to Learn Tech from the AI menu or settings. Browse available courses by category, click on any course to view details, and tap "Enroll Now" to start learning. Some courses may require credits.',
+      icon: GraduationCap,
     },
     {
       question: 'How do I report inappropriate content?',
@@ -159,6 +170,14 @@ const HelpSupport = () => {
             >
               <Users className="w-5 h-5 text-blue-500" />
               <span className="text-sm">Friends Guide</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto py-4 flex flex-col gap-2 col-span-2"
+              onClick={() => navigate('/learn-tech')}
+            >
+              <GraduationCap className="w-5 h-5 text-green-500" />
+              <span className="text-sm">Learn Tech</span>
             </Button>
           </div>
         </Card>
