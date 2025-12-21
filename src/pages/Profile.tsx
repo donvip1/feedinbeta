@@ -94,7 +94,7 @@ const Profile = () => {
     } | null;
   }[]>([]);
 
-  // Use cached profile hook for instant loading
+  // Use cached profile hook - this returns cached data INSTANTLY
   const { profile: cachedProfile, isLoading: cacheLoading, refetch: refetchCached } = useProfileWithCache(identifier);
 
   // Helper to check if string is UUID
@@ -103,20 +103,7 @@ const Profile = () => {
     return uuidRegex.test(str);
   };
 
-  // Load cached data immediately on mount
-  useEffect(() => {
-    if (identifier) {
-      // Try to load from cache immediately for instant display
-      indexedDBCache.get<Profile>(`profile:${identifier}`).then(cached => {
-        if (cached) {
-          setProfile(cached);
-          setLoading(false);
-        }
-      });
-    }
-  }, [identifier]);
-
-  // Update profile from cached hook when available
+  // INSTANT: Set profile from cache immediately when available - no loading state
   useEffect(() => {
     if (cachedProfile) {
       setProfile(prev => ({
@@ -125,9 +112,25 @@ const Profile = () => {
         post_count: prev?.post_count || cachedProfile.posts_count || 0,
         total_views: prev?.total_views || 0,
       } as Profile));
+      // CRITICAL: Stop loading immediately when we have cached data
       setLoading(false);
     }
   }, [cachedProfile]);
+
+  // Also check sync cache for instant access
+  useEffect(() => {
+    if (!identifier) return;
+    
+    // Check IndexedDB cache synchronously-ish (fast path)
+    const checkCache = async () => {
+      const cached = await indexedDBCache.get<Profile>(`profile:${identifier}`);
+      if (cached && !profile) {
+        setProfile(cached);
+        setLoading(false);
+      }
+    };
+    checkCache();
+  }, [identifier]);
 
   // Resolve identifier to userId
   useEffect(() => {
@@ -677,7 +680,8 @@ const Profile = () => {
     }
   };
 
-  if (loading) {
+  // Only show loading spinner if we have NO profile data at all
+  if (loading && !profile) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-background">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
