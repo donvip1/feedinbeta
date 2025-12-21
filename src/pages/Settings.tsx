@@ -28,6 +28,7 @@ import {
   Users,
   Radio,
   ShieldCheck,
+  Briefcase,
   Smartphone,
   Banknote
 } from 'lucide-react';
@@ -210,6 +211,13 @@ const Settings = () => {
       description: 'Manage app cache and cookies',
       route: '/settings/cache',
       color: 'text-slate-500'
+    },
+    {
+      icon: Briefcase,
+      title: 'For Investors',
+      description: 'Risk disclosure and investor FAQ',
+      route: '/investors',
+      color: 'text-emerald-500'
     }
   ];
 
