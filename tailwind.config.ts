@@ -149,6 +149,14 @@ export default {
           from: { opacity: "1" },
           to: { opacity: "0" },
         },
+        "spin-slow": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+        "marquee": {
+          "0%": { transform: "translateX(0%)" },
+          "100%": { transform: "translateX(-100%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -168,6 +176,8 @@ export default {
         "focus-ring": "focus-ring 0.8s ease-out forwards",
         "record-pulse": "record-pulse 1.5s ease-in-out infinite",
         "flash": "flash 0.1s ease-out forwards",
+        "spin-slow": "spin-slow 3s linear infinite",
+        "marquee": "marquee 8s linear infinite",
       },
     },
   },
