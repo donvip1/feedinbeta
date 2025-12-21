@@ -5,10 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CallControls } from '@/components/calls/CallControls';
 import { ConnectionStatus } from '@/components/calls/ConnectionStatus';
+import { NetworkQualityIndicator } from '@/components/calls/NetworkQualityIndicator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePresence } from '@/hooks/usePresence';
 import { callSounds } from '@/utils/callSounds';
-import { WebRTCManager, ConnectionStatus as ConnectionStatusType } from '@/utils/webrtcManager';
+import { WebRTCManager, ConnectionStatus as ConnectionStatusType, NetworkQuality } from '@/utils/webrtcManager';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -41,12 +42,14 @@ const Call = () => {
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'offline' | 'ended'>('connecting');
   const [otherUserProfile, setOtherUserProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('initializing');
   const [connectionMessage, setConnectionMessage] = useState('Starting call...');
   const [showRetry, setShowRetry] = useState(false);
+  const [networkQuality, setNetworkQuality] = useState<NetworkQuality | null>(null);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -77,7 +80,6 @@ const Call = () => {
     }, 1000);
   }, []);
 
-  // Helper function to get or create conversation between two users
   const getOrCreateConversation = async (userId1: string, userId2: string): Promise<string | null> => {
     try {
       const { data: existingConvs } = await supabase
@@ -224,15 +226,12 @@ const Call = () => {
     setConnectionMessage('Retrying connection...');
     setupCompleteRef.current = false;
     
-    // Cleanup existing connection
     await webrtcRef.current?.cleanup();
     webrtcRef.current = null;
     
-    // Re-setup WebRTC
     await setupWebRTC(callData);
   }, [callData, user]);
 
-  // Initialize call
   useEffect(() => {
     if (user === undefined) return;
     
@@ -459,6 +458,9 @@ const Call = () => {
               setShowRetry(true);
             }
           },
+          onNetworkQuality: (quality) => {
+            setNetworkQuality(quality);
+          },
           onError: (error) => {
             console.error('[Call] WebRTC error:', error);
             setShowRetry(true);
@@ -477,18 +479,13 @@ const Call = () => {
         localVideoRef.current.srcObject = localStream;
       }
 
-      // Improved synchronization: receiver signals ready, then caller sends offer
+      // Use presence-based synchronization
       if (data.caller_id === user?.id) {
-        // Caller: wait for receiver ready signal, then send offer
-        console.log('[Call] Caller waiting for receiver ready signal...');
-        await webrtcRef.current.waitForReceiverReady(5000);
-        
-        console.log('[Call] Caller creating and sending offer...');
-        await webrtcRef.current.createAndSendOffer();
+        // Caller: wait for peer presence, then send offer
+        console.log('[Call] Caller waiting for peer and creating offer...');
+        await webrtcRef.current.waitForPeerAndCreateOffer(8000);
       } else {
-        // Receiver: signal ready, then wait for offer
-        console.log('[Call] Receiver signaling ready...');
-        await webrtcRef.current.sendReceiverReady();
+        // Receiver: just wait for offer (presence is tracked automatically)
         console.log('[Call] Receiver waiting for offer from caller...');
       }
       
@@ -526,6 +523,33 @@ const Call = () => {
     });
   };
 
+  const flipCamera = async () => {
+    if (webrtcRef.current) {
+      const success = await webrtcRef.current.flipCamera();
+      if (success && localVideoRef.current) {
+        localVideoRef.current.srcObject = webrtcRef.current.getLocalStream();
+      }
+    }
+  };
+
+  const toggleScreenShare = async () => {
+    if (!webrtcRef.current) return;
+    
+    if (isScreenSharing) {
+      await webrtcRef.current.stopScreenShare();
+      setIsScreenSharing(false);
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = webrtcRef.current.getLocalStream();
+      }
+    } else {
+      const screenStream = await webrtcRef.current.startScreenShare();
+      if (screenStream && localVideoRef.current) {
+        localVideoRef.current.srcObject = screenStream;
+        setIsScreenSharing(true);
+      }
+    }
+  };
+
   if (!callData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -535,6 +559,7 @@ const Call = () => {
   }
 
   const isVideoCall = callTypeRef.current === 'video';
+  const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex flex-col relative overflow-hidden">
@@ -547,9 +572,16 @@ const Call = () => {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       </div>
 
+      {/* Network Quality Indicator */}
+      {isConnected && (
+        <div className="absolute top-4 right-4 z-20">
+          <NetworkQualityIndicator quality={networkQuality} showDetails />
+        </div>
+      )}
+
       {/* Connection Status Overlay */}
       {callStatus === 'connecting' && connectionStatus !== 'connected' && (
-        <div className="absolute top-4 left-4 right-4 z-20">
+        <div className="absolute top-4 left-4 right-20 z-20">
           <ConnectionStatus 
             status={connectionStatus}
             message={connectionMessage}
@@ -603,6 +635,11 @@ const Call = () => {
                   <span className="text-gray-400 text-xs">Camera off</span>
                 </div>
               )}
+              {isScreenSharing && (
+                <div className="absolute bottom-1 left-1 right-1 bg-primary/80 text-xs text-center py-0.5 rounded">
+                  Sharing
+                </div>
+              )}
             </div>
             
             {/* Call info */}
@@ -618,7 +655,7 @@ const Call = () => {
             </div>
           </div>
         ) : (
-          /* Voice call layout - single avatar only */
+          /* Voice call layout */
           <div className="flex flex-col items-center justify-center gap-8">
             <div className="relative">
               {(callStatus === 'ringing' || callStatus === 'connecting') && (
@@ -672,7 +709,6 @@ const Call = () => {
                 </p>
               )}
               
-              {/* Retry button for failed connections */}
               {showRetry && callStatus !== 'connected' && callStatus !== 'ended' && (
                 <Button
                   onClick={retryConnection}
@@ -695,10 +731,13 @@ const Call = () => {
           isVideoOff={isVideoOff}
           isSpeakerOn={isSpeakerOn}
           isVideoCall={isVideoCall}
+          isScreenSharing={isScreenSharing}
           onToggleMute={toggleMute}
           onToggleVideo={toggleVideo}
           onToggleSpeaker={toggleSpeaker}
           onEndCall={endCall}
+          onFlipCamera={isVideoCall && isMobileDevice ? flipCamera : undefined}
+          onToggleScreenShare={isVideoCall && !isMobileDevice ? toggleScreenShare : undefined}
         />
       </div>
     </div>

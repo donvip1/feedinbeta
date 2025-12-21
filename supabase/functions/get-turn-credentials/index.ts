@@ -6,7 +6,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -14,10 +13,43 @@ serve(async (req) => {
   try {
     console.log('[TURN] Generating TURN credentials...');
 
-    // Use free public TURN servers from Open Relay Project
-    // These are free and widely used for WebRTC applications
+    // Comprehensive ICE server list with reliable providers
     const iceServers = [
-      // Open Relay TURN servers (free, reliable)
+      // Google STUN servers (highly reliable)
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' },
+      
+      // Metered TURN servers (free tier - reliable)
+      {
+        urls: 'turn:a.relay.metered.ca:80',
+        username: 'e8dd65c92e9b0a5f1c47f890',
+        credential: 'IpV+N4hHwXjzwQKE',
+      },
+      {
+        urls: 'turn:a.relay.metered.ca:80?transport=tcp',
+        username: 'e8dd65c92e9b0a5f1c47f890',
+        credential: 'IpV+N4hHwXjzwQKE',
+      },
+      {
+        urls: 'turn:a.relay.metered.ca:443',
+        username: 'e8dd65c92e9b0a5f1c47f890',
+        credential: 'IpV+N4hHwXjzwQKE',
+      },
+      {
+        urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+        username: 'e8dd65c92e9b0a5f1c47f890',
+        credential: 'IpV+N4hHwXjzwQKE',
+      },
+      {
+        urls: 'turns:a.relay.metered.ca:443',
+        username: 'e8dd65c92e9b0a5f1c47f890',
+        credential: 'IpV+N4hHwXjzwQKE',
+      },
+      
+      // OpenRelay TURN servers (backup)
       {
         urls: 'turn:openrelay.metered.ca:80',
         username: 'openrelayproject',
@@ -32,10 +64,6 @@ serve(async (req) => {
         urls: 'turn:openrelay.metered.ca:443?transport=tcp',
         username: 'openrelayproject',
         credential: 'openrelayproject',
-      },
-      // Additional STUN servers for better ICE candidates
-      {
-        urls: 'stun:stun.relay.metered.ca:80',
       },
     ];
 
@@ -59,8 +87,10 @@ serve(async (req) => {
       JSON.stringify({ 
         error: errorMessage,
         success: false,
-        // Fallback to STUN-only if TURN fails
-        iceServers: [],
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
       }),
       { 
         status: 500,
