@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { startupPreloader } from '@/lib/startup-preloader';
+import { appShellPreloader } from '@/lib/app-shell-preloader';
 import { backgroundSync } from '@/lib/background-sync';
 
 /**
@@ -15,10 +15,7 @@ export function useDataPreloader(): void {
     if (user?.id && !initialized.current) {
       initialized.current = true;
 
-      // Start aggressive preload
-      startupPreloader.startPreload(user.id);
-
-      // Initialize background sync
+      // Background sync initialization
       backgroundSync.initialize(user.id);
     }
 
@@ -27,7 +24,7 @@ export function useDataPreloader(): void {
       if (!user) {
         initialized.current = false;
         backgroundSync.stop();
-        startupPreloader.reset();
+        appShellPreloader.reset();
       }
     };
   }, [user?.id]);

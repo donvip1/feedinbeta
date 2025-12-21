@@ -17,6 +17,12 @@ interface Post {
   comments_count?: number;
   refeeds_count?: number;
   shares_count?: number;
+  post_type?: string | null;
+  original_post?: {
+    id: string;
+    media_url: string | null;
+    media_type: string | null;
+  } | null;
   profiles?: {
     username: string | null;
     display_name: string | null;
@@ -84,13 +90,39 @@ export default function FullscreenMediaViewer({
 
   // Filter posts by media type - videos with videos, images with images
   // For videos, use allVideoPosts if provided (contains ALL video posts for TikTok-style navigation)
-  const isVideoPost = post.media_type === 'video';
-  const navigablePosts = isVideoPost 
-    ? (allVideoPosts && allVideoPosts.length > 0 ? allVideoPosts : allPosts.filter(p => p.media_type === 'video'))
-    : allPosts.filter(p => p.media_type === 'image');
+  const isVideoPost = post.media_type === 'video' || 
+    ((post as any).post_type === 'refeed' && (post as any).original_post?.media_type === 'video') ||
+    ((post as any).post_type === 'quote' && (post as any).original_post?.media_type === 'video');
+  
+  // Build navigable posts list - ensure we have the correct media type filter
+  const navigablePosts = (() => {
+    if (isVideoPost) {
+      // For video posts, prefer allVideoPosts if available
+      if (allVideoPosts && allVideoPosts.length > 0) {
+        return allVideoPosts;
+      }
+      // Fallback: filter allPosts for video content
+      return allPosts.filter(p => 
+        p.media_type === 'video' || 
+        (p.post_type === 'refeed' && p.original_post?.media_type === 'video') ||
+        (p.post_type === 'quote' && p.original_post?.media_type === 'video')
+      );
+    }
+    // For image posts, filter for images
+    return allPosts.filter(p => p.media_type === 'image' && p.media_url);
+  })();
 
-  const currentPost = navigablePosts[currentPostIndex];
-  const isVideo = currentPost?.media_type === 'video';
+  const currentPost = navigablePosts[currentPostIndex] || post;
+  const isVideo = currentPost?.media_type === 'video' || 
+    (currentPost?.post_type === 'refeed' && currentPost?.original_post?.media_type === 'video') ||
+    (currentPost?.post_type === 'quote' && currentPost?.original_post?.media_type === 'video');
+  
+  // Get the actual media URL for the current post (handle refeeds)
+  const getMediaUrl = (p: Post) => {
+    if (p.media_url) return p.media_url;
+    if ((p as any).original_post?.media_url) return (p as any).original_post.media_url;
+    return null;
+  };
 
   // Mark post as viewed when navigating to it
   useEffect(() => {
@@ -459,7 +491,7 @@ export default function FullscreenMediaViewer({
         {isVideo ? (
           <video
             ref={videoRef}
-            src={currentPost.media_url || ''}
+            src={getMediaUrl(currentPost) || ''}
             className="w-full h-full object-cover"
             playsInline
             muted={isMuted}
@@ -471,7 +503,7 @@ export default function FullscreenMediaViewer({
           />
         ) : (
           <img
-            src={currentPost.media_url || ''}
+            src={getMediaUrl(currentPost) || ''}
             alt="Post content"
             className="w-full h-full object-cover"
             onClick={handleImageTap}
@@ -647,22 +679,11 @@ export default function FullscreenMediaViewer({
           </div>
         )}
 
-        {/* Navigation Hints */}
+        {/* Post counter - minimal indicator */}
         {navigablePosts.length > 1 && (
-          <>
-            {currentPostIndex < navigablePosts.length - 1 && (
-              <div className="absolute bottom-36 left-4 text-white/50 text-xs flex items-center gap-1">
-                <span className="animate-bounce">↑</span>
-                Swipe up for next {isVideo ? 'video' : 'image'} ({currentPostIndex + 1}/{navigablePosts.length})
-              </div>
-            )}
-            {currentPostIndex > 0 && (
-              <div className="absolute top-20 left-4 text-white/50 text-xs flex items-center gap-1">
-                <span className="animate-bounce">↓</span>
-                Swipe down for previous
-              </div>
-            )}
-          </>
+          <div className="absolute bottom-36 left-4 text-white/40 text-xs">
+            {currentPostIndex + 1}/{navigablePosts.length}
+          </div>
         )}
       </div>
     </div>

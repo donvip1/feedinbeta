@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SessionManager } from '@/lib/session-manager';
 import { CookieManager } from '@/lib/cookie-manager';
-import { startupPreloader } from '@/lib/startup-preloader';
+import { appShellPreloader } from '@/lib/app-shell-preloader';
 import { backgroundSync } from '@/lib/background-sync';
 
 interface AuthContextType {
@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         if (event === 'SIGNED_IN') {
           // Start aggressive preload for offline-first experience
           if (session?.user) {
-            startupPreloader.startPreload(session.user.id);
+            appShellPreloader.refreshInBackground();
             backgroundSync.initialize(session.user.id);
             // Defer profile sync to avoid deadlock
             setTimeout(() => {
@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else if (event === 'SIGNED_OUT') {
           // Stop background sync and reset preloader
           backgroundSync.stop();
-          startupPreloader.reset();
+          appShellPreloader.reset();
           // Clear all local data on sign out
           clearAllLocalData();
           setUser(null);
