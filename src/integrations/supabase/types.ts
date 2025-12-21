@@ -1958,12 +1958,17 @@ export type Database = {
           id: string
           is_copyright_free: boolean | null
           is_trending: boolean | null
+          original_creator_id: string | null
+          original_post_id: string | null
           play_count: number | null
           preview_url: string | null
           source: string | null
           title: string
+          trim_end: number | null
+          trim_start: number | null
           updated_at: string | null
           uploader_id: string | null
+          usage_count: number | null
         }
         Insert: {
           artist?: string | null
@@ -1975,12 +1980,17 @@ export type Database = {
           id?: string
           is_copyright_free?: boolean | null
           is_trending?: boolean | null
+          original_creator_id?: string | null
+          original_post_id?: string | null
           play_count?: number | null
           preview_url?: string | null
           source?: string | null
           title: string
+          trim_end?: number | null
+          trim_start?: number | null
           updated_at?: string | null
           uploader_id?: string | null
+          usage_count?: number | null
         }
         Update: {
           artist?: string | null
@@ -1992,14 +2002,41 @@ export type Database = {
           id?: string
           is_copyright_free?: boolean | null
           is_trending?: boolean | null
+          original_creator_id?: string | null
+          original_post_id?: string | null
           play_count?: number | null
           preview_url?: string | null
           source?: string | null
           title?: string
+          trim_end?: number | null
+          trim_start?: number | null
           updated_at?: string | null
           uploader_id?: string | null
+          usage_count?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "music_tracks_original_creator_id_fkey"
+            columns: ["original_creator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "music_tracks_original_creator_id_fkey"
+            columns: ["original_creator_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "music_tracks_original_post_id_fkey"
+            columns: ["original_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       muted_users: {
         Row: {
@@ -2848,7 +2885,10 @@ export type Database = {
           moderation_status: string | null
           music_artist: string | null
           music_title: string | null
+          music_trim_end: number | null
+          music_trim_start: number | null
           music_url: string | null
+          original_audio_track_id: string | null
           original_post_id: string | null
           post_type: string | null
           privacy: string | null
@@ -2881,7 +2921,10 @@ export type Database = {
           moderation_status?: string | null
           music_artist?: string | null
           music_title?: string | null
+          music_trim_end?: number | null
+          music_trim_start?: number | null
           music_url?: string | null
+          original_audio_track_id?: string | null
           original_post_id?: string | null
           post_type?: string | null
           privacy?: string | null
@@ -2914,7 +2957,10 @@ export type Database = {
           moderation_status?: string | null
           music_artist?: string | null
           music_title?: string | null
+          music_trim_end?: number | null
+          music_trim_start?: number | null
           music_url?: string | null
+          original_audio_track_id?: string | null
           original_post_id?: string | null
           post_type?: string | null
           privacy?: string | null
@@ -2927,6 +2973,13 @@ export type Database = {
           views_count?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "posts_original_audio_track_id_fkey"
+            columns: ["original_audio_track_id"]
+            isOneToOne: false
+            referencedRelation: "music_tracks"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "posts_original_post_id_fkey"
             columns: ["original_post_id"]

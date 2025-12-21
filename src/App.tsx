@@ -57,6 +57,7 @@ import SessionManagement from "./pages/SessionManagement";
 import CreatorPayouts from "./pages/CreatorPayouts";
 import Promotions from "./pages/Promotions";
 import Install from "./pages/Install";
+import MusicDiscovery from "./pages/MusicDiscovery";
 
 const queryClient = new QueryClient();
 
@@ -151,6 +152,7 @@ const App = () => {
             
             {/* Posts & Content Management */}
             <Route path="/saved" element={<SavedPosts />} />
+            <Route path="/music" element={<MusicDiscovery />} />
             <Route path="/promotions" element={<Promotions />} />
             <Route path="/promote/:postId" element={<Promote />} />
             <Route path="/moderation" element={<Moderation />} />
