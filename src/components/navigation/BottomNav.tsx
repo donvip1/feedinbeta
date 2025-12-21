@@ -9,6 +9,8 @@ import { useEffect, useState, useCallback, useContext } from 'react';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { RefreshContext, RefreshContextType, RefreshPage } from '@/context/RefreshContext';
+import { navigationPrefetcher } from '@/lib/navigation-prefetcher';
+import { memoryCache } from '@/lib/memory-cache';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -26,8 +28,18 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   useEffect(() => {
     if (user) {
-      loadAvatar();
+      // Try to get avatar from memory cache first (INSTANT)
+      const cachedProfile = memoryCache.get<any>(`profile:${user.id}`);
+      if (cachedProfile?.avatar_url) {
+        setAvatarUrl(cachedProfile.avatar_url);
+      } else {
+        loadAvatar();
+      }
+      
       loadUnreadMessages();
+      
+      // Prefetch all nav destinations for instant navigation
+      navigationPrefetcher.setUserId(user.id);
       
       // Subscribe to new messages for INSTANT real-time updates
       const channel = supabase

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { profileCache, CachedProfile } from '@/lib/feed-cache';
 import { memoryCache } from '@/lib/memory-cache';
+import { usernameCache } from '@/lib/username-cache';
 
 interface FullProfile extends Omit<CachedProfile, 'posts_count'> {
   posts_count?: number;
@@ -28,11 +29,17 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
   // INSTANT: Check memory cache synchronously FIRST
   const memoryCached = identifier ? memoryCache.get<FullProfile>(`profile:${identifier}`) : null;
   
-  const [profile, setProfile] = useState<FullProfile | null>(memoryCached);
-  const [isLoading, setIsLoading] = useState(!memoryCached); // Only load if no memory cache
+  // Also try to resolve username to ID from username cache for faster lookup
+  const resolvedId = identifier && !isUUID(identifier) ? usernameCache.get(identifier) : null;
+  const memoryCachedById = resolvedId ? memoryCache.get<FullProfile>(`profile:${resolvedId}`) : null;
+  
+  const initialProfile = memoryCached || memoryCachedById || null;
+  
+  const [profile, setProfile] = useState<FullProfile | null>(initialProfile);
+  const [isLoading, setIsLoading] = useState(!initialProfile); // Only load if no memory cache
   const [isFreshLoading, setIsFreshLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [cacheChecked, setCacheChecked] = useState(!!memoryCached);
+  const [cacheChecked, setCacheChecked] = useState(!!initialProfile);
 
   // Check IndexedDB cache if memory cache miss
   useEffect(() => {
@@ -45,11 +52,11 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
         setIsLoading(false);
         // Save to memory cache for future instant access
         memoryCache.set(`profile:${identifier}`, cached, 30 * 60 * 1000);
-      } else if (!memoryCached) {
+      } else if (!initialProfile) {
         setIsLoading(true);
       }
     });
-  }, [identifier, cacheChecked, memoryCached]);
+  }, [identifier, cacheChecked, initialProfile]);
 
   const fetchProfile = useCallback(async (showLoading = true) => {
     if (!identifier) {
@@ -65,8 +72,16 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
         setIsLoading(true);
       }
 
-      // Determine if identifier is UUID or username
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+      // Try to use cached username -> ID mapping for faster resolution
+      let targetId = identifier;
+      const isIdentifierUUID = isUUID(identifier);
+      
+      if (!isIdentifierUUID) {
+        const cachedId = usernameCache.get(identifier);
+        if (cachedId) {
+          targetId = cachedId;
+        }
+      }
 
       let query = supabase
         .from('profiles')
@@ -77,8 +92,8 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
           location, is_premium, status, status_visibility, about
         `);
 
-      if (isUUID) {
-        query = query.eq('id', identifier);
+      if (isUUID(targetId)) {
+        query = query.eq('id', targetId);
       } else {
         query = query.eq('username', identifier);
       }
@@ -90,7 +105,7 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
       }
 
       if (data) {
-        // Get posts count separately
+        // Get posts count separately (don't block on this)
         const { count: postsCount } = await supabase
           .from('posts')
           .select('*', { count: 'exact', head: true })
@@ -121,19 +136,18 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
         
         // Cache to memory (instant) and IndexedDB (persistent)
         memoryCache.set(`profile:${identifier}`, profileData, 30 * 60 * 1000);
+        memoryCache.set(`profile:${data.id}`, profileData, 30 * 60 * 1000);
+        
+        // Cache username -> ID mapping
+        if (data.username) {
+          await usernameCache.set(data.username, data.id);
+          memoryCache.set(`profile:${data.username}`, profileData, 30 * 60 * 1000);
+        }
+        
         await profileCache.set(identifier, {
           ...profileData,
           posts_count: profileData.posts_count || 0,
         });
-        
-        // Also cache by ID if we fetched by username
-        if (!isUUID && data.id !== identifier) {
-          memoryCache.set(`profile:${data.id}`, profileData, 30 * 60 * 1000);
-          await profileCache.set(data.id, {
-            ...profileData,
-            posts_count: profileData.posts_count || 0,
-          });
-        }
       }
 
       setError(null);
@@ -144,7 +158,7 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
       setIsLoading(false);
       setIsFreshLoading(false);
     }
-  }, [identifier]);
+  }, [identifier, profile]);
 
   // Fetch fresh data in background after cache check
   useEffect(() => {
@@ -162,21 +176,34 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
   };
 };
 
+// Helper function
+function isUUID(str: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
 // Hook to prefetch a profile (e.g., on hover)
 export const usePrefetchProfile = () => {
   const prefetch = useCallback(async (identifier: string) => {
-    // Check if already cached
+    // Check if already cached in memory
+    if (memoryCache.has(`profile:${identifier}`)) return;
+    
+    // Check username cache for resolved ID
+    const resolvedId = isUUID(identifier) ? null : usernameCache.get(identifier);
+    if (resolvedId && memoryCache.has(`profile:${resolvedId}`)) return;
+
+    // Check IndexedDB cache
     const cached = await profileCache.get(identifier);
-    if (cached) return;
+    if (cached) {
+      memoryCache.set(`profile:${identifier}`, cached, 30 * 60 * 1000);
+      return;
+    }
 
     // Fetch and cache
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
-
     let query = supabase
       .from('profiles')
       .select('id, username, display_name, avatar_url, cover_url, bio, followers_count, following_count');
 
-    if (isUUID) {
+    if (isUUID(identifier)) {
       query = query.eq('id', identifier);
     } else {
       query = query.eq('username', identifier);
@@ -197,6 +224,15 @@ export const usePrefetchProfile = () => {
         posts_count: 0, // Will be fetched when full profile loads
       };
 
+      // Cache everywhere
+      memoryCache.set(`profile:${identifier}`, profileData, 30 * 60 * 1000);
+      memoryCache.set(`profile:${data.id}`, profileData, 30 * 60 * 1000);
+      
+      if (data.username) {
+        await usernameCache.set(data.username, data.id);
+        memoryCache.set(`profile:${data.username}`, profileData, 30 * 60 * 1000);
+      }
+      
       await profileCache.set(identifier, profileData);
     }
   }, []);
