@@ -140,7 +140,18 @@ const Feed = () => {
       );
 
       // Sort posts: unviewed promoted first, then unviewed, then viewed
-      const sortedPosts = [...allPosts].sort((a, b) => {
+      // Also add promotion metadata to posts
+      const postsWithPromotion = allPosts.map(post => {
+        const promo = promotedMap.get(post.id);
+        return {
+          ...post,
+          _isPromoted: promo?.is_promoted || false,
+          _boostLevel: promo?.boost_level || null,
+          _promoterName: null, // Could be extended to fetch promoter info
+        };
+      });
+
+      const sortedPosts = [...postsWithPromotion].sort((a, b) => {
         const aViewed = viewedMap.get(a.id) || initialViewedRef.current.includes(a.id);
         const bViewed = viewedMap.get(b.id) || initialViewedRef.current.includes(b.id);
         const aPromo = promotedMap.get(a.id);
@@ -425,6 +436,9 @@ const Feed = () => {
                 <div key={uniqueKey} className={wrapperClass}>
                   <PostCard
                     post={post}
+                    isPromoted={post._isPromoted || false}
+                    promoterName={post._promoterName}
+                    boostLevel={post._boostLevel}
                     allPosts={displayPosts}
                     allVideoPosts={allVideoPostsRef.current}
                     onLikeUpdate={() => refetch()}
