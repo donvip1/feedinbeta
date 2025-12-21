@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import { PackageCard } from '@/components/wallet/PackageCard';
 import { SubscriptionCard } from '@/components/wallet/SubscriptionCard';
 import { TransactionList } from '@/components/wallet/TransactionList';
 import { usePageRefresh } from '@/context/RefreshContext';
+import { useCachedQuery } from '@/hooks/useCachedQuery';
 
 const Wallet = () => {
   const navigate = useNavigate();
@@ -35,7 +36,6 @@ const Wallet = () => {
 
   // Subscribe to silent refresh from navigation
   usePageRefresh('wallet', useCallback(() => {
-    // Silent background refresh - no loading indicators
     queryClient.invalidateQueries({ queryKey: ['user-credits'] });
     queryClient.invalidateQueries({ queryKey: ['credit-transactions'] });
     queryClient.invalidateQueries({ queryKey: ['user-subscription'] });
@@ -48,7 +48,9 @@ const Wallet = () => {
     }
   }, [user, authLoading, navigate]);
 
-  const { data: credits } = useQuery({
+  // Credits with offline-first caching
+  const { data: credits, isStale: creditsStale } = useCachedQuery({
+    cacheKey: `credits:${user?.id}`,
     queryKey: ['user-credits', user?.id],
     queryFn: async () => {
       const { data: baseData, error: baseError } = await supabase
@@ -70,9 +72,12 @@ const Wallet = () => {
       };
     },
     enabled: !!user,
+    ttl: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: transactions } = useQuery({
+  // Transactions with caching
+  const { data: transactions } = useCachedQuery({
+    cacheKey: `transactions:${user?.id}`,
     queryKey: ['credit-transactions', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -86,9 +91,12 @@ const Wallet = () => {
       return data;
     },
     enabled: !!user,
+    ttl: 5 * 60 * 1000, // 5 minutes
   });
 
-  const { data: subscription } = useQuery({
+  // Subscription with caching
+  const { data: subscription } = useCachedQuery({
+    cacheKey: `subscription:${user?.id}`,
     queryKey: ['user-subscription', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -102,9 +110,12 @@ const Wallet = () => {
       return data;
     },
     enabled: !!user,
+    ttl: 30 * 60 * 1000, // 30 minutes
   });
 
-  const { data: packages } = useQuery({
+  // Packages with caching
+  const { data: packages } = useCachedQuery({
+    cacheKey: 'credit_packages',
     queryKey: ['credit-packages'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -116,9 +127,12 @@ const Wallet = () => {
       if (error) throw error;
       return data;
     },
+    ttl: 60 * 60 * 1000, // 1 hour
   });
 
-  const { data: tiers } = useQuery({
+  // Subscription tiers with caching
+  const { data: tiers } = useCachedQuery({
+    cacheKey: 'subscription_tiers',
     queryKey: ['subscription-tiers'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -130,6 +144,7 @@ const Wallet = () => {
       if (error) throw error;
       return data;
     },
+    ttl: 60 * 60 * 1000, // 1 hour
   });
 
   if (authLoading) {

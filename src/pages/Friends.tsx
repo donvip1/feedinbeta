@@ -13,6 +13,7 @@ import { Search, UserPlus, Check, X, ArrowLeft, Settings as SettingsIcon, Clock,
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { sanitizeSearchQuery } from '@/lib/search-utils';
+import { useCachedQuery } from '@/hooks/useCachedQuery';
 
 interface Profile {
   id: string;
@@ -41,124 +42,102 @@ const Friends = () => {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Profile[]>([]);
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
-  const [outgoingRequests, setOutgoingRequests] = useState<FriendRequest[]>([]);
-  const [friends, setFriends] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [friendshipStatuses, setFriendshipStatuses] = useState<Record<string, FriendshipStatus>>({});
 
-  const loadFriendRequests = useCallback(async () => {
-    if (!user?.id) return;
-    
-    try {
+  // Friend requests with caching
+  const { data: friendRequestsData, refetch: refetchRequests } = useCachedQuery({
+    cacheKey: `friend_requests:${user?.id}`,
+    queryKey: ['friend-requests', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { incoming: [], outgoing: [] };
+
       // Load incoming requests
-      const { data: incomingData, error: incomingError } = await supabase
+      const { data: incomingData } = await supabase
         .from('friend_requests')
         .select('id, sender_id, receiver_id, status, created_at')
         .eq('receiver_id', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-      if (incomingError) throw incomingError;
-
       // Load outgoing requests
-      const { data: outgoingData, error: outgoingError } = await supabase
+      const { data: outgoingData } = await supabase
         .from('friend_requests')
         .select('id, sender_id, receiver_id, status, created_at')
         .eq('sender_id', user.id)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
-      if (outgoingError) throw outgoingError;
-
-      // Fetch profiles for all requests
+      // Fetch profiles
       const allUserIds = [
         ...(incomingData || []).map(req => req.sender_id),
         ...(outgoingData || []).map(req => req.receiver_id)
       ];
 
+      let profiles: Profile[] = [];
       if (allUserIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
+        const { data } = await supabase
           .from('public_profiles')
           .select('*')
           .in('id', allUserIds);
-
-        if (profilesError) throw profilesError;
-
-        // Combine incoming requests with profiles
-        const incomingWithProfiles = (incomingData || []).map(req => ({
-          ...req,
-          profiles: profiles?.find(p => p.id === req.sender_id) || {
-            id: req.sender_id,
-            display_name: null,
-            username: null,
-            avatar_url: null,
-            bio: null,
-            followers_count: 0,
-            following_count: 0,
-          }
-        }));
-
-        // Combine outgoing requests with profiles
-        const outgoingWithProfiles = (outgoingData || []).map(req => ({
-          ...req,
-          profiles: profiles?.find(p => p.id === req.receiver_id) || {
-            id: req.receiver_id,
-            display_name: null,
-            username: null,
-            avatar_url: null,
-            bio: null,
-            followers_count: 0,
-            following_count: 0,
-          }
-        }));
-
-        setFriendRequests(incomingWithProfiles);
-        setOutgoingRequests(outgoingWithProfiles);
-      } else {
-        setFriendRequests([]);
-        setOutgoingRequests([]);
+        profiles = data || [];
       }
-    } catch (error: any) {
-      console.error('Error loading friend requests:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
 
-  const loadFriends = useCallback(async () => {
-    if (!user?.id) return;
-    
-    try {
-      const { data: acceptedRequests, error } = await supabase
+      const incoming = (incomingData || []).map(req => ({
+        ...req,
+        profiles: profiles.find(p => p.id === req.sender_id) || {
+          id: req.sender_id, display_name: null, username: null, avatar_url: null, bio: null, followers_count: 0, following_count: 0
+        }
+      }));
+
+      const outgoing = (outgoingData || []).map(req => ({
+        ...req,
+        profiles: profiles.find(p => p.id === req.receiver_id) || {
+          id: req.receiver_id, display_name: null, username: null, avatar_url: null, bio: null, followers_count: 0, following_count: 0
+        }
+      }));
+
+      return { incoming, outgoing };
+    },
+    enabled: !!user?.id,
+    ttl: 5 * 60 * 1000, // 5 minutes
+  });
+
+  const friendRequests = friendRequestsData?.incoming || [];
+  const outgoingRequests = friendRequestsData?.outgoing || [];
+
+  // Friends list with caching
+  const { data: friends = [], refetch: refetchFriends, isLoading: loading } = useCachedQuery({
+    cacheKey: `friends:${user?.id}`,
+    queryKey: ['friends-list', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+
+      const { data: acceptedRequests } = await supabase
         .from('friend_requests')
         .select('sender_id, receiver_id')
         .eq('status', 'accepted')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
-      if (error) throw error;
-
       const friendIds = acceptedRequests?.map((req) =>
         req.sender_id === user.id ? req.receiver_id : req.sender_id
       ) || [];
 
-      if (friendIds.length === 0) {
-        setFriends([]);
-        return;
-      }
+      if (friendIds.length === 0) return [];
 
-      const { data: profiles, error: profilesError } = await supabase
+      const { data: profiles } = await supabase
         .from('public_profiles')
         .select('*')
         .in('id', friendIds);
 
-      if (profilesError) throw profilesError;
-      setFriends(profiles || []);
-    } catch (error: any) {
-      console.error('Error loading friends:', error);
-    }
-  }, [user?.id]);
+      return profiles || [];
+    },
+    enabled: !!user?.id,
+    ttl: 10 * 60 * 1000, // 10 minutes
+  });
+
+  const loadFriendRequests = useCallback(() => refetchRequests(), [refetchRequests]);
+  const loadFriends = useCallback(() => refetchFriends(), [refetchFriends]);
 
   // Initial load and realtime subscription
   useEffect(() => {
@@ -167,8 +146,6 @@ const Friends = () => {
       navigate('/auth');
       return;
     }
-    loadFriendRequests();
-    loadFriends();
 
     // Subscribe to realtime updates for friend_requests
     const channel = supabase
@@ -182,7 +159,6 @@ const Friends = () => {
           filter: `receiver_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Friend request change (receiver):', payload);
           if (payload.eventType === 'INSERT') {
             toast({
               title: 'New friend request!',
@@ -202,8 +178,7 @@ const Friends = () => {
           filter: `sender_id=eq.${user.id}`,
         },
         (payload) => {
-          console.log('Friend request change (sender):', payload);
-          if (payload.eventType === 'UPDATE' && payload.new.status === 'accepted') {
+          if (payload.eventType === 'UPDATE' && (payload.new as any).status === 'accepted') {
             toast({
               title: 'Friend request accepted!',
               description: 'You are now friends',

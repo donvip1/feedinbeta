@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { ArrowLeft, Plus, Search, Users, Lock, Globe } from 'lucide-react';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
+import { useCachedQuery } from '@/hooks/useCachedQuery';
 
 interface Group {
   id: string;
@@ -29,54 +30,63 @@ const Groups = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [myGroups, setMyGroups] = useState<Group[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) {
       navigate('/auth');
-      return;
     }
-    loadGroups();
   }, [user]);
 
-  const loadGroups = async () => {
-    try {
-      // Load all public groups
-      const { data: allGroups, error: allError } = await supabase
-        .from('groups')
-        .select('*')
-        .order('member_count', { ascending: false });
-
-      if (allError) throw allError;
-
-      // Load user's groups
-      const { data: memberGroups, error: memberError } = await supabase
+  // Fetch user's groups with caching
+  const { data: myGroups = [], refetch: refetchMyGroups } = useCachedQuery({
+    cacheKey: `my_groups:${user?.id}`,
+    queryKey: ['my-groups', user?.id],
+    queryFn: async () => {
+      const { data: memberGroups } = await supabase
         .from('group_members')
         .select('group_id')
         .eq('user_id', user?.id);
 
-      if (memberError) throw memberError;
+      if (!memberGroups?.length) return [];
+
+      const groupIds = memberGroups.map(m => m.group_id);
+      const { data: groups } = await supabase
+        .from('groups')
+        .select('*')
+        .in('id', groupIds);
+
+      return groups || [];
+    },
+    enabled: !!user,
+    ttl: 15 * 60 * 1000, // 15 minutes
+  });
+
+  // Fetch discoverable groups with caching
+  const { data: groups = [], isLoading: loading } = useCachedQuery({
+    cacheKey: 'discover_groups',
+    queryKey: ['discover-groups', user?.id],
+    queryFn: async () => {
+      const { data: allGroups } = await supabase
+        .from('groups')
+        .select('*')
+        .order('member_count', { ascending: false });
+
+      const { data: memberGroups } = await supabase
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', user?.id);
 
       const myGroupIds = memberGroups?.map(m => m.group_id) || [];
-      const userGroups = allGroups?.filter(g => myGroupIds.includes(g.id)) || [];
-      const otherGroups = allGroups?.filter(g => !myGroupIds.includes(g.id)) || [];
+      return allGroups?.filter(g => !myGroupIds.includes(g.id)) || [];
+    },
+    enabled: !!user,
+    ttl: 15 * 60 * 1000, // 15 minutes
+  });
 
-      setMyGroups(userGroups);
-      setGroups(otherGroups);
-    } catch (error: any) {
-      console.error('Error loading groups:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load groups',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
+  const loadGroups = async () => {
+    refetchMyGroups();
   };
 
   const filteredGroups = groups.filter(g =>

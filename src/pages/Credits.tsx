@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +7,16 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { PackageCard } from "@/components/wallet/PackageCard";
+import { useCachedQuery } from "@/hooks/useCachedQuery";
+import { useAuth } from "@/hooks/useAuth";
 
 const Credits = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState<string | null>(null);
 
-  const { data: packages } = useQuery({
+  const { data: packages, isLoading: packagesLoading } = useCachedQuery({
+    cacheKey: "credit_packages",
     queryKey: ["credit-packages"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -25,23 +28,34 @@ const Credits = () => {
       if (error) throw error;
       return data;
     },
+    ttl: 60 * 60 * 1000, // 1 hour
   });
 
-  const { data: userCredits } = useQuery({
-    queryKey: ["user-credits"],
+  const { data: userCredits, isStale: creditsStale } = useCachedQuery({
+    cacheKey: `credits:${user?.id}`,
+    queryKey: ["user-credits", user?.id],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) return null;
 
-      const { data, error } = await supabase
+      const { data: baseData } = await supabase
         .from("user_credits")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", currentUser.id)
         .single();
+
+      const { data: secureCredits } = await supabase.rpc('get_user_credits', { 
+        p_user_id: currentUser.id 
+      });
       
-      if (error && error.code !== 'PGRST116') throw error;
-      return data;
+      return {
+        balance: secureCredits ?? baseData?.balance ?? 0,
+        total_earned: baseData?.total_earned ?? 0,
+        total_spent: baseData?.total_spent ?? 0,
+      };
     },
+    ttl: 10 * 60 * 1000, // 10 minutes
+    enabled: !!user,
   });
 
   const handlePurchase = async (packageId: string, priceId: string) => {
