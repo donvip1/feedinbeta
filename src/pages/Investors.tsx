@@ -1,11 +1,26 @@
-import { ArrowLeft, TrendingUp, Shield, Scale, Server, Users, HelpCircle, Mail, ExternalLink } from "lucide-react";
+import { ArrowLeft, TrendingUp, Shield, Scale, Server, Users, HelpCircle, Mail, ExternalLink, BarChart3 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const Investors = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Check admin access for analytics link
+  const { data: isAdmin } = useQuery({
+    queryKey: ['admin-check-investors', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('can_view_admin_wallet');
+      if (error) return false;
+      return data as boolean;
+    },
+    enabled: !!user
+  });
 
   const risks = [
     {
@@ -116,15 +131,21 @@ const Investors = () => {
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
             Join us in building the future of creator monetization. A social platform where every creator can earn from day one.
           </p>
-          <div className="flex gap-3 justify-center pt-4">
+          <div className="flex flex-wrap gap-3 justify-center pt-4">
             <Button onClick={() => window.open('mailto:invest@feedin.app', '_blank')}>
               <Mail className="h-4 w-4 mr-2" />
               Contact Us
             </Button>
-            <Button variant="outline" onClick={() => navigate('/investors')}>
-              <ExternalLink className="h-4 w-4 mr-2" />
-              View Pitch Deck
+            <Button variant="outline" onClick={() => navigate('/competitive-analysis')}>
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Competitive Analysis
             </Button>
+            {isAdmin && (
+              <Button variant="outline" onClick={() => navigate('/admin/analytics')}>
+                <BarChart3 className="h-4 w-4 mr-2" />
+                View Analytics
+              </Button>
+            )}
           </div>
         </div>
 

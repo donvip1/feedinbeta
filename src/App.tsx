@@ -59,6 +59,8 @@ import Promotions from "./pages/Promotions";
 import Install from "./pages/Install";
 import MusicDiscovery from "./pages/MusicDiscovery";
 import Investors from "./pages/Investors";
+import AdminAnalytics from "./pages/AdminAnalytics";
+import CompetitiveAnalysis from "./pages/CompetitiveAnalysis";
 
 const queryClient = new QueryClient();
 
@@ -169,6 +171,8 @@ const App = () => {
             <Route path="/settings/help" element={<HelpSupport />} />
             <Route path="/settings/sessions" element={<SessionManagement />} />
             <Route path="/investors" element={<Investors />} />
+            <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            <Route path="/competitive-analysis" element={<CompetitiveAnalysis />} />
             
             {/* Legacy routes for backwards compatibility */}
             <Route path="/post/:postId" element={<PostDetail />} />

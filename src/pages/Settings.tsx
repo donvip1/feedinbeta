@@ -194,6 +194,13 @@ const Settings = () => {
       description: 'Manage creator monetization and payouts',
       route: '/wallet/creator-payouts',
       color: 'text-green-500'
+    },
+    {
+      icon: TrendingUp,
+      title: 'Analytics Dashboard',
+      description: 'MAU, DAU, revenue, and investor metrics',
+      route: '/admin/analytics',
+      color: 'text-blue-500'
     }
   ];
 
