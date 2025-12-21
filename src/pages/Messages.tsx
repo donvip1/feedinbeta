@@ -16,9 +16,11 @@ import { StoriesBar } from '@/components/stories/StoriesBar';
 import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { useToast } from '@/hooks/use-toast';
 import { useConversationCache, useGroupCache } from '@/hooks/useConversationCache';
+import { useConversationListRealtime } from '@/hooks/useMessageRealtime';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ActivityBadge, ActivityType, getActivityIcon, getActivityColor } from '@/components/messages/TypingIndicator';
 import { usePageRefresh } from '@/context/RefreshContext';
+import { realtimeManager } from '@/lib/unified-realtime';
 
 interface Conversation {
   id: string;
@@ -113,11 +115,19 @@ export default function Messages() {
     };
   }, []);
 
+  // Redirect to auth if not logged in
   useEffect(() => {
     if (!authLoading && !user) {
       navigate('/auth');
     }
   }, [user, authLoading, navigate]);
+
+  // Initialize realtime manager for this user
+  useEffect(() => {
+    if (user?.id) {
+      realtimeManager.initialize(user.id);
+    }
+  }, [user?.id]);
 
   // Track my own presence so others know I'm online
   useEffect(() => {
@@ -153,146 +163,91 @@ export default function Messages() {
     }
   }, [hasGroupCache, cachedGroups, cachedMyGroups]);
 
+  // Handle new message from unified realtime
+  const handleRealtimeMessage = useCallback((message: { conversation_id: string; content: string; created_at: string; sender_id: string }) => {
+    console.log('[Messages Page] Realtime message:', message.conversation_id);
+    
+    setConversations(prev => {
+      const updated = prev.map(conv => {
+        if (conv.id === message.conversation_id) {
+          const isFromOther = message.sender_id !== user?.id;
+          return {
+            ...conv,
+            updated_at: message.created_at,
+            last_message: {
+              content: message.content,
+              created_at: message.created_at,
+              sender_id: message.sender_id,
+            },
+            // Only increment unread if message is from other user and not viewing this conversation
+            unread_count: isFromOther && selectedConversationId !== message.conversation_id 
+              ? (conv.unread_count || 0) + 1 
+              : conv.unread_count,
+          };
+        }
+        return conv;
+      });
+      // Sort by most recent
+      return updated.sort((a, b) => 
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+      );
+    });
+  }, [user?.id, selectedConversationId]);
+
+  // Handle typing indicator from unified realtime
+  const handleRealtimeTyping = useCallback((typing: { user_id: string; conversation_id: string; is_typing: boolean; activity_type?: string }) => {
+    if (typing.user_id === user?.id) return;
+    
+    setConversations(prev => prev.map(conv => 
+      conv.id === typing.conversation_id 
+        ? { 
+            ...conv, 
+            isTyping: typing.is_typing,
+            activityType: typing.activity_type as ActivityType || 'typing'
+          } 
+        : conv
+    ));
+  }, [user?.id]);
+
+  // Use unified realtime hook - SINGLE subscription for conversation list
+  useConversationListRealtime({
+    onNewMessage: handleRealtimeMessage,
+    onTyping: handleRealtimeTyping,
+  });
+
+  // Initial data load
   useEffect(() => {
     if (user && !initialLoadDoneRef.current) {
       initialLoadDoneRef.current = true;
       // Load fresh data in background (don't show loading if we have cache)
       loadConversations(!hasCachedData);
       loadGroups();
-      
-      // Subscribe to new messages - update locally instead of reloading
-      const messageChannel = supabase
-        .channel(`messages-list-${user.id}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages'
-          },
-          (payload: any) => {
-            console.log('[Messages Page] New message received:', payload);
-            const newMsg = payload?.new;
-            if (!newMsg) return;
-            
-            const convId = newMsg.conversation_id;
-            // Update conversation list instantly without reload
-            setConversations(prev => {
-              const updated = prev.map(conv => {
-                if (conv.id === convId) {
-                  const isFromOther = newMsg.sender_id !== user.id;
-                  return {
-                    ...conv,
-                    updated_at: newMsg.created_at,
-                    last_message: {
-                      content: newMsg.content,
-                      created_at: newMsg.created_at,
-                      sender_id: newMsg.sender_id,
-                    },
-                    // Only increment unread if message is from other user and not viewing this conversation
-                    unread_count: isFromOther && selectedConversationId !== convId 
-                      ? (conv.unread_count || 0) + 1 
-                      : conv.unread_count,
-                  };
-                }
-                return conv;
-              });
-              // Sort by most recent
-              return updated.sort((a, b) => 
-                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-              );
-            });
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'messages'
-          },
-          (payload: any) => {
-            const updatedMsg = payload?.new;
-            const oldMsg = payload?.old;
-            if (!updatedMsg) return;
-            
-            // If message was marked as read, decrement unread count
-            if (updatedMsg.is_read && !oldMsg?.is_read) {
-              const convId = updatedMsg.conversation_id;
-              setConversations(prev => prev.map(conv => 
-                conv.id === convId 
-                  ? { ...conv, unread_count: Math.max(0, (conv.unread_count || 0) - 1) }
-                  : conv
-              ));
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log('[Messages Page] Message channel status:', status);
-        });
-
-      // Subscribe to typing indicators for all conversations
-      const typingChannel = supabase
-        .channel(`typing-list-${user.id}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'typing_indicators'
-          },
-          (payload: any) => {
-            console.log('[Messages Page] Activity indicator:', payload);
-            const typing = payload?.new;
-            if (!typing || typing.user_id === user.id) return;
-            
-            setConversations(prev => prev.map(conv => 
-              conv.id === typing.conversation_id 
-                ? { 
-                    ...conv, 
-                    isTyping: typing.is_typing,
-                    activityType: typing.activity_type as ActivityType || 'typing'
-                  } 
-                : conv
-            ));
-          }
-        )
-        .subscribe((status) => {
-          console.log('[Messages Page] Typing channel status:', status);
-        });
-
-      return () => {
-        supabase.removeChannel(messageChannel);
-        supabase.removeChannel(typingChannel);
-      };
     }
-  }, [user, selectedConversationId]);
+  }, [user, hasCachedData]);
 
-  // Subscribe to presence for each conversation participant
+  // Subscribe to presence for each conversation participant using unified manager
   useEffect(() => {
     if (!user || conversations.length === 0) return;
 
-    const presenceChannels: ReturnType<typeof supabase.channel>[] = [];
+    const unsubscribers: (() => void)[] = [];
 
     conversations.forEach(conv => {
       if (!conv.other_participant?.id) return;
       
-      const channel = supabase.channel(`user-presence:${conv.other_participant.id}`)
-        .on('presence', { event: 'sync' }, () => {
-          const state = channel.presenceState();
-          const isOnline = Object.keys(state).length > 0;
-          
+      const unsubscribe = realtimeManager.subscribeToPresence(
+        conv.other_participant.id,
+        ({ isOnline }) => {
           setConversations(prev => prev.map(c => 
             c.id === conv.id ? { ...c, isOnline } : c
           ));
-        })
-        .subscribe();
+        }
+      );
       
-      presenceChannels.push(channel);
+      unsubscribers.push(unsubscribe);
     });
 
     return () => {
-      presenceChannels.forEach(channel => supabase.removeChannel(channel));
+      unsubscribers.forEach(unsub => unsub());
     };
   }, [user?.id, conversations.length]);
 
