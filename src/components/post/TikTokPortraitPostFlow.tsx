@@ -312,7 +312,7 @@ export default function TikTokPortraitPostFlow({
         .from(bucketName)
         .getPublicUrl(fileName);
 
-      // Create post
+      // Create post with music
       const { error: postError } = await supabase.from('posts').insert({
         user_id: user.id,
         feed_id: crypto.randomUUID(),
@@ -323,6 +323,10 @@ export default function TikTokPortraitPostFlow({
         privacy: privacy,
         post_type: 'public',
         status: 'active',
+        // Music data
+        music_title: selectedMusic?.title || null,
+        music_artist: selectedMusic?.artist || null,
+        music_url: selectedMusic?.audio_url || null,
       });
 
       if (postError) throw postError;

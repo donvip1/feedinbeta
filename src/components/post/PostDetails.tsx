@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock, CheckCircle2, Music, Play, Pause, Disc3 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -7,6 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { MusicPicker } from './MusicPicker';
+import { MusicUploader } from './MusicUploader';
+
+interface SelectedMusic {
+  id: string;
+  title: string;
+  artist: string | null;
+  audio_url: string;
+  duration_seconds: number | null;
+}
 
 interface PostDetailsProps {
   media: { url: string; type: 'image' | 'video'; file: File }[];
@@ -30,6 +40,57 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
   const [detectingLocation, setDetectingLocation] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStage, setUploadStage] = useState<'idle' | 'uploading' | 'creating' | 'done'>('idle');
+  
+  // Music state
+  const [selectedMusic, setSelectedMusic] = useState<SelectedMusic | null>(null);
+  const [showMusicPicker, setShowMusicPicker] = useState(false);
+  const [showMusicUploader, setShowMusicUploader] = useState(false);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const toggleMusicPreview = () => {
+    if (!selectedMusic || !musicAudioRef.current) return;
+    
+    if (isMusicPlaying) {
+      musicAudioRef.current.pause();
+      setIsMusicPlaying(false);
+    } else {
+      musicAudioRef.current.play().catch(console.error);
+      setIsMusicPlaying(true);
+    }
+  };
+
+  const handleMusicSelect = (track: SelectedMusic) => {
+    // Stop any playing preview
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      setIsMusicPlaying(false);
+    }
+    setSelectedMusic(track);
+    setShowMusicPicker(false);
+  };
+
+  const handleMusicUploadComplete = (track: {
+    id: string;
+    title: string;
+    artist: string | null;
+    audio_url: string;
+    duration_seconds: number;
+  }) => {
+    setSelectedMusic({
+      ...track,
+      duration_seconds: track.duration_seconds,
+    });
+    setShowMusicUploader(false);
+  };
+
+  const removeMusic = () => {
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+    }
+    setSelectedMusic(null);
+    setIsMusicPlaying(false);
+  };
 
   const privacyOptions = [
     { value: 'everyone' as const, label: 'Everyone', icon: Globe },
@@ -158,6 +219,10 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         post_type: 'public',
         status: scheduledAt ? 'scheduled' : 'active',
         scheduled_at: scheduledAt,
+        // Music data
+        music_title: selectedMusic?.title || null,
+        music_artist: selectedMusic?.artist || null,
+        music_url: selectedMusic?.audio_url || null,
       };
 
       // For multiple media, only use arrays. For single media, use both single and array fields
@@ -282,6 +347,60 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
           className="w-full p-3 border border-border rounded-lg text-sm resize-none bg-background"
           rows={3}
         />
+      </div>
+
+      {/* Music Selection - TikTok/Instagram Style */}
+      <div className="w-full mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Music className="w-4 h-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Add Music</span>
+        </div>
+        
+        {selectedMusic ? (
+          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
+            <button
+              onClick={toggleMusicPreview}
+              className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0"
+            >
+              {isMusicPlaying ? (
+                <Pause className="w-4 h-4 text-primary" />
+              ) : (
+                <Play className="w-4 h-4 text-primary ml-0.5" />
+              )}
+            </button>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{selectedMusic.title}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {selectedMusic.artist || 'Unknown Artist'}
+              </p>
+            </div>
+            <Disc3 className={`w-5 h-5 text-primary ${isMusicPlaying ? 'animate-spin-slow' : ''}`} />
+            <button
+              onClick={removeMusic}
+              className="p-1.5 rounded-full hover:bg-muted"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowMusicPicker(true)}
+            className="w-full p-3 border border-dashed border-border rounded-lg text-sm text-muted-foreground hover:bg-muted/50 hover:border-primary/50 transition-colors flex items-center justify-center gap-2"
+          >
+            <Music className="w-4 h-4" />
+            Tap to add music to your post
+          </button>
+        )}
+        
+        {/* Hidden audio element for preview */}
+        {selectedMusic && (
+          <audio
+            ref={musicAudioRef}
+            src={selectedMusic.audio_url}
+            onEnded={() => setIsMusicPlaying(false)}
+            preload="metadata"
+          />
+        )}
       </div>
 
       <div className="w-full mb-4">
@@ -463,6 +582,24 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         {loading && <Loader2 className="w-4 h-4 animate-spin" />}
         {loading ? 'Posting...' : 'Post'}
       </button>
+
+      {/* Music Picker Modal */}
+      <MusicPicker
+        isOpen={showMusicPicker}
+        onClose={() => setShowMusicPicker(false)}
+        onSelect={handleMusicSelect}
+        onUpload={() => {
+          setShowMusicPicker(false);
+          setShowMusicUploader(true);
+        }}
+      />
+
+      {/* Music Uploader Modal */}
+      <MusicUploader
+        isOpen={showMusicUploader}
+        onClose={() => setShowMusicUploader(false)}
+        onUploadComplete={handleMusicUploadComplete}
+      />
     </div>
   );
 }
