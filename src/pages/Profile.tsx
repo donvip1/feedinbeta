@@ -18,7 +18,7 @@ import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { useProfileWithCache } from '@/hooks/useProfileWithCache';
-import { indexedDBCache } from '@/lib/indexed-db-cache';
+import { memoryCache } from '@/lib/memory-cache';
 
 interface Profile {
   id: string;
@@ -103,7 +103,7 @@ const Profile = () => {
     return uuidRegex.test(str);
   };
 
-  // INSTANT: Set profile from cache immediately when available - no loading state
+  // Set profile from cache immediately when available
   useEffect(() => {
     if (cachedProfile) {
       setProfile(prev => ({
@@ -112,25 +112,9 @@ const Profile = () => {
         post_count: prev?.post_count || cachedProfile.posts_count || 0,
         total_views: prev?.total_views || 0,
       } as Profile));
-      // CRITICAL: Stop loading immediately when we have cached data
       setLoading(false);
     }
   }, [cachedProfile]);
-
-  // Also check sync cache for instant access
-  useEffect(() => {
-    if (!identifier) return;
-    
-    // Check IndexedDB cache synchronously-ish (fast path)
-    const checkCache = async () => {
-      const cached = await indexedDBCache.get<Profile>(`profile:${identifier}`);
-      if (cached && !profile) {
-        setProfile(cached);
-        setLoading(false);
-      }
-    };
-    checkCache();
-  }, [identifier]);
 
   // Resolve identifier to userId
   useEffect(() => {
@@ -244,9 +228,9 @@ const Profile = () => {
       setProfile(fullProfile);
       
       // Cache the profile for instant access next time
-      await indexedDBCache.set(`profile:${identifier}`, fullProfile, 10 * 60 * 1000);
+      memoryCache.set(`profile:${identifier}`, fullProfile, 10 * 60 * 1000);
       if (resolvedUserId !== identifier) {
-        await indexedDBCache.set(`profile:${resolvedUserId}`, fullProfile, 10 * 60 * 1000);
+        memoryCache.set(`profile:${resolvedUserId}`, fullProfile, 10 * 60 * 1000);
       }
     } catch (error: any) {
       // Only show error if we don't have cached data

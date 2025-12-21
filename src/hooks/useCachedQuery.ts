@@ -1,6 +1,7 @@
 import { useQuery, UseQueryOptions, QueryKey } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { indexedDBCache } from '@/lib/indexed-db-cache';
+import { memoryCache } from '@/lib/memory-cache';
 
 interface UseCachedQueryOptions<TData> extends Omit<UseQueryOptions<TData, Error, TData, QueryKey>, 'queryKey' | 'queryFn'> {
   cacheKey: string;
@@ -20,7 +21,7 @@ interface UseCachedQueryResult<TData> {
 
 /**
  * A hook that implements stale-while-revalidate pattern
- * Returns cached data immediately while fetching fresh data in the background
+ * Uses memory cache first (synchronous), then IndexedDB, then network
  */
 export function useCachedQuery<TData>({
   cacheKey,
@@ -30,23 +31,25 @@ export function useCachedQuery<TData>({
   enabled = true,
   ...options
 }: UseCachedQueryOptions<TData>): UseCachedQueryResult<TData> {
-  const [cachedData, setCachedData] = useState<TData | undefined>(undefined);
-  const [isStale, setIsStale] = useState(false);
-  const [cacheLoaded, setCacheLoaded] = useState(false);
+  // INSTANT: Check memory cache synchronously first
+  const memoryCached = memoryCache.get<TData>(cacheKey);
+  
+  const [cachedData, setCachedData] = useState<TData | undefined>(memoryCached || undefined);
+  const [isStale, setIsStale] = useState(!!memoryCached);
+  const [cacheLoaded, setCacheLoaded] = useState(!!memoryCached);
 
-  // Load from cache immediately on mount
+  // Load from IndexedDB if not in memory cache
   useEffect(() => {
-    if (!enabled) {
-      setCacheLoaded(true);
-      return;
-    }
+    if (!enabled || cacheLoaded) return;
 
     const loadCache = async () => {
       try {
         const cached = await indexedDBCache.get<TData>(cacheKey);
         if (cached) {
           setCachedData(cached);
-          setIsStale(true); // Mark as stale since we're fetching fresh data
+          setIsStale(true);
+          // Also save to memory cache for future instant access
+          memoryCache.set(cacheKey, cached, ttl);
         }
       } catch (error) {
         console.error('[useCachedQuery] Cache load error:', error);
@@ -56,15 +59,16 @@ export function useCachedQuery<TData>({
     };
 
     loadCache();
-  }, [cacheKey, enabled]);
+  }, [cacheKey, enabled, cacheLoaded, ttl]);
 
   // Use React Query for fresh data fetching
   const query = useQuery({
     queryKey,
     queryFn: async () => {
       const freshData = await queryFn();
-      // Save to cache
+      // Save to both memory and IndexedDB cache
       try {
+        memoryCache.set(cacheKey, freshData, ttl);
         await indexedDBCache.set(cacheKey, freshData, ttl);
       } catch (error) {
         console.error('[useCachedQuery] Cache save error:', error);
@@ -107,6 +111,7 @@ export async function preCacheData<TData>(
   ttl: number = 5 * 60 * 1000
 ): Promise<void> {
   try {
+    memoryCache.set(cacheKey, data, ttl);
     await indexedDBCache.set(cacheKey, data, ttl);
   } catch (error) {
     console.error('[preCacheData] Error:', error);
@@ -114,8 +119,11 @@ export async function preCacheData<TData>(
 }
 
 /**
- * Get cached data without triggering a query
+ * Get cached data synchronously from memory cache
  */
+export function getCachedDataSync<TData>(cacheKey: string): TData | null {
+  return memoryCache.get<TData>(cacheKey);
+}
 export async function getCachedData<TData>(cacheKey: string): Promise<TData | null> {
   try {
     return await indexedDBCache.get<TData>(cacheKey);

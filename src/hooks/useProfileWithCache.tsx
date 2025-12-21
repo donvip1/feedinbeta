@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { profileCache, CachedProfile } from '@/lib/feed-cache';
+import { memoryCache } from '@/lib/memory-cache';
 
 interface FullProfile extends Omit<CachedProfile, 'posts_count'> {
   posts_count?: number;
@@ -24,27 +25,31 @@ interface UseProfileResult {
 }
 
 export const useProfileWithCache = (identifier: string | undefined): UseProfileResult => {
-  const [profile, setProfile] = useState<FullProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(false); // Start false - assume cached
+  // INSTANT: Check memory cache synchronously FIRST
+  const memoryCached = identifier ? memoryCache.get<FullProfile>(`profile:${identifier}`) : null;
+  
+  const [profile, setProfile] = useState<FullProfile | null>(memoryCached);
+  const [isLoading, setIsLoading] = useState(!memoryCached); // Only load if no memory cache
   const [isFreshLoading, setIsFreshLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const [cacheChecked, setCacheChecked] = useState(false);
+  const [cacheChecked, setCacheChecked] = useState(!!memoryCached);
 
-  // INSTANT: Check cache synchronously on mount - before any async operations
+  // Check IndexedDB cache if memory cache miss
   useEffect(() => {
     if (!identifier || cacheChecked) return;
     
-    // Check cache immediately
     profileCache.get(identifier).then(cached => {
       setCacheChecked(true);
       if (cached) {
         setProfile(cached as FullProfile);
         setIsLoading(false);
-      } else {
-        setIsLoading(true); // Only show loading if no cache
+        // Save to memory cache for future instant access
+        memoryCache.set(`profile:${identifier}`, cached, 30 * 60 * 1000);
+      } else if (!memoryCached) {
+        setIsLoading(true);
       }
     });
-  }, [identifier, cacheChecked]);
+  }, [identifier, cacheChecked, memoryCached]);
 
   const fetchProfile = useCallback(async (showLoading = true) => {
     if (!identifier) {
@@ -114,7 +119,8 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
 
         setProfile(profileData);
         
-        // Cache the profile
+        // Cache to memory (instant) and IndexedDB (persistent)
+        memoryCache.set(`profile:${identifier}`, profileData, 30 * 60 * 1000);
         await profileCache.set(identifier, {
           ...profileData,
           posts_count: profileData.posts_count || 0,
@@ -122,6 +128,7 @@ export const useProfileWithCache = (identifier: string | undefined): UseProfileR
         
         // Also cache by ID if we fetched by username
         if (!isUUID && data.id !== identifier) {
+          memoryCache.set(`profile:${data.id}`, profileData, 30 * 60 * 1000);
           await profileCache.set(data.id, {
             ...profileData,
             posts_count: profileData.posts_count || 0,
