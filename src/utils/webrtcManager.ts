@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 export type ConnectionStatus = 
   | 'initializing' 
   | 'getting_media' 
+  | 'waiting_for_peer'
   | 'signaling' 
   | 'negotiating' 
   | 'ice_checking' 
@@ -15,18 +16,21 @@ export interface WebRTCCallbacks {
   onConnectionStateChange: (state: RTCPeerConnectionState) => void;
   onIceConnectionStateChange: (state: RTCIceConnectionState) => void;
   onDetailedStatusChange?: (status: ConnectionStatus, message: string) => void;
+  onNetworkQuality?: (quality: NetworkQuality) => void;
   onError: (error: Error) => void;
 }
 
-interface TurnCredentials {
-  urls: string[];
-  username: string;
-  credential: string;
+export interface NetworkQuality {
+  quality: 'excellent' | 'good' | 'fair' | 'poor';
+  bitrate: number;
+  packetLoss: number;
+  latency: number;
 }
 
 export class WebRTCManager {
   private peerConnection: RTCPeerConnection | null = null;
   private localStream: MediaStream | null = null;
+  private screenStream: MediaStream | null = null;
   private callId: string;
   private userId: string;
   private otherUserId: string;
@@ -39,15 +43,16 @@ export class WebRTCManager {
   private connectionTimeout: NodeJS.Timeout | null = null;
   private offerRetryTimeout: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 3;
+  private maxReconnectAttempts = 5;
   private offerRetryCount = 0;
   private maxOfferRetries = 5;
-  private channelSubscriptionAttempts = 0;
-  private maxChannelSubscriptionAttempts = 3;
   private isChannelSubscribed = false;
-  private receiverReadyReceived = false;
+  private peerPresent = false;
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private statsInterval: NodeJS.Timeout | null = null;
   private lastHeartbeat: number = 0;
+  private currentFacingMode: 'user' | 'environment' = 'user';
+  private isVideoCall = false;
 
   private rtcConfig: RTCConfiguration = {
     iceServers: [
@@ -81,6 +86,7 @@ export class WebRTCManager {
 
   async initialize(isVideo: boolean): Promise<MediaStream> {
     try {
+      this.isVideoCall = isVideo;
       this.updateStatus('initializing', 'Starting WebRTC connection...');
       
       // Fetch TURN credentials first
@@ -93,7 +99,7 @@ export class WebRTCManager {
         video: isVideo ? { 
           width: { ideal: 1280, max: 1920 },
           height: { ideal: 720, max: 1080 },
-          facingMode: 'user',
+          facingMode: this.currentFacingMode,
           frameRate: { ideal: 30, max: 60 }
         } : false,
         audio: {
@@ -120,8 +126,8 @@ export class WebRTCManager {
 
       this.updateStatus('signaling', 'Setting up signaling channel...');
       
-      // Set up signaling channel using Supabase Realtime broadcast with retry
-      await this.setupSignalingWithRetry();
+      // Set up signaling channel using Supabase Realtime with PRESENCE
+      await this.setupSignalingWithPresence();
 
       // Start heartbeat
       this.startHeartbeat();
@@ -150,36 +156,30 @@ export class WebRTCManager {
       }
 
       if (data?.iceServers && Array.isArray(data.iceServers)) {
-        // Merge TURN servers with existing STUN servers
-        this.rtcConfig.iceServers = [
-          ...this.rtcConfig.iceServers!,
-          ...data.iceServers,
-        ];
+        // Replace ICE servers with new ones (they already include STUN)
+        this.rtcConfig.iceServers = data.iceServers;
         console.log('[WebRTC] TURN credentials loaded, ICE servers:', this.rtcConfig.iceServers.length);
       }
     } catch (error) {
       console.warn('[WebRTC] Error fetching TURN credentials:', error);
-      // Continue with STUN-only configuration
     }
   }
 
   private setConnectionTimeout() {
-    // Clear any existing timeout
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
     }
 
-    // Set a 90-second timeout ONLY for initial connection establishment
+    // 60-second timeout for initial connection
     this.connectionTimeout = setTimeout(() => {
-      // Only timeout if we never connected at all
       if (this.peerConnection?.connectionState !== 'connected' && 
           this.peerConnection?.iceConnectionState !== 'connected' &&
           this.peerConnection?.iceConnectionState !== 'completed') {
-        console.error('[WebRTC] Initial connection timeout - failed to connect within 90 seconds');
+        console.error('[WebRTC] Initial connection timeout');
         this.updateStatus('failed', 'Connection timeout. Please check your network and try again.');
         this.callbacks.onError(new Error('Connection timeout. Please check your network and try again.'));
       }
-    }, 90000);
+    }, 60000);
   }
 
   private setupPeerConnectionHandlers() {
@@ -210,6 +210,9 @@ export class WebRTCManager {
       if (event.streams[0]) {
         console.log('[WebRTC] Remote stream has', event.streams[0].getTracks().length, 'tracks');
         this.callbacks.onRemoteStream(event.streams[0]);
+        
+        // Start monitoring network quality
+        this.startNetworkQualityMonitoring();
       }
     };
 
@@ -219,7 +222,6 @@ export class WebRTCManager {
       console.log('[WebRTC] Connection state:', state);
       
       if (state === 'connected') {
-        // Clear timeout on successful connection
         if (this.connectionTimeout) {
           clearTimeout(this.connectionTimeout);
           this.connectionTimeout = null;
@@ -312,38 +314,75 @@ export class WebRTCManager {
     }, 5000);
   }
 
-  private async setupSignalingWithRetry(): Promise<void> {
-    while (this.channelSubscriptionAttempts < this.maxChannelSubscriptionAttempts) {
-      try {
-        await this.setupSignaling();
-        return;
-      } catch (error) {
-        this.channelSubscriptionAttempts++;
-        console.error(`[WebRTC] Signaling setup failed (attempt ${this.channelSubscriptionAttempts}/${this.maxChannelSubscriptionAttempts}):`, error);
-        
-        if (this.channelSubscriptionAttempts < this.maxChannelSubscriptionAttempts) {
-          // Exponential backoff: 1s, 2s, 4s
-          const delay = Math.pow(2, this.channelSubscriptionAttempts - 1) * 1000;
-          console.log(`[WebRTC] Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
+  private startNetworkQualityMonitoring() {
+    if (this.statsInterval) return;
     
-    throw new Error('Failed to setup signaling channel after multiple attempts');
+    let lastBytesReceived = 0;
+    let lastTimestamp = Date.now();
+    
+    this.statsInterval = setInterval(async () => {
+      if (!this.peerConnection) return;
+      
+      try {
+        const stats = await this.peerConnection.getStats();
+        let packetsLost = 0;
+        let packetsReceived = 0;
+        let bytesReceived = 0;
+        let roundTripTime = 0;
+        
+        stats.forEach(report => {
+          if (report.type === 'inbound-rtp' && report.kind === 'audio') {
+            packetsLost = report.packetsLost || 0;
+            packetsReceived = report.packetsReceived || 0;
+            bytesReceived = report.bytesReceived || 0;
+          }
+          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
+            roundTripTime = report.currentRoundTripTime * 1000 || 0; // Convert to ms
+          }
+        });
+        
+        const now = Date.now();
+        const timeDiff = (now - lastTimestamp) / 1000;
+        const bitrate = Math.round(((bytesReceived - lastBytesReceived) * 8) / timeDiff / 1000); // kbps
+        lastBytesReceived = bytesReceived;
+        lastTimestamp = now;
+        
+        const totalPackets = packetsReceived + packetsLost;
+        const packetLoss = totalPackets > 0 ? (packetsLost / totalPackets) * 100 : 0;
+        
+        let quality: 'excellent' | 'good' | 'fair' | 'poor' = 'excellent';
+        if (packetLoss > 5 || roundTripTime > 300) {
+          quality = 'poor';
+        } else if (packetLoss > 2 || roundTripTime > 200) {
+          quality = 'fair';
+        } else if (packetLoss > 0.5 || roundTripTime > 100) {
+          quality = 'good';
+        }
+        
+        this.callbacks.onNetworkQuality?.({
+          quality,
+          bitrate,
+          packetLoss: Math.round(packetLoss * 100) / 100,
+          latency: Math.round(roundTripTime),
+        });
+      } catch (error) {
+        console.warn('[WebRTC] Error getting stats:', error);
+      }
+    }, 2000);
   }
 
-  private async setupSignaling(): Promise<void> {
-    console.log('[WebRTC] Setting up Realtime signaling channel for call:', this.callId);
+  // Use consistent channel name and Supabase Presence for peer detection
+  private async setupSignalingWithPresence(): Promise<void> {
+    console.log('[WebRTC] Setting up Realtime signaling with Presence for call:', this.callId);
     
-    // Clean up any existing channel first
     if (this.signalChannel) {
       await supabase.removeChannel(this.signalChannel);
       this.signalChannel = null;
     }
     
-    // Use unique channel name with timestamp to avoid conflicts
-    const channelName = `call-signal:${this.callId}:${Date.now()}`;
+    // CRITICAL FIX: Use consistent channel name WITHOUT timestamp
+    const channelName = `call-signal:${this.callId}`;
+    console.log('[WebRTC] Using channel:', channelName);
     
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
@@ -360,9 +399,35 @@ export class WebRTCManager {
             presence: { key: this.userId },
           }
         })
+        // Handle presence for peer detection
+        .on('presence', { event: 'sync' }, () => {
+          const state = this.signalChannel?.presenceState() || {};
+          const presentUsers = Object.keys(state);
+          console.log('[WebRTC] Presence sync, users:', presentUsers);
+          
+          // Check if other user is present
+          const otherPresent = presentUsers.includes(this.otherUserId);
+          if (otherPresent && !this.peerPresent) {
+            this.peerPresent = true;
+            console.log('[WebRTC] Peer is now present!');
+          }
+        })
+        .on('presence', { event: 'join' }, ({ key }) => {
+          console.log('[WebRTC] User joined:', key);
+          if (key === this.otherUserId) {
+            this.peerPresent = true;
+            console.log('[WebRTC] Peer joined the channel!');
+          }
+        })
+        .on('presence', { event: 'leave' }, ({ key }) => {
+          console.log('[WebRTC] User left:', key);
+          if (key === this.otherUserId) {
+            this.peerPresent = false;
+          }
+        })
+        // Handle broadcast signals
         .on('broadcast', { event: 'signal' }, async (payload) => {
           const signal = payload.payload;
-          // Only process signals meant for us
           if (signal.from !== this.userId) {
             console.log('[WebRTC] Received signal:', signal.type);
             
@@ -371,34 +436,32 @@ export class WebRTCManager {
               return;
             }
             
-            if (signal.type === 'receiver_ready') {
-              console.log('[WebRTC] Receiver is ready, can send offer now');
-              this.receiverReadyReceived = true;
-              return;
-            }
-            
             await this.handleSignal(signal);
           }
         })
-        .subscribe((status) => {
+        .subscribe(async (status) => {
           console.log('[WebRTC] Signal channel status:', status);
           
           if (status === 'SUBSCRIBED') {
             clearTimeout(timeoutId);
             this.isChannelSubscribed = true;
-            console.log('[WebRTC] Ready to exchange signals');
+            
+            // Track our presence
+            await this.signalChannel?.track({
+              online_at: new Date().toISOString(),
+              user_id: this.userId,
+            });
+            
+            console.log('[WebRTC] Ready to exchange signals, tracking presence');
             resolve();
           } else if (status === 'CHANNEL_ERROR') {
             clearTimeout(timeoutId);
             this.isChannelSubscribed = false;
-            reject(new Error('Signaling channel error - check RLS policies and network'));
+            reject(new Error('Signaling channel error'));
           } else if (status === 'TIMED_OUT') {
             clearTimeout(timeoutId);
             this.isChannelSubscribed = false;
-            reject(new Error('Signaling channel connection timed out'));
-          } else if (status === 'CLOSED') {
-            this.isChannelSubscribed = false;
-            console.warn('[WebRTC] Signaling channel was closed');
+            reject(new Error('Signaling channel timeout'));
           }
         });
     });
@@ -406,7 +469,7 @@ export class WebRTCManager {
 
   private async sendSignal(data: any) {
     if (!this.signalChannel || !this.isChannelSubscribed) {
-      console.error('[WebRTC] No signal channel available or not subscribed');
+      console.error('[WebRTC] No signal channel available');
       return;
     }
 
@@ -434,7 +497,6 @@ export class WebRTCManager {
       if (data.type === 'offer') {
         console.log('[WebRTC] Processing offer', data.iceRestart ? '(ICE restart)' : '');
         
-        // Check if we can accept this offer
         if (this.peerConnection.signalingState !== 'stable' && !data.iceRestart) {
           console.log('[WebRTC] Ignoring offer - not in stable state');
           return;
@@ -456,7 +518,6 @@ export class WebRTCManager {
           from: this.userId,
         });
         
-        // Process queued ICE candidates
         await this.processQueuedCandidates();
         
       } else if (data.type === 'answer') {
@@ -467,7 +528,6 @@ export class WebRTCManager {
           return;
         }
         
-        // Clear offer retry timeout since we got an answer
         if (this.offerRetryTimeout) {
           clearTimeout(this.offerRetryTimeout);
           this.offerRetryTimeout = null;
@@ -479,13 +539,12 @@ export class WebRTCManager {
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.sdp));
         console.log('[WebRTC] Remote description set (answer)');
         
-        // Process queued ICE candidates
         await this.processQueuedCandidates();
         
       } else if (data.type === 'ice-candidate') {
         const candidate = new RTCIceCandidate(data.candidate);
         
-        if (this.peerConnection.remoteDescription && this.peerConnection.remoteDescription.type) {
+        if (this.peerConnection.remoteDescription?.type) {
           console.log('[WebRTC] Adding ICE candidate directly');
           await this.peerConnection.addIceCandidate(candidate);
         } else {
@@ -512,27 +571,46 @@ export class WebRTCManager {
     }
   }
 
-  // Notify caller that receiver is ready to receive offer
-  async sendReceiverReady() {
-    console.log('[WebRTC] Sending receiver_ready signal');
-    await this.sendSignal({
-      type: 'receiver_ready',
-      from: this.userId,
-    });
-  }
-
-  // Wait for receiver to be ready before creating offer
-  async waitForReceiverReady(timeoutMs: number = 10000): Promise<boolean> {
+  // Wait for peer presence before sending offer
+  async waitForPeerAndCreateOffer(timeoutMs: number = 10000): Promise<void> {
+    this.updateStatus('waiting_for_peer', 'Waiting for other user to join...');
+    
     const startTime = Date.now();
     
     while (Date.now() - startTime < timeoutMs) {
-      if (this.receiverReadyReceived) {
-        return true;
+      if (this.peerPresent) {
+        console.log('[WebRTC] Peer detected via presence, creating offer...');
+        await this.createAndSendOffer();
+        return;
       }
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
     
-    console.log('[WebRTC] Receiver ready timeout, proceeding with offer anyway');
+    console.log('[WebRTC] Peer not detected, creating offer anyway...');
+    await this.createAndSendOffer();
+  }
+
+  // Receiver signals ready (deprecated, using presence now)
+  async sendReceiverReady() {
+    console.log('[WebRTC] Receiver is ready (using presence tracking)');
+  }
+
+  // Wait for receiver ready (deprecated, using presence now)
+  async waitForReceiverReady(timeoutMs: number = 10000): Promise<boolean> {
+    return this.waitForPeerPresence(timeoutMs);
+  }
+
+  private async waitForPeerPresence(timeoutMs: number = 10000): Promise<boolean> {
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < timeoutMs) {
+      if (this.peerPresent) {
+        return true;
+      }
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
+    
+    console.log('[WebRTC] Peer presence timeout, proceeding anyway');
     return false;
   }
 
@@ -542,7 +620,6 @@ export class WebRTCManager {
       return;
     }
 
-    // Don't create offer if we already received one or got an answer
     if (this.hasReceivedOffer) {
       console.log('[WebRTC] Already received offer, not creating one');
       return;
@@ -577,7 +654,7 @@ export class WebRTCManager {
         from: this.userId,
       });
       
-      // Set up retry if no answer received within 3 seconds
+      // Retry if no answer received within 3 seconds
       if (this.offerRetryCount < this.maxOfferRetries) {
         this.offerRetryTimeout = setTimeout(() => {
           if (!this.hasReceivedAnswer && this.peerConnection) {
@@ -620,6 +697,106 @@ export class WebRTCManager {
     return videoTracks[0]?.enabled ?? false;
   }
 
+  async flipCamera(): Promise<boolean> {
+    if (!this.localStream || !this.isVideoCall) return false;
+    
+    try {
+      // Toggle facing mode
+      this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+      
+      // Get new stream with flipped camera
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          facingMode: this.currentFacingMode,
+          frameRate: { ideal: 30, max: 60 }
+        },
+        audio: false,
+      });
+      
+      // Get the new video track
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const oldVideoTrack = this.localStream.getVideoTracks()[0];
+      
+      if (newVideoTrack && oldVideoTrack) {
+        // Replace track in peer connection
+        const sender = this.peerConnection?.getSenders().find(s => s.track?.kind === 'video');
+        if (sender) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+        
+        // Replace track in local stream
+        this.localStream.removeTrack(oldVideoTrack);
+        oldVideoTrack.stop();
+        this.localStream.addTrack(newVideoTrack);
+        
+        console.log('[WebRTC] Camera flipped to:', this.currentFacingMode);
+        return true;
+      }
+    } catch (error) {
+      console.error('[WebRTC] Error flipping camera:', error);
+      // Revert facing mode on error
+      this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+    }
+    
+    return false;
+  }
+
+  async startScreenShare(): Promise<MediaStream | null> {
+    try {
+      this.screenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 }
+        },
+        audio: true,
+      });
+      
+      const screenVideoTrack = this.screenStream.getVideoTracks()[0];
+      
+      // Replace video track in peer connection
+      const sender = this.peerConnection?.getSenders().find(s => s.track?.kind === 'video');
+      if (sender && screenVideoTrack) {
+        await sender.replaceTrack(screenVideoTrack);
+        
+        // Handle screen share stop
+        screenVideoTrack.onended = async () => {
+          await this.stopScreenShare();
+        };
+      }
+      
+      console.log('[WebRTC] Screen sharing started');
+      return this.screenStream;
+    } catch (error) {
+      console.error('[WebRTC] Error starting screen share:', error);
+      return null;
+    }
+  }
+
+  async stopScreenShare(): Promise<void> {
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(track => track.stop());
+      this.screenStream = null;
+    }
+    
+    // Restore camera video track
+    if (this.localStream && this.isVideoCall) {
+      const cameraTrack = this.localStream.getVideoTracks()[0];
+      const sender = this.peerConnection?.getSenders().find(s => s.track?.kind === 'video');
+      if (sender && cameraTrack) {
+        await sender.replaceTrack(cameraTrack);
+      }
+    }
+    
+    console.log('[WebRTC] Screen sharing stopped');
+  }
+
+  isScreenSharing(): boolean {
+    return this.screenStream !== null;
+  }
+
   getLocalStream(): MediaStream | null {
     return this.localStream;
   }
@@ -630,17 +807,17 @@ export class WebRTCManager {
            this.peerConnection?.iceConnectionState === 'completed';
   }
 
-  getConnectionStats(): { reconnectAttempts: number; isChannelSubscribed: boolean } {
+  getConnectionStats(): { reconnectAttempts: number; isChannelSubscribed: boolean; peerPresent: boolean } {
     return {
       reconnectAttempts: this.reconnectAttempts,
       isChannelSubscribed: this.isChannelSubscribed,
+      peerPresent: this.peerPresent,
     };
   }
 
   async cleanup() {
     console.log('[WebRTC] Cleaning up...');
     
-    // Clear timeouts
     if (this.connectionTimeout) {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
@@ -656,10 +833,19 @@ export class WebRTCManager {
       this.heartbeatInterval = null;
     }
 
+    if (this.statsInterval) {
+      clearInterval(this.statsInterval);
+      this.statsInterval = null;
+    }
+
+    // Stop screen share if active
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(track => track.stop());
+      this.screenStream = null;
+    }
+
     // Stop all local tracks
-    this.localStream?.getTracks().forEach(track => {
-      track.stop();
-    });
+    this.localStream?.getTracks().forEach(track => track.stop());
 
     // Close peer connection
     if (this.peerConnection) {
@@ -679,9 +865,8 @@ export class WebRTCManager {
     this.hasReceivedAnswer = false;
     this.isNegotiating = false;
     this.offerRetryCount = 0;
-    this.channelSubscriptionAttempts = 0;
     this.isChannelSubscribed = false;
-    this.receiverReadyReceived = false;
+    this.peerPresent = false;
     
     console.log('[WebRTC] Cleanup complete');
   }
