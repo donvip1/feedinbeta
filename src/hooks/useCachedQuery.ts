@@ -22,6 +22,7 @@ interface UseCachedQueryResult<TData> {
 /**
  * A hook that implements stale-while-revalidate pattern
  * Uses memory cache first (synchronous), then IndexedDB, then network
+ * NEVER shows loading spinner if any cached data exists
  */
 export function useCachedQuery<TData>({
   cacheKey,
@@ -90,10 +91,15 @@ export function useCachedQuery<TData>({
   // Determine what data to show
   const displayData = query.data ?? cachedData;
 
+  // CRITICAL: Never show loading if we have ANY cached data
+  const hasAnyData = displayData !== undefined;
+
   return {
     data: displayData,
-    isLoading: !cacheLoaded || (!cachedData && query.isLoading),
-    isFreshLoading: query.isLoading && !!cachedData,
+    // Only show loading if NO cached data exists and still loading
+    isLoading: !hasAnyData && (!cacheLoaded || query.isLoading),
+    // Show fresh loading indicator only if we have stale data and fetching fresh
+    isFreshLoading: query.isLoading && hasAnyData,
     isStale: isStale && !query.data,
     error: query.error,
     refetch: async () => {
@@ -124,6 +130,7 @@ export async function preCacheData<TData>(
 export function getCachedDataSync<TData>(cacheKey: string): TData | null {
   return memoryCache.get<TData>(cacheKey);
 }
+
 export async function getCachedData<TData>(cacheKey: string): Promise<TData | null> {
   try {
     return await indexedDBCache.get<TData>(cacheKey);

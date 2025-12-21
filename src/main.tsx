@@ -5,57 +5,57 @@ import "./index.css";
 import { CacheManager } from "./lib/cache-manager";
 import { indexedDBCache } from "./lib/indexed-db-cache";
 import { memoryCache } from "./lib/memory-cache";
+import { appShellPreloader } from "./lib/app-shell-preloader";
 
-// Preload critical data into memory cache from IndexedDB BEFORE React renders
-const preloadMemoryCache = async () => {
-  try {
-    const userId = localStorage.getItem('currentUserId');
-    if (userId) {
-      // Load critical data into memory cache in parallel
-      const keys = [
-        `profile:${userId}`,
-        `credits:${userId}`,
-        `notifications_count:${userId}`,
-        'credit_packages',
-        'subscription_tiers',
-      ];
-      
-      await Promise.all(keys.map(async (key) => {
-        const data = await indexedDBCache.get(key);
-        if (data) {
-          memoryCache.set(key, data, 30 * 60 * 1000); // 30 min TTL
-        }
-      }));
-      
-      console.log('[Main] Memory cache preloaded');
+// PHASE 1: Load cache to memory BEFORE React renders (instant feel)
+const initializeApp = async () => {
+  const startTime = Date.now();
+  
+  // Check if user is likely authenticated
+  if (appShellPreloader.isLikelyAuthenticated()) {
+    // Load cached data into memory for instant access
+    await appShellPreloader.loadCacheToMemory();
+    console.log(`[Main] App shell preloaded in ${Date.now() - startTime}ms`);
+  }
+
+  // Register service worker for PWA functionality
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      CacheManager.register();
+    });
+  }
+
+  // Cleanup expired cache entries periodically
+  indexedDBCache.cleanupExpired();
+  setInterval(() => {
+    indexedDBCache.cleanupExpired();
+    memoryCache.cleanup();
+  }, 5 * 60 * 1000); // Every 5 minutes
+
+  // Now render React
+  const rootElement = document.getElementById("root");
+  if (!rootElement) throw new Error("Root element not found");
+
+  createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  );
+
+  // PHASE 2: Refresh data in background AFTER React mounts
+  if (appShellPreloader.isLikelyAuthenticated()) {
+    // Use requestIdleCallback for non-blocking background refresh
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        appShellPreloader.refreshInBackground();
+      }, { timeout: 3000 });
+    } else {
+      setTimeout(() => {
+        appShellPreloader.refreshInBackground();
+      }, 100);
     }
-  } catch (error) {
-    console.error('[Main] Preload error:', error);
   }
 };
 
-// Start preloading immediately
-preloadMemoryCache();
-
-// Register service worker for PWA functionality
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    CacheManager.register();
-  });
-}
-
-// Cleanup expired cache entries periodically
-indexedDBCache.cleanupExpired();
-setInterval(() => {
-  indexedDBCache.cleanupExpired();
-  memoryCache.cleanup();
-}, 5 * 60 * 1000); // Every 5 minutes
-
-const rootElement = document.getElementById("root");
-if (!rootElement) throw new Error("Root element not found");
-
-createRoot(rootElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// Start initialization
+initializeApp();

@@ -19,6 +19,7 @@ import { ViewHistory } from '@/components/profile/ViewHistory';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { useProfileWithCache } from '@/hooks/useProfileWithCache';
 import { memoryCache } from '@/lib/memory-cache';
+import { usernameCache } from '@/lib/username-cache';
 
 interface Profile {
   id: string;
@@ -64,7 +65,7 @@ const Profile = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start with false - show cached data immediately
   const [isFollowing, setIsFollowing] = useState(false);
   const [hasPendingRequest, setHasPendingRequest] = useState(false);
   const [resolvedUserId, setResolvedUserId] = useState<string | null>(null);
@@ -103,7 +104,7 @@ const Profile = () => {
     return uuidRegex.test(str);
   };
 
-  // Set profile from cache immediately when available
+  // INSTANT: Set profile from cache immediately when available
   useEffect(() => {
     if (cachedProfile) {
       setProfile(prev => ({
@@ -112,11 +113,12 @@ const Profile = () => {
         post_count: prev?.post_count || cachedProfile.posts_count || 0,
         total_views: prev?.total_views || 0,
       } as Profile));
+      // Don't show loading if we have cached data
       setLoading(false);
     }
   }, [cachedProfile]);
 
-  // Resolve identifier to userId
+  // INSTANT: Resolve identifier to userId using username cache first
   useEffect(() => {
     const resolveIdentifier = async () => {
       if (!identifier) return;
@@ -124,7 +126,14 @@ const Profile = () => {
       if (isUUID(identifier)) {
         setResolvedUserId(identifier);
       } else {
-        // It's a username, resolve to UUID
+        // Try username cache first (INSTANT)
+        const cachedId = usernameCache.get(identifier);
+        if (cachedId) {
+          setResolvedUserId(cachedId);
+          return;
+        }
+        
+        // Fall back to database lookup
         const { data, error } = await supabase
           .rpc('get_user_by_username', { p_username: identifier });
         
@@ -137,6 +146,9 @@ const Profile = () => {
           navigate('/feed');
           return;
         }
+        
+        // Cache the mapping for next time
+        await usernameCache.set(identifier, data);
         setResolvedUserId(data);
       }
     };
@@ -188,8 +200,8 @@ const Profile = () => {
   const loadProfile = async (showLoading = true) => {
     if (!resolvedUserId) return;
     
-    // Only show loading if no cached data
-    if (showLoading && !profile) {
+    // NEVER show loading if we have any cached data
+    if (showLoading && !profile && !cachedProfile) {
       setLoading(true);
     }
     
@@ -210,12 +222,15 @@ const Profile = () => {
       if (profileResult.error) throw profileResult.error;
       
       if (!profileResult.data) {
-        toast({
-          title: 'Profile not found',
-          description: 'This profile does not exist.',
-          variant: 'destructive',
-        });
-        navigate('/feed');
+        // Only show error if we don't have cached data
+        if (!profile && !cachedProfile) {
+          toast({
+            title: 'Profile not found',
+            description: 'This profile does not exist.',
+            variant: 'destructive',
+          });
+          navigate('/feed');
+        }
         return;
       }
 
@@ -232,9 +247,14 @@ const Profile = () => {
       if (resolvedUserId !== identifier) {
         memoryCache.set(`profile:${resolvedUserId}`, fullProfile, 10 * 60 * 1000);
       }
+      
+      // Cache username mapping
+      if (fullProfile.username) {
+        await usernameCache.set(fullProfile.username, resolvedUserId);
+      }
     } catch (error: any) {
       // Only show error if we don't have cached data
-      if (!profile) {
+      if (!profile && !cachedProfile) {
         toast({
           title: 'Error loading profile',
           description: error.message,
