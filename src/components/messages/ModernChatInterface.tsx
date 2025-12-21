@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { usePresence, getStatusText, getStatusColor, formatLastSeen, PresenceStatus } from '@/hooks/usePresence';
 import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
 import { useMessageCache } from '@/hooks/useMessageCache';
+import { useMessageRealtime } from '@/hooks/useMessageRealtime';
+import { MessagePayload, TypingPayload } from '@/lib/unified-realtime';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -176,180 +178,106 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     };
   }, [user?.id, conversationId]);
 
-  // Initialize data and subscriptions
-  useEffect(() => {
-    let messageChannel: ReturnType<typeof supabase.channel> | null = null;
-    let typingChannel: ReturnType<typeof supabase.channel> | null = null;
-    let reactionsChannel: ReturnType<typeof supabase.channel> | null = null;
-    let receiptsChannel: ReturnType<typeof supabase.channel> | null = null;
+  // Handle new message from realtime
+  const handleRealtimeMessage = useCallback((message: MessagePayload) => {
+    console.log('[Realtime] New message from other user:', message.id);
+    
+    setMessages(prev => {
+      // Don't add duplicates
+      if (prev.some(m => m.id === message.id)) return prev;
+      
+      const formattedMsg: Message = {
+        id: message.id,
+        content: message.content,
+        sender_id: message.sender_id,
+        created_at: message.created_at,
+        media_url: message.media_url || null,
+        media_type: message.media_type || null,
+        reply_to_id: message.reply_to_id || null,
+        reply_to_message: null,
+        profiles: {
+          display_name: otherUser?.display_name || 'Unknown',
+          avatar_url: otherUser?.avatar_url || null
+        },
+        reactions: [],
+        read_receipts: [],
+        status: 'sent',
+        is_pinned: false,
+        edited_at: null,
+      };
+      
+      return [...prev, formattedMsg];
+    });
+    
+    // Cache the message
+    appendMessage({
+      id: message.id,
+      content: message.content,
+      sender_id: message.sender_id,
+      created_at: message.created_at,
+      media_url: message.media_url || null,
+      media_type: message.media_type || null,
+      profiles: {
+        display_name: otherUser?.display_name || 'Unknown',
+        avatar_url: otherUser?.avatar_url || null
+      },
+    });
+    
+    // Scroll to bottom if near bottom
+    if (isNearBottomRef.current) {
+      setTimeout(() => scrollToBottom(), 100);
+      markMessagesAsRead([{ id: message.id, sender_id: message.sender_id, read_receipts: [] } as Message]);
+    } else {
+      setShowScrollButton(true);
+      setNewMessagesCount(prev => prev + 1);
+    }
+  }, [otherUser, appendMessage]);
 
+  // Handle typing indicator from realtime
+  const handleRealtimeTyping = useCallback((typing: TypingPayload) => {
+    setIsTyping(typing.is_typing);
+    setActivityType((typing.activity_type as ActivityType) || 'typing');
+  }, []);
+
+  // Handle message delete from realtime
+  const handleRealtimeDelete = useCallback((payload: { id: string }) => {
+    setMessages(prev => prev.filter(m => m.id !== payload.id));
+  }, []);
+
+  // Handle read receipt from realtime
+  const handleRealtimeReceipt = useCallback((receipt: { message_id: string; user_id: string; read_at: string }) => {
+    setMessages(prev => prev.map(msg =>
+      msg.id === receipt.message_id
+        ? { ...msg, status: 'read' as Message['status'], read_receipts: [...(msg.read_receipts || []), { user_id: receipt.user_id, read_at: receipt.read_at }] }
+        : msg
+    ));
+  }, []);
+
+  // Handle presence change from realtime  
+  const handleRealtimePresence = useCallback((isOnline: boolean) => {
+    // Presence is now handled by the unified manager
+    console.log('[Realtime] Other user presence:', isOnline);
+  }, []);
+
+  // Use unified realtime hook - SINGLE subscription for everything
+  useMessageRealtime({
+    conversationId,
+    otherUserId: otherUser?.id,
+    onNewMessage: handleRealtimeMessage,
+    onMessageDelete: handleRealtimeDelete,
+    onTyping: handleRealtimeTyping,
+    onReadReceipt: handleRealtimeReceipt,
+    onPresenceChange: handleRealtimePresence,
+  });
+
+  // Initialize data on mount
+  useEffect(() => {
     const init = async () => {
       await loadOtherUser();
       await loadMessages();
-      
-      // Subscribe to real-time message updates with unique channel name
-      messageChannel = supabase
-        .channel(`chat-messages-${conversationId}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'messages',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          async (payload: any) => {
-            const newMsg = payload?.new;
-            if (!newMsg) return;
-            
-            // Skip messages from current user - we handle those via optimistic update
-            // This prevents the flickering/duplicate issue
-            if (newMsg.sender_id === user?.id) {
-              console.log('[Realtime] Own message, handled optimistically');
-              return;
-            }
-            
-            console.log('[Realtime] New message from other user:', newMsg.id);
-            
-            // Add message from other user instantly
-            setMessages(prev => {
-              // Double-check we don't already have it
-              if (prev.some(m => m.id === newMsg.id)) {
-                return prev;
-              }
-              
-              const formattedMsg: Message = {
-                id: newMsg.id,
-                content: newMsg.content,
-                sender_id: newMsg.sender_id,
-                created_at: newMsg.created_at,
-                media_url: newMsg.media_url || null,
-                media_type: newMsg.media_type || null,
-                reply_to_id: newMsg.reply_to_id || null,
-                reply_to_message: null,
-                profiles: {
-                  display_name: otherUser?.display_name || 'Unknown',
-                  avatar_url: otherUser?.avatar_url || null
-                },
-                reactions: [],
-                read_receipts: [],
-                status: 'sent',
-                is_pinned: false,
-                edited_at: null,
-              };
-              
-              return [...prev, formattedMsg];
-            });
-            
-            // Also append to cache
-            appendMessage({
-              id: newMsg.id,
-              content: newMsg.content,
-              sender_id: newMsg.sender_id,
-              created_at: newMsg.created_at,
-              media_url: newMsg.media_url || null,
-              media_type: newMsg.media_type || null,
-              profiles: {
-                display_name: otherUser?.display_name || 'Unknown',
-                avatar_url: otherUser?.avatar_url || null
-              },
-            });
-            
-            // Only scroll to bottom if user is near the bottom
-            if (isNearBottomRef.current) {
-              setTimeout(() => scrollToBottom(), 100);
-              // Mark as read immediately
-              markMessagesAsRead([{ id: newMsg.id, sender_id: newMsg.sender_id, read_receipts: [] } as Message]);
-            } else {
-              // Show scroll button with count to indicate new messages
-              setShowScrollButton(true);
-              setNewMessagesCount(prev => prev + 1);
-            }
-          }
-        )
-        .on(
-          'postgres_changes',
-          {
-            event: 'DELETE',
-            schema: 'public',
-            table: 'messages',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          (payload: any) => {
-            const deletedMsg = payload?.old;
-            if (deletedMsg?.id) {
-              setMessages(prev => prev.filter(m => m.id !== deletedMsg.id));
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log('[Realtime] Messages channel status:', status);
-        });
-
-      // Subscribe to typing indicators with unique channel name
-      typingChannel = supabase
-        .channel(`chat-typing-${conversationId}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'typing_indicators',
-            filter: `conversation_id=eq.${conversationId}`,
-          },
-          (payload: any) => {
-            console.log('[Realtime] Typing indicator:', payload);
-            if (payload.new?.user_id !== user?.id) {
-              setIsTyping(payload.new?.is_typing || false);
-              setActivityType(payload.new?.activity_type || 'typing');
-            }
-          }
-        )
-        .subscribe((status) => {
-          console.log('[Realtime] Typing channel status:', status);
-        });
-
-      // Subscribe to reactions with unique channel name
-      reactionsChannel = supabase
-        .channel(`chat-reactions-${conversationId}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table: 'message_reactions' },
-          () => loadMessages()
-        )
-        .subscribe();
-
-      // Subscribe to read receipts with unique channel name
-      receiptsChannel = supabase
-        .channel(`chat-receipts-${conversationId}-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'message_read_receipts' },
-          (payload: any) => {
-            console.log('[Realtime] Read receipt:', payload);
-            const receipt = payload?.new;
-            if (!receipt || receipt.user_id === user?.id) return;
-            
-            setMessages(prev => prev.map(msg =>
-              msg.id === receipt.message_id
-                ? { ...msg, status: 'read', read_receipts: [...(msg.read_receipts || []), { user_id: receipt.user_id, read_at: receipt.read_at }] }
-                : msg
-            ));
-          }
-        )
-        .subscribe();
     };
-
     init();
-
-    return () => {
-      console.log('[Realtime] Cleaning up channels');
-      if (messageChannel) supabase.removeChannel(messageChannel);
-      if (typingChannel) supabase.removeChannel(typingChannel);
-      if (reactionsChannel) supabase.removeChannel(reactionsChannel);
-      if (receiptsChannel) supabase.removeChannel(receiptsChannel);
-    };
-  }, [conversationId, user?.id, otherUser]);
+  }, [conversationId, user?.id]);
 
   // Get other user's presence data for display
   const otherUserPresence = otherUser?.id ? userStatuses.get(otherUser.id) : null;
