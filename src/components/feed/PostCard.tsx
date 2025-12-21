@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark, Music, Disc3 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark, Music, Disc3, Sparkles, BarChart3 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,12 +8,14 @@ import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
 import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import CaptionText from './CaptionText';
 import FullscreenMediaViewer from './FullscreenMediaViewer';
+import PromotionStatsModal from './PromotionStatsModal';
 
 interface PostCardProps {
   post: {
@@ -57,6 +59,9 @@ interface PostCardProps {
       avatar_url: string | null;
     };
   };
+  isPromoted?: boolean;
+  promoterName?: string;
+  boostLevel?: string;
   allPosts?: any[];
   allVideoPosts?: any[]; // All video posts for TikTok-style fullscreen navigation
   onLikeUpdate?: () => void;
@@ -67,7 +72,7 @@ interface PostCardProps {
   onMarkAsViewed?: (postId: string) => void; // Callback to mark posts as viewed in fullscreen
 }
 
-export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd, onView, onMarkAsViewed }: PostCardProps) {
+export default function PostCard({ post, isPromoted, promoterName, boostLevel, allPosts = [], allVideoPosts = [], onLikeUpdate, onCommentsOpenChange, onInteractionStart, onInteractionEnd, onView, onMarkAsViewed }: PostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -100,6 +105,7 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
+  const [showPromotionStats, setShowPromotionStats] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -487,7 +493,30 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
 
   return (
     <>
-      <div ref={postRef} className="mb-4 snap-start snap-always w-full px-4 py-2">
+      <div ref={postRef} className={`mb-4 snap-start snap-always w-full px-4 py-2 ${isPromoted ? 'bg-primary/5 border border-primary/20 rounded-xl' : ''}`}>
+        {/* Sponsored/Promoted badge */}
+        {isPromoted && (
+          <div 
+            className="flex items-center justify-between mb-2 px-1 cursor-pointer"
+            onClick={() => setShowPromotionStats(true)}
+          >
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-medium text-primary">
+                Sponsored {promoterName ? `by ${promoterName}` : ''}
+              </span>
+              {boostLevel && (
+                <Badge variant="secondary" className="text-[10px] h-4 px-1">
+                  {boostLevel}
+                </Badge>
+              )}
+            </div>
+            <button className="p-1 hover:bg-primary/10 rounded-full transition-colors">
+              <BarChart3 className="w-3.5 h-3.5 text-primary" />
+            </button>
+          </div>
+        )}
+
         {/* Refeed/Quote Refeed indicator */}
         {(post.post_type === 'refeed' || post.post_type === 'quote') && (
           <div className="flex items-center gap-1.5 mb-2 px-1">
@@ -1102,6 +1131,13 @@ export default function PostCard({ post, allPosts = [], allVideoPosts = [], onLi
           setShowFullscreenViewer(false);
           setShareOpen(true);
         }}
+      />
+
+      {/* Promotion Stats Modal */}
+      <PromotionStatsModal
+        open={showPromotionStats}
+        onOpenChange={setShowPromotionStats}
+        postId={post.id}
       />
     </>
   );
