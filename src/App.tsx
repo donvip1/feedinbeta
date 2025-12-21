@@ -58,6 +58,7 @@ import CreatorPayouts from "./pages/CreatorPayouts";
 import Promotions from "./pages/Promotions";
 import Install from "./pages/Install";
 import MusicDiscovery from "./pages/MusicDiscovery";
+import Investors from "./pages/Investors";
 
 const queryClient = new QueryClient();
 
@@ -167,6 +168,7 @@ const App = () => {
             <Route path="/settings/language" element={<LanguageSettings />} />
             <Route path="/settings/help" element={<HelpSupport />} />
             <Route path="/settings/sessions" element={<SessionManagement />} />
+            <Route path="/investors" element={<Investors />} />
             
             {/* Legacy routes for backwards compatibility */}
             <Route path="/post/:postId" element={<PostDetail />} />
