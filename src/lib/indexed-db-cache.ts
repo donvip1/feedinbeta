@@ -1,10 +1,11 @@
 /**
  * IndexedDB Cache Manager for FeedIn
- * Provides fast, persistent caching for conversations, messages, and profiles
+ * Provides fast, persistent caching for conversations, messages, profiles,
+ * and general app data with TTL support
  */
 
 const DB_NAME = 'feedin_cache';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Upgraded for new stores
 
 interface CacheEntry<T> {
   key: string;
@@ -90,10 +91,17 @@ class IndexedDBCache {
           db.createObjectStore('profiles', { keyPath: 'id' });
         }
         
-        // Generic cache store
+        // Generic cache store with TTL support
         if (!db.objectStoreNames.contains('cache')) {
           const cacheStore = db.createObjectStore('cache', { keyPath: 'key' });
           cacheStore.createIndex('expiresAt', 'expiresAt');
+        }
+
+        // App data store for structured data (v2)
+        if (!db.objectStoreNames.contains('app_data')) {
+          const appStore = db.createObjectStore('app_data', { keyPath: 'key' });
+          appStore.createIndex('category', 'category');
+          appStore.createIndex('expiresAt', 'expiresAt');
         }
       };
     });

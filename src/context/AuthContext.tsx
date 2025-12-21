@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { SessionManager } from '@/lib/session-manager';
 import { CookieManager } from '@/lib/cookie-manager';
+import { startupPreloader } from '@/lib/startup-preloader';
+import { backgroundSync } from '@/lib/background-sync';
 
 interface AuthContextType {
   user: User | null;
@@ -76,13 +78,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Handle specific auth events
         if (event === 'SIGNED_IN') {
-          // Defer profile sync to avoid deadlock
+          // Start aggressive preload for offline-first experience
           if (session?.user) {
+            startupPreloader.startPreload(session.user.id);
+            backgroundSync.initialize(session.user.id);
+            // Defer profile sync to avoid deadlock
             setTimeout(() => {
               syncUserProfile(session.user);
             }, 0);
           }
         } else if (event === 'SIGNED_OUT') {
+          // Stop background sync and reset preloader
+          backgroundSync.stop();
+          startupPreloader.reset();
           // Clear all local data on sign out
           clearAllLocalData();
           setUser(null);

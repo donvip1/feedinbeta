@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { useCachedQuery } from '@/hooks/useCachedQuery';
 import { 
   ArrowLeft, 
   User, 
@@ -38,8 +38,9 @@ const Settings = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();
 
-  // Fetch user profile for username
-  const { data: userProfile } = useQuery({
+  // Fetch user profile with caching
+  const { data: userProfile } = useCachedQuery({
+    cacheKey: `profile:${user?.id}`,
     queryKey: ["user-profile-settings", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -51,10 +52,12 @@ const Settings = () => {
       return data;
     },
     enabled: !!user,
+    ttl: 30 * 60 * 1000, // 30 minutes
   });
 
-  // Server-side check for admin wallet access
-  const { data: canViewAdminWallet } = useQuery({
+  // Server-side check for admin wallet access with caching
+  const { data: canViewAdminWallet } = useCachedQuery({
+    cacheKey: `admin_access:${user?.id}`,
     queryKey: ["can-view-admin-wallet"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("can_view_admin_wallet");
@@ -62,6 +65,7 @@ const Settings = () => {
       return data as boolean;
     },
     enabled: !!user,
+    ttl: 30 * 60 * 1000, // 30 minutes
   });
 
   useEffect(() => {
