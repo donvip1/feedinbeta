@@ -3,8 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
-import { usePresence, getStatusText, getStatusColor, formatLastSeen, PresenceStatus } from '@/hooks/usePresence';
-import { useKeyboardHeight } from '@/hooks/useKeyboardHeight';
+import { usePresence, formatLastSeen } from '@/hooks/usePresence';
 import { useMessageCache } from '@/hooks/useMessageCache';
 import { useMessageRealtime } from '@/hooks/useMessageRealtime';
 import { MessagePayload, TypingPayload } from '@/lib/unified-realtime';
@@ -90,7 +89,6 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { keyboardHeight, isKeyboardOpen, visualViewportOffset } = useKeyboardHeight();
   const { cachedMessages, hasCachedData, saveToCache, appendMessage } = useMessageCache(conversationId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -129,10 +127,6 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const isNearBottomRef = useRef(true);
   const lastScrollPositionRef = useRef<number>(0);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
-
-  // Calculate input bottom position - only use keyboard height
-  // Don't add extra offset that causes blank screen
-  const inputBottom = keyboardHeight;
 
   // Load cached messages immediately on mount
   useEffect(() => {
@@ -308,30 +302,8 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     // Don't auto-scroll on subsequent message updates - let user control
   }, [firstUnreadId]); // Remove messages dependency to stop auto-scrolling on new messages
 
-  // Scroll to bottom when keyboard opens to keep messages visible
-  // Store scroll position before keyboard opens, restore relative position after
-  useEffect(() => {
-    if (isKeyboardOpen) {
-      // Keyboard opened - scroll to bottom immediately to keep messages visible
-      // Use requestAnimationFrame for smoother scroll
-      requestAnimationFrame(() => {
-        if (isNearBottomRef.current) {
-          scrollToBottom();
-        } else if (scrollAreaRef.current) {
-          // Maintain relative scroll position from bottom
-          const container = scrollAreaRef.current;
-          const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-          // After keyboard opens, maintain same distance from bottom
-          requestAnimationFrame(() => {
-            if (scrollAreaRef.current) {
-              const newScrollTop = scrollAreaRef.current.scrollHeight - scrollAreaRef.current.clientHeight - distanceFromBottom;
-              scrollAreaRef.current.scrollTop = Math.max(0, newScrollTop);
-            }
-          });
-        }
-      });
-    }
-  }, [isKeyboardOpen]);
+  // With flexbox layout, browser handles keyboard automatically
+  // No need for manual keyboard offset calculations
 
   // Only scroll to bottom for own messages or if user is near bottom
   const scrollToBottomIfNeeded = useCallback(() => {
@@ -944,9 +916,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   // inputBottom is already calculated at the top of the component
 
   return (
-    <div className="relative h-screen w-full bg-gradient-to-b from-background to-background/95">
-      {/* Header - FIXED at top, never moves with keyboard */}
-      <header className="chat-header-fixed flex items-center gap-3 p-3 border-b border-border/50 bg-background/95 backdrop-blur-lg z-50 min-h-[60px]">
+    <div className="flex flex-col h-[100dvh] w-full bg-gradient-to-b from-background to-background/95 overflow-hidden">
+      {/* Header - Flex shrink 0 to stay at top */}
+      <header className="flex-shrink-0 flex items-center gap-3 p-3 border-b border-border/50 bg-background/95 backdrop-blur-lg z-50 min-h-[60px]">
         <Button
           variant="ghost"
           size="icon"
@@ -1044,9 +1016,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       </header>
 
-      {/* Search Bar - FIXED below header */}
+      {/* Search Bar - Below header */}
       {showSearch && (
-        <div className="fixed top-[60px] left-0 md:left-80 right-0 p-2 border-b border-border/50 bg-background/50 backdrop-blur-sm z-40">
+        <div className="flex-shrink-0 p-2 border-b border-border/50 bg-background/50 backdrop-blur-sm z-40">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -1070,13 +1042,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Messages - FIXED scrollable area between header and input */}
+      {/* Messages - Flex grow to fill remaining space, scrollable */}
       <div 
-        className="chat-messages-area left-0 right-0 px-3"
-        style={{ 
-          top: showSearch ? 110 : 60,
-          bottom: showVoiceRecorder ? 80 : (replyingTo || previewMedia ? 140 : 76) + inputBottom 
-        }}
+        className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-3"
         onScroll={handleScroll}
         ref={scrollAreaRef}
       >
@@ -1172,17 +1140,16 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             </div>
           )}
           
-          <div ref={scrollRef} />
+          <div ref={scrollRef} className="h-1" />
         </div>
       </div>
 
-      {/* Scroll to bottom button with new messages count */}
+      {/* Scroll to bottom button */}
       {showScrollButton && (
         <Button
           variant="secondary"
           size="sm"
-          className="fixed right-4 rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2 z-50 gap-1 px-3"
-          style={{ bottom: (showVoiceRecorder ? 100 : 96) + inputBottom }}
+          className="absolute right-4 bottom-24 rounded-full shadow-lg animate-in fade-in slide-in-from-bottom-2 z-50 gap-1 px-3"
           onClick={() => {
             scrollToBottom();
             setNewMessagesCount(0);
@@ -1197,12 +1164,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </Button>
       )}
 
-      {/* Reply Preview - FIXED above input */}
+      {/* Reply Preview - Above input in flex layout */}
       {replyingTo && (
-        <div 
-          className="chat-input-fixed flex items-center gap-3 px-4 py-2 bg-primary/5 border-t border-border/50 z-40"
-          style={{ bottom: 64 + inputBottom }}
-        >
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2 bg-primary/5 border-t border-border/50 z-40">
           <div className="w-1 h-10 bg-primary rounded-full" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-primary">Replying to {replyingTo.sender}</p>
@@ -1219,12 +1183,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Media Preview - FIXED above input */}
+      {/* Media Preview - Above input in flex layout */}
       {previewMedia && (
-        <div 
-          className="chat-input-fixed flex items-center gap-3 px-4 py-2 bg-muted/50 border-t border-border/50 z-40"
-          style={{ bottom: 64 + inputBottom }}
-        >
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2 bg-muted/50 border-t border-border/50 z-40">
           <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted">
             {previewMedia.type.startsWith('image') ? (
               <img src={previewMedia.url} alt="Preview" className="w-full h-full object-cover" />
@@ -1246,12 +1207,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Voice Recorder - FIXED at bottom */}
+      {/* Voice Recorder - At bottom in flex layout */}
       {showVoiceRecorder && (
-        <div 
-          className="chat-input-fixed px-4 py-3 bg-muted/50 border-t border-border/50 z-40"
-          style={{ bottom: inputBottom }}
-        >
+        <div className="flex-shrink-0 px-4 py-3 bg-muted/50 border-t border-border/50 z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
           <VoiceRecorder
             onSend={handleVoiceSend}
             onCancel={() => {
@@ -1263,12 +1221,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Input Area - FIXED at bottom, adjusts with keyboard */}
+      {/* Input Area - At bottom in flex layout */}
       {!showVoiceRecorder && (
-        <div 
-          className="chat-input-fixed p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40"
-          style={{ bottom: inputBottom, paddingBottom: `max(12px, env(safe-area-inset-bottom))` }}
-        >
+        <div className="flex-shrink-0 p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
           <div className="flex items-end gap-2">
             <AttachmentPicker onFileSelect={handleFileSelect} />
             
