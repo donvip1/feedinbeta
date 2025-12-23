@@ -4,7 +4,7 @@ import {
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
   PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff,
-  AudioLines, Home
+  AudioLines, Home, Minimize2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -24,6 +24,7 @@ import { ListenersModal } from './ListenersModal';
 import { cn } from '@/lib/utils';
 import { useSpaceAudio, ConnectionStatus } from '@/hooks/useSpaceAudio';
 import { useNavigation } from '@/context/NavigationContext';
+import { useOptionalSpaceContext } from '@/context/SpaceContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -96,6 +97,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { setHideBottomNav } = useNavigation();
+  const spaceContext = useOptionalSpaceContext();
   const [space, setSpace] = useState<SpaceData | null>(null);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isMuted, setIsMuted] = useState(true);
@@ -114,6 +116,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [totalGifts, setTotalGifts] = useState(0);
   const [myHostMuted, setMyHostMuted] = useState(false);
   const [myMicAllowed, setMyMicAllowed] = useState(true);
+  const notifiedUsersRef = useRef<Set<string>>(new Set());
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
   const isHost = space?.user_id === user?.id || myRole === 'host' || myRole === 'co_host';
@@ -125,6 +128,36 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     isSpeaker: myRole === 'speaker',
     isListener: myRole === 'listener',
   });
+
+  // Update SpaceContext when space data changes
+  useEffect(() => {
+    if (space && spaceContext) {
+      const hostProfile = speakers.find(s => s.user_id === space.user_id)?.profile;
+      spaceContext.joinSpace({
+        id: space.id,
+        title: space.title,
+        hostId: space.user_id,
+        hostName: hostProfile?.display_name || 'Host',
+        hostAvatar: hostProfile?.avatar_url || '',
+        startedAt: space.started_at || new Date().toISOString(),
+      }, myRole);
+    }
+  }, [space?.id, myRole, speakers.length]);
+
+  // Update context connection status
+  useEffect(() => {
+    if (spaceContext) {
+      spaceContext.setConnectionStatus(connectionStatus);
+    }
+  }, [connectionStatus]);
+
+  // Minimize handler
+  const handleMinimize = () => {
+    if (spaceContext) {
+      spaceContext.minimizeSpace();
+      navigate('/feed');
+    }
+  };
 
   // Hide bottom navigation when in live space
   useEffect(() => {
@@ -172,6 +205,43 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
+        table: 'live_space_speakers',
+        filter: `space_id=eq.${spaceId}`,
+      }, async (payload: any) => {
+        // Show "user joined" toast for new listeners
+        const newUserId = payload.new.user_id;
+        if (newUserId && newUserId !== user?.id && !notifiedUsersRef.current.has(newUserId)) {
+          notifiedUsersRef.current.add(newUserId);
+          
+          // Fetch profile of the new user
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('display_name, username, avatar_url')
+            .eq('id', newUserId)
+            .single();
+          
+          if (profile) {
+            toast(
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs font-medium">{profile.display_name?.[0] || 'U'}</span>
+                  )}
+                </div>
+                <span className="text-sm">
+                  <strong>{profile.display_name || profile.username}</strong> joined the space
+                </span>
+              </div>,
+              { duration: 3000 }
+            );
+          }
+        }
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
         table: 'live_space_reactions',
         filter: `space_id=eq.${spaceId}`,
       }, (payload: any) => {
@@ -202,6 +272,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         if (payload.new.status === 'ended') {
           // Show modal for 3 seconds then navigate away
           setShowSpaceEndedModal(true);
+          spaceContext?.leaveSpace();
           setTimeout(() => {
             setShowSpaceEndedModal(false);
             navigate('/live');
@@ -216,7 +287,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       disconnect();
       supabase.removeChannel(channel);
     };
-  }, [spaceId]);
+  }, [spaceId, user?.id]);
 
   // Join space AFTER space data is loaded (so we know if we're the host)
   useEffect(() => {
@@ -771,10 +842,10 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 variant="ghost" 
                 size="icon" 
                 className="rounded-full" 
-                onClick={() => navigate('/feed')}
-                title="Go to Feed"
+                onClick={handleMinimize}
+                title="Minimize and continue listening"
               >
-                <Home className="w-4 h-4" />
+                <Minimize2 className="w-4 h-4" />
               </Button>
               <Button variant="ghost" size="icon" className="rounded-full" onClick={handleShare}>
                 <Share2 className="w-4 h-4" />
