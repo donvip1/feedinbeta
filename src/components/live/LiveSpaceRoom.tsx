@@ -20,6 +20,7 @@ import { LiveGiftModal } from './LiveGiftModal';
 import { SpeakerQueuePanel } from './SpeakerQueuePanel';
 import { TestAudioModal } from './TestAudioModal';
 import { SpeakerAvatarWithWaves } from './SpeakerAvatarWithWaves';
+import { ListenersModal } from './ListenersModal';
 import { cn } from '@/lib/utils';
 import { useSpaceAudio, ConnectionStatus } from '@/hooks/useSpaceAudio';
 import { useNavigation } from '@/context/NavigationContext';
@@ -750,10 +751,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </div>
               <h1 className="text-lg font-bold truncate">{space?.title}</h1>
               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                <span className="flex items-center gap-1">
-                  <Users className="w-3 h-3" />
-                  {speakers.length} listening
-                </span>
+                <ListenersModal 
+                  listeners={listeners}
+                  totalCount={speakers.length}
+                  isHost={isHost}
+                  onPromote={(speakerId) => promoteSpeaker(speakerId, 'speaker')}
+                />
                 {totalGifts > 0 && (
                   <span className="flex items-center gap-1 text-amber-400">
                     <Gift className="w-3 h-3" />
