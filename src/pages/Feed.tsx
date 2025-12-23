@@ -64,32 +64,55 @@ const Feed = () => {
   const allVideoPostsRef = useRef<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
+  // Fetch live content count for indicator (always enabled)
+  const { data: liveCount, refetch: refetchLiveCount } = useQuery({
+    queryKey: ['feed-live-count'],
+    queryFn: async () => {
+      const [{ count: streamsCount }, { count: spacesCount }] = await Promise.all([
+        supabase.from('live_streams').select('*', { count: 'exact', head: true }).eq('status', 'live'),
+        supabase.from('live_spaces').select('*', { count: 'exact', head: true }).eq('status', 'live'),
+      ]);
+      return (streamsCount || 0) + (spacesCount || 0);
+    },
+    refetchInterval: 10000, // Refresh every 10 seconds to catch new live content
+  });
+
   // Fetch live content for the Live tab
   const { data: liveContent, refetch: refetchLive } = useQuery({
     queryKey: ['feed-live-content'],
     queryFn: async () => {
+      console.log('[Feed] Fetching live content...');
       // Fetch live streams
-      const { data: streams } = await supabase
+      const { data: streams, error: streamsError } = await supabase
         .from('live_streams')
         .select('id, title, status, viewer_count, thumbnail_url, user_id')
         .eq('status', 'live')
         .order('viewer_count', { ascending: false })
         .limit(20);
 
+      if (streamsError) console.error('[Feed] Error fetching streams:', streamsError);
+      console.log('[Feed] Live streams found:', streams?.length || 0);
+
       // Fetch live spaces
-      const { data: spaces } = await supabase
+      const { data: spaces, error: spacesError } = await supabase
         .from('live_spaces')
         .select('id, title, status, viewer_count, topic_category, share_link, user_id')
         .eq('status', 'live')
         .order('viewer_count', { ascending: false })
         .limit(20);
 
+      if (spacesError) console.error('[Feed] Error fetching spaces:', spacesError);
+      console.log('[Feed] Live spaces found:', spaces?.length || 0);
+
       const allUserIds = [
         ...(streams || []).map(s => s.user_id),
         ...(spaces || []).map(s => s.user_id)
       ];
 
-      if (allUserIds.length === 0) return [];
+      if (allUserIds.length === 0) {
+        console.log('[Feed] No live content found');
+        return [];
+      }
 
       const { data: profiles } = await supabase
         .from('profiles')
@@ -111,12 +134,44 @@ const Feed = () => {
         }))
       ];
 
+      console.log('[Feed] Total live items:', liveItems.length);
+
       // Sort by viewer count
       return liveItems.sort((a, b) => (b.viewer_count || 0) - (a.viewer_count || 0));
     },
     enabled: activeTab === 'live',
-    refetchInterval: 30000,
+    refetchInterval: 15000, // Refresh every 15 seconds when on live tab
+    staleTime: 5000,
   });
+
+  // Subscribe to live content changes for real-time updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('feed-live-updates')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_streams',
+      }, () => {
+        console.log('[Feed] Live streams updated');
+        refetchLiveCount();
+        if (activeTab === 'live') refetchLive();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_spaces',
+      }, () => {
+        console.log('[Feed] Live spaces updated');
+        refetchLiveCount();
+        if (activeTab === 'live') refetchLive();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeTab, refetchLive, refetchLiveCount]);
   
   // Offline mode support
   const { isOffline, cachedPosts, lastSyncTime, updateSyncTime } = useOfflineMode(user?.id);
@@ -560,16 +615,25 @@ const Feed = () => {
                 haptic('selection');
                 setActiveTab('live');
               }}
-              className={`transition-all p-1 rounded-full ${
+              className={`transition-all p-1 rounded-full flex items-center gap-1.5 ${
                 activeTab === 'live'
-                  ? 'bg-red-500/10'
+                  ? 'bg-red-500/20'
                   : ''
               }`}
               title="Live"
             >
+              {(liveCount || 0) > 0 && (
+                <span className="text-xs font-bold text-red-500">{liveCount}</span>
+              )}
               <span className="relative flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                {(liveCount || 0) > 0 ? (
+                  <>
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  </>
+                ) : (
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-muted-foreground/50"></span>
+                )}
               </span>
             </button>
             {/* Sliding tab indicator */}
