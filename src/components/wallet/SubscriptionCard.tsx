@@ -37,16 +37,16 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   return (
     <div 
       className={cn(
-        "relative flex-shrink-0 w-[300px] sm:w-auto rounded-2xl border p-5 transition-all duration-200",
+        "relative flex-shrink-0 w-[300px] sm:w-auto rounded-2xl border p-5 pt-8 transition-all duration-200 overflow-visible",
         isPopular 
-          ? "border-primary bg-primary/5 shadow-lg shadow-primary/20 sm:scale-105" 
+          ? "border-primary bg-primary/5 shadow-lg shadow-primary/20 sm:scale-105 mt-4" 
           : "border-border bg-card hover:border-primary/50",
         isCurrentPlan && "ring-2 ring-green-500/50"
       )}
     >
       {/* Popular badge */}
       {isPopular && (
-        <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-accent text-primary-foreground">
+        <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-accent text-primary-foreground whitespace-nowrap z-10">
           <Sparkles className="w-3 h-3 mr-1" />
           Most Popular
         </Badge>

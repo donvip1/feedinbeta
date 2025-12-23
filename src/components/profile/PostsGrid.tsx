@@ -113,7 +113,7 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
             key={post.id}
             className="aspect-square bg-muted rounded cursor-pointer hover:opacity-80 transition relative overflow-hidden group"
           >
-            <div onClick={() => navigate('/feed', { state: { postId: post.id } })}>
+            <div onClick={() => navigate(`/feed/post/${post.id}`)}>
               {post.media_url && post.media_type === 'image' && (
                 <img 
                   src={post.media_url} 

@@ -38,7 +38,7 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
       onPointerUp={() => setIsPressed(false)}
       onPointerLeave={() => setIsPressed(false)}
       className={cn(
-        'fixed bottom-[72px] right-4 md:bottom-20 md:right-8 z-[80]',
+        'fixed bottom-[72px] left-1/2 -translate-x-1/2 md:bottom-20 z-[80]',
         'flex items-center justify-center',
         'transition-all duration-200 ease-out',
         'touch-manipulation',

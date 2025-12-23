@@ -1,11 +1,12 @@
 import React, { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
-import { User, Image, Radio, Send } from 'lucide-react';
+import { User, Image, Radio, Send, ChevronRight } from 'lucide-react';
 
 const giftEmojis: Record<string, string> = {
   heart: '❤️',
@@ -23,6 +24,7 @@ const giftEmojis: Record<string, string> = {
 export const SentGifts = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: gifts, isLoading, refetch } = useQuery({
     queryKey: ['sent-gifts', user?.id],
@@ -119,15 +121,29 @@ export const SentGifts = () => {
     }
   };
 
+  const handleGiftClick = (gift: any) => {
+    if (gift.source_type === 'post' && gift.source_id) {
+      navigate(`/feed/post/${gift.source_id}`);
+    } else if (gift.source_type === 'live' && gift.source_id) {
+      navigate(`/live/stream/${gift.source_id}`);
+    }
+  };
+
+  const isClickable = (gift: any) => {
+    return (gift.source_type === 'post' || gift.source_type === 'live') && gift.source_id;
+  };
+
   return (
     <div className="space-y-3 max-h-[400px] overflow-y-auto">
       {gifts.map((gift) => {
         const receiver = gift.receiver as any;
+        const clickable = isClickable(gift);
         
         return (
           <div
             key={gift.id}
-            className="flex items-center justify-between p-3 rounded-lg bg-accent/50 hover:bg-accent transition-colors"
+            onClick={() => clickable && handleGiftClick(gift)}
+            className={`flex items-center justify-between p-3 rounded-lg bg-accent/50 hover:bg-accent transition-colors ${clickable ? 'cursor-pointer' : ''}`}
           >
             <div className="flex items-center gap-3">
               <div className="text-2xl">
@@ -152,9 +168,14 @@ export const SentGifts = () => {
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <p className="font-bold text-red-500">-{gift.credit_value}</p>
-              <p className="text-xs text-muted-foreground">credits</p>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="font-bold text-red-500">-{gift.credit_value}</p>
+                <p className="text-xs text-muted-foreground">credits</p>
+              </div>
+              {clickable && (
+                <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              )}
             </div>
           </div>
         );
