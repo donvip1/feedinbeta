@@ -168,6 +168,7 @@ const App = () => {
             <Route path="/live" element={<Live />} />
             <Route path="/live/stream/:streamId" element={<LiveStreamDetail />} />
             <Route path="/live/space/:spaceId" element={<SpaceDetail />} />
+            <Route path="/space/:spaceId" element={<SpaceDetail />} />
             <Route path="/story/:storyId" element={<StoryDetail />} />
             
             {/* AI Features */}

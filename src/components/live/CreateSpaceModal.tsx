@@ -58,8 +58,8 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
 
     setLoading(true);
     try {
-      // Generate unique share link
-      const shareLink = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+      // Generate short numeric share ID (6 digits)
+      const shareLink = Math.floor(100000 + Math.random() * 900000).toString();
       
       const { data, error } = await supabase
         .from('live_spaces')
