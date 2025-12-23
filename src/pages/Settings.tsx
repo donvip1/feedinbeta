@@ -5,8 +5,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
+import { useTheme } from 'next-themes';
 import { 
   ArrowLeft, 
   User, 
@@ -30,13 +32,17 @@ import {
   ShieldCheck,
   Briefcase,
   Smartphone,
-  Banknote
+  Banknote,
+  Moon,
+  Sun,
+  BarChart3
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user, signOut, loading } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   // Fetch user profile with caching
   const { data: userProfile } = useCachedQuery({
@@ -181,6 +187,13 @@ const Settings = () => {
       description: 'Discover trending posts and hashtags',
       route: '/trending',
       color: 'text-orange-500'
+    },
+    {
+      icon: BarChart3,
+      title: 'Creator Dashboard',
+      description: 'View your analytics and earnings',
+      route: '/creator/dashboard',
+      color: 'text-emerald-500'
     }
   ];
 
@@ -289,6 +302,27 @@ const Settings = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">
+        {/* Theme Toggle Card */}
+        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mb-6">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="text-yellow-500 bg-gradient-to-br from-secondary/40 to-secondary/20 p-3 rounded-xl shadow-md">
+                  {theme === 'dark' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">Dark Mode</h3>
+                  <p className="text-sm text-muted-foreground">Toggle dark/light theme</p>
+                </div>
+              </div>
+              <Switch
+                checked={theme === 'dark'}
+                onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+              />
+            </div>
+          </div>
+        </Card>
+
         {/* Account Settings Card */}
         <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl">
           <div className="p-6">

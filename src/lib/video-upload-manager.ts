@@ -38,53 +38,55 @@ export class VideoUploadManager {
       const fileExt = file.name.split('.').pop();
       const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-      // Start progress simulation
-      let progressInterval: NodeJS.Timeout | undefined;
-      if (onProgress) {
-        let simProgress = 0;
-        progressInterval = setInterval(() => {
-          simProgress = Math.min(simProgress + 5, 90);
-          onProgress({
-            loaded: (file.size * simProgress) / 100,
-            total: file.size,
-            percentage: simProgress,
-          });
-        }, 200);
+      // Use XMLHttpRequest for real progress tracking
+      const { data: { session } } = await supabase.auth.getSession();
+      const accessToken = session?.access_token;
+      
+      if (!accessToken) {
+        return { url: '', error: 'Not authenticated' };
       }
 
-      // Upload to post-videos bucket
-      const { data, error } = await supabase.storage
-        .from('post-videos')
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false,
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const uploadUrl = `${supabaseUrl}/storage/v1/object/post-videos/${fileName}`;
+
+      const result = await new Promise<{ url: string; error?: string }>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable && onProgress) {
+            const percentage = Math.round((event.loaded / event.total) * 100);
+            onProgress({
+              loaded: event.loaded,
+              total: event.total,
+              percentage,
+            });
+          }
         });
 
-      // Clear progress interval
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
-
-      // Complete progress
-      if (onProgress) {
-        onProgress({
-          loaded: file.size,
-          total: file.size,
-          percentage: 100,
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+              .from('post-videos')
+              .getPublicUrl(fileName);
+            resolve({ url: publicUrl });
+          } else {
+            resolve({ url: '', error: `Upload failed with status ${xhr.status}` });
+          }
         });
-      }
 
-      if (error) {
-        console.error('Upload error:', error);
-        return { url: '', error: error.message };
-      }
+        xhr.addEventListener('error', () => {
+          resolve({ url: '', error: 'Network error during upload' });
+        });
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('post-videos')
-        .getPublicUrl(fileName);
+        xhr.open('POST', uploadUrl);
+        xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+        xhr.setRequestHeader('x-upsert', 'false');
+        xhr.send(file);
+      });
 
-      return { url: publicUrl };
+      return result;
+
     } catch (error: any) {
       console.error('Video upload failed:', error);
       return { url: '', error: error.message };
