@@ -195,10 +195,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     };
   }, [spaceId]);
 
-  // Connect audio after joining
+  // Connect audio after role is determined
   useEffect(() => {
-    if (space && user) {
-      connect();
+    if (space && user && myRole) {
+      // Disconnect and reconnect when role changes to ensure proper audio setup
+      disconnect();
+      const timer = setTimeout(() => {
+        connect();
+      }, 100);
+      return () => clearTimeout(timer);
     }
   }, [space, user, myRole]);
 
