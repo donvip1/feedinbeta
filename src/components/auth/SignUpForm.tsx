@@ -202,7 +202,7 @@ export const SignUpForm = () => {
 
       toast({
         title: "Account created!",
-        description: "Welcome to FEEDIN",
+        description: "Welcome to feedin",
       });
       navigate('/');
     } catch (error: any) {

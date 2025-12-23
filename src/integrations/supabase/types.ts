@@ -895,10 +895,13 @@ export type Database = {
         Row: {
           created_at: string | null
           credit_value: number
+          feedback_timestamp: string | null
           gift_type: string
           id: string
           platform_fee: number | null
+          receiver_feedback: string | null
           receiver_id: string
+          sender_feedback: string | null
           sender_id: string | null
           source_id: string | null
           source_type: string
@@ -906,10 +909,13 @@ export type Database = {
         Insert: {
           created_at?: string | null
           credit_value: number
+          feedback_timestamp?: string | null
           gift_type: string
           id?: string
           platform_fee?: number | null
+          receiver_feedback?: string | null
           receiver_id: string
+          sender_feedback?: string | null
           sender_id?: string | null
           source_id?: string | null
           source_type: string
@@ -917,10 +923,13 @@ export type Database = {
         Update: {
           created_at?: string | null
           credit_value?: number
+          feedback_timestamp?: string | null
           gift_type?: string
           id?: string
           platform_fee?: number | null
+          receiver_feedback?: string | null
           receiver_id?: string
+          sender_feedback?: string | null
           sender_id?: string | null
           source_id?: string | null
           source_type?: string
@@ -941,6 +950,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gift_appreciation_options: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          emoji: string
+          id: string
+          message: string
+          sort_order: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          emoji: string
+          id?: string
+          message: string
+          sort_order?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          emoji?: string
+          id?: string
+          message?: string
+          sort_order?: number | null
+        }
+        Relationships: []
       }
       group_join_requests: {
         Row: {
@@ -4126,6 +4162,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_wallet_notifications: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_viewed_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_viewed_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_viewed_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
     }
     Views: {

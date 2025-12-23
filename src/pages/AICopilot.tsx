@@ -9,8 +9,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
-import { ArrowLeft, Send, Sparkles, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, Trash2 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
+import feedinIcon from '@/assets/feedin-icon.png';
 import { usePageRefresh } from '@/context/RefreshContext';
 
 interface Message {
@@ -73,23 +74,78 @@ const AICopilot = () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage: Message = { role: 'user', content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    const currentMessages = [...messages, userMessage];
+    setMessages(currentMessages);
     setInput('');
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: { message: input },
+      // Use streaming for better UX
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: currentMessages }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get response');
+      }
 
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: data.response,
-      };
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let assistantContent = '';
+      
+      // Add empty assistant message first
+      setMessages((prev) => [...prev, { role: 'assistant', content: '' }]);
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      if (reader) {
+        let buffer = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  assistantContent += content;
+                  setMessages((prev) => {
+                    const newMessages = [...prev];
+                    newMessages[newMessages.length - 1] = {
+                      role: 'assistant',
+                      content: assistantContent,
+                    };
+                    return newMessages;
+                  });
+                }
+              } catch {
+                // Ignore parse errors for incomplete chunks
+              }
+            }
+          }
+        }
+      }
+
+      // Save messages to database
+      if (assistantContent) {
+        await supabase.from('ai_chat_messages').insert([
+          { user_id: user?.id, role: 'user', content: input },
+          { user_id: user?.id, role: 'assistant', content: assistantContent },
+        ]);
+      }
     } catch (error: any) {
       console.error('Error sending message:', error);
       toast({
@@ -97,6 +153,8 @@ const AICopilot = () => {
         description: error.message || 'Failed to send message',
         variant: 'destructive',
       });
+      // Remove the empty assistant message on error
+      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
     }
@@ -142,12 +200,12 @@ const AICopilot = () => {
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2">
               <Avatar className="w-8 h-8">
-                <AvatarImage src={feedinLogo} />
+                <AvatarImage src={feedinIcon} />
                 <AvatarFallback>AI</AvatarFallback>
               </Avatar>
-              <span className="text-lg font-semibold">AI Copilot</span>
+              <span className="text-lg font-semibold">FeedAI</span>
             </div>
             <Button
               variant="ghost"
@@ -163,10 +221,10 @@ const AICopilot = () => {
           <div className="space-y-4 max-w-2xl mx-auto">
             {messages.length === 0 && (
               <div className="text-center py-12">
-                <Sparkles className="w-12 h-12 mx-auto mb-4 text-primary" />
-                <h3 className="text-xl font-semibold mb-2">Welcome to AI Copilot</h3>
+                <img src={feedinIcon} alt="FeedAI" className="w-16 h-16 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold mb-2">Welcome to FeedAI</h3>
                 <p className="text-muted-foreground">
-                  Ask me anything! I'm here to help you with your questions.
+                  I'm feedin's AI assistant. Ask me anything about content creation, platform features, or general questions!
                 </p>
               </div>
             )}
