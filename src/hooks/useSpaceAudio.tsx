@@ -134,38 +134,107 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
     }
   }, [user, createAnalyzer, canBroadcast]);
 
+  // Handle peer disconnect - MUST be defined before createPeerConnection
+  const handlePeerDisconnect = useCallback((peerId: string) => {
+    const peer = peersRef.current.get(peerId);
+    if (peer) {
+      peer.connection.close();
+      peersRef.current.delete(peerId);
+      analyzersRef.current.delete(peerId);
+      
+      // Remove audio element
+      const audioElement = document.getElementById(`audio-${peerId}`);
+      if (audioElement) {
+        audioElement.remove();
+      }
+    }
+  }, []);
+
+  // Attempt to reconnect - MUST be defined before createPeerConnection
+  const attemptReconnect = useCallback(async () => {
+    if (reconnectAttempts.current >= maxReconnectAttempts) {
+      setConnectionStatus('failed');
+      toast.error('Failed to connect to audio. Please try rejoining.');
+      return;
+    }
+
+    reconnectAttempts.current++;
+    setConnectionStatus('reconnecting');
+    
+    // Wait with exponential backoff
+    await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000)));
+    
+    // Try to reconnect
+    if (channelRef.current) {
+      console.log(`[SpaceAudio] Reconnection attempt ${reconnectAttempts.current}`);
+    }
+  }, []);
+
+  // Send offer to a specific peer
+  const sendOfferToPeer = useCallback(async (peerConnection: RTCPeerConnection, peerId: string) => {
+    if (!user) return;
+    
+    try {
+      console.log(`[SpaceAudio] Creating and sending offer to ${peerId}`);
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'offer',
+        payload: {
+          from: user.id,
+          to: peerId,
+          sdp: offer,
+        },
+      });
+      console.log(`[SpaceAudio] Offer sent to ${peerId}`);
+    } catch (error) {
+      console.error('[SpaceAudio] Error creating offer:', error);
+    }
+  }, [user]);
+
   // Create peer connection
-  const createPeerConnection = useCallback(async (peerId: string, initiator: boolean) => {
+  const createPeerConnection = useCallback(async (peerId: string, initiator: boolean, forceSendOffer: boolean = false) => {
     if (!user) return null;
 
     // Check if we already have a connection to this peer
-    if (peersRef.current.has(peerId)) {
-      console.log(`Already connected to ${peerId}`);
-      return peersRef.current.get(peerId)?.connection || null;
+    const existingPeer = peersRef.current.get(peerId);
+    if (existingPeer) {
+      console.log(`[SpaceAudio] Already have connection to ${peerId}, state: ${existingPeer.connection.connectionState}`);
+      
+      // If we need to resend offer and we're broadcaster, do it
+      if (forceSendOffer && canBroadcast && existingPeer.connection.signalingState === 'stable') {
+        console.log(`[SpaceAudio] Re-sending offer to ${peerId}`);
+        await sendOfferToPeer(existingPeer.connection, peerId);
+      }
+      return existingPeer.connection;
     }
 
-    console.log(`Creating peer connection with ${peerId}, initiator: ${initiator}, canBroadcast: ${canBroadcast}`);
+    console.log(`[SpaceAudio] Creating peer connection with ${peerId}, initiator: ${initiator}, canBroadcast: ${canBroadcast}`);
     
     const peerConnection = new RTCPeerConnection(iceServers);
     
     // Add local stream tracks ONLY if we can broadcast
     if (localStreamRef.current && canBroadcast) {
+      console.log(`[SpaceAudio] Adding local tracks to connection for ${peerId}`);
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current!);
       });
     } else if (!canBroadcast) {
       // For listeners, add a transceiver to receive audio
+      console.log(`[SpaceAudio] Adding recvonly transceiver for listener`);
       peerConnection.addTransceiver('audio', { direction: 'recvonly' });
     }
 
     // Handle incoming tracks (everyone needs this to receive audio)
     peerConnection.ontrack = (event) => {
-      console.log(`Received track from ${peerId}`, event.streams);
+      console.log(`[SpaceAudio] ✅ Received audio track from ${peerId}`, event.streams);
       const remoteStream = event.streams[0];
       
       if (remoteStream) {
         // Create audio element to play the stream
-        const existingAudio = document.getElementById(`audio-${peerId}`);
+        const existingAudio = document.getElementById(`audio-${peerId}`) as HTMLAudioElement;
         if (existingAudio) {
           existingAudio.remove();
         }
@@ -175,12 +244,27 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
         audio.autoplay = true;
         audio.id = `audio-${peerId}`;
         audio.volume = 1.0;
+        
+        // Important: Set these for iOS compatibility
+        (audio as any).playsInline = true;
+        
         document.body.appendChild(audio);
         
-        // Play audio (handle autoplay policy)
-        audio.play().catch(err => {
-          console.warn('Audio autoplay blocked, waiting for user interaction:', err);
-        });
+        // Play audio with proper error handling
+        const playPromise = audio.play();
+        if (playPromise) {
+          playPromise.then(() => {
+            console.log(`[SpaceAudio] ✅ Audio playing from ${peerId}`);
+          }).catch(err => {
+            console.warn('[SpaceAudio] Audio autoplay blocked:', err);
+            // Create a click handler to enable audio
+            const enableAudio = () => {
+              audio.play().catch(console.error);
+              document.removeEventListener('click', enableAudio);
+            };
+            document.addEventListener('click', enableAudio);
+          });
+        }
 
         // Create analyzer for remote audio
         createAnalyzer(remoteStream, peerId);
@@ -190,7 +274,7 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
     // Handle ICE candidates
     peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`Sending ICE candidate to ${peerId}`);
+        console.log(`[SpaceAudio] Sending ICE candidate to ${peerId}`);
         channelRef.current?.send({
           type: 'broadcast',
           event: 'ice-candidate',
@@ -203,13 +287,20 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
       }
     };
 
+    // Handle ICE connection state
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log(`[SpaceAudio] ICE state with ${peerId}: ${peerConnection.iceConnectionState}`);
+    };
+
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
-      console.log(`Connection state with ${peerId}: ${peerConnection.connectionState}`);
+      console.log(`[SpaceAudio] Connection state with ${peerId}: ${peerConnection.connectionState}`);
       if (peerConnection.connectionState === 'connected') {
+        console.log(`[SpaceAudio] ✅ Connected to ${peerId}`);
         setConnectionStatus('connected');
         reconnectAttempts.current = 0;
       } else if (peerConnection.connectionState === 'failed') {
+        console.log(`[SpaceAudio] ❌ Connection failed with ${peerId}`);
         handlePeerDisconnect(peerId);
         attemptReconnect();
       } else if (peerConnection.connectionState === 'disconnected') {
@@ -231,63 +322,11 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
 
     // If initiator and can broadcast, create and send offer
     if (initiator && canBroadcast) {
-      try {
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        
-        channelRef.current?.send({
-          type: 'broadcast',
-          event: 'offer',
-          payload: {
-            from: user.id,
-            to: peerId,
-            sdp: offer,
-          },
-        });
-      } catch (error) {
-        console.error('Error creating offer:', error);
-      }
+      await sendOfferToPeer(peerConnection, peerId);
     }
 
     return peerConnection;
-  }, [user, canBroadcast, createAnalyzer]);
-
-  // Attempt to reconnect
-  const attemptReconnect = useCallback(async () => {
-    if (reconnectAttempts.current >= maxReconnectAttempts) {
-      setConnectionStatus('failed');
-      toast.error('Failed to connect to audio. Please try rejoining.');
-      return;
-    }
-
-    reconnectAttempts.current++;
-    setConnectionStatus('reconnecting');
-    
-    // Wait with exponential backoff
-    await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000)));
-    
-    // Try to reconnect
-    if (channelRef.current) {
-      console.log(`Reconnection attempt ${reconnectAttempts.current}`);
-      // Reconnection handled by channel
-    }
-  }, []);
-
-  // Handle peer disconnect
-  const handlePeerDisconnect = useCallback((peerId: string) => {
-    const peer = peersRef.current.get(peerId);
-    if (peer) {
-      peer.connection.close();
-      peersRef.current.delete(peerId);
-      analyzersRef.current.delete(peerId);
-      
-      // Remove audio element
-      const audioElement = document.getElementById(`audio-${peerId}`);
-      if (audioElement) {
-        audioElement.remove();
-      }
-    }
-  }, []);
+  }, [user, canBroadcast, createAnalyzer, sendOfferToPeer, handlePeerDisconnect, attemptReconnect]);
 
   // Handle incoming offer
   const handleOffer = useCallback(async (from: string, sdp: RTCSessionDescriptionInit) => {
@@ -356,12 +395,13 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
     if (!user || connectionStatus === 'connecting') return;
     
     setConnectionStatus('connecting');
-    console.log(`Connecting to space audio... canBroadcast: ${canBroadcast}`);
+    console.log(`[SpaceAudio] Connecting to space audio... canBroadcast: ${canBroadcast}, isHost: ${isHost}, isSpeaker: ${isSpeaker}`);
 
     try {
       // Get local stream ONLY if we can broadcast (host/speaker)
       if (canBroadcast) {
-        await getLocalStream();
+        const stream = await getLocalStream();
+        console.log(`[SpaceAudio] Got local stream:`, stream ? 'yes' : 'no');
       }
 
       // Subscribe to signaling channel - ALL users connect to receive audio
@@ -375,11 +415,14 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
       channel
         .on('broadcast', { event: 'offer' }, ({ payload }) => {
           if (payload.to === user.id) {
+            console.log(`[SpaceAudio] Received offer from ${payload.from}`);
             handleOffer(payload.from, payload.sdp);
           }
         })
         .on('broadcast', { event: 'answer' }, ({ payload }) => {
-          if (payload.to === user.id) {            handleAnswer(payload.from, payload.sdp);
+          if (payload.to === user.id) {
+            console.log(`[SpaceAudio] Received answer from ${payload.from}`);
+            handleAnswer(payload.from, payload.sdp);
           }
         })
         .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
@@ -388,56 +431,73 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
           }
         })
         .on('broadcast', { event: 'broadcaster-joined' }, async ({ payload }) => {
-          // A broadcaster joined - if we're a listener, prepare to receive
+          // A broadcaster joined - if we're a listener, request them to send us an offer
           if (!canBroadcast && payload.userId !== user.id) {
-            console.log(`Broadcaster ${payload.userId} joined, preparing to receive audio`);
-            // The broadcaster will send us an offer, but create the connection placeholder
-            if (!peersRef.current.has(payload.userId)) {
-              await createPeerConnection(payload.userId, false);
-            }
+            console.log(`[SpaceAudio] Broadcaster ${payload.userId} joined, requesting audio connection`);
+            // Request the broadcaster to send us an offer
+            channel.send({
+              type: 'broadcast',
+              event: 'listener-needs-audio',
+              payload: { listenerId: user.id }
+            });
+          }
+        })
+        .on('broadcast', { event: 'listener-needs-audio' }, async ({ payload }) => {
+          // A listener is requesting audio - send them an offer
+          if (canBroadcast && payload.listenerId !== user.id) {
+            console.log(`[SpaceAudio] Listener ${payload.listenerId} requesting audio, sending offer`);
+            await createPeerConnection(payload.listenerId, true, true);
           }
         })
         .on('presence', { event: 'join' }, async ({ key, newPresences }) => {
           // When a new peer joins
           if (key !== user.id) {
-            console.log(`New peer joined: ${key}`, newPresences);
+            console.log(`[SpaceAudio] New peer joined: ${key}`, newPresences);
             // Hosts/speakers initiate connection to new joiners
             if (canBroadcast) {
-              await createPeerConnection(key, true);
+              console.log(`[SpaceAudio] I'm a broadcaster, sending offer to new joiner ${key}`);
+              // Small delay to let them set up their connection
+              setTimeout(async () => {
+                await createPeerConnection(key, true);
+              }, 500);
             }
           }
         })
         .on('presence', { event: 'leave' }, ({ key }) => {
+          console.log(`[SpaceAudio] Peer left: ${key}`);
           handlePeerDisconnect(key);
         })
         .on('presence', { event: 'sync' }, async () => {
           // Handle initial sync - connect to all existing peers
           const state = channel.presenceState();
-          console.log('Presence sync, state:', Object.keys(state));
+          const peerIds = Object.keys(state).filter(k => k !== user.id);
+          console.log(`[SpaceAudio] Presence sync, found ${peerIds.length} peers:`, peerIds);
           
-          for (const key of Object.keys(state)) {
-            if (key !== user.id && !peersRef.current.has(key)) {
-              const presence = state[key][0] as any;
-              console.log(`Found peer ${key}, role: ${presence?.role}, canBroadcast: ${presence?.canBroadcast}`);
-              
-              // If we can broadcast, send offers to everyone (including listeners)
-              if (canBroadcast) {
-                console.log(`Sending offer to ${key} as broadcaster`);
-                await createPeerConnection(key, true);
-              } 
-              // If we're a listener and they can broadcast, wait for their offer
-              else if (presence?.canBroadcast) {
-                console.log(`Waiting for offer from broadcaster ${key}`);
-                // Create connection but don't initiate - wait for their offer
-                await createPeerConnection(key, false);
-              }
+          for (const key of peerIds) {
+            const presence = state[key][0] as any;
+            console.log(`[SpaceAudio] Peer ${key}: role=${presence?.role}, canBroadcast=${presence?.canBroadcast}`);
+            
+            // If we can broadcast, send offers to everyone (including listeners)
+            if (canBroadcast) {
+              console.log(`[SpaceAudio] Sending offer to ${key} as broadcaster`);
+              await createPeerConnection(key, true);
+            } 
+            // If we're a listener and they can broadcast, request audio from them
+            else if (presence?.canBroadcast) {
+              console.log(`[SpaceAudio] Requesting audio from broadcaster ${key}`);
+              // Request them to send us an offer
+              channel.send({
+                type: 'broadcast',
+                event: 'listener-needs-audio',
+                payload: { listenerId: user.id }
+              });
             }
           }
         });
 
       await channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          console.log(`Subscribed to channel as ${isHost ? 'host' : isSpeaker ? 'speaker' : 'listener'}, canBroadcast: ${canBroadcast}`);
+          console.log(`[SpaceAudio] ✅ Subscribed to channel as ${isHost ? 'host' : isSpeaker ? 'speaker' : 'listener'}, canBroadcast: ${canBroadcast}`);
           
           await channel.track({ 
             user_id: user.id, 
@@ -447,6 +507,7 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
           
           // If we're a broadcaster, announce ourselves so listeners can prepare
           if (canBroadcast) {
+            console.log(`[SpaceAudio] Broadcasting presence as host/speaker`);
             channel.send({
               type: 'broadcast',
               event: 'broadcaster-joined',
@@ -464,7 +525,7 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
       channelRef.current = channel;
 
     } catch (error) {
-      console.error('Error connecting to space audio:', error);
+      console.error('[SpaceAudio] Error connecting to space audio:', error);
       setConnectionStatus('failed');
       toast.error('Failed to connect to audio');
     }
