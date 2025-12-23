@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Users, Phone, Coins, Shield, Sparkles, LogOut } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
+import feedinIcon from '@/assets/feedin-icon.png';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -125,7 +126,7 @@ const Index = () => {
       <header className="container mx-auto px-2 py-1 border-b border-border">
         <nav className="flex items-center justify-between">
           <div className="flex items-center">
-            <img src={feedinLogo} alt="feedin" className="w-14 h-14" />
+            <img src={feedinIcon} alt="feedin" className="w-12 h-12 object-contain" />
           </div>
           <Button
             onClick={signOut}
