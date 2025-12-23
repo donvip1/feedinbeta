@@ -122,10 +122,10 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-subtle overflow-y-auto">
-      <header className="container mx-auto px-4 py-6 border-b border-border">
+      <header className="container mx-auto px-2 py-1 border-b border-border">
         <nav className="flex items-center justify-between">
           <div className="flex items-center">
-            <img src={feedinLogo} alt="feedin" className="w-16 h-16" />
+            <img src={feedinLogo} alt="feedin" className="w-14 h-14" />
           </div>
           <Button
             onClick={signOut}
@@ -140,21 +140,18 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-20">
         <div className="text-center max-w-4xl mx-auto animate-fade-in">
-          {/* Enhanced glowing logo */}
+          {/* Enhanced glowing logo - reduced glow for visibility */}
           <div className="relative flex justify-center mb-8">
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-72 h-72 bg-primary/30 rounded-full blur-3xl animate-pulse" />
-            </div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-56 h-56 bg-primary/50 rounded-full blur-2xl animate-pulse [animation-delay:0.5s]" />
+              <div className="w-48 h-48 bg-primary/15 rounded-full blur-2xl" />
             </div>
             <img 
               src={feedinLogo} 
               alt="feedin" 
-              className="relative z-10 w-64 h-64 drop-shadow-[0_0_35px_rgba(139,92,246,0.6)]" 
+              className="relative z-10 w-64 h-64 drop-shadow-[0_0_20px_rgba(139,92,246,0.4)]" 
             />
           </div>
-          <p className="text-xl text-muted-foreground mb-8">
+          <p className="text-xl text-muted-foreground mb-8 animate-[slideInFromRight_1.5s_ease-out_forwards]">
             Your feed is ready. Start creating and sharing posts!
           </p>
           <Button
