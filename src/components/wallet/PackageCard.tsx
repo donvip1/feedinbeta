@@ -67,7 +67,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
   return (
     <div 
       className={cn(
-        "relative flex-shrink-0 w-[300px] sm:w-auto rounded-2xl border p-5 pt-8 transition-all duration-300 overflow-visible",
+        "relative flex-shrink-0 w-[300px] sm:w-auto rounded-2xl border p-5 pt-10 transition-all duration-300 overflow-visible mt-4",
         `bg-gradient-to-br ${getGradientClass()}`,
         getBorderClass()
       )}

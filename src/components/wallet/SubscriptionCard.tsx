@@ -37,9 +37,9 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   return (
     <div 
       className={cn(
-        "relative flex-shrink-0 w-[300px] sm:w-auto rounded-2xl border p-5 pt-8 transition-all duration-200 overflow-visible",
+        "relative flex-shrink-0 w-[300px] sm:w-auto rounded-2xl border p-5 pt-10 transition-all duration-200 overflow-visible mt-4",
         isPopular 
-          ? "border-primary bg-primary/5 shadow-lg shadow-primary/20 sm:scale-105 mt-4" 
+          ? "border-primary bg-primary/5 shadow-lg shadow-primary/20 sm:scale-105" 
           : "border-border bg-card hover:border-primary/50",
         isCurrentPlan && "ring-2 ring-green-500/50"
       )}

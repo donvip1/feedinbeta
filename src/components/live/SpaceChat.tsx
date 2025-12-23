@@ -1,0 +1,157 @@
+import { useState, useEffect, useRef } from 'react';
+import { X, Send } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+
+interface SpaceChatProps {
+  spaceId: string;
+  onClose: () => void;
+}
+
+interface ChatMessage {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  profile?: {
+    display_name: string;
+    username: string;
+    avatar_url: string;
+  };
+}
+
+export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [newMessage, setNewMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetchMessages();
+
+    const channel = supabase
+      .channel(`space-chat-${spaceId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'live_space_messages',
+        filter: `space_id=eq.${spaceId}`,
+      }, async (payload) => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .eq('id', payload.new.user_id)
+          .single();
+
+        const newMsg: ChatMessage = {
+          id: payload.new.id,
+          content: payload.new.content,
+          created_at: payload.new.created_at,
+          user_id: payload.new.user_id,
+          profile: profile || undefined,
+        };
+
+        setMessages(prev => [...prev, newMsg]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [spaceId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const fetchMessages = async () => {
+    const { data: messagesData } = await supabase
+      .from('live_space_messages')
+      .select('*')
+      .eq('space_id', spaceId)
+      .order('created_at', { ascending: true })
+      .limit(100);
+
+    if (messagesData && messagesData.length > 0) {
+      const userIds = [...new Set(messagesData.map(m => m.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+      
+      setMessages(messagesData.map(m => ({
+        ...m,
+        profile: profileMap.get(m.user_id),
+      })));
+    }
+  };
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !user || sending) return;
+
+    setSending(true);
+    try {
+      await supabase.from('live_space_messages').insert({
+        space_id: spaceId,
+        user_id: user.id,
+        content: newMessage.trim(),
+      });
+      setNewMessage('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-x-0 bottom-[140px] h-[50vh] bg-background border-t rounded-t-2xl z-20 flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between p-3 border-b">
+        <h3 className="font-semibold">Chat</h3>
+        <Button variant="ghost" size="icon" onClick={onClose}>
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {messages.map((msg) => (
+          <div key={msg.id} className="flex gap-2">
+            <Avatar className="w-8 h-8 flex-shrink-0">
+              <AvatarImage src={msg.profile?.avatar_url || ''} />
+              <AvatarFallback>{msg.profile?.display_name?.[0] || 'U'}</AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-primary">
+                {msg.profile?.display_name || 'User'}
+              </p>
+              <p className="text-sm break-words">{msg.content}</p>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="p-3 border-t flex gap-2">
+        <Input
+          value={newMessage}
+          onChange={(e) => setNewMessage(e.target.value)}
+          placeholder="Say something..."
+          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          disabled={sending}
+        />
+        <Button size="icon" onClick={sendMessage} disabled={sending || !newMessage.trim()}>
+          <Send className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+};

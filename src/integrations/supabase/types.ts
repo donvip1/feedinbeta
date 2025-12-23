@@ -1176,6 +1176,250 @@ export type Database = {
         }
         Relationships: []
       }
+      live_space_gifts: {
+        Row: {
+          created_at: string | null
+          credit_value: number
+          gift_type: string
+          id: string
+          receiver_id: string
+          sender_id: string
+          space_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          credit_value?: number
+          gift_type: string
+          id?: string
+          receiver_id: string
+          sender_id: string
+          space_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          credit_value?: number
+          gift_type?: string
+          id?: string
+          receiver_id?: string
+          sender_id?: string
+          space_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_space_gifts_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "live_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_space_invitations: {
+        Row: {
+          created_at: string | null
+          id: string
+          invitee_id: string
+          inviter_id: string
+          responded_at: string | null
+          space_id: string | null
+          status: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invitee_id: string
+          inviter_id: string
+          responded_at?: string | null
+          space_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invitee_id?: string
+          inviter_id?: string
+          responded_at?: string | null
+          space_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_space_invitations_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "live_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_space_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          space_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          space_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          space_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_space_messages_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "live_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_space_reactions: {
+        Row: {
+          created_at: string | null
+          id: string
+          reaction_type: string
+          space_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          reaction_type: string
+          space_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          reaction_type?: string
+          space_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_space_reactions_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "live_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_space_speakers: {
+        Row: {
+          hand_raised_at: string | null
+          has_raised_hand: boolean | null
+          id: string
+          is_muted: boolean | null
+          joined_at: string | null
+          left_at: string | null
+          role: string | null
+          space_id: string | null
+          user_id: string
+        }
+        Insert: {
+          hand_raised_at?: string | null
+          has_raised_hand?: boolean | null
+          id?: string
+          is_muted?: boolean | null
+          joined_at?: string | null
+          left_at?: string | null
+          role?: string | null
+          space_id?: string | null
+          user_id: string
+        }
+        Update: {
+          hand_raised_at?: string | null
+          has_raised_hand?: boolean | null
+          id?: string
+          is_muted?: boolean | null
+          joined_at?: string | null
+          left_at?: string | null
+          role?: string | null
+          space_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_space_speakers_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "live_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      live_spaces: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          ended_at: string | null
+          id: string
+          is_private: boolean | null
+          is_recording_enabled: boolean | null
+          peak_viewers: number | null
+          recording_url: string | null
+          scheduled_start: string | null
+          share_link: string | null
+          started_at: string | null
+          status: string | null
+          title: string
+          topic_category: string | null
+          updated_at: string | null
+          user_id: string
+          viewer_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          id?: string
+          is_private?: boolean | null
+          is_recording_enabled?: boolean | null
+          peak_viewers?: number | null
+          recording_url?: string | null
+          scheduled_start?: string | null
+          share_link?: string | null
+          started_at?: string | null
+          status?: string | null
+          title: string
+          topic_category?: string | null
+          updated_at?: string | null
+          user_id: string
+          viewer_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          ended_at?: string | null
+          id?: string
+          is_private?: boolean | null
+          is_recording_enabled?: boolean | null
+          peak_viewers?: number | null
+          recording_url?: string | null
+          scheduled_start?: string | null
+          share_link?: string | null
+          started_at?: string | null
+          status?: string | null
+          title?: string
+          topic_category?: string | null
+          updated_at?: string | null
+          user_id?: string
+          viewer_count?: number | null
+        }
+        Relationships: []
+      }
       live_stream_analytics: {
         Row: {
           average_watch_time: number | null

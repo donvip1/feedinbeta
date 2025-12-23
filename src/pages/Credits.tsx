@@ -165,8 +165,8 @@ const Credits = () => {
         )}
 
         {/* Credit Packages - Horizontal scroll on mobile, grid on desktop */}
-        <div className="overflow-x-auto overflow-y-visible scrollbar-hide -mx-4 px-4 pt-6">
-          <div className="flex gap-5 sm:grid sm:grid-cols-2 lg:grid-cols-4 min-w-max sm:min-w-0 pb-4">
+        <div className="overflow-x-auto overflow-y-visible scrollbar-hide -mx-4 px-4 pt-10 mt-4">
+          <div className="flex gap-5 sm:grid sm:grid-cols-2 lg:grid-cols-4 min-w-max sm:min-w-0 pb-4 pt-4">
             {packages?.map((pkg) => (
               <PackageCard
                 key={pkg.id}
