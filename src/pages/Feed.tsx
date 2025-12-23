@@ -165,13 +165,9 @@ const Feed = () => {
         return await fetchFallbackPosts(user.id);
       }
 
-      // If no posts from algorithm
+      // If no posts from algorithm, always use fallback (never show empty)
       if (feedData.length === 0) {
-        // For Following tab with no followed users, return empty
-        if (activeTab === 'following') {
-          return [];
-        }
-        // For You fallback: get recent posts
+        // Both tabs should fall back to trending/recent posts - never empty
         return await fetchFallbackPosts(user.id);
       }
 
@@ -498,7 +494,7 @@ const Feed = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/search')}
+              onClick={() => navigate('/feed/search')}
             >
               <Search className="w-5 h-5" />
             </Button>
@@ -598,16 +594,7 @@ const Feed = () => {
               );
             })}
           </SectionErrorBoundary>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
-            <p className="text-muted-foreground mb-2">No posts yet</p>
-            <p className="text-sm text-muted-foreground">
-              {activeTab === 'following' 
-                ? 'Follow some users to see their posts here' 
-                : 'Be the first to create a post!'}
-            </p>
-          </div>
-        )}
+        ) : null}
       </div>
 
       <BottomNav hidden={isCommentsOpen || !showNav || postStep !== null} />

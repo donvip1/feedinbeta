@@ -165,8 +165,8 @@ const Credits = () => {
         )}
 
         {/* Credit Packages - Horizontal scroll on mobile, grid on desktop */}
-        <div className="overflow-x-auto overflow-y-visible scrollbar-hide -mx-4 px-4 pt-4">
-          <div className="flex gap-4 sm:grid sm:grid-cols-2 lg:grid-cols-4 min-w-max sm:min-w-0">
+        <div className="overflow-x-auto overflow-y-visible scrollbar-hide -mx-4 px-4 pt-6">
+          <div className="flex gap-5 sm:grid sm:grid-cols-2 lg:grid-cols-4 min-w-max sm:min-w-0 pb-4">
             {packages?.map((pkg) => (
               <PackageCard
                 key={pkg.id}
@@ -175,8 +175,11 @@ const Credits = () => {
                 credits={pkg.credits}
                 bonusCredits={pkg.bonus_credits || 0}
                 price={pkg.price}
-                isPopular={pkg.name.toLowerCase().includes('popular')}
+                isPopular={pkg.name.toLowerCase().includes('popular') || pkg.name.toLowerCase().includes('pro')}
                 isLoading={loading === pkg.id}
+                promotionLabel={pkg.promotion_label}
+                promotionActive={pkg.promotion_active}
+                discountPercentage={pkg.discount_percentage}
                 onPurchase={() => handlePurchase(pkg.id, pkg.stripe_price_id)}
               />
             ))}
