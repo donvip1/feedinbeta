@@ -2,10 +2,12 @@
  * IndexedDB Cache Manager for FeedIn
  * Provides fast, persistent caching for conversations, messages, profiles,
  * and general app data with TTL support
+ * 
+ * Enhanced with additional stores for stories, trending, wallet, and live content
  */
 
 const DB_NAME = 'feedin_cache';
-const DB_VERSION = 2; // Upgraded for new stores
+const DB_VERSION = 3; // Upgraded for new stores (v3)
 
 interface CacheEntry<T> {
   key: string;
@@ -102,6 +104,37 @@ class IndexedDBCache {
           const appStore = db.createObjectStore('app_data', { keyPath: 'key' });
           appStore.createIndex('category', 'category');
           appStore.createIndex('expiresAt', 'expiresAt');
+        }
+
+        // Stories store (v3)
+        if (!db.objectStoreNames.contains('stories')) {
+          const storiesStore = db.createObjectStore('stories', { keyPath: 'id' });
+          storiesStore.createIndex('user_id', 'user_id');
+          storiesStore.createIndex('expires_at', 'expires_at');
+        }
+
+        // Trending store (v3)
+        if (!db.objectStoreNames.contains('trending')) {
+          const trendingStore = db.createObjectStore('trending', { keyPath: 'id' });
+          trendingStore.createIndex('category', 'category');
+        }
+
+        // Wallet store (v3)
+        if (!db.objectStoreNames.contains('wallet')) {
+          const walletStore = db.createObjectStore('wallet', { keyPath: 'user_id' });
+        }
+
+        // Live content store (v3)
+        if (!db.objectStoreNames.contains('live_content')) {
+          const liveStore = db.createObjectStore('live_content', { keyPath: 'id' });
+          liveStore.createIndex('type', 'type');
+          liveStore.createIndex('status', 'status');
+        }
+
+        // Media URLs store for preloaded media (v3)
+        if (!db.objectStoreNames.contains('media_urls')) {
+          const mediaStore = db.createObjectStore('media_urls', { keyPath: 'url' });
+          mediaStore.createIndex('preloaded_at', 'preloaded_at');
         }
       };
     });

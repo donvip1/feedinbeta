@@ -1,24 +1,27 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
 const CACHE_IMAGES = `${CACHE_NAME}-images`;
+const CACHE_MEDIA = `${CACHE_NAME}-media`;
 
 // Build timestamp for version tracking
 const BUILD_TIMESTAMP = Date.now();
 
-// Assets to cache immediately
+// Assets to cache immediately - expanded for faster app load
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/favicon.png',
   '/offline.html',
+  '/robots.txt',
 ];
 
-// Max cache sizes
-const MAX_DYNAMIC_CACHE = 50;
-const MAX_IMAGE_CACHE = 100;
+// Max cache sizes - increased for better offline experience
+const MAX_DYNAMIC_CACHE = 100;
+const MAX_IMAGE_CACHE = 300;
+const MAX_MEDIA_CACHE = 50;
 
 // Update check interval (5 minutes)
 const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
