@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
-  PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff
+  PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff,
+  AudioLines
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -16,6 +17,8 @@ import { SpaceChat } from './SpaceChat';
 import { SpaceInviteModal } from './SpaceInviteModal';
 import { LiveGiftModal } from './LiveGiftModal';
 import { SpeakerQueuePanel } from './SpeakerQueuePanel';
+import { TestAudioModal } from './TestAudioModal';
+import { SpeakerAvatarWithWaves } from './SpeakerAvatarWithWaves';
 import { cn } from '@/lib/utils';
 import { useSpaceAudio, ConnectionStatus } from '@/hooks/useSpaceAudio';
 import { useNavigation } from '@/context/NavigationContext';
@@ -102,6 +105,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [showSpeakerQueue, setShowSpeakerQueue] = useState(false);
   const [selectedGiftRecipient, setSelectedGiftRecipient] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showTestAudio, setShowTestAudio] = useState(false);
   const [duration, setDuration] = useState('0:00');
   const [totalGifts, setTotalGifts] = useState(0);
   const [myHostMuted, setMyHostMuted] = useState(false);
@@ -812,7 +816,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             </div>
             <div className="flex flex-wrap gap-6 justify-center">
               {hosts.map((speaker) => (
-                <SpeakerAvatar
+                <SpeakerAvatarWithWaves
                   key={speaker.id}
                   speaker={speaker}
                   isHost={isHost}
@@ -842,7 +846,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </div>
               <div className="flex flex-wrap gap-4 justify-center">
                 {activeSpeakers.map((speaker) => (
-                  <SpeakerAvatar
+                  <SpeakerAvatarWithWaves
                     key={speaker.id}
                     speaker={speaker}
                     isHost={isHost}
@@ -1030,6 +1034,19 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </motion.div>
             )}
 
+            {/* Test Audio Button - show for hosts/speakers */}
+            {canSpeak && (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-12 w-12 rounded-xl"
+                onClick={() => setShowTestAudio(true)}
+                title="Test Microphone"
+              >
+                <AudioLines className="w-5 h-5" />
+              </Button>
+            )}
+
             <Button 
               variant="outline" 
               size="icon" 
@@ -1083,6 +1100,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       </AnimatePresence>
 
       {/* Modals */}
+      <TestAudioModal
+        isOpen={showTestAudio}
+        onClose={() => setShowTestAudio(false)}
+      />
+
       <SpaceInviteModal
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
