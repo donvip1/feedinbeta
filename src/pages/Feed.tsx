@@ -23,7 +23,8 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { FeedSkeleton, PullToRefreshIndicator } from '@/components/native/NativeLoadingSpinner';
 import { feedCache } from '@/lib/feed-cache';
 import { usePageRefresh } from '@/context/RefreshContext';
-
+import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
+import { QueryErrorFallback } from '@/components/shared/QueryErrorFallback';
 const Feed = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -95,7 +96,7 @@ const Feed = () => {
   };
 
   // Fetch posts using personalized feed algorithms
-  const { data: posts, isLoading, refetch } = useQuery({
+  const { data: posts, isLoading, error: feedError, refetch } = useQuery({
     queryKey: ['feed-posts', activeTab, user?.id],
     queryFn: async () => {
       if (!user) return [];
@@ -447,10 +448,18 @@ const Feed = () => {
         className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth native-scroll-container"
         data-scrollable="true"
       >
-        {isLoading && displayPosts.length === 0 ? (
+        {feedError && displayPosts.length === 0 ? (
+          <div className="p-4">
+            <QueryErrorFallback 
+              error={feedError as Error} 
+              onRetry={() => refetch()} 
+              message="Unable to load your feed. Please try again."
+            />
+          </div>
+        ) : isLoading && displayPosts.length === 0 ? (
           <FeedSkeleton />
         ) : displayPosts && displayPosts.length > 0 ? (
-          <>
+          <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
             {displayPosts.map((post) => {
               // Styled text posts and media posts should be full height
               // Plain text posts without background should be compact
@@ -484,7 +493,7 @@ const Feed = () => {
                 </div>
               );
             })}
-          </>
+          </SectionErrorBoundary>
         ) : (
           <div className="flex flex-col items-center justify-center h-[60vh] text-center px-4">
             <p className="text-muted-foreground mb-2">No posts yet</p>

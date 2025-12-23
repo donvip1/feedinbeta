@@ -21,6 +21,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ActivityBadge, ActivityType, getActivityIcon, getActivityColor } from '@/components/messages/TypingIndicator';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { realtimeManager } from '@/lib/unified-realtime';
+import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
+import { QueryErrorFallback } from '@/components/shared/QueryErrorFallback';
 
 interface Conversation {
   id: string;
@@ -68,6 +70,7 @@ export default function Messages() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(!hasCachedData); // Only show loading if no cache
+  const [loadError, setLoadError] = useState<Error | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [groups, setGroups] = useState<Group[]>(cachedGroups);
@@ -255,6 +258,7 @@ export default function Messages() {
     if (!user) return;
 
     if (showLoading) setLoading(true);
+    setLoadError(null);
     try {
       // Use optimized RPC function - single query instead of 4+ per conversation
       const { data, error } = await supabase
@@ -284,6 +288,15 @@ export default function Messages() {
       saveToCache(sortedConversations);
     } catch (error: any) {
       console.error('Error loading conversations:', error);
+      setLoadError(error);
+      // Show error toast only if we have no cached data
+      if (conversations.length === 0) {
+        toast({
+          title: 'Failed to load conversations',
+          description: 'Please check your connection and try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -512,7 +525,15 @@ export default function Messages() {
         <ScrollArea className="flex-1">
           <Tabs value={activeTab} className="w-full">
             <TabsContent value="chats" className="m-0">
-              {showSkeleton ? (
+              {loadError && conversations.length === 0 ? (
+                <div className="p-4">
+                  <QueryErrorFallback 
+                    error={loadError} 
+                    onRetry={() => loadConversations()} 
+                    compact 
+                  />
+                </div>
+              ) : showSkeleton ? (
                 // Skeleton loading for instant perceived performance
                 <div className="space-y-1">
                   {[1, 2, 3, 4, 5].map((i) => (
