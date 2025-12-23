@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { SpaceMentionInput } from './SpaceMentionInput';
+import { cn } from '@/lib/utils';
 
 interface SpaceChatProps {
   spaceId: string;
@@ -29,6 +30,21 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Format message content with highlighted mentions
+  const formatMessageWithMentions = (content: string) => {
+    const parts = content.split(/(@\w+)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('@')) {
+        return (
+          <span key={index} className={cn("text-primary font-semibold")}>
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
 
   useEffect(() => {
     fetchMessages();
@@ -132,7 +148,9 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
               <p className="text-xs font-semibold text-primary">
                 {msg.profile?.display_name || 'User'}
               </p>
-              <p className="text-sm break-words">{msg.content}</p>
+              <p className="text-sm break-words">
+                {formatMessageWithMentions(msg.content)}
+              </p>
             </div>
           </div>
         ))}
@@ -141,12 +159,13 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
 
       {/* Input */}
       <div className="p-3 border-t flex gap-2">
-        <Input
+        <SpaceMentionInput
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Say something..."
-          onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+          onChange={(value) => setNewMessage(value)}
+          placeholder="Say something... (@ to mention)"
+          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
           disabled={sending}
+          spaceId={spaceId}
         />
         <Button size="icon" onClick={sendMessage} disabled={sending || !newMessage.trim()}>
           <Send className="w-4 h-4" />
