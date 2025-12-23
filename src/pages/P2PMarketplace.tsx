@@ -115,7 +115,7 @@ const P2PMarketplace = () => {
     }
 
     toast.success('Transaction created! Please proceed with payment.');
-    navigate(`/p2p-transaction/${data.id}`);
+    navigate(`/wallet/p2p/${data.id}`);
   };
 
   return (

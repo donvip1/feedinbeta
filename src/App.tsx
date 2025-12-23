@@ -12,6 +12,7 @@ import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
 import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
+import { BrowserInstallBanner } from "@/components/pwa/BrowserInstallBanner";
 import { UPDATE_AVAILABLE_EVENT, autoUpdater } from "@/lib/auto-updater";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -130,6 +131,7 @@ const App = () => {
                   <FloatingCallWidget />
                   <ActiveCallIndicator />
                   <MobileInstallModal />
+                  <BrowserInstallBanner />
                   <UpdatePromptModal 
                     open={showUpdateModal} 
                     onUpdate={handleUpdate} 

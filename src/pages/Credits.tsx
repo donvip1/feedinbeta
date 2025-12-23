@@ -122,7 +122,7 @@ const Credits = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate('/p2p-marketplace')}
+            onClick={() => navigate('/wallet/p2p')}
             className="gap-2"
           >
             <TrendingUp className="w-4 h-4" />
