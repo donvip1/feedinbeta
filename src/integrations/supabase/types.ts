@@ -4359,6 +4359,14 @@ export type Database = {
           message_id: string
         }[]
       }
+      get_following_feed: {
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
+        Returns: {
+          boost_level: string
+          is_promoted: boolean
+          post_id: string
+        }[]
+      }
       get_gift_analytics_summary: { Args: never; Returns: Json }
       get_gift_statistics: { Args: never; Returns: Json }
       get_live_stream_statistics: { Args: never; Returns: Json }
@@ -4437,6 +4445,15 @@ export type Database = {
       get_personalized_feed_v2: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
+          post_id: string
+          relevance_score: number
+        }[]
+      }
+      get_personalized_for_you_feed: {
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
+        Returns: {
+          boost_level: string
+          is_promoted: boolean
           post_id: string
           relevance_score: number
         }[]

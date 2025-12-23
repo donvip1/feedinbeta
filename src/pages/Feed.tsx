@@ -59,33 +59,91 @@ const Feed = () => {
     initialViewedRef.current = [...viewedPostIds];
   }, [activeTab]);
 
-  // Fetch posts with smart deduplication and priority sorting
+  // Fetch posts using personalized feed algorithms
   const { data: posts, isLoading, refetch } = useQuery({
-    queryKey: ['feed-posts', activeTab],
+    queryKey: ['feed-posts', activeTab, user?.id],
     queryFn: async () => {
+      if (!user) return [];
+
       // Try cache first for instant display
       const cached = await feedCache.get(activeTab);
       if (cached && cached.length > 0) {
         setDisplayPosts(cached);
       }
 
-      // Use the smart feed function that handles priority and deduplication
-      const { data: smartFeed, error: smartError } = await supabase.rpc('get_smart_feed_posts', {
-        p_limit: 100,
-        p_tab: activeTab
-      });
-
-      if (smartError) {
-        console.error('Smart feed error, falling back:', smartError);
+      // Use the appropriate feed function based on tab
+      let feedData: { post_id: string; is_promoted: boolean; boost_level: string; relevance_score?: number }[] = [];
+      
+      if (activeTab === 'following') {
+        // Following tab: Only posts from people user follows
+        const { data, error } = await supabase.rpc('get_following_feed', {
+          p_user_id: user.id,
+          p_limit: 100,
+          p_offset: 0
+        });
+        
+        if (error) {
+          console.error('Following feed error:', error);
+        } else {
+          feedData = data || [];
+        }
+      } else {
+        // For You tab: Personalized feed based on interests, location, engagement
+        const { data, error } = await supabase.rpc('get_personalized_for_you_feed', {
+          p_user_id: user.id,
+          p_limit: 100,
+          p_offset: 0
+        });
+        
+        if (error) {
+          console.error('For You feed error:', error);
+        } else {
+          feedData = data || [];
+        }
       }
 
-      // Get the post IDs from smart feed
-      const smartPostIds = smartFeed?.map((p: any) => p.post_id) || [];
-      const viewedMap = new Map(smartFeed?.map((p: any) => [p.post_id, p.is_viewed]) || []);
-      const promotedMap = new Map(smartFeed?.map((p: any) => [p.post_id, { is_promoted: p.is_promoted, boost_level: p.boost_level }]) || []);
+      // If no posts from algorithm, return empty
+      if (feedData.length === 0) {
+        // For Following tab with no followed users
+        if (activeTab === 'following') {
+          return [];
+        }
+        // Fallback: just get recent posts for For You
+        const { data: fallbackPosts } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles:user_id (username, display_name, avatar_url),
+            original_post:original_post_id (
+              id, user_id, content, media_url, media_type, media_urls, media_types, created_at,
+              profiles:user_id (username, display_name, avatar_url)
+            )
+          `)
+          .eq('status', 'active')
+          .neq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(50);
+        
+        return (fallbackPosts || []).map(post => ({
+          ...post,
+          _isPromoted: false,
+          _boostLevel: null,
+          _relevanceScore: 0
+        }));
+      }
+
+      // Create maps for promotion data
+      const promotedMap = new Map(feedData.map(p => [p.post_id, { 
+        is_promoted: p.is_promoted, 
+        boost_level: p.boost_level,
+        relevance_score: (p as any).relevance_score || 0
+      }]));
+
+      // Get post IDs to fetch full data
+      const postIds = feedData.map(p => p.post_id);
 
       // Fetch full post data
-      let query = supabase
+      const { data: fullPosts, error: postsError } = await supabase
         .from('posts')
         .select(`
           *,
@@ -110,101 +168,39 @@ const Feed = () => {
             )
           )
         `)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(100);
+        .in('id', postIds);
 
-      if (activeTab === 'following' && user) {
-        const { data: following } = await supabase
-          .from('follows')
-          .select('following_id')
-          .eq('follower_id', user.id);
+      if (postsError) throw postsError;
 
-        const followingIds = following?.map(f => f.following_id) || [];
-        if (followingIds.length > 0) {
-          query = query.in('user_id', followingIds);
-        } else {
-          return [];
-        }
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const allPosts = data || [];
+      // Sort posts by the order returned from the feed function (preserves ranking)
+      const postMap = new Map((fullPosts || []).map(p => [p.id, p]));
+      const orderedPosts = postIds
+        .map(id => postMap.get(id))
+        .filter(Boolean)
+        .map(post => {
+          const promo = promotedMap.get(post!.id);
+          return {
+            ...post!,
+            _isPromoted: promo?.is_promoted || false,
+            _boostLevel: promo?.boost_level || null,
+            _relevanceScore: promo?.relevance_score || 0,
+            _promoterName: null
+          };
+        });
 
       // Store all video posts for fullscreen navigation
-      allVideoPostsRef.current = allPosts.filter(p => 
+      allVideoPostsRef.current = orderedPosts.filter(p => 
         p.media_type === 'video' || 
         ((p.post_type === 'refeed' || p.post_type === 'quote') && p.original_post?.media_type === 'video')
       );
 
-      // Sort posts: unviewed promoted first, then unviewed, then viewed
-      // Also add promotion metadata to posts
-      const postsWithPromotion = allPosts.map(post => {
-        const promo = promotedMap.get(post.id);
-        return {
-          ...post,
-          _isPromoted: promo?.is_promoted || false,
-          _boostLevel: promo?.boost_level || null,
-          _promoterName: null, // Could be extended to fetch promoter info
-        };
-      });
-
-      const sortedPosts = [...postsWithPromotion].sort((a, b) => {
-        const aViewed = viewedMap.get(a.id) || initialViewedRef.current.includes(a.id);
-        const bViewed = viewedMap.get(b.id) || initialViewedRef.current.includes(b.id);
-        const aPromo = promotedMap.get(a.id);
-        const bPromo = promotedMap.get(b.id);
-
-        // Priority scoring
-        const getScore = (isViewed: boolean, promo: any) => {
-          if (!isViewed && promo?.is_promoted) {
-            if (promo.boost_level === 'premium') return 1;
-            if (promo.boost_level === 'standard') return 2;
-            if (promo.boost_level === 'basic') return 3;
-          }
-          if (!isViewed) return 4;
-          if (promo?.is_promoted) {
-            if (promo.boost_level === 'premium') return 5;
-            if (promo.boost_level === 'standard') return 6;
-            if (promo.boost_level === 'basic') return 7;
-          }
-          return 8;
-        };
-
-        const aScore = getScore(aViewed, aPromo);
-        const bScore = getScore(bViewed, bPromo);
-
-        if (aScore !== bScore) return aScore - bScore;
-
-        // Add randomness within same priority tier
-        return Math.random() - 0.5;
-      });
-
       // Store all posts for infinite scroll
-      allLoadedPostsRef.current = sortedPosts;
+      allLoadedPostsRef.current = orderedPosts;
       
       // Cache the results
-      feedCache.set(activeTab, sortedPosts);
+      feedCache.set(activeTab, orderedPosts);
 
-      // If all posts have been viewed, show all posts (cycle)
-      // Otherwise, prioritize unviewed posts
-      if (hasViewedAllPosts) {
-        return sortedPosts;
-      }
-
-      // Return unviewed posts first, then append viewed if needed
-      const unviewedPosts = sortedPosts.filter(p => 
-        !viewedMap.get(p.id) && !initialViewedRef.current.includes(p.id)
-      );
-
-      if (unviewedPosts.length >= 5) {
-        return unviewedPosts;
-      }
-
-      // If few unviewed posts, append some viewed ones
-      return sortedPosts;
+      return orderedPosts;
     },
     enabled: !!user,
     staleTime: 30000,
