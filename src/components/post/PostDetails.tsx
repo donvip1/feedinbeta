@@ -265,10 +265,17 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         .select('id')
         .single();
 
-      if (postError) throw postError;
+      if (postError) {
+        console.error('Post creation error:', postError);
+        throw new Error(postError.message || 'Failed to save post to database');
+      }
+
+      if (!newPost?.id) {
+        throw new Error('Post was created but no ID was returned');
+      }
 
       // Process hashtags in background (don't wait)
-      if (newPost?.id && parsedHashtags.length > 0) {
+      if (parsedHashtags.length > 0) {
         supabase.functions.invoke('process-hashtags', {
           body: { postId: newPost.id, content: fullContent }
         }).catch(err => console.error('Error processing hashtags:', err));
@@ -285,17 +292,26 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
       // Short delay to show 100% then navigate to the new post
       setTimeout(() => {
         onSubmit();
-        if (newPost?.id) {
-          navigate(`/feed/post/${newPost.id}`);
-        }
+        navigate(`/feed/post/${newPost.id}`);
       }, 500);
     } catch (error: any) {
       console.error('Error creating post:', error);
       setUploadStage('idle');
       setUploadProgress(0);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to create post';
+      if (error.message?.includes('violates row-level security')) {
+        errorMessage = 'Permission denied. Please try logging out and back in.';
+      } else if (error.message?.includes('storage')) {
+        errorMessage = 'Failed to upload media. Please try again.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create post',
+        description: errorMessage,
         variant: 'destructive',
       });
       setLoading(false);
