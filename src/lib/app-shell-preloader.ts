@@ -1,6 +1,7 @@
 /**
  * App Shell Preloader - Loads all critical data BEFORE React renders
  * This ensures instant navigation for authenticated users
+ * Enhanced with aggressive caching and media preloading
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -9,16 +10,22 @@ import { memoryCache } from './memory-cache';
 import { usernameCache } from './username-cache';
 import { navigationPrefetcher } from './navigation-prefetcher';
 
+// Extended cache TTL for longer-lasting cache
 const CACHE_TTL = {
-  profile: 30 * 60 * 1000,
-  credits: 10 * 60 * 1000,
-  packages: 60 * 60 * 1000,
-  notifications: 2 * 60 * 1000,
-  friends: 10 * 60 * 1000,
-  groups: 15 * 60 * 1000,
-  subscription: 30 * 60 * 1000,
-  conversations: 5 * 60 * 1000,
-  feed: 5 * 60 * 1000,
+  profile: 2 * 60 * 60 * 1000,      // 2 hours (was 30 min)
+  credits: 30 * 60 * 1000,          // 30 min (was 10 min)
+  packages: 4 * 60 * 60 * 1000,     // 4 hours (was 1 hour)
+  notifications: 5 * 60 * 1000,     // 5 min (was 2 min)
+  friends: 60 * 60 * 1000,          // 1 hour (was 10 min)
+  groups: 60 * 60 * 1000,           // 1 hour (was 15 min)
+  subscription: 4 * 60 * 60 * 1000, // 4 hours (was 30 min)
+  conversations: 15 * 60 * 1000,    // 15 min (was 5 min)
+  feed: 30 * 60 * 1000,             // 30 min (was 5 min)
+  stories: 15 * 60 * 1000,          // 15 min (new)
+  trending: 30 * 60 * 1000,         // 30 min (new)
+  wallet: 60 * 60 * 1000,           // 1 hour (new)
+  liveContent: 5 * 60 * 1000,       // 5 min (new)
+  mediaUrls: 24 * 60 * 60 * 1000,   // 24 hours (new)
 };
 
 class AppShellPreloader {
@@ -56,7 +63,7 @@ class AppShellPreloader {
     // Load username cache first
     await usernameCache.load();
 
-    // Keys to preload into memory
+    // Keys to preload into memory - expanded list
     const keys = [
       `profile:${userId}`,
       `credits:${userId}`,
@@ -67,6 +74,11 @@ class AppShellPreloader {
       `conversations:${userId}`,
       `feed_posts_forYou`,
       `feed_posts_following`,
+      `stories:${userId}`,
+      `trending_posts`,
+      `wallet:${userId}`,
+      `live_content`,
+      `media_urls:${userId}`,
       'credit_packages',
       'subscription_tiers',
     ];
@@ -76,7 +88,7 @@ class AppShellPreloader {
       try {
         const data = await indexedDBCache.get(key);
         if (data) {
-          memoryCache.set(key, data, 30 * 60 * 1000);
+          memoryCache.set(key, data, CACHE_TTL.feed); // Use generous TTL
         }
       } catch (error) {
         // Ignore individual cache errors
@@ -101,7 +113,7 @@ class AppShellPreloader {
     navigationPrefetcher.setUserId(this.userId);
 
     try {
-      // Fetch all critical data in parallel
+      // Fetch all critical data in parallel - expanded
       await Promise.allSettled([
         this.refreshProfile(),
         this.refreshCredits(),
@@ -112,7 +124,14 @@ class AppShellPreloader {
         this.refreshFriends(),
         this.refreshGroups(),
         this.refreshConversations(),
+        this.refreshStories(),
+        this.refreshTrendingPosts(),
+        this.refreshWallet(),
+        this.refreshLiveContent(),
       ]);
+
+      // Preload media URLs in idle time
+      this.preloadMediaUrls();
 
       console.log(`[AppShellPreloader] Background refresh done in ${Date.now() - startTime}ms`);
       this.preloadComplete = true;
@@ -252,6 +271,128 @@ class AppShellPreloader {
       const { data } = await supabase.rpc('get_conversations_with_details', { p_user_id: this.userId });
       if (data) await this.saveToCache(`conversations:${this.userId}`, data, CACHE_TTL.conversations);
     } catch (error) { /* Ignore */ }
+  }
+
+  // NEW: Refresh stories for stories bar
+  private async refreshStories(): Promise<void> {
+    if (!this.userId) return;
+    try {
+      const { data } = await supabase
+        .from('stories')
+        .select(`
+          *,
+          profiles:user_id (id, username, display_name, avatar_url)
+        `)
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (data) await this.saveToCache(`stories:${this.userId}`, data, CACHE_TTL.stories);
+    } catch (error) { /* Ignore */ }
+  }
+
+  // NEW: Refresh trending posts
+  private async refreshTrendingPosts(): Promise<void> {
+    try {
+      const { data } = await supabase
+        .from('posts')
+        .select(`
+          *,
+          profiles:user_id (username, display_name, avatar_url)
+        `)
+        .eq('status', 'active')
+        .order('likes_count', { ascending: false })
+        .limit(20);
+      if (data) await this.saveToCache('trending_posts', data, CACHE_TTL.trending);
+    } catch (error) { /* Ignore */ }
+  }
+
+  // NEW: Refresh wallet data
+  private async refreshWallet(): Promise<void> {
+    if (!this.userId) return;
+    try {
+      const [creditsResult, transactionsResult] = await Promise.all([
+        supabase.from('user_credits').select('*').eq('user_id', this.userId).single(),
+        supabase
+          .from('credit_transactions')
+          .select('*')
+          .eq('user_id', this.userId)
+          .order('created_at', { ascending: false })
+          .limit(50)
+      ]);
+
+      const walletData = {
+        credits: creditsResult.data,
+        transactions: transactionsResult.data || []
+      };
+      await this.saveToCache(`wallet:${this.userId}`, walletData, CACHE_TTL.wallet);
+    } catch (error) { /* Ignore */ }
+  }
+
+  // NEW: Refresh live content
+  private async refreshLiveContent(): Promise<void> {
+    try {
+      const [streamsResult, spacesResult] = await Promise.all([
+        supabase
+          .from('live_streams')
+          .select('id, title, status, viewer_count, thumbnail_url, user_id')
+          .eq('status', 'live')
+          .limit(10),
+        supabase
+          .from('live_spaces')
+          .select('id, title, status, viewer_count, topic_category, user_id')
+          .eq('status', 'live')
+          .limit(10)
+      ]);
+
+      const liveContent = {
+        streams: streamsResult.data || [],
+        spaces: spacesResult.data || []
+      };
+      await this.saveToCache('live_content', liveContent, CACHE_TTL.liveContent);
+    } catch (error) { /* Ignore */ }
+  }
+
+  // NEW: Preload media URLs in idle time
+  private preloadMediaUrls(): void {
+    if (typeof requestIdleCallback === 'undefined') return;
+
+    requestIdleCallback(async () => {
+      if (!this.userId) return;
+
+      try {
+        // Get avatar URLs from friends
+        const friends = memoryCache.get(`friends:${this.userId}`) as any[];
+        if (friends) {
+          const avatarUrls = friends
+            .filter(f => f.avatar_url)
+            .map(f => f.avatar_url);
+          
+          // Preload images
+          avatarUrls.forEach(url => {
+            const img = new Image();
+            img.src = url;
+          });
+        }
+
+        // Get media from cached feed posts
+        const forYouPosts = memoryCache.get('feed_posts_forYou') as any[];
+        if (forYouPosts) {
+          const mediaUrls = forYouPosts
+            .slice(0, 20)
+            .filter(p => p.media_url || p.media_urls?.[0])
+            .map(p => p.media_url || p.media_urls?.[0])
+            .filter(Boolean);
+
+          // Preload first few images/thumbnails
+          mediaUrls.slice(0, 10).forEach(url => {
+            if (url.includes('.jpg') || url.includes('.png') || url.includes('.webp')) {
+              const img = new Image();
+              img.src = url;
+            }
+          });
+        }
+      } catch (error) { /* Ignore */ }
+    }, { timeout: 5000 });
   }
 
   isComplete(): boolean {
