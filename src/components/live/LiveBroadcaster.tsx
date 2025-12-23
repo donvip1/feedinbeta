@@ -17,6 +17,7 @@ import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { LiveInviteModal } from "./LiveInviteModal";
+import { useNavigation } from '@/context/NavigationContext';
 
 interface LiveBroadcasterProps {
   streamId: string;
@@ -25,6 +26,7 @@ interface LiveBroadcasterProps {
 
 export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => {
   const { user } = useAuth();
+  const { setHideBottomNav } = useNavigation();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const viewersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -44,6 +46,12 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [viewers, setViewers] = useState<any[]>([]);
   const [totalGiftsReceived, setTotalGiftsReceived] = useState(0);
+
+  // Hide bottom navigation when broadcasting
+  useEffect(() => {
+    setHideBottomNav(true);
+    return () => setHideBottomNav(false);
+  }, [setHideBottomNav]);
 
   // Initialize media stream
   const initializeMedia = async () => {

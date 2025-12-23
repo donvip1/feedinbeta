@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { LiveInviteModal } from "./LiveInviteModal";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigation } from '@/context/NavigationContext';
 import AnimatedGiftEmoji from "@/components/shared/AnimatedGiftEmoji";
 
 interface LiveStreamViewerProps {
@@ -42,6 +43,7 @@ const REACTION_EMOJIS = [
 
 export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) => {
   const { user } = useAuth();
+  const { setHideBottomNav } = useNavigation();
   const [stream, setStream] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -56,6 +58,12 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
   const [viewers, setViewers] = useState<any[]>([]);
   const [totalGifts, setTotalGifts] = useState(0);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Hide bottom navigation when viewing live stream
+  useEffect(() => {
+    setHideBottomNav(true);
+    return () => setHideBottomNav(false);
+  }, [setHideBottomNav]);
 
   const isHost = stream?.user_id === user?.id;
 

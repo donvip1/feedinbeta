@@ -18,6 +18,7 @@ import { LiveGiftModal } from './LiveGiftModal';
 import { SpeakerQueuePanel } from './SpeakerQueuePanel';
 import { cn } from '@/lib/utils';
 import { useSpaceAudio, ConnectionStatus } from '@/hooks/useSpaceAudio';
+import { useNavigation } from '@/context/NavigationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -85,6 +86,7 @@ const REACTION_EMOJIS = [
 
 export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const { user } = useAuth();
+  const { setHideBottomNav } = useNavigation();
   const [space, setSpace] = useState<SpaceData | null>(null);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isMuted, setIsMuted] = useState(true);
@@ -112,6 +114,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     isSpeaker: myRole === 'speaker',
     isListener: myRole === 'listener',
   });
+
+  // Hide bottom navigation when in live space
+  useEffect(() => {
+    setHideBottomNav(true);
+    return () => setHideBottomNav(false);
+  }, [setHideBottomNav]);
 
   // Duration timer
   useEffect(() => {
