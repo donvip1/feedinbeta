@@ -109,7 +109,7 @@ const Subscription = () => {
           </Card>
         )}
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-6 pt-8 mt-4">
           {tiers?.map((tier) => {
             const features = tier.features as string[];
             const Icon = tierIcons[tier.name as keyof typeof tierIcons] || Zap;
@@ -118,7 +118,7 @@ const Subscription = () => {
             return (
               <Card 
                 key={tier.id} 
-                className={`relative ${tier.name === 'Pro' ? 'border-primary shadow-lg scale-105' : ''}`}
+                className={`relative overflow-visible ${tier.name === 'Pro' ? 'border-primary shadow-lg scale-105 mt-4' : ''}`}
               >
                 {tier.name === 'Pro' && (
                   <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-accent">
