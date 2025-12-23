@@ -7,9 +7,11 @@ import { AuthProvider } from "@/context/AuthContext";
 import { RefreshProvider } from "@/context/RefreshContext";
 import { NavigationProvider } from "@/context/NavigationContext";
 import { CallProvider } from "@/context/CallContext";
+import { SpaceProvider } from "@/context/SpaceContext";
 import { ThemeProvider } from "next-themes";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
+import { FloatingSpacePlayer } from "@/components/live/FloatingSpacePlayer";
 import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
@@ -129,9 +131,11 @@ const App = () => {
               <RefreshProvider>
                 <AuthProvider>
                   <CallProvider>
+                    <SpaceProvider>
                     <Toaster />
                   <IncomingCallListener />
                   <FloatingCallWidget />
+                  <FloatingSpacePlayer />
                   <ActiveCallIndicator />
                   <MobileInstallModal />
                   <BrowserInstallBanner />
@@ -218,6 +222,7 @@ const App = () => {
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
               </Routes>
+                </SpaceProvider>
                 </CallProvider>
               </AuthProvider>
             </RefreshProvider>
