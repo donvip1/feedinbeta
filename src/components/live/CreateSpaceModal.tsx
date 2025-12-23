@@ -46,6 +46,9 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
 
     setLoading(true);
     try {
+      // Generate unique share link
+      const shareLink = `${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+      
       const { data, error } = await supabase
         .from('live_spaces')
         .insert({
@@ -58,6 +61,7 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
           status: isScheduled ? 'scheduled' : 'live',
           scheduled_start: isScheduled && scheduledStart ? new Date(scheduledStart).toISOString() : null,
           started_at: isScheduled ? null : new Date().toISOString(),
+          share_link: shareLink,
         })
         .select()
         .single();
