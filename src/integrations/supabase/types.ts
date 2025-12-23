@@ -1320,10 +1320,12 @@ export type Database = {
         Row: {
           hand_raised_at: string | null
           has_raised_hand: boolean | null
+          host_muted: boolean | null
           id: string
           is_muted: boolean | null
           joined_at: string | null
           left_at: string | null
+          mic_allowed: boolean | null
           role: string | null
           space_id: string | null
           user_id: string
@@ -1331,10 +1333,12 @@ export type Database = {
         Insert: {
           hand_raised_at?: string | null
           has_raised_hand?: boolean | null
+          host_muted?: boolean | null
           id?: string
           is_muted?: boolean | null
           joined_at?: string | null
           left_at?: string | null
+          mic_allowed?: boolean | null
           role?: string | null
           space_id?: string | null
           user_id: string
@@ -1342,10 +1346,12 @@ export type Database = {
         Update: {
           hand_raised_at?: string | null
           has_raised_hand?: boolean | null
+          host_muted?: boolean | null
           id?: string
           is_muted?: boolean | null
           joined_at?: string | null
           left_at?: string | null
+          mic_allowed?: boolean | null
           role?: string | null
           space_id?: string | null
           user_id?: string
@@ -1362,6 +1368,7 @@ export type Database = {
       }
       live_spaces: {
         Row: {
+          allow_mic_for_all: boolean | null
           created_at: string | null
           description: string | null
           ended_at: string | null
@@ -1381,6 +1388,7 @@ export type Database = {
           viewer_count: number | null
         }
         Insert: {
+          allow_mic_for_all?: boolean | null
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
@@ -1400,6 +1408,7 @@ export type Database = {
           viewer_count?: number | null
         }
         Update: {
+          allow_mic_for_all?: boolean | null
           created_at?: string | null
           description?: string | null
           ended_at?: string | null

@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
-  PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown
+  PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -16,7 +17,7 @@ import { SpaceInviteModal } from './SpaceInviteModal';
 import { LiveGiftModal } from './LiveGiftModal';
 import { SpeakerQueuePanel } from './SpeakerQueuePanel';
 import { cn } from '@/lib/utils';
-import { useSpaceAudio } from '@/hooks/useSpaceAudio';
+import { useSpaceAudio, ConnectionStatus } from '@/hooks/useSpaceAudio';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -48,6 +49,8 @@ interface Speaker {
   is_muted: boolean;
   has_raised_hand: boolean;
   hand_raised_at?: string;
+  host_muted?: boolean;
+  mic_allowed?: boolean;
   profile?: {
     display_name: string;
     username: string;
@@ -66,6 +69,7 @@ interface SpaceData {
   share_link: string;
   is_private: boolean;
   started_at?: string;
+  allow_mic_for_all?: boolean;
 }
 
 const REACTION_EMOJIS = [
@@ -95,15 +99,18 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [duration, setDuration] = useState('0:00');
   const [totalGifts, setTotalGifts] = useState(0);
+  const [myHostMuted, setMyHostMuted] = useState(false);
+  const [myMicAllowed, setMyMicAllowed] = useState(true);
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
   const isHost = space?.user_id === user?.id || myRole === 'host' || myRole === 'co_host';
   
-  const { isConnected, audioLevels, connect, disconnect } = useSpaceAudio({
+  const { isConnected, isConnecting, connectionStatus, audioLevels, connect, disconnect } = useSpaceAudio({
     spaceId,
     isMuted,
     isHost: myRole === 'host' || myRole === 'co_host',
     isSpeaker: myRole === 'speaker',
+    isListener: myRole === 'listener',
   });
 
   // Duration timer
@@ -122,14 +129,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     return () => clearInterval(interval);
   }, [space?.started_at]);
 
+  // Connect audio for ALL users (not just speakers)
   useEffect(() => {
     fetchSpaceData();
     joinSpace();
     fetchTotalGifts();
-    
-    if (canSpeak) {
-      connect();
-    }
 
     const channel = supabase
       .channel(`space-${spaceId}`)
@@ -183,6 +187,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     };
   }, [spaceId]);
 
+  // Connect audio after joining
+  useEffect(() => {
+    if (space && user) {
+      connect();
+    }
+  }, [space, user, myRole]);
+
   const fetchSpaceData = async () => {
     const { data, error } = await supabase
       .from('live_spaces')
@@ -225,6 +236,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         setMyRole(mySpeaker.role);
         setIsMuted(mySpeaker.is_muted);
         setHasRaisedHand(mySpeaker.has_raised_hand);
+        setMyHostMuted(mySpeaker.host_muted || false);
+        setMyMicAllowed(mySpeaker.mic_allowed !== false);
       }
     }
   };
@@ -255,6 +268,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         user_id: user.id,
         role: space?.user_id === user.id ? 'host' : 'listener',
         is_muted: true,
+        host_muted: false,
+        mic_allowed: true,
       });
 
       await supabase
@@ -281,8 +296,21 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   };
 
+  // Toggle mute with host control checks
   const toggleMute = async () => {
     if (!user || myRole === 'listener') return;
+
+    // Check if host has muted us - can't unmute
+    if (myHostMuted && isMuted) {
+      toast.error('Host has muted you. Only the host can unmute you.');
+      return;
+    }
+
+    // Check if mic is not allowed globally and we don't have permission
+    if (!space?.allow_mic_for_all && !myMicAllowed && isMuted) {
+      toast.error('Mic is currently disabled by host');
+      return;
+    }
 
     const newMuteState = !isMuted;
     setIsMuted(newMuteState);
@@ -292,6 +320,81 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       .update({ is_muted: newMuteState })
       .eq('space_id', spaceId)
       .eq('user_id', user.id);
+  };
+
+  // Host mutes a user (they can't unmute themselves)
+  const hostMuteUser = async (speakerId: string) => {
+    if (!isHost) return;
+    
+    await supabase
+      .from('live_space_speakers')
+      .update({ is_muted: true, host_muted: true })
+      .eq('id', speakerId);
+    
+    toast.success('User muted');
+  };
+
+  // Host allows user to unmute
+  const hostUnmuteUser = async (speakerId: string) => {
+    if (!isHost) return;
+    
+    await supabase
+      .from('live_space_speakers')
+      .update({ host_muted: false })
+      .eq('id', speakerId);
+    
+    toast.success('User can now unmute');
+  };
+
+  // Toggle mic permission for a specific user
+  const toggleMicPermission = async (speakerId: string, allowed: boolean) => {
+    if (!isHost) return;
+    
+    await supabase
+      .from('live_space_speakers')
+      .update({ mic_allowed: allowed })
+      .eq('id', speakerId);
+    
+    toast.success(allowed ? 'Mic permission granted' : 'Mic permission revoked');
+  };
+
+  // Global: Allow/disallow mic for all listeners
+  const toggleMicForAll = async (allowed: boolean) => {
+    if (!isHost) return;
+    
+    await supabase
+      .from('live_spaces')
+      .update({ allow_mic_for_all: allowed })
+      .eq('id', spaceId);
+    
+    setSpace(prev => prev ? { ...prev, allow_mic_for_all: allowed } : null);
+    toast.success(allowed ? 'Mic enabled for all' : 'Mic disabled for all');
+  };
+
+  // Mute all speakers
+  const muteAllSpeakers = async () => {
+    if (!isHost) return;
+    
+    await supabase
+      .from('live_space_speakers')
+      .update({ is_muted: true, host_muted: true })
+      .eq('space_id', spaceId)
+      .neq('user_id', user?.id)
+      .in('role', ['speaker', 'co_host']);
+    
+    toast.success('All speakers muted');
+  };
+
+  // Allow all to unmute
+  const allowAllToUnmute = async () => {
+    if (!isHost) return;
+    
+    await supabase
+      .from('live_space_speakers')
+      .update({ host_muted: false })
+      .eq('space_id', spaceId);
+    
+    toast.success('All users can now unmute');
   };
 
   const toggleRaiseHand = async () => {
@@ -359,7 +462,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const promoteSpeaker = async (speakerId: string, newRole: 'speaker' | 'co_host') => {
     await supabase
       .from('live_space_speakers')
-      .update({ role: newRole, has_raised_hand: false })
+      .update({ role: newRole, has_raised_hand: false, mic_allowed: true, host_muted: false })
       .eq('id', speakerId);
     
     toast.success(`User promoted to ${newRole === 'co_host' ? 'co-host' : 'speaker'}`);
@@ -388,6 +491,47 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       username: s.profile?.username || 'user',
       avatar_url: s.profile?.avatar_url || '',
     }));
+  };
+
+  // Connection status badge
+  const ConnectionStatusBadge = () => {
+    switch (connectionStatus) {
+      case 'connecting':
+        return (
+          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            Connecting...
+          </Badge>
+        );
+      case 'reconnecting':
+        return (
+          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 gap-1">
+            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+            Reconnecting...
+          </Badge>
+        );
+      case 'connected':
+        return (
+          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1">
+            <Wifi className="w-3 h-3" />
+            Connected
+          </Badge>
+        );
+      case 'failed':
+        return (
+          <Badge className="bg-red-500/20 text-red-400 border-red-500/30 gap-1">
+            <WifiOff className="w-3 h-3" />
+            Failed
+          </Badge>
+        );
+      default:
+        return (
+          <Badge className="bg-muted text-muted-foreground gap-1">
+            <WifiOff className="w-3 h-3" />
+            Disconnected
+          </Badge>
+        );
+    }
   };
 
   return (
@@ -420,12 +564,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30">
                   <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
                   <span className="text-[10px] font-semibold text-red-400 uppercase">Live</span>
                 </div>
                 <span className="text-xs text-muted-foreground">{duration}</span>
+                <ConnectionStatusBadge />
                 {space?.topic_category && (
                   <Badge variant="secondary" className="text-[10px] h-5">
                     {space.topic_category}
@@ -456,6 +601,41 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </Button>
             </div>
           </div>
+
+          {/* Host Controls Bar */}
+          {isHost && (
+            <div className="flex items-center gap-3 mt-3 p-2 rounded-lg bg-muted/50 border border-border/50">
+              <div className="flex items-center gap-2">
+                <Switch 
+                  checked={space?.allow_mic_for_all !== false}
+                  onCheckedChange={toggleMicForAll}
+                  id="mic-for-all"
+                />
+                <label htmlFor="mic-for-all" className="text-xs font-medium cursor-pointer">
+                  Allow mic for all
+                </label>
+              </div>
+              <div className="h-4 w-px bg-border" />
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-xs"
+                onClick={muteAllSpeakers}
+              >
+                <VolumeX className="w-3 h-3 mr-1" />
+                Mute All
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-xs"
+                onClick={allowAllToUnmute}
+              >
+                <Volume2 className="w-3 h-3 mr-1" />
+                Allow Unmute
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -474,12 +654,16 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   key={speaker.id}
                   speaker={speaker}
                   isHost={isHost}
+                  currentUserId={user?.id}
                   audioLevel={audioLevels[speaker.user_id] || 0}
                   onGift={() => {
                     setSelectedGiftRecipient(speaker.user_id);
                     setShowGiftModal(true);
                   }}
-                  onAction={isHost && speaker.user_id !== user?.id ? () => removeSpeaker(speaker.id) : undefined}
+                  onHostMute={() => hostMuteUser(speaker.id)}
+                  onHostUnmute={() => hostUnmuteUser(speaker.id)}
+                  onToggleMicPermission={(allowed) => toggleMicPermission(speaker.id, allowed)}
+                  onRemove={() => removeSpeaker(speaker.id)}
                   size="lg"
                   showCrown
                 />
@@ -500,12 +684,16 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     key={speaker.id}
                     speaker={speaker}
                     isHost={isHost}
+                    currentUserId={user?.id}
                     audioLevel={audioLevels[speaker.user_id] || 0}
                     onGift={() => {
                       setSelectedGiftRecipient(speaker.user_id);
                       setShowGiftModal(true);
                     }}
-                    onAction={isHost ? () => removeSpeaker(speaker.id) : undefined}
+                    onHostMute={() => hostMuteUser(speaker.id)}
+                    onHostUnmute={() => hostUnmuteUser(speaker.id)}
+                    onToggleMicPermission={(allowed) => toggleMicPermission(speaker.id, allowed)}
+                    onRemove={() => removeSpeaker(speaker.id)}
                     size="md"
                   />
                 ))}
@@ -606,6 +794,14 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
       {/* Bottom controls */}
       <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl bg-background/90 border-t border-border/50 pb-safe">
+        {/* Host muted warning */}
+        {myHostMuted && canSpeak && (
+          <div className="flex items-center justify-center gap-2 py-2 px-4 bg-red-500/10 border-b border-red-500/20">
+            <Shield className="w-4 h-4 text-red-400" />
+            <span className="text-xs text-red-400">You've been muted by the host</span>
+          </div>
+        )}
+
         {/* Quick reactions */}
         <div className="flex justify-center gap-1 py-3 px-4 border-b border-border/30">
           {REACTION_EMOJIS.map(({ emoji, label }) => (
@@ -657,12 +853,17 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   variant={isMuted ? "outline" : "default"}
                   size="icon"
                   className={cn(
-                    "h-12 w-12 rounded-xl transition-all",
-                    !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0"
+                    "h-12 w-12 rounded-xl transition-all relative",
+                    !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0",
+                    myHostMuted && "opacity-50"
                   )}
                   onClick={toggleMute}
+                  disabled={myHostMuted && isMuted}
                 >
                   {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  {myHostMuted && (
+                    <Shield className="absolute -top-1 -right-1 w-4 h-4 text-red-500" />
+                  )}
                 </Button>
               </motion.div>
             )}
@@ -766,14 +967,30 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 interface SpeakerAvatarProps {
   speaker: Speaker;
   isHost: boolean;
+  currentUserId?: string;
   audioLevel: number;
   onGift: () => void;
-  onAction?: () => void;
+  onHostMute?: () => void;
+  onHostUnmute?: () => void;
+  onToggleMicPermission?: (allowed: boolean) => void;
+  onRemove?: () => void;
   size: 'sm' | 'md' | 'lg';
   showCrown?: boolean;
 }
 
-const SpeakerAvatar = ({ speaker, isHost, audioLevel, onGift, onAction, size, showCrown }: SpeakerAvatarProps) => {
+const SpeakerAvatar = ({ 
+  speaker, 
+  isHost, 
+  currentUserId,
+  audioLevel, 
+  onGift, 
+  onHostMute,
+  onHostUnmute,
+  onToggleMicPermission,
+  onRemove,
+  size, 
+  showCrown 
+}: SpeakerAvatarProps) => {
   const sizeClasses = {
     sm: 'w-12 h-12',
     md: 'w-16 h-16',
@@ -781,6 +998,8 @@ const SpeakerAvatar = ({ speaker, isHost, audioLevel, onGift, onAction, size, sh
   };
 
   const isSpeaking = !speaker.is_muted && audioLevel > 0.1;
+  const isSelf = speaker.user_id === currentUserId;
+  const canShowHostControls = isHost && !isSelf && speaker.role !== 'host';
 
   return (
     <div className="flex flex-col items-center gap-2 group">
@@ -824,8 +1043,15 @@ const SpeakerAvatar = ({ speaker, isHost, audioLevel, onGift, onAction, size, sh
           )}
         </div>
 
+        {/* Host muted indicator */}
+        {speaker.host_muted && (
+          <div className="absolute -top-1 -left-1 rounded-full p-1 bg-red-500">
+            <Shield className="w-3 h-3 text-white" />
+          </div>
+        )}
+
         {/* Actions dropdown for hosts */}
-        {isHost && onAction && (
+        {canShowHostControls && (
           <div className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -839,7 +1065,30 @@ const SpeakerAvatar = ({ speaker, isHost, audioLevel, onGift, onAction, size, sh
                   Send Gift
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onAction} className="text-destructive">
+                {speaker.host_muted ? (
+                  <DropdownMenuItem onClick={onHostUnmute}>
+                    <Volume2 className="w-4 h-4 mr-2" />
+                    Allow to Unmute
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={onHostMute}>
+                    <VolumeX className="w-4 h-4 mr-2" />
+                    Mute User
+                  </DropdownMenuItem>
+                )}
+                {speaker.mic_allowed ? (
+                  <DropdownMenuItem onClick={() => onToggleMicPermission?.(false)}>
+                    <MicOff className="w-4 h-4 mr-2" />
+                    Revoke Mic Permission
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem onClick={() => onToggleMicPermission?.(true)}>
+                    <Mic className="w-4 h-4 mr-2" />
+                    Grant Mic Permission
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onRemove} className="text-destructive">
                   <X className="w-4 h-4 mr-2" />
                   Remove from stage
                 </DropdownMenuItem>
