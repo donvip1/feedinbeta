@@ -144,7 +144,7 @@ const Settings = () => {
       icon: Coins,
       title: 'Buy Credits',
       description: 'Purchase credit packages',
-      route: '/credits',
+      route: '/wallet/credits',
       color: 'text-amber-500'
     }
   ];
@@ -185,7 +185,7 @@ const Settings = () => {
       icon: TrendingUp,
       title: 'Trending',
       description: 'Discover trending posts and hashtags',
-      route: '/trending',
+      route: '/feed/trending',
       color: 'text-orange-500'
     },
     {

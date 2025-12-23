@@ -140,7 +140,7 @@ const P2PTransaction = () => {
       if (error) throw error;
 
       toast.success('Transaction cancelled. Credits refunded to seller.');
-      navigate('/p2p-marketplace');
+      navigate('/wallet/p2p');
     } catch (error: any) {
       toast.error(error.message || 'Failed to cancel transaction');
     } finally {
@@ -174,7 +174,7 @@ const P2PTransaction = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/p2p-marketplace')}
+              onClick={() => navigate('/wallet/p2p')}
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>

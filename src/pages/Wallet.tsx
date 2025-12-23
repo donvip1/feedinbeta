@@ -458,7 +458,7 @@ const Wallet = () => {
             </CardHeader>
             <CardContent>
               <Button 
-                onClick={() => navigate('/p2p-marketplace')}
+                onClick={() => navigate('/wallet/p2p')}
                 className="w-full"
                 size="lg"
               >
