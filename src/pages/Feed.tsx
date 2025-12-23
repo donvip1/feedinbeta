@@ -59,6 +59,41 @@ const Feed = () => {
     initialViewedRef.current = [...viewedPostIds];
   }, [activeTab]);
 
+  // Helper function to fetch posts directly as fallback
+  const fetchFallbackPosts = async (excludeUserId?: string) => {
+    const query = supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles:user_id (username, display_name, avatar_url),
+        original_post:original_post_id (
+          id, user_id, content, media_url, media_type, media_urls, media_types, created_at,
+          profiles:user_id (username, display_name, avatar_url)
+        )
+      `)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (excludeUserId) {
+      query.neq('user_id', excludeUserId);
+    }
+
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('Fallback posts error:', error);
+      return [];
+    }
+    
+    return (data || []).map(post => ({
+      ...post,
+      _isPromoted: false,
+      _boostLevel: null,
+      _relevanceScore: 0
+    }));
+  };
+
   // Fetch posts using personalized feed algorithms
   const { data: posts, isLoading, refetch } = useQuery({
     queryKey: ['feed-posts', activeTab, user?.id],
@@ -73,63 +108,56 @@ const Feed = () => {
 
       // Use the appropriate feed function based on tab
       let feedData: { post_id: string; is_promoted: boolean; boost_level: string; relevance_score?: number }[] = [];
+      let useFallback = false;
       
-      if (activeTab === 'following') {
-        // Following tab: Only posts from people user follows
-        const { data, error } = await supabase.rpc('get_following_feed', {
-          p_user_id: user.id,
-          p_limit: 100,
-          p_offset: 0
-        });
-        
-        if (error) {
-          console.error('Following feed error:', error);
+      try {
+        if (activeTab === 'following') {
+          // Following tab: Only posts from people user follows
+          const { data, error } = await supabase.rpc('get_following_feed', {
+            p_user_id: user.id,
+            p_limit: 100,
+            p_offset: 0
+          });
+          
+          if (error) {
+            console.error('Following feed error:', error);
+            useFallback = true;
+          } else {
+            feedData = data || [];
+          }
         } else {
-          feedData = data || [];
+          // For You tab: Personalized feed based on interests, location, engagement
+          const { data, error } = await supabase.rpc('get_personalized_for_you_feed', {
+            p_user_id: user.id,
+            p_limit: 100,
+            p_offset: 0
+          });
+          
+          if (error) {
+            console.error('For You feed error:', error);
+            useFallback = true;
+          } else {
+            feedData = data || [];
+          }
         }
-      } else {
-        // For You tab: Personalized feed based on interests, location, engagement
-        const { data, error } = await supabase.rpc('get_personalized_for_you_feed', {
-          p_user_id: user.id,
-          p_limit: 100,
-          p_offset: 0
-        });
-        
-        if (error) {
-          console.error('For You feed error:', error);
-        } else {
-          feedData = data || [];
-        }
+      } catch (err) {
+        console.error('Feed RPC error:', err);
+        useFallback = true;
       }
 
-      // If no posts from algorithm, return empty
+      // If RPC failed, use fallback query
+      if (useFallback) {
+        return await fetchFallbackPosts(user.id);
+      }
+
+      // If no posts from algorithm
       if (feedData.length === 0) {
-        // For Following tab with no followed users
+        // For Following tab with no followed users, return empty
         if (activeTab === 'following') {
           return [];
         }
-        // Fallback: just get recent posts for For You
-        const { data: fallbackPosts } = await supabase
-          .from('posts')
-          .select(`
-            *,
-            profiles:user_id (username, display_name, avatar_url),
-            original_post:original_post_id (
-              id, user_id, content, media_url, media_type, media_urls, media_types, created_at,
-              profiles:user_id (username, display_name, avatar_url)
-            )
-          `)
-          .eq('status', 'active')
-          .neq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(50);
-        
-        return (fallbackPosts || []).map(post => ({
-          ...post,
-          _isPromoted: false,
-          _boostLevel: null,
-          _relevanceScore: 0
-        }));
+        // For You fallback: get recent posts
+        return await fetchFallbackPosts(user.id);
       }
 
       // Create maps for promotion data
@@ -170,7 +198,11 @@ const Feed = () => {
         `)
         .in('id', postIds);
 
-      if (postsError) throw postsError;
+      if (postsError) {
+        console.error('Posts fetch error:', postsError);
+        // Fallback if post fetch fails
+        return await fetchFallbackPosts(user.id);
+      }
 
       // Sort posts by the order returned from the feed function (preserves ranking)
       const postMap = new Map((fullPosts || []).map(p => [p.id, p]));
@@ -187,6 +219,11 @@ const Feed = () => {
             _promoterName: null
           };
         });
+
+      // If no posts after mapping, use fallback
+      if (orderedPosts.length === 0) {
+        return await fetchFallbackPosts(user.id);
+      }
 
       // Store all video posts for fullscreen navigation
       allVideoPostsRef.current = orderedPosts.filter(p => 
