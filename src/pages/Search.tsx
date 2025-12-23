@@ -12,6 +12,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { sanitizeSearchQuery } from '@/lib/search-utils';
 import { Badge } from '@/components/ui/badge';
 import { useQuery } from '@tanstack/react-query';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 const RECENT_SEARCHES_KEY = 'feedin_recent_searches';
 const MAX_RECENT_SEARCHES = 10;

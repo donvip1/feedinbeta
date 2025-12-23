@@ -1,12 +1,11 @@
-import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { BottomNav } from '@/components/navigation/BottomNav';
-import { TrendingUp, ArrowLeft } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import PostCard from '@/components/feed/PostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useViewedPosts } from '@/hooks/useViewedPosts';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { BottomNav } from '@/components/navigation/BottomNav';
 
 const TrendingContent = () => {
   const [posts, setPosts] = useState<any[]>([]);
@@ -113,31 +112,13 @@ const TrendingContent = () => {
 };
 
 const Trending = () => {
-  const navigate = useNavigate();
-
   return (
     <>
       <div className="min-h-screen bg-background pb-20">
-        <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-          <div className="container mx-auto px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <Button
-                  onClick={() => navigate('/feed')}
-                  variant="ghost"
-                  size="icon"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                  <TrendingUp className="w-6 h-6 text-primary" />
-                  Trending
-                </h1>
-              </div>
-            </div>
-          </div>
-        </header>
-
+        <PageHeader 
+          title="Trending" 
+          icon={<TrendingUp className="w-5 h-5" />}
+        />
         <TrendingContent />
       </div>
       <BottomNav />

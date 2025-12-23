@@ -2,13 +2,14 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Coins, Gift, TrendingUp, ArrowLeft, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Coins, Gift, TrendingUp, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { PackageCard } from "@/components/wallet/PackageCard";
 import { useCachedQuery } from "@/hooks/useCachedQuery";
 import { useAuth } from "@/hooks/useAuth";
+import { PageHeader } from "@/components/shared/PageHeader";
 
 const Credits = () => {
   const navigate = useNavigate();
@@ -92,23 +93,10 @@ const Credits = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Compact Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="px-4 py-3">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(-1)}
-              className="h-9 w-9"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <Coins className="w-5 h-5 text-primary" />
-            <h1 className="text-lg font-bold">Credits Store</h1>
-          </div>
-        </div>
-      </header>
+      <PageHeader 
+        title="Credits Store" 
+        icon={<Coins className="w-5 h-5" />}
+      />
 
       <div className="px-4 py-5 space-y-6">
         {/* Header section */}

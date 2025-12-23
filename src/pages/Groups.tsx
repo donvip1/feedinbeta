@@ -9,9 +9,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Plus, Search, Users, Lock, Globe } from 'lucide-react';
+import { Plus, Search, Users, Lock, Globe } from 'lucide-react';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 interface Group {
   id: string;
@@ -99,40 +100,32 @@ const Groups = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Button
-                onClick={() => navigate('/feed')}
-                variant="ghost"
-                size="icon"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <h1 className="text-xl font-bold">Groups</h1>
-            </div>
-            <Button
-              onClick={() => setIsCreateModalOpen(true)}
-              size="sm"
-              className="bg-primary hover:bg-primary/90"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create
-            </Button>
-          </div>
-          <div className="mt-3 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Search groups..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
+      <PageHeader 
+        title="Groups" 
+        rightContent={
+          <Button
+            onClick={() => setIsCreateModalOpen(true)}
+            size="sm"
+            className="bg-primary hover:bg-primary/90"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Create
+          </Button>
+        }
+      />
+      
+      {/* Search */}
+      <div className="px-4 py-3 border-b border-border">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search groups..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
         </div>
-      </header>
+      </div>
 
       {/* Content */}
       <div className="container mx-auto px-4 py-6 space-y-6">

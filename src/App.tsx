@@ -5,6 +5,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { RefreshProvider } from "@/context/RefreshContext";
+import { NavigationProvider } from "@/context/NavigationContext";
 import { CallProvider } from "@/context/CallContext";
 import { ThemeProvider } from "next-themes";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
@@ -124,10 +125,11 @@ const App = () => {
       <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="feedin-theme">
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
-            <RefreshProvider>
-              <AuthProvider>
-                <CallProvider>
-                  <Toaster />
+            <NavigationProvider>
+              <RefreshProvider>
+                <AuthProvider>
+                  <CallProvider>
+                    <Toaster />
                   <IncomingCallListener />
                   <FloatingCallWidget />
                   <ActiveCallIndicator />
@@ -218,6 +220,7 @@ const App = () => {
                 </CallProvider>
               </AuthProvider>
             </RefreshProvider>
+          </NavigationProvider>
           </BrowserRouter>
         </QueryClientProvider>
       </ThemeProvider>
