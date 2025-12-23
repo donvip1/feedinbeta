@@ -38,12 +38,13 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
       onPointerUp={() => setIsPressed(false)}
       onPointerLeave={() => setIsPressed(false)}
       className={cn(
-        'fixed bottom-[72px] left-1/2 -translate-x-1/2 md:bottom-20 z-[80]',
+        'fixed bottom-[72px] md:bottom-20 z-[80]',
+        // Right side, aligned with feed card max-width (max-w-lg = 32rem = 512px)
+        'right-4 md:right-auto md:left-1/2 md:ml-[calc(min(256px,50vw-2rem)-28px)]',
         'flex items-center justify-center',
         'transition-all duration-200 ease-out',
         'touch-manipulation',
         isPressed ? 'scale-90' : 'hover:scale-110 active:scale-95',
-        // Subtle shadow for depth
         'drop-shadow-lg'
       )}
       style={{ WebkitTapHighlightColor: 'transparent' }}
