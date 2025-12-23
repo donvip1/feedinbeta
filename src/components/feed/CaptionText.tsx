@@ -24,7 +24,7 @@ export default function CaptionText({ text, maxLength = 150, showMore = false, o
               className="text-primary cursor-pointer hover:underline"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/search?q=${encodeURIComponent(part.searchTerm)}`);
+                navigate(`/feed/hashtag/${encodeURIComponent(part.searchTerm.replace('#', ''))}`);
               }}
             >
               {part.text}

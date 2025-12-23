@@ -6,6 +6,7 @@ import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
 import { AuthProvider } from "@/context/AuthContext";
 import { RefreshProvider } from "@/context/RefreshContext";
 import { CallProvider } from "@/context/CallContext";
+import { ThemeProvider } from "next-themes";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
 import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
@@ -62,14 +63,13 @@ import Install from "./pages/Install";
 import MusicDiscovery from "./pages/MusicDiscovery";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import Investors from "./pages/Investors";
+import CreatorDashboard from "./pages/CreatorDashboard";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Set dark mode by default and initialize offline manager + auto-updater
+  // Initialize offline manager + auto-updater
   useEffect(() => {
-    document.documentElement.classList.add('dark');
-    
     // Initialize offline manager
     import('@/lib/offline-manager').then(({ offlineManager: manager }) => {
       // Manager auto-initializes as singleton
@@ -95,17 +95,18 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <RefreshProvider>
-            <AuthProvider>
-              <CallProvider>
-                <Toaster />
-                <IncomingCallListener />
-                <FloatingCallWidget />
-                <ActiveCallIndicator />
-                <MobileInstallModal />
-              <Routes>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem storageKey="feedin-theme">
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <RefreshProvider>
+              <AuthProvider>
+                <CallProvider>
+                  <Toaster />
+                  <IncomingCallListener />
+                  <FloatingCallWidget />
+                  <ActiveCallIndicator />
+                  <MobileInstallModal />
+                <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />
             <Route path="/welcome" element={<Welcome />} />
@@ -176,15 +177,17 @@ const App = () => {
             <Route path="/settings/sessions" element={<SessionManagement />} />
             <Route path="/settings/investors" element={<Investors />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            <Route path="/creator/dashboard" element={<CreatorDashboard />} />
             
-            {/* Catch-all */}
-            <Route path="*" element={<NotFound />} />
-            </Routes>
-              </CallProvider>
-            </AuthProvider>
-          </RefreshProvider>
-        </BrowserRouter>
-      </QueryClientProvider>
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+              </Routes>
+                </CallProvider>
+              </AuthProvider>
+            </RefreshProvider>
+          </BrowserRouter>
+        </QueryClientProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 };
