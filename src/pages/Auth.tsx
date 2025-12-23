@@ -36,7 +36,7 @@ const Auth = () => {
           <div className="flex flex-col items-center mb-8 animate-fade-in">
             <div className="relative mb-4">
               <div className="absolute inset-0 bg-primary/20 blur-xl rounded-full" />
-              <img src={feedinLogo} alt="FEEDIN" className="w-20 h-20 relative z-10" />
+              <img src={feedinLogo} alt="feedin" className="w-32 h-32 relative z-10" />
             </div>
             <h1 className="text-2xl font-bold text-foreground">Reset Password</h1>
             <p className="text-muted-foreground mt-2 text-center text-sm">
@@ -60,11 +60,8 @@ const Auth = () => {
         <div className="flex flex-col items-center mb-6 animate-fade-in">
           <div className="relative mb-4">
             <div className="absolute inset-0 bg-primary/30 blur-2xl rounded-full animate-pulse" />
-            <img src={feedinLogo} alt="FEEDIN" className="w-20 h-20 relative z-10 drop-shadow-lg" />
+            <img src={feedinLogo} alt="feedin" className="w-32 h-32 relative z-10 drop-shadow-lg" />
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Welcome to FEEDIN
-          </h1>
           <p className="text-muted-foreground mt-2 text-sm">
             AI-Powered Social Media Platform
           </p>

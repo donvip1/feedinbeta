@@ -491,7 +491,7 @@ const Feed = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/trending')}
+              onClick={() => navigate('/feed/trending')}
             >
               <TrendingUp className="w-5 h-5" />
             </Button>

@@ -41,11 +41,10 @@ export default function Welcome() {
         )}
 
         {/* Logo/Brand */}
-        <div className="space-y-2">
+        <div className="space-y-4">
           <div className="flex justify-center">
-            <img src={feedinLogo} alt="feedin" className="w-24 h-24 object-contain" />
+            <img src={feedinLogo} alt="feedin" className="w-48 h-48 object-contain" />
           </div>
-          <h1 className="text-4xl font-bold text-foreground">Welcome to feedin</h1>
           <p className="text-muted-foreground text-lg">
             Connect, share, and explore with the world
           </p>
