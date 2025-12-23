@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Radio, Users } from "lucide-react";
+import { Plus, Radio, Users, Mic } from "lucide-react";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateLiveStreamModal } from "@/components/live/CreateLiveStreamModal";
+import { CreateSpaceModal } from "@/components/live/CreateSpaceModal";
 import { LiveStreamCard } from "@/components/live/LiveStreamCard";
+import { SpaceCard } from "@/components/live/SpaceCard";
 import { LiveStreamViewerWebRTC } from "@/components/live/LiveStreamViewerWebRTC";
 import { LiveBroadcaster } from "@/components/live/LiveBroadcaster";
+import { LiveSpaceRoom } from "@/components/live/LiveSpaceRoom";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";

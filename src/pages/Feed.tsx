@@ -20,6 +20,7 @@ import { useViewedPosts } from '@/hooks/useViewedPosts';
 import { useScrollPosition } from '@/hooks/useScrollPosition';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { FeedSkeleton } from '@/components/native/NativeLoadingSpinner';
+import { LiveFeedCard } from '@/components/feed/LiveFeedCard';
 import { feedCache } from '@/lib/feed-cache';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
@@ -33,7 +34,7 @@ const Feed = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
+  const [activeTab, setActiveTab] = useState<'following' | 'forYou' | 'live'>('forYou');
   const { containerRef: scrollContainerRef } = useScrollPosition('feed');
   const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file: File }[]>([]);
@@ -51,6 +52,60 @@ const Feed = () => {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const allVideoPostsRef = useRef<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+
+  // Fetch live content for the Live tab
+  const { data: liveContent, refetch: refetchLive } = useQuery({
+    queryKey: ['feed-live-content'],
+    queryFn: async () => {
+      // Fetch live streams
+      const { data: streams } = await supabase
+        .from('live_streams')
+        .select('id, title, status, viewer_count, thumbnail_url, user_id')
+        .eq('status', 'live')
+        .order('viewer_count', { ascending: false })
+        .limit(20);
+
+      // Fetch live spaces
+      const { data: spaces } = await supabase
+        .from('live_spaces')
+        .select('id, title, status, viewer_count, topic_category, share_link, user_id')
+        .eq('status', 'live')
+        .order('viewer_count', { ascending: false })
+        .limit(20);
+
+      const allUserIds = [
+        ...(streams || []).map(s => s.user_id),
+        ...(spaces || []).map(s => s.user_id)
+      ];
+
+      if (allUserIds.length === 0) return [];
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', allUserIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      const liveItems = [
+        ...(streams || []).map(s => ({
+          ...s,
+          type: 'video' as const,
+          host: profileMap.get(s.user_id) || { display_name: 'Unknown', username: 'unknown', avatar_url: '' }
+        })),
+        ...(spaces || []).map(s => ({
+          ...s,
+          type: 'space' as const,
+          host: profileMap.get(s.user_id) || { display_name: 'Unknown', username: 'unknown', avatar_url: '' }
+        }))
+      ];
+
+      // Sort by viewer count
+      return liveItems.sort((a, b) => (b.viewer_count || 0) - (a.viewer_count || 0));
+    },
+    enabled: activeTab === 'live',
+    refetchInterval: 30000,
+  });
   
   // Offline mode support
   const { isOffline, cachedPosts, lastSyncTime, updateSyncTime } = useOfflineMode(user?.id);
@@ -110,7 +165,8 @@ const Feed = () => {
       if (!user) return [];
 
       // Try cache first for instant display (don't wait for network)
-      const cached = await feedCache.get(activeTab);
+      const cacheKey = activeTab === 'live' ? 'forYou' : activeTab;
+      const cached = await feedCache.get(cacheKey as 'following' | 'forYou');
       if (cached && cached.length > 0) {
         // Set display posts immediately from cache
         setDisplayPosts(cached);
@@ -246,7 +302,8 @@ const Feed = () => {
       allLoadedPostsRef.current = orderedPosts;
       
       // Cache the results
-      feedCache.set(activeTab, orderedPosts);
+      const cacheKeySet = activeTab === 'live' ? 'forYou' : activeTab;
+      feedCache.set(cacheKeySet as 'following' | 'forYou', orderedPosts);
 
       return orderedPosts;
     },
@@ -460,7 +517,7 @@ const Feed = () => {
             onPanelClose={handleNotificationPanelClose}
           />
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setActiveTab('following')}
               className={`text-sm font-semibold transition-all ${
@@ -480,6 +537,20 @@ const Feed = () => {
               }`}
             >
               For You
+            </button>
+            <button
+              onClick={() => setActiveTab('live')}
+              className={`text-sm font-semibold transition-all flex items-center gap-1 ${
+                activeTab === 'live'
+                  ? 'text-foreground'
+                  : 'text-muted-foreground'
+              }`}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+              </span>
+              Live
             </button>
           </div>
 
@@ -522,7 +593,50 @@ const Feed = () => {
           isRefreshing={isRefreshing}
         />
         
-        {feedError && displayPosts.length === 0 ? (
+        {activeTab === 'live' ? (
+          // Live content tab
+          <div className="p-4 space-y-4">
+            {liveContent && liveContent.length > 0 ? (
+              liveContent.map((item) => (
+                <LiveFeedCard
+                  key={item.id}
+                  item={{
+                    ...item,
+                    status: item.status as 'live' | 'ended',
+                    type: item.type as 'video' | 'space'
+                  }}
+                  onClick={() => {
+                    if (item.type === 'video') {
+                      navigate(`/live/stream/${item.id}`);
+                    } else {
+                      navigate(`/live/space/${item.id}`);
+                    }
+                  }}
+                />
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <div className="relative w-24 h-24 mb-6">
+                  <Radio className="w-24 h-24 text-muted-foreground/30" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 bg-red-500/20 rounded-full animate-ping" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-semibold mb-2">No Live Content</h3>
+                <p className="text-muted-foreground mb-6 max-w-xs">
+                  Be the first to go live and share your moment with the world!
+                </p>
+                <Button 
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={() => navigate('/live')}
+                >
+                  <Radio className="w-4 h-4 mr-2" />
+                  Start Streaming
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : feedError && displayPosts.length === 0 ? (
           <div className="p-4">
             <QueryErrorFallback 
               error={feedError as Error} 
@@ -535,17 +649,13 @@ const Feed = () => {
         ) : displayPosts && displayPosts.length > 0 ? (
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
             {displayPosts.map((post) => {
-              // Styled text posts and media posts should be full height
-              // Plain text posts without background should be compact
               const isStyledText = post.media_type === 'text_styled' && post.media_url && post.content;
               const isMedia = post.media_url && post.media_type !== 'text_styled';
-              const isPlainText = !post.media_url && post.content;
               
               const wrapperClass = (isStyledText || isMedia)
                 ? "snap-start snap-always h-[calc(100vh-8rem)] flex items-start" 
                 : "snap-start mb-4";
               
-              // Use _cycleKey if present (for infinite scroll cycles), otherwise use id
               const uniqueKey = post._cycleKey || post.id;
               
               return (
@@ -568,11 +678,9 @@ const Feed = () => {
               );
             })}
             
-            {/* Infinite Scroll Loading Skeleton */}
             {isLoadingMore && <InfiniteScrollSkeleton count={2} />}
           </SectionErrorBoundary>
         ) : isOffline && cachedPosts.length > 0 ? (
-          // Show cached posts when offline
           <SectionErrorBoundary sectionName="Cached Posts" onRetry={() => {}}>
             {cachedPosts.map((post) => {
               const uniqueKey = (post as any)._cycleKey || post.id;
