@@ -1,33 +1,45 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
-  Users, Send, Heart, ThumbsUp, Laugh, X, Gift, 
+  Users, Send, Heart, X, Gift, 
   Volume2, VolumeX, Maximize, Minimize, Flame, 
-  PartyPopper, MessageCircle, Share2, Radio, Home
+  PartyPopper, ThumbsUp, Star, Sparkles, 
+  MessageCircle, Home
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
-import { FlyingChat } from './FlyingChat';
-import { LiveStreamMentionInput } from './LiveStreamMentionInput';
+import { motion, AnimatePresence } from "framer-motion";
+import { LiveGiftModal } from "./LiveGiftModal";
+import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 
 interface LiveStreamViewerWebRTCProps {
   streamId: string;
   onClose: () => void;
 }
 
+// Sexy emoji reactions - TikTok style
+const REACTIONS = [
+  { type: 'heart', emoji: '❤️', icon: Heart, color: 'text-red-500' },
+  { type: 'fire', emoji: '🔥', icon: Flame, color: 'text-orange-500' },
+  { type: 'star', emoji: '⭐', icon: Star, color: 'text-yellow-500' },
+  { type: 'clap', emoji: '👏', icon: PartyPopper, color: 'text-purple-500' },
+  { type: 'like', emoji: '👍', icon: ThumbsUp, color: 'text-blue-500' },
+  { type: 'love', emoji: '😍', icon: Sparkles, color: 'text-pink-500' },
+];
+
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const viewerIdRef = useRef<string>(crypto.randomUUID());
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   
   const [stream, setStream] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
@@ -35,11 +47,16 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [viewerSession, setViewerSession] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [reactions, setReactions] = useState<{ type: string; id: number; x: number }[]>([]);
+  const [reactions, setReactions] = useState<{ type: string; id: number; x: number; y: number }[]>([]);
   const [isConnecting, setIsConnecting] = useState(true);
   const [showChat, setShowChat] = useState(true);
   const [hasVideo, setHasVideo] = useState(false);
-  const [flyingGifts, setFlyingGifts] = useState<{ id: string; gift_type: string; sender_name: string; credit_value: number }[]>([]);
+  const [flyingGifts, setFlyingGifts] = useState<any[]>([]);
+  const [showGiftModal, setShowGiftModal] = useState(false);
+  const [viewers, setViewers] = useState<any[]>([]);
+  const [isChatFocused, setIsChatFocused] = useState(false);
+  
+  const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
   // Fetch stream details
   useEffect(() => {
@@ -56,7 +73,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         return;
       }
 
-      // Fetch profile
       const { data: profileData } = await supabase
         .from("profiles")
         .select("display_name, username, avatar_url")
@@ -72,6 +88,37 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
     fetchStream();
   }, [streamId]);
+
+  // Subscribe to stream status changes - kick viewers when stream ends
+  useEffect(() => {
+    const channel = supabase
+      .channel(`stream-status-${streamId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'live_streams',
+        filter: `id=eq.${streamId}`,
+      }, (payload: any) => {
+        console.log("[Viewer] Stream status changed:", payload.new.status);
+        if (payload.new.status === 'ended') {
+          toast.info("Stream has ended");
+          // Close connection and exit
+          if (pcRef.current) {
+            pcRef.current.close();
+          }
+          setTimeout(() => {
+            onClose();
+            navigate('/live');
+          }, 1500);
+        }
+        setStream((prev: any) => prev ? { ...prev, ...payload.new } : null);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId, onClose, navigate]);
 
   // Join stream as viewer
   useEffect(() => {
@@ -105,6 +152,32 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     };
   }, [streamId]);
 
+  // Fetch active viewers for gift modal
+  useEffect(() => {
+    const fetchViewers = async () => {
+      const { data } = await supabase
+        .from("live_stream_viewers")
+        .select("user_id")
+        .eq("stream_id", streamId)
+        .eq("is_active", true)
+        .not("user_id", "is", null);
+
+      if (data && data.length > 0) {
+        const userIds = data.map(v => v.user_id);
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_url")
+          .in("id", userIds);
+        
+        setViewers(profiles || []);
+      }
+    };
+
+    fetchViewers();
+    const interval = setInterval(fetchViewers, 10000);
+    return () => clearInterval(interval);
+  }, [streamId]);
+
   // WebRTC connection setup with retry mechanism
   useEffect(() => {
     if (stream?.status !== 'live') return;
@@ -126,11 +199,9 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
     pcRef.current = pc;
 
-    // Add transceiver to receive video/audio
     pc.addTransceiver('video', { direction: 'recvonly' });
     pc.addTransceiver('audio', { direction: 'recvonly' });
 
-    // Handle incoming stream
     pc.ontrack = (event) => {
       console.log("[Viewer] Received track:", event.track.kind);
       if (videoRef.current && event.streams[0]) {
@@ -138,7 +209,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         setHasVideo(true);
         setIsConnecting(false);
         
-        // Clear any retry timeouts since we're connected
         if (retryTimeout) clearTimeout(retryTimeout);
         if (connectionTimeout) clearTimeout(connectionTimeout);
         
@@ -153,7 +223,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         retryCount = 0;
       } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         setIsConnecting(true);
-        // Attempt reconnect
         if (retryCount < maxRetries) {
           retryTimeout = setTimeout(() => {
             console.log(`[Viewer] Retrying connection (attempt ${retryCount + 1}/${maxRetries})`);
@@ -164,12 +233,9 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       }
     };
 
-    // Subscribe to broadcast channel
     const channel = supabase
       .channel(`broadcast-${streamId}`, {
-        config: {
-          broadcast: { self: false },
-        }
+        config: { broadcast: { self: false } }
       })
       .on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload.viewerId !== viewerId) return;
@@ -180,7 +246,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
 
-          // Send answer back
           channel.send({
             type: 'broadcast',
             event: 'answer',
@@ -202,12 +267,19 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         }
       })
       .on('broadcast', { event: 'host-ready' }, () => {
-        // Host is signaling they're ready - announce ourselves
         console.log("[Viewer] Host signaled ready, announcing join");
         announceViewerJoin();
+      })
+      .on('broadcast', { event: 'stream-ended' }, () => {
+        console.log("[Viewer] Host ended stream via broadcast");
+        toast.info("Stream has ended");
+        pc.close();
+        setTimeout(() => {
+          onClose();
+          navigate('/live');
+        }, 1500);
       });
 
-    // Function to announce viewer join
     const announceViewerJoin = () => {
       console.log("[Viewer] Announcing join with viewerId:", viewerId);
       channel.send({
@@ -217,7 +289,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       });
     };
 
-    // Send ICE candidates
     pc.onicecandidate = (event) => {
       if (event.candidate) {
         channel.send({
@@ -231,10 +302,8 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     channel.subscribe((status) => {
       if (status === 'SUBSCRIBED') {
         console.log("[Viewer] Subscribed to broadcast channel");
-        // Announce viewer join immediately
         announceViewerJoin();
         
-        // Set a connection timeout - if no video after 10 seconds, retry
         connectionTimeout = setTimeout(() => {
           if (!hasVideo && retryCount < maxRetries) {
             console.log("[Viewer] Connection timeout, retrying...");
@@ -243,7 +312,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           }
         }, 10000);
         
-        // Also retry every 3 seconds initially
         retryTimeout = setTimeout(() => {
           if (!hasVideo) {
             console.log("[Viewer] Initial retry...");
@@ -259,7 +327,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       pc.close();
       supabase.removeChannel(channel);
     };
-  }, [stream?.status, streamId, hasVideo]);
+  }, [stream?.status, streamId, hasVideo, onClose, navigate]);
 
   // Subscribe to comments
   useEffect(() => {
@@ -304,6 +372,13 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     };
   }, [streamId]);
 
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [comments]);
+
   // Subscribe to reactions
   useEffect(() => {
     const channel = supabase
@@ -316,13 +391,49 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       }, (payload: any) => {
         const newReaction = { 
           type: payload.new.reaction_type, 
-          id: Date.now(),
-          x: Math.random() * 60 + 20,
+          id: Date.now() + Math.random(),
+          x: Math.random() * 40 + 55, // Right side
+          y: Math.random() * 30 + 40,
         };
         setReactions(prev => [...prev, newReaction]);
         setTimeout(() => {
           setReactions(prev => prev.filter(r => r.id !== newReaction.id));
         }, 3000);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId]);
+
+  // Subscribe to gifts
+  useEffect(() => {
+    const channel = supabase
+      .channel(`gifts-${streamId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'live_stream_gifts',
+        filter: `stream_id=eq.${streamId}`,
+      }, async (payload: any) => {
+        const { data: senderProfile } = await supabase
+          .from("profiles")
+          .select("display_name")
+          .eq("id", payload.new.sender_id)
+          .single();
+
+        const newGift = {
+          id: payload.new.id,
+          gift_type: payload.new.gift_type,
+          sender_name: senderProfile?.display_name || 'Someone',
+          credit_value: payload.new.credit_value,
+        };
+        
+        setFlyingGifts(prev => [...prev, newGift]);
+        setTimeout(() => {
+          setFlyingGifts(prev => prev.filter(g => g.id !== newGift.id));
+        }, 4000);
       })
       .subscribe();
 
@@ -347,11 +458,27 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     });
 
     setNewComment("");
+    chatInputRef.current?.blur();
   };
 
   const sendReaction = async (reactionType: string) => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      toast.error("Please log in to react");
+      return;
+    }
+
+    // Add immediate local reaction for feedback
+    const localReaction = {
+      type: reactionType,
+      id: Date.now() + Math.random(),
+      x: Math.random() * 40 + 55,
+      y: Math.random() * 30 + 40,
+    };
+    setReactions(prev => [...prev, localReaction]);
+    setTimeout(() => {
+      setReactions(prev => prev.filter(r => r.id !== localReaction.id));
+    }, 3000);
 
     await supabase.from("live_stream_reactions").insert({
       stream_id: streamId,
@@ -361,14 +488,16 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   };
 
   const getReactionEmoji = (type: string) => {
-    switch (type) {
-      case 'heart': return '❤️';
-      case 'like': return '👍';
-      case 'laugh': return '😂';
-      case 'fire': return '🔥';
-      case 'clap': return '👏';
-      default: return '❤️';
-    }
+    return REACTIONS.find(r => r.type === type)?.emoji || '❤️';
+  };
+
+  const getGiftEmoji = (type: string) => {
+    const giftEmojis: Record<string, string> = {
+      heart: '❤️', star: '⭐', fire: '🔥', lightning: '⚡',
+      crown: '👑', diamond: '💎', rocket: '🚀', universe: '🌌',
+      credits: '💰',
+    };
+    return giftEmojis[type] || '🎁';
   };
 
   if (!stream) {
@@ -380,123 +509,223 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   }
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-50 bg-black",
-      !isFullscreen && "flex flex-col"
-    )}>
-      {/* Video Container */}
-      <div className="relative flex-1 bg-black flex items-center justify-center">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isMuted}
-          className="w-full h-full object-contain"
-        />
+    <div className="fixed inset-0 z-50 bg-black">
+      {/* Full Screen Video */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted={isMuted}
+        className="absolute inset-0 w-full h-full object-cover"
+      />
 
-        {/* Loading/Waiting State */}
-        {(isConnecting || stream.status !== 'live') && (
-          <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
-            <div className="text-center">
-              {stream.status === 'live' ? (
-                <>
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                  <p className="text-white">Connecting to stream...</p>
-                </>
-              ) : stream.status === 'scheduled' ? (
-                <>
-                  <Radio className="w-16 h-16 mx-auto mb-4 text-primary" />
-                  <h3 className="text-xl font-bold text-white mb-2">Stream Not Started Yet</h3>
-                  <p className="text-muted-foreground">
-                    {stream.scheduled_start 
-                      ? `Starts ${formatDistanceToNow(new Date(stream.scheduled_start), { addSuffix: true })}`
-                      : "Waiting for host to start..."}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <Radio className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-                  <h3 className="text-xl font-bold text-white mb-2">Stream Ended</h3>
-                  <p className="text-muted-foreground">This stream has ended</p>
-                </>
-              )}
-            </div>
+      {/* Loading/Waiting State */}
+      {(isConnecting || stream.status !== 'live') && (
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+          <div className="text-center">
+            {stream.status === 'live' ? (
+              <>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+                <p className="text-white">Connecting to stream...</p>
+              </>
+            ) : stream.status === 'scheduled' ? (
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 text-primary">📡</div>
+                <h3 className="text-xl font-bold text-white mb-2">Stream Not Started Yet</h3>
+                <p className="text-muted-foreground">
+                  {stream.scheduled_start 
+                    ? `Starts ${formatDistanceToNow(new Date(stream.scheduled_start), { addSuffix: true })}`
+                    : "Waiting for host to start..."}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-5xl mb-4">📺</div>
+                <h3 className="text-xl font-bold text-white mb-2">Stream Ended</h3>
+                <p className="text-muted-foreground">This stream has ended</p>
+                <Button className="mt-4" onClick={() => navigate('/live')}>
+                  Browse Other Streams
+                </Button>
+              </>
+            )}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Stream Info Header */}
-        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar className="border-2 border-primary">
-                <AvatarImage src={stream.profiles?.avatar_url} />
-                <AvatarFallback>{stream.profiles?.display_name?.[0] || 'U'}</AvatarFallback>
-              </Avatar>
-              <div>
-                <h2 className="font-bold text-white">{stream.profiles?.display_name}</h2>
-                <div className="flex items-center gap-2">
-                  {stream.status === 'live' && (
-                    <Badge variant="destructive" className="animate-pulse">LIVE</Badge>
-                  )}
-                  <span className="text-sm text-white/80 flex items-center gap-1">
-                    <Users className="w-3 h-3" />
-                    {stream.viewer_count || 0}
-                  </span>
-                </div>
+      {/* Top Header Gradient */}
+      <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-4 z-20 safe-area-top">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Avatar className="border-2 border-primary w-10 h-10">
+              <AvatarImage src={stream.profiles?.avatar_url} />
+              <AvatarFallback>{stream.profiles?.display_name?.[0] || 'U'}</AvatarFallback>
+            </Avatar>
+            <div>
+              <h2 className="font-bold text-white text-sm">{stream.profiles?.display_name}</h2>
+              <div className="flex items-center gap-2">
+                {stream.status === 'live' && (
+                  <Badge variant="destructive" className="animate-pulse text-[10px] h-5">LIVE</Badge>
+                )}
+                <span className="text-xs text-white/80 flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  {stream.viewer_count || 0}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20"
-                onClick={() => navigate('/feed')}
-                title="Go to Feed"
-              >
-                <Home className="w-5 h-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20"
-                onClick={onClose}
-              >
-                <X className="w-6 h-6" />
-              </Button>
-            </div>
           </div>
-          <p className="text-white/80 text-sm mt-2 line-clamp-1">{stream.title}</p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 h-9 w-9"
+              onClick={() => navigate('/feed')}
+            >
+              <Home className="w-5 h-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20 h-9 w-9"
+              onClick={onClose}
+            >
+              <X className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
+        <p className="text-white/80 text-xs mt-2 line-clamp-1">{stream.title}</p>
+      </div>
 
-        {/* Flying Chat Overlay */}
-        {stream.status === 'live' && (
-          <FlyingChat 
-            messages={comments} 
-            gifts={flyingGifts}
-            maxMessages={8}
-          />
-        )}
+      {/* Floating Chat Overlay - TikTok Style */}
+      {showChat && stream.status === 'live' && (
+        <div 
+          className="absolute left-0 right-20 z-20 pointer-events-none"
+          style={{
+            bottom: isKeyboardOpen ? `${keyboardHeight + 60}px` : '120px',
+            maxHeight: '40vh',
+          }}
+        >
+          <div 
+            ref={chatScrollRef}
+            className="overflow-y-auto px-3 space-y-2 pointer-events-auto"
+            style={{ maxHeight: '40vh' }}
+          >
+            <AnimatePresence>
+              {comments.slice(-15).map((comment, index) => (
+                <motion.div
+                  key={comment.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-start gap-2"
+                >
+                  <Avatar className="w-7 h-7 shrink-0 border border-white/20">
+                    <AvatarImage src={comment.profiles?.avatar_url} />
+                    <AvatarFallback className="text-[10px] bg-primary/50">
+                      {comment.profiles?.display_name?.[0] || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="bg-black/50 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[80%]">
+                    <span className="text-primary text-xs font-semibold">
+                      {comment.profiles?.display_name || 'Anonymous'}
+                    </span>
+                    <p className="text-white text-sm break-words">{comment.content}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      )}
 
-        {/* Floating Reactions */}
+      {/* Flying Gift Notifications */}
+      <AnimatePresence>
+        {flyingGifts.map((gift) => (
+          <motion.div
+            key={gift.id}
+            initial={{ opacity: 0, scale: 0, x: '50%', y: '50%' }}
+            animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            className="absolute top-1/3 left-1/2 -translate-x-1/2 z-30 pointer-events-none"
+          >
+            <div className="bg-gradient-to-r from-amber-500/90 to-orange-500/90 backdrop-blur-sm rounded-2xl px-6 py-4 flex items-center gap-3 shadow-2xl">
+              <span className="text-4xl">{getGiftEmoji(gift.gift_type)}</span>
+              <div>
+                <p className="text-white font-bold">{gift.sender_name}</p>
+                <p className="text-white/80 text-sm">sent {gift.gift_type} ({gift.credit_value} credits)</p>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Floating Reactions */}
+      <AnimatePresence>
         {reactions.map((reaction) => (
-          <div
+          <motion.div
             key={reaction.id}
-            className="absolute bottom-32 text-4xl pointer-events-none"
+            initial={{ opacity: 1, y: 0, scale: 1 }}
+            animate={{ 
+              opacity: 0, 
+              y: -200, 
+              scale: [1, 1.4, 1.2],
+              x: [0, Math.random() * 40 - 20, Math.random() * 60 - 30]
+            }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 3, ease: "easeOut" }}
+            className="absolute text-4xl pointer-events-none z-30"
             style={{
-              left: `${reaction.x}%`,
-              animation: 'floatUp 3s ease-out forwards',
+              right: `${100 - reaction.x}%`,
+              bottom: `${reaction.y}%`,
             }}
           >
             {getReactionEmoji(reaction.type)}
-          </div>
+          </motion.div>
         ))}
+      </AnimatePresence>
 
+      {/* Right Side Reaction Buttons */}
+      <div 
+        className="absolute right-3 flex flex-col gap-2 z-20"
+        style={{
+          bottom: isKeyboardOpen ? `${keyboardHeight + 130}px` : '190px',
+        }}
+      >
+        {REACTIONS.map((reaction) => (
+          <motion.button
+            key={reaction.type}
+            whileTap={{ scale: 0.85 }}
+            className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10 active:bg-white/20"
+            onClick={() => sendReaction(reaction.type)}
+          >
+            <span className="text-2xl">{reaction.emoji}</span>
+          </motion.button>
+        ))}
+        
+        {/* Gift Button */}
+        <motion.button
+          whileTap={{ scale: 0.85 }}
+          className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg"
+          onClick={() => setShowGiftModal(true)}
+        >
+          <Gift className="w-6 h-6 text-white" />
+        </motion.button>
+      </div>
+
+      {/* Bottom Controls */}
+      <div 
+        className="absolute left-0 right-0 bg-gradient-to-t from-black/80 to-transparent z-20"
+        style={{
+          bottom: isKeyboardOpen ? `${keyboardHeight}px` : '0',
+          paddingBottom: isKeyboardOpen ? '8px' : 'max(env(safe-area-inset-bottom), 16px)',
+        }}
+      >
         {/* Video Controls */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-black/60 backdrop-blur-sm rounded-full px-3 py-2">
+        <div className="flex items-center justify-center gap-2 mb-3 px-4">
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full text-white hover:bg-white/20"
+            className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
             onClick={() => setIsMuted(!isMuted)}
           >
             {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
@@ -504,118 +733,55 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full text-white hover:bg-white/20"
+            className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
             onClick={() => setShowChat(!showChat)}
           >
-            <MessageCircle className="w-5 h-5" />
+            <MessageCircle className={cn("w-5 h-5", showChat && "text-primary")} />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="rounded-full text-white hover:bg-white/20"
+            className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
             onClick={() => setIsFullscreen(!isFullscreen)}
           >
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </Button>
         </div>
 
-        {/* Reaction Buttons */}
-        <div className="absolute right-4 bottom-32 flex flex-col gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full bg-white/10 text-white hover:bg-white/20 hover:scale-110 transition-transform"
-            onClick={() => sendReaction('heart')}
-          >
-            <Heart className="w-6 h-6" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full bg-white/10 text-white hover:bg-white/20 hover:scale-110 transition-transform"
-            onClick={() => sendReaction('fire')}
-          >
-            <Flame className="w-6 h-6" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full bg-white/10 text-white hover:bg-white/20 hover:scale-110 transition-transform"
-            onClick={() => sendReaction('clap')}
-          >
-            <PartyPopper className="w-6 h-6" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full bg-white/10 text-white hover:bg-white/20 hover:scale-110 transition-transform"
-            onClick={() => sendReaction('like')}
-          >
-            <ThumbsUp className="w-6 h-6" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full bg-primary text-white hover:bg-primary/80 hover:scale-110 transition-transform"
-          >
-            <Gift className="w-6 h-6" />
-          </Button>
-        </div>
+        {/* Chat Input */}
+        {showChat && (
+          <div className="flex gap-2 px-3 pb-2">
+            <Input
+              ref={chatInputRef}
+              placeholder="Say something..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && sendComment()}
+              onFocus={() => setIsChatFocused(true)}
+              onBlur={() => setIsChatFocused(false)}
+              className="flex-1 h-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 rounded-full px-4"
+            />
+            <Button 
+              size="icon" 
+              onClick={sendComment} 
+              className="h-10 w-10 rounded-full bg-primary shrink-0"
+              disabled={!newComment.trim()}
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Chat Section */}
-      {!isFullscreen && showChat && (
-        <Card className="h-64 rounded-none border-t bg-background/95 backdrop-blur">
-          <CardContent className="p-3 h-full flex flex-col">
-            <ScrollArea className="flex-1 mb-2">
-              <div className="space-y-2">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-2 items-start">
-                    <Avatar className="w-6 h-6 shrink-0">
-                      <AvatarImage src={comment.profiles?.avatar_url} />
-                      <AvatarFallback className="text-xs">
-                        {comment.profiles?.display_name?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-xs text-primary">
-                        {comment.profiles?.display_name || 'Anonymous'}
-                      </span>
-                      <span className="text-sm ml-2 break-words">{comment.content}</span>
-                    </div>
-                  </div>
-                ))}
-                {comments.length === 0 && (
-                  <p className="text-center text-muted-foreground text-sm py-4">
-                    No comments yet. Be the first!
-                  </p>
-                )}
-              </div>
-            </ScrollArea>
-
-            <div className="flex gap-2">
-              <Input
-                placeholder="Send a message..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendComment()}
-                className="flex-1 h-9"
-              />
-              <Button size="sm" onClick={sendComment} className="h-9 px-3">
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <style>{`
-        @keyframes floatUp {
-          0% { opacity: 1; transform: translateY(0) scale(1); }
-          50% { opacity: 0.8; transform: translateY(-50px) scale(1.2); }
-          100% { opacity: 0; transform: translateY(-150px) scale(0.8); }
-        }
-      `}</style>
+      {/* Gift Modal */}
+      <LiveGiftModal
+        isOpen={showGiftModal}
+        onClose={() => setShowGiftModal(false)}
+        streamId={streamId}
+        hostId={stream.user_id}
+        viewers={viewers}
+        isHost={false}
+      />
     </div>
   );
 };

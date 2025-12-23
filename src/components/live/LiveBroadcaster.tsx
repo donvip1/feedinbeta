@@ -116,6 +116,18 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
 
   // Stop broadcasting
   const stopBroadcast = async () => {
+    // Send stream-ended broadcast to all viewers FIRST
+    const endChannel = supabase.channel(`broadcast-${streamId}-end`);
+    await endChannel.subscribe();
+    await supabase.channel(`broadcast-${streamId}`).send({
+      type: 'broadcast',
+      event: 'stream-ended',
+      payload: { streamId },
+    });
+    
+    // Give viewers a moment to receive the message
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     // Stop all tracks
     streamRef.current?.getTracks().forEach(track => track.stop());
     
@@ -132,6 +144,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       })
       .eq("id", streamId);
 
+    await supabase.removeChannel(endChannel);
     setIsLive(false);
     onClose();
   };
