@@ -7,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useVideoPreloader } from '@/hooks/useVideoPreloader';
 import { videoPreloadManager } from '@/lib/video-preload-manager';
-
+import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 interface Post {
   id: string;
   user_id: string;
@@ -73,6 +73,7 @@ export default function FullscreenMediaViewer({
 }: FullscreenMediaViewerProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { haptic } = useNativeFeatures();
   const [currentPostIndex, setCurrentPostIndex] = useState(0);
   const [isMuted, setIsMuted] = useState(initialMuted);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -202,13 +203,15 @@ export default function FullscreenMediaViewer({
     if (velocity > VELOCITY_THRESHOLD || Math.abs(deltaY) > SWIPE_THRESHOLD) {
       if (deltaY > 0 && currentPostIndex < navigablePosts.length - 1) {
         // Swipe up - next post
+        haptic('light');
         scrollToIndex(currentPostIndex + 1);
       } else if (deltaY < 0 && currentPostIndex > 0) {
         // Swipe down - previous post
+        haptic('light');
         scrollToIndex(currentPostIndex - 1);
       }
     }
-  }, [currentPostIndex, navigablePosts.length, scrollToIndex]);
+  }, [currentPostIndex, navigablePosts.length, scrollToIndex, haptic]);
 
   // Initialize scroll position
   useEffect(() => {
@@ -298,7 +301,7 @@ export default function FullscreenMediaViewer({
     }
   }, [isOpen, isVideo, currentPostIndex]);
 
-  // Keyboard navigation
+  // Keyboard navigation with haptic feedback
   useEffect(() => {
     if (!isOpen) return;
 
@@ -306,11 +309,13 @@ export default function FullscreenMediaViewer({
       if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
         e.preventDefault();
         if (currentPostIndex < navigablePosts.length - 1) {
+          haptic('light');
           scrollToIndex(currentPostIndex + 1);
         }
       } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
         e.preventDefault();
         if (currentPostIndex > 0) {
+          haptic('light');
           scrollToIndex(currentPostIndex - 1);
         }
       } else if (e.key === 'Escape') {
@@ -325,7 +330,7 @@ export default function FullscreenMediaViewer({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, currentPostIndex, navigablePosts.length, isVideo, scrollToIndex, onClose]);
+  }, [isOpen, currentPostIndex, navigablePosts.length, isVideo, scrollToIndex, onClose, haptic]);
 
   // Video time update
   useEffect(() => {
@@ -379,12 +384,14 @@ export default function FullscreenMediaViewer({
     // Tap on right third → next post
     if (tapX > screenWidth * 0.66) {
       if (currentPostIndex < navigablePosts.length - 1) {
+        haptic('light');
         scrollToIndex(currentPostIndex + 1);
       }
     }
     // Tap on left third → previous post
     else if (tapX < screenWidth * 0.33) {
       if (currentPostIndex > 0) {
+        haptic('light');
         scrollToIndex(currentPostIndex - 1);
       }
     }
@@ -392,7 +399,7 @@ export default function FullscreenMediaViewer({
     else {
       setShowControls(prev => !prev);
     }
-  }, [currentPostIndex, navigablePosts.length, scrollToIndex]);
+  }, [currentPostIndex, navigablePosts.length, scrollToIndex, haptic]);
 
   const toggleMute = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();

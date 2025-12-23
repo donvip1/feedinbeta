@@ -29,12 +29,23 @@ import { useOfflineMode } from '@/hooks/useOfflineMode';
 import { OfflineBanner } from '@/components/shared/OfflineBanner';
 import { InfiniteScrollSkeleton } from '@/components/feed/InfiniteScrollSkeleton';
 import { PullToRefresh } from '@/components/feed/PullToRefresh';
+import { SwipeableTabs } from '@/components/feed/SwipeableTabs';
+import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 
 const Feed = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { haptic } = useNativeFeatures();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou' | 'live'>('forYou');
+  
+  // Tab configuration for swipe gestures
+  const tabs: ('following' | 'forYou' | 'live')[] = ['following', 'forYou', 'live'];
+  const activeTabIndex = tabs.indexOf(activeTab);
+  
+  const handleTabChange = useCallback((index: number) => {
+    setActiveTab(tabs[index]);
+  }, []);
   const { containerRef: scrollContainerRef } = useScrollPosition('feed');
   const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file: File }[]>([]);
@@ -517,9 +528,12 @@ const Feed = () => {
             onPanelClose={handleNotificationPanelClose}
           />
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative">
             <button
-              onClick={() => setActiveTab('following')}
+              onClick={() => {
+                haptic('selection');
+                setActiveTab('following');
+              }}
               className={`text-sm font-semibold transition-all ${
                 activeTab === 'following'
                   ? 'text-foreground'
@@ -529,7 +543,10 @@ const Feed = () => {
               Following
             </button>
             <button
-              onClick={() => setActiveTab('forYou')}
+              onClick={() => {
+                haptic('selection');
+                setActiveTab('forYou');
+              }}
               className={`text-sm font-semibold transition-all ${
                 activeTab === 'forYou'
                   ? 'text-foreground'
@@ -539,7 +556,10 @@ const Feed = () => {
               For You
             </button>
             <button
-              onClick={() => setActiveTab('live')}
+              onClick={() => {
+                haptic('selection');
+                setActiveTab('live');
+              }}
               className={`transition-all p-1 rounded-full ${
                 activeTab === 'live'
                   ? 'bg-red-500/10'
@@ -552,6 +572,14 @@ const Feed = () => {
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
               </span>
             </button>
+            {/* Sliding tab indicator */}
+            <div 
+              className="absolute -bottom-2 h-0.5 bg-primary transition-all duration-200 ease-out"
+              style={{ 
+                width: activeTab === 'live' ? '12px' : '50px',
+                left: activeTab === 'following' ? '0' : activeTab === 'forYou' ? '70px' : '140px'
+              }}
+            />
           </div>
 
           <div className="flex items-center gap-2">
@@ -581,17 +609,22 @@ const Feed = () => {
         </div>
       </div>
 
-      <div
-        ref={containerRef}
-        className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth native-scroll-container relative"
-        data-scrollable="true"
+      <SwipeableTabs
+        activeIndex={activeTabIndex}
+        onTabChange={handleTabChange}
+        tabCount={tabs.length}
       >
-        {/* Pull to Refresh Indicator */}
-        <PullToRefresh 
-          pullDistance={pullDistance}
-          pullProgress={pullProgress}
-          isRefreshing={isRefreshing}
-        />
+        <div
+          ref={containerRef}
+          className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth native-scroll-container relative"
+          data-scrollable="true"
+        >
+          {/* Pull to Refresh Indicator */}
+          <PullToRefresh 
+            pullDistance={pullDistance}
+            pullProgress={pullProgress}
+            isRefreshing={isRefreshing}
+          />
         
         {activeTab === 'live' ? (
           // Live content tab
@@ -703,7 +736,8 @@ const Feed = () => {
             })}
           </SectionErrorBoundary>
         ) : null}
-      </div>
+        </div>
+      </SwipeableTabs>
 
       <BottomNav hidden={isCommentsOpen || !showNav || postStep !== null} />
       
