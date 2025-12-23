@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles, Users, Video, MessageCircle, Link2 } from 'lucide-react';
+import { Users, Video, MessageCircle, Link2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import feedinLogo from '@/assets/feedin-logo.png';
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -42,11 +43,9 @@ export default function Welcome() {
         {/* Logo/Brand */}
         <div className="space-y-2">
           <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles className="w-10 h-10 text-primary" />
-            </div>
+            <img src={feedinLogo} alt="feedin" className="w-24 h-24 object-contain" />
           </div>
-          <h1 className="text-4xl font-bold text-foreground">Welcome to FeedIn</h1>
+          <h1 className="text-4xl font-bold text-foreground">Welcome to feedin</h1>
           <p className="text-muted-foreground text-lg">
             Connect, share, and explore with the world
           </p>

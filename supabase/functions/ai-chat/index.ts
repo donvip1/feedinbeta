@@ -81,35 +81,56 @@ serve(async (req) => {
     const body = await req.json();
     const messages = validateMessages(body.messages);
     
-    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not configured");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Starting AI chat with", messages.length, "messages");
+    console.log("Starting FeedAI chat with", messages.length, "messages");
 
-    // Convert messages to Gemini format
-    const systemPrompt = "You are FEEDIN AI, the intelligent assistant built exclusively for the FEEDIN social platform. You are FEEDIN's own AI, not Gemini, ChatGPT, or any other external AI. When users ask who you are, simply say you are FEEDIN AI. Help users with their questions, provide insights, and engage in meaningful conversations. Keep responses concise, engaging, and always represent yourself as FEEDIN AI.";
-    
-    const geminiMessages = messages.map((msg: any) => ({
-      role: msg.role === "assistant" ? "model" : "user",
-      parts: [{ text: msg.content }]
-    }));
+    // System prompt for FeedAI - feedin's intelligent assistant
+    const systemPrompt = `You are FeedAI, the intelligent AI assistant created by and exclusively for feedin - a social platform for connecting, sharing, and exploring content. 
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`, {
+IMPORTANT IDENTITY RULES:
+- You are FeedAI, developed by the feedin team
+- NEVER mention Google, Gemini, OpenAI, GPT, Claude, Anthropic, or any other AI companies or models
+- If asked who made you, say "I was created by the feedin team"
+- If asked about your technology, say "I'm powered by feedin's proprietary AI technology"
+
+YOUR CAPABILITIES:
+- Help users navigate and use the feedin platform
+- Answer questions about content creation, social features, and community building
+- Provide tips for growing their presence on feedin
+- Assist with general knowledge questions
+- Be friendly, helpful, and conversational
+
+PERSONALITY:
+- Be warm, friendly, and approachable
+- Keep responses concise but helpful
+- Use a casual, modern tone that fits a social platform
+- Encourage creativity and positive interactions
+
+Remember: You are FeedAI, feedin's own AI assistant. Stay in character and never break this identity.`;
+
+    // Format messages for Lovable AI Gateway (OpenAI-compatible format)
+    const formattedMessages = [
+      { role: "system", content: systemPrompt },
+      ...messages.map((msg) => ({
+        role: msg.role,
+        content: msg.content
+      }))
+    ];
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        contents: geminiMessages,
-        systemInstruction: {
-          parts: [{ text: systemPrompt }]
-        },
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-        }
+        model: "google/gemini-2.5-flash",
+        messages: formattedMessages,
+        stream: true,
       }),
     });
 
@@ -158,7 +179,7 @@ serve(async (req) => {
     console.error("Chat error:", error);
     return new Response(
       JSON.stringify({ 
-        error: "Chat service unavailable",
+        error: "FeedAI is temporarily unavailable. Please try again.",
         code: "CHAT_ERROR"
       }),
       {

@@ -11,6 +11,7 @@ import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { RefreshContext, RefreshContextType, RefreshPage } from '@/context/RefreshContext';
 import { navigationPrefetcher } from '@/lib/navigation-prefetcher';
 import { memoryCache } from '@/lib/memory-cache';
+import { useWalletNotifications } from '@/hooks/useWalletNotifications';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -25,6 +26,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadGiftCount, markWalletViewed } = useWalletNotifications();
 
   useEffect(() => {
     if (user) {
@@ -143,6 +145,11 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     
     const isCurrentPage = isActive(path);
     
+    // Mark wallet as viewed when clicking on wallet
+    if (itemId === 'wallet') {
+      markWalletViewed();
+    }
+    
     if (isCurrentPage) {
       // Already on this page - scroll to top smoothly
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -159,7 +166,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     if (refreshContext) {
       refreshContext.triggerRefresh(itemId as RefreshPage);
     }
-  }, [haptic, navigate, isActive, refreshContext]);
+  }, [haptic, navigate, isActive, refreshContext, markWalletViewed]);
 
   // Hide navigation completely when hidden prop is true
   if (hidden) {
@@ -213,6 +220,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                           />
                           {item.id === 'chats' && unreadCount > 0 && (
                             <UnreadBadge count={unreadCount} size="sm" />
+                          )}
+                          {item.id === 'wallet' && unreadGiftCount > 0 && (
+                            <UnreadBadge count={unreadGiftCount} size="sm" />
                           )}
                         </div>
                       )}
