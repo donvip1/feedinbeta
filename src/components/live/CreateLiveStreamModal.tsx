@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Video, Sparkles, Crown, Unlock } from "lucide-react";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { useNavigation } from "@/context/NavigationContext";
 
 // ADMIN CONFIG: Set to true to restrict live streaming to premium users only
 // When false, all users can create live streams (current default for launch)
@@ -21,12 +22,23 @@ interface CreateLiveStreamModalProps {
 }
 
 export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: CreateLiveStreamModalProps) => {
+  const { setHideBottomNav } = useNavigation();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [isPremium, setIsPremium] = useState(false);
   const [loading, setLoading] = useState(false);
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
+
+  // Hide bottom navigation when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      setHideBottomNav(true);
+    } else {
+      setHideBottomNav(false);
+    }
+    return () => setHideBottomNav(false);
+  }, [isOpen, setHideBottomNav]);
 
   // Check if user can create streams
   const canCreateStream = !REQUIRE_PREMIUM_FOR_STREAMING || userIsPremium;
