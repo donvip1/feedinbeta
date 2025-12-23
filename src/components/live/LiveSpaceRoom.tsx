@@ -451,19 +451,49 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/live/space/${space?.share_link || spaceId}`;
     
-    if (navigator.share) {
+    // Try native share first (mobile devices)
+    if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
       try {
         await navigator.share({
           title: space?.title || 'Live Space',
           text: `Join my live space: ${space?.title}`,
           url: shareUrl,
         });
-      } catch {
-        // User cancelled
+        return;
+      } catch (error: any) {
+        // If user cancelled, don't fall through to clipboard
+        if (error?.name === 'AbortError') return;
       }
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success('Link copied to clipboard!');
+    }
+    
+    // Fallback to clipboard with multiple methods
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          toast.success('Link copied to clipboard!');
+        } else {
+          toast.error('Could not copy link. Please copy manually: ' + shareUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast.error('Could not copy link. Please copy manually: ' + shareUrl);
     }
   };
 

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { 
   Video, VideoOff, Mic, MicOff, Camera, FlipHorizontal,
   Users, Send, Heart, X, Sparkles, Gift, MessageCircle,
-  Settings, Maximize, Minimize, Radio, UserPlus, Coins
+  Settings, Maximize, Minimize, Radio, UserPlus, Coins, Share2
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -408,6 +408,55 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
+  const handleShare = async () => {
+    const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
+    
+    // Try native share first (mobile devices)
+    if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({
+          title: stream?.title || 'Live Stream',
+          text: `Watch my live stream: ${stream?.title}`,
+          url: shareUrl,
+        });
+        return;
+      } catch (error: any) {
+        // If user cancelled, don't fall through to clipboard
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    
+    // Fallback to clipboard with multiple methods
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          toast.success('Link copied to clipboard!');
+        } else {
+          toast.error('Could not copy link. Please copy manually: ' + shareUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast.error('Could not copy link. Please copy manually: ' + shareUrl);
+    }
+  };
+
   return (
     <div className={cn(
       "fixed inset-0 z-50 bg-black",
@@ -497,6 +546,14 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         {/* Host Action Buttons */}
         {isLive && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full bg-green-500/80 hover:bg-green-600"
+              onClick={handleShare}
+            >
+              <Share2 className="w-5 h-5 text-white" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
