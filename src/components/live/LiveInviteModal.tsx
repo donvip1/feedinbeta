@@ -16,6 +16,8 @@ interface LiveInviteModalProps {
   isOpen: boolean;
   onClose: () => void;
   streamId: string;
+  currentCoHostCount?: number;
+  maxCoHosts?: number;
 }
 
 interface PendingInvite {
@@ -30,7 +32,7 @@ interface PendingInvite {
   };
 }
 
-export const LiveInviteModal = ({ isOpen, onClose, streamId }: LiveInviteModalProps) => {
+export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount = 0, maxCoHosts = 4 }: LiveInviteModalProps) => {
   const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -116,6 +118,12 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId }: LiveInviteModalPr
   const handleInvite = async (userId: string) => {
     if (!user) return;
 
+    // Check co-host limit
+    if (currentCoHostCount + pendingInvites.length >= maxCoHosts) {
+      toast.error(`Maximum ${maxCoHosts} co-hosts allowed`);
+      return;
+    }
+
     setInviting(userId);
     try {
       const { error } = await supabase.from("live_stream_invites").insert({
@@ -152,17 +160,27 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId }: LiveInviteModalPr
     }
   };
 
+  const canInviteMore = currentCoHostCount + pendingInvites.length < maxCoHosts;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-primary" />
-            Invite Co-Host
+            Invite Co-Host ({currentCoHostCount}/{maxCoHosts})
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Capacity Warning */}
+          {!canInviteMore && (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+              <p className="text-sm text-amber-600">
+                Maximum {maxCoHosts} co-hosts reached. Remove a co-host to invite more.
+              </p>
+            </div>
+          )}
           {/* Search */}
           <div>
             <Label>Search by username</Label>

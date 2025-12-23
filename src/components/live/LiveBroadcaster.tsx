@@ -9,23 +9,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { 
-  Video, VideoOff, Mic, MicOff, Camera, FlipHorizontal,
-  Users, Send, Heart, X, Sparkles, Gift, MessageCircle,
-  Settings, Maximize, Minimize, Radio, UserPlus, Coins, Share2, Home
+  Video, VideoOff, Mic, MicOff, FlipHorizontal,
+  Users, Send, X, Gift, MessageCircle,
+  Maximize, Minimize, Radio, UserPlus, Coins, Share2, Home
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { LiveInviteModal } from "./LiveInviteModal";
 import { useNavigation } from '@/context/NavigationContext';
 import { useNavigate } from 'react-router-dom';
 import { FlyingChat } from './FlyingChat';
-import { LiveStreamMentionInput } from './LiveStreamMentionInput';
+import { ViewerListPanel } from './ViewerListPanel';
+import { motion, AnimatePresence } from "framer-motion";
 
 interface LiveBroadcasterProps {
   streamId: string;
   onClose: () => void;
 }
+
+// Reaction emojis
+const REACTION_EMOJIS: Record<string, string> = {
+  heart: '❤️',
+  like: '👍',
+  laugh: '😂',
+  fire: '🔥',
+  clap: '👏',
+  love: '😍',
+  star: '⭐',
+};
 
 export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => {
   const { user } = useAuth();
@@ -34,6 +45,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const viewersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   
   const [stream, setStream] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
@@ -43,7 +55,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
-  const [reactions, setReactions] = useState<{ type: string; id: number }[]>([]);
+  const [reactions, setReactions] = useState<{ type: string; id: number; x: number; y: number }[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
@@ -51,6 +63,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [viewers, setViewers] = useState<any[]>([]);
   const [totalGiftsReceived, setTotalGiftsReceived] = useState(0);
   const [flyingGifts, setFlyingGifts] = useState<{ id: string; gift_type: string; sender_name: string; credit_value: number }[]>([]);
+  const [coHosts, setCoHosts] = useState<string[]>([]);
 
   // Hide bottom navigation when broadcasting
   useEffect(() => {
@@ -327,23 +340,49 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
-  // Subscribe to comments
+  // Subscribe to comments - fetch profiles separately for reliability
   useEffect(() => {
     const fetchComments = async () => {
-      const { data } = await supabase
+      const { data: commentsData } = await supabase
         .from("live_stream_comments")
-        .select("*, profiles:user_id(display_name, username, avatar_url)")
+        .select("*")
         .eq("stream_id", streamId)
         .order("created_at", { ascending: false })
         .limit(50);
 
-      if (data) setComments(data.reverse());
+      if (!commentsData || commentsData.length === 0) {
+        setComments([]);
+        return;
+      }
+
+      // Fetch profiles separately
+      const userIds = [...new Set(commentsData.map(c => c.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, display_name, username, avatar_url")
+        .in("id", userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      const commentsWithProfiles = commentsData.map(comment => ({
+        ...comment,
+        profiles: profileMap.get(comment.user_id) || null,
+      }));
+
+      setComments(commentsWithProfiles.reverse());
+      
+      // Auto-scroll chat
+      setTimeout(() => {
+        if (chatScrollRef.current) {
+          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+      }, 100);
     };
 
     fetchComments();
 
     const channel = supabase
-      .channel(`comments-${streamId}`)
+      .channel(`host-comments-${streamId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -367,7 +406,12 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         table: 'live_stream_reactions',
         filter: `stream_id=eq.${streamId}`,
       }, (payload: any) => {
-        const newReaction = { type: payload.new.reaction_type, id: Date.now() };
+        const newReaction = { 
+          type: payload.new.reaction_type, 
+          id: Date.now() + Math.random(),
+          x: Math.random() * 40 + 55,
+          y: Math.random() * 30 + 40,
+        };
         setReactions(prev => [...prev, newReaction]);
         setTimeout(() => {
           setReactions(prev => prev.filter(r => r.id !== newReaction.id));
@@ -523,13 +567,28 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   };
 
   const getReactionEmoji = (type: string) => {
-    switch (type) {
-      case 'heart': return '❤️';
-      case 'like': return '👍';
-      case 'laugh': return '😂';
-      case 'fire': return '🔥';
-      case 'clap': return '👏';
-      default: return '❤️';
+    return REACTION_EMOJIS[type] || '❤️';
+  };
+
+  const handleInviteToSpeak = async (userId: string) => {
+    if (coHosts.length >= 4) {
+      toast.error("Maximum 4 co-hosts allowed");
+      return;
+    }
+    
+    // For now, just add to coHosts list - in full implementation would send WebRTC invite
+    setCoHosts(prev => [...prev, userId]);
+    
+    const viewer = viewers.find(v => v.id === userId);
+    if (viewer) {
+      toast.success(`Invited ${viewer.display_name} to speak!`);
+      
+      // Send notification comment
+      await supabase.from("live_stream_comments").insert({
+        stream_id: streamId,
+        user_id: user?.id,
+        content: `🎤 ${viewer.display_name} has been invited to speak!`,
+      });
     }
   };
 
@@ -665,20 +724,30 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           />
         )}
 
-        {/* Floating Reactions */}
-        <div className="absolute bottom-32 right-4 flex flex-col gap-2">
+        {/* Floating Reactions - Animated */}
+        <AnimatePresence>
           {reactions.map((reaction) => (
-            <div
+            <motion.div
               key={reaction.id}
-              className="text-3xl animate-bounce"
+              initial={{ opacity: 1, y: 0, scale: 1 }}
+              animate={{ 
+                opacity: 0, 
+                y: -200, 
+                scale: [1, 1.4, 1.2],
+                x: [0, Math.random() * 40 - 20, Math.random() * 60 - 30]
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 3, ease: "easeOut" }}
+              className="absolute text-4xl pointer-events-none z-30"
               style={{
-                animation: 'floatUp 3s ease-out forwards',
+                right: `${100 - reaction.x}%`,
+                bottom: `${reaction.y}%`,
               }}
             >
               {getReactionEmoji(reaction.type)}
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </AnimatePresence>
 
         {/* Gifts Received Badge */}
         {isLive && totalGiftsReceived > 0 && (
@@ -707,6 +776,17 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
             >
               <Gift className="w-5 h-5 text-white" />
             </Button>
+            
+            {/* Viewer List Panel */}
+            <ViewerListPanel
+              viewers={viewers}
+              viewerCount={viewerCount}
+              streamId={streamId}
+              onInviteToSpeak={handleInviteToSpeak}
+              coHosts={coHosts}
+              maxCoHosts={4}
+            />
+            
             <Button
               variant="ghost"
               size="icon"
@@ -842,6 +922,8 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         isOpen={showInviteModal}
         onClose={() => setShowInviteModal(false)}
         streamId={streamId}
+        currentCoHostCount={coHosts.length}
+        maxCoHosts={4}
       />
     </div>
   );
