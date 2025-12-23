@@ -27,6 +27,13 @@ const SpaceDetail = () => {
     }
   }, [spaceId]);
 
+  // Auto-join for logged-in users when space data is loaded
+  useEffect(() => {
+    if (!authLoading && user && space && space.status === 'live' && !showRoom) {
+      setShowRoom(true);
+    }
+  }, [authLoading, user, space, showRoom]);
+
   const fetchSpace = async () => {
     // Try to find by share_link or id
     let query = supabase.from('live_spaces').select('*');
@@ -62,11 +69,7 @@ const SpaceDetail = () => {
     }
 
     setLoading(false);
-
-    // Auto-join if space is live and user is authenticated
-    if (data.status === 'live' && user) {
-      setShowRoom(true);
-    }
+    // Note: Auto-join is now handled by a separate useEffect
   };
 
   const handleJoin = () => {

@@ -11,13 +11,16 @@ import { toast } from "sonner";
 import { 
   Video, VideoOff, Mic, MicOff, Camera, FlipHorizontal,
   Users, Send, Heart, X, Sparkles, Gift, MessageCircle,
-  Settings, Maximize, Minimize, Radio, UserPlus, Coins, Share2
+  Settings, Maximize, Minimize, Radio, UserPlus, Coins, Share2, Home
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { LiveInviteModal } from "./LiveInviteModal";
 import { useNavigation } from '@/context/NavigationContext';
+import { useNavigate } from 'react-router-dom';
+import { FlyingChat } from './FlyingChat';
+import { LiveStreamMentionInput } from './LiveStreamMentionInput';
 
 interface LiveBroadcasterProps {
   streamId: string;
@@ -27,6 +30,7 @@ interface LiveBroadcasterProps {
 export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => {
   const { user } = useAuth();
   const { setHideBottomNav } = useNavigation();
+  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const viewersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -46,6 +50,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [viewers, setViewers] = useState<any[]>([]);
   const [totalGiftsReceived, setTotalGiftsReceived] = useState(0);
+  const [flyingGifts, setFlyingGifts] = useState<{ id: string; gift_type: string; sender_name: string; credit_value: number }[]>([]);
 
   // Hide bottom navigation when broadcasting
   useEffect(() => {
@@ -333,7 +338,29 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     const channel = supabase
       .channel(`viewers-${streamId}`)
       .on('postgres_changes', {
-        event: '*',
+        event: 'INSERT',
+        schema: 'public',
+        table: 'live_stream_viewers',
+        filter: `stream_id=eq.${streamId}`,
+      }, async (payload: any) => {
+        // Show user joined notification
+        if (payload.new.user_id) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', payload.new.user_id)
+            .single();
+          
+          if (profile) {
+            toast(`👋 ${profile.display_name || profile.username} joined the stream`, {
+              duration: 3000,
+            });
+          }
+        }
+        fetchViewers();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
         schema: 'public',
         table: 'live_stream_viewers',
         filter: `stream_id=eq.${streamId}`,
@@ -369,9 +396,31 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         schema: 'public',
         table: 'live_stream_gifts',
         filter: `stream_id=eq.${streamId}`,
-      }, (payload: any) => {
+      }, async (payload: any) => {
         if (payload.new.receiver_id === user.id) {
           setTotalGiftsReceived(prev => prev + (payload.new.credit_value || 0));
+          
+          // Get sender name for flying gift
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('display_name, username')
+            .eq('id', payload.new.sender_id)
+            .single();
+          
+          // Add flying gift
+          const newGift = {
+            id: payload.new.id,
+            gift_type: payload.new.gift_type,
+            sender_name: senderProfile?.display_name || senderProfile?.username || 'Someone',
+            credit_value: payload.new.credit_value || 0,
+          };
+          setFlyingGifts(prev => [...prev, newGift]);
+          
+          // Remove after animation
+          setTimeout(() => {
+            setFlyingGifts(prev => prev.filter(g => g.id !== newGift.id));
+          }, 4000);
+          
           toast.success(`Received ${payload.new.gift_type} gift! +${payload.new.credit_value} credits`);
         }
       })
@@ -510,15 +559,35 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           </div>
         )}
 
-        {/* Close Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-4 right-4 text-white hover:bg-white/20"
-          onClick={isLive ? stopBroadcast : onClose}
-        >
-          <X className="w-6 h-6" />
-        </Button>
+        {/* Close and Home Buttons */}
+        <div className="absolute top-4 right-4 flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/20"
+            onClick={() => navigate('/feed')}
+            title="Go to Feed"
+          >
+            <Home className="w-5 h-5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/20"
+            onClick={isLive ? stopBroadcast : onClose}
+          >
+            <X className="w-6 h-6" />
+          </Button>
+        </div>
+
+        {/* Flying Chat Overlay */}
+        {isLive && (
+          <FlyingChat 
+            messages={comments} 
+            gifts={flyingGifts}
+            maxMessages={8}
+          />
+        )}
 
         {/* Floating Reactions */}
         <div className="absolute bottom-32 right-4 flex flex-col gap-2">

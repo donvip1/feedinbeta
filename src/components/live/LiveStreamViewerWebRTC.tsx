@@ -10,10 +10,13 @@ import { toast } from "sonner";
 import { 
   Users, Send, Heart, ThumbsUp, Laugh, X, Gift, 
   Volume2, VolumeX, Maximize, Minimize, Flame, 
-  PartyPopper, MessageCircle, Share2, Radio
+  PartyPopper, MessageCircle, Share2, Radio, Home
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { useNavigate } from 'react-router-dom';
+import { FlyingChat } from './FlyingChat';
+import { LiveStreamMentionInput } from './LiveStreamMentionInput';
 
 interface LiveStreamViewerWebRTCProps {
   streamId: string;
@@ -21,6 +24,7 @@ interface LiveStreamViewerWebRTCProps {
 }
 
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
+  const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const viewerIdRef = useRef<string>(crypto.randomUUID());
@@ -35,6 +39,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [isConnecting, setIsConnecting] = useState(true);
   const [showChat, setShowChat] = useState(true);
   const [hasVideo, setHasVideo] = useState(false);
+  const [flyingGifts, setFlyingGifts] = useState<{ id: string; gift_type: string; sender_name: string; credit_value: number }[]>([]);
 
   // Fetch stream details
   useEffect(() => {
@@ -370,17 +375,37 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
                 </div>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20"
-              onClick={onClose}
-            >
-              <X className="w-6 h-6" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20"
+                onClick={() => navigate('/feed')}
+                title="Go to Feed"
+              >
+                <Home className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20"
+                onClick={onClose}
+              >
+                <X className="w-6 h-6" />
+              </Button>
+            </div>
           </div>
           <p className="text-white/80 text-sm mt-2 line-clamp-1">{stream.title}</p>
         </div>
+
+        {/* Flying Chat Overlay */}
+        {stream.status === 'live' && (
+          <FlyingChat 
+            messages={comments} 
+            gifts={flyingGifts}
+            maxMessages={8}
+          />
+        )}
 
         {/* Floating Reactions */}
         {reactions.map((reaction) => (

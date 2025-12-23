@@ -8,22 +8,25 @@ import { ArrowLeft, Radio } from 'lucide-react';
 import { LiveStreamViewerWebRTC } from '@/components/live/LiveStreamViewerWebRTC';
 
 const LiveStreamDetail = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { streamId } = useParams<{ streamId: string }>();
   const [stream, setStream] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for auth to finish loading before redirecting
+    if (authLoading) return;
+    
     if (!user) {
       sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
-      navigate('/welcome');
+      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
     if (streamId) {
       loadStream();
     }
-  }, [user, streamId, navigate]);
+  }, [user, authLoading, streamId, navigate]);
 
   const loadStream = async () => {
     try {
@@ -42,10 +45,13 @@ const LiveStreamDetail = () => {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Skeleton className="w-full max-w-4xl h-[80vh] rounded-xl" />
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading stream...</p>
+        </div>
       </div>
     );
   }
