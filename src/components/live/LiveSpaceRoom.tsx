@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Settings, Crown, UserPlus } from 'lucide-react';
+import { X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 import { SpaceChat } from './SpaceChat';
 import { SpaceInviteModal } from './SpaceInviteModal';
 import { LiveGiftModal } from './LiveGiftModal';
+import { SpeakerQueuePanel } from './SpeakerQueuePanel';
 import { cn } from '@/lib/utils';
+import { useSpaceAudio } from '@/hooks/useSpaceAudio';
 
 interface LiveSpaceRoomProps {
   spaceId: string;
@@ -52,8 +54,19 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [myRole, setMyRole] = useState<string>('listener');
   const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number }[]>([]);
+  const [showSpeakerQueue, setShowSpeakerQueue] = useState(false);
+  const [selectedGiftRecipient, setSelectedGiftRecipient] = useState<string | null>(null);
 
-  useEffect(() => {
+  // WebRTC audio integration
+  const isHost = myRole === 'host' || myRole === 'co_host';
+  const isSpeaker = myRole === 'speaker';
+  
+  const { isConnected, audioLevels, connect, disconnect } = useSpaceAudio({
+    spaceId,
+    isMuted,
+    isHost,
+    isSpeaker,
+  });
     fetchSpaceData();
     joinSpace();
 
