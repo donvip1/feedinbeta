@@ -20,6 +20,8 @@ import { usePageRefresh } from '@/context/RefreshContext';
 import { useProfileWithCache } from '@/hooks/useProfileWithCache';
 import { memoryCache } from '@/lib/memory-cache';
 import { usernameCache } from '@/lib/username-cache';
+import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
+import { QueryErrorFallback } from '@/components/shared/QueryErrorFallback';
 
 interface Profile {
   id: string;
