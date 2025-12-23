@@ -124,11 +124,8 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-subtle overflow-y-auto">
       <header className="container mx-auto px-4 py-6 border-b border-border">
         <nav className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <img src={feedinLogo} alt="FEEDIN" className="w-12 h-12" />
-            <span className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-              FEEDIN
-            </span>
+          <div className="flex items-center">
+            <img src={feedinLogo} alt="feedin" className="w-16 h-16" />
           </div>
           <Button
             onClick={signOut}
@@ -143,8 +140,19 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-20">
         <div className="text-center max-w-4xl mx-auto animate-fade-in">
-          <div className="flex justify-center mb-6">
-            <img src={feedinLogo} alt="feedin" className="w-48 h-48" />
+          {/* Enhanced glowing logo */}
+          <div className="relative flex justify-center mb-8">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-72 h-72 bg-primary/30 rounded-full blur-3xl animate-pulse" />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-56 h-56 bg-primary/50 rounded-full blur-2xl animate-pulse [animation-delay:0.5s]" />
+            </div>
+            <img 
+              src={feedinLogo} 
+              alt="feedin" 
+              className="relative z-10 w-64 h-64 drop-shadow-[0_0_35px_rgba(139,92,246,0.6)]" 
+            />
           </div>
           <p className="text-xl text-muted-foreground mb-8">
             Your feed is ready. Start creating and sharing posts!
