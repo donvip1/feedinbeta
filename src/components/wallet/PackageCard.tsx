@@ -31,7 +31,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
   return (
     <div 
       className={cn(
-        "relative flex-shrink-0 w-[280px] sm:w-auto rounded-2xl border p-4 transition-all duration-200",
+        "relative flex-shrink-0 w-[280px] sm:w-auto rounded-2xl border p-4 pt-6 transition-all duration-200 overflow-visible",
         isPopular 
           ? "border-primary bg-primary/5 shadow-lg shadow-primary/20" 
           : "border-border bg-card hover:border-primary/50"
@@ -39,7 +39,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
     >
       {/* Popular badge */}
       {isPopular && (
-        <Badge className="absolute -top-2.5 left-4 bg-gradient-to-r from-primary to-accent text-primary-foreground">
+        <Badge className="absolute -top-3 left-4 bg-gradient-to-r from-primary to-accent text-primary-foreground z-10">
           <Sparkles className="w-3 h-3 mr-1" />
           Popular
         </Badge>
@@ -47,7 +47,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
 
       {/* Bonus badge */}
       {savingsPercent > 0 && (
-        <Badge className="absolute -top-2.5 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white">
+        <Badge className="absolute -top-3 right-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white z-10">
           +{savingsPercent}% Bonus
         </Badge>
       )}
