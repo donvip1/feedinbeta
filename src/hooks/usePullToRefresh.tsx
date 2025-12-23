@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useNativeFeatures } from './useNativeFeatures';
 
+type PullState = 'idle' | 'pulling' | 'ready' | 'refreshing';
+
 interface PullToRefreshOptions {
   onRefresh: () => Promise<void>;
   threshold?: number;
@@ -8,27 +10,30 @@ interface PullToRefreshOptions {
 }
 
 /**
- * Native-style pull-to-refresh hook with haptic feedback
+ * Native-style pull-to-refresh hook with haptic feedback and spring physics
  */
 export const usePullToRefresh = ({
   onRefresh,
   threshold = 80,
   resistance = 2.5,
 }: PullToRefreshOptions) => {
-  const [isPulling, setIsPulling] = useState(false);
+  const [pullState, setPullState] = useState<PullState>('idle');
   const [pullDistance, setPullDistance] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const { haptic } = useNativeFeatures();
 
   const containerRef = useRef<HTMLDivElement>(null);
   const startY = useRef(0);
   const currentY = useRef(0);
   const isAtTop = useRef(true);
-  const hasTriggeredHaptic = useRef(false);
+  const hasTriggeredStartHaptic = useRef(false);
+  const hasTriggeredThresholdHaptic = useRef(false);
+
+  const isRefreshing = pullState === 'refreshing';
+  const isPulling = pullState === 'pulling' || pullState === 'ready';
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || isRefreshing) return;
 
     // Only enable pull-to-refresh when scrolled to top
     isAtTop.current = container.scrollTop <= 0;
@@ -36,44 +41,72 @@ export const usePullToRefresh = ({
 
     startY.current = e.touches[0].clientY;
     currentY.current = startY.current;
-    hasTriggeredHaptic.current = false;
-  }, []);
+    hasTriggeredStartHaptic.current = false;
+    hasTriggeredThresholdHaptic.current = false;
+  }, [isRefreshing]);
 
   const handleTouchMove = useCallback((e: TouchEvent) => {
     if (!isAtTop.current || isRefreshing) return;
 
     currentY.current = e.touches[0].clientY;
-    const distance = (currentY.current - startY.current) / resistance;
+    const rawDistance = currentY.current - startY.current;
+    
+    // Apply resistance for natural feel
+    const distance = rawDistance > 0 ? rawDistance / resistance : 0;
 
     if (distance > 0) {
-      setIsPulling(true);
-      setPullDistance(Math.min(distance, threshold * 1.5));
+      // Trigger start haptic
+      if (!hasTriggeredStartHaptic.current && distance > 5) {
+        hasTriggeredStartHaptic.current = true;
+        haptic('selection');
+      }
 
-      // Trigger haptic when crossing threshold
-      if (distance >= threshold && !hasTriggeredHaptic.current) {
-        hasTriggeredHaptic.current = true;
-        haptic('medium');
+      const newDistance = Math.min(distance, threshold * 1.5);
+      setPullDistance(newDistance);
+
+      // Update state based on distance
+      if (distance >= threshold) {
+        if (pullState !== 'ready') {
+          setPullState('ready');
+          // Trigger threshold haptic
+          if (!hasTriggeredThresholdHaptic.current) {
+            hasTriggeredThresholdHaptic.current = true;
+            haptic('medium');
+          }
+        }
+      } else if (distance > 0) {
+        if (pullState !== 'pulling') {
+          setPullState('pulling');
+        }
       }
     }
-  }, [isRefreshing, resistance, threshold, haptic]);
+  }, [isRefreshing, resistance, threshold, haptic, pullState]);
 
   const handleTouchEnd = useCallback(async () => {
-    if (!isPulling) return;
+    if (pullState === 'idle' || isRefreshing) return;
 
-    if (pullDistance >= threshold && !isRefreshing) {
-      setIsRefreshing(true);
+    if (pullState === 'ready') {
+      setPullState('refreshing');
+      setPullDistance(60); // Keep some distance while refreshing
       haptic('success');
 
       try {
         await onRefresh();
+        haptic('success');
+      } catch (error) {
+        console.error('Refresh error:', error);
+        haptic('error');
       } finally {
-        setIsRefreshing(false);
+        // Spring animation back to zero
+        setPullState('idle');
+        setPullDistance(0);
       }
+    } else {
+      // Spring back if not ready
+      setPullState('idle');
+      setPullDistance(0);
     }
-
-    setIsPulling(false);
-    setPullDistance(0);
-  }, [isPulling, pullDistance, threshold, isRefreshing, onRefresh, haptic]);
+  }, [pullState, isRefreshing, onRefresh, haptic]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -98,5 +131,6 @@ export const usePullToRefresh = ({
     pullDistance,
     pullProgress,
     isRefreshing,
+    pullState,
   };
 };

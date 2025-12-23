@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, Suspense, lazy } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -9,7 +9,6 @@ import { Search, TrendingUp, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
-import TikTokPortraitPostFlow from '@/components/post/TikTokPortraitPostFlow';
 import NativeCreationSheet from '@/components/post/NativeCreationSheet';
 import NativeCameraView from '@/components/post/NativeCameraView';
 import NativeGalleryPicker from '@/components/post/NativeGalleryPicker';
@@ -20,17 +19,22 @@ import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { useViewedPosts } from '@/hooks/useViewedPosts';
 import { useScrollPosition } from '@/hooks/useScrollPosition';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import { FeedSkeleton, PullToRefreshIndicator } from '@/components/native/NativeLoadingSpinner';
+import { FeedSkeleton } from '@/components/native/NativeLoadingSpinner';
 import { feedCache } from '@/lib/feed-cache';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
 import { QueryErrorFallback } from '@/components/shared/QueryErrorFallback';
+import { useOfflineMode } from '@/hooks/useOfflineMode';
+import { OfflineBanner } from '@/components/shared/OfflineBanner';
+import { InfiniteScrollSkeleton } from '@/components/feed/InfiniteScrollSkeleton';
+import { PullToRefresh } from '@/components/feed/PullToRefresh';
+
 const Feed = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'following' | 'forYou'>('forYou');
-  const { containerRef } = useScrollPosition('feed');
+  const { containerRef: scrollContainerRef } = useScrollPosition('feed');
   const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file: File }[]>([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
@@ -39,13 +43,17 @@ const Feed = () => {
   const [showNav, setShowNav] = useState(true);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
-  const { viewedPostIds, markAsViewed, hasViewedAllPosts, canCountView } = useViewedPosts();
+  const { viewedPostIds, markAsViewed } = useViewedPosts();
   const initialViewedRef = useRef<string[]>([]);
   const hasInitializedRef = useRef(false);
   const [displayPosts, setDisplayPosts] = useState<any[]>([]);
   const allLoadedPostsRef = useRef<any[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const allVideoPostsRef = useRef<any[]>([]); // Store all video posts for fullscreen navigation
+  const allVideoPostsRef = useRef<any[]>([]);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Offline mode support
+  const { isOffline, cachedPosts, lastSyncTime, updateSyncTime } = useOfflineMode(user?.id);
 
   // Capture viewed posts only once when component mounts or tab changes
   useEffect(() => {
@@ -252,6 +260,35 @@ const Feed = () => {
     refetchOnMount: true,
   });
 
+  // Pull-to-refresh with haptic feedback - defined after refetch is available
+  const handleRefresh = useCallback(async () => {
+    if (isOffline) {
+      toast({
+        title: "You're offline",
+        description: 'Connect to the internet to refresh.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    await refetch();
+    updateSyncTime();
+    toast({
+      title: 'Feed refreshed',
+      description: 'You\'re up to date!',
+    });
+  }, [isOffline, refetch, updateSyncTime, toast]);
+
+  const { 
+    containerRef, 
+    isPulling, 
+    pullDistance, 
+    pullProgress, 
+    isRefreshing 
+  } = usePullToRefresh({
+    onRefresh: handleRefresh,
+    threshold: 80,
+  });
+
   // Subscribe to silent refresh from navigation
   usePageRefresh('feed', useCallback(() => {
     // Silent background refetch - no loading indicators
@@ -265,41 +302,51 @@ const Feed = () => {
     }
   }, [posts]);
 
-  // Infinite scroll handler
+  // Infinite scroll handler with skeleton loading
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    let debounceTimer: NodeJS.Timeout | null = null;
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
       const isNearBottom = scrollTop + clientHeight >= scrollHeight - 500;
 
-      if (isNearBottom && allLoadedPostsRef.current.length > 0) {
-        // Append posts from the beginning to create infinite loop
-        // User won't know they've reached the end
-        setDisplayPosts(prev => {
-          const currentIds = new Set(prev.map(p => p.id));
-          const postsToAdd = allLoadedPostsRef.current.filter(p => !currentIds.has(p.id));
-          
-          if (postsToAdd.length > 0) {
-            return [...prev, ...postsToAdd.slice(0, 10)];
-          }
-          
-          // If all posts are shown, start from beginning with unique keys
-          const startIndex = prev.length % allLoadedPostsRef.current.length;
-          const cyclePosts = allLoadedPostsRef.current.slice(startIndex, startIndex + 10).map((p, i) => ({
-            ...p,
-            _cycleKey: `${p.id}-cycle-${Date.now()}-${i}` // Unique key for each cycle
-          }));
-          return [...prev, ...cyclePosts];
-        });
+      if (isNearBottom && allLoadedPostsRef.current.length > 0 && !isLoadingMore) {
+        // Show skeleton loading
+        setIsLoadingMore(true);
+        
+        // Debounce loading more posts
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          setDisplayPosts(prev => {
+            const currentIds = new Set(prev.map(p => p.id));
+            const postsToAdd = allLoadedPostsRef.current.filter(p => !currentIds.has(p.id));
+            
+            if (postsToAdd.length > 0) {
+              return [...prev, ...postsToAdd.slice(0, 10)];
+            }
+            
+            // If all posts are shown, start from beginning with unique keys
+            const startIndex = prev.length % allLoadedPostsRef.current.length;
+            const cyclePosts = allLoadedPostsRef.current.slice(startIndex, startIndex + 10).map((p, i) => ({
+              ...p,
+              _cycleKey: `${p.id}-cycle-${Date.now()}-${i}`
+            }));
+            return [...prev, ...cyclePosts];
+          });
+          setIsLoadingMore(false);
+        }, 300);
       }
     };
 
     container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
-
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  }, [isLoadingMore]);
   // Pause all videos when notification panel opens
   const handleNotificationPanelOpen = () => {
     setIsNotificationOpen(true);
@@ -403,6 +450,13 @@ const Feed = () => {
 
   return (
     <div className="min-h-screen bg-background pb-16 native-feed-container">
+      {/* Offline Banner */}
+      <OfflineBanner 
+        isOffline={isOffline} 
+        lastSyncTime={lastSyncTime} 
+        onRetry={() => !isOffline && refetch()}
+      />
+      
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between px-3 py-2 max-w-2xl mx-auto">
           <NotificationBell 
@@ -462,9 +516,16 @@ const Feed = () => {
 
       <div
         ref={containerRef}
-        className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth native-scroll-container"
+        className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth native-scroll-container relative"
         data-scrollable="true"
       >
+        {/* Pull to Refresh Indicator */}
+        <PullToRefresh 
+          pullDistance={pullDistance}
+          pullProgress={pullProgress}
+          isRefreshing={isRefreshing}
+        />
+        
         {feedError && displayPosts.length === 0 ? (
           <div className="p-4">
             <QueryErrorFallback 
@@ -506,6 +567,32 @@ const Feed = () => {
                     onInteractionEnd={handleInteractionEnd}
                     onView={() => markAsViewed(post.id)}
                     onMarkAsViewed={markAsViewed}
+                  />
+                </div>
+              );
+            })}
+            
+            {/* Infinite Scroll Loading Skeleton */}
+            {isLoadingMore && <InfiniteScrollSkeleton count={2} />}
+          </SectionErrorBoundary>
+        ) : isOffline && cachedPosts.length > 0 ? (
+          // Show cached posts when offline
+          <SectionErrorBoundary sectionName="Cached Posts" onRetry={() => {}}>
+            {cachedPosts.map((post) => {
+              const uniqueKey = (post as any)._cycleKey || post.id;
+              return (
+                <div key={uniqueKey} className="snap-start mb-4">
+                  <PostCard
+                    post={post as any}
+                    isPromoted={false}
+                    allPosts={cachedPosts as any}
+                    allVideoPosts={[]}
+                    onLikeUpdate={() => {}}
+                    onCommentsOpenChange={setIsCommentsOpen}
+                    onInteractionStart={handleInteractionStart}
+                    onInteractionEnd={handleInteractionEnd}
+                    onView={() => {}}
+                    onMarkAsViewed={() => {}}
                   />
                 </div>
               );
