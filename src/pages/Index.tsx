@@ -12,7 +12,7 @@ const Index = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="animate-pulse">
-          <img src={feedinLogo} alt="FEEDIN" className="w-20 h-20" />
+          <img src={feedinLogo} alt="feedin" className="w-40 h-40" />
         </div>
       </div>
     );
@@ -24,9 +24,9 @@ const Index = () => {
         <main className="container mx-auto px-4 py-16">
           {/* Hero Section */}
           <div className="text-center max-w-4xl mx-auto mb-16 animate-fade-in">
-            <h1 className="text-6xl md:text-7xl font-bold mb-6">
-              Welcome to FeedIn
-            </h1>
+            <div className="flex justify-center mb-6">
+              <img src={feedinLogo} alt="feedin" className="w-48 h-48" />
+            </div>
             <p className="text-xl text-gray-400">
               Connect with friends, join groups, and chat with people worldwide
             </p>
@@ -143,9 +143,9 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-20">
         <div className="text-center max-w-4xl mx-auto animate-fade-in">
-          <h1 className="text-5xl font-bold mb-6 bg-gradient-primary bg-clip-text text-transparent">
-            Welcome to FEEDIN
-          </h1>
+          <div className="flex justify-center mb-6">
+            <img src={feedinLogo} alt="feedin" className="w-48 h-48" />
+          </div>
           <p className="text-xl text-muted-foreground mb-8">
             Your feed is ready. Start creating and sharing posts!
           </p>

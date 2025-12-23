@@ -338,9 +338,29 @@ export default function FullscreenMediaViewer({
     }
   }, [isPlaying, currentPost?.id]);
 
-  const handleImageTap = useCallback(() => {
-    setShowControls(prev => !prev);
-  }, []);
+  const handleImageTap = useCallback((e: React.MouseEvent) => {
+    // Get tap position relative to screen
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const tapX = e.clientX - rect.left;
+    const screenWidth = rect.width;
+    
+    // Tap on right third → next post
+    if (tapX > screenWidth * 0.66) {
+      if (currentPostIndex < navigablePosts.length - 1) {
+        scrollToIndex(currentPostIndex + 1);
+      }
+    }
+    // Tap on left third → previous post
+    else if (tapX < screenWidth * 0.33) {
+      if (currentPostIndex > 0) {
+        scrollToIndex(currentPostIndex - 1);
+      }
+    }
+    // Tap in center → toggle controls
+    else {
+      setShowControls(prev => !prev);
+    }
+  }, [currentPostIndex, navigablePosts.length, scrollToIndex]);
 
   const toggleMute = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();

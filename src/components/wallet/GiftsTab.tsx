@@ -1,20 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Gift, Send, ArrowDownLeft, Sparkles } from 'lucide-react';
 import { ReceivedGifts } from './ReceivedGifts';
 import { SentGifts } from './SentGifts';
 import { SendDirectGiftModal } from './SendDirectGiftModal';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export const GiftsTab = () => {
   const { user } = useAuth();
   const [showSendGiftModal, setShowSendGiftModal] = useState(false);
+  const queryClient = useQueryClient();
 
   // Fetch gift statistics
-  const { data: giftStats } = useQuery({
+  const { data: giftStats, refetch: refetchStats } = useQuery({
     queryKey: ['gift-stats', user?.id],
     queryFn: async () => {
       // Get received gifts count and total
@@ -47,6 +48,36 @@ export const GiftsTab = () => {
     },
     enabled: !!user,
   });
+
+  // Real-time subscription for gift updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('gifts-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'gift_analytics',
+        },
+        (payload) => {
+          const newGift = payload.new as any;
+          // If the user is the sender or receiver, refetch
+          if (newGift.sender_id === user.id || newGift.receiver_id === user.id) {
+            refetchStats();
+            queryClient.invalidateQueries({ queryKey: ['received-gifts', user.id] });
+            queryClient.invalidateQueries({ queryKey: ['sent-gifts', user.id] });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, refetchStats, queryClient]);
 
   return (
     <div className="space-y-5">

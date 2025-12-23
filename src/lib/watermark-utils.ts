@@ -2,21 +2,29 @@
  * Utility functions for adding FeedIn watermark to images and videos
  */
 
+import feedinWatermark from '@/assets/feedin-watermark.png';
+
 /**
- * Add watermark to an image
+ * Add watermark to an image using the feedin logo icon
  * @param imageUrl - URL or data URL of the image
- * @param watermarkText - Text to display as watermark (default: "FeedIn")
  * @returns Promise<Blob> - Watermarked image as a blob
  */
 export const addWatermarkToImage = async (
-  imageUrl: string,
-  watermarkText: string = "FeedIn"
+  imageUrl: string
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
     
-    img.onload = () => {
+    const watermarkImg = new Image();
+    watermarkImg.crossOrigin = "anonymous";
+    
+    let imgLoaded = false;
+    let watermarkLoaded = false;
+    
+    const tryDraw = () => {
+      if (!imgLoaded || !watermarkLoaded) return;
+      
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       
@@ -32,33 +40,24 @@ export const addWatermarkToImage = async (
       // Draw the original image
       ctx.drawImage(img, 0, 0);
 
-      // Configure watermark style
-      const fontSize = Math.max(20, img.width * 0.03);
-      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-      ctx.lineWidth = 2;
+      // Calculate watermark size (3% of image width, min 40px, max 100px)
+      const watermarkSize = Math.min(100, Math.max(40, img.width * 0.08));
+      const padding = Math.max(15, img.width * 0.02);
       
-      // Add shadow for better visibility
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-      ctx.shadowBlur = 4;
+      // Position watermark at bottom right
+      const x = img.width - watermarkSize - padding;
+      const y = img.height - watermarkSize - padding;
+
+      // Add subtle shadow
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 6;
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
-
-      // Measure text
-      const textMetrics = ctx.measureText(watermarkText);
-      const textWidth = textMetrics.width;
-      const textHeight = fontSize;
-
-      // Position watermark at bottom right with padding
-      const padding = Math.max(10, img.width * 0.02);
-      const x = img.width - textWidth - padding;
-      const y = img.height - padding;
-
-      // Draw text stroke
-      ctx.strokeText(watermarkText, x, y);
-      // Draw text fill
-      ctx.fillText(watermarkText, x, y);
+      
+      // Draw watermark logo with slight transparency
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(watermarkImg, x, y, watermarkSize, watermarkSize);
+      ctx.globalAlpha = 1;
 
       // Convert canvas to blob
       canvas.toBlob((blob) => {
@@ -69,12 +68,41 @@ export const addWatermarkToImage = async (
         }
       }, 'image/jpeg', 0.9);
     };
+    
+    img.onload = () => {
+      imgLoaded = true;
+      tryDraw();
+    };
 
     img.onerror = () => {
       reject(new Error('Failed to load image'));
     };
 
+    watermarkImg.onload = () => {
+      watermarkLoaded = true;
+      tryDraw();
+    };
+    
+    watermarkImg.onerror = () => {
+      // If watermark fails to load, still resolve without watermark
+      imgLoaded = true;
+      watermarkLoaded = true;
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to create blob'));
+        }, 'image/jpeg', 0.9);
+      }
+    };
+
     img.src = imageUrl;
+    watermarkImg.src = feedinWatermark;
   });
 };
 
@@ -88,13 +116,16 @@ export const addWatermarkToImage = async (
  * @returns Promise<string> - Data URL of watermarked thumbnail
  */
 export const addWatermarkToVideoThumbnail = async (
-  videoUrl: string,
-  watermarkText: string = "FeedIn"
+  videoUrl: string
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video');
     video.crossOrigin = "anonymous";
     video.preload = 'metadata';
+    
+    const watermarkImg = new Image();
+    watermarkImg.crossOrigin = "anonymous";
+    watermarkImg.src = feedinWatermark;
 
     video.onloadedmetadata = () => {
       // Seek to 1 second to get a good thumbnail
@@ -116,26 +147,20 @@ export const addWatermarkToVideoThumbnail = async (
       // Draw video frame
       ctx.drawImage(video, 0, 0);
 
-      // Add watermark
-      const fontSize = Math.max(20, video.videoWidth * 0.03);
-      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
-      ctx.lineWidth = 2;
-      
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-      ctx.shadowBlur = 4;
+      // Calculate watermark size
+      const watermarkSize = Math.min(100, Math.max(40, video.videoWidth * 0.08));
+      const padding = Math.max(15, video.videoWidth * 0.02);
+      const x = video.videoWidth - watermarkSize - padding;
+      const y = video.videoHeight - watermarkSize - padding;
+
+      // Add shadow and draw watermark
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 6;
       ctx.shadowOffsetX = 2;
       ctx.shadowOffsetY = 2;
-
-      const textMetrics = ctx.measureText(watermarkText);
-      const textWidth = textMetrics.width;
-      const padding = Math.max(10, video.videoWidth * 0.02);
-      const x = video.videoWidth - textWidth - padding;
-      const y = video.videoHeight - padding;
-
-      ctx.strokeText(watermarkText, x, y);
-      ctx.fillText(watermarkText, x, y);
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(watermarkImg, x, y, watermarkSize, watermarkSize);
+      ctx.globalAlpha = 1;
 
       resolve(canvas.toDataURL('image/jpeg', 0.9));
     };

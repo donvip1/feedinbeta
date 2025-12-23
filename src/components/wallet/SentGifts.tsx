@@ -1,5 +1,5 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,8 +22,9 @@ const giftEmojis: Record<string, string> = {
 
 export const SentGifts = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const { data: gifts, isLoading } = useQuery({
+  const { data: gifts, isLoading, refetch } = useQuery({
     queryKey: ['sent-gifts', user?.id],
     queryFn: async () => {
       // First get gift analytics
@@ -55,6 +56,31 @@ export const SentGifts = () => {
     },
     enabled: !!user,
   });
+
+  // Real-time subscription for sent gifts
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('sent-gifts-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'gift_analytics',
+          filter: `sender_id=eq.${user.id}`,
+        },
+        () => {
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, refetch]);
 
   if (isLoading) {
     return (
