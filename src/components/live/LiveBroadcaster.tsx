@@ -642,21 +642,24 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   };
 
   return (
-    <div className={cn(
-      "fixed inset-0 z-50 bg-black",
-      isFullscreen ? "" : "flex flex-col"
-    )}>
-      {/* Video Container */}
-      <div className="relative flex-1 bg-black">
+    <div className="fixed inset-0 z-50 bg-black overflow-hidden">
+      {/* Video Container - Always fills entire screen */}
+      <div className="absolute inset-0 bg-black">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
           className={cn(
-            "w-full h-full object-cover",
+            "absolute inset-0 w-full h-full object-cover",
             isFrontCamera && "scale-x-[-1]"
           )}
+          style={{
+            // Ensure video fills and centers on all devices
+            objectPosition: 'center center',
+            minWidth: '100%',
+            minHeight: '100%',
+          }}
         />
 
         {/* Not Live Yet Overlay */}
@@ -851,9 +854,58 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         )}
       </div>
 
-      {/* Chat Section */}
+      {/* Desktop/Tablet Chat Overlay - shown on larger screens */}
+      {isLive && (
+        <div className="hidden md:block absolute left-4 bottom-24 w-96 max-h-[40vh] z-20">
+          <div className="bg-black/40 backdrop-blur-sm rounded-2xl p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+                <MessageCircle className="w-4 h-4" />
+                Live Chat
+              </h3>
+              <Badge variant="outline" className="text-white/80 border-white/30 text-xs">{comments.length}</Badge>
+            </div>
+
+            <ScrollArea className="h-48 mb-3">
+              <div className="space-y-2">
+                {comments.slice(-15).map((comment) => (
+                  <div key={comment.id} className="flex gap-2 items-start">
+                    <Avatar className="w-6 h-6 shrink-0">
+                      <AvatarImage src={comment.profiles?.avatar_url} />
+                      <AvatarFallback className="text-xs bg-primary/50">
+                        {comment.profiles?.display_name?.[0] || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-medium text-xs text-primary">
+                        {comment.profiles?.display_name || 'Anonymous'}
+                      </span>
+                      <p className="text-white text-sm break-words">{comment.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            <div className="flex gap-2">
+              <Input
+                placeholder="Say something..."
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && sendComment()}
+                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/50 h-9"
+              />
+              <Button size="icon" onClick={sendComment} className="h-9 w-9 shrink-0">
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Chat Section - shown on mobile when not fullscreen */}
       {!isFullscreen && (
-        <Card className="h-72 rounded-none border-t bg-background/95 backdrop-blur">
+        <Card className="md:hidden h-72 rounded-none border-t bg-background/95 backdrop-blur fixed bottom-0 left-0 right-0 z-30">
           <CardContent className="p-4 h-full flex flex-col">
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-semibold flex items-center gap-2">

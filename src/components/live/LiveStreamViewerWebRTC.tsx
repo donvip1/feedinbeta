@@ -509,14 +509,20 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
-      {/* Full Screen Video */}
+    <div className="fixed inset-0 z-50 bg-black overflow-hidden">
+      {/* Full Screen Video - Fills entire viewport, cropping as needed */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted={isMuted}
         className="absolute inset-0 w-full h-full object-cover"
+        style={{
+          // Ensure video fills and centers on all devices
+          objectPosition: 'center center',
+          minWidth: '100%',
+          minHeight: '100%',
+        }}
       />
 
       {/* Loading/Waiting State */}
@@ -598,10 +604,13 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       {/* Floating Chat Overlay - TikTok Style */}
       {showChat && stream.status === 'live' && (
         <div 
-          className="absolute left-0 right-20 z-20 pointer-events-none"
+          className="absolute left-0 z-20 pointer-events-none"
           style={{
             bottom: isKeyboardOpen ? `${keyboardHeight + 60}px` : '120px',
             maxHeight: '40vh',
+            // Wider on desktop/tablet
+            right: window.innerWidth >= 768 ? '25%' : '80px',
+            width: window.innerWidth >= 768 ? '400px' : 'auto',
           }}
         >
           <div 
@@ -619,17 +628,17 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
                   transition={{ duration: 0.3 }}
                   className="flex items-start gap-2"
                 >
-                  <Avatar className="w-7 h-7 shrink-0 border border-white/20">
+                  <Avatar className="w-7 h-7 md:w-8 md:h-8 shrink-0 border border-white/20">
                     <AvatarImage src={comment.profiles?.avatar_url} />
                     <AvatarFallback className="text-[10px] bg-primary/50">
                       {comment.profiles?.display_name?.[0] || 'U'}
                     </AvatarFallback>
                   </Avatar>
-                  <div className="bg-black/50 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[80%]">
-                    <span className="text-primary text-xs font-semibold">
+                  <div className="bg-black/50 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[85%]">
+                    <span className="text-primary text-xs md:text-sm font-semibold">
                       {comment.profiles?.display_name || 'Anonymous'}
                     </span>
-                    <p className="text-white text-sm break-words">{comment.content}</p>
+                    <p className="text-white text-sm md:text-base break-words">{comment.content}</p>
                   </div>
                 </motion.div>
               ))}
@@ -684,9 +693,9 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         ))}
       </AnimatePresence>
 
-      {/* Right Side Reaction Buttons */}
+      {/* Right Side Reaction Buttons - Larger on desktop */}
       <div 
-        className="absolute right-3 flex flex-col gap-2 z-20"
+        className="absolute right-3 md:right-6 flex flex-col gap-2 md:gap-3 z-20"
         style={{
           bottom: isKeyboardOpen ? `${keyboardHeight + 130}px` : '190px',
         }}
@@ -695,20 +704,20 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           <motion.button
             key={reaction.type}
             whileTap={{ scale: 0.85 }}
-            className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10 active:bg-white/20"
+            className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10 active:bg-white/20 transition-colors"
             onClick={() => sendReaction(reaction.type)}
           >
-            <span className="text-2xl">{reaction.emoji}</span>
+            <span className="text-2xl md:text-3xl">{reaction.emoji}</span>
           </motion.button>
         ))}
         
         {/* Gift Button */}
         <motion.button
           whileTap={{ scale: 0.85 }}
-          className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg"
+          className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg"
           onClick={() => setShowGiftModal(true)}
         >
-          <Gift className="w-6 h-6 text-white" />
+          <Gift className="w-6 h-6 md:w-7 md:h-7 text-white" />
         </motion.button>
       </div>
 
