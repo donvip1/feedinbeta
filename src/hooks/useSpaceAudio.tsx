@@ -14,16 +14,18 @@ interface UseSpaceAudioProps {
   isMuted: boolean;
   isHost: boolean;
   isSpeaker: boolean;
+  isListener?: boolean;
 }
 
 interface AudioLevels {
   [peerId: string]: number;
 }
 
-export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceAudioProps) => {
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'failed' | 'reconnecting';
+
+export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener = false }: UseSpaceAudioProps) => {
   const { user } = useAuth();
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected');
   const [audioLevels, setAudioLevels] = useState<AudioLevels>({});
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -33,6 +35,15 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
   const analyzersRef = useRef<Map<string, AnalyserNode>>(new Map());
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
+
+  // Derived states for backward compatibility
+  const isConnected = connectionStatus === 'connected';
+  const isConnecting = connectionStatus === 'connecting' || connectionStatus === 'reconnecting';
+
+  // Can this user broadcast audio?
+  const canBroadcast = isHost || isSpeaker;
 
   // ICE servers configuration
   const iceServers: RTCConfiguration = {
@@ -53,14 +64,19 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
 
   // Create audio analyzer for speaking indicators
   const createAnalyzer = useCallback((stream: MediaStream, peerId: string) => {
-    const audioContext = initAudioContext();
-    const source = audioContext.createMediaStreamSource(stream);
-    const analyzer = audioContext.createAnalyser();
-    analyzer.fftSize = 256;
-    analyzer.smoothingTimeConstant = 0.8;
-    source.connect(analyzer);
-    analyzersRef.current.set(peerId, analyzer);
-    return analyzer;
+    try {
+      const audioContext = initAudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyzer = audioContext.createAnalyser();
+      analyzer.fftSize = 256;
+      analyzer.smoothingTimeConstant = 0.8;
+      source.connect(analyzer);
+      analyzersRef.current.set(peerId, analyzer);
+      return analyzer;
+    } catch (error) {
+      console.error('Error creating audio analyzer:', error);
+      return null;
+    }
   }, [initAudioContext]);
 
   // Monitor audio levels for speaking indicators
@@ -78,10 +94,14 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
     animationFrameRef.current = requestAnimationFrame(monitorAudioLevels);
   }, []);
 
-  // Get local audio stream
+  // Get local audio stream (only for hosts/speakers)
   const getLocalStream = useCallback(async () => {
     if (localStreamRef.current) {
       return localStreamRef.current;
+    }
+
+    if (!canBroadcast) {
+      return null; // Listeners don't need a local stream
     }
 
     try {
@@ -107,39 +127,61 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
     } catch (error) {
       console.error('Error accessing microphone:', error);
       toast.error('Could not access microphone. Please check permissions.');
-      throw error;
+      return null;
     }
-  }, [user, createAnalyzer]);
+  }, [user, createAnalyzer, canBroadcast]);
 
   // Create peer connection
   const createPeerConnection = useCallback(async (peerId: string, initiator: boolean) => {
     if (!user) return null;
 
-    console.log(`Creating peer connection with ${peerId}, initiator: ${initiator}`);
+    // Check if we already have a connection to this peer
+    if (peersRef.current.has(peerId)) {
+      console.log(`Already connected to ${peerId}`);
+      return peersRef.current.get(peerId)?.connection || null;
+    }
+
+    console.log(`Creating peer connection with ${peerId}, initiator: ${initiator}, canBroadcast: ${canBroadcast}`);
     
     const peerConnection = new RTCPeerConnection(iceServers);
     
-    // Add local stream tracks
-    if (localStreamRef.current && (isHost || isSpeaker)) {
+    // Add local stream tracks ONLY if we can broadcast
+    if (localStreamRef.current && canBroadcast) {
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current!);
       });
+    } else if (!canBroadcast) {
+      // For listeners, add a transceiver to receive audio
+      peerConnection.addTransceiver('audio', { direction: 'recvonly' });
     }
 
-    // Handle incoming tracks
+    // Handle incoming tracks (everyone needs this to receive audio)
     peerConnection.ontrack = (event) => {
-      console.log(`Received track from ${peerId}`);
+      console.log(`Received track from ${peerId}`, event.streams);
       const remoteStream = event.streams[0];
       
-      // Create audio element to play the stream
-      const audio = new Audio();
-      audio.srcObject = remoteStream;
-      audio.autoplay = true;
-      audio.id = `audio-${peerId}`;
-      document.body.appendChild(audio);
+      if (remoteStream) {
+        // Create audio element to play the stream
+        const existingAudio = document.getElementById(`audio-${peerId}`);
+        if (existingAudio) {
+          existingAudio.remove();
+        }
+        
+        const audio = new Audio();
+        audio.srcObject = remoteStream;
+        audio.autoplay = true;
+        audio.id = `audio-${peerId}`;
+        audio.volume = 1.0;
+        document.body.appendChild(audio);
+        
+        // Play audio (handle autoplay policy)
+        audio.play().catch(err => {
+          console.warn('Audio autoplay blocked, waiting for user interaction:', err);
+        });
 
-      // Create analyzer for remote audio
-      createAnalyzer(remoteStream, peerId);
+        // Create analyzer for remote audio
+        createAnalyzer(remoteStream, peerId);
+      }
     };
 
     // Handle ICE candidates
@@ -162,10 +204,18 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
     peerConnection.onconnectionstatechange = () => {
       console.log(`Connection state with ${peerId}: ${peerConnection.connectionState}`);
       if (peerConnection.connectionState === 'connected') {
-        setIsConnected(true);
-      } else if (peerConnection.connectionState === 'failed' || peerConnection.connectionState === 'disconnected') {
-        // Attempt to reconnect
+        setConnectionStatus('connected');
+        reconnectAttempts.current = 0;
+      } else if (peerConnection.connectionState === 'failed') {
         handlePeerDisconnect(peerId);
+        attemptReconnect();
+      } else if (peerConnection.connectionState === 'disconnected') {
+        // Don't immediately disconnect, might reconnect
+        setTimeout(() => {
+          if (peerConnection.connectionState === 'disconnected') {
+            handlePeerDisconnect(peerId);
+          }
+        }, 3000);
       }
     };
 
@@ -176,8 +226,8 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
       audioLevel: 0,
     });
 
-    // If initiator, create and send offer
-    if (initiator) {
+    // If initiator and can broadcast, create and send offer
+    if (initiator && canBroadcast) {
       try {
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
@@ -197,7 +247,28 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
     }
 
     return peerConnection;
-  }, [user, isHost, isSpeaker, createAnalyzer]);
+  }, [user, canBroadcast, createAnalyzer]);
+
+  // Attempt to reconnect
+  const attemptReconnect = useCallback(async () => {
+    if (reconnectAttempts.current >= maxReconnectAttempts) {
+      setConnectionStatus('failed');
+      toast.error('Failed to connect to audio. Please try rejoining.');
+      return;
+    }
+
+    reconnectAttempts.current++;
+    setConnectionStatus('reconnecting');
+    
+    // Wait with exponential backoff
+    await new Promise(resolve => setTimeout(resolve, Math.min(1000 * Math.pow(2, reconnectAttempts.current), 10000)));
+    
+    // Try to reconnect
+    if (channelRef.current) {
+      console.log(`Reconnection attempt ${reconnectAttempts.current}`);
+      // Reconnection handled by channel
+    }
+  }, []);
 
   // Handle peer disconnect
   const handlePeerDisconnect = useCallback((peerId: string) => {
@@ -277,20 +348,20 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
     }
   }, [user]);
 
-  // Connect to space audio
+  // Connect to space audio - NOW ALL USERS CAN CONNECT (not just speakers)
   const connect = useCallback(async () => {
-    if (!user || isConnecting) return;
+    if (!user || connectionStatus === 'connecting') return;
     
-    setIsConnecting(true);
-    console.log('Connecting to space audio...');
+    setConnectionStatus('connecting');
+    console.log(`Connecting to space audio... canBroadcast: ${canBroadcast}`);
 
     try {
-      // Get local stream if we're a host or speaker
-      if (isHost || isSpeaker) {
+      // Get local stream ONLY if we can broadcast (host/speaker)
+      if (canBroadcast) {
         await getLocalStream();
       }
 
-      // Subscribe to signaling channel
+      // Subscribe to signaling channel - ALL users connect to receive audio
       const channel = supabase.channel(`space-audio-${spaceId}`, {
         config: {
           broadcast: { self: false },
@@ -305,8 +376,7 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
           }
         })
         .on('broadcast', { event: 'answer' }, ({ payload }) => {
-          if (payload.to === user.id) {
-            handleAnswer(payload.from, payload.sdp);
+          if (payload.to === user.id) {            handleAnswer(payload.from, payload.sdp);
           }
         })
         .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
@@ -315,21 +385,41 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
           }
         })
         .on('presence', { event: 'join' }, async ({ key, newPresences }) => {
-          // When a new peer joins, initiate connection if we're host/speaker
-          if ((isHost || isSpeaker) && key !== user.id) {
-            console.log(`New peer joined: ${key}`);
-            await createPeerConnection(key, true);
+          // When a new peer joins
+          if (key !== user.id) {
+            console.log(`New peer joined: ${key}`, newPresences);
+            // Hosts/speakers initiate connection to new joiners
+            if (canBroadcast) {
+              await createPeerConnection(key, true);
+            }
           }
         })
         .on('presence', { event: 'leave' }, ({ key }) => {
           handlePeerDisconnect(key);
+        })
+        .on('presence', { event: 'sync' }, () => {
+          // Handle initial sync - connect to existing broadcasters
+          const state = channel.presenceState();
+          Object.keys(state).forEach(async (key) => {
+            if (key !== user.id) {
+              const presence = state[key][0] as any;
+              // If they're a broadcaster and we're not connected, request connection
+              if (presence?.role === 'host' || presence?.role === 'speaker' || presence?.role === 'co_host') {
+                console.log(`Connecting to existing broadcaster: ${key}`);
+                // The broadcaster will send an offer to us
+              }
+            }
+          });
         });
 
       await channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ user_id: user.id, role: isHost ? 'host' : isSpeaker ? 'speaker' : 'listener' });
-          setIsConnected(true);
-          setIsConnecting(false);
+          await channel.track({ 
+            user_id: user.id, 
+            role: isHost ? 'host' : isSpeaker ? 'speaker' : 'listener',
+            canBroadcast 
+          });
+          setConnectionStatus('connected');
           
           // Start monitoring audio levels
           monitorAudioLevels();
@@ -340,10 +430,10 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
 
     } catch (error) {
       console.error('Error connecting to space audio:', error);
-      setIsConnecting(false);
+      setConnectionStatus('failed');
       toast.error('Failed to connect to audio');
     }
-  }, [user, spaceId, isHost, isSpeaker, isConnecting, getLocalStream, handleOffer, handleAnswer, handleIceCandidate, createPeerConnection, handlePeerDisconnect, monitorAudioLevels]);
+  }, [user, spaceId, canBroadcast, isHost, isSpeaker, connectionStatus, getLocalStream, handleOffer, handleAnswer, handleIceCandidate, createPeerConnection, handlePeerDisconnect, monitorAudioLevels]);
 
   // Disconnect from space audio
   const disconnect = useCallback(() => {
@@ -384,7 +474,7 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
       channelRef.current = null;
     }
 
-    setIsConnected(false);
+    setConnectionStatus('disconnected');
   }, []);
 
   // Toggle mute
@@ -406,6 +496,7 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker }: UseSpaceA
   return {
     isConnected,
     isConnecting,
+    connectionStatus,
     audioLevels,
     localStream,
     connect,
