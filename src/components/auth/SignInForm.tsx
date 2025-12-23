@@ -5,9 +5,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Mail, User, Loader2, Eye, EyeOff } from 'lucide-react';
-import { z } from 'zod';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import { Mail, User, Loader2, Eye, EyeOff, Lock } from 'lucide-react';
+import { z } from 'zod';
 
 const loginSchema = z.object({
   identifier: z.string().trim().min(3, 'Please enter your email or username'),
@@ -22,32 +23,32 @@ const LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 function checkRateLimit(identifier: string): { allowed: boolean; waitTime: number } {
   const now = Date.now();
   const attempts = loginAttempts.get(identifier);
-  
+
   if (!attempts) {
     return { allowed: true, waitTime: 0 };
   }
-  
+
   if (now - attempts.lastAttempt > LOCKOUT_DURATION) {
     loginAttempts.delete(identifier);
     return { allowed: true, waitTime: 0 };
   }
-  
+
   if (attempts.count >= MAX_ATTEMPTS) {
     const waitTime = LOCKOUT_DURATION - (now - attempts.lastAttempt);
     return { allowed: false, waitTime };
   }
-  
+
   return { allowed: true, waitTime: 0 };
 }
 
 function recordLoginAttempt(identifier: string, success: boolean): void {
   const now = Date.now();
-  
+
   if (success) {
     loginAttempts.delete(identifier);
     return;
   }
-  
+
   const attempts = loginAttempts.get(identifier);
   if (attempts) {
     loginAttempts.set(identifier, { count: attempts.count + 1, lastAttempt: now });
@@ -68,6 +69,7 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
 
   const isEmail = (value: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -83,17 +85,17 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
       });
       return;
     }
-    
+
     setLoading(true);
     try {
       const validated = loginSchema.parse({ identifier, password });
       let email = validated.identifier;
-      
+
       // If not an email, look up the email by username
       if (!isEmail(validated.identifier)) {
         const { data: userEmail, error: lookupError } = await supabase
           .rpc('get_user_email_by_username', { p_username: validated.identifier });
-        
+
         if (lookupError || !userEmail) {
           recordLoginAttempt(identifier, false);
           throw new Error('Invalid username or password');
@@ -112,8 +114,15 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
       }
 
       recordLoginAttempt(identifier, true);
-      setPassword('');
       
+      // Store last login method for convenience
+      if (rememberMe) {
+        localStorage.setItem('lastLoginMethod', isEmail(identifier) ? 'email' : 'username');
+        localStorage.setItem('lastLoginIdentifier', identifier);
+      }
+      
+      setPassword('');
+
       toast({
         title: "Welcome back!",
         description: "Successfully signed in",
@@ -142,7 +151,7 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
     setGoogleLoading(true);
     try {
       const redirectUrl = `${window.location.origin}/`;
-      
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -175,13 +184,13 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Google Sign In Button */}
       <Button
         onClick={handleGoogleSignIn}
         disabled={googleLoading || loading}
         variant="outline"
-        className="w-full h-12 text-base font-medium border-2 hover:bg-accent"
+        className="w-full h-12 text-base font-medium border-2 hover:bg-accent transition-all duration-200"
       >
         {googleLoading ? (
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
@@ -213,7 +222,7 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
           <Separator className="w-full" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">
+          <span className="bg-card px-3 text-muted-foreground">
             Or continue with
           </span>
         </div>
@@ -222,8 +231,15 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
       {/* Email/Username Sign In */}
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="identifier">Email or Username</Label>
+          <Label htmlFor="identifier" className="text-sm font-medium">Email or Username</Label>
           <div className="relative">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              {isEmail(identifier) ? (
+                <Mail className="h-4 w-4" />
+              ) : (
+                <User className="h-4 w-4" />
+              )}
+            </div>
             <Input
               id="identifier"
               type="text"
@@ -233,21 +249,15 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
               onKeyDown={handleKeyDown}
               disabled={loading}
               autoComplete="username"
-              className="pl-10"
+              className="pl-10 h-11"
             />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-              {isEmail(identifier) ? (
-                <Mail className="h-4 w-4" />
-              ) : (
-                <User className="h-4 w-4" />
-              )}
-            </div>
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password" className="text-sm font-medium">Password</Label>
           <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               id="password"
               type={showPassword ? 'text' : 'password'}
@@ -257,7 +267,7 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
               onKeyDown={handleKeyDown}
               disabled={loading}
               autoComplete="current-password"
-              className="pr-10"
+              className="pl-10 pr-10 h-11"
             />
             <button
               type="button"
@@ -270,23 +280,39 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
           </div>
         </div>
 
+        {/* Remember Me & Forgot Password Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Checkbox 
+              id="remember" 
+              checked={rememberMe}
+              onCheckedChange={(checked) => setRememberMe(checked === true)}
+            />
+            <label
+              htmlFor="remember"
+              className="text-sm text-muted-foreground cursor-pointer select-none"
+            >
+              Remember me
+            </label>
+          </div>
+          <Button
+            variant="link"
+            onClick={onForgotPassword}
+            className="px-0 text-sm text-muted-foreground hover:text-primary"
+          >
+            Forgot password?
+          </Button>
+        </div>
+
         <Button
           onClick={handleSignIn}
           disabled={loading || !identifier || !password}
-          className="w-full h-11 bg-gradient-primary hover:shadow-glow"
+          className="w-full h-12 text-base font-semibold bg-gradient-primary hover:shadow-glow transition-all duration-200"
         >
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {loading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
           Sign In
         </Button>
       </div>
-
-      <Button
-        variant="link"
-        onClick={onForgotPassword}
-        className="w-full text-muted-foreground hover:text-primary"
-      >
-        Forgot your password?
-      </Button>
     </div>
   );
 };
