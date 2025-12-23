@@ -67,6 +67,7 @@ import MusicDiscovery from "./pages/MusicDiscovery";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import Investors from "./pages/Investors";
 import CreatorDashboard from "./pages/CreatorDashboard";
+import SpaceDetail from "./pages/SpaceDetail";
 
 const queryClient = new QueryClient();
 
@@ -164,7 +165,7 @@ const App = () => {
             {/* Live & Stories */}
             <Route path="/live" element={<Live />} />
             <Route path="/live/stream/:streamId" element={<LiveStreamDetail />} />
-            <Route path="/live/space/:spaceId" element={<Live />} />
+            <Route path="/live/space/:spaceId" element={<SpaceDetail />} />
             <Route path="/story/:storyId" element={<StoryDetail />} />
             
             {/* AI Features */}
