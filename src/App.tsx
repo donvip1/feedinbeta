@@ -61,6 +61,7 @@ import Promotions from "./pages/Promotions";
 import Install from "./pages/Install";
 import MusicDiscovery from "./pages/MusicDiscovery";
 import AdminAnalytics from "./pages/AdminAnalytics";
+import Investors from "./pages/Investors";
 
 const queryClient = new QueryClient();
 
@@ -173,6 +174,7 @@ const App = () => {
             <Route path="/settings/language" element={<LanguageSettings />} />
             <Route path="/settings/help" element={<HelpSupport />} />
             <Route path="/settings/sessions" element={<SessionManagement />} />
+            <Route path="/settings/investors" element={<Investors />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             
             {/* Catch-all */}

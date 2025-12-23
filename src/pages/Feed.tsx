@@ -101,10 +101,16 @@ const Feed = () => {
     queryFn: async () => {
       if (!user) return [];
 
-      // Try cache first for instant display
+      // Try cache first for instant display (don't wait for network)
       const cached = await feedCache.get(activeTab);
       if (cached && cached.length > 0) {
+        // Set display posts immediately from cache
         setDisplayPosts(cached);
+        allLoadedPostsRef.current = cached;
+        allVideoPostsRef.current = cached.filter((p: any) => 
+          p.media_type === 'video' || 
+          ((p.post_type === 'refeed' || p.post_type === 'quote') && p.original_post?.media_type === 'video')
+        );
       }
 
       // Use the appropriate feed function based on tab
@@ -368,9 +374,20 @@ const Feed = () => {
     setPostStep('selector');
   };
 
-  const handlePostSubmit = () => {
+  // Enhanced post submit with optimistic update
+  const handlePostSubmit = async () => {
     setPostStep(null);
-    refetch();
+    setSelectedMedia([]);
+    setCurrentMediaIndex(0);
+    
+    // Immediately refetch to get the new post
+    await refetch();
+    
+    // Show success feedback
+    toast({
+      title: 'Post created!',
+      description: 'Your post is now live.',
+    });
   };
 
   const handleGalleryMediaSelect = (files: { url: string; type: 'image' | 'video'; file: File }[]) => {
