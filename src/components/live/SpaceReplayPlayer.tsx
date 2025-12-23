@@ -171,7 +171,7 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/live/space/${spaceId}`;
+    const shareUrl = `${window.location.origin}/space/${spaceId}`;
     
     // Try native share first (mobile devices)
     if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {

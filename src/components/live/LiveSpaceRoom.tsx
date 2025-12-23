@@ -449,7 +449,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/live/space/${space?.share_link || spaceId}`;
+    const shareUrl = `${window.location.origin}/space/${space?.share_link || spaceId}`;
     
     // Try native share first (mobile devices)
     if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
@@ -642,36 +642,39 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
           {/* Host Controls Bar */}
           {isHost && (
-            <div className="flex items-center gap-3 mt-3 p-2 rounded-lg bg-muted/50 border border-border/50">
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mt-3 p-2 rounded-lg bg-muted/50 border border-border/50 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <Switch 
                   checked={space?.allow_mic_for_all !== false}
                   onCheckedChange={toggleMicForAll}
                   id="mic-for-all"
+                  className="scale-90"
                 />
-                <label htmlFor="mic-for-all" className="text-xs font-medium cursor-pointer">
-                  Allow mic for all
+                <label htmlFor="mic-for-all" className="text-[10px] font-medium cursor-pointer whitespace-nowrap">
+                  Mic All
                 </label>
               </div>
-              <div className="h-4 w-px bg-border" />
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="h-7 text-xs"
-                onClick={muteAllSpeakers}
-              >
-                <VolumeX className="w-3 h-3 mr-1" />
-                Mute All
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="h-7 text-xs"
-                onClick={allowAllToUnmute}
-              >
-                <Volume2 className="w-3 h-3 mr-1" />
-                Allow Unmute
-              </Button>
+              <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
+              <div className="flex items-center gap-1.5">
+                <Button 
+                  size="icon" 
+                  variant="outline" 
+                  className="h-7 w-7"
+                  onClick={muteAllSpeakers}
+                  title="Mute All"
+                >
+                  <VolumeX className="w-3.5 h-3.5" />
+                </Button>
+                <Button 
+                  size="icon" 
+                  variant="outline" 
+                  className="h-7 w-7"
+                  onClick={allowAllToUnmute}
+                  title="Allow Unmute"
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
