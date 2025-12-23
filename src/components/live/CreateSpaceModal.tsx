@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { Mic, Users, Lock, Globe, Calendar } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { useNavigation } from '@/context/NavigationContext';
 
 interface CreateSpaceModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ const TOPIC_CATEGORIES = [
 
 export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpaceModalProps) => {
   const { user } = useAuth();
+  const { setHideBottomNav } = useNavigation();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [topicCategory, setTopicCategory] = useState('');
@@ -32,6 +34,16 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
   const [scheduledStart, setScheduledStart] = useState('');
   const [isRecordingEnabled, setIsRecordingEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  // Hide bottom navigation when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      setHideBottomNav(true);
+    } else {
+      setHideBottomNav(false);
+    }
+    return () => setHideBottomNav(false);
+  }, [isOpen, setHideBottomNav]);
 
   const handleCreate = async () => {
     if (!title.trim()) {
