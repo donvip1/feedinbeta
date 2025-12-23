@@ -129,7 +129,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'like':
         if (notification.related_id) {
-          navigate(`/post/${notification.related_id}`);
+          navigate(`/feed/post/${notification.related_id}`);
         }
         break;
         
@@ -144,7 +144,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
               .single();
             
             if (comment?.post_id) {
-              navigate(`/post/${comment.post_id}`, { 
+              navigate(`/feed/post/${comment.post_id}`, { 
                 state: { openComments: true, highlightComment: notification.related_id } 
               });
             }
@@ -177,7 +177,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
       case 'gift':
       case 'gift_received':
         if (notification.related_id) {
-          navigate(`/post/${notification.related_id}`);
+          navigate(`/feed/post/${notification.related_id}`);
         }
         break;
         
@@ -189,7 +189,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'mention':
         if (notification.related_type === 'post' && notification.related_id) {
-          navigate(`/post/${notification.related_id}`);
+          navigate(`/feed/post/${notification.related_id}`);
         } else if (notification.related_type === 'comment' && notification.related_id) {
           try {
             const { data: comment } = await supabase
@@ -199,7 +199,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
               .single();
             
             if (comment?.post_id) {
-              navigate(`/post/${comment.post_id}`, { 
+              navigate(`/feed/post/${comment.post_id}`, { 
                 state: { openComments: true, highlightComment: notification.related_id } 
               });
             }
@@ -212,14 +212,14 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
       case 'refeed':
       case 'quote':
         if (notification.related_id) {
-          navigate(`/post/${notification.related_id}`);
+          navigate(`/feed/post/${notification.related_id}`);
         }
         break;
         
       case 'promotion':
       case 'promotion_reward':
         if (notification.related_id) {
-          navigate(`/post/${notification.related_id}`);
+          navigate(`/feed/post/${notification.related_id}`);
         } else {
           navigate('/promotions');
         }
@@ -233,7 +233,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       default:
         if (notification.related_type === 'post' && notification.related_id) {
-          navigate(`/post/${notification.related_id}`);
+          navigate(`/feed/post/${notification.related_id}`);
         } else if (notification.related_type === 'profile' && notification.related_id) {
           navigate(`/profile/${notification.related_id}`);
         } else {

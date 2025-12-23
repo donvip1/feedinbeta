@@ -63,7 +63,7 @@ export const ViewHistory = () => {
   };
 
   const handlePostClick = (postId: string) => {
-    navigate(`/post/${postId}`);
+    navigate(`/feed/post/${postId}`);
   };
 
   const truncateText = (text: string | null, maxLength: number = 80) => {
