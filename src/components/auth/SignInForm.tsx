@@ -5,23 +5,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Mail, Phone, User, Loader2, Eye, EyeOff, Shield } from 'lucide-react';
+import { Mail, User, Loader2, Eye, EyeOff } from 'lucide-react';
 import { z } from 'zod';
-import { getOrCreateFingerprint, getDeviceName } from '@/lib/device-fingerprint';
+import { Separator } from '@/components/ui/separator';
 
-const emailSchema = z.object({
-  email: z.string().trim().email('Invalid email address').max(255, 'Email too long'),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
-});
-
-const phoneSchema = z.object({
-  phone: z.string().trim().min(10, 'Invalid phone number').max(20, 'Phone number too long'),
-  password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
-});
-
-const usernameSchema = z.object({
-  username: z.string().trim().min(3, 'Username must be at least 3 characters').max(30, 'Username too long'),
+const loginSchema = z.object({
+  identifier: z.string().trim().min(3, 'Please enter your email or username'),
   password: z.string().min(6, 'Password must be at least 6 characters').max(128, 'Password too long'),
 });
 
@@ -38,7 +27,6 @@ function checkRateLimit(identifier: string): { allowed: boolean; waitTime: numbe
     return { allowed: true, waitTime: 0 };
   }
   
-  // Reset if lockout has passed
   if (now - attempts.lastAttempt > LOCKOUT_DURATION) {
     loginAttempts.delete(identifier);
     return { allowed: true, waitTime: 0 };
@@ -76,24 +64,18 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);
-  const [lockoutTime, setLockoutTime] = useState(0);
-  const [formData, setFormData] = useState({
-    email: '',
-    phone: '',
-    username: '',
-    password: '',
-  });
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleSignIn = async (method: 'email' | 'phone' | 'username') => {
-    const identifier = method === 'email' ? formData.email : method === 'phone' ? formData.phone : formData.username;
-    
-    // Check rate limiting
+  const isEmail = (value: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  };
+
+  const handleSignIn = async () => {
     const { allowed, waitTime } = checkRateLimit(identifier);
     if (!allowed) {
-      setIsLocked(true);
-      setLockoutTime(Math.ceil(waitTime / 60000));
       toast({
         title: "Too many attempts",
         description: `Please wait ${Math.ceil(waitTime / 60000)} minutes before trying again`,
@@ -104,47 +86,33 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
     
     setLoading(true);
     try {
-      // Generate device fingerprint for session tracking
-      const fingerprint = await getOrCreateFingerprint();
+      const validated = loginSchema.parse({ identifier, password });
+      let email = validated.identifier;
       
-      if (method === 'email') {
-        const validated = emailSchema.parse({ email: formData.email, password: formData.password });
-        const { error } = await supabase.auth.signInWithPassword({
-          email: validated.email,
-          password: validated.password,
-        });
-        if (error) {
-          recordLoginAttempt(identifier, false);
-          // Don't reveal if email exists or not
-          throw new Error('Invalid email or password');
-        }
-        recordLoginAttempt(identifier, true);
-      } else if (method === 'phone') {
-        const validated = phoneSchema.parse({ phone: formData.phone, password: formData.password });
-        const { error } = await supabase.auth.signInWithPassword({
-          phone: validated.phone,
-          password: validated.password,
-        });
-        if (error) {
-          recordLoginAttempt(identifier, false);
-          throw new Error('Invalid phone number or password');
-        }
-        recordLoginAttempt(identifier, true);
-      } else if (method === 'username') {
-        usernameSchema.parse({ username: formData.username, password: formData.password });
+      // If not an email, look up the email by username
+      if (!isEmail(validated.identifier)) {
+        const { data: userEmail, error: lookupError } = await supabase
+          .rpc('get_user_email_by_username', { p_username: validated.identifier });
         
-        // Username login is not directly supported by Supabase
-        toast({
-          title: "Use Email or Phone",
-          description: "Please sign in with your email or phone number associated with your account",
-          variant: "default",
-        });
-        setLoading(false);
-        return;
+        if (lookupError || !userEmail) {
+          recordLoginAttempt(identifier, false);
+          throw new Error('Invalid username or password');
+        }
+        email = userEmail;
       }
 
-      // Clear password from memory
-      setFormData(prev => ({ ...prev, password: '' }));
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: validated.password,
+      });
+
+      if (error) {
+        recordLoginAttempt(identifier, false);
+        throw new Error('Invalid credentials');
+      }
+
+      recordLoginAttempt(identifier, true);
+      setPassword('');
       
       toast({
         title: "Welcome back!",
@@ -170,177 +138,152 @@ export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent, method: 'email' | 'phone' | 'username') => {
+  const handleGoogleSignIn = async () => {
+    setGoogleLoading(true);
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+    } catch (error: any) {
+      toast({
+        title: "Google sign in failed",
+        description: error.message || 'Could not sign in with Google',
+        variant: "destructive",
+      });
+      setGoogleLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !loading) {
       e.preventDefault();
-      handleSignIn(method);
+      handleSignIn();
     }
   };
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="email" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="email">
-            <Mail className="w-4 h-4 mr-2" />
-            Email
-          </TabsTrigger>
-          <TabsTrigger value="phone">
-            <Phone className="w-4 h-4 mr-2" />
-            Phone
-          </TabsTrigger>
-          <TabsTrigger value="username">
-            <User className="w-4 h-4 mr-2" />
-            Username
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="email" className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              onKeyDown={(e) => handleKeyDown(e, 'email')}
-              disabled={loading}
-              autoComplete="email"
+      {/* Google Sign In Button */}
+      <Button
+        onClick={handleGoogleSignIn}
+        disabled={googleLoading || loading}
+        variant="outline"
+        className="w-full h-12 text-base font-medium border-2 hover:bg-accent"
+      >
+        {googleLoading ? (
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        ) : (
+          <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
+            <path
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              fill="#4285F4"
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email-password">Password</Label>
-            <div className="relative">
-              <Input
-                id="email-password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                onKeyDown={(e) => handleKeyDown(e, 'email')}
-                disabled={loading}
-                autoComplete="current-password"
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-          <Button
-            onClick={() => handleSignIn('email')}
-            disabled={loading}
-            className="w-full bg-gradient-primary hover:shadow-glow"
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign In with Email
-          </Button>
-        </TabsContent>
-
-        <TabsContent value="phone" className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              type="tel"
-              placeholder="+1234567890"
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              onKeyDown={(e) => handleKeyDown(e, 'phone')}
-              disabled={loading}
-              autoComplete="tel"
+            <path
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              fill="#34A853"
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone-password">Password</Label>
-            <div className="relative">
-              <Input
-                id="phone-password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                onKeyDown={(e) => handleKeyDown(e, 'phone')}
-                disabled={loading}
-                autoComplete="current-password"
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
-          </div>
-          <Button
-            onClick={() => handleSignIn('phone')}
-            disabled={loading}
-            className="w-full bg-gradient-primary hover:shadow-glow"
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign In with Phone
-          </Button>
-        </TabsContent>
+            <path
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+              fill="#FBBC05"
+            />
+            <path
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+              fill="#EA4335"
+            />
+          </svg>
+        )}
+        Continue with Google
+      </Button>
 
-        <TabsContent value="username" className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <Separator className="w-full" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            Or continue with
+          </span>
+        </div>
+      </div>
+
+      {/* Email/Username Sign In */}
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="identifier">Email or Username</Label>
+          <div className="relative">
             <Input
-              id="username"
+              id="identifier"
               type="text"
-              placeholder="yourusername"
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value.toLowerCase() })}
-              onKeyDown={(e) => handleKeyDown(e, 'username')}
+              placeholder="Enter email or username"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value.trim())}
+              onKeyDown={handleKeyDown}
               disabled={loading}
               autoComplete="username"
+              className="pl-10"
             />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="username-password">Password</Label>
-            <div className="relative">
-              <Input
-                id="username-password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                onKeyDown={(e) => handleKeyDown(e, 'username')}
-                disabled={loading}
-                autoComplete="current-password"
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                tabIndex={-1}
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              {isEmail(identifier) ? (
+                <Mail className="h-4 w-4" />
+              ) : (
+                <User className="h-4 w-4" />
+              )}
             </div>
           </div>
-          <Button
-            onClick={() => handleSignIn('username')}
-            disabled={loading}
-            className="w-full bg-gradient-primary hover:shadow-glow"
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Sign In with Username
-          </Button>
-        </TabsContent>
-      </Tabs>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={loading}
+              autoComplete="current-password"
+              className="pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              tabIndex={-1}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleSignIn}
+          disabled={loading || !identifier || !password}
+          className="w-full h-11 bg-gradient-primary hover:shadow-glow"
+        >
+          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Sign In
+        </Button>
+      </div>
 
       <Button
         variant="link"
         onClick={onForgotPassword}
-        className="w-full"
+        className="w-full text-muted-foreground hover:text-primary"
       >
         Forgot your password?
       </Button>

@@ -4550,6 +4550,10 @@ export type Database = {
       }
       get_user_by_username: { Args: { p_username: string }; Returns: string }
       get_user_credits: { Args: { p_user_id: string }; Returns: number }
+      get_user_email_by_username: {
+        Args: { p_username: string }
+        Returns: string
+      }
       get_user_post_count: { Args: { user_uuid: string }; Returns: number }
       get_user_public_profile: {
         Args: { target_user_id: string }
