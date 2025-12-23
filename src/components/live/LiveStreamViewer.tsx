@@ -290,11 +290,50 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
 
   const handleShare = async () => {
     const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
-    if (navigator.share) {
-      await navigator.share({ title: stream?.title, url: shareUrl });
-    } else {
-      await navigator.clipboard.writeText(shareUrl);
-      toast.success("Link copied!");
+    
+    // Try native share first (mobile devices)
+    if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+      try {
+        await navigator.share({
+          title: stream?.title || 'Live Stream',
+          text: `Watch this live stream: ${stream?.title}`,
+          url: shareUrl,
+        });
+        return;
+      } catch (error: any) {
+        // If user cancelled, don't fall through to clipboard
+        if (error?.name === 'AbortError') return;
+      }
+    }
+    
+    // Fallback to clipboard with multiple methods
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+      } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = shareUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        if (successful) {
+          toast.success('Link copied to clipboard!');
+        } else {
+          toast.error('Could not copy link. Please copy manually: ' + shareUrl);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      toast.error('Could not copy link. Please copy manually: ' + shareUrl);
     }
   };
 
