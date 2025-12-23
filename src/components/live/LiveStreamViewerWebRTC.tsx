@@ -105,74 +105,117 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     };
   }, [streamId]);
 
-  // WebRTC connection setup
+  // WebRTC connection setup with retry mechanism
   useEffect(() => {
     if (stream?.status !== 'live') return;
 
     const viewerId = viewerIdRef.current;
+    let retryCount = 0;
+    const maxRetries = 5;
+    let retryTimeout: NodeJS.Timeout | null = null;
+    let connectionTimeout: NodeJS.Timeout | null = null;
 
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
       ]
     });
 
     pcRef.current = pc;
 
+    // Add transceiver to receive video/audio
+    pc.addTransceiver('video', { direction: 'recvonly' });
+    pc.addTransceiver('audio', { direction: 'recvonly' });
+
     // Handle incoming stream
     pc.ontrack = (event) => {
-      console.log("Received track:", event.track.kind);
+      console.log("[Viewer] Received track:", event.track.kind);
       if (videoRef.current && event.streams[0]) {
         videoRef.current.srcObject = event.streams[0];
         setHasVideo(true);
         setIsConnecting(false);
+        
+        // Clear any retry timeouts since we're connected
+        if (retryTimeout) clearTimeout(retryTimeout);
+        if (connectionTimeout) clearTimeout(connectionTimeout);
+        
+        toast.success('Connected to stream!');
       }
     };
 
     pc.onconnectionstatechange = () => {
-      console.log("Connection state:", pc.connectionState);
+      console.log("[Viewer] Connection state:", pc.connectionState);
       if (pc.connectionState === 'connected') {
         setIsConnecting(false);
+        retryCount = 0;
       } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         setIsConnecting(true);
+        // Attempt reconnect
+        if (retryCount < maxRetries) {
+          retryTimeout = setTimeout(() => {
+            console.log(`[Viewer] Retrying connection (attempt ${retryCount + 1}/${maxRetries})`);
+            announceViewerJoin();
+          }, 2000 * Math.pow(2, retryCount));
+          retryCount++;
+        }
       }
     };
 
     // Subscribe to broadcast channel
     const channel = supabase
-      .channel(`broadcast-${streamId}`)
+      .channel(`broadcast-${streamId}`, {
+        config: {
+          broadcast: { self: false },
+        }
+      })
       .on('broadcast', { event: 'offer' }, async ({ payload }) => {
         if (payload.viewerId !== viewerId) return;
 
-        console.log("Received offer");
-        await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+        console.log("[Viewer] Received offer from host");
+        try {
+          await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
 
-        // Send answer back
-        channel.send({
-          type: 'broadcast',
-          event: 'answer',
-          payload: { viewerId, answer },
-        });
+          // Send answer back
+          channel.send({
+            type: 'broadcast',
+            event: 'answer',
+            payload: { viewerId, answer },
+          });
+          console.log("[Viewer] Sent answer to host");
+        } catch (err) {
+          console.error("[Viewer] Error handling offer:", err);
+        }
       })
       .on('broadcast', { event: 'ice-candidate-from-host' }, async ({ payload }) => {
         if (payload.viewerId !== viewerId) return;
         if (payload.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          } catch (err) {
+            console.error("[Viewer] Error adding ICE candidate:", err);
+          }
         }
       })
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          // Announce viewer join
-          channel.send({
-            type: 'broadcast',
-            event: 'viewer-join',
-            payload: { viewerId },
-          });
-        }
+      .on('broadcast', { event: 'host-ready' }, () => {
+        // Host is signaling they're ready - announce ourselves
+        console.log("[Viewer] Host signaled ready, announcing join");
+        announceViewerJoin();
       });
+
+    // Function to announce viewer join
+    const announceViewerJoin = () => {
+      console.log("[Viewer] Announcing join with viewerId:", viewerId);
+      channel.send({
+        type: 'broadcast',
+        event: 'viewer-join',
+        payload: { viewerId },
+      });
+    };
 
     // Send ICE candidates
     pc.onicecandidate = (event) => {
@@ -185,11 +228,38 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       }
     };
 
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log("[Viewer] Subscribed to broadcast channel");
+        // Announce viewer join immediately
+        announceViewerJoin();
+        
+        // Set a connection timeout - if no video after 10 seconds, retry
+        connectionTimeout = setTimeout(() => {
+          if (!hasVideo && retryCount < maxRetries) {
+            console.log("[Viewer] Connection timeout, retrying...");
+            announceViewerJoin();
+            retryCount++;
+          }
+        }, 10000);
+        
+        // Also retry every 3 seconds initially
+        retryTimeout = setTimeout(() => {
+          if (!hasVideo) {
+            console.log("[Viewer] Initial retry...");
+            announceViewerJoin();
+          }
+        }, 3000);
+      }
+    });
+
     return () => {
+      if (retryTimeout) clearTimeout(retryTimeout);
+      if (connectionTimeout) clearTimeout(connectionTimeout);
       pc.close();
       supabase.removeChannel(channel);
     };
-  }, [stream?.status, streamId]);
+  }, [stream?.status, streamId, hasVideo]);
 
   // Subscribe to comments
   useEffect(() => {

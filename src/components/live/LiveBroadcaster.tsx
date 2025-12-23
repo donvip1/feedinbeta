@@ -185,24 +185,59 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     if (!isLive) return;
 
     const channel = supabase
-      .channel(`broadcast-${streamId}`)
+      .channel(`broadcast-${streamId}`, {
+        config: {
+          broadcast: { self: false },
+        }
+      })
       .on('broadcast', { event: 'viewer-join' }, async ({ payload }) => {
-        console.log("Viewer joining:", payload.viewerId);
-        await handleViewerJoin(payload.viewerId);
+        console.log("[Host] Viewer joining:", payload.viewerId);
+        await handleViewerJoin(payload.viewerId, channel);
       })
       .on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
         const pc = viewersRef.current.get(payload.viewerId);
         if (pc && payload.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
+          } catch (err) {
+            console.error("[Host] Error adding ICE candidate:", err);
+          }
         }
       })
       .on('broadcast', { event: 'answer' }, async ({ payload }) => {
         const pc = viewersRef.current.get(payload.viewerId);
         if (pc) {
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+          try {
+            await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+            console.log("[Host] Received answer from viewer:", payload.viewerId);
+          } catch (err) {
+            console.error("[Host] Error setting remote description:", err);
+          }
         }
-      })
-      .subscribe();
+      });
+
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        console.log("[Host] Subscribed to broadcast channel");
+        // Signal to any waiting viewers that host is ready
+        channel.send({
+          type: 'broadcast',
+          event: 'host-ready',
+          payload: { streamId },
+        });
+        
+        // Send host-ready signal periodically to catch new viewers
+        const readyInterval = setInterval(() => {
+          channel.send({
+            type: 'broadcast',
+            event: 'host-ready',
+            payload: { streamId },
+          });
+        }, 5000);
+        
+        return () => clearInterval(readyInterval);
+      }
+    });
 
     return () => {
       supabase.removeChannel(channel);
@@ -210,25 +245,39 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   }, [isLive, streamId]);
 
   // Handle new viewer connection
-  const handleViewerJoin = async (viewerId: string) => {
-    if (!streamRef.current) return;
+  const handleViewerJoin = async (viewerId: string, channel: any) => {
+    if (!streamRef.current) {
+      console.log("[Host] No stream available yet");
+      return;
+    }
+
+    // Check if we already have a connection for this viewer
+    if (viewersRef.current.has(viewerId)) {
+      console.log("[Host] Already have connection for viewer:", viewerId);
+      // Still send a new offer in case they're reconnecting
+    }
+
+    console.log("[Host] Creating peer connection for viewer:", viewerId);
 
     const pc = new RTCPeerConnection({
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' },
       ]
     });
 
     // Add local stream tracks
     streamRef.current.getTracks().forEach(track => {
+      console.log("[Host] Adding track:", track.kind);
       pc.addTrack(track, streamRef.current!);
     });
 
     // Send ICE candidates to viewer
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        supabase.channel(`broadcast-${streamId}`).send({
+        channel.send({
           type: 'broadcast',
           event: 'ice-candidate-from-host',
           payload: { viewerId, candidate: event.candidate },
@@ -236,19 +285,33 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       }
     };
 
-    // Create offer
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
+    pc.onconnectionstatechange = () => {
+      console.log(`[Host] Connection state for ${viewerId}:`, pc.connectionState);
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        viewersRef.current.delete(viewerId);
+        setViewerCount(viewersRef.current.size);
+      }
+    };
 
-    // Send offer to viewer
-    supabase.channel(`broadcast-${streamId}`).send({
-      type: 'broadcast',
-      event: 'offer',
-      payload: { viewerId, offer },
-    });
+    try {
+      // Create offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
 
-    viewersRef.current.set(viewerId, pc);
-    setViewerCount(viewersRef.current.size);
+      // Send offer to viewer
+      console.log("[Host] Sending offer to viewer:", viewerId);
+      channel.send({
+        type: 'broadcast',
+        event: 'offer',
+        payload: { viewerId, offer },
+      });
+
+      viewersRef.current.set(viewerId, pc);
+      setViewerCount(viewersRef.current.size);
+    } catch (err) {
+      console.error("[Host] Error creating offer:", err);
+      pc.close();
+    }
   };
 
   // Subscribe to comments
