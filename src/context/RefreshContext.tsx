@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useCallback, useRef } from 'react';
+import { createContext, useContext, useCallback, useRef, useEffect } from 'react';
+import type { FC, ReactNode } from 'react';
 
 export type RefreshPage = 'feed' | 'chats' | 'wallet' | 'profile' | 'learn' | 'ai';
 
@@ -9,7 +10,7 @@ export interface RefreshContextType {
 
 export const RefreshContext = createContext<RefreshContextType | null>(null);
 
-export const RefreshProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const RefreshProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const subscribersRef = useRef<Map<RefreshPage, Set<() => void>>>(new Map());
 
   const triggerRefresh = useCallback((page: RefreshPage) => {
@@ -56,7 +57,7 @@ export const useRefresh = () => {
 export const usePageRefresh = (page: RefreshPage, onRefresh: () => void) => {
   const { subscribeToRefresh } = useRefresh();
   
-  React.useEffect(() => {
+  useEffect(() => {
     const unsubscribe = subscribeToRefresh(page, onRefresh);
     return unsubscribe;
   }, [page, onRefresh, subscribeToRefresh]);
