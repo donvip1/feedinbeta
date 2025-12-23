@@ -384,6 +384,16 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
             handleIceCandidate(payload.from, payload.candidate);
           }
         })
+        .on('broadcast', { event: 'broadcaster-joined' }, async ({ payload }) => {
+          // A broadcaster joined - if we're a listener, prepare to receive
+          if (!canBroadcast && payload.userId !== user.id) {
+            console.log(`Broadcaster ${payload.userId} joined, preparing to receive audio`);
+            // The broadcaster will send us an offer, but create the connection placeholder
+            if (!peersRef.current.has(payload.userId)) {
+              await createPeerConnection(payload.userId, false);
+            }
+          }
+        })
         .on('presence', { event: 'join' }, async ({ key, newPresences }) => {
           // When a new peer joins
           if (key !== user.id) {
@@ -397,28 +407,50 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
         .on('presence', { event: 'leave' }, ({ key }) => {
           handlePeerDisconnect(key);
         })
-        .on('presence', { event: 'sync' }, () => {
-          // Handle initial sync - connect to existing broadcasters
+        .on('presence', { event: 'sync' }, async () => {
+          // Handle initial sync - connect to all existing peers
           const state = channel.presenceState();
-          Object.keys(state).forEach(async (key) => {
-            if (key !== user.id) {
+          console.log('Presence sync, state:', Object.keys(state));
+          
+          for (const key of Object.keys(state)) {
+            if (key !== user.id && !peersRef.current.has(key)) {
               const presence = state[key][0] as any;
-              // If they're a broadcaster and we're not connected, request connection
-              if (presence?.role === 'host' || presence?.role === 'speaker' || presence?.role === 'co_host') {
-                console.log(`Connecting to existing broadcaster: ${key}`);
-                // The broadcaster will send an offer to us
+              console.log(`Found peer ${key}, role: ${presence?.role}, canBroadcast: ${presence?.canBroadcast}`);
+              
+              // If we can broadcast, send offers to everyone (including listeners)
+              if (canBroadcast) {
+                console.log(`Sending offer to ${key} as broadcaster`);
+                await createPeerConnection(key, true);
+              } 
+              // If we're a listener and they can broadcast, wait for their offer
+              else if (presence?.canBroadcast) {
+                console.log(`Waiting for offer from broadcaster ${key}`);
+                // Create connection but don't initiate - wait for their offer
+                await createPeerConnection(key, false);
               }
             }
-          });
+          }
         });
 
       await channel.subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
+          console.log(`Subscribed to channel as ${isHost ? 'host' : isSpeaker ? 'speaker' : 'listener'}, canBroadcast: ${canBroadcast}`);
+          
           await channel.track({ 
             user_id: user.id, 
             role: isHost ? 'host' : isSpeaker ? 'speaker' : 'listener',
             canBroadcast 
           });
+          
+          // If we're a broadcaster, announce ourselves so listeners can prepare
+          if (canBroadcast) {
+            channel.send({
+              type: 'broadcast',
+              event: 'broadcaster-joined',
+              payload: { userId: user.id }
+            });
+          }
+          
           setConnectionStatus('connected');
           
           // Start monitoring audio levels
