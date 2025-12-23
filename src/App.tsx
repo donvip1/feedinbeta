@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -11,6 +11,8 @@ import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
 import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
+import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
+import { UPDATE_AVAILABLE_EVENT, autoUpdater } from "@/lib/auto-updater";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -68,6 +70,8 @@ import CreatorDashboard from "./pages/CreatorDashboard";
 const queryClient = new QueryClient();
 
 const App = () => {
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
   // Initialize offline manager + auto-updater
   useEffect(() => {
     // Initialize offline manager
@@ -81,6 +85,12 @@ const App = () => {
       getAutoUpdater();
       console.log('Auto-updater ready');
     });
+
+    // Listen for update available event
+    const handleUpdateAvailable = () => {
+      setShowUpdateModal(true);
+    };
+    window.addEventListener(UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
     
     // Request notification permission on app load
     if ('Notification' in window && Notification.permission === 'default') {
@@ -91,7 +101,21 @@ const App = () => {
         });
       }, 3000);
     }
+
+    return () => {
+      window.removeEventListener(UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
+    };
   }, []);
+
+  const handleUpdate = () => {
+    setShowUpdateModal(false);
+    autoUpdater.applyUpdate();
+  };
+
+  const handleUpdateLater = () => {
+    setShowUpdateModal(false);
+    autoUpdater.dismissUpdate();
+  };
 
   return (
     <ErrorBoundary>
@@ -106,6 +130,11 @@ const App = () => {
                   <FloatingCallWidget />
                   <ActiveCallIndicator />
                   <MobileInstallModal />
+                  <UpdatePromptModal 
+                    open={showUpdateModal} 
+                    onUpdate={handleUpdate} 
+                    onLater={handleUpdateLater} 
+                  />
                 <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />

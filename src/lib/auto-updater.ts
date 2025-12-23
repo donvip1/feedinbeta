@@ -2,12 +2,16 @@
  * Auto Updater - Manages automatic background updates for the PWA
  */
 
+// Custom event for update available
+export const UPDATE_AVAILABLE_EVENT = 'feedin-update-available';
+
 class AutoUpdater {
   private static instance: AutoUpdater;
   private registration: ServiceWorkerRegistration | null = null;
   private checkInterval: number | null = null;
   private isChecking = false;
   private lastCheck = 0;
+  private pendingUpdate = false;
   private readonly CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes for faster updates
   private readonly MIN_CHECK_GAP = 30 * 1000; // 30 seconds minimum between checks
   private readonly IDLE_THRESHOLD = 5 * 1000; // 5 seconds of inactivity to apply update
@@ -107,8 +111,10 @@ class AutoUpdater {
 
     newWorker.addEventListener('statechange', () => {
       if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        console.log('[AutoUpdater] New version ready, applying update...');
-        this.applyUpdate();
+        console.log('[AutoUpdater] New version ready, notifying user...');
+        this.pendingUpdate = true;
+        // Dispatch custom event to show update prompt
+        window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
       }
     });
   };
@@ -128,8 +134,9 @@ class AutoUpdater {
       
       // Check if there's a waiting worker
       if (this.registration.waiting) {
-        console.log('[AutoUpdater] Update available, applying...');
-        this.applyUpdate();
+        console.log('[AutoUpdater] Update available, notifying user...');
+        this.pendingUpdate = true;
+        window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
         return true;
       }
       
@@ -148,34 +155,18 @@ class AutoUpdater {
       return;
     }
 
-    // Check if user is idle or tab is hidden - perfect time to update
-    const isIdle = this.isUserIdle();
-    const isHidden = document.visibilityState === 'hidden';
-    
-    if (isIdle || isHidden) {
-      console.log('[AutoUpdater] Applying update silently (idle/hidden)');
-      this.registration.waiting.postMessage({ action: 'skipWaiting' });
-    } else {
-      console.log('[AutoUpdater] User active, scheduling background update');
-      // Apply on next visibility change or idle
-      const applyOnIdle = () => {
-        if (document.visibilityState === 'hidden' || this.isUserIdle()) {
-          document.removeEventListener('visibilitychange', applyOnIdle);
-          this.registration?.waiting?.postMessage({ action: 'skipWaiting' });
-        }
-      };
-      
-      document.addEventListener('visibilitychange', applyOnIdle);
-      
-      // Fallback: apply after 60 seconds regardless (reduced from 5 minutes)
-      setTimeout(() => {
-        document.removeEventListener('visibilitychange', applyOnIdle);
-        if (this.registration?.waiting) {
-          console.log('[AutoUpdater] Applying update (timeout)');
-          this.registration.waiting.postMessage({ action: 'skipWaiting' });
-        }
-      }, 60 * 1000);
-    }
+    console.log('[AutoUpdater] Applying update now...');
+    this.pendingUpdate = false;
+    this.registration.waiting.postMessage({ action: 'skipWaiting' });
+  }
+
+  hasPendingUpdate(): boolean {
+    return this.pendingUpdate || !!this.registration?.waiting;
+  }
+
+  dismissUpdate() {
+    // User chose to update later - we'll remind them on next check
+    console.log('[AutoUpdater] User dismissed update prompt');
   }
 
   private isUserIdle(): boolean {
@@ -230,6 +221,12 @@ export const autoUpdater = {
   },
   applyUpdate() {
     getAutoUpdater().applyUpdate();
+  },
+  hasPendingUpdate() {
+    return getAutoUpdater().hasPendingUpdate();
+  },
+  dismissUpdate() {
+    getAutoUpdater().dismissUpdate();
   },
   destroy() {
     getAutoUpdater().destroy();
