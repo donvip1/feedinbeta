@@ -49,9 +49,12 @@ interface Speaker {
   role: string;
   is_muted: boolean;
   has_raised_hand: boolean;
-  hand_raised_at?: string;
+  hand_raised_at?: string | null;
   host_muted?: boolean;
   mic_allowed?: boolean;
+  joined_at?: string | null;
+  left_at?: string | null;
+  space_id?: string;
   profile?: {
     display_name: string;
     username: string;
@@ -137,11 +140,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     return () => clearInterval(interval);
   }, [space?.started_at]);
 
-  // Connect audio for ALL users (not just speakers)
+  // Initialize space and set up realtime
   useEffect(() => {
-    fetchSpaceData();
-    joinSpace();
-    fetchTotalGifts();
+    const initSpace = async () => {
+      console.log('[LiveSpace] Initializing space:', spaceId);
+      await fetchSpaceData();
+      await fetchTotalGifts();
+    };
+    
+    initSpace();
 
     const channel = supabase
       .channel(`space-${spaceId}`)
@@ -150,7 +157,10 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         schema: 'public',
         table: 'live_space_speakers',
         filter: `space_id=eq.${spaceId}`,
-      }, () => fetchSpeakers())
+      }, () => {
+        console.log('[LiveSpace] Speakers changed, refetching...');
+        fetchSpeakers();
+      })
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -195,41 +205,71 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     };
   }, [spaceId]);
 
-  // Connect audio after role is determined
+  // Join space AFTER space data is loaded (so we know if we're the host)
+  useEffect(() => {
+    if (space && user) {
+      console.log('[LiveSpace] Space loaded, joining as user:', user.id, 'Space owner:', space.user_id);
+      joinSpace();
+    }
+  }, [space?.id, user?.id]);
+
+  // Connect audio AFTER role is determined from speakers table
   useEffect(() => {
     if (space && user && myRole) {
+      console.log('[LiveSpace] Role determined:', myRole, 'Connecting audio...');
       // Disconnect and reconnect when role changes to ensure proper audio setup
       disconnect();
       const timer = setTimeout(() => {
         connect();
-      }, 100);
+      }, 200);
       return () => clearTimeout(timer);
     }
-  }, [space, user, myRole]);
+  }, [myRole]);
 
   const fetchSpaceData = async () => {
+    console.log('[LiveSpace] Fetching space data for:', spaceId);
     const { data, error } = await supabase
       .from('live_spaces')
       .select('*')
       .eq('id', spaceId)
       .single();
 
-    if (!error && data) {
-      setSpace(data);
+    if (error) {
+      console.error('[LiveSpace] Error fetching space:', error);
+      toast.error('Failed to load space');
+      return;
     }
     
-    fetchSpeakers();
+    if (data) {
+      console.log('[LiveSpace] Space data loaded:', data.title, 'Owner:', data.user_id);
+      setSpace(data);
+    }
   };
 
   const fetchSpeakers = async () => {
-    const { data: speakersData } = await supabase
+    console.log('[LiveSpace] Fetching speakers for space:', spaceId);
+    const { data: speakersData, error } = await supabase
       .from('live_space_speakers')
       .select('*')
       .eq('space_id', spaceId)
       .is('left_at', null);
 
-    if (speakersData && speakersData.length > 0) {
-      const userIds = speakersData.map(s => s.user_id);
+    if (error) {
+      console.error('[LiveSpace] Error fetching speakers:', error);
+      return;
+    }
+
+    console.log('[LiveSpace] Found speakers:', speakersData?.length || 0);
+
+    // Get user IDs including the space owner as fallback
+    let userIds = speakersData?.map(s => s.user_id) || [];
+    
+    // Ensure host is included even if not in speakers table yet
+    if (space?.user_id && !userIds.includes(space.user_id)) {
+      userIds.push(space.user_id);
+    }
+
+    if (userIds.length > 0) {
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url')
@@ -237,20 +277,60 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
       
-      const enrichedSpeakers = speakersData.map(s => ({
+      let enrichedSpeakers: Speaker[] = (speakersData || []).map(s => ({
         ...s,
         profile: profileMap.get(s.user_id),
       }));
 
+      // Add host as fallback if not in speakers list
+      if (space?.user_id) {
+        const hostInSpeakers = enrichedSpeakers.find(s => s.user_id === space.user_id);
+        if (!hostInSpeakers) {
+          console.log('[LiveSpace] Host not in speakers, adding fallback');
+          enrichedSpeakers.unshift({
+            id: `fallback-${space.user_id}`,
+            user_id: space.user_id,
+            role: 'host',
+            is_muted: false,
+            has_raised_hand: false,
+            host_muted: false,
+            mic_allowed: true,
+            hand_raised_at: null,
+            joined_at: new Date().toISOString(),
+            left_at: null,
+            space_id: spaceId,
+            profile: profileMap.get(space.user_id),
+          });
+        }
+      }
+
+      console.log('[LiveSpace] Enriched speakers:', enrichedSpeakers.map(s => ({ 
+        user_id: s.user_id, 
+        role: s.role, 
+        name: s.profile?.display_name 
+      })));
+
       setSpeakers(enrichedSpeakers);
 
+      // Determine my role
       const mySpeaker = enrichedSpeakers.find(s => s.user_id === user?.id);
       if (mySpeaker) {
+        console.log('[LiveSpace] My role from speakers:', mySpeaker.role);
         setMyRole(mySpeaker.role);
         setIsMuted(mySpeaker.is_muted);
         setHasRaisedHand(mySpeaker.has_raised_hand);
         setMyHostMuted(mySpeaker.host_muted || false);
         setMyMicAllowed(mySpeaker.mic_allowed !== false);
+      } else if (user?.id === space?.user_id) {
+        // I'm the owner but not in speakers list yet - set as host
+        console.log('[LiveSpace] I am the space owner, setting role to host');
+        setMyRole('host');
+      }
+    } else {
+      // No speakers yet, check if I'm the host
+      if (user?.id === space?.user_id) {
+        console.log('[LiveSpace] No speakers yet, but I am the owner');
+        setMyRole('host');
       }
     }
   };
@@ -265,31 +345,67 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   const joinSpace = async () => {
-    if (!user) return;
+    if (!user || !space) {
+      console.log('[LiveSpace] Cannot join - no user or space data');
+      return;
+    }
 
-    const { data: existing } = await supabase
+    console.log('[LiveSpace] Joining space as:', user.id, 'Space owner:', space.user_id);
+    const isOwner = space.user_id === user.id;
+
+    // Check if already in speakers table
+    const { data: existing, error: existingError } = await supabase
       .from('live_space_speakers')
-      .select('id')
+      .select('id, role')
       .eq('space_id', spaceId)
       .eq('user_id', user.id)
       .is('left_at', null)
       .maybeSingle();
 
-    if (!existing) {
-      await supabase.from('live_space_speakers').insert({
+    if (existingError) {
+      console.error('[LiveSpace] Error checking existing speaker:', existingError);
+    }
+
+    if (existing) {
+      console.log('[LiveSpace] Already in speakers table with role:', existing.role);
+      
+      // If I'm the owner but my role is wrong, fix it
+      if (isOwner && existing.role !== 'host') {
+        console.log('[LiveSpace] Fixing owner role to host');
+        await supabase
+          .from('live_space_speakers')
+          .update({ role: 'host', is_muted: false })
+          .eq('id', existing.id);
+      }
+    } else {
+      // Insert new speaker
+      const role = isOwner ? 'host' : 'listener';
+      console.log('[LiveSpace] Inserting new speaker with role:', role);
+      
+      const { error: insertError } = await supabase.from('live_space_speakers').insert({
         space_id: spaceId,
         user_id: user.id,
-        role: space?.user_id === user.id ? 'host' : 'listener',
-        is_muted: true,
+        role: role,
+        is_muted: !isOwner, // Host starts unmuted
         host_muted: false,
         mic_allowed: true,
       });
 
+      if (insertError) {
+        console.error('[LiveSpace] Error inserting speaker:', insertError);
+        toast.error('Failed to join space');
+        return;
+      }
+
+      // Update viewer count
       await supabase
         .from('live_spaces')
-        .update({ viewer_count: (space?.viewer_count || 0) + 1 })
+        .update({ viewer_count: (space.viewer_count || 0) + 1 })
         .eq('id', spaceId);
     }
+
+    // Refetch speakers to update UI
+    await fetchSpeakers();
   };
 
   const leaveSpace = async () => {

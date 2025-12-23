@@ -61,6 +61,8 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
       // Generate short numeric share ID (6 digits)
       const shareLink = Math.floor(100000 + Math.random() * 900000).toString();
       
+      console.log('[CreateSpace] Creating space with share link:', shareLink);
+      
       const { data, error } = await supabase
         .from('live_spaces')
         .insert({
@@ -78,17 +80,31 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('[CreateSpace] Error creating space:', error);
+        throw error;
+      }
+
+      console.log('[CreateSpace] Space created:', data.id, 'Adding host to speakers...');
 
       // Add creator as host
-      await supabase
+      const { error: hostError } = await supabase
         .from('live_space_speakers')
         .insert({
           space_id: data.id,
           user_id: user.id,
           role: 'host',
           is_muted: false,
+          host_muted: false,
+          mic_allowed: true,
         });
+
+      if (hostError) {
+        console.error('[CreateSpace] Error adding host to speakers:', hostError);
+        // Don't throw - space was created, we can add host on join
+      } else {
+        console.log('[CreateSpace] Host added to speakers successfully');
+      }
 
       toast.success(isScheduled ? 'Space scheduled!' : 'Space started!');
       onSpaceCreated(data.id);

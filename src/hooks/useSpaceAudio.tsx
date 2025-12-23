@@ -44,6 +44,9 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
 
   // Can this user broadcast audio?
   const canBroadcast = isHost || isSpeaker;
+  
+  // Log role changes
+  console.log(`[SpaceAudio] Role check - isHost: ${isHost}, isSpeaker: ${isSpeaker}, canBroadcast: ${canBroadcast}`);
 
   // ICE servers configuration
   const iceServers: RTCConfiguration = {
