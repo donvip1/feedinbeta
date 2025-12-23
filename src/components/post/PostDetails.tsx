@@ -286,7 +286,7 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
       setTimeout(() => {
         onSubmit();
         if (newPost?.id) {
-          navigate(`/post/${newPost.id}`);
+          navigate(`/feed/post/${newPost.id}`);
         }
       }, 500);
     } catch (error: any) {

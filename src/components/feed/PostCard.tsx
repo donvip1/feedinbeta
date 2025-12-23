@@ -606,7 +606,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
           <div className="border rounded-2xl p-3 bg-muted/30 mb-2">
             <div 
               className="flex items-center gap-2 mb-2 cursor-pointer"
-              onClick={() => navigate(`/post/${post.original_post.id}`)}
+              onClick={() => navigate(`/feed/post/${post.original_post.id}`)}
             >
               <Avatar 
                 className="w-6 h-6 cursor-pointer"
@@ -640,7 +640,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
             {post.original_post.content && (
               <p 
                 className="text-sm mb-2 line-clamp-3 cursor-pointer"
-                onClick={() => navigate(`/post/${post.original_post.id}`)}
+                onClick={() => navigate(`/feed/post/${post.original_post.id}`)}
               >
                 {post.original_post.content}
               </p>
@@ -717,7 +717,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
                     src={opMediaUrl} 
                     alt="Original post" 
                     className="w-full h-full object-cover cursor-pointer no-download-media"
-                    onClick={() => navigate(`/post/${post.original_post.id}`)}
+                    onClick={() => navigate(`/feed/post/${post.original_post.id}`)}
                     onContextMenu={(e) => e.preventDefault()}
                     draggable={false}
                   />

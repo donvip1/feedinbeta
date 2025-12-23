@@ -69,13 +69,25 @@ export const SignUpForm = () => {
   const checkUsernameAvailability = async (username: string): Promise<boolean> => {
     if (username.length < 3) return true;
     
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('username', username.toLowerCase())
-      .maybeSingle();
-    
-    return !data && !error;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', username.toLowerCase())
+        .maybeSingle();
+      
+      // If there's a permission/RLS error, allow signup to proceed
+      // The database unique constraint will catch actual duplicates
+      if (error) {
+        console.warn('Username check error (will validate on insert):', error.message);
+        return true;
+      }
+      
+      return !data; // Username available if no matching profile found
+    } catch (err) {
+      console.warn('Username check failed:', err);
+      return true; // Allow signup to proceed - database constraint catches duplicates
+    }
   };
 
   const handleSignUp = async (method: 'email' | 'phone') => {
