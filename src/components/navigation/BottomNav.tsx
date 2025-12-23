@@ -12,6 +12,8 @@ import { RefreshContext, RefreshContextType, RefreshPage } from '@/context/Refre
 import { navigationPrefetcher } from '@/lib/navigation-prefetcher';
 import { memoryCache } from '@/lib/memory-cache';
 import { useWalletNotifications } from '@/hooks/useWalletNotifications';
+import { useNavigation } from '@/context/NavigationContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -23,10 +25,14 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
   const location = useLocation();
   const { user } = useAuth();
   const { haptic } = useNativeFeatures();
+  const { isSubPage, hideBottomNav } = useNavigation();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const { unreadGiftCount, markWalletViewed } = useWalletNotifications();
+
+  // Should hide: manual hidden prop, context hideBottomNav, or on sub-pages
+  const shouldHide = hidden || hideBottomNav || isSubPage;
 
   useEffect(() => {
     if (user) {
@@ -168,21 +174,24 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     }
   }, [haptic, navigate, isActive, refreshContext, markWalletViewed]);
 
-  // Hide navigation completely when hidden prop is true
-  if (hidden) {
-    return null;
-  }
-
   return (
-    <TooltipProvider>
-      <nav 
-        className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-border/50 native-bottom-nav"
-        style={{
-          paddingBottom: 'env(safe-area-inset-bottom)',
-          transform: 'translateZ(0)',
-          WebkitTransform: 'translateZ(0)',
-        }}
-      >
+    <AnimatePresence>
+      {!shouldHide && (
+        <motion.div
+          initial={{ y: 100, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 100, opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+        >
+          <TooltipProvider>
+            <nav 
+              className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-border/50 native-bottom-nav"
+              style={{
+                paddingBottom: 'env(safe-area-inset-bottom)',
+                transform: 'translateZ(0)',
+                WebkitTransform: 'translateZ(0)',
+              }}
+            >
         <div className="max-w-screen-xl mx-auto px-2">
           <div className="flex items-center justify-between py-2">
             {navItems.map((item) => {
@@ -236,7 +245,10 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
             })}
           </div>
         </div>
-      </nav>
-    </TooltipProvider>
+            </nav>
+          </TooltipProvider>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

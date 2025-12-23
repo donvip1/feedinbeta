@@ -21,8 +21,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { ArrowLeft, Camera, Loader2, Trash2 } from 'lucide-react';
+import { Camera, Loader2, Trash2 } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { PageHeader } from '@/components/shared/PageHeader';
 
 const AccountSettings = () => {
   const navigate = useNavigate();
@@ -175,16 +176,7 @@ const AccountSettings = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center space-x-3">
-            <Button onClick={() => navigate('/settings')} size="sm" variant="ghost">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-xl font-bold">Account Settings</span>
-          </div>
-        </div>
-      </header>
+      <PageHeader title="Account Settings" />
 
       <main className="container mx-auto px-4 py-6 max-w-2xl pb-24">
         <Card className="bg-card border-border p-6">

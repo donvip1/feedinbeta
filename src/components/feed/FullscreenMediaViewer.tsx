@@ -90,6 +90,12 @@ export default function FullscreenMediaViewer({
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const isScrolling = useRef(false);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Touch gesture tracking for fast swipes
+  const touchStartY = useRef(0);
+  const touchStartTime = useRef(0);
+  const SWIPE_THRESHOLD = 40; // pixels - reduced for faster response
+  const VELOCITY_THRESHOLD = 0.3; // pixels per millisecond
 
   // Filter posts by media type
   const isVideoPost = post.media_type === 'video' || 
@@ -159,7 +165,7 @@ export default function FullscreenMediaViewer({
     }
   }, [currentPostIndex, navigablePosts, onNavigate]);
 
-  // Scroll to specific index
+  // Scroll to specific index - instant for fast response
   const scrollToIndex = useCallback((index: number) => {
     if (!scrollContainerRef.current) return;
     
@@ -167,16 +173,42 @@ export default function FullscreenMediaViewer({
     const container = scrollContainerRef.current;
     const targetTop = index * container.clientHeight;
     
+    // Use 'auto' for instant response instead of 'smooth'
     container.scrollTo({
       top: targetTop,
-      behavior: 'smooth'
+      behavior: 'auto'
     });
+    
+    setCurrentPostIndex(index);
 
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
       isScrolling.current = false;
-    }, 300);
+    }, 100); // Reduced from 300ms
   }, []);
+
+  // Touch gesture handlers for fast swipe detection
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchStartTime.current = Date.now();
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const deltaY = touchStartY.current - e.changedTouches[0].clientY;
+    const deltaTime = Date.now() - touchStartTime.current;
+    const velocity = Math.abs(deltaY) / deltaTime;
+    
+    // Fast flick OR sufficient distance = navigate immediately
+    if (velocity > VELOCITY_THRESHOLD || Math.abs(deltaY) > SWIPE_THRESHOLD) {
+      if (deltaY > 0 && currentPostIndex < navigablePosts.length - 1) {
+        // Swipe up - next post
+        scrollToIndex(currentPostIndex + 1);
+      } else if (deltaY < 0 && currentPostIndex > 0) {
+        // Swipe down - previous post
+        scrollToIndex(currentPostIndex - 1);
+      }
+    }
+  }, [currentPostIndex, navigablePosts.length, scrollToIndex]);
 
   // Initialize scroll position
   useEffect(() => {
@@ -480,12 +512,18 @@ export default function FullscreenMediaViewer({
 
   return (
     <div className="fixed inset-0 z-[100] bg-black">
-      {/* Scroll Container with snap */}
+      {/* Scroll Container with snap and touch gestures */}
       <div 
         ref={scrollContainerRef}
         className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
         onScroll={handleScroll}
-        style={{ scrollBehavior: 'smooth' }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        style={{ 
+          scrollBehavior: 'auto',
+          overscrollBehavior: 'contain',
+          WebkitOverflowScrolling: 'touch'
+        }}
       >
         {navigablePosts.map((p, index) => {
           const mediaUrl = getMediaUrl(p);
