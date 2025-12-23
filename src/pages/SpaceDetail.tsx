@@ -72,6 +72,8 @@ const SpaceDetail = () => {
   const handleJoin = () => {
     if (!user) {
       toast.error('Please sign in to join this space');
+      // Store redirect in sessionStorage as backup
+      sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
       navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
@@ -81,6 +83,8 @@ const SpaceDetail = () => {
   const handleReplay = () => {
     if (!user) {
       toast.error('Please sign in to listen to this replay');
+      // Store redirect in sessionStorage as backup
+      sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
       navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
