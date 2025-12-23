@@ -174,7 +174,7 @@ const HelpSupport = () => {
             <Button
               variant="outline"
               className="h-auto py-4 flex flex-col gap-2 col-span-2"
-              onClick={() => navigate('/learn-tech')}
+              onClick={() => navigate('/ai/learn')}
             >
               <GraduationCap className="w-5 h-5 text-green-500" />
               <span className="text-sm">Learn Tech</span>

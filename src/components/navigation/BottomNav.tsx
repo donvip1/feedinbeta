@@ -123,8 +123,8 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     { id: 'feed', label: 'Feeds', icon: Home, path: '/feed' },
     { id: 'chats', label: 'Chats', icon: Mail, path: '/messages' },
     { id: 'wallet', label: 'Wallet', icon: Wallet, path: '/wallet' },
-    { id: 'learn', label: 'Learn Tech', icon: BookOpen, path: '/learn-tech' },
-    { id: 'ai', label: 'FeedAI', icon: Zap, path: '/ai-copilot' },
+    { id: 'learn', label: 'Learn Tech', icon: BookOpen, path: '/ai/learn' },
+    { id: 'ai', label: 'FeedAI', icon: Zap, path: '/ai/copilot' },
     { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}`, isProfile: true },
   ];
 

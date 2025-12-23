@@ -131,7 +131,7 @@ const Settings = () => {
       icon: Crown,
       title: 'Subscription Plans',
       description: 'Upgrade to premium features',
-      route: '/subscription',
+      route: '/wallet/subscription',
       color: 'text-yellow-500'
     },
     {
@@ -227,7 +227,7 @@ const Settings = () => {
       icon: Briefcase,
       title: 'For Investors',
       description: 'Risk disclosure and investor FAQ',
-      route: '/investors',
+      route: '/settings/investors',
       color: 'text-emerald-500'
     }
   ];
