@@ -57,19 +57,24 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [showSpeakerQueue, setShowSpeakerQueue] = useState(false);
   const [selectedGiftRecipient, setSelectedGiftRecipient] = useState<string | null>(null);
 
-  // WebRTC audio integration
-  const isHost = myRole === 'host' || myRole === 'co_host';
-  const isSpeaker = myRole === 'speaker';
+  // Derived role flags for audio
+  const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
   
   const { isConnected, audioLevels, connect, disconnect } = useSpaceAudio({
     spaceId,
     isMuted,
-    isHost,
-    isSpeaker,
+    isHost: myRole === 'host' || myRole === 'co_host',
+    isSpeaker: myRole === 'speaker',
   });
+
+  useEffect(() => {
     fetchSpaceData();
     joinSpace();
-
+    
+    // Connect to audio when component mounts
+    if (canSpeak) {
+      connect();
+    }
     // Subscribe to realtime updates
     const channel = supabase
       .channel(`space-${spaceId}`)
