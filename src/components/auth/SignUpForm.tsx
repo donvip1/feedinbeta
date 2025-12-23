@@ -29,7 +29,11 @@ const signupSchema = z.object({
     .transform(val => val.toLowerCase()),
 });
 
-export const SignUpForm = () => {
+interface SignUpFormProps {
+  onEmailAlreadyExists?: (email: string) => void;
+}
+
+export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -187,7 +191,11 @@ export const SignUpForm = () => {
 
       if (error) {
         if (error.message.includes('already registered')) {
-          throw new Error('An account with this email already exists');
+          // Call callback to switch to signin tab with email prefilled
+          if (onEmailAlreadyExists) {
+            onEmailAlreadyExists(formData.email);
+          }
+          throw new Error('An account with this email already exists. Please sign in instead.');
         }
         throw error;
       }

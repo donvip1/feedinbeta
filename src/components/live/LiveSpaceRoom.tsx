@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
   PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff,
-  AudioLines
+  AudioLines, Home
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -91,6 +92,7 @@ const REACTION_EMOJIS = [
 ];
 
 export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { setHideBottomNav } = useNavigation();
   const [space, setSpace] = useState<SpaceData | null>(null);
@@ -106,6 +108,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [selectedGiftRecipient, setSelectedGiftRecipient] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
   const [showTestAudio, setShowTestAudio] = useState(false);
+  const [showSpaceEndedModal, setShowSpaceEndedModal] = useState(false);
   const [duration, setDuration] = useState('0:00');
   const [totalGifts, setTotalGifts] = useState(0);
   const [myHostMuted, setMyHostMuted] = useState(false);
@@ -194,9 +197,14 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         table: 'live_spaces',
         filter: `id=eq.${spaceId}`,
       }, (payload: any) => {
+        console.log('[LiveSpace] Space updated:', payload.new.status);
         if (payload.new.status === 'ended') {
-          toast.info('This space has ended');
-          onClose();
+          // Show modal for 3 seconds then navigate away
+          setShowSpaceEndedModal(true);
+          setTimeout(() => {
+            setShowSpaceEndedModal(false);
+            navigate('/live');
+          }, 3000);
         }
         setSpace(payload.new);
       })
@@ -756,6 +764,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             </div>
             
             <div className="flex items-center gap-2">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="rounded-full" 
+                onClick={() => navigate('/feed')}
+                title="Go to Feed"
+              >
+                <Home className="w-4 h-4" />
+              </Button>
               <Button variant="ghost" size="icon" className="rounded-full" onClick={handleShare}>
                 <Share2 className="w-4 h-4" />
               </Button>
@@ -1141,6 +1158,23 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               End Space
             </AlertDialogAction>
           </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Space Ended Modal - shown to all users when host ends the space */}
+      <AlertDialog open={showSpaceEndedModal}>
+        <AlertDialogContent className="text-center">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-center">Space Ended</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              The host has ended this space. You will be redirected to the Live page in a moment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex justify-center py-4">
+            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center animate-pulse">
+              <Radio className="w-6 h-6 text-muted-foreground" />
+            </div>
+          </div>
         </AlertDialogContent>
       </AlertDialog>
     </div>

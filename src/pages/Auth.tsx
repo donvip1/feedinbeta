@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -15,6 +15,13 @@ const Auth = () => {
   const { user } = useAuth();
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
+  const [prefillEmail, setPrefillEmail] = useState('');
+
+  // Callback when signup shows "email already exists" error
+  const handleEmailAlreadyExists = useCallback((email: string) => {
+    setPrefillEmail(email);
+    setActiveTab('signin');
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -89,11 +96,14 @@ const Auth = () => {
               </TabsList>
 
               <TabsContent value="signin" className="mt-0 animate-fade-in">
-                <SignInForm onForgotPassword={() => setShowForgotPassword(true)} />
+                <SignInForm 
+                  onForgotPassword={() => setShowForgotPassword(true)} 
+                  prefillEmail={prefillEmail}
+                />
               </TabsContent>
 
               <TabsContent value="signup" className="mt-0 animate-fade-in">
-                <SignUpForm />
+                <SignUpForm onEmailAlreadyExists={handleEmailAlreadyExists} />
               </TabsContent>
             </Tabs>
           </CardContent>

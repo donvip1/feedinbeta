@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { useNavigation } from '@/context/NavigationContext';
 
 interface SpaceReplayPlayerProps {
   spaceId: string;
@@ -33,6 +34,7 @@ interface SpaceData {
 }
 
 export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) => {
+  const { setHideBottomNav } = useNavigation();
   const [space, setSpace] = useState<SpaceData | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -44,6 +46,12 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
   
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressInterval = useRef<NodeJS.Timeout | null>(null);
+
+  // Hide bottom navigation when in replay player
+  useEffect(() => {
+    setHideBottomNav(true);
+    return () => setHideBottomNav(false);
+  }, [setHideBottomNav]);
 
   useEffect(() => {
     fetchSpaceData();

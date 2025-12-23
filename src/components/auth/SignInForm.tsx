@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -59,17 +59,25 @@ function recordLoginAttempt(identifier: string, success: boolean): void {
 
 interface SignInFormProps {
   onForgotPassword: () => void;
+  prefillEmail?: string;
 }
 
-export const SignInForm = ({ onForgotPassword }: SignInFormProps) => {
+export const SignInForm = ({ onForgotPassword, prefillEmail }: SignInFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState(prefillEmail || '');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+
+  // Update identifier when prefillEmail changes
+  useEffect(() => {
+    if (prefillEmail) {
+      setIdentifier(prefillEmail);
+    }
+  }, [prefillEmail]);
 
   const isEmail = (value: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
