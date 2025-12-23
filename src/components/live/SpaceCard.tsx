@@ -19,6 +19,7 @@ interface SpaceCardProps {
     started_at?: string;
     ended_at?: string;
     user_id: string;
+    active_listeners?: number;
     profiles?: {
       display_name: string;
       username: string;
@@ -160,7 +161,7 @@ export const SpaceCard = ({ space, speakers = [], onClick, isOwner }: SpaceCardP
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Users className="w-4 h-4" />
-              <span className="font-medium">{space.viewer_count || 0}</span>
+              <span className="font-medium">{space.active_listeners ?? space.viewer_count ?? 0}</span>
             </span>
             <span className="flex items-center gap-1.5">
               <Mic className="w-4 h-4" />

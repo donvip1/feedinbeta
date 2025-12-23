@@ -415,13 +415,13 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
       channel
         .on('broadcast', { event: 'offer' }, ({ payload }) => {
           if (payload.to === user.id) {
-            console.log(`[SpaceAudio] Received offer from ${payload.from}`);
+            console.log(`[SpaceAudio] ✅ Received offer from ${payload.from}`);
             handleOffer(payload.from, payload.sdp);
           }
         })
         .on('broadcast', { event: 'answer' }, ({ payload }) => {
           if (payload.to === user.id) {
-            console.log(`[SpaceAudio] Received answer from ${payload.from}`);
+            console.log(`[SpaceAudio] ✅ Received answer from ${payload.from}`);
             handleAnswer(payload.from, payload.sdp);
           }
         })
@@ -433,26 +433,28 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
         .on('broadcast', { event: 'broadcaster-joined' }, async ({ payload }) => {
           // A broadcaster joined - if we're a listener, request them to send us an offer
           if (!canBroadcast && payload.userId !== user.id) {
-            console.log(`[SpaceAudio] Broadcaster ${payload.userId} joined, requesting audio connection`);
-            // Request the broadcaster to send us an offer
-            channel.send({
-              type: 'broadcast',
-              event: 'listener-needs-audio',
-              payload: { listenerId: user.id }
-            });
+            console.log(`[SpaceAudio] 🎤 Broadcaster ${payload.userId} joined, requesting audio connection`);
+            // Small delay to ensure broadcaster is ready
+            setTimeout(() => {
+              channel.send({
+                type: 'broadcast',
+                event: 'listener-needs-audio',
+                payload: { listenerId: user.id }
+              });
+            }, 300);
           }
         })
         .on('broadcast', { event: 'listener-needs-audio' }, async ({ payload }) => {
           // A listener is requesting audio - send them an offer
           if (canBroadcast && payload.listenerId !== user.id) {
-            console.log(`[SpaceAudio] Listener ${payload.listenerId} requesting audio, sending offer`);
+            console.log(`[SpaceAudio] 👂 Listener ${payload.listenerId} requesting audio, creating connection and sending offer`);
             await createPeerConnection(payload.listenerId, true, true);
           }
         })
         .on('presence', { event: 'join' }, async ({ key, newPresences }) => {
           // When a new peer joins
           if (key !== user.id) {
-            console.log(`[SpaceAudio] New peer joined: ${key}`, newPresences);
+            console.log(`[SpaceAudio] 👋 New peer joined: ${key}`, newPresences);
             // Hosts/speakers initiate connection to new joiners
             if (canBroadcast) {
               console.log(`[SpaceAudio] I'm a broadcaster, sending offer to new joiner ${key}`);
@@ -464,33 +466,37 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
           }
         })
         .on('presence', { event: 'leave' }, ({ key }) => {
-          console.log(`[SpaceAudio] Peer left: ${key}`);
+          console.log(`[SpaceAudio] 👋 Peer left: ${key}`);
           handlePeerDisconnect(key);
         })
         .on('presence', { event: 'sync' }, async () => {
           // Handle initial sync - connect to all existing peers
           const state = channel.presenceState();
           const peerIds = Object.keys(state).filter(k => k !== user.id);
-          console.log(`[SpaceAudio] Presence sync, found ${peerIds.length} peers:`, peerIds);
+          console.log(`[SpaceAudio] 🔄 Presence sync, found ${peerIds.length} peers:`, peerIds);
           
-          for (const key of peerIds) {
-            const presence = state[key][0] as any;
-            console.log(`[SpaceAudio] Peer ${key}: role=${presence?.role}, canBroadcast=${presence?.canBroadcast}`);
-            
-            // If we can broadcast, send offers to everyone (including listeners)
-            if (canBroadcast) {
-              console.log(`[SpaceAudio] Sending offer to ${key} as broadcaster`);
+          // If we're a listener, request audio from ALL broadcasters
+          if (!canBroadcast) {
+            for (const key of peerIds) {
+              const presence = state[key][0] as any;
+              console.log(`[SpaceAudio] Checking peer ${key}: canBroadcast=${presence?.canBroadcast}`);
+              
+              if (presence?.canBroadcast) {
+                console.log(`[SpaceAudio] 📡 Requesting audio from broadcaster ${key}`);
+                channel.send({
+                  type: 'broadcast',
+                  event: 'listener-needs-audio',
+                  payload: { listenerId: user.id }
+                });
+                // Only need to request once since broadcaster will send to us
+                break;
+              }
+            }
+          } else {
+            // Broadcaster: send offers to all peers
+            for (const key of peerIds) {
+              console.log(`[SpaceAudio] 📤 Sending offer to ${key} as broadcaster`);
               await createPeerConnection(key, true);
-            } 
-            // If we're a listener and they can broadcast, request audio from them
-            else if (presence?.canBroadcast) {
-              console.log(`[SpaceAudio] Requesting audio from broadcaster ${key}`);
-              // Request them to send us an offer
-              channel.send({
-                type: 'broadcast',
-                event: 'listener-needs-audio',
-                payload: { listenerId: user.id }
-              });
             }
           }
         });
@@ -507,12 +513,22 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
           
           // If we're a broadcaster, announce ourselves so listeners can prepare
           if (canBroadcast) {
-            console.log(`[SpaceAudio] Broadcasting presence as host/speaker`);
+            console.log(`[SpaceAudio] 🎤 Broadcasting presence as host/speaker`);
             channel.send({
               type: 'broadcast',
               event: 'broadcaster-joined',
               payload: { userId: user.id }
             });
+          } else {
+            // Listener: proactively request audio after a short delay
+            setTimeout(() => {
+              console.log(`[SpaceAudio] 👂 Listener requesting audio from all broadcasters`);
+              channel.send({
+                type: 'broadcast',
+                event: 'listener-needs-audio',
+                payload: { listenerId: user.id }
+              });
+            }, 1000);
           }
           
           setConnectionStatus('connected');

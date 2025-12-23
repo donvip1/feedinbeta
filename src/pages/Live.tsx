@@ -132,14 +132,31 @@ const Live = () => {
       
       if (data && data.length > 0) {
         const userIds = [...new Set(data.map(s => s.user_id))];
+        const spaceIds = data.map(s => s.id);
+        
+        // Fetch profiles
         const { data: profiles } = await supabase
           .from("profiles")
           .select("id, display_name, username, avatar_url")
           .in("id", userIds);
         
+        // Fetch active listener counts per space
+        const { data: listenerCounts } = await supabase
+          .from("live_space_speakers")
+          .select("space_id")
+          .in("space_id", spaceIds)
+          .is("left_at", null);
+        
+        // Count listeners per space
+        const countMap = new Map<string, number>();
+        listenerCounts?.forEach(l => {
+          countMap.set(l.space_id!, (countMap.get(l.space_id!) || 0) + 1);
+        });
+        
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
         return data.map(space => ({
           ...space,
+          active_listeners: countMap.get(space.id) || 0,
           profiles: profileMap.get(space.user_id)
         }));
       }
@@ -259,6 +276,14 @@ const Live = () => {
       }, () => {
         refetchLiveSpaces();
         refetchMySpaces();
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_space_speakers',
+      }, () => {
+        // Refetch spaces when speakers change to update listener counts
+        refetchLiveSpaces();
       })
       .subscribe();
 
