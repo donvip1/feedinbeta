@@ -239,32 +239,64 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
           existingAudio.remove();
         }
         
-        const audio = new Audio();
+        const audio = document.createElement('audio') as HTMLAudioElement;
         audio.srcObject = remoteStream;
         audio.autoplay = true;
         audio.id = `audio-${peerId}`;
         audio.volume = 1.0;
         
-        // Important: Set these for iOS compatibility
+        // Important: Set these for iOS compatibility and loudspeaker
         (audio as any).playsInline = true;
+        audio.setAttribute('playsinline', 'true');
+        audio.setAttribute('webkit-playsinline', 'true');
+        
+        // Try to use loudspeaker on mobile devices
+        if ('setSinkId' in audio) {
+          try {
+            // Get available audio output devices
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+              const speakers = devices.filter(d => d.kind === 'audiooutput');
+              // Prefer default or speaker output
+              const speakerDevice = speakers.find(d => 
+                d.label.toLowerCase().includes('speaker') || 
+                d.deviceId === 'default'
+              );
+              if (speakerDevice && 'setSinkId' in audio) {
+                (audio as any).setSinkId(speakerDevice.deviceId).catch(console.warn);
+              }
+            }).catch(console.warn);
+          } catch (e) {
+            console.warn('[SpaceAudio] Could not set audio output device:', e);
+          }
+        }
         
         document.body.appendChild(audio);
         
-        // Play audio with proper error handling
-        const playPromise = audio.play();
-        if (playPromise) {
-          playPromise.then(() => {
+        // Play audio with proper error handling and retry
+        const playAudio = async (retryCount = 0) => {
+          try {
+            await audio.play();
             console.log(`[SpaceAudio] ✅ Audio playing from ${peerId}`);
-          }).catch(err => {
+          } catch (err: any) {
             console.warn('[SpaceAudio] Audio autoplay blocked:', err);
-            // Create a click handler to enable audio
-            const enableAudio = () => {
-              audio.play().catch(console.error);
-              document.removeEventListener('click', enableAudio);
-            };
-            document.addEventListener('click', enableAudio);
-          });
-        }
+            if (retryCount < 3) {
+              // Retry after a short delay
+              setTimeout(() => playAudio(retryCount + 1), 1000);
+            } else {
+              // Create a click handler to enable audio
+              const enableAudio = () => {
+                audio.play().catch(console.error);
+                document.removeEventListener('click', enableAudio);
+                document.removeEventListener('touchstart', enableAudio);
+              };
+              document.addEventListener('click', enableAudio);
+              document.addEventListener('touchstart', enableAudio);
+              toast.info('Tap anywhere to enable audio');
+            }
+          }
+        };
+        
+        playAudio();
 
         // Create analyzer for remote audio
         createAnalyzer(remoteStream, peerId);
@@ -519,6 +551,19 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
               event: 'broadcaster-joined',
               payload: { userId: user.id }
             });
+            
+            // Broadcasters send periodic heartbeats so new listeners can connect
+            const heartbeatInterval = setInterval(() => {
+              if (channelRef.current) {
+                channel.send({
+                  type: 'broadcast',
+                  event: 'broadcaster-joined',
+                  payload: { userId: user.id }
+                });
+              } else {
+                clearInterval(heartbeatInterval);
+              }
+            }, 10000); // Every 10 seconds
           } else {
             // Listener: proactively request audio after a short delay
             setTimeout(() => {

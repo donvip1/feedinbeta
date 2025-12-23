@@ -428,68 +428,89 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     setTotalGifts(count || 0);
   };
 
-  const joinSpace = async () => {
+  const joinSpace = async (retryCount = 0) => {
     if (!user || !space) {
       console.log('[LiveSpace] Cannot join - no user or space data');
+      return;
+    }
+
+    // Check if space is actually live
+    if (space.status !== 'live') {
+      toast.error('This space is not currently live');
       return;
     }
 
     console.log('[LiveSpace] Joining space as:', user.id, 'Space owner:', space.user_id);
     const isOwner = space.user_id === user.id;
 
-    // Check if already in speakers table
-    const { data: existing, error: existingError } = await supabase
-      .from('live_space_speakers')
-      .select('id, role')
-      .eq('space_id', spaceId)
-      .eq('user_id', user.id)
-      .is('left_at', null)
-      .maybeSingle();
+    try {
+      // Check if already in speakers table
+      const { data: existing, error: existingError } = await supabase
+        .from('live_space_speakers')
+        .select('id, role')
+        .eq('space_id', spaceId)
+        .eq('user_id', user.id)
+        .is('left_at', null)
+        .maybeSingle();
 
-    if (existingError) {
-      console.error('[LiveSpace] Error checking existing speaker:', existingError);
-    }
+      if (existingError) {
+        console.error('[LiveSpace] Error checking existing speaker:', existingError);
+        throw existingError;
+      }
 
-    if (existing) {
-      console.log('[LiveSpace] Already in speakers table with role:', existing.role);
-      
-      // If I'm the owner but my role is wrong, fix it
-      if (isOwner && existing.role !== 'host') {
-        console.log('[LiveSpace] Fixing owner role to host');
+      if (existing) {
+        console.log('[LiveSpace] Already in speakers table with role:', existing.role);
+        
+        // If I'm the owner but my role is wrong, fix it
+        if (isOwner && existing.role !== 'host') {
+          console.log('[LiveSpace] Fixing owner role to host');
+          await supabase
+            .from('live_space_speakers')
+            .update({ role: 'host', is_muted: false })
+            .eq('id', existing.id);
+        }
+      } else {
+        // Insert new speaker
+        const role = isOwner ? 'host' : 'listener';
+        console.log('[LiveSpace] Inserting new speaker with role:', role);
+        
+        const { error: insertError } = await supabase.from('live_space_speakers').insert({
+          space_id: spaceId,
+          user_id: user.id,
+          role: role,
+          is_muted: !isOwner, // Host starts unmuted
+          host_muted: false,
+          mic_allowed: true,
+        });
+
+        if (insertError) {
+          console.error('[LiveSpace] Error inserting speaker:', insertError);
+          throw insertError;
+        }
+
+        // Update viewer count
         await supabase
-          .from('live_space_speakers')
-          .update({ role: 'host', is_muted: false })
-          .eq('id', existing.id);
+          .from('live_spaces')
+          .update({ viewer_count: (space.viewer_count || 0) + 1 })
+          .eq('id', spaceId);
       }
-    } else {
-      // Insert new speaker
-      const role = isOwner ? 'host' : 'listener';
-      console.log('[LiveSpace] Inserting new speaker with role:', role);
+
+      // Refetch speakers to update UI
+      await fetchSpeakers();
+      toast.success('Joined space successfully!');
+    } catch (error: any) {
+      console.error('[LiveSpace] Join error:', error);
       
-      const { error: insertError } = await supabase.from('live_space_speakers').insert({
-        space_id: spaceId,
-        user_id: user.id,
-        role: role,
-        is_muted: !isOwner, // Host starts unmuted
-        host_muted: false,
-        mic_allowed: true,
-      });
-
-      if (insertError) {
-        console.error('[LiveSpace] Error inserting speaker:', insertError);
-        toast.error('Failed to join space');
-        return;
+      // Retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 1000;
+        console.log(`[LiveSpace] Retrying join in ${delay}ms (attempt ${retryCount + 1}/3)`);
+        toast.info(`Connecting to space... (attempt ${retryCount + 1}/3)`);
+        setTimeout(() => joinSpace(retryCount + 1), delay);
+      } else {
+        toast.error(`Failed to join space: ${error.message || 'Unknown error'}`);
       }
-
-      // Update viewer count
-      await supabase
-        .from('live_spaces')
-        .update({ viewer_count: (space.viewer_count || 0) + 1 })
-        .eq('id', spaceId);
     }
-
-    // Refetch speakers to update UI
-    await fetchSpeakers();
   };
 
   const leaveSpace = async () => {
@@ -824,7 +845,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                 <ListenersModal 
                   listeners={listeners}
-                  totalCount={speakers.length}
+                  totalCount={listeners.length}
                   isHost={isHost}
                   onPromote={(speakerId) => promoteSpeaker(speakerId, 'speaker')}
                 />
@@ -958,13 +979,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             </section>
           )}
 
-          {/* Raised hands (for hosts) */}
-          {isHost && raisedHands.length > 0 && (
+          {/* Raised hands - visible to ALL users */}
+          {raisedHands.length > 0 && (
             <section className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <Hand className="w-4 h-4 text-amber-400" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-amber-400">Raised Hands</span>
+                  <Mic className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs font-semibold uppercase tracking-wide text-amber-400">Requesting to Speak</span>
                   <Badge className="bg-amber-500/20 text-amber-400 border-0">{raisedHands.length}</Badge>
                 </div>
               </div>
@@ -972,31 +993,41 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 {raisedHands.map((speaker) => (
                   <div key={speaker.id} className="flex items-center justify-between p-2 rounded-xl bg-background/50">
                     <div className="flex items-center gap-2">
-                      <Avatar className="w-8 h-8">
+                      <Avatar className="w-8 h-8 ring-2 ring-amber-400">
                         <AvatarImage src={speaker.profile?.avatar_url || ''} />
                         <AvatarFallback>{speaker.profile?.display_name?.[0] || 'U'}</AvatarFallback>
                       </Avatar>
-                      <span className="text-sm font-medium">{speaker.profile?.display_name}</span>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium">{speaker.profile?.display_name}</span>
+                        <span className="text-xs text-muted-foreground">wants to speak</span>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        className="h-7 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700"
-                        onClick={() => promoteSpeaker(speaker.id, 'speaker')}
-                      >
-                        <Mic className="w-3 h-3 mr-1" />
-                        Invite
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        className="h-7"
-                        onClick={() => promoteSpeaker(speaker.id, 'co_host')}
-                      >
-                        <Crown className="w-3 h-3 mr-1" />
-                        Co-host
-                      </Button>
-                    </div>
+                    {/* Only hosts can promote speakers */}
+                    {isHost ? (
+                      <div className="flex gap-2">
+                        <Button 
+                          size="sm" 
+                          className="h-7 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700"
+                          onClick={() => promoteSpeaker(speaker.id, 'speaker')}
+                        >
+                          <Mic className="w-3 h-3 mr-1" />
+                          Invite
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          className="h-7"
+                          onClick={() => promoteSpeaker(speaker.id, 'co_host')}
+                        >
+                          <Crown className="w-3 h-3 mr-1" />
+                          Co-host
+                        </Button>
+                      </div>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        ✋ Waiting
+                      </Badge>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1100,8 +1131,9 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
                   )}
                   onClick={toggleRaiseHand}
+                  title={hasRaisedHand ? "Cancel request" : "Request to speak"}
                 >
-                  <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-bounce")} />
+                  <Mic className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
                 </Button>
               </motion.div>
             ) : (
