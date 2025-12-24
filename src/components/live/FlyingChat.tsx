@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AnimatedGiftEmoji } from '@/components/shared/AnimatedGiftEmoji';
+import { Coins } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -30,10 +31,22 @@ interface FlyingChatProps {
   className?: string;
 }
 
+const GIFT_EMOJIS: Record<string, string> = {
+  heart: '❤️',
+  star: '⭐',
+  fire: '🔥',
+  lightning: '⚡',
+  crown: '👑',
+  diamond: '💎',
+  rocket: '🚀',
+  universe: '🌌',
+  credits: '💰',
+};
+
 export const FlyingChat = ({ 
   messages, 
   gifts = [], 
-  maxMessages = 6,
+  maxMessages = 12,
   className 
 }: FlyingChatProps) => {
   const [displayedMessages, setDisplayedMessages] = useState<(ChatMessage & { _key: string })[]>([]);
@@ -55,14 +68,13 @@ export const FlyingChat = ({
         
         setDisplayedMessages(prev => {
           const updated = [...prev, newMessage];
-          // Keep only the last N messages
           return updated.slice(-maxMessages);
         });
       }
     }
   }, [messages, maxMessages]);
 
-  // Handle flying gifts
+  // Handle flying gifts - TikTok style prominent display
   useEffect(() => {
     if (gifts.length > 0) {
       const latestGift = gifts[gifts.length - 1];
@@ -75,7 +87,7 @@ export const FlyingChat = ({
         // Remove after animation
         setTimeout(() => {
           setFlyingGifts(prev => prev.filter(g => g._animKey !== animKey));
-        }, 4000);
+        }, 5000);
       }
     }
   }, [gifts]);
@@ -87,7 +99,6 @@ export const FlyingChat = ({
     
     return parts.map((part, i) => {
       if (i % 2 === 1) {
-        // This is a username (captured group)
         return (
           <span key={i} className="text-primary font-semibold">
             @{part}
@@ -98,49 +109,78 @@ export const FlyingChat = ({
     });
   };
 
+  const getGiftEmoji = (type: string) => GIFT_EMOJIS[type] || '🎁';
+
   return (
     <div className={cn(
-      "absolute bottom-24 left-0 right-16 pointer-events-none overflow-hidden",
+      "absolute bottom-28 left-0 right-16 pointer-events-none overflow-hidden",
       className
     )}>
-      {/* Flying Gifts - full screen animations */}
+      {/* TikTok-Style Flying Gifts - Center screen, prominent */}
       <AnimatePresence>
-        {flyingGifts.map((gift) => (
+        {flyingGifts.map((gift, index) => (
           <motion.div
             key={gift._animKey}
             initial={{ 
-              x: -100, 
-              y: 0, 
-              opacity: 1,
-              scale: 0.5 
+              opacity: 0, 
+              scale: 0,
+              x: '-50%',
+              y: 100
             }}
             animate={{ 
-              x: ['0%', '50%', '100%'],
-              y: [0, -50, -100],
-              opacity: [1, 1, 0],
-              scale: [1.5, 2, 1.5]
+              opacity: [0, 1, 1, 1, 0],
+              scale: [0.5, 1.2, 1, 1, 0.8],
+              y: [100, 0, 0, -50, -150],
+            }}
+            exit={{ 
+              opacity: 0,
+              scale: 0.5,
+              y: -200
             }}
             transition={{ 
-              duration: 3,
-              ease: "easeOut"
+              duration: 4,
+              ease: "easeOut",
+              times: [0, 0.15, 0.3, 0.7, 1]
             }}
-            className="absolute bottom-1/2 left-0 z-50 flex items-center gap-2 bg-gradient-to-r from-amber-500/90 to-pink-500/90 text-white px-4 py-2 rounded-full shadow-lg"
+            className="fixed left-1/2 top-1/3 z-50 pointer-events-none"
+            style={{ marginTop: index * 80 }}
           >
-            <AnimatedGiftEmoji giftType={gift.gift_type} size={32} />
-            <span className="font-bold text-sm whitespace-nowrap">
-              {gift.sender_name} sent {gift.gift_type}!
-            </span>
-            <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-              +{gift.credit_value}
-            </span>
+            <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white px-6 py-3 rounded-full shadow-2xl">
+              <motion.span 
+                className="text-4xl"
+                animate={{ 
+                  scale: [1, 1.3, 1],
+                  rotate: [0, 10, -10, 0]
+                }}
+                transition={{ 
+                  duration: 0.5, 
+                  repeat: 3,
+                  repeatType: "reverse"
+                }}
+              >
+                {getGiftEmoji(gift.gift_type)}
+              </motion.span>
+              <div className="text-left">
+                <p className="font-bold text-lg whitespace-nowrap">
+                  {gift.sender_name}
+                </p>
+                <p className="text-sm text-white/90">
+                  sent <span className="font-bold">{gift.gift_type}</span>
+                </p>
+              </div>
+              <div className="flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full">
+                <Coins className="w-4 h-4" />
+                <span className="font-bold">+{gift.credit_value}</span>
+              </div>
+            </div>
           </motion.div>
         ))}
       </AnimatePresence>
 
       {/* Chat Messages */}
-      <div className="flex flex-col gap-1.5 px-3">
+      <div className="flex flex-col gap-2 px-3">
         <AnimatePresence mode="popLayout">
-          {displayedMessages.map((message, index) => (
+          {displayedMessages.map((message) => (
             <motion.div
               key={message._key}
               initial={{ x: -50, opacity: 0, scale: 0.9 }}
@@ -150,16 +190,16 @@ export const FlyingChat = ({
                 duration: 0.3,
                 delay: 0.05
               }}
-              className="flex items-start gap-2 max-w-[85%]"
+              className="flex items-start gap-2 max-w-[90%]"
             >
-              <Avatar className="w-7 h-7 shrink-0 ring-1 ring-white/20">
+              <Avatar className="w-8 h-8 shrink-0 ring-2 ring-white/20">
                 <AvatarImage src={message.profiles?.avatar_url} />
                 <AvatarFallback className="text-xs bg-primary/20 text-primary">
                   {message.profiles?.display_name?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
-              <div className="bg-black/60 backdrop-blur-sm rounded-2xl px-3 py-1.5 shadow-lg">
-                <span className="text-primary text-xs font-semibold mr-1.5">
+              <div className="bg-black/70 backdrop-blur-sm rounded-2xl px-3 py-2 shadow-lg">
+                <span className="text-primary text-sm font-bold mr-2">
                   {message.profiles?.display_name || 'Anonymous'}
                 </span>
                 <span className="text-white text-sm break-words">
@@ -170,15 +210,6 @@ export const FlyingChat = ({
           ))}
         </AnimatePresence>
       </div>
-
-      {/* Auto-fade old messages */}
-      <style>{`
-        @keyframes fadeSlideUp {
-          0% { opacity: 1; transform: translateY(0); }
-          80% { opacity: 1; }
-          100% { opacity: 0; transform: translateY(-20px); }
-        }
-      `}</style>
     </div>
   );
 };

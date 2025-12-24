@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { UserPlus, Search, Clock, Check, X, Loader2 } from "lucide-react";
+import { UserPlus, Search, Clock, X, Loader2 } from "lucide-react";
 import { sanitizeSearchQuery } from "@/lib/search-utils";
 
 interface LiveInviteModalProps {
@@ -39,12 +39,25 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount 
   const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [searching, setSearching] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
+  const [streamTitle, setStreamTitle] = useState<string>("");
 
-  // Fetch pending invites
+  // Fetch stream title and pending invites
   useEffect(() => {
     if (!isOpen) return;
 
-    const fetchInvites = async () => {
+    const fetchStreamAndInvites = async () => {
+      // Fetch stream title
+      const { data: streamData } = await supabase
+        .from("live_streams")
+        .select("title")
+        .eq("id", streamId)
+        .single();
+      
+      if (streamData) {
+        setStreamTitle(streamData.title);
+      }
+
+      // Fetch pending invites
       const { data } = await supabase
         .from("live_stream_invites")
         .select("*")
@@ -52,7 +65,6 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount 
         .eq("status", "pending");
 
       if (data && data.length > 0) {
-        // Fetch profiles for invites
         const userIds = data.map((i) => i.invited_user_id);
         const { data: profiles } = await supabase
           .from("profiles")
@@ -71,7 +83,7 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount 
       }
     };
 
-    fetchInvites();
+    fetchStreamAndInvites();
 
     // Subscribe to invite updates
     const channel = supabase
@@ -84,7 +96,7 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount 
           table: "live_stream_invites",
           filter: `stream_id=eq.${streamId}`,
         },
-        () => fetchInvites()
+        () => fetchStreamAndInvites()
       )
       .subscribe();
 
@@ -126,6 +138,7 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount 
 
     setInviting(userId);
     try {
+      // Create the invite
       const { error } = await supabase.from("live_stream_invites").insert({
         stream_id: streamId,
         host_id: user.id,
@@ -140,6 +153,31 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount 
         }
         return;
       }
+
+      // Create a notification for the invited user
+      await supabase.from("notifications").insert({
+        user_id: userId,
+        from_user_id: user.id,
+        type: "live_invite",
+        title: "Live Stream Invite",
+        message: `invited you to join their live stream: "${streamTitle || 'Live Stream'}"`,
+        related_id: streamId,
+        related_type: "live_stream",
+      });
+
+      // Send broadcast for immediate popup notification
+      const broadcastChannel = supabase.channel(`live-invite-${userId}`);
+      await broadcastChannel.subscribe();
+      await broadcastChannel.send({
+        type: 'broadcast',
+        event: 'new-invite',
+        payload: {
+          streamId,
+          hostId: user.id,
+          streamTitle: streamTitle || 'Live Stream',
+        },
+      });
+      await supabase.removeChannel(broadcastChannel);
 
       toast.success("Invite sent!");
       // Remove from search results
@@ -225,7 +263,7 @@ export const LiveInviteModal = ({ isOpen, onClose, streamId, currentCoHostCount 
                       <Button
                         size="sm"
                         onClick={() => handleInvite(profile.id)}
-                        disabled={inviting === profile.id}
+                        disabled={inviting === profile.id || !canInviteMore}
                       >
                         {inviting === profile.id ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
