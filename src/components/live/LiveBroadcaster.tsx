@@ -55,7 +55,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [isFrontCamera, setIsFrontCamera] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewerCount, setViewerCount] = useState(0);
-  const [reactions, setReactions] = useState<{ type: string; id: number; x: number; y: number }[]>([]);
+  const [reactions, setReactions] = useState<{ type: string; id: number; x: number; y: number; senderName?: string }[]>([]);
   const [isLive, setIsLive] = useState(false);
   const [isStarting, setIsStarting] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
@@ -280,7 +280,6 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     // Check if we already have a connection for this viewer
     if (viewersRef.current.has(viewerId)) {
       console.log("[Host] Already have connection for viewer:", viewerId);
-      // Still send a new offer in case they're reconnecting
     }
 
     console.log("[Host] Creating peer connection for viewer:", viewerId);
@@ -340,22 +339,22 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
-  // Subscribe to comments - fetch profiles separately for reliability
+  // Subscribe to comments - FIXED: properly fetch and display with profiles
   useEffect(() => {
     const fetchComments = async () => {
       const { data: commentsData } = await supabase
         .from("live_stream_comments")
         .select("*")
         .eq("stream_id", streamId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+        .order("created_at", { ascending: true })
+        .limit(100);
 
       if (!commentsData || commentsData.length === 0) {
         setComments([]);
         return;
       }
 
-      // Fetch profiles separately
+      // Fetch profiles separately for reliability
       const userIds = [...new Set(commentsData.map(c => c.user_id))];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -369,7 +368,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         profiles: profileMap.get(comment.user_id) || null,
       }));
 
-      setComments(commentsWithProfiles.reverse());
+      setComments(commentsWithProfiles);
       
       // Auto-scroll chat
       setTimeout(() => {
@@ -388,7 +387,28 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         schema: 'public',
         table: 'live_stream_comments',
         filter: `stream_id=eq.${streamId}`,
-      }, () => fetchComments())
+      }, async (payload) => {
+        // Fetch the new comment's profile immediately
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_url")
+          .eq("id", payload.new.user_id)
+          .single();
+
+        const newComment = {
+          ...payload.new,
+          profiles: profile,
+        };
+
+        setComments(prev => [...prev, newComment]);
+
+        // Auto-scroll
+        setTimeout(() => {
+          if (chatScrollRef.current) {
+            chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+          }
+        }, 100);
+      })
       .subscribe();
 
     return () => {
@@ -396,7 +416,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     };
   }, [streamId]);
 
-  // Subscribe to reactions
+  // Subscribe to reactions - FIXED: show who sent the reaction
   useEffect(() => {
     const channel = supabase
       .channel(`reactions-${streamId}`)
@@ -405,14 +425,30 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         schema: 'public',
         table: 'live_stream_reactions',
         filter: `stream_id=eq.${streamId}`,
-      }, (payload: any) => {
+      }, async (payload: any) => {
+        // Fetch sender profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("display_name, username")
+          .eq("id", payload.new.user_id)
+          .single();
+
+        const senderName = profile?.display_name || profile?.username || 'Someone';
+
         const newReaction = { 
           type: payload.new.reaction_type, 
           id: Date.now() + Math.random(),
           x: Math.random() * 40 + 55,
           y: Math.random() * 30 + 40,
+          senderName,
         };
         setReactions(prev => [...prev, newReaction]);
+        
+        // Show toast with sender name
+        toast(`${senderName} sent ${REACTION_EMOJIS[payload.new.reaction_type] || '❤️'}`, {
+          duration: 2000,
+        });
+
         setTimeout(() => {
           setReactions(prev => prev.filter(r => r.id !== newReaction.id));
         }, 3000);
@@ -492,7 +528,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     };
   }, [streamId]);
 
-  // Subscribe to gifts received
+  // Subscribe to gifts received - FIXED: TikTok style with sender names
   useEffect(() => {
     if (!user) return;
 
@@ -527,7 +563,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
             .eq('id', payload.new.sender_id)
             .single();
           
-          // Add flying gift
+          // Add flying gift with prominent display
           const newGift = {
             id: payload.new.id,
             gift_type: payload.new.gift_type,
@@ -539,9 +575,9 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           // Remove after animation
           setTimeout(() => {
             setFlyingGifts(prev => prev.filter(g => g.id !== newGift.id));
-          }, 4000);
+          }, 5000);
           
-          toast.success(`Received ${payload.new.gift_type} gift! +${payload.new.credit_value} credits`);
+          toast.success(`🎁 ${newGift.sender_name} sent ${payload.new.gift_type}! +${payload.new.credit_value} credits`);
         }
       })
       .subscribe();
@@ -642,9 +678,258 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black overflow-hidden">
-      {/* Video Container - Always fills entire screen */}
-      <div className="absolute inset-0 bg-black">
+    <div className="fixed inset-0 z-50 bg-black flex">
+      {/* Desktop: 9:16 centered video with side chat */}
+      <div className="hidden lg:flex w-full h-full">
+        {/* Left spacer */}
+        <div className="flex-1 bg-black/95" />
+        
+        {/* Center: 9:16 Video Container */}
+        <div className="relative h-full" style={{ aspectRatio: '9/16', maxWidth: '100vh' }}>
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className={cn(
+              "w-full h-full object-cover",
+              isFrontCamera && "scale-x-[-1]"
+            )}
+          />
+
+          {/* Not Live Yet Overlay */}
+          {!isLive && (
+            <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
+              <div className="text-center">
+                <Radio className="w-20 h-20 mx-auto mb-4 text-primary animate-pulse" />
+                <h2 className="text-2xl font-bold text-white mb-2">Ready to Go Live?</h2>
+                <p className="text-muted-foreground mb-6">
+                  {stream?.title || "Your stream"}
+                </p>
+                <Button
+                  size="lg"
+                  onClick={startBroadcast}
+                  disabled={isStarting}
+                  className="bg-red-600 hover:bg-red-700 text-white px-8"
+                >
+                  {isStarting ? "Starting..." : "Start Broadcasting"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Live Badge & Stats */}
+          {isLive && (
+            <div className="absolute top-4 left-4 flex items-center gap-3">
+              <Badge variant="destructive" className="animate-pulse px-3 py-1 text-sm">
+                <span className="w-2 h-2 bg-white rounded-full mr-2 animate-ping" />
+                LIVE
+              </Badge>
+              <Badge variant="secondary" className="px-3 py-1">
+                <Users className="w-4 h-4 mr-1" />
+                {viewerCount}
+              </Badge>
+              {totalGiftsReceived > 0 && (
+                <Badge className="bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-3 py-1">
+                  <Coins className="w-4 h-4 mr-1" />
+                  {totalGiftsReceived}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Close Button */}
+          <div className="absolute top-4 right-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/20"
+              onClick={isLive ? stopBroadcast : onClose}
+            >
+              <X className="w-6 h-6" />
+            </Button>
+          </div>
+
+          {/* Flying Chat Overlay */}
+          {isLive && (
+            <FlyingChat 
+              messages={comments} 
+              gifts={flyingGifts}
+              maxMessages={10}
+            />
+          )}
+
+          {/* Floating Reactions with sender names */}
+          <AnimatePresence>
+            {reactions.map((reaction) => (
+              <motion.div
+                key={reaction.id}
+                initial={{ opacity: 1, y: 0, scale: 1 }}
+                animate={{ 
+                  opacity: 0, 
+                  y: -200, 
+                  scale: [1, 1.4, 1.2],
+                  x: [0, Math.random() * 40 - 20, Math.random() * 60 - 30]
+                }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 3, ease: "easeOut" }}
+                className="absolute text-4xl pointer-events-none z-30 flex flex-col items-center"
+                style={{
+                  right: `${100 - reaction.x}%`,
+                  bottom: `${reaction.y}%`,
+                }}
+              >
+                <span>{getReactionEmoji(reaction.type)}</span>
+                {reaction.senderName && (
+                  <span className="text-xs text-white bg-black/50 px-2 py-0.5 rounded-full mt-1">
+                    {reaction.senderName}
+                  </span>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {/* Host Action Buttons */}
+          {isLive && (
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-green-500/80 hover:bg-green-600"
+                onClick={handleShare}
+              >
+                <Share2 className="w-5 h-5 text-white" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-pink-500/80 hover:bg-pink-600"
+                onClick={() => setShowGiftModal(true)}
+              >
+                <Gift className="w-5 h-5 text-white" />
+              </Button>
+              
+              {/* Viewer List Panel */}
+              <ViewerListPanel
+                viewers={viewers}
+                viewerCount={viewerCount}
+                streamId={streamId}
+                onInviteToSpeak={handleInviteToSpeak}
+                coHosts={coHosts}
+                maxCoHosts={4}
+              />
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full bg-blue-500/80 hover:bg-blue-600"
+                onClick={() => setShowInviteModal(true)}
+              >
+                <UserPlus className="w-5 h-5 text-white" />
+              </Button>
+            </div>
+          )}
+
+          {/* Control Bar */}
+          {isLive && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "rounded-full",
+                  !isVideoOn && "bg-red-600 hover:bg-red-700"
+                )}
+                onClick={toggleVideo}
+              >
+                {isVideoOn ? <Video className="w-5 h-5 text-white" /> : <VideoOff className="w-5 h-5 text-white" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "rounded-full",
+                  !isAudioOn && "bg-red-600 hover:bg-red-700"
+                )}
+                onClick={toggleAudio}
+              >
+                {isAudioOn ? <Mic className="w-5 h-5 text-white" /> : <MicOff className="w-5 h-5 text-white" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full"
+                onClick={switchCamera}
+              >
+                <FlipHorizontal className="w-5 h-5 text-white" />
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="rounded-full ml-2"
+                onClick={stopBroadcast}
+              >
+                End Stream
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Right: Chat Panel for Desktop */}
+        {isLive && (
+          <div className="w-96 bg-background/95 border-l border-border flex flex-col">
+            <div className="p-4 border-b border-border">
+              <h3 className="font-bold flex items-center gap-2">
+                <MessageCircle className="w-5 h-5" />
+                Live Chat
+              </h3>
+              <p className="text-sm text-muted-foreground">{comments.length} messages</p>
+            </div>
+
+            <ScrollArea className="flex-1 p-4" ref={chatScrollRef}>
+              <div className="space-y-3">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="flex gap-3 items-start">
+                    <Avatar className="w-8 h-8 shrink-0">
+                      <AvatarImage src={comment.profiles?.avatar_url} />
+                      <AvatarFallback className="text-xs bg-primary/20">
+                        {comment.profiles?.display_name?.[0] || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <span className="font-semibold text-sm text-primary">
+                        {comment.profiles?.display_name || 'Anonymous'}
+                      </span>
+                      <p className="text-sm break-words">{comment.content}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+
+            <div className="p-4 border-t border-border">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Say something..."
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendComment()}
+                  className="flex-1"
+                />
+                <Button size="icon" onClick={sendComment}>
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Right spacer when not live */}
+        {!isLive && <div className="flex-1 bg-black/95" />}
+      </div>
+
+      {/* Mobile/Tablet: Full screen video */}
+      <div className="lg:hidden absolute inset-0 bg-black">
         <video
           ref={videoRef}
           autoPlay
@@ -655,7 +940,6 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
             isFrontCamera && "scale-x-[-1]"
           )}
           style={{
-            // Ensure video fills and centers on all devices
             objectPosition: 'center center',
             minWidth: '100%',
             minHeight: '100%',
@@ -685,7 +969,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
 
         {/* Live Badge & Stats */}
         {isLive && (
-          <div className="absolute top-4 left-4 flex items-center gap-3">
+          <div className="absolute top-4 left-4 flex items-center gap-3 z-20">
             <Badge variant="destructive" className="animate-pulse px-3 py-1 text-sm">
               <span className="w-2 h-2 bg-white rounded-full mr-2 animate-ping" />
               LIVE
@@ -698,7 +982,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         )}
 
         {/* Close and Home Buttons */}
-        <div className="absolute top-4 right-4 flex items-center gap-2">
+        <div className="absolute top-4 right-4 flex items-center gap-2 z-20">
           <Button
             variant="ghost"
             size="icon"
@@ -727,7 +1011,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           />
         )}
 
-        {/* Floating Reactions - Animated */}
+        {/* Floating Reactions with sender names */}
         <AnimatePresence>
           {reactions.map((reaction) => (
             <motion.div
@@ -741,20 +1025,25 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
               }}
               exit={{ opacity: 0 }}
               transition={{ duration: 3, ease: "easeOut" }}
-              className="absolute text-4xl pointer-events-none z-30"
+              className="absolute text-4xl pointer-events-none z-30 flex flex-col items-center"
               style={{
                 right: `${100 - reaction.x}%`,
                 bottom: `${reaction.y}%`,
               }}
             >
-              {getReactionEmoji(reaction.type)}
+              <span>{getReactionEmoji(reaction.type)}</span>
+              {reaction.senderName && (
+                <span className="text-xs text-white bg-black/50 px-2 py-0.5 rounded-full mt-1">
+                  {reaction.senderName}
+                </span>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
 
         {/* Gifts Received Badge */}
         {isLive && totalGiftsReceived > 0 && (
-          <div className="absolute top-4 right-16 flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-3 py-1 rounded-full">
+          <div className="absolute top-4 right-24 flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-3 py-1 rounded-full z-20">
             <Coins className="w-4 h-4" />
             <span className="font-bold">{totalGiftsReceived}</span>
           </div>
@@ -762,7 +1051,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
 
         {/* Host Action Buttons */}
         {isLive && (
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
             <Button
               variant="ghost"
               size="icon"
@@ -803,7 +1092,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
 
         {/* Control Bar */}
         {isLive && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2">
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 bg-black/60 backdrop-blur-sm rounded-full px-4 py-2 z-20">
             <Button
               variant="ghost"
               size="icon"
@@ -853,111 +1142,6 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           </div>
         )}
       </div>
-
-      {/* Desktop/Tablet Chat Overlay - shown on larger screens */}
-      {isLive && (
-        <div className="hidden md:block absolute left-4 bottom-24 w-96 max-h-[40vh] z-20">
-          <div className="bg-black/40 backdrop-blur-sm rounded-2xl p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-white text-sm flex items-center gap-2">
-                <MessageCircle className="w-4 h-4" />
-                Live Chat
-              </h3>
-              <Badge variant="outline" className="text-white/80 border-white/30 text-xs">{comments.length}</Badge>
-            </div>
-
-            <ScrollArea className="h-48 mb-3">
-              <div className="space-y-2">
-                {comments.slice(-15).map((comment) => (
-                  <div key={comment.id} className="flex gap-2 items-start">
-                    <Avatar className="w-6 h-6 shrink-0">
-                      <AvatarImage src={comment.profiles?.avatar_url} />
-                      <AvatarFallback className="text-xs bg-primary/50">
-                        {comment.profiles?.display_name?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-xs text-primary">
-                        {comment.profiles?.display_name || 'Anonymous'}
-                      </span>
-                      <p className="text-white text-sm break-words">{comment.content}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-
-            <div className="flex gap-2">
-              <Input
-                placeholder="Say something..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendComment()}
-                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/50 h-9"
-              />
-              <Button size="icon" onClick={sendComment} className="h-9 w-9 shrink-0">
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Chat Section - shown on mobile when not fullscreen */}
-      {!isFullscreen && (
-        <Card className="md:hidden h-72 rounded-none border-t bg-background/95 backdrop-blur fixed bottom-0 left-0 right-0 z-30">
-          <CardContent className="p-4 h-full flex flex-col">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold flex items-center gap-2">
-                <MessageCircle className="w-4 h-4" />
-                Live Chat
-              </h3>
-              <Badge variant="outline">{comments.length} messages</Badge>
-            </div>
-
-            <ScrollArea className="flex-1 mb-3">
-              <div className="space-y-2">
-                {comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-2 items-start">
-                    <Avatar className="w-6 h-6">
-                      <AvatarImage src={comment.profiles?.avatar_url} />
-                      <AvatarFallback className="text-xs">
-                        {comment.profiles?.display_name?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-sm text-primary">
-                        {comment.profiles?.display_name || 'Anonymous'}
-                      </span>
-                      <span className="text-sm ml-2">{comment.content}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-
-            <div className="flex gap-2">
-              <Input
-                placeholder="Say something..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendComment()}
-                className="flex-1"
-              />
-              <Button size="icon" onClick={sendComment}>
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <style>{`
-        @keyframes floatUp {
-          0% { opacity: 1; transform: translateY(0); }
-          100% { opacity: 0; transform: translateY(-100px); }
-        }
-      `}</style>
 
       {/* Gift Modal */}
       <LiveGiftModal
