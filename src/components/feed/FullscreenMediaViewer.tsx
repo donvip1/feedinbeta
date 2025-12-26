@@ -8,6 +8,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useVideoPreloader } from '@/hooks/useVideoPreloader';
 import { videoPreloadManager } from '@/lib/video-preload-manager';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
+import CommentsModal from './CommentsModal';
+import ShareModal from './ShareModal';
+import GiftModal from './GiftModal';
+import RefeedModal from './RefeedModal';
+
 interface Post {
   id: string;
   user_id: string;
@@ -62,10 +67,6 @@ export default function FullscreenMediaViewer({
   onMarkAsViewed,
   initialTime = 0,
   initialMuted = true,
-  onOpenComments,
-  onOpenRefeed,
-  onOpenGift,
-  onOpenShare,
   parentCommentsCount,
   parentRefeedsCount,
   parentLikesCount,
@@ -86,6 +87,13 @@ export default function FullscreenMediaViewer({
   const [commentsCount, setCommentsCount] = useState(0);
   const [refeedsCount, setRefeedsCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
+  // Modal states - render inside fullscreen to stay open
+  const [showComments, setShowComments] = useState(false);
+  const [showRefeed, setShowRefeed] = useState(false);
+  const [showGift, setShowGift] = useState(false);
+  const [showShare, setShowShare] = useState(false);
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
@@ -95,8 +103,8 @@ export default function FullscreenMediaViewer({
   // Touch gesture tracking for fast swipes
   const touchStartY = useRef(0);
   const touchStartTime = useRef(0);
-  const SWIPE_THRESHOLD = 40; // pixels - reduced for faster response
-  const VELOCITY_THRESHOLD = 0.3; // pixels per millisecond
+  const SWIPE_THRESHOLD = 40;
+  const VELOCITY_THRESHOLD = 0.3;
 
   // Filter posts by media type
   const isVideoPost = post.media_type === 'video' || 
@@ -131,11 +139,22 @@ export default function FullscreenMediaViewer({
     return null;
   };
 
-  // Get visible posts for rendering (current + adjacent)
+  // Pause ALL videos except the current one
+  const pauseAllExceptCurrent = useCallback((currentIdx: number) => {
+    videoRefs.current.forEach((video, postId) => {
+      const postIndex = navigablePosts.findIndex(p => p.id === postId);
+      if (postIndex !== currentIdx) {
+        video.pause();
+        video.currentTime = 0;
+      }
+    });
+  }, [navigablePosts]);
+
+  // Get visible posts for rendering - ONLY current ± 1 for performance
   const getVisiblePosts = useCallback(() => {
     const visible: { post: Post; index: number }[] = [];
     const start = Math.max(0, currentPostIndex - 1);
-    const end = Math.min(navigablePosts.length - 1, currentPostIndex + 2);
+    const end = Math.min(navigablePosts.length - 1, currentPostIndex + 1);
     
     for (let i = start; i <= end; i++) {
       if (navigablePosts[i]) {
@@ -155,29 +174,34 @@ export default function FullscreenMediaViewer({
     const newIndex = Math.round(scrollTop / itemHeight);
 
     if (newIndex !== currentPostIndex && newIndex >= 0 && newIndex < navigablePosts.length) {
+      setIsTransitioning(true);
       setCurrentPostIndex(newIndex);
       onNavigate?.(navigablePosts[newIndex].id);
       
-      // Pause previous video, play new one
-      const prevVideo = videoRefs.current.get(navigablePosts[currentPostIndex]?.id);
-      if (prevVideo) {
-        prevVideo.pause();
-      }
+      // Pause ALL videos except the new current
+      pauseAllExceptCurrent(newIndex);
+      
+      // Remove transition state after animation
+      setTimeout(() => setIsTransitioning(false), 150);
     }
-  }, [currentPostIndex, navigablePosts, onNavigate]);
+  }, [currentPostIndex, navigablePosts, onNavigate, pauseAllExceptCurrent]);
 
-  // Scroll to specific index - instant for fast response
+  // Scroll to specific index with smooth transition
   const scrollToIndex = useCallback((index: number) => {
     if (!scrollContainerRef.current) return;
     
+    setIsTransitioning(true);
     isScrolling.current = true;
     const container = scrollContainerRef.current;
     const targetTop = index * container.clientHeight;
     
-    // Use 'auto' for instant response instead of 'smooth'
+    // Pause all videos first
+    pauseAllExceptCurrent(index);
+    
+    // Use smooth scroll for better visual transition
     container.scrollTo({
       top: targetTop,
-      behavior: 'auto'
+      behavior: 'smooth'
     });
     
     setCurrentPostIndex(index);
@@ -185,8 +209,9 @@ export default function FullscreenMediaViewer({
     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
     scrollTimeout.current = setTimeout(() => {
       isScrolling.current = false;
-    }, 100); // Reduced from 300ms
-  }, []);
+      setIsTransitioning(false);
+    }, 200);
+  }, [pauseAllExceptCurrent]);
 
   // Touch gesture handlers for fast swipe detection
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -280,9 +305,12 @@ export default function FullscreenMediaViewer({
     setIsMuted(initialMuted);
   }, [initialMuted]);
 
-  // Auto-play current video
+  // Auto-play current video and pause others
   useEffect(() => {
     if (!isOpen || !isVideo) return;
+
+    // First pause all other videos
+    pauseAllExceptCurrent(currentPostIndex);
 
     const video = videoRefs.current.get(currentPost?.id);
     if (video) {
@@ -292,7 +320,7 @@ export default function FullscreenMediaViewer({
       setIsPlaying(true);
       setShowControls(false);
     }
-  }, [isOpen, currentPostIndex, currentPost?.id, isVideo]);
+  }, [isOpen, currentPostIndex, currentPost?.id, isVideo, pauseAllExceptCurrent]);
 
   // Show controls for images
   useEffect(() => {
@@ -491,24 +519,25 @@ export default function FullscreenMediaViewer({
     }
   };
 
+  // Open modals INSIDE fullscreen - don't close fullscreen
   const handleComments = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenComments) onOpenComments(actualPostId || currentPost?.id || '');
+    setShowComments(true);
   };
 
   const handleRefeed = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenRefeed) onOpenRefeed(actualPostId || currentPost?.id || '');
+    setShowRefeed(true);
   };
 
   const handleGift = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenGift && currentPost) onOpenGift(actualPostId || currentPost.id);
+    setShowGift(true);
   };
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (onOpenShare && currentPost) onOpenShare(actualPostId || currentPost.id);
+    setShowShare(true);
   };
 
   if (!isOpen || !currentPost) return null;
@@ -532,7 +561,22 @@ export default function FullscreenMediaViewer({
           WebkitOverflowScrolling: 'touch'
         }}
       >
+        {/* Only render current ± 1 posts for performance - with placeholder spacing */}
         {navigablePosts.map((p, index) => {
+          // Only render posts within 1 index of current
+          const shouldRender = Math.abs(index - currentPostIndex) <= 1;
+          
+          if (!shouldRender) {
+            // Return empty placeholder to maintain scroll position
+            return (
+              <div 
+                key={p.id}
+                className="w-full snap-start snap-always"
+                style={{ height: '100dvh', minHeight: '100dvh' }}
+              />
+            );
+          }
+
           const mediaUrl = getMediaUrl(p);
           const isCurrentVideo = p.media_type === 'video' || 
             (p.post_type === 'refeed' && p.original_post?.media_type === 'video') ||
@@ -547,7 +591,9 @@ export default function FullscreenMediaViewer({
           return (
             <div 
               key={p.id}
-              className="w-full h-full snap-start snap-always relative flex items-center justify-center"
+              className={`w-full h-full snap-start snap-always relative flex items-center justify-center transition-opacity duration-150 ${
+                isCurrent ? 'opacity-100' : 'opacity-70'
+              }`}
               style={{ height: '100dvh', minHeight: '100dvh' }}
             >
               {/* Media */}
@@ -555,6 +601,7 @@ export default function FullscreenMediaViewer({
                 <video
                   ref={(el) => {
                     if (el) videoRefs.current.set(p.id, el);
+                    else videoRefs.current.delete(p.id);
                   }}
                   src={mediaUrl || ''}
                   className="w-full h-full object-cover"
@@ -708,6 +755,50 @@ export default function FullscreenMediaViewer({
           );
         })}
       </div>
+
+      {/* Modals rendered INSIDE fullscreen to stay open */}
+      <CommentsModal
+        isOpen={showComments}
+        onClose={() => setShowComments(false)}
+        postId={actualPostId || currentPost?.id || ''}
+        postData={{
+          content: currentPost?.content || null,
+          media_url: getMediaUrl(currentPost) || null,
+          media_type: currentPost?.media_type || null,
+          profiles: currentPost?.profiles
+        }}
+        onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+      />
+
+      <RefeedModal
+        isOpen={showRefeed}
+        onClose={() => setShowRefeed(false)}
+        postId={actualPostId || currentPost?.id || ''}
+        post={currentPost}
+        onRefeedAdded={() => {
+          setRefeedsCount(prev => prev + 1);
+          setShowRefeed(false);
+        }}
+      />
+
+      <GiftModal
+        isOpen={showGift}
+        onClose={() => setShowGift(false)}
+        recipientId={currentPost?.user_id || ''}
+        recipientName={displayName}
+        postId={actualPostId || currentPost?.id}
+      />
+
+      <ShareModal
+        isOpen={showShare}
+        onClose={() => setShowShare(false)}
+        postId={actualPostId || currentPost?.id || ''}
+        postData={{
+          content: currentPost?.content || undefined,
+          media_url: getMediaUrl(currentPost) || undefined,
+          media_type: currentPost?.media_type || undefined
+        }}
+      />
     </div>
   );
 }

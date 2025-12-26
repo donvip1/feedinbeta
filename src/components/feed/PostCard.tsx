@@ -1116,20 +1116,16 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
         // For refeed/quote posts, use the refeed post ID for interactions
         actualPostId={post.id}
         onOpenComments={() => {
-          setShowFullscreenViewer(false);
-          setCommentsOpen(true);
+          // Comments now handled inside fullscreen viewer
         }}
         onOpenRefeed={() => {
-          setShowFullscreenViewer(false);
-          setRefeedOpen(true);
+          // Refeed now handled inside fullscreen viewer
         }}
         onOpenGift={() => {
-          setShowFullscreenViewer(false);
-          setGiftOpen(true);
+          // Gift now handled inside fullscreen viewer
         }}
         onOpenShare={() => {
-          setShowFullscreenViewer(false);
-          setShareOpen(true);
+          // Share now handled inside fullscreen viewer
         }}
       />
 
