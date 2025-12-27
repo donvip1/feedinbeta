@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useVideoPreloader } from '@/hooks/useVideoPreloader';
 import { videoPreloadManager } from '@/lib/video-preload-manager';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
-import CommentsModal from './CommentsModal';
+import InlineCommentsPanel from './InlineCommentsPanel';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
@@ -547,229 +547,277 @@ export default function FullscreenMediaViewer({
   const visiblePosts = getVisiblePosts();
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black">
-      {/* Scroll Container with snap and touch gestures */}
+    <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+      {/* Media Container - shrinks when comments are open */}
       <div 
-        ref={scrollContainerRef}
-        className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
-        onScroll={handleScroll}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        style={{ 
-          scrollBehavior: 'auto',
-          overscrollBehavior: 'contain',
-          WebkitOverflowScrolling: 'touch'
-        }}
+        className={`relative transition-all duration-300 ease-in-out ${
+          showComments ? 'h-[55%]' : 'h-full'
+        }`}
       >
-        {/* Only render current ± 1 posts for performance - with placeholder spacing */}
-        {navigablePosts.map((p, index) => {
-          // Only render posts within 1 index of current
-          const shouldRender = Math.abs(index - currentPostIndex) <= 1;
-          
-          if (!shouldRender) {
-            // Return empty placeholder to maintain scroll position
+        {/* Scroll Container with snap and touch gestures */}
+        <div 
+          ref={scrollContainerRef}
+          className="w-full h-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+          onScroll={handleScroll}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          style={{ 
+            scrollBehavior: 'auto',
+            overscrollBehavior: 'contain',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          {/* Only render current ± 1 posts for performance - with placeholder spacing */}
+          {navigablePosts.map((p, index) => {
+            // Only render posts within 1 index of current
+            const shouldRender = Math.abs(index - currentPostIndex) <= 1;
+            
+            // Calculate dynamic height based on whether comments are open
+            const itemHeight = showComments ? '55dvh' : '100dvh';
+            
+            if (!shouldRender) {
+              // Return empty placeholder to maintain scroll position
+              return (
+                <div 
+                  key={p.id}
+                  className="w-full snap-start snap-always"
+                  style={{ height: itemHeight, minHeight: itemHeight }}
+                />
+              );
+            }
+
+            const mediaUrl = getMediaUrl(p);
+            const isCurrentVideo = p.media_type === 'video' || 
+              (p.post_type === 'refeed' && p.original_post?.media_type === 'video') ||
+              (p.post_type === 'quote' && p.original_post?.media_type === 'video');
+            const isCurrent = index === currentPostIndex;
+            const postDisplayName = p.profiles?.display_name || p.profiles?.username || 'Anonymous';
+            const postUsername = p.profiles?.username || 'anonymous';
+            
+            // Check if video is preloaded
+            const isPreloaded = mediaUrl ? videoPreloadManager.isReady(mediaUrl) : false;
+
             return (
               <div 
                 key={p.id}
-                className="w-full snap-start snap-always"
-                style={{ height: '100dvh', minHeight: '100dvh' }}
-              />
-            );
-          }
+                className={`w-full h-full snap-start snap-always relative flex items-center justify-center transition-opacity duration-150 ${
+                  isCurrent ? 'opacity-100' : 'opacity-70'
+                }`}
+                style={{ height: itemHeight, minHeight: itemHeight }}
+              >
+                {/* Media */}
+                {isCurrentVideo ? (
+                  <video
+                    ref={(el) => {
+                      if (el) videoRefs.current.set(p.id, el);
+                      else videoRefs.current.delete(p.id);
+                    }}
+                    src={mediaUrl || ''}
+                    className="w-full h-full object-cover"
+                    playsInline
+                    muted={isMuted}
+                    loop
+                    preload={isPreloaded ? 'auto' : 'metadata'}
+                    onClick={() => isCurrent && togglePlayPause()}
+                    onContextMenu={(e) => e.preventDefault()}
+                    controlsList="nodownload nofullscreen noremoteplayback"
+                    disablePictureInPicture
+                  />
+                ) : (
+                  <img
+                    src={mediaUrl || ''}
+                    alt="Post content"
+                    className="w-full h-full object-cover"
+                    onClick={handleImageTap}
+                    onContextMenu={(e) => e.preventDefault()}
+                  />
+                )}
 
-          const mediaUrl = getMediaUrl(p);
-          const isCurrentVideo = p.media_type === 'video' || 
-            (p.post_type === 'refeed' && p.original_post?.media_type === 'video') ||
-            (p.post_type === 'quote' && p.original_post?.media_type === 'video');
-          const isCurrent = index === currentPostIndex;
-          const postDisplayName = p.profiles?.display_name || p.profiles?.username || 'Anonymous';
-          const postUsername = p.profiles?.username || 'anonymous';
-          
-          // Check if video is preloaded
-          const isPreloaded = mediaUrl ? videoPreloadManager.isReady(mediaUrl) : false;
+                {/* Overlays - only show for current post */}
+                {isCurrent && (
+                  <>
+                    {/* Top Overlay */}
+                    <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 z-10">
+                      <div className="flex items-center justify-between">
+                        <div 
+                          className="flex items-center gap-3 cursor-pointer"
+                          onClick={handleProfileClick}
+                        >
+                          <Avatar className="w-10 h-10">
+                            <AvatarImage src={p.profiles?.avatar_url || ''} />
+                            <AvatarFallback>{postDisplayName[0]?.toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-semibold text-white text-sm">{postDisplayName}</p>
+                            <p className="text-xs text-white/60">@{postUsername}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={onClose}
+                          className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
+                        >
+                          <X className="w-6 h-6" />
+                        </button>
+                      </div>
+                    </div>
 
-          return (
-            <div 
-              key={p.id}
-              className={`w-full h-full snap-start snap-always relative flex items-center justify-center transition-opacity duration-150 ${
-                isCurrent ? 'opacity-100' : 'opacity-70'
-              }`}
-              style={{ height: '100dvh', minHeight: '100dvh' }}
-            >
-              {/* Media */}
-              {isCurrentVideo ? (
-                <video
-                  ref={(el) => {
-                    if (el) videoRefs.current.set(p.id, el);
-                    else videoRefs.current.delete(p.id);
-                  }}
-                  src={mediaUrl || ''}
-                  className="w-full h-full object-cover"
-                  playsInline
-                  muted={isMuted}
-                  loop
-                  preload={isPreloaded ? 'auto' : 'metadata'}
-                  onClick={() => isCurrent && togglePlayPause()}
-                  onContextMenu={(e) => e.preventDefault()}
-                  controlsList="nodownload nofullscreen noremoteplayback"
-                  disablePictureInPicture
-                />
-              ) : (
-                <img
-                  src={mediaUrl || ''}
-                  alt="Post content"
-                  className="w-full h-full object-cover"
-                  onClick={handleImageTap}
-                  onContextMenu={(e) => e.preventDefault()}
-                />
-              )}
-
-              {/* Overlays - only show for current post */}
-              {isCurrent && (
-                <>
-                  {/* Top Overlay */}
-                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/70 to-transparent p-4 z-10">
-                    <div className="flex items-center justify-between">
+                    {/* Social Action Buttons - adjust position based on comments state */}
+                    {showControls && (
                       <div 
-                        className="flex items-center gap-3 cursor-pointer"
-                        onClick={handleProfileClick}
+                        className={`absolute right-4 flex flex-col items-center gap-5 z-30 transition-all duration-300 ${
+                          showComments ? 'bottom-4' : 'bottom-32'
+                        }`}
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={p.profiles?.avatar_url || ''} />
-                          <AvatarFallback>{postDisplayName[0]?.toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-semibold text-white text-sm">{postDisplayName}</p>
-                          <p className="text-xs text-white/60">@{postUsername}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={onClose}
-                        className="p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-all"
-                      >
-                        <X className="w-6 h-6" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Social Action Buttons */}
-                  {showControls && (
-                    <div 
-                      className="absolute right-4 bottom-32 flex flex-col items-center gap-5 z-30"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button onClick={handleLike} className="flex flex-col items-center gap-1">
-                        <div className={`p-3 rounded-full ${isLiked ? 'bg-red-500' : 'bg-black/50'} hover:bg-black/70 transition-all`}>
-                          <Heart className={`w-6 h-6 ${isLiked ? 'text-white fill-white' : 'text-white'}`} />
-                        </div>
-                        <span className="text-white text-xs font-medium">{likesCount}</span>
-                      </button>
-
-                      <button onClick={handleComments} className="flex flex-col items-center gap-1">
-                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                          <MessageCircle className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-white text-xs font-medium">{commentsCount}</span>
-                      </button>
-
-                      <button onClick={handleRefeed} className="flex flex-col items-center gap-1">
-                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                          <Repeat2 className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-white text-xs font-medium">{refeedsCount}</span>
-                      </button>
-
-                      <button onClick={handleGift} className="flex flex-col items-center gap-1">
-                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                          <Gift className="w-6 h-6 text-white" />
-                        </div>
-                      </button>
-
-                      <button onClick={handleShare} className="flex flex-col items-center gap-1">
-                        <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
-                          <Share2 className="w-6 h-6 text-white" />
-                        </div>
-                        <span className="text-white text-xs font-medium">{p.shares_count || 0}</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Play/Pause indicator */}
-                  {isCurrentVideo && !isPlaying && showControls && (
-                    <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                      <div className="p-5 bg-black/40 rounded-full">
-                        <Play className="w-12 h-12 text-white" fill="white" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Video Controls */}
-                  {isCurrentVideo && showControls && (
-                    <div 
-                      className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 z-20"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex justify-between text-white text-xs mb-2 font-medium">
-                        <span>{formatTime(currentTime)}</span>
-                        <span>{formatTime(duration)}</span>
-                      </div>
-
-                      <div className="mb-4">
-                        <Slider
-                          value={[currentTime]}
-                          min={0}
-                          max={duration || 100}
-                          step={0.1}
-                          onValueChange={handleSeekChange}
-                          onValueCommit={handleSeekEnd}
-                          className="w-full cursor-pointer [&_[role=slider]]:h-4 [&_[role=slider]]:w-4 [&_[role=slider]]:bg-white [&_[role=slider]]:border-0 [&_[role=slider]]:shadow-lg [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/30 [&>span:first-child>span]:bg-primary"
-                        />
-                      </div>
-
-                      <div className="flex items-center justify-center gap-6">
-                        <button onClick={seekBackward} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
-                          <SkipBack className="w-6 h-6 text-white" fill="white" />
+                        <button onClick={handleLike} className="flex flex-col items-center gap-1">
+                          <div className={`p-3 rounded-full ${isLiked ? 'bg-red-500' : 'bg-black/50'} hover:bg-black/70 transition-all`}>
+                            <Heart className={`w-6 h-6 ${isLiked ? 'text-white fill-white' : 'text-white'}`} />
+                          </div>
+                          <span className="text-white text-xs font-medium">{likesCount}</span>
                         </button>
 
-                        <button onClick={togglePlayPause} className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all" type="button">
+                        <button onClick={handleComments} className="flex flex-col items-center gap-1">
+                          <div className={`p-3 rounded-full transition-all ${showComments ? 'bg-primary' : 'bg-black/50 hover:bg-black/70'}`}>
+                            <MessageCircle className="w-6 h-6 text-white" />
+                          </div>
+                          <span className="text-white text-xs font-medium">{commentsCount}</span>
+                        </button>
+
+                        <button onClick={handleRefeed} className="flex flex-col items-center gap-1">
+                          <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                            <Repeat2 className="w-6 h-6 text-white" />
+                          </div>
+                          <span className="text-white text-xs font-medium">{refeedsCount}</span>
+                        </button>
+
+                        <button onClick={handleGift} className="flex flex-col items-center gap-1">
+                          <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                            <Gift className="w-6 h-6 text-white" />
+                          </div>
+                        </button>
+
+                        <button onClick={handleShare} className="flex flex-col items-center gap-1">
+                          <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                            <Share2 className="w-6 h-6 text-white" />
+                          </div>
+                          <span className="text-white text-xs font-medium">{p.shares_count || 0}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Play/Pause indicator */}
+                    {isCurrentVideo && !isPlaying && showControls && !showComments && (
+                      <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+                        <div className="p-5 bg-black/40 rounded-full">
+                          <Play className="w-12 h-12 text-white" fill="white" />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Video Controls - hide when comments are open for cleaner look */}
+                    {isCurrentVideo && showControls && !showComments && (
+                      <div 
+                        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 z-20"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex justify-between text-white text-xs mb-2 font-medium">
+                          <span>{formatTime(currentTime)}</span>
+                          <span>{formatTime(duration)}</span>
+                        </div>
+
+                        <div className="mb-4">
+                          <Slider
+                            value={[currentTime]}
+                            min={0}
+                            max={duration || 100}
+                            step={0.1}
+                            onValueChange={handleSeekChange}
+                            onValueCommit={handleSeekEnd}
+                            className="w-full cursor-pointer [&_[role=slider]]:h-4 [&_[role=slider]]:w-4 [&_[role=slider]]:bg-white [&_[role=slider]]:border-0 [&_[role=slider]]:shadow-lg [&>span:first-child]:h-1.5 [&>span:first-child]:bg-white/30 [&>span:first-child>span]:bg-primary"
+                          />
+                        </div>
+
+                        <div className="flex items-center justify-center gap-6">
+                          <button onClick={seekBackward} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
+                            <SkipBack className="w-6 h-6 text-white" fill="white" />
+                          </button>
+
+                          <button onClick={togglePlayPause} className="p-4 bg-primary rounded-full hover:bg-primary/90 transition-all" type="button">
+                            {isPlaying ? (
+                              <Pause className="w-7 h-7 text-primary-foreground" fill="currentColor" />
+                            ) : (
+                              <Play className="w-7 h-7 text-primary-foreground" fill="currentColor" />
+                            )}
+                          </button>
+
+                          <button onClick={seekForward} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
+                            <SkipForward className="w-6 h-6 text-white" fill="white" />
+                          </button>
+
+                          <button onClick={toggleMute} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
+                            {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Compact video controls when comments are open */}
+                    {isCurrentVideo && showComments && (
+                      <div 
+                        className="absolute bottom-2 left-2 right-16 flex items-center gap-2 z-20"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button 
+                          onClick={togglePlayPause} 
+                          className="p-2 bg-black/60 rounded-full"
+                          type="button"
+                        >
                           {isPlaying ? (
-                            <Pause className="w-7 h-7 text-primary-foreground" fill="currentColor" />
+                            <Pause className="w-4 h-4 text-white" fill="white" />
                           ) : (
-                            <Play className="w-7 h-7 text-primary-foreground" fill="currentColor" />
+                            <Play className="w-4 h-4 text-white" fill="white" />
                           )}
                         </button>
-
-                        <button onClick={seekForward} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
-                          <SkipForward className="w-6 h-6 text-white" fill="white" />
-                        </button>
-
-                        <button onClick={toggleMute} className="p-3 hover:bg-white/10 rounded-full transition-all" type="button">
-                          {isMuted ? <VolumeX className="w-6 h-6 text-white" /> : <Volume2 className="w-6 h-6 text-white" />}
+                        <div className="flex-1">
+                          <Slider
+                            value={[currentTime]}
+                            min={0}
+                            max={duration || 100}
+                            step={0.1}
+                            onValueChange={handleSeekChange}
+                            onValueCommit={handleSeekEnd}
+                            className="w-full cursor-pointer [&_[role=slider]]:h-3 [&_[role=slider]]:w-3 [&_[role=slider]]:bg-white [&_[role=slider]]:border-0 [&>span:first-child]:h-1 [&>span:first-child]:bg-white/30 [&>span:first-child>span]:bg-primary"
+                          />
+                        </div>
+                        <span className="text-white text-[10px] font-medium bg-black/60 px-1.5 py-0.5 rounded">
+                          {formatTime(currentTime)}
+                        </span>
+                        <button 
+                          onClick={toggleMute} 
+                          className="p-2 bg-black/60 rounded-full"
+                          type="button"
+                        >
+                          {isMuted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
                         </button>
                       </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })}
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Modals rendered INSIDE fullscreen to stay open */}
-      <CommentsModal
+      {/* Inline Comments Panel - YouTube style */}
+      <InlineCommentsPanel
         isOpen={showComments}
         onClose={() => setShowComments(false)}
         postId={actualPostId || currentPost?.id || ''}
-        postData={{
-          content: currentPost?.content || null,
-          media_url: getMediaUrl(currentPost) || null,
-          media_type: currentPost?.media_type || null,
-          profiles: currentPost?.profiles
-        }}
         onCommentAdded={() => setCommentsCount(prev => prev + 1)}
       />
 
+      {/* Other Modals rendered INSIDE fullscreen to stay open */}
       <RefeedModal
         isOpen={showRefeed}
         onClose={() => setShowRefeed(false)}
