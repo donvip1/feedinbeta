@@ -346,7 +346,7 @@ export default function InlineCommentsPanel({
 
   return (
     <div 
-      className="absolute bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm rounded-t-3xl flex flex-col z-50 animate-in slide-in-from-bottom duration-300"
+      className="fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-sm rounded-t-3xl flex flex-col z-[110] animate-in slide-in-from-bottom duration-300"
       style={{ height: '45%', maxHeight: '45vh' }}
       onClick={(e) => e.stopPropagation()}
     >
