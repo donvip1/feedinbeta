@@ -442,58 +442,64 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
     console.log('[LiveSpace] Joining space as:', user.id, 'Space owner:', space.user_id);
     const isOwner = space.user_id === user.id;
+    const role = isOwner ? 'host' : 'listener';
 
     try {
-      // Check if already in speakers table
-      const { data: existing, error: existingError } = await supabase
+      // First, clear any stale entries where left_at is set (user previously left)
+      await supabase
         .from('live_space_speakers')
-        .select('id, role')
+        .delete()
         .eq('space_id', spaceId)
         .eq('user_id', user.id)
-        .is('left_at', null)
-        .maybeSingle();
+        .not('left_at', 'is', null);
 
-      if (existingError) {
-        console.error('[LiveSpace] Error checking existing speaker:', existingError);
-        throw existingError;
-      }
-
-      if (existing) {
-        console.log('[LiveSpace] Already in speakers table with role:', existing.role);
-        
-        // If I'm the owner but my role is wrong, fix it
-        if (isOwner && existing.role !== 'host') {
-          console.log('[LiveSpace] Fixing owner role to host');
-          await supabase
-            .from('live_space_speakers')
-            .update({ role: 'host', is_muted: false })
-            .eq('id', existing.id);
-        }
-      } else {
-        // Insert new speaker
-        const role = isOwner ? 'host' : 'listener';
-        console.log('[LiveSpace] Inserting new speaker with role:', role);
-        
-        const { error: insertError } = await supabase.from('live_space_speakers').insert({
+      // Use upsert to handle both new joins and rejoins atomically
+      const { error: upsertError } = await supabase
+        .from('live_space_speakers')
+        .upsert({
           space_id: spaceId,
           user_id: user.id,
           role: role,
           is_muted: !isOwner, // Host starts unmuted
           host_muted: false,
           mic_allowed: true,
+          left_at: null,
+          joined_at: new Date().toISOString(),
+        }, {
+          onConflict: 'space_id,user_id',
+          ignoreDuplicates: false
         });
 
-        if (insertError) {
-          console.error('[LiveSpace] Error inserting speaker:', insertError);
-          throw insertError;
+      if (upsertError) {
+        console.error('[LiveSpace] Error upserting speaker:', upsertError);
+        // If upsert fails, try to just update existing entry
+        const { error: updateError } = await supabase
+          .from('live_space_speakers')
+          .update({
+            left_at: null,
+            joined_at: new Date().toISOString(),
+            role: isOwner ? 'host' : undefined, // Only update role if owner
+          })
+          .eq('space_id', spaceId)
+          .eq('user_id', user.id);
+        
+        if (updateError) {
+          console.error('[LiveSpace] Error updating speaker:', updateError);
+          throw updateError;
         }
-
-        // Update viewer count
-        await supabase
-          .from('live_spaces')
-          .update({ viewer_count: (space.viewer_count || 0) + 1 })
-          .eq('id', spaceId);
       }
+
+      // Update viewer count
+      const { data: currentSpace } = await supabase
+        .from('live_spaces')
+        .select('viewer_count')
+        .eq('id', spaceId)
+        .single();
+      
+      await supabase
+        .from('live_spaces')
+        .update({ viewer_count: (currentSpace?.viewer_count || 0) + 1 })
+        .eq('id', spaceId);
 
       // Refetch speakers to update UI
       await fetchSpeakers();
