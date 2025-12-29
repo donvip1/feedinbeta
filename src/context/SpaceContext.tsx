@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 interface SpaceInfo {
   id: string;
@@ -11,13 +12,26 @@ interface SpaceInfo {
   startedAt: string;
 }
 
+export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'failed' | 'reconnecting';
+
+interface AudioLevels {
+  [peerId: string]: number;
+}
+
+interface PeerConnection {
+  peerId: string;
+  connection: RTCPeerConnection;
+  audioLevel: number;
+}
+
 interface SpaceState {
   isActive: boolean;
   isMinimized: boolean;
   spaceInfo: SpaceInfo | null;
   isMuted: boolean;
   myRole: 'host' | 'co_host' | 'speaker' | 'listener';
-  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'failed' | 'reconnecting';
+  connectionStatus: ConnectionStatus;
+  audioLevels: AudioLevels;
 }
 
 interface SpaceContextType {
@@ -27,8 +41,11 @@ interface SpaceContextType {
   minimizeSpace: () => void;
   maximizeSpace: () => void;
   setMuted: (muted: boolean) => void;
-  setConnectionStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'failed' | 'reconnecting') => void;
+  setConnectionStatus: (status: ConnectionStatus) => void;
   updateRole: (role: string) => void;
+  connectAudio: () => Promise<void>;
+  disconnectAudio: () => void;
+  localStream: MediaStream | null;
 }
 
 const defaultState: SpaceState = {
@@ -38,6 +55,7 @@ const defaultState: SpaceState = {
   isMuted: true,
   myRole: 'listener',
   connectionStatus: 'disconnected',
+  audioLevels: {},
 };
 
 const SpaceContext = createContext<SpaceContextType | null>(null);
@@ -54,25 +72,546 @@ export const useOptionalSpaceContext = () => {
   return useContext(SpaceContext);
 };
 
+// ICE servers configuration
+const iceServers: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ],
+};
+
 export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const [spaceState, setSpaceState] = useState<SpaceState>(defaultState);
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  
+  // Audio management refs - persist across navigation
+  const peersRef = useRef<Map<string, PeerConnection>>(new Map());
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyzersRef = useRef<Map<string, AnalyserNode>>(new Map());
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 5;
+  const isConnectingRef = useRef(false);
 
+  // Derived values
+  const canBroadcast = spaceState.myRole === 'host' || spaceState.myRole === 'co_host' || spaceState.myRole === 'speaker';
+
+  // Initialize audio context
+  const initAudioContext = useCallback(() => {
+    if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+      audioContextRef.current = new AudioContext();
+    }
+    return audioContextRef.current;
+  }, []);
+
+  // Create audio analyzer for speaking indicators
+  const createAnalyzer = useCallback((stream: MediaStream, peerId: string) => {
+    try {
+      const audioContext = initAudioContext();
+      const source = audioContext.createMediaStreamSource(stream);
+      const analyzer = audioContext.createAnalyser();
+      analyzer.fftSize = 256;
+      analyzer.smoothingTimeConstant = 0.8;
+      source.connect(analyzer);
+      analyzersRef.current.set(peerId, analyzer);
+      return analyzer;
+    } catch (error) {
+      console.error('[SpaceContext] Error creating audio analyzer:', error);
+      return null;
+    }
+  }, [initAudioContext]);
+
+  // Monitor audio levels for speaking indicators
+  const monitorAudioLevels = useCallback(() => {
+    const levels: AudioLevels = {};
+    
+    analyzersRef.current.forEach((analyzer, peerId) => {
+      const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+      analyzer.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((sum, value) => sum + value, 0) / dataArray.length;
+      levels[peerId] = Math.min(100, average * 1.5);
+    });
+
+    setSpaceState(prev => ({ ...prev, audioLevels: levels }));
+    animationFrameRef.current = requestAnimationFrame(monitorAudioLevels);
+  }, []);
+
+  // Get local audio stream
+  const getLocalStream = useCallback(async () => {
+    console.log('[SpaceContext] getLocalStream called, canBroadcast:', canBroadcast);
+    
+    if (localStreamRef.current) {
+      console.log('[SpaceContext] Using existing local stream');
+      return localStreamRef.current;
+    }
+
+    if (!canBroadcast) {
+      console.log('[SpaceContext] Listener mode - no local stream needed');
+      return null;
+    }
+
+    try {
+      console.log('[SpaceContext] Requesting microphone access...');
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+        },
+        video: false,
+      });
+
+      console.log('[SpaceContext] ✅ Got microphone access, tracks:', stream.getAudioTracks().length);
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+
+      // Set initial mute state
+      stream.getAudioTracks().forEach(track => {
+        track.enabled = !spaceState.isMuted;
+      });
+
+      // Create analyzer for local audio
+      if (user) {
+        createAnalyzer(stream, user.id);
+      }
+
+      return stream;
+    } catch (error: any) {
+      console.error('[SpaceContext] ❌ Error accessing microphone:', error);
+      if (error.name === 'NotAllowedError') {
+        toast.error('Microphone access denied. Please allow microphone access.');
+      } else if (error.name === 'NotFoundError') {
+        toast.error('No microphone found. Please connect a microphone.');
+      } else {
+        toast.error('Could not access microphone.');
+      }
+      return null;
+    }
+  }, [user, createAnalyzer, canBroadcast, spaceState.isMuted]);
+
+  // Handle peer disconnect
+  const handlePeerDisconnect = useCallback((peerId: string) => {
+    const peer = peersRef.current.get(peerId);
+    if (peer) {
+      peer.connection.close();
+      peersRef.current.delete(peerId);
+      analyzersRef.current.delete(peerId);
+      
+      const audioElement = document.getElementById(`audio-${peerId}`);
+      if (audioElement) {
+        audioElement.remove();
+      }
+    }
+  }, []);
+
+  // Send offer to a specific peer
+  const sendOfferToPeer = useCallback(async (peerConnection: RTCPeerConnection, peerId: string) => {
+    if (!user) return;
+    
+    try {
+      console.log(`[SpaceContext] Creating and sending offer to ${peerId}`);
+      const offer = await peerConnection.createOffer();
+      await peerConnection.setLocalDescription(offer);
+      
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'offer',
+        payload: {
+          from: user.id,
+          to: peerId,
+          sdp: offer,
+        },
+      });
+      console.log(`[SpaceContext] Offer sent to ${peerId}`);
+    } catch (error) {
+      console.error('[SpaceContext] Error creating offer:', error);
+    }
+  }, [user]);
+
+  // Create peer connection
+  const createPeerConnection = useCallback(async (peerId: string, initiator: boolean, forceSendOffer: boolean = false) => {
+    if (!user || !spaceState.spaceInfo) return null;
+
+    const existingPeer = peersRef.current.get(peerId);
+    if (existingPeer) {
+      console.log(`[SpaceContext] Already have connection to ${peerId}`);
+      if (forceSendOffer && canBroadcast && existingPeer.connection.signalingState === 'stable') {
+        await sendOfferToPeer(existingPeer.connection, peerId);
+      }
+      return existingPeer.connection;
+    }
+
+    console.log(`[SpaceContext] Creating peer connection with ${peerId}, initiator: ${initiator}, canBroadcast: ${canBroadcast}`);
+    
+    const peerConnection = new RTCPeerConnection(iceServers);
+    
+    // Add local stream tracks ONLY if we can broadcast
+    if (localStreamRef.current && canBroadcast) {
+      console.log(`[SpaceContext] Adding local tracks to connection for ${peerId}`);
+      localStreamRef.current.getTracks().forEach(track => {
+        peerConnection.addTrack(track, localStreamRef.current!);
+      });
+    } else if (!canBroadcast) {
+      console.log(`[SpaceContext] Adding recvonly transceiver for listener`);
+      peerConnection.addTransceiver('audio', { direction: 'recvonly' });
+    }
+
+    // Handle incoming tracks
+    peerConnection.ontrack = (event) => {
+      console.log(`[SpaceContext] ✅ Received audio track from ${peerId}`, event.streams);
+      const remoteStream = event.streams[0];
+      
+      if (remoteStream) {
+        const existingAudio = document.getElementById(`audio-${peerId}`) as HTMLAudioElement;
+        if (existingAudio) existingAudio.remove();
+        
+        const audio = document.createElement('audio') as HTMLAudioElement;
+        audio.srcObject = remoteStream;
+        audio.autoplay = true;
+        audio.id = `audio-${peerId}`;
+        audio.volume = 1.0;
+        (audio as any).playsInline = true;
+        audio.setAttribute('playsinline', 'true');
+        
+        document.body.appendChild(audio);
+        
+        const playAudio = async (retryCount = 0) => {
+          try {
+            await audio.play();
+            console.log(`[SpaceContext] ✅ Audio playing from ${peerId}`);
+          } catch (err: any) {
+            console.warn('[SpaceContext] Audio autoplay blocked:', err);
+            if (retryCount < 3) {
+              setTimeout(() => playAudio(retryCount + 1), 1000);
+            } else {
+              const enableAudio = () => {
+                audio.play().catch(console.error);
+                document.removeEventListener('click', enableAudio);
+                document.removeEventListener('touchstart', enableAudio);
+              };
+              document.addEventListener('click', enableAudio);
+              document.addEventListener('touchstart', enableAudio);
+              toast.info('Tap anywhere to enable audio');
+            }
+          }
+        };
+        
+        playAudio();
+        createAnalyzer(remoteStream, peerId);
+      }
+    };
+
+    // Handle ICE candidates
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log(`[SpaceContext] Sending ICE candidate to ${peerId}`);
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'ice-candidate',
+          payload: {
+            from: user.id,
+            to: peerId,
+            candidate: event.candidate,
+          },
+        });
+      }
+    };
+
+    // Handle connection state changes
+    peerConnection.onconnectionstatechange = () => {
+      console.log(`[SpaceContext] Connection state with ${peerId}: ${peerConnection.connectionState}`);
+      if (peerConnection.connectionState === 'connected') {
+        setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
+        reconnectAttempts.current = 0;
+      } else if (peerConnection.connectionState === 'failed') {
+        handlePeerDisconnect(peerId);
+      }
+    };
+
+    peersRef.current.set(peerId, {
+      peerId,
+      connection: peerConnection,
+      audioLevel: 0,
+    });
+
+    if (initiator && canBroadcast) {
+      await sendOfferToPeer(peerConnection, peerId);
+    }
+
+    return peerConnection;
+  }, [user, spaceState.spaceInfo, canBroadcast, createAnalyzer, sendOfferToPeer, handlePeerDisconnect]);
+
+  // Handle incoming offer
+  const handleOffer = useCallback(async (from: string, sdp: RTCSessionDescriptionInit) => {
+    if (!user || from === user.id) return;
+
+    console.log(`[SpaceContext] Received offer from ${from}`);
+    
+    let peerConnection = peersRef.current.get(from)?.connection;
+    if (!peerConnection) {
+      peerConnection = await createPeerConnection(from, false);
+    }
+    
+    if (!peerConnection) return;
+
+    try {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
+      
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'answer',
+        payload: {
+          from: user.id,
+          to: from,
+          sdp: answer,
+        },
+      });
+    } catch (error) {
+      console.error('[SpaceContext] Error handling offer:', error);
+    }
+  }, [user, createPeerConnection]);
+
+  // Handle incoming answer
+  const handleAnswer = useCallback(async (from: string, sdp: RTCSessionDescriptionInit) => {
+    if (!user || from === user.id) return;
+
+    const peerConnection = peersRef.current.get(from)?.connection;
+    if (!peerConnection) return;
+
+    try {
+      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+    } catch (error) {
+      console.error('[SpaceContext] Error handling answer:', error);
+    }
+  }, [user]);
+
+  // Handle incoming ICE candidate
+  const handleIceCandidate = useCallback(async (from: string, candidate: RTCIceCandidateInit) => {
+    if (!user || from === user.id) return;
+
+    const peerConnection = peersRef.current.get(from)?.connection;
+    if (!peerConnection) return;
+
+    try {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } catch (error) {
+      console.error('[SpaceContext] Error adding ICE candidate:', error);
+    }
+  }, [user]);
+
+  // Connect to space audio - GLOBAL function that persists
+  const connectAudio = useCallback(async () => {
+    if (!user || !spaceState.spaceInfo || isConnectingRef.current) return;
+    if (spaceState.connectionStatus === 'connected') {
+      console.log('[SpaceContext] Already connected to audio');
+      return;
+    }
+    
+    isConnectingRef.current = true;
+    setSpaceState(prev => ({ ...prev, connectionStatus: 'connecting' }));
+    console.log(`[SpaceContext] Connecting to space audio... canBroadcast: ${canBroadcast}`);
+
+    try {
+      if (canBroadcast) {
+        await getLocalStream();
+      }
+
+      const spaceId = spaceState.spaceInfo.id;
+      const channel = supabase.channel(`space-audio-${spaceId}`, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: user.id },
+        },
+      });
+
+      channel
+        .on('broadcast', { event: 'offer' }, ({ payload }) => {
+          if (payload.to === user.id) {
+            handleOffer(payload.from, payload.sdp);
+          }
+        })
+        .on('broadcast', { event: 'answer' }, ({ payload }) => {
+          if (payload.to === user.id) {
+            handleAnswer(payload.from, payload.sdp);
+          }
+        })
+        .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => {
+          if (payload.to === user.id) {
+            handleIceCandidate(payload.from, payload.candidate);
+          }
+        })
+        .on('broadcast', { event: 'broadcaster-joined' }, async ({ payload }) => {
+          if (!canBroadcast && payload.userId !== user.id) {
+            console.log(`[SpaceContext] 🎤 Broadcaster ${payload.userId} joined, requesting audio`);
+            setTimeout(() => {
+              channel.send({
+                type: 'broadcast',
+                event: 'listener-needs-audio',
+                payload: { listenerId: user.id }
+              });
+            }, 300);
+          }
+        })
+        .on('broadcast', { event: 'listener-needs-audio' }, async ({ payload }) => {
+          if (canBroadcast && payload.listenerId !== user.id) {
+            console.log(`[SpaceContext] 👂 Listener ${payload.listenerId} requesting audio`);
+            await createPeerConnection(payload.listenerId, true, true);
+          }
+        })
+        .on('presence', { event: 'join' }, async ({ key }) => {
+          if (key !== user.id && canBroadcast) {
+            console.log(`[SpaceContext] 👋 New peer joined: ${key}`);
+            setTimeout(async () => {
+              await createPeerConnection(key, true);
+            }, 500);
+          }
+        })
+        .on('presence', { event: 'leave' }, ({ key }) => {
+          console.log(`[SpaceContext] 👋 Peer left: ${key}`);
+          handlePeerDisconnect(key);
+        })
+        .on('presence', { event: 'sync' }, async () => {
+          const state = channel.presenceState();
+          const peerIds = Object.keys(state).filter(k => k !== user.id);
+          console.log(`[SpaceContext] 🔄 Presence sync, found ${peerIds.length} peers`);
+          
+          if (!canBroadcast) {
+            for (const key of peerIds) {
+              const presence = state[key][0] as any;
+              if (presence?.canBroadcast) {
+                channel.send({
+                  type: 'broadcast',
+                  event: 'listener-needs-audio',
+                  payload: { listenerId: user.id }
+                });
+                break;
+              }
+            }
+          } else {
+            for (const key of peerIds) {
+              await createPeerConnection(key, true);
+            }
+          }
+        });
+
+      await channel.subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`[SpaceContext] ✅ Subscribed to audio channel, canBroadcast: ${canBroadcast}`);
+          
+          await channel.track({ 
+            user_id: user.id, 
+            role: spaceState.myRole,
+            canBroadcast 
+          });
+          
+          if (canBroadcast) {
+            channel.send({
+              type: 'broadcast',
+              event: 'broadcaster-joined',
+              payload: { userId: user.id }
+            });
+            
+            // Periodic heartbeat for new listeners
+            const heartbeatInterval = setInterval(() => {
+              if (channelRef.current) {
+                channel.send({
+                  type: 'broadcast',
+                  event: 'broadcaster-joined',
+                  payload: { userId: user.id }
+                });
+              } else {
+                clearInterval(heartbeatInterval);
+              }
+            }, 10000);
+          } else {
+            setTimeout(() => {
+              channel.send({
+                type: 'broadcast',
+                event: 'listener-needs-audio',
+                payload: { listenerId: user.id }
+              });
+            }, 1000);
+          }
+          
+          setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
+          monitorAudioLevels();
+        }
+      });
+
+      channelRef.current = channel;
+      isConnectingRef.current = false;
+
+    } catch (error) {
+      console.error('[SpaceContext] Error connecting to audio:', error);
+      setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
+      isConnectingRef.current = false;
+      toast.error('Failed to connect to audio');
+    }
+  }, [user, spaceState.spaceInfo, spaceState.myRole, spaceState.connectionStatus, canBroadcast, getLocalStream, handleOffer, handleAnswer, handleIceCandidate, createPeerConnection, handlePeerDisconnect, monitorAudioLevels]);
+
+  // Disconnect from space audio
+  const disconnectAudio = useCallback(() => {
+    console.log('[SpaceContext] Disconnecting from space audio...');
+    
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
+    peersRef.current.forEach((peer, peerId) => {
+      peer.connection.close();
+      const audioElement = document.getElementById(`audio-${peerId}`);
+      if (audioElement) audioElement.remove();
+    });
+    peersRef.current.clear();
+    analyzersRef.current.clear();
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+      setLocalStream(null);
+    }
+
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      audioContextRef.current.close();
+      audioContextRef.current = null;
+    }
+
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    isConnectingRef.current = false;
+    setSpaceState(prev => ({ ...prev, connectionStatus: 'disconnected', audioLevels: {} }));
+  }, []);
+
+  // Join a space - just set state, don't connect audio yet
   const joinSpace = useCallback((spaceInfo: SpaceInfo, role: string) => {
+    console.log('[SpaceContext] Joining space:', spaceInfo.id, 'as', role);
     setSpaceState({
       isActive: true,
       isMinimized: false,
       spaceInfo,
       isMuted: role !== 'host',
       myRole: role as SpaceState['myRole'],
-      connectionStatus: 'connecting',
+      connectionStatus: 'disconnected',
+      audioLevels: {},
     });
   }, []);
 
+  // Leave space - ONLY called on explicit user action
   const leaveSpace = useCallback(async () => {
+    console.log('[SpaceContext] Leaving space explicitly');
+    
     if (spaceState.spaceInfo && user) {
-      // Mark user as left in database
       await supabase
         .from('live_space_speakers')
         .update({ left_at: new Date().toISOString() })
@@ -80,18 +619,17 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .eq('user_id', user.id);
     }
     
-    // Cleanup audio elements
+    // Cleanup audio
+    disconnectAudio();
+    
+    // Remove any remaining audio elements
     document.querySelectorAll('[id^="audio-"]').forEach(el => el.remove());
     
-    if (cleanupRef.current) {
-      cleanupRef.current();
-      cleanupRef.current = null;
-    }
-    
     setSpaceState(defaultState);
-  }, [spaceState.spaceInfo, user]);
+  }, [spaceState.spaceInfo, user, disconnectAudio]);
 
   const minimizeSpace = useCallback(() => {
+    console.log('[SpaceContext] Minimizing space - audio continues');
     setSpaceState(prev => ({
       ...prev,
       isMinimized: true,
@@ -99,6 +637,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const maximizeSpace = useCallback(() => {
+    console.log('[SpaceContext] Maximizing space');
     setSpaceState(prev => ({
       ...prev,
       isMinimized: false,
@@ -106,13 +645,21 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const setMuted = useCallback((muted: boolean) => {
+    console.log('[SpaceContext] Setting muted:', muted);
     setSpaceState(prev => ({
       ...prev,
       isMuted: muted,
     }));
+    
+    // Toggle actual audio track
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach(track => {
+        track.enabled = !muted;
+      });
+    }
   }, []);
 
-  const setConnectionStatus = useCallback((status: 'disconnected' | 'connecting' | 'connected' | 'failed' | 'reconnecting') => {
+  const setConnectionStatus = useCallback((status: ConnectionStatus) => {
     setSpaceState(prev => ({
       ...prev,
       connectionStatus: status,
@@ -120,20 +667,50 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const updateRole = useCallback((role: string) => {
+    console.log('[SpaceContext] Updating role to:', role);
     setSpaceState(prev => ({
       ...prev,
       myRole: role as SpaceState['myRole'],
     }));
   }, []);
 
+  // Handle page visibility changes - keep audio playing
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && spaceState.isActive) {
+        console.log('[SpaceContext] Page hidden - keeping audio active');
+      } else if (!document.hidden && spaceState.isActive && spaceState.connectionStatus === 'disconnected') {
+        console.log('[SpaceContext] Page visible - reconnecting audio if needed');
+        connectAudio();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [spaceState.isActive, spaceState.connectionStatus, connectAudio]);
+
+  // Handle beforeunload - cleanup on browser close
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (spaceState.isActive && spaceState.spaceInfo && user) {
+        // Send a beacon to mark user as left
+        navigator.sendBeacon(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/live_space_speakers?space_id=eq.${spaceState.spaceInfo.id}&user_id=eq.${user.id}`,
+          JSON.stringify({ left_at: new Date().toISOString() })
+        );
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [spaceState.isActive, spaceState.spaceInfo, user]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (cleanupRef.current) {
-        cleanupRef.current();
-      }
+      disconnectAudio();
     };
-  }, []);
+  }, [disconnectAudio]);
 
   return (
     <SpaceContext.Provider
@@ -146,6 +723,9 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setMuted,
         setConnectionStatus,
         updateRole,
+        connectAudio,
+        disconnectAudio,
+        localStream,
       }}
     >
       {children}
