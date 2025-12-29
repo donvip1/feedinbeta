@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { SpaceMentionInput } from './SpaceMentionInput';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface SpaceChatProps {
   spaceId: string;
@@ -47,6 +48,7 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
   };
 
   useEffect(() => {
+    console.log('[SpaceChat] Initializing chat for space:', spaceId);
     fetchMessages();
 
     const channel = supabase
@@ -57,6 +59,7 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
         table: 'live_space_messages',
         filter: `space_id=eq.${spaceId}`,
       }, async (payload) => {
+        console.log('[SpaceChat] New message received:', payload.new);
         const { data: profile } = await supabase
           .from('profiles')
           .select('id, display_name, username, avatar_url')
@@ -73,9 +76,12 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
 
         setMessages(prev => [...prev, newMsg]);
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[SpaceChat] Subscription status:', status);
+      });
 
     return () => {
+      console.log('[SpaceChat] Cleaning up subscription');
       supabase.removeChannel(channel);
     };
   }, [spaceId]);
@@ -112,15 +118,25 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
     if (!newMessage.trim() || !user || sending) return;
 
     setSending(true);
+    console.log('[SpaceChat] Sending message:', newMessage.trim());
+    
     try {
-      await supabase.from('live_space_messages').insert({
+      const { data, error } = await supabase.from('live_space_messages').insert({
         space_id: spaceId,
         user_id: user.id,
         content: newMessage.trim(),
-      });
-      setNewMessage('');
+      }).select().single();
+      
+      if (error) {
+        console.error('[SpaceChat] Error sending message:', error);
+        toast.error('Failed to send message');
+      } else {
+        console.log('[SpaceChat] Message sent successfully:', data);
+        setNewMessage('');
+      }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('[SpaceChat] Error sending message:', error);
+      toast.error('Failed to send message');
     } finally {
       setSending(false);
     }

@@ -78,46 +78,57 @@ const Feed = () => {
   });
 
   // Fetch live content for the Live tab
-  const { data: liveContent, refetch: refetchLive } = useQuery({
+  const { data: liveContent, refetch: refetchLive, isLoading: isLoadingLive } = useQuery({
     queryKey: ['feed-live-content'],
     queryFn: async () => {
       console.log('[Feed] Fetching live content...');
-      // Fetch live streams
+      
+      // Fetch live streams - use case-insensitive check
       const { data: streams, error: streamsError } = await supabase
         .from('live_streams')
         .select('id, title, status, viewer_count, thumbnail_url, user_id')
-        .eq('status', 'live')
+        .ilike('status', 'live')
         .order('viewer_count', { ascending: false })
         .limit(20);
 
-      if (streamsError) console.error('[Feed] Error fetching streams:', streamsError);
-      console.log('[Feed] Live streams found:', streams?.length || 0);
+      if (streamsError) {
+        console.error('[Feed] Error fetching streams:', streamsError);
+      } else {
+        console.log('[Feed] Live streams found:', streams?.length || 0, streams);
+      }
 
-      // Fetch live spaces
+      // Fetch live spaces - use case-insensitive check
       const { data: spaces, error: spacesError } = await supabase
         .from('live_spaces')
         .select('id, title, status, viewer_count, topic_category, share_link, user_id')
-        .eq('status', 'live')
+        .ilike('status', 'live')
         .order('viewer_count', { ascending: false })
         .limit(20);
 
-      if (spacesError) console.error('[Feed] Error fetching spaces:', spacesError);
-      console.log('[Feed] Live spaces found:', spaces?.length || 0);
+      if (spacesError) {
+        console.error('[Feed] Error fetching spaces:', spacesError);
+      } else {
+        console.log('[Feed] Live spaces found:', spaces?.length || 0, spaces);
+      }
 
       const allUserIds = [
         ...(streams || []).map(s => s.user_id),
         ...(spaces || []).map(s => s.user_id)
-      ];
+      ].filter(Boolean);
 
       if (allUserIds.length === 0) {
-        console.log('[Feed] No live content found');
+        console.log('[Feed] No live content found - no user IDs');
         return [];
       }
 
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profileError } = await supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url')
         .in('id', allUserIds);
+
+      if (profileError) {
+        console.error('[Feed] Error fetching profiles:', profileError);
+      }
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
@@ -125,23 +136,23 @@ const Feed = () => {
         ...(streams || []).map(s => ({
           ...s,
           type: 'video' as const,
-          host: profileMap.get(s.user_id) || { display_name: 'Unknown', username: 'unknown', avatar_url: '' }
+          host: profileMap.get(s.user_id) || { display_name: 'Unknown Host', username: 'unknown', avatar_url: '' }
         })),
         ...(spaces || []).map(s => ({
           ...s,
           type: 'space' as const,
-          host: profileMap.get(s.user_id) || { display_name: 'Unknown', username: 'unknown', avatar_url: '' }
+          host: profileMap.get(s.user_id) || { display_name: 'Unknown Host', username: 'unknown', avatar_url: '' }
         }))
       ];
 
-      console.log('[Feed] Total live items:', liveItems.length);
+      console.log('[Feed] Total live items prepared:', liveItems.length);
 
       // Sort by viewer count
       return liveItems.sort((a, b) => (b.viewer_count || 0) - (a.viewer_count || 0));
     },
     enabled: activeTab === 'live',
-    refetchInterval: 15000, // Refresh every 15 seconds when on live tab
-    staleTime: 5000,
+    refetchInterval: 10000, // Refresh every 10 seconds when on live tab
+    staleTime: 3000,
   });
 
   // Subscribe to live content changes for real-time updates
