@@ -72,8 +72,8 @@ export const useOptionalSpaceContext = () => {
   return useContext(SpaceContext);
 };
 
-// ICE servers configuration
-const iceServers: RTCConfiguration = {
+// Default ICE servers (STUN only fallback)
+const defaultIceServers: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
@@ -96,9 +96,45 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
   const isConnectingRef = useRef(false);
+  const iceServersRef = useRef<RTCConfiguration>(defaultIceServers);
+  const roleRef = useRef<string>('listener');
+  const spaceInfoRef = useRef<SpaceInfo | null>(null);
 
-  // Derived values
-  const canBroadcast = spaceState.myRole === 'host' || spaceState.myRole === 'co_host' || spaceState.myRole === 'speaker';
+  // Keep refs in sync with state
+  useEffect(() => {
+    roleRef.current = spaceState.myRole;
+  }, [spaceState.myRole]);
+
+  useEffect(() => {
+    spaceInfoRef.current = spaceState.spaceInfo;
+  }, [spaceState.spaceInfo]);
+
+  // Fetch TURN credentials on mount
+  useEffect(() => {
+    const fetchTurnCredentials = async () => {
+      try {
+        console.log('[SpaceContext] Fetching TURN credentials...');
+        const { data, error } = await supabase.functions.invoke('get-turn-credentials');
+        
+        if (error) throw error;
+        
+        if (data?.iceServers && Array.isArray(data.iceServers)) {
+          console.log('[SpaceContext] Got TURN credentials:', data.iceServers.length, 'servers');
+          iceServersRef.current = { iceServers: data.iceServers };
+        }
+      } catch (error) {
+        console.warn('[SpaceContext] Failed to fetch TURN credentials, using STUN only:', error);
+      }
+    };
+    
+    fetchTurnCredentials();
+  }, []);
+
+  // Derived: can this user broadcast?
+  const getCanBroadcast = useCallback(() => {
+    const role = roleRef.current;
+    return role === 'host' || role === 'co_host' || role === 'speaker';
+  }, []);
 
   // Initialize audio context
   const initAudioContext = useCallback(() => {
@@ -142,7 +178,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Get local audio stream
   const getLocalStream = useCallback(async () => {
-    console.log('[SpaceContext] getLocalStream called, canBroadcast:', canBroadcast);
+    const canBroadcast = getCanBroadcast();
+    console.log('[SpaceContext] getLocalStream called, canBroadcast:', canBroadcast, 'role:', roleRef.current);
     
     if (localStreamRef.current) {
       console.log('[SpaceContext] Using existing local stream');
@@ -192,10 +229,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return null;
     }
-  }, [user, createAnalyzer, canBroadcast, spaceState.isMuted]);
+  }, [user, createAnalyzer, spaceState.isMuted, getCanBroadcast]);
 
   // Handle peer disconnect
   const handlePeerDisconnect = useCallback((peerId: string) => {
+    console.log('[SpaceContext] Disconnecting peer:', peerId);
     const peer = peersRef.current.get(peerId);
     if (peer) {
       peer.connection.close();
@@ -215,7 +253,10 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     try {
       console.log(`[SpaceContext] Creating and sending offer to ${peerId}`);
-      const offer = await peerConnection.createOffer();
+      const offer = await peerConnection.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: false,
+      });
       await peerConnection.setLocalDescription(offer);
       
       channelRef.current?.send({
@@ -227,7 +268,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           sdp: offer,
         },
       });
-      console.log(`[SpaceContext] Offer sent to ${peerId}`);
+      console.log(`[SpaceContext] ✅ Offer sent to ${peerId}`);
     } catch (error) {
       console.error('[SpaceContext] Error creating offer:', error);
     }
@@ -235,11 +276,13 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Create peer connection
   const createPeerConnection = useCallback(async (peerId: string, initiator: boolean, forceSendOffer: boolean = false) => {
-    if (!user || !spaceState.spaceInfo) return null;
+    if (!user || !spaceInfoRef.current) return null;
 
+    const canBroadcast = getCanBroadcast();
+    
     const existingPeer = peersRef.current.get(peerId);
     if (existingPeer) {
-      console.log(`[SpaceContext] Already have connection to ${peerId}`);
+      console.log(`[SpaceContext] Already have connection to ${peerId}, state:`, existingPeer.connection.connectionState);
       if (forceSendOffer && canBroadcast && existingPeer.connection.signalingState === 'stable') {
         await sendOfferToPeer(existingPeer.connection, peerId);
       }
@@ -248,11 +291,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     console.log(`[SpaceContext] Creating peer connection with ${peerId}, initiator: ${initiator}, canBroadcast: ${canBroadcast}`);
     
-    const peerConnection = new RTCPeerConnection(iceServers);
+    const peerConnection = new RTCPeerConnection(iceServersRef.current);
     
     // Add local stream tracks ONLY if we can broadcast
     if (localStreamRef.current && canBroadcast) {
-      console.log(`[SpaceContext] Adding local tracks to connection for ${peerId}`);
+      console.log(`[SpaceContext] Adding ${localStreamRef.current.getTracks().length} local tracks to connection for ${peerId}`);
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current!);
       });
@@ -322,6 +365,16 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
     };
 
+    // Handle ICE connection state
+    peerConnection.oniceconnectionstatechange = () => {
+      console.log(`[SpaceContext] ICE state with ${peerId}: ${peerConnection.iceConnectionState}`);
+      
+      if (peerConnection.iceConnectionState === 'failed') {
+        console.log(`[SpaceContext] ICE failed with ${peerId}, attempting restart...`);
+        peerConnection.restartIce();
+      }
+    };
+
     // Handle connection state changes
     peerConnection.onconnectionstatechange = () => {
       console.log(`[SpaceContext] Connection state with ${peerId}: ${peerConnection.connectionState}`);
@@ -330,6 +383,14 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         reconnectAttempts.current = 0;
       } else if (peerConnection.connectionState === 'failed') {
         handlePeerDisconnect(peerId);
+      } else if (peerConnection.connectionState === 'disconnected') {
+        // Give it time to recover before disconnecting
+        setTimeout(() => {
+          const peer = peersRef.current.get(peerId);
+          if (peer && peer.connection.connectionState === 'disconnected') {
+            handlePeerDisconnect(peerId);
+          }
+        }, 5000);
       }
     };
 
@@ -344,7 +405,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     return peerConnection;
-  }, [user, spaceState.spaceInfo, canBroadcast, createAnalyzer, sendOfferToPeer, handlePeerDisconnect]);
+  }, [user, getCanBroadcast, createAnalyzer, sendOfferToPeer, handlePeerDisconnect]);
 
   // Handle incoming offer
   const handleOffer = useCallback(async (from: string, sdp: RTCSessionDescriptionInit) => {
@@ -360,7 +421,17 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!peerConnection) return;
 
     try {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+      // Handle glare (both sides sending offers)
+      if (peerConnection.signalingState !== 'stable') {
+        console.log(`[SpaceContext] Signaling state not stable (${peerConnection.signalingState}), rolling back...`);
+        await Promise.all([
+          peerConnection.setLocalDescription({ type: 'rollback' }),
+          peerConnection.setRemoteDescription(new RTCSessionDescription(sdp))
+        ]);
+      } else {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+      }
+      
       const answer = await peerConnection.createAnswer();
       await peerConnection.setLocalDescription(answer);
       
@@ -373,6 +444,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           sdp: answer,
         },
       });
+      console.log(`[SpaceContext] ✅ Answer sent to ${from}`);
     } catch (error) {
       console.error('[SpaceContext] Error handling offer:', error);
     }
@@ -382,11 +454,17 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const handleAnswer = useCallback(async (from: string, sdp: RTCSessionDescriptionInit) => {
     if (!user || from === user.id) return;
 
+    console.log(`[SpaceContext] Received answer from ${from}`);
     const peerConnection = peersRef.current.get(from)?.connection;
     if (!peerConnection) return;
 
     try {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+      if (peerConnection.signalingState === 'have-local-offer') {
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(sdp));
+        console.log(`[SpaceContext] ✅ Answer applied from ${from}`);
+      } else {
+        console.warn(`[SpaceContext] Ignoring answer - signaling state: ${peerConnection.signalingState}`);
+      }
     } catch (error) {
       console.error('[SpaceContext] Error handling answer:', error);
     }
@@ -397,7 +475,10 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!user || from === user.id) return;
 
     const peerConnection = peersRef.current.get(from)?.connection;
-    if (!peerConnection) return;
+    if (!peerConnection) {
+      console.warn(`[SpaceContext] No peer connection for ICE candidate from ${from}`);
+      return;
+    }
 
     try {
       await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
@@ -408,22 +489,30 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Connect to space audio - GLOBAL function that persists
   const connectAudio = useCallback(async () => {
-    if (!user || !spaceState.spaceInfo || isConnectingRef.current) return;
-    if (spaceState.connectionStatus === 'connected') {
-      console.log('[SpaceContext] Already connected to audio');
+    if (!user || !spaceInfoRef.current || isConnectingRef.current) {
+      console.log('[SpaceContext] Cannot connect - no user/space or already connecting');
+      return;
+    }
+    
+    // Check if already connected
+    if (channelRef.current) {
+      console.log('[SpaceContext] Already have a channel, skipping connect');
       return;
     }
     
     isConnectingRef.current = true;
     setSpaceState(prev => ({ ...prev, connectionStatus: 'connecting' }));
-    console.log(`[SpaceContext] Connecting to space audio... canBroadcast: ${canBroadcast}`);
+    
+    const canBroadcast = getCanBroadcast();
+    console.log(`[SpaceContext] Connecting to space audio... role: ${roleRef.current}, canBroadcast: ${canBroadcast}`);
 
     try {
+      // Get local stream if broadcaster
       if (canBroadcast) {
         await getLocalStream();
       }
 
-      const spaceId = spaceState.spaceInfo.id;
+      const spaceId = spaceInfoRef.current.id;
       const channel = supabase.channel(`space-audio-${spaceId}`, {
         config: {
           broadcast: { self: false },
@@ -448,7 +537,9 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           }
         })
         .on('broadcast', { event: 'broadcaster-joined' }, async ({ payload }) => {
-          if (!canBroadcast && payload.userId !== user.id) {
+          // A broadcaster joined - listeners should request audio
+          const currentCanBroadcast = getCanBroadcast();
+          if (!currentCanBroadcast && payload.userId !== user.id) {
             console.log(`[SpaceContext] 🎤 Broadcaster ${payload.userId} joined, requesting audio`);
             setTimeout(() => {
               channel.send({
@@ -456,21 +547,28 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 event: 'listener-needs-audio',
                 payload: { listenerId: user.id }
               });
-            }, 300);
+            }, 500);
           }
         })
         .on('broadcast', { event: 'listener-needs-audio' }, async ({ payload }) => {
-          if (canBroadcast && payload.listenerId !== user.id) {
-            console.log(`[SpaceContext] 👂 Listener ${payload.listenerId} requesting audio`);
+          // A listener needs audio - broadcasters should send offer
+          const currentCanBroadcast = getCanBroadcast();
+          if (currentCanBroadcast && payload.listenerId !== user.id) {
+            console.log(`[SpaceContext] 👂 Listener ${payload.listenerId} requesting audio, sending offer...`);
             await createPeerConnection(payload.listenerId, true, true);
           }
         })
-        .on('presence', { event: 'join' }, async ({ key }) => {
-          if (key !== user.id && canBroadcast) {
-            console.log(`[SpaceContext] 👋 New peer joined: ${key}`);
-            setTimeout(async () => {
-              await createPeerConnection(key, true);
-            }, 500);
+        .on('presence', { event: 'join' }, async ({ key, newPresences }) => {
+          if (key !== user.id) {
+            console.log(`[SpaceContext] 👋 Peer joined: ${key}`, newPresences);
+            const currentCanBroadcast = getCanBroadcast();
+            
+            // If we're a broadcaster and new peer joined, send them an offer
+            if (currentCanBroadcast) {
+              setTimeout(async () => {
+                await createPeerConnection(key, true);
+              }, 1000);
+            }
           }
         })
         .on('presence', { event: 'leave' }, ({ key }) => {
@@ -480,21 +578,29 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .on('presence', { event: 'sync' }, async () => {
           const state = channel.presenceState();
           const peerIds = Object.keys(state).filter(k => k !== user.id);
-          console.log(`[SpaceContext] 🔄 Presence sync, found ${peerIds.length} peers`);
+          console.log(`[SpaceContext] 🔄 Presence sync, found ${peerIds.length} peers:`, peerIds);
           
-          if (!canBroadcast) {
+          const currentCanBroadcast = getCanBroadcast();
+          
+          if (!currentCanBroadcast) {
+            // I'm a listener - request audio from any broadcaster
             for (const key of peerIds) {
-              const presence = state[key][0] as any;
-              if (presence?.canBroadcast) {
-                channel.send({
-                  type: 'broadcast',
-                  event: 'listener-needs-audio',
-                  payload: { listenerId: user.id }
-                });
-                break;
+              const presences = state[key];
+              if (presences && presences.length > 0) {
+                const presence = presences[0] as any;
+                if (presence?.canBroadcast) {
+                  console.log(`[SpaceContext] Found broadcaster ${key}, requesting audio...`);
+                  channel.send({
+                    type: 'broadcast',
+                    event: 'listener-needs-audio',
+                    payload: { listenerId: user.id }
+                  });
+                  break;
+                }
               }
             }
           } else {
+            // I'm a broadcaster - send offers to all peers
             for (const key of peerIds) {
               await createPeerConnection(key, true);
             }
@@ -502,23 +608,28 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         });
 
       await channel.subscribe(async (status) => {
+        console.log(`[SpaceContext] Channel subscription status: ${status}`);
+        
         if (status === 'SUBSCRIBED') {
-          console.log(`[SpaceContext] ✅ Subscribed to audio channel, canBroadcast: ${canBroadcast}`);
+          const currentCanBroadcast = getCanBroadcast();
+          console.log(`[SpaceContext] ✅ Subscribed to audio channel, canBroadcast: ${currentCanBroadcast}`);
           
+          // Track presence with our role info
           await channel.track({ 
             user_id: user.id, 
-            role: spaceState.myRole,
-            canBroadcast 
+            role: roleRef.current,
+            canBroadcast: currentCanBroadcast 
           });
           
-          if (canBroadcast) {
+          if (currentCanBroadcast) {
+            // Notify others that a broadcaster joined
             channel.send({
               type: 'broadcast',
               event: 'broadcaster-joined',
               payload: { userId: user.id }
             });
             
-            // Periodic heartbeat for new listeners
+            // Periodic heartbeat so late-joining listeners can discover us
             const heartbeatInterval = setInterval(() => {
               if (channelRef.current) {
                 channel.send({
@@ -529,19 +640,23 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
               } else {
                 clearInterval(heartbeatInterval);
               }
-            }, 10000);
+            }, 15000);
           } else {
+            // I'm a listener - request audio after a short delay
             setTimeout(() => {
               channel.send({
                 type: 'broadcast',
                 event: 'listener-needs-audio',
                 payload: { listenerId: user.id }
               });
-            }, 1000);
+            }, 1500);
           }
           
           setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
           monitorAudioLevels();
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('[SpaceContext] Channel error');
+          setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
         }
       });
 
@@ -554,7 +669,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isConnectingRef.current = false;
       toast.error('Failed to connect to audio');
     }
-  }, [user, spaceState.spaceInfo, spaceState.myRole, spaceState.connectionStatus, canBroadcast, getLocalStream, handleOffer, handleAnswer, handleIceCandidate, createPeerConnection, handlePeerDisconnect, monitorAudioLevels]);
+  }, [user, getCanBroadcast, getLocalStream, handleOffer, handleAnswer, handleIceCandidate, createPeerConnection, handlePeerDisconnect, monitorAudioLevels]);
 
   // Disconnect from space audio
   const disconnectAudio = useCallback(() => {
@@ -596,6 +711,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Join a space - just set state, don't connect audio yet
   const joinSpace = useCallback((spaceInfo: SpaceInfo, role: string) => {
     console.log('[SpaceContext] Joining space:', spaceInfo.id, 'as', role);
+    roleRef.current = role;
+    spaceInfoRef.current = spaceInfo;
     setSpaceState({
       isActive: true,
       isMinimized: false,
@@ -611,11 +728,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const leaveSpace = useCallback(async () => {
     console.log('[SpaceContext] Leaving space explicitly');
     
-    if (spaceState.spaceInfo && user) {
+    if (spaceInfoRef.current && user) {
       await supabase
         .from('live_space_speakers')
         .update({ left_at: new Date().toISOString() })
-        .eq('space_id', spaceState.spaceInfo.id)
+        .eq('space_id', spaceInfoRef.current.id)
         .eq('user_id', user.id);
     }
     
@@ -625,8 +742,10 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Remove any remaining audio elements
     document.querySelectorAll('[id^="audio-"]').forEach(el => el.remove());
     
+    roleRef.current = 'listener';
+    spaceInfoRef.current = null;
     setSpaceState(defaultState);
-  }, [spaceState.spaceInfo, user, disconnectAudio]);
+  }, [user, disconnectAudio]);
 
   const minimizeSpace = useCallback(() => {
     console.log('[SpaceContext] Minimizing space - audio continues');
@@ -668,42 +787,35 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const updateRole = useCallback((role: string) => {
     console.log('[SpaceContext] Updating role to:', role);
+    roleRef.current = role;
     setSpaceState(prev => ({
       ...prev,
       myRole: role as SpaceState['myRole'],
     }));
   }, []);
 
-  // Handle page visibility changes - keep audio playing
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden && spaceState.isActive) {
-        console.log('[SpaceContext] Page hidden - keeping audio active');
-      } else if (!document.hidden && spaceState.isActive && spaceState.connectionStatus === 'disconnected') {
-        console.log('[SpaceContext] Page visible - reconnecting audio if needed');
-        connectAudio();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [spaceState.isActive, spaceState.connectionStatus, connectAudio]);
-
   // Handle beforeunload - cleanup on browser close
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (spaceState.isActive && spaceState.spaceInfo && user) {
+      if (spaceState.isActive && spaceInfoRef.current && user) {
         // Send a beacon to mark user as left
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/live_space_speakers?space_id=eq.${spaceInfoRef.current.id}&user_id=eq.${user.id}`;
+        const headers = {
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        };
+        
         navigator.sendBeacon(
-          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/live_space_speakers?space_id=eq.${spaceState.spaceInfo.id}&user_id=eq.${user.id}`,
-          JSON.stringify({ left_at: new Date().toISOString() })
+          url,
+          new Blob([JSON.stringify({ left_at: new Date().toISOString() })], { type: 'application/json' })
         );
       }
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [spaceState.isActive, spaceState.spaceInfo, user]);
+  }, [spaceState.isActive, user]);
 
   // Cleanup on unmount
   useEffect(() => {
