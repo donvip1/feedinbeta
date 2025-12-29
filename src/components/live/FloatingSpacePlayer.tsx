@@ -41,7 +41,11 @@ export const FloatingSpacePlayer: React.FC = () => {
 
   const handleMaximize = () => {
     maximizeSpace();
-    navigate(`/live/space/${spaceState.spaceInfo?.id}`);
+    // Navigate to the space - use spaceId directly for proper routing
+    const spaceId = spaceState.spaceInfo?.id;
+    if (spaceId) {
+      navigate(`/space/${spaceId}`);
+    }
   };
 
   const handleToggleMute = () => {

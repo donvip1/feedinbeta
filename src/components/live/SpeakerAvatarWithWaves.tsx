@@ -41,6 +41,7 @@ interface SpeakerAvatarWithWavesProps {
   onHostUnmute?: () => void;
   onToggleMicPermission?: (allowed: boolean) => void;
   onRemove?: () => void;
+  onProfileClick?: () => void;
   size: 'sm' | 'md' | 'lg';
   showCrown?: boolean;
 }
@@ -55,6 +56,7 @@ export const SpeakerAvatarWithWaves = ({
   onHostUnmute,
   onToggleMicPermission,
   onRemove,
+  onProfileClick,
   size, 
   showCrown 
 }: SpeakerAvatarWithWavesProps) => {
@@ -159,6 +161,8 @@ export const SpeakerAvatarWithWaves = ({
         <motion.div
           animate={isSpeaking ? { scale: [1, 1.02, 1] } : {}}
           transition={{ duration: 0.2, repeat: isSpeaking ? Infinity : 0 }}
+          onClick={onProfileClick}
+          className={onProfileClick ? "cursor-pointer" : ""}
         >
           <Avatar className={cn(
             sizeClasses[size],
@@ -167,7 +171,8 @@ export const SpeakerAvatarWithWaves = ({
               ? "ring-primary shadow-lg shadow-primary/40" 
               : speaker.is_muted 
               ? "ring-muted" 
-              : "ring-green-500/50"
+              : "ring-green-500/50",
+            onProfileClick && "hover:ring-primary/70"
           )}>
             <AvatarImage src={speaker.profile?.avatar_url || ''} />
             <AvatarFallback className="text-lg font-bold">
@@ -255,7 +260,13 @@ export const SpeakerAvatarWithWaves = ({
       </div>
 
       <div className="text-center">
-        <p className="text-xs font-medium truncate max-w-[80px]">
+        <p 
+          className={cn(
+            "text-xs font-medium truncate max-w-[80px]",
+            onProfileClick && "cursor-pointer hover:text-primary"
+          )}
+          onClick={onProfileClick}
+        >
           {speaker.profile?.display_name || 'User'}
         </p>
         {speaker.role !== 'listener' && speaker.role !== 'speaker' && (
