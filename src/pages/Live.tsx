@@ -122,13 +122,19 @@ const Live = () => {
   const { data: liveSpaces, refetch: refetchLiveSpaces } = useQuery({
     queryKey: ["live-spaces", "live"],
     queryFn: async () => {
+      console.log('[Live] Fetching live spaces...');
       const { data, error } = await supabase
         .from("live_spaces")
         .select("*")
         .eq("status", "live")
         .order("viewer_count", { ascending: false });
       
-      if (error) throw error;
+      if (error) {
+        console.error('[Live] Error fetching live spaces:', error);
+        throw error;
+      }
+      
+      console.log('[Live] Found live spaces:', data?.length || 0, data);
       
       if (data && data.length > 0) {
         const userIds = [...new Set(data.map(s => s.user_id))];
@@ -162,6 +168,8 @@ const Live = () => {
       }
       return data || [];
     },
+    staleTime: 0, // Always refetch to get latest live content
+    refetchInterval: 10000, // Refetch every 10 seconds
   });
 
   const { data: scheduledSpaces } = useQuery({
