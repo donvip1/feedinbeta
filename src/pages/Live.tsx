@@ -336,6 +336,9 @@ const Live = () => {
   const scheduledCount = (scheduledStreams?.length || 0) + (scheduledSpaces?.length || 0);
   const myContentCount = (myStreams?.length || 0) + (mySpaces?.length || 0);
 
+  // Debug logging
+  console.log('[Live] Render - liveStreams:', liveStreams?.length, 'liveSpaces:', liveSpaces?.length, 'liveCount:', liveCount);
+
   // Render modals/overlays
   if (selectedStreamId) {
     return (
