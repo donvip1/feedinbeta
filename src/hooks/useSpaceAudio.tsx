@@ -99,15 +99,20 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
 
   // Get local audio stream (only for hosts/speakers)
   const getLocalStream = useCallback(async () => {
+    console.log('[SpaceAudio] getLocalStream called, canBroadcast:', canBroadcast);
+    
     if (localStreamRef.current) {
+      console.log('[SpaceAudio] Using existing local stream');
       return localStreamRef.current;
     }
 
     if (!canBroadcast) {
+      console.log('[SpaceAudio] Listener mode - no local stream needed');
       return null; // Listeners don't need a local stream
     }
 
     try {
+      console.log('[SpaceAudio] Requesting microphone access...');
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -118,6 +123,7 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
         video: false,
       });
 
+      console.log('[SpaceAudio] ✅ Got microphone access, tracks:', stream.getAudioTracks().length);
       localStreamRef.current = stream;
       setLocalStream(stream);
 
@@ -127,9 +133,17 @@ export const useSpaceAudio = ({ spaceId, isMuted, isHost, isSpeaker, isListener 
       }
 
       return stream;
-    } catch (error) {
-      console.error('Error accessing microphone:', error);
-      toast.error('Could not access microphone. Please check permissions.');
+    } catch (error: any) {
+      console.error('[SpaceAudio] ❌ Error accessing microphone:', error);
+      
+      // More specific error messages
+      if (error.name === 'NotAllowedError') {
+        toast.error('Microphone access denied. Please allow microphone access in your browser settings.');
+      } else if (error.name === 'NotFoundError') {
+        toast.error('No microphone found. Please connect a microphone and try again.');
+      } else {
+        toast.error('Could not access microphone. Please check permissions.');
+      }
       return null;
     }
   }, [user, createAnalyzer, canBroadcast]);

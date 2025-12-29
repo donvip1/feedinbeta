@@ -23,18 +23,23 @@ const SpaceDetail = () => {
 
   useEffect(() => {
     if (spaceId) {
+      console.log('[SpaceDetail] Loading space:', spaceId);
       fetchSpace();
     }
   }, [spaceId]);
 
   // Auto-join for logged-in users when space data is loaded
   useEffect(() => {
-    if (!authLoading && user && space && space.status === 'live' && !showRoom) {
+    console.log('[SpaceDetail] Auto-join check:', { authLoading, hasUser: !!user, spaceStatus: space?.status, showRoom });
+    if (!authLoading && user && space && (space.status === 'live' || space.status?.toLowerCase() === 'live') && !showRoom) {
+      console.log('[SpaceDetail] Auto-joining space...');
       setShowRoom(true);
     }
   }, [authLoading, user, space, showRoom]);
 
   const fetchSpace = async () => {
+    console.log('[SpaceDetail] Fetching space with ID:', spaceId);
+    
     // Try to find by share_link or id
     let query = supabase.from('live_spaces').select('*');
     
@@ -47,22 +52,36 @@ const SpaceDetail = () => {
       query = query.eq('share_link', spaceId);
     }
 
-    const { data, error } = await query.single();
+    const { data, error } = await query.maybeSingle();
 
-    if (error || !data) {
+    console.log('[SpaceDetail] Space fetch result:', { data, error });
+
+    if (error) {
+      console.error('[SpaceDetail] Error fetching space:', error);
+      toast.error('Error loading space');
+      navigate('/live');
+      return;
+    }
+    
+    if (!data) {
       toast.error('Space not found');
       navigate('/live');
       return;
     }
 
+    console.log('[SpaceDetail] Space loaded:', data.title, 'Status:', data.status);
     setSpace(data);
 
     // Fetch host profile
-    const { data: hostData } = await supabase
+    const { data: hostData, error: hostError } = await supabase
       .from('profiles')
       .select('display_name, username, avatar_url')
       .eq('id', data.user_id)
       .single();
+    
+    if (hostError) {
+      console.error('[SpaceDetail] Error fetching host:', hostError);
+    }
     
     if (hostData) {
       setHost(hostData);
