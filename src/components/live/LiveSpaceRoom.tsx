@@ -300,6 +300,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   // Connect audio via SpaceContext AFTER role is determined
   useEffect(() => {
     if (space && user && myRole && spaceContext) {
+      // Skip if already connected (e.g., returning from minimized state)
+      if (spaceContext.spaceState.connectionStatus === 'connected') {
+        console.log('[LiveSpace] Already connected, skipping connectAudio');
+        return;
+      }
+      
       console.log('[LiveSpace] Role determined:', myRole, 'Connecting audio via SpaceContext...');
       spaceContext.updateRole(myRole);
       // Small delay to allow state to update before connecting
@@ -657,17 +663,37 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       .eq('space_id', spaceId)
       .eq('user_id', user.id);
 
-    toast.success(newHandState ? '✋ Hand raised!' : 'Hand lowered');
+    toast.success(newHandState ? '✋ Hand raised! The host can see your request.' : 'Hand lowered');
   };
 
   const sendReaction = async (emoji: string) => {
     if (!user) return;
 
-    await supabase.from('live_space_reactions').insert({
-      space_id: spaceId,
-      user_id: user.id,
-      reaction_type: emoji,
-    });
+    // Optimistic UI - show reaction immediately
+    const optimisticReaction = {
+      id: `optimistic-${Date.now()}`,
+      emoji,
+      x: Math.random() * 60 + 20,
+      y: Math.random() * 20,
+    };
+    setReactions(prev => [...prev, optimisticReaction]);
+    setTimeout(() => {
+      setReactions(prev => prev.filter(r => r.id !== optimisticReaction.id));
+    }, 3000);
+
+    try {
+      const { error } = await supabase.from('live_space_reactions').insert({
+        space_id: spaceId,
+        user_id: user.id,
+        reaction_type: emoji,
+      });
+      
+      if (error) {
+        console.error('[LiveSpace] Failed to send reaction:', error);
+      }
+    } catch (error) {
+      console.error('[LiveSpace] Error sending reaction:', error);
+    }
   };
 
   const endSpace = async () => {
@@ -953,6 +979,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   onHostUnmute={() => hostUnmuteUser(speaker.id)}
                   onToggleMicPermission={(allowed) => toggleMicPermission(speaker.id, allowed)}
                   onRemove={() => removeSpeaker(speaker.id)}
+                  onProfileClick={() => navigate(`/profile/${speaker.user_id}`)}
                   size="lg"
                   showCrown
                 />
@@ -983,6 +1010,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     onHostUnmute={() => hostUnmuteUser(speaker.id)}
                     onToggleMicPermission={(allowed) => toggleMicPermission(speaker.id, allowed)}
                     onRemove={() => removeSpeaker(speaker.id)}
+                    onProfileClick={() => navigate(`/profile/${speaker.user_id}`)}
                     size="md"
                   />
                 ))}
@@ -1056,10 +1084,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             <div className="flex flex-wrap gap-3">
               {listeners.slice(0, 24).map((listener) => (
                 <div key={listener.id} className="relative group">
-                  <Avatar className={cn(
-                    "w-12 h-12 ring-2 transition-all cursor-pointer",
-                    listener.has_raised_hand ? "ring-amber-400 animate-bounce" : "ring-transparent hover:ring-primary/50"
-                  )}>
+                  <Avatar 
+                    className={cn(
+                      "w-12 h-12 ring-2 transition-all cursor-pointer",
+                      listener.has_raised_hand ? "ring-amber-400 animate-bounce" : "ring-transparent hover:ring-primary/50"
+                    )}
+                    onClick={() => navigate(`/profile/${listener.user_id}`)}
+                  >
                     <AvatarImage src={listener.profile?.avatar_url || ''} />
                     <AvatarFallback className="text-xs bg-muted">
                       {listener.profile?.display_name?.[0] || 'U'}
@@ -1142,9 +1173,9 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
                   )}
                   onClick={toggleRaiseHand}
-                  title={hasRaisedHand ? "Cancel request" : "Request to speak"}
+                  title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
                 >
-                  <Mic className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
+                  <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
                 </Button>
               </motion.div>
             ) : (

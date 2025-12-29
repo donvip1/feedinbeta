@@ -282,25 +282,36 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     
     const existingPeer = peersRef.current.get(peerId);
     if (existingPeer) {
-      console.log(`[SpaceContext] Already have connection to ${peerId}, state:`, existingPeer.connection.connectionState);
-      if (forceSendOffer && canBroadcast && existingPeer.connection.signalingState === 'stable') {
-        await sendOfferToPeer(existingPeer.connection, peerId);
+      const connState = existingPeer.connection.connectionState;
+      console.log(`[SpaceContext] Already have connection to ${peerId}, state:`, connState);
+      
+      // If connection is in a failed/closed state, clean it up and create new
+      if (connState === 'failed' || connState === 'closed') {
+        console.log(`[SpaceContext] Cleaning up stale connection to ${peerId}`);
+        handlePeerDisconnect(peerId);
+      } else {
+        if (forceSendOffer && canBroadcast && existingPeer.connection.signalingState === 'stable') {
+          await sendOfferToPeer(existingPeer.connection, peerId);
+        }
+        return existingPeer.connection;
       }
-      return existingPeer.connection;
     }
 
     console.log(`[SpaceContext] Creating peer connection with ${peerId}, initiator: ${initiator}, canBroadcast: ${canBroadcast}`);
     
     const peerConnection = new RTCPeerConnection(iceServersRef.current);
     
-    // Add local stream tracks ONLY if we can broadcast
+    // Add local stream tracks if we can broadcast
     if (localStreamRef.current && canBroadcast) {
       console.log(`[SpaceContext] Adding ${localStreamRef.current.getTracks().length} local tracks to connection for ${peerId}`);
       localStreamRef.current.getTracks().forEach(track => {
         peerConnection.addTrack(track, localStreamRef.current!);
       });
-    } else if (!canBroadcast) {
-      console.log(`[SpaceContext] Adding recvonly transceiver for listener`);
+    } 
+    
+    // For listeners, add recvonly transceiver to receive audio
+    if (!canBroadcast) {
+      console.log(`[SpaceContext] Adding recvonly transceiver for listener to receive from ${peerId}`);
       peerConnection.addTransceiver('audio', { direction: 'recvonly' });
     }
 
@@ -583,21 +594,54 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const currentCanBroadcast = getCanBroadcast();
           
           if (!currentCanBroadcast) {
-            // I'm a listener - request audio from any broadcaster
+            // I'm a listener - look for any broadcaster and request audio
+            let foundBroadcaster = false;
             for (const key of peerIds) {
               const presences = state[key];
               if (presences && presences.length > 0) {
                 const presence = presences[0] as any;
                 if (presence?.canBroadcast) {
-                  console.log(`[SpaceContext] Found broadcaster ${key}, requesting audio...`);
-                  channel.send({
-                    type: 'broadcast',
-                    event: 'listener-needs-audio',
-                    payload: { listenerId: user.id }
-                  });
-                  break;
+                  console.log(`[SpaceContext] Found broadcaster ${key}, will create connection and request audio`);
+                  foundBroadcaster = true;
+                  
+                  // Create connection for this broadcaster (listener creates offer too)
+                  const pc = await createPeerConnection(key, false);
+                  if (pc) {
+                    // Listener sends offer to broadcaster
+                    try {
+                      const offer = await pc.createOffer({
+                        offerToReceiveAudio: true,
+                        offerToReceiveVideo: false,
+                      });
+                      await pc.setLocalDescription(offer);
+                      
+                      channel.send({
+                        type: 'broadcast',
+                        event: 'offer',
+                        payload: {
+                          from: user.id,
+                          to: key,
+                          sdp: offer,
+                        },
+                      });
+                      console.log(`[SpaceContext] ✅ Listener sent offer to broadcaster ${key}`);
+                    } catch (err) {
+                      console.error('[SpaceContext] Error creating listener offer:', err);
+                    }
+                  }
                 }
               }
+            }
+            
+            // Also broadcast that we need audio (fallback mechanism)
+            if (foundBroadcaster) {
+              setTimeout(() => {
+                channel.send({
+                  type: 'broadcast',
+                  event: 'listener-needs-audio',
+                  payload: { listenerId: user.id }
+                });
+              }, 1000);
             }
           } else {
             // I'm a broadcaster - send offers to all peers

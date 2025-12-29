@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -27,6 +28,7 @@ interface ChatMessage {
 
 export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
@@ -156,12 +158,18 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.map((msg) => (
           <div key={msg.id} className="flex gap-2">
-            <Avatar className="w-8 h-8 flex-shrink-0">
+            <Avatar 
+              className="w-8 h-8 flex-shrink-0 cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+              onClick={() => navigate(`/profile/${msg.user_id}`)}
+            >
               <AvatarImage src={msg.profile?.avatar_url || ''} />
               <AvatarFallback>{msg.profile?.display_name?.[0] || 'U'}</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-semibold text-primary">
+              <p 
+                className="text-xs font-semibold text-primary cursor-pointer hover:underline"
+                onClick={() => navigate(`/profile/${msg.user_id}`)}
+              >
                 {msg.profile?.display_name || 'User'}
               </p>
               <p className="text-sm break-words">

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useOptionalSpaceContext } from '@/context/SpaceContext';
 import { LiveSpaceRoom } from '@/components/live/LiveSpaceRoom';
 import { SpaceReplayPlayer } from '@/components/live/SpaceReplayPlayer';
 import { Button } from '@/components/ui/button';
@@ -15,11 +16,25 @@ const SpaceDetail = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const spaceContext = useOptionalSpaceContext();
   const [space, setSpace] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showRoom, setShowRoom] = useState(false);
   const [showReplay, setShowReplay] = useState(false);
+
+  // Check if we're returning from minimized state
+  useEffect(() => {
+    if (spaceContext && spaceContext.spaceState.isActive && !spaceContext.spaceState.isMinimized) {
+      // If we're already in this space and it's not minimized, show the room immediately
+      const activeSpaceId = spaceContext.spaceState.spaceInfo?.id;
+      if (activeSpaceId === spaceId || (space && activeSpaceId === space.id)) {
+        console.log('[SpaceDetail] Already in this space, showing room directly');
+        setShowRoom(true);
+        setLoading(false);
+      }
+    }
+  }, [spaceContext?.spaceState.isActive, spaceContext?.spaceState.isMinimized, spaceId, space?.id]);
 
   useEffect(() => {
     if (spaceId) {
@@ -28,14 +43,7 @@ const SpaceDetail = () => {
     }
   }, [spaceId]);
 
-  // Auto-join for logged-in users when space data is loaded
-  useEffect(() => {
-    console.log('[SpaceDetail] Auto-join check:', { authLoading, hasUser: !!user, spaceStatus: space?.status, showRoom });
-    if (!authLoading && user && space && (space.status === 'live' || space.status?.toLowerCase() === 'live') && !showRoom) {
-      console.log('[SpaceDetail] Auto-joining space...');
-      setShowRoom(true);
-    }
-  }, [authLoading, user, space, showRoom]);
+  // No auto-join - always show preview and let user click "Join Space"
 
   const fetchSpace = async () => {
     console.log('[SpaceDetail] Fetching space with ID:', spaceId);
