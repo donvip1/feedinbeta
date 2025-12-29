@@ -22,9 +22,8 @@ import { TestAudioModal } from './TestAudioModal';
 import { SpeakerAvatarWithWaves } from './SpeakerAvatarWithWaves';
 import { ListenersModal } from './ListenersModal';
 import { cn } from '@/lib/utils';
-import { useSpaceAudio, ConnectionStatus } from '@/hooks/useSpaceAudio';
 import { useNavigation } from '@/context/NavigationContext';
-import { useOptionalSpaceContext } from '@/context/SpaceContext';
+import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
@@ -121,13 +120,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
   const isHost = space?.user_id === user?.id || myRole === 'host' || myRole === 'co_host';
   
-  const { isConnected, isConnecting, connectionStatus, audioLevels, connect, disconnect } = useSpaceAudio({
-    spaceId,
-    isMuted,
-    isHost: myRole === 'host' || myRole === 'co_host',
-    isSpeaker: myRole === 'speaker',
-    isListener: myRole === 'listener',
-  });
+  // Use SpaceContext for audio management - GLOBAL, persists across navigation
+  const connectionStatus = spaceContext?.spaceState.connectionStatus || 'disconnected';
+  const audioLevels = spaceContext?.spaceState.audioLevels || {};
+  const isConnected = connectionStatus === 'connected';
+  const isConnecting = connectionStatus === 'connecting' || connectionStatus === 'reconnecting';
 
   // Update SpaceContext when space data changes
   useEffect(() => {
@@ -144,12 +141,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   }, [space?.id, myRole, speakers.length]);
 
-  // Update context connection status
-  useEffect(() => {
-    if (spaceContext) {
-      spaceContext.setConnectionStatus(connectionStatus);
-    }
-  }, [connectionStatus]);
+  // No longer need to update context connection status - it's managed in SpaceContext
 
   // Minimize handler
   const handleMinimize = () => {
@@ -157,6 +149,14 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       spaceContext.minimizeSpace();
       navigate('/feed');
     }
+  };
+
+  // Explicit leave handler - this is the ONLY way to leave the space
+  const handleLeaveSpace = async () => {
+    if (spaceContext) {
+      await spaceContext.leaveSpace();
+    }
+    onClose();
   };
 
   // Hide bottom navigation when in live space
@@ -283,8 +283,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       .subscribe();
 
     return () => {
-      leaveSpace();
-      disconnect();
+      // DON'T call leaveSpace or disconnect here - user may just be navigating away
+      // Audio continues via SpaceContext. Only cleanup when user explicitly leaves.
       supabase.removeChannel(channel);
     };
   }, [spaceId, user?.id]);
@@ -297,18 +297,18 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   }, [space?.id, user?.id]);
 
-  // Connect audio AFTER role is determined from speakers table
+  // Connect audio via SpaceContext AFTER role is determined
   useEffect(() => {
-    if (space && user && myRole) {
-      console.log('[LiveSpace] Role determined:', myRole, 'Connecting audio...');
-      // Disconnect and reconnect when role changes to ensure proper audio setup
-      disconnect();
+    if (space && user && myRole && spaceContext) {
+      console.log('[LiveSpace] Role determined:', myRole, 'Connecting audio via SpaceContext...');
+      spaceContext.updateRole(myRole);
+      // Small delay to allow state to update before connecting
       const timer = setTimeout(() => {
-        connect();
+        spaceContext.connectAudio();
       }, 200);
       return () => clearTimeout(timer);
     }
-  }, [myRole]);
+  }, [myRole, space?.id]);
 
   const fetchSpaceData = async () => {
     console.log('[LiveSpace] Fetching space data for:', spaceId);
@@ -554,6 +554,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
     const newMuteState = !isMuted;
     setIsMuted(newMuteState);
+    
+    // Update SpaceContext mute state for global audio control
+    if (spaceContext) {
+      spaceContext.setMuted(newMuteState);
+    }
 
     await supabase
       .from('live_space_speakers')
@@ -877,7 +882,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               <Button variant="ghost" size="icon" className="rounded-full" onClick={handleShare}>
                 <Share2 className="w-4 h-4" />
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-full" onClick={onClose}>
+              <Button variant="ghost" size="icon" className="rounded-full" onClick={handleLeaveSpace}>
                 <X className="w-5 h-5" />
               </Button>
             </div>
@@ -1115,7 +1120,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           {/* Leave/End button */}
           <Button 
             variant={isHost ? "destructive" : "outline"} 
-            onClick={isHost ? () => setShowEndConfirm(true) : onClose}
+            onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
             className={cn(
               "flex-1 h-12 rounded-xl font-semibold",
               isHost && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
