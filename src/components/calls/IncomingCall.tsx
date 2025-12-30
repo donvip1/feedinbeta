@@ -111,21 +111,35 @@ export const IncomingCall = ({
   const handleAccept = async () => {
     setIsRinging(false);
     callSounds.stopAllSounds();
-    callSounds.playConnected();
     
     try {
-      // Update call status to answered
-      await supabase
+      console.log('[IncomingCall] Accepting call:', callId);
+      
+      // Update call status to answered FIRST and wait for it to complete
+      const { error } = await supabase
         .from('call_logs')
-        .update({ status: 'answered' })
+        .update({ 
+          status: 'answered',
+          started_at: new Date().toISOString()
+        })
         .eq('id', callId);
+
+      if (error) {
+        console.error('[IncomingCall] Error updating call status:', error);
+        throw error;
+      }
+      
+      console.log('[IncomingCall] Call status updated to answered');
+      
+      // Wait a moment for realtime to propagate the change to caller
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       onAccept();
       
       // Navigate to call page
       navigate(`/call?callId=${callId}&type=${callType}`);
     } catch (error) {
-      console.error('Error accepting call:', error);
+      console.error('[IncomingCall] Error accepting call:', error);
     }
   };
 
