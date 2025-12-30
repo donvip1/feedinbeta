@@ -40,6 +40,7 @@ class CloudflareSFUClient {
   private localTrackName: string | null = null;
   private onTrackCallback: ((track: MediaStreamTrack, peerId: string) => void) | null = null;
   private onConnectionStateChange: ((state: RTCPeerConnectionState) => void) | null = null;
+  private remoteAudioElements: Map<string, HTMLAudioElement> = new Map();
 
   /**
    * Create a new Cloudflare SFU session
@@ -74,7 +75,7 @@ class CloudflareSFUClient {
   /**
    * Initialize the peer connection to Cloudflare SFU
    */
-  async initPeerConnection(): Promise<RTCPeerConnection> {
+  private initPeerConnection(): RTCPeerConnection {
     if (this.peerConnection && this.peerConnection.connectionState !== 'closed') {
       console.log('[CloudflareSFU] Reusing existing peer connection');
       return this.peerConnection;
@@ -87,6 +88,7 @@ class CloudflareSFUClient {
       iceServers: [
         { urls: 'stun:stun.cloudflare.com:3478' },
         { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
       ],
       bundlePolicy: 'max-bundle',
       iceTransportPolicy: 'all',
@@ -95,10 +97,15 @@ class CloudflareSFUClient {
     // Handle incoming tracks (for listeners receiving audio)
     this.peerConnection.ontrack = (event) => {
       console.log('[CloudflareSFU] ✅ Received remote track:', event.track.kind, 'id:', event.track.id);
-      if (this.onTrackCallback && event.track.kind === 'audio') {
-        // Extract peer ID from track info if available
-        const peerId = event.transceiver?.mid || 'remote-' + Date.now();
-        this.onTrackCallback(event.track, peerId);
+      
+      if (event.track.kind === 'audio') {
+        // Create audio element for playback
+        const peerId = event.transceiver?.mid || `remote-${Date.now()}`;
+        this.playRemoteAudio(event.track, peerId);
+        
+        if (this.onTrackCallback) {
+          this.onTrackCallback(event.track, peerId);
+        }
       }
     };
 
@@ -127,6 +134,37 @@ class CloudflareSFUClient {
   }
 
   /**
+   * Play remote audio through an audio element
+   */
+  private playRemoteAudio(track: MediaStreamTrack, peerId: string): void {
+    // Remove existing audio element if any
+    const existing = this.remoteAudioElements.get(peerId);
+    if (existing) {
+      existing.remove();
+      this.remoteAudioElements.delete(peerId);
+    }
+
+    const audio = document.createElement('audio');
+    audio.id = `sfu-audio-${peerId}`;
+    audio.autoplay = true;
+    audio.srcObject = new MediaStream([track]);
+    document.body.appendChild(audio);
+    this.remoteAudioElements.set(peerId, audio);
+
+    audio.play().catch((err) => {
+      console.warn('[CloudflareSFU] Autoplay blocked:', err);
+      // Add click handler to enable audio
+      const enableAudio = () => {
+        audio.play().catch(console.error);
+        document.removeEventListener('click', enableAudio);
+      };
+      document.addEventListener('click', enableAudio);
+    });
+
+    console.log('[CloudflareSFU] 🔊 Playing remote audio for peer:', peerId);
+  }
+
+  /**
    * Wait for ICE gathering to complete (or timeout)
    */
   private waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 3000): Promise<void> {
@@ -141,13 +179,15 @@ class CloudflareSFUClient {
         resolve();
       }, timeoutMs);
 
-      pc.onicegatheringstatechange = () => {
+      const handler = () => {
         if (pc.iceGatheringState === 'complete') {
           clearTimeout(timeout);
+          pc.removeEventListener('icegatheringstatechange', handler);
           console.log('[CloudflareSFU] ICE gathering complete');
           resolve();
         }
       };
+      pc.addEventListener('icegatheringstatechange', handler);
     });
   }
 
@@ -162,7 +202,7 @@ class CloudflareSFUClient {
     try {
       console.log('[CloudflareSFU] Publishing audio track:', trackName);
       
-      const pc = await this.initPeerConnection();
+      const pc = this.initPeerConnection();
       
       // Add local audio track
       const audioTrack = localStream.getAudioTracks()[0];
@@ -257,6 +297,7 @@ class CloudflareSFUClient {
 
   /**
    * Subscribe to remote audio tracks (for listeners)
+   * This creates a NEW peer connection for receiving tracks
    */
   async pullTracks(
     sessionId: string,
@@ -265,13 +306,9 @@ class CloudflareSFUClient {
     try {
       console.log('[CloudflareSFU] Pulling', remoteTracks.length, 'remote tracks...', remoteTracks);
       
-      const pc = await this.initPeerConnection();
+      const pc = this.initPeerConnection();
 
-      // Add a recvonly transceiver for receiving audio
-      const transceiver = pc.addTransceiver('audio', { direction: 'recvonly' });
-      console.log('[CloudflareSFU] Added recvonly transceiver, mid:', transceiver.mid);
-
-      // Request tracks from SFU - the SFU will send us an offer
+      // Request tracks from SFU - SFU will send us an offer with the tracks
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
         body: {
           action: 'pull-tracks',
@@ -288,27 +325,38 @@ class CloudflareSFUClient {
 
       console.log('[CloudflareSFU] Got response from SFU, type:', data.sessionDescription?.type);
 
-      // If we got an offer from the server, we need to answer it
-      if (data.sessionDescription?.type === 'offer') {
-        console.log('[CloudflareSFU] Got offer from SFU, creating answer...');
-        
-        await pc.setRemoteDescription({
-          type: 'offer',
-          sdp: data.sessionDescription.sdp,
-        });
+      // Handle the SFU response
+      if (data.sessionDescription) {
+        if (data.sessionDescription.type === 'offer') {
+          // SFU sends us an offer - we need to answer
+          console.log('[CloudflareSFU] Got offer from SFU, setting remote description...');
+          
+          await pc.setRemoteDescription({
+            type: 'offer',
+            sdp: data.sessionDescription.sdp,
+          });
 
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
+          // Create answer
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
 
-        // Wait for ICE gathering
-        await this.waitForIceGathering(pc);
+          // Wait for ICE gathering
+          await this.waitForIceGathering(pc);
 
-        // Always send answer back via renegotiate to complete the handshake
-        const answerSdp = pc.localDescription?.sdp || answer.sdp;
-        console.log('[CloudflareSFU] Sending answer to SFU...');
-        await this.renegotiate(sessionId, answerSdp!);
-        
-        console.log('[CloudflareSFU] ✅ WebRTC connection established for receiving');
+          // Send answer back via renegotiate to complete the handshake
+          const answerSdp = pc.localDescription?.sdp || answer.sdp;
+          console.log('[CloudflareSFU] Sending answer to SFU...');
+          await this.renegotiate(sessionId, answerSdp!);
+          
+          console.log('[CloudflareSFU] ✅ WebRTC connection established for receiving');
+        } else if (data.sessionDescription.type === 'answer') {
+          // Unexpected but handle it
+          console.log('[CloudflareSFU] Got answer from SFU (unexpected)...');
+          await pc.setRemoteDescription({
+            type: 'answer',
+            sdp: data.sessionDescription.sdp,
+          });
+        }
       }
 
       console.log('[CloudflareSFU] ✅ Tracks pulled successfully');
@@ -418,6 +466,12 @@ class CloudflareSFUClient {
   cleanup() {
     console.log('[CloudflareSFU] Cleaning up...');
     
+    // Remove all audio elements
+    this.remoteAudioElements.forEach((audio, peerId) => {
+      audio.remove();
+    });
+    this.remoteAudioElements.clear();
+
     if (this.peerConnection) {
       this.peerConnection.close();
       this.peerConnection = null;

@@ -43,6 +43,7 @@ class SpaceRoomManager {
   private onAudioLevels: AudioLevelCallback | null = null;
   private onConnectionStateChange: ConnectionStateCallback | null = null;
   private realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+  private subscribedSpeakers: Set<string> = new Set();
 
   /**
    * Initialize the room manager for a specific space
@@ -63,9 +64,11 @@ class SpaceRoomManager {
     this.onStateChange = onStateChange || null;
     this.onAudioLevels = onAudioLevels || null;
     this.onConnectionStateChange = onConnectionStateChange || null;
+    this.subscribedSpeakers.clear();
 
     // Set up SFU callbacks before creating session
     cloudflareSFU.onTrack((track, peerId) => {
+      console.log('[SpaceRoomManager] Received track from peer:', peerId);
       this.handleRemoteTrack(track, peerId);
     });
 
@@ -146,19 +149,22 @@ class SpaceRoomManager {
       
       console.log('[SpaceRoomManager] Speaker change detected:', {
         event: eventType,
+        speakerId: speaker.id,
         userId: speaker.user_id,
         hasSessionId: !!speaker.cloudflare_session_id,
         hasTrackId: !!speaker.cloudflare_track_id,
         isMe: speaker.user_id === this.userId,
+        alreadySubscribed: this.subscribedSpeakers.has(speaker.user_id),
       });
       
-      // If a speaker has track info and it's not me, subscribe to them
+      // If a speaker has track info, it's not me, and I haven't subscribed yet
       if (
         speaker.cloudflare_session_id && 
         speaker.cloudflare_track_id && 
-        speaker.user_id !== this.userId
+        speaker.user_id !== this.userId &&
+        !this.subscribedSpeakers.has(speaker.user_id)
       ) {
-        console.log('[SpaceRoomManager] New speaker to subscribe to:', speaker.user_id);
+        console.log('[SpaceRoomManager] 🎧 New speaker to subscribe to:', speaker.user_id);
         await this.subscribeToSpeaker(speaker);
       }
     }
@@ -171,11 +177,18 @@ class SpaceRoomManager {
    */
   private async subscribeToSpeaker(speaker: SpaceSpeaker) {
     if (!this.sessionId || !speaker.cloudflare_session_id || !speaker.cloudflare_track_id) {
-      console.warn('[SpaceRoomManager] Cannot subscribe - missing session or track info', speaker);
+      console.warn('[SpaceRoomManager] Cannot subscribe - missing session or track info', {
+        mySession: this.sessionId,
+        speakerSession: speaker.cloudflare_session_id,
+        speakerTrack: speaker.cloudflare_track_id,
+      });
       return;
     }
 
-    console.log('[SpaceRoomManager] Subscribing to speaker:', speaker.user_id, {
+    // Mark as subscribing to prevent duplicate subscriptions
+    this.subscribedSpeakers.add(speaker.user_id);
+
+    console.log('[SpaceRoomManager] 🎧 Subscribing to speaker:', speaker.user_id, {
       speakerSession: speaker.cloudflare_session_id.slice(0, 8),
       speakerTrack: speaker.cloudflare_track_id,
       mySession: this.sessionId.slice(0, 8),
@@ -188,7 +201,8 @@ class SpaceRoomManager {
     }]);
 
     if (!result.success) {
-      console.error('[SpaceRoomManager] Failed to subscribe to speaker:', result.error);
+      console.error('[SpaceRoomManager] ❌ Failed to subscribe to speaker:', result.error);
+      this.subscribedSpeakers.delete(speaker.user_id); // Allow retry
     } else {
       console.log('[SpaceRoomManager] ✅ Successfully subscribed to speaker:', speaker.user_id);
     }
@@ -198,26 +212,10 @@ class SpaceRoomManager {
    * Handle incoming remote audio track
    */
   private handleRemoteTrack(track: MediaStreamTrack, peerId: string) {
-    console.log('[SpaceRoomManager] Handling remote track from:', peerId);
-
-    // Create audio element for playback
-    const audio = document.createElement('audio');
-    audio.id = `sfu-audio-${peerId}`;
-    audio.autoplay = true;
-    audio.srcObject = new MediaStream([track]);
-    document.body.appendChild(audio);
+    console.log('[SpaceRoomManager] 🔊 Handling remote track from:', peerId);
 
     // Create analyzer for speaking indicator
     this.createAnalyzer(new MediaStream([track]), peerId);
-
-    audio.play().catch((err) => {
-      console.warn('[SpaceRoomManager] Autoplay blocked:', err);
-      const enableAudio = () => {
-        audio.play().catch(console.error);
-        document.removeEventListener('click', enableAudio);
-      };
-      document.addEventListener('click', enableAudio);
-    });
   }
 
   /**
@@ -229,7 +227,7 @@ class SpaceRoomManager {
       return false;
     }
 
-    console.log('[SpaceRoomManager] Starting broadcast...');
+    console.log('[SpaceRoomManager] 🎤 Starting broadcast...');
     
     this.localStream = stream;
     this.localTrackName = `audio-${this.userId}-${Date.now()}`;
@@ -245,11 +243,13 @@ class SpaceRoomManager {
     );
 
     if (!result.success) {
-      console.error('[SpaceRoomManager] Failed to start broadcasting:', result.error);
+      console.error('[SpaceRoomManager] ❌ Failed to start broadcasting:', result.error);
       return false;
     }
 
-    // Update speaker record with track info
+    console.log('[SpaceRoomManager] ✅ Broadcast started, updating database...');
+
+    // Update speaker record with track info - this will trigger realtime update for listeners
     const { error } = await supabase
       .from('live_space_speakers')
       .update({
@@ -261,6 +261,8 @@ class SpaceRoomManager {
 
     if (error) {
       console.error('[SpaceRoomManager] Failed to update speaker track info:', error);
+    } else {
+      console.log('[SpaceRoomManager] ✅ Speaker track info saved to database');
     }
 
     this.notifyStateChange();
@@ -292,11 +294,11 @@ class SpaceRoomManager {
   async subscribeToAllSpeakers(): Promise<void> {
     if (!this.spaceId || !this.sessionId) return;
 
-    console.log('[SpaceRoomManager] Subscribing to all active speakers...');
+    console.log('[SpaceRoomManager] 🔍 Looking for active speakers to subscribe to...');
 
-    // Retry logic to wait for host's track info
-    const maxRetries = 5;
-    const retryDelay = 1500; // 1.5 seconds
+    // Retry logic to wait for host's track info to be saved
+    const maxRetries = 8;
+    const retryDelay = 1500;
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       // Fetch all active speakers with track info
@@ -313,7 +315,10 @@ class SpaceRoomManager {
         return;
       }
 
-      const validSpeakers = (speakers || []).filter(s => s.user_id !== this.userId);
+      const validSpeakers = (speakers || []).filter(
+        s => s.user_id !== this.userId && !this.subscribedSpeakers.has(s.user_id)
+      );
+      
       console.log('[SpaceRoomManager] Found speakers with tracks:', validSpeakers.length, 'attempt:', attempt + 1);
 
       if (validSpeakers.length > 0) {
@@ -327,12 +332,12 @@ class SpaceRoomManager {
 
       // No speakers found yet, wait and retry
       if (attempt < maxRetries - 1) {
-        console.log('[SpaceRoomManager] No speakers with tracks yet, waiting...', retryDelay, 'ms');
+        console.log('[SpaceRoomManager] ⏳ No speakers with tracks yet, waiting...', retryDelay, 'ms');
         await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }
 
-    console.log('[SpaceRoomManager] No speakers with tracks found after retries. Will subscribe when they publish.');
+    console.log('[SpaceRoomManager] ⚠️ No speakers with tracks found after retries. Will subscribe when they publish via realtime.');
   }
 
   /**
@@ -404,7 +409,7 @@ class SpaceRoomManager {
         sessionId: this.sessionId,
         localTrackName: this.localTrackName,
         isHost: this.isHost,
-        activeSpeakers: [], // Would need to fetch from DB
+        activeSpeakers: [],
       });
     }
   }
@@ -424,12 +429,9 @@ class SpaceRoomManager {
     // Stop broadcasting
     await this.stopBroadcasting();
 
-    // Remove all audio elements
-    this.analyzers.forEach((_, peerId) => {
-      const audio = document.getElementById(`sfu-audio-${peerId}`);
-      if (audio) audio.remove();
-    });
+    // Clear analyzers
     this.analyzers.clear();
+    this.subscribedSpeakers.clear();
 
     // Close audio context
     if (this.audioContext) {

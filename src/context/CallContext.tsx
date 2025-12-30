@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { WebRTCManager, ConnectionStatus as ConnectionStatusType, NetworkQuality } from '@/utils/webrtcManager';
+import { CloudflareCallManager, ConnectionStatus as ConnectionStatusType, NetworkQuality } from '@/lib/cloudflare-call-manager';
 import { supabase } from '@/integrations/supabase/client';
 import { callSounds } from '@/utils/callSounds';
 import { useToast } from '@/hooks/use-toast';
@@ -45,8 +45,8 @@ interface CallContextType {
   setLocalVideoRef: (ref: HTMLVideoElement | null) => void;
   setRemoteVideoRef: (ref: HTMLVideoElement | null) => void;
   setRemoteAudioRef: (ref: HTMLAudioElement | null) => void;
-  // WebRTC instance
-  webrtcManager: WebRTCManager | null;
+  // Call manager instance
+  callManager: CloudflareCallManager | null;
 }
 
 const defaultCallState: CallState = {
@@ -87,13 +87,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
   const [callState, setCallState] = useState<CallState>(defaultCallState);
   
-  const webrtcRef = useRef<WebRTCManager | null>(null);
+  const callManagerRef = useRef<CloudflareCallManager | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
-  const pipVideoRef = useRef<HTMLVideoElement | null>(null);
 
   // Clean up on unmount
   useEffect(() => {
@@ -101,7 +100,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
-      webrtcRef.current?.cleanup();
+      callManagerRef.current?.cleanup();
     };
   }, []);
 
@@ -139,7 +138,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     otherUserId: string,
     isCaller: boolean
   ) => {
-    console.log('[CallContext] Starting call:', { callId, callType, otherUserId, isCaller });
+    console.log('[CallContext] Starting call with Cloudflare SFU:', { callId, callType, otherUserId, isCaller });
 
     // Load other user's profile
     await loadOtherUserProfile(otherUserId);
@@ -166,7 +165,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
 
     try {
-      webrtcRef.current = new WebRTCManager(
+      callManagerRef.current = new CloudflareCallManager(
         callId,
         user.id,
         otherUserId,
@@ -196,18 +195,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (state === 'connected') {
               setCallState(prev => {
                 if (!prev.isConnected) {
-                  startDurationTimer();
-                  return { ...prev, isConnected: true, connectionStatus: 'connected' };
-                }
-                return prev;
-              });
-            }
-          },
-          onIceConnectionStateChange: (state) => {
-            console.log('[CallContext] ICE state:', state);
-            if (state === 'connected' || state === 'completed') {
-              setCallState(prev => {
-                if (!prev.isConnected) {
                   callSounds.stopAllSounds();
                   callSounds.playConnected();
                   startDurationTimer();
@@ -215,16 +202,19 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
                 return prev;
               });
+            } else if (state === 'failed') {
+              setCallState(prev => ({ ...prev, connectionStatus: 'failed' }));
             }
           },
           onDetailedStatusChange: (status, message) => {
+            console.log('[CallContext] Status:', status, message);
             setCallState(prev => ({ ...prev, connectionStatus: status }));
           },
           onNetworkQuality: (quality) => {
             setCallState(prev => ({ ...prev, networkQuality: quality }));
           },
           onError: (error) => {
-            console.error('[CallContext] WebRTC error:', error);
+            console.error('[CallContext] Call error:', error);
             toast({
               title: 'Connection Error',
               description: error.message || 'Failed to establish call connection',
@@ -235,7 +225,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
 
       const isVideo = callType === 'video';
-      const localStream = await webrtcRef.current.initialize(isVideo);
+      const localStream = await callManagerRef.current.initialize(isVideo);
       
       setCallState(prev => ({ ...prev, localStream }));
       
@@ -243,14 +233,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localVideoRef.current.srcObject = localStream;
       }
 
-      if (isCaller) {
-        console.log('[CallContext] Caller waiting for peer and creating offer...');
-        await webrtcRef.current.waitForPeerAndCreateOffer(8000);
-      } else {
-        console.log('[CallContext] Receiver waiting for offer from caller...');
-      }
     } catch (error: any) {
-      console.error('[CallContext] Error setting up WebRTC:', error);
+      console.error('[CallContext] Error setting up call:', error);
       toast({
         title: 'Media Access Error',
         description: error.message || 'Failed to access camera/microphone. Please check permissions.',
@@ -286,8 +270,8 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     
-    await webrtcRef.current?.cleanup();
-    webrtcRef.current = null;
+    await callManagerRef.current?.cleanup();
+    callManagerRef.current = null;
     
     setCallState(defaultCallState);
   }, [callState.callId, callState.callDuration, stopDurationTimer]);
@@ -303,15 +287,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const toggleMute = useCallback(() => {
-    if (webrtcRef.current) {
-      const isEnabled = webrtcRef.current.toggleMute();
+    if (callManagerRef.current) {
+      const isEnabled = callManagerRef.current.toggleMute();
       setCallState(prev => ({ ...prev, isMuted: !isEnabled }));
     }
   }, []);
 
   const toggleVideo = useCallback(() => {
-    if (webrtcRef.current) {
-      const isEnabled = webrtcRef.current.toggleVideo();
+    if (callManagerRef.current) {
+      const isEnabled = callManagerRef.current.toggleVideo();
       setCallState(prev => ({ ...prev, isVideoOff: !isEnabled }));
     }
   }, []);
@@ -325,16 +309,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [callState.isSpeakerOn, toast]);
 
   const toggleScreenShare = useCallback(async () => {
-    if (!webrtcRef.current) return;
+    if (!callManagerRef.current) return;
     
     if (callState.isScreenSharing) {
-      await webrtcRef.current.stopScreenShare();
+      await callManagerRef.current.stopScreenShare();
       setCallState(prev => ({ ...prev, isScreenSharing: false }));
       if (localVideoRef.current) {
-        localVideoRef.current.srcObject = webrtcRef.current.getLocalStream();
+        localVideoRef.current.srcObject = callManagerRef.current.getLocalStream();
       }
     } else {
-      const screenStream = await webrtcRef.current.startScreenShare();
+      const screenStream = await callManagerRef.current.startScreenShare();
       if (screenStream && localVideoRef.current) {
         localVideoRef.current.srcObject = screenStream;
         setCallState(prev => ({ ...prev, isScreenSharing: true }));
@@ -343,10 +327,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [callState.isScreenSharing]);
 
   const flipCamera = useCallback(async () => {
-    if (webrtcRef.current) {
-      const success = await webrtcRef.current.flipCamera();
+    if (callManagerRef.current) {
+      const success = await callManagerRef.current.flipCamera();
       if (success && localVideoRef.current) {
-        localVideoRef.current.srcObject = webrtcRef.current.getLocalStream();
+        localVideoRef.current.srcObject = callManagerRef.current.getLocalStream();
       }
     }
   }, []);
@@ -425,7 +409,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLocalVideoRef,
     setRemoteVideoRef,
     setRemoteAudioRef,
-    webrtcManager: webrtcRef.current,
+    callManager: callManagerRef.current,
   };
 
   return (
