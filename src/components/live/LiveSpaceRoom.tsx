@@ -815,7 +815,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         return (
           <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1">
             <Wifi className="w-3 h-3" />
-            Connected
+            Connected (SFU)
           </Badge>
         );
       case 'failed':
