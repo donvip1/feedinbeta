@@ -40,13 +40,12 @@ serve(async (req) => {
     switch (body.action) {
       case 'create-session': {
         console.log('[Cloudflare-SFU] Creating new session...');
+        // Note: /sessions/new does NOT require a body - just POST to create a new session
         const response = await fetch(`${CLOUDFLARE_API_BASE}/apps/${appId}/sessions/new`, {
           method: 'POST',
           headers: {
             'Authorization': authHeader,
-            'Content-Type': 'application/json',
           },
-          body: JSON.stringify({}),
         });
 
         if (!response.ok) {
@@ -65,11 +64,31 @@ serve(async (req) => {
       }
 
       case 'push-track': {
-        if (!body.sessionId || !body.sdp || !body.trackName) {
-          throw new Error('Missing sessionId, sdp, or trackName for push-track');
+        if (!body.sessionId || !body.trackName) {
+          throw new Error('Missing sessionId or trackName for push-track');
         }
 
         console.log('[Cloudflare-SFU] Pushing track:', body.trackName, 'to session:', body.sessionId.slice(0, 8));
+        
+        // Build request body based on whether we have an SDP offer or not
+        const requestBody: any = {
+          tracks: [{
+            location: 'local',
+            trackName: body.trackName,
+            kind: 'audio',
+          }],
+        };
+
+        // If we have an SDP offer with a mid, include it
+        if (body.sdp) {
+          requestBody.sessionDescription = {
+            type: 'offer',
+            sdp: body.sdp,
+          };
+          // Try to extract mid from SDP (the m= line index maps to mid)
+          // For audio-only, first m=audio line has mid "0"
+          requestBody.tracks[0].mid = '0';
+        }
         
         const response = await fetch(`${CLOUDFLARE_API_BASE}/apps/${appId}/sessions/${body.sessionId}/tracks/new`, {
           method: 'POST',
@@ -77,16 +96,7 @@ serve(async (req) => {
             'Authorization': authHeader,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            sessionDescription: {
-              type: 'offer',
-              sdp: body.sdp,
-            },
-            tracks: [{
-              location: 'local',
-              trackName: body.trackName,
-            }],
-          }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!response.ok) {
@@ -96,13 +106,14 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log('[Cloudflare-SFU] Track pushed successfully, tracks:', data.tracks?.length);
+        console.log('[Cloudflare-SFU] Track pushed successfully, tracks:', data.tracks?.length, 'requiresRenegotiation:', data.requiresImmediateRenegotiation);
         
         return new Response(
           JSON.stringify({ 
             success: true, 
             sessionDescription: data.sessionDescription,
             tracks: data.tracks,
+            requiresImmediateRenegotiation: data.requiresImmediateRenegotiation,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
