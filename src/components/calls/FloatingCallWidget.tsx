@@ -1,17 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOptionalCallContext } from '@/context/CallContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Phone, PhoneOff, Mic, MicOff, Video, Maximize2 } from 'lucide-react';
-import { motion, AnimatePresence, useDragControls, PanInfo } from 'framer-motion';
+import { Phone, PhoneOff, Mic, MicOff, Video, Maximize2, Minimize2 } from 'lucide-react';
+import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 
 export const FloatingCallWidget: React.FC = () => {
   const callContext = useOptionalCallContext();
   const navigate = useNavigate();
   const [position, setPosition] = useState({ x: 16, y: 100 });
-  const constraintsRef = useRef<HTMLDivElement>(null);
-  const dragControls = useDragControls();
 
   // Don't render if no active minimized call
   if (!callContext || !callContext.callState.isActive || !callContext.callState.isMinimized) {
@@ -19,6 +17,7 @@ export const FloatingCallWidget: React.FC = () => {
   }
 
   const { callState, toggleMute, endCall, maximizeCall } = callContext;
+  const isConnecting = callState.connectionStatus === 'connecting' || callState.connectionStatus === 'ringing';
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -49,19 +48,12 @@ export const FloatingCallWidget: React.FC = () => {
 
   return (
     <>
-      {/* Invisible constraints container */}
-      <div 
-        ref={constraintsRef} 
-        className="fixed inset-0 pointer-events-none z-[90]"
-      />
-      
       <AnimatePresence>
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           exit={{ scale: 0, opacity: 0 }}
           drag
-          dragControls={dragControls}
           dragMomentum={false}
           dragElastic={0.1}
           onDragEnd={handleDragEnd}
@@ -107,6 +99,17 @@ export const FloatingCallWidget: React.FC = () => {
               </div>
             )}
 
+            {/* Connecting animation for ringing state */}
+            {isConnecting && (
+              <div className="w-44 h-20 bg-gradient-to-br from-primary/20 to-purple-600/20 flex items-center justify-center">
+                <div className="flex gap-1">
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
+
             {/* Call info section */}
             <div className="p-3 flex items-center gap-3">
               <div className="relative">
@@ -119,6 +122,9 @@ export const FloatingCallWidget: React.FC = () => {
                 {callState.isConnected && (
                   <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900" />
                 )}
+                {isConnecting && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-yellow-500 rounded-full border-2 border-slate-900 animate-pulse" />
+                )}
               </div>
               
               <div className="flex-1 min-w-0">
@@ -128,7 +134,9 @@ export const FloatingCallWidget: React.FC = () => {
                 <p className="text-xs text-primary">
                   {callState.isConnected 
                     ? formatDuration(callState.callDuration)
-                    : 'Connecting...'}
+                    : callState.connectionStatus === 'ringing' 
+                      ? 'Ringing...'
+                      : 'Connecting...'}
                 </p>
               </div>
             </div>
