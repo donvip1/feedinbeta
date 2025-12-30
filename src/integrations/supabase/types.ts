@@ -1318,6 +1318,7 @@ export type Database = {
       }
       live_space_speakers: {
         Row: {
+          cloudflare_track_id: string | null
           hand_raised_at: string | null
           has_raised_hand: boolean | null
           host_muted: boolean | null
@@ -1331,6 +1332,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cloudflare_track_id?: string | null
           hand_raised_at?: string | null
           has_raised_hand?: boolean | null
           host_muted?: boolean | null
@@ -1344,6 +1346,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cloudflare_track_id?: string | null
           hand_raised_at?: string | null
           has_raised_hand?: boolean | null
           host_muted?: boolean | null
@@ -1369,6 +1372,7 @@ export type Database = {
       live_spaces: {
         Row: {
           allow_mic_for_all: boolean | null
+          cloudflare_session_id: string | null
           created_at: string | null
           description: string | null
           ended_at: string | null
@@ -1389,6 +1393,7 @@ export type Database = {
         }
         Insert: {
           allow_mic_for_all?: boolean | null
+          cloudflare_session_id?: string | null
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
@@ -1409,6 +1414,7 @@ export type Database = {
         }
         Update: {
           allow_mic_for_all?: boolean | null
+          cloudflare_session_id?: string | null
           created_at?: string | null
           description?: string | null
           ended_at?: string | null

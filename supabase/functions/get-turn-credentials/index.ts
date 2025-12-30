@@ -13,58 +13,19 @@ serve(async (req) => {
   try {
     console.log('[TURN] Generating TURN credentials...');
 
-    // Comprehensive ICE server list with reliable providers
+    // ICE servers for WebRTC connections
+    // Cloudflare STUN is used for Live Spaces (SFU mode)
+    // Google STUN servers are used as fallback for video calls
     const iceServers = [
-      // Google STUN servers (highly reliable)
+      // Cloudflare STUN server (primary for SFU connections)
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      
+      // Google STUN servers (fallback for P2P video calls)
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun3.l.google.com:19302' },
       { urls: 'stun:stun4.l.google.com:19302' },
-      
-      // Metered TURN servers (free tier - reliable)
-      {
-        urls: 'turn:a.relay.metered.ca:80',
-        username: 'e8dd65c92e9b0a5f1c47f890',
-        credential: 'IpV+N4hHwXjzwQKE',
-      },
-      {
-        urls: 'turn:a.relay.metered.ca:80?transport=tcp',
-        username: 'e8dd65c92e9b0a5f1c47f890',
-        credential: 'IpV+N4hHwXjzwQKE',
-      },
-      {
-        urls: 'turn:a.relay.metered.ca:443',
-        username: 'e8dd65c92e9b0a5f1c47f890',
-        credential: 'IpV+N4hHwXjzwQKE',
-      },
-      {
-        urls: 'turn:a.relay.metered.ca:443?transport=tcp',
-        username: 'e8dd65c92e9b0a5f1c47f890',
-        credential: 'IpV+N4hHwXjzwQKE',
-      },
-      {
-        urls: 'turns:a.relay.metered.ca:443',
-        username: 'e8dd65c92e9b0a5f1c47f890',
-        credential: 'IpV+N4hHwXjzwQKE',
-      },
-      
-      // OpenRelay TURN servers (backup)
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject',
-      },
     ];
 
     console.log('[TURN] Returning', iceServers.length, 'ICE servers');
