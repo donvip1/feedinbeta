@@ -75,7 +75,7 @@ class CloudflareSFUClient {
    * Initialize the peer connection to Cloudflare SFU
    */
   async initPeerConnection(): Promise<RTCPeerConnection> {
-    if (this.peerConnection) {
+    if (this.peerConnection && this.peerConnection.connectionState !== 'closed') {
       console.log('[CloudflareSFU] Reusing existing peer connection');
       return this.peerConnection;
     }
@@ -84,16 +84,20 @@ class CloudflareSFUClient {
     
     // Cloudflare uses STUN only - their network handles NAT traversal
     this.peerConnection = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+      iceServers: [
+        { urls: 'stun:stun.cloudflare.com:3478' },
+        { urls: 'stun:stun.l.google.com:19302' },
+      ],
       bundlePolicy: 'max-bundle',
+      iceTransportPolicy: 'all',
     });
 
     // Handle incoming tracks (for listeners receiving audio)
     this.peerConnection.ontrack = (event) => {
-      console.log('[CloudflareSFU] Received track:', event.track.kind);
+      console.log('[CloudflareSFU] ✅ Received remote track:', event.track.kind, 'id:', event.track.id);
       if (this.onTrackCallback && event.track.kind === 'audio') {
         // Extract peer ID from track info if available
-        const peerId = event.transceiver?.mid || 'remote';
+        const peerId = event.transceiver?.mid || 'remote-' + Date.now();
         this.onTrackCallback(event.track, peerId);
       }
     };
@@ -111,7 +115,40 @@ class CloudflareSFUClient {
       console.log('[CloudflareSFU] ICE state:', this.peerConnection?.iceConnectionState);
     };
 
+    this.peerConnection.onicegatheringstatechange = () => {
+      console.log('[CloudflareSFU] ICE gathering state:', this.peerConnection?.iceGatheringState);
+    };
+
+    this.peerConnection.onnegotiationneeded = () => {
+      console.log('[CloudflareSFU] Negotiation needed');
+    };
+
     return this.peerConnection;
+  }
+
+  /**
+   * Wait for ICE gathering to complete (or timeout)
+   */
+  private waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 3000): Promise<void> {
+    return new Promise((resolve) => {
+      if (pc.iceGatheringState === 'complete') {
+        resolve();
+        return;
+      }
+
+      const timeout = setTimeout(() => {
+        console.log('[CloudflareSFU] ICE gathering timeout, proceeding...');
+        resolve();
+      }, timeoutMs);
+
+      pc.onicegatheringstatechange = () => {
+        if (pc.iceGatheringState === 'complete') {
+          clearTimeout(timeout);
+          console.log('[CloudflareSFU] ICE gathering complete');
+          resolve();
+        }
+      };
+    });
   }
 
   /**
@@ -133,24 +170,33 @@ class CloudflareSFUClient {
         throw new Error('No audio track in stream');
       }
 
+      console.log('[CloudflareSFU] Adding audio track to peer connection...');
+      
       // Add transceiver for sending audio
-      pc.addTransceiver(audioTrack, { 
+      const transceiver = pc.addTransceiver(audioTrack, { 
         direction: 'sendonly',
         streams: [localStream],
       });
+
+      console.log('[CloudflareSFU] Transceiver created, mid:', transceiver.mid);
 
       // Create offer
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      console.log('[CloudflareSFU] Sending offer to SFU...');
+      // Wait for ICE candidates to be gathered
+      await this.waitForIceGathering(pc);
+
+      // Get the complete local description with ICE candidates
+      const localDesc = pc.localDescription;
+      console.log('[CloudflareSFU] Sending offer to SFU with ICE candidates...');
 
       // Push track to SFU with the offer
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
         body: {
           action: 'push-track',
           sessionId,
-          sdp: offer.sdp,
+          sdp: localDesc?.sdp || offer.sdp,
           trackName,
         },
       });
@@ -161,16 +207,21 @@ class CloudflareSFUClient {
         throw new Error(data.error || 'Failed to push track');
       }
 
+      console.log('[CloudflareSFU] Got response from SFU, type:', data.sessionDescription?.type);
+
       // Handle the response - could be an answer or an offer
       if (data.sessionDescription) {
         if (data.sessionDescription.type === 'answer') {
           // Standard flow: we sent offer, got answer
+          console.log('[CloudflareSFU] Setting remote description (answer)...');
           await pc.setRemoteDescription({
             type: 'answer',
             sdp: data.sessionDescription.sdp,
           });
+          console.log('[CloudflareSFU] ✅ WebRTC connection established for publishing');
         } else if (data.sessionDescription.type === 'offer') {
           // Server offer flow: need to answer
+          console.log('[CloudflareSFU] Got offer from SFU, creating answer...');
           await pc.setRemoteDescription({
             type: 'offer',
             sdp: data.sessionDescription.sdp,
@@ -178,13 +229,17 @@ class CloudflareSFUClient {
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           
+          // Wait for ICE gathering for the answer
+          await this.waitForIceGathering(pc);
+          
           // Send the answer back via renegotiate
-          await this.renegotiate(sessionId, answer.sdp!);
+          const answerSdp = pc.localDescription?.sdp || answer.sdp;
+          await this.renegotiate(sessionId, answerSdp!);
         }
       }
 
       this.localTrackName = trackName;
-      console.log('[CloudflareSFU] Audio track published successfully');
+      console.log('[CloudflareSFU] ✅ Audio track published successfully');
 
       return {
         success: true,
@@ -192,7 +247,7 @@ class CloudflareSFUClient {
         tracks: data.tracks,
       };
     } catch (error) {
-      console.error('[CloudflareSFU] Error publishing audio track:', error);
+      console.error('[CloudflareSFU] ❌ Error publishing audio track:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to publish track',
@@ -208,9 +263,13 @@ class CloudflareSFUClient {
     remoteTracks: PullTrackRequest[]
   ): Promise<SFUTrackResult> {
     try {
-      console.log('[CloudflareSFU] Pulling', remoteTracks.length, 'remote tracks...');
+      console.log('[CloudflareSFU] Pulling', remoteTracks.length, 'remote tracks...', remoteTracks);
       
       const pc = await this.initPeerConnection();
+
+      // Add a recvonly transceiver for receiving audio
+      const transceiver = pc.addTransceiver('audio', { direction: 'recvonly' });
+      console.log('[CloudflareSFU] Added recvonly transceiver, mid:', transceiver.mid);
 
       // Request tracks from SFU - the SFU will send us an offer
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
@@ -227,6 +286,8 @@ class CloudflareSFUClient {
         throw new Error(data.error || 'Failed to pull tracks');
       }
 
+      console.log('[CloudflareSFU] Got response from SFU, type:', data.sessionDescription?.type);
+
       // If we got an offer from the server, we need to answer it
       if (data.sessionDescription?.type === 'offer') {
         console.log('[CloudflareSFU] Got offer from SFU, creating answer...');
@@ -239,12 +300,18 @@ class CloudflareSFUClient {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
+        // Wait for ICE gathering
+        await this.waitForIceGathering(pc);
+
         // Always send answer back via renegotiate to complete the handshake
+        const answerSdp = pc.localDescription?.sdp || answer.sdp;
         console.log('[CloudflareSFU] Sending answer to SFU...');
-        await this.renegotiate(sessionId, answer.sdp!);
+        await this.renegotiate(sessionId, answerSdp!);
+        
+        console.log('[CloudflareSFU] ✅ WebRTC connection established for receiving');
       }
 
-      console.log('[CloudflareSFU] Tracks pulled successfully');
+      console.log('[CloudflareSFU] ✅ Tracks pulled successfully');
 
       return {
         success: true,
@@ -252,7 +319,7 @@ class CloudflareSFUClient {
         tracks: data.tracks,
       };
     } catch (error) {
-      console.error('[CloudflareSFU] Error pulling tracks:', error);
+      console.error('[CloudflareSFU] ❌ Error pulling tracks:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to pull tracks',
