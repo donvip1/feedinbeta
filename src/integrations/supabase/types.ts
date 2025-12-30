@@ -1318,6 +1318,7 @@ export type Database = {
       }
       live_space_speakers: {
         Row: {
+          cloudflare_session_id: string | null
           cloudflare_track_id: string | null
           hand_raised_at: string | null
           has_raised_hand: boolean | null
@@ -1332,6 +1333,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cloudflare_session_id?: string | null
           cloudflare_track_id?: string | null
           hand_raised_at?: string | null
           has_raised_hand?: boolean | null
@@ -1346,6 +1348,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cloudflare_session_id?: string | null
           cloudflare_track_id?: string | null
           hand_raised_at?: string | null
           has_raised_hand?: boolean | null

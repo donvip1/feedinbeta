@@ -144,12 +144,19 @@ class SpaceRoomManager {
     if (eventType === 'INSERT' || eventType === 'UPDATE') {
       const speaker = newData as SpaceSpeaker;
       
-      // If a new speaker has a track and we're a listener, subscribe to it
+      console.log('[SpaceRoomManager] Speaker change detected:', {
+        event: eventType,
+        userId: speaker.user_id,
+        hasSessionId: !!speaker.cloudflare_session_id,
+        hasTrackId: !!speaker.cloudflare_track_id,
+        isMe: speaker.user_id === this.userId,
+      });
+      
+      // If a speaker has track info and it's not me, subscribe to them
       if (
         speaker.cloudflare_session_id && 
         speaker.cloudflare_track_id && 
-        speaker.user_id !== this.userId &&
-        !this.isHost
+        speaker.user_id !== this.userId
       ) {
         console.log('[SpaceRoomManager] New speaker to subscribe to:', speaker.user_id);
         await this.subscribeToSpeaker(speaker);
@@ -164,10 +171,15 @@ class SpaceRoomManager {
    */
   private async subscribeToSpeaker(speaker: SpaceSpeaker) {
     if (!this.sessionId || !speaker.cloudflare_session_id || !speaker.cloudflare_track_id) {
+      console.warn('[SpaceRoomManager] Cannot subscribe - missing session or track info', speaker);
       return;
     }
 
-    console.log('[SpaceRoomManager] Subscribing to speaker:', speaker.user_id);
+    console.log('[SpaceRoomManager] Subscribing to speaker:', speaker.user_id, {
+      speakerSession: speaker.cloudflare_session_id.slice(0, 8),
+      speakerTrack: speaker.cloudflare_track_id,
+      mySession: this.sessionId.slice(0, 8),
+    });
 
     const result = await cloudflareSFU.pullTracks(this.sessionId, [{
       location: 'remote',
@@ -177,6 +189,8 @@ class SpaceRoomManager {
 
     if (!result.success) {
       console.error('[SpaceRoomManager] Failed to subscribe to speaker:', result.error);
+    } else {
+      console.log('[SpaceRoomManager] ✅ Successfully subscribed to speaker:', speaker.user_id);
     }
   }
 
@@ -280,25 +294,45 @@ class SpaceRoomManager {
 
     console.log('[SpaceRoomManager] Subscribing to all active speakers...');
 
-    // Fetch all active speakers with track info
-    const { data: speakers, error } = await supabase
-      .from('live_space_speakers')
-      .select('*')
-      .eq('space_id', this.spaceId)
-      .is('left_at', null)
-      .not('cloudflare_track_id', 'is', null);
+    // Retry logic to wait for host's track info
+    const maxRetries = 5;
+    const retryDelay = 1500; // 1.5 seconds
+    
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      // Fetch all active speakers with track info
+      const { data: speakers, error } = await supabase
+        .from('live_space_speakers')
+        .select('*')
+        .eq('space_id', this.spaceId)
+        .is('left_at', null)
+        .not('cloudflare_track_id', 'is', null)
+        .not('cloudflare_session_id', 'is', null);
 
-    if (error) {
-      console.error('[SpaceRoomManager] Failed to fetch speakers:', error);
-      return;
-    }
+      if (error) {
+        console.error('[SpaceRoomManager] Failed to fetch speakers:', error);
+        return;
+      }
 
-    // Subscribe to each speaker
-    for (const speaker of speakers || []) {
-      if (speaker.user_id !== this.userId) {
-        await this.subscribeToSpeaker(speaker as SpaceSpeaker);
+      const validSpeakers = (speakers || []).filter(s => s.user_id !== this.userId);
+      console.log('[SpaceRoomManager] Found speakers with tracks:', validSpeakers.length, 'attempt:', attempt + 1);
+
+      if (validSpeakers.length > 0) {
+        // Subscribe to each speaker
+        for (const speaker of validSpeakers) {
+          console.log('[SpaceRoomManager] Subscribing to speaker:', speaker.user_id, 'track:', speaker.cloudflare_track_id);
+          await this.subscribeToSpeaker(speaker as SpaceSpeaker);
+        }
+        return;
+      }
+
+      // No speakers found yet, wait and retry
+      if (attempt < maxRetries - 1) {
+        console.log('[SpaceRoomManager] No speakers with tracks yet, waiting...', retryDelay, 'ms');
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }
+
+    console.log('[SpaceRoomManager] No speakers with tracks found after retries. Will subscribe when they publish.');
   }
 
   /**
