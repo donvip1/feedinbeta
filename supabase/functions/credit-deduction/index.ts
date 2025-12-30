@@ -6,32 +6,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Input validation schema
-const validateInput = (data: any) => {
-  const { action, targetUserId, metadata } = data;
-  
-  const validActions = ["friend_request", "profile_view", "voice_call", "video_call"];
-  if (!validActions.includes(action)) {
-    throw new Error("Invalid action type");
-  }
-  
-  if (targetUserId && typeof targetUserId !== "string") {
-    throw new Error("Invalid targetUserId");
-  }
-  
-  if (metadata) {
-    if (metadata.minutes !== undefined) {
-      const minutes = Number(metadata.minutes);
-      if (isNaN(minutes) || minutes <= 0 || minutes > 120) {
-        throw new Error("Invalid minutes value");
-      }
-    }
-    if (metadata.username && typeof metadata.username !== "string") {
-      throw new Error("Invalid username");
-    }
-  }
-  
-  return { action, targetUserId, metadata };
+// Credit costs per action
+const COSTS: Record<string, number> = {
+  friend_request: 5,
+  profile_view: 2,
+  voice_call: 20,  // per minute
+  video_call: 30,  // per minute
 };
 
 serve(async (req) => {
@@ -40,7 +20,6 @@ serve(async (req) => {
   }
 
   try {
-    // Extract and verify JWT
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(
@@ -49,108 +28,103 @@ serve(async (req) => {
       );
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Use service role key for all DB operations (bypasses RLS)
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+      { auth: { persistSession: false } }
+    );
+
+    // Verify user from JWT token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
     
-    // User client for auth verification
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false }
-    });
-
-    // Service role client for database operations (bypasses RLS)
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { persistSession: false }
-    });
-
-    const { data: { user }, error: authError } = await userClient.auth.getUser();
-    if (authError || !user) {
+    if (userError || !user) {
       return new Response(
         JSON.stringify({ error: "Invalid token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Validate input (no userId accepted from client)
-    const requestData = await req.json();
-    const { action, targetUserId, metadata } = validateInput(requestData);
-    
-    // Use authenticated user ID
-    const userId = user.id;
+    const { action, targetUserId, metadata } = await req.json();
 
-    // Define credit costs
-    const COSTS = {
-      friend_request: 5,
-      profile_view: 2,
-      voice_call_per_min: 20,
-      video_call_per_min: 30,
-    };
-
-    let amount = 0;
-    let description = "";
-
-    switch (action) {
-      case "friend_request":
-        amount = -COSTS.friend_request;
-        description = "Friend request sent";
-        break;
-      case "profile_view":
-        amount = -COSTS.profile_view;
-        description = `Viewed profile of ${metadata?.username || "user"}`;
-        break;
-      case "voice_call":
-        amount = -(COSTS.voice_call_per_min * (metadata?.minutes || 1));
-        description = `Voice call - ${metadata?.minutes || 1} minutes`;
-        break;
-      case "video_call":
-        amount = -(COSTS.video_call_per_min * (metadata?.minutes || 1));
-        description = `Video call - ${metadata?.minutes || 1} minutes`;
-        break;
-    }
-
-    // Check if user has enough credits
-    const { data: userCredits } = await supabase
-      .from("user_credits")
-      .select("balance")
-      .eq("user_id", userId)
-      .single();
-
-    if (!userCredits || userCredits.balance < Math.abs(amount)) {
-      if (action === "profile_view") {
-        return new Response(
-          JSON.stringify({ success: false, error: "Insufficient credits" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
+    // Validate action type
+    const costPerUnit = COSTS[action];
+    if (costPerUnit === undefined) {
       return new Response(
-        JSON.stringify({ error: "Insufficient credits" }),
+        JSON.stringify({ error: "Invalid action type" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Deduct credits
-    const { error: transactionError } = await supabase
+    // Calculate total cost
+    let totalCost = costPerUnit;
+    let description = "";
+
+    switch (action) {
+      case "friend_request":
+        description = `Friend request sent`;
+        break;
+      case "profile_view":
+        description = `Viewed profile${metadata?.username ? ` of ${metadata.username}` : ""}`;
+        break;
+      case "voice_call":
+      case "video_call":
+        const minutes = Math.max(1, Math.min(120, Number(metadata?.minutes) || 1));
+        totalCost = costPerUnit * minutes;
+        description = `${action === "video_call" ? "Video" : "Voice"} call - ${minutes} min`;
+        break;
+    }
+
+    // Check user balance
+    const { data: credits, error: creditError } = await supabase
+      .from("user_credits")
+      .select("balance")
+      .eq("user_id", user.id)
+      .single();
+
+    if (creditError || !credits) {
+      console.log(`[Credit] No credits found for user ${user.id}`);
+      return new Response(
+        JSON.stringify({ success: false, error: "No credit account found" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (credits.balance < totalCost) {
+      console.log(`[Credit] Insufficient: has ${credits.balance}, needs ${totalCost}`);
+      return new Response(
+        JSON.stringify({ success: false, error: "Insufficient credits" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Insert transaction (triggers will update balance)
+    const { error: txError } = await supabase
       .from("credit_transactions")
       .insert({
-        user_id: userId,
-        type: "deduction",
-        amount,
+        user_id: user.id,
+        amount: -totalCost,
         description,
-        related_id: targetUserId,
+        type: "deduction",
+        related_id: targetUserId || null,
       });
 
-    if (transactionError) throw transactionError;
+    if (txError) {
+      console.error("[Credit] Transaction error:", txError);
+      throw txError;
+    }
 
-    console.log(`Credit deduction: user=${userId}, action=${action}, amount=${amount}`);
+    console.log(`[Credit] Deducted ${totalCost} from user ${user.id} for ${action}`);
 
     return new Response(
-      JSON.stringify({ success: true, amount, description }),
+      JSON.stringify({ success: true, totalCost, description }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
+
   } catch (error: any) {
-    console.error("Credit deduction error:", error);
+    console.error("[Credit] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

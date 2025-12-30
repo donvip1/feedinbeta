@@ -255,48 +255,45 @@ export class WebRTCP2PManager {
   private async setupSignaling(): Promise<void> {
     console.log('[P2P] Setting up signaling channel for call:', this.callId);
     
-    // Subscribe to call_signals table for this call
+    // Subscribe to call_signals table for this call - listen for signals TO this user
     this.signalChannel = supabase
-      .channel(`call-signals-${this.callId}-${Date.now()}`)
+      .channel(`call-signals-${this.callId}-${this.userId}`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
           table: 'call_signals',
-          filter: `call_id=eq.${this.callId}`,
+          filter: `to_user_id=eq.${this.userId}`,
         },
         async (payload: any) => {
           const signal = payload.new;
           
-          // Only process signals from the other user
-          if (signal.from_user_id === this.userId) return;
+          // Only process signals for this call
+          if (signal.call_id !== this.callId) return;
           
           // Avoid processing the same signal twice
           if (this.lastProcessedSignalId === signal.id) return;
           this.lastProcessedSignalId = signal.id;
           
-          console.log('[P2P] Received realtime signal:', signal.signal_data?.type, 'id:', signal.id);
+          console.log('[P2P] Realtime signal received:', signal.signal_data?.type);
           await this.handleSignal(signal.signal_data);
         }
       )
       .subscribe((status) => {
         console.log('[P2P] Signal channel status:', status);
-        if (status === 'CHANNEL_ERROR') {
-          console.log('[P2P] Channel error, relying on polling');
-        }
       });
   }
 
   private startSignalPolling(): void {
-    console.log('[P2P] Starting signal polling');
+    console.log('[P2P] Starting signal polling (500ms interval)');
     
-    // Poll every 1 second for new signals
+    // Poll every 500ms for faster response
     this.pollingInterval = setInterval(async () => {
       await this.checkForNewSignals();
-    }, 1000);
+    }, 500);
     
-    // Also check immediately
+    // Check immediately
     this.checkForNewSignals();
   }
 
