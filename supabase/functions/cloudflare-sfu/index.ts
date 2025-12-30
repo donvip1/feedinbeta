@@ -12,6 +12,7 @@ interface SessionRequest {
   sessionId?: string;
   sdp?: string;
   trackName?: string;
+  mid?: string; // Media line ID from SDP - required for push-track
   remoteTracks?: Array<{ location: string; trackName: string; sessionId: string }>;
   trackId?: string;
 }
@@ -70,11 +71,33 @@ serve(async (req) => {
 
         console.log('[Cloudflare-SFU] 🎤 Pushing track:', body.trackName, 'to session:', body.sessionId.slice(0, 8));
         
+        // Parse SDP to extract mid values if not provided
+        let mids: string[] = [];
+        if (body.sdp) {
+          // Extract all m= lines and their corresponding a=mid values
+          const sdpLines = body.sdp.split('\n');
+          let currentMid: string | null = null;
+          
+          for (const line of sdpLines) {
+            if (line.startsWith('a=mid:')) {
+              currentMid = line.replace('a=mid:', '').trim();
+              if (currentMid) {
+                mids.push(currentMid);
+              }
+            }
+          }
+          console.log('[Cloudflare-SFU] Extracted mids from SDP:', mids);
+        }
+        
+        // If explicit mid provided, use it; otherwise use first extracted mid
+        const mid = body.mid || mids[0] || '0';
+        
         // Build request body with the local track we want to publish
         const requestBody: any = {
           tracks: [{
             location: 'local',
             trackName: body.trackName,
+            mid: mid, // Required by Cloudflare
           }],
         };
 
