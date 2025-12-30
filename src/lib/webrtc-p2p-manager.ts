@@ -35,7 +35,8 @@ export class WebRTCP2PManager {
   private hasRemoteDescription = false;
   private connectionCheckInterval: NodeJS.Timeout | null = null;
   private pollingInterval: NodeJS.Timeout | null = null;
-  private lastProcessedSignalId: string | null = null;
+  private processedSignalIds = new Set<string>();
+  private isCaller = false;
 
   // Multiple STUN/TURN servers for better NAT traversal
   private static readonly ICE_SERVERS: RTCIceServer[] = [
@@ -44,7 +45,7 @@ export class WebRTCP2PManager {
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:stun4.l.google.com:19302' },
-    // Free TURN servers for NAT traversal
+    // Free TURN servers for NAT traversal (works through firewalls)
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelayproject',
@@ -81,13 +82,17 @@ export class WebRTCP2PManager {
    */
   async initializeAsCaller(isVideo: boolean): Promise<MediaStream> {
     console.log('[P2P] Initializing as CALLER, isVideo:', isVideo);
+    this.isCaller = true;
     this.callbacks.onStatusChange('ringing', 'Calling...');
+    
+    // Clean up any old signals for this call first
+    await this.cleanupOldSignals();
     
     await this.setupPeerConnection();
     await this.getLocalMedia(isVideo);
     await this.setupSignaling();
     
-    // Start polling for signals (for answer)
+    // Start polling for answer BEFORE sending offer
     this.startSignalPolling();
     
     // Create and send offer
@@ -97,12 +102,13 @@ export class WebRTCP2PManager {
     });
     
     await this.pc!.setLocalDescription(offer);
-    console.log('[P2P] Created offer, sending to peer');
+    console.log('[P2P] Created offer, waiting for ICE candidates...');
     
-    // Wait a bit for ICE candidates to gather
+    // Wait for ICE candidates to gather (with timeout)
     await this.waitForIceGathering();
     
     // Store offer in database for the receiver
+    console.log('[P2P] Sending offer to peer');
     await this.sendSignal({
       type: 'offer',
       sdp: this.pc!.localDescription?.sdp,
@@ -116,6 +122,7 @@ export class WebRTCP2PManager {
    */
   async initializeAsReceiver(isVideo: boolean): Promise<MediaStream> {
     console.log('[P2P] Initializing as RECEIVER, isVideo:', isVideo);
+    this.isCaller = false;
     this.callbacks.onStatusChange('connecting', 'Connecting...');
     
     await this.setupPeerConnection();
@@ -125,10 +132,23 @@ export class WebRTCP2PManager {
     // Start polling for signals immediately
     this.startSignalPolling();
     
-    // Check for existing offer
+    // Process any existing offer (may have arrived before we subscribed)
     await this.checkForExistingOffer();
     
     return this.localStream!;
+  }
+
+  private async cleanupOldSignals(): Promise<void> {
+    try {
+      // Delete old signals for this call to start fresh
+      await supabase
+        .from('call_signals')
+        .delete()
+        .eq('call_id', this.callId);
+      console.log('[P2P] Cleaned up old signals for call:', this.callId);
+    } catch (error) {
+      console.log('[P2P] Could not cleanup old signals:', error);
+    }
   }
 
   private async setupPeerConnection(): Promise<void> {
@@ -142,7 +162,7 @@ export class WebRTCP2PManager {
     // Handle ICE candidates - send them immediately
     this.pc.onicecandidate = async (event) => {
       if (event.candidate) {
-        console.log('[P2P] New ICE candidate:', event.candidate.type);
+        console.log('[P2P] New ICE candidate:', event.candidate.type, event.candidate.protocol);
         await this.sendSignal({
           type: 'ice-candidate',
           candidate: event.candidate.toJSON(),
@@ -160,11 +180,7 @@ export class WebRTCP2PManager {
           this.callbacks.onStatusChange('connecting', 'Establishing connection...');
           break;
         case 'connected':
-          if (!this.isConnected) {
-            this.isConnected = true;
-            this.callbacks.onStatusChange('connected', 'Connected');
-            this.stopSignalPolling();
-          }
+          this.handleConnected();
           break;
         case 'disconnected':
           this.callbacks.onStatusChange('connecting', 'Reconnecting...');
@@ -181,11 +197,7 @@ export class WebRTCP2PManager {
       console.log('[P2P] ICE state:', iceState);
       
       if (iceState === 'connected' || iceState === 'completed') {
-        if (!this.isConnected) {
-          this.isConnected = true;
-          this.callbacks.onStatusChange('connected', 'Connected');
-          this.stopSignalPolling();
-        }
+        this.handleConnected();
       } else if (iceState === 'failed') {
         console.log('[P2P] ICE failed, attempting restart');
         this.attemptIceRestart();
@@ -211,20 +223,26 @@ export class WebRTCP2PManager {
       }
       
       this.callbacks.onRemoteStream(this.remoteStream);
-      
-      if (!this.isConnected) {
-        this.isConnected = true;
-        this.callbacks.onStatusChange('connected', 'Connected');
-        this.stopSignalPolling();
-      }
+      this.handleConnected();
     };
 
     // Start connection monitoring
     this.startConnectionMonitoring();
   }
 
+  private handleConnected(): void {
+    if (!this.isConnected) {
+      this.isConnected = true;
+      console.log('[P2P] Call connected!');
+      this.callbacks.onStatusChange('connected', 'Connected');
+      this.stopSignalPolling();
+    }
+  }
+
   private async getLocalMedia(isVideo: boolean): Promise<void> {
     try {
+      console.log('[P2P] Requesting media access, video:', isVideo);
+      
       this.localStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -238,6 +256,8 @@ export class WebRTCP2PManager {
           frameRate: { ideal: 30, max: 30 },
         } : false,
       });
+
+      console.log('[P2P] Got local media, tracks:', this.localStream.getTracks().map(t => t.kind));
 
       // Add tracks to peer connection
       this.localStream.getTracks().forEach((track) => {
@@ -255,7 +275,7 @@ export class WebRTCP2PManager {
   private async setupSignaling(): Promise<void> {
     console.log('[P2P] Setting up signaling channel for call:', this.callId);
     
-    // Subscribe to call_signals table for this call - listen for signals TO this user
+    // Subscribe to call_signals table for signals TO this user
     this.signalChannel = supabase
       .channel(`call-signals-${this.callId}-${this.userId}`)
       .on(
@@ -269,12 +289,12 @@ export class WebRTCP2PManager {
         async (payload: any) => {
           const signal = payload.new;
           
-          // Only process signals for this call
+          // Only process signals for THIS call
           if (signal.call_id !== this.callId) return;
           
           // Avoid processing the same signal twice
-          if (this.lastProcessedSignalId === signal.id) return;
-          this.lastProcessedSignalId = signal.id;
+          if (this.processedSignalIds.has(signal.id)) return;
+          this.processedSignalIds.add(signal.id);
           
           console.log('[P2P] Realtime signal received:', signal.signal_data?.type);
           await this.handleSignal(signal.signal_data);
@@ -286,12 +306,14 @@ export class WebRTCP2PManager {
   }
 
   private startSignalPolling(): void {
-    console.log('[P2P] Starting signal polling (500ms interval)');
+    if (this.pollingInterval) return;
     
-    // Poll every 500ms for faster response
+    console.log('[P2P] Starting signal polling (300ms interval)');
+    
+    // Poll every 300ms for faster response
     this.pollingInterval = setInterval(async () => {
       await this.checkForNewSignals();
-    }, 500);
+    }, 300);
     
     // Check immediately
     this.checkForNewSignals();
@@ -322,11 +344,11 @@ export class WebRTCP2PManager {
       }
 
       for (const signal of data || []) {
-        if (this.lastProcessedSignalId === signal.id) continue;
-        this.lastProcessedSignalId = signal.id;
+        if (this.processedSignalIds.has(signal.id)) continue;
+        this.processedSignalIds.add(signal.id);
         
         const signalData = signal.signal_data as unknown as SignalData;
-        console.log('[P2P] Processing polled signal:', signalData?.type, 'id:', signal.id);
+        console.log('[P2P] Processing polled signal:', signalData?.type);
         await this.handleSignal(signalData);
       }
     } catch (error) {
@@ -335,7 +357,10 @@ export class WebRTCP2PManager {
   }
 
   private async checkForExistingOffer(): Promise<void> {
-    console.log('[P2P] Checking for existing offer');
+    console.log('[P2P] Checking for existing offer...');
+    
+    // Small delay to ensure signals are stored
+    await new Promise(resolve => setTimeout(resolve, 200));
     
     const { data, error } = await supabase
       .from('call_signals')
@@ -349,10 +374,12 @@ export class WebRTCP2PManager {
       return;
     }
 
+    console.log('[P2P] Found', data?.length || 0, 'existing signals');
+
     // Process any existing signals
     for (const signal of data || []) {
-      if (this.lastProcessedSignalId === signal.id) continue;
-      this.lastProcessedSignalId = signal.id;
+      if (this.processedSignalIds.has(signal.id)) continue;
+      this.processedSignalIds.add(signal.id);
       
       const signalData = signal.signal_data as unknown as SignalData;
       console.log('[P2P] Processing existing signal:', signalData?.type);
@@ -366,9 +393,10 @@ export class WebRTCP2PManager {
     try {
       switch (data.type) {
         case 'offer':
-          console.log('[P2P] Processing offer');
+          console.log('[P2P] Processing offer, current state:', this.pc.signalingState);
+          
           if (this.pc.signalingState !== 'stable') {
-            console.log('[P2P] Not in stable state, current:', this.pc.signalingState);
+            console.log('[P2P] Not in stable state, ignoring offer');
             return;
           }
           
@@ -377,6 +405,7 @@ export class WebRTCP2PManager {
             sdp: data.sdp,
           }));
           this.hasRemoteDescription = true;
+          console.log('[P2P] Set remote description (offer)');
           
           // Process any pending ICE candidates
           await this.processPendingCandidates();
@@ -384,20 +413,23 @@ export class WebRTCP2PManager {
           // Create and send answer
           const answer = await this.pc.createAnswer();
           await this.pc.setLocalDescription(answer);
+          console.log('[P2P] Created answer, waiting for ICE...');
           
           // Wait briefly for ICE candidates
           await this.waitForIceGathering();
           
+          console.log('[P2P] Sending answer to caller');
           await this.sendSignal({
             type: 'answer',
             sdp: this.pc.localDescription?.sdp,
           });
           
-          console.log('[P2P] Sent answer');
+          this.callbacks.onStatusChange('connecting', 'Answer sent, connecting...');
           break;
 
         case 'answer':
-          console.log('[P2P] Processing answer');
+          console.log('[P2P] Processing answer, current state:', this.pc.signalingState);
+          
           if (this.pc.signalingState !== 'have-local-offer') {
             console.log('[P2P] Not expecting answer, state:', this.pc.signalingState);
             return;
@@ -408,22 +440,25 @@ export class WebRTCP2PManager {
             sdp: data.sdp,
           }));
           this.hasRemoteDescription = true;
+          console.log('[P2P] Set remote description (answer)');
           
           // Process any pending ICE candidates
           await this.processPendingCandidates();
+          
+          this.callbacks.onStatusChange('connecting', 'Establishing connection...');
           break;
 
         case 'ice-candidate':
           if (data.candidate) {
             if (this.hasRemoteDescription && this.pc.remoteDescription) {
-              console.log('[P2P] Adding ICE candidate');
+              console.log('[P2P] Adding ICE candidate immediately');
               try {
                 await this.pc.addIceCandidate(new RTCIceCandidate(data.candidate));
               } catch (e) {
                 console.log('[P2P] Error adding ICE candidate:', e);
               }
             } else {
-              console.log('[P2P] Queuing ICE candidate');
+              console.log('[P2P] Queuing ICE candidate (no remote description yet)');
               this.pendingCandidates.push(data.candidate);
             }
           }
@@ -437,7 +472,7 @@ export class WebRTCP2PManager {
   private async processPendingCandidates(): Promise<void> {
     if (this.pendingCandidates.length === 0) return;
     
-    console.log('[P2P] Processing', this.pendingCandidates.length, 'pending candidates');
+    console.log('[P2P] Processing', this.pendingCandidates.length, 'pending ICE candidates');
     
     const candidates = [...this.pendingCandidates];
     this.pendingCandidates = [];
@@ -476,14 +511,15 @@ export class WebRTCP2PManager {
     if (!this.pc) return;
     
     if (this.pc.iceGatheringState === 'complete') {
+      console.log('[P2P] ICE gathering already complete');
       return;
     }
 
     return new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        console.log('[P2P] ICE gathering timeout, proceeding with available candidates');
+        console.log('[P2P] ICE gathering timeout (1.5s), proceeding with available candidates');
         resolve();
-      }, 2000); // 2 second timeout
+      }, 1500); // Reduced timeout for faster connection
 
       const checkComplete = () => {
         if (this.pc?.iceGatheringState === 'complete') {
@@ -541,6 +577,7 @@ export class WebRTCP2PManager {
       const audioTrack = this.localStream.getAudioTracks()[0];
       if (audioTrack) {
         audioTrack.enabled = !audioTrack.enabled;
+        console.log('[P2P] Audio muted:', !audioTrack.enabled);
         return audioTrack.enabled;
       }
     }
@@ -552,6 +589,7 @@ export class WebRTCP2PManager {
       const videoTrack = this.localStream.getVideoTracks()[0];
       if (videoTrack) {
         videoTrack.enabled = !videoTrack.enabled;
+        console.log('[P2P] Video enabled:', videoTrack.enabled);
         return videoTrack.enabled;
       }
     }
@@ -586,6 +624,7 @@ export class WebRTCP2PManager {
       this.localStream.addTrack(newVideoTrack);
       
       this.callbacks.onLocalStream(this.localStream);
+      console.log('[P2P] Camera flipped to:', newFacingMode);
       return true;
     } catch (error) {
       console.error('[P2P] Failed to flip camera:', error);
@@ -602,7 +641,7 @@ export class WebRTCP2PManager {
   }
 
   async cleanup(): Promise<void> {
-    console.log('[P2P] Cleaning up');
+    console.log('[P2P] Cleaning up call resources');
     
     this.stopConnectionMonitoring();
     this.stopSignalPolling();
@@ -636,9 +675,21 @@ export class WebRTCP2PManager {
       this.pc = null;
     }
 
+    // Clean up signals from database
+    try {
+      await supabase
+        .from('call_signals')
+        .delete()
+        .eq('call_id', this.callId);
+    } catch (error) {
+      console.log('[P2P] Could not cleanup signals:', error);
+    }
+
     this.isConnected = false;
     this.hasRemoteDescription = false;
     this.pendingCandidates = [];
-    this.lastProcessedSignalId = null;
+    this.processedSignalIds.clear();
+    
+    console.log('[P2P] Cleanup complete');
   }
 }
