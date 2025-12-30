@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { CloudflareCallManager, ConnectionStatus as ConnectionStatusType, NetworkQuality } from '@/lib/cloudflare-call-manager';
+import { WebRTCP2PManager, CallStatus as P2PCallStatus } from '@/lib/webrtc-p2p-manager';
 import { supabase } from '@/integrations/supabase/client';
 import { callSounds } from '@/utils/callSounds';
 import { useToast } from '@/hooks/use-toast';
@@ -15,8 +15,7 @@ interface CallState {
   isSpeakerOn: boolean;
   isScreenSharing: boolean;
   callDuration: number;
-  connectionStatus: ConnectionStatusType;
-  networkQuality: NetworkQuality | null;
+  connectionStatus: P2PCallStatus;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   otherUserId: string | null;
@@ -37,16 +36,11 @@ interface CallContextType {
   toggleMute: () => void;
   toggleVideo: () => void;
   toggleSpeaker: () => void;
-  toggleScreenShare: () => Promise<void>;
   flipCamera: () => Promise<void>;
-  enterPiP: () => Promise<void>;
-  exitPiP: () => void;
   // Refs for video elements
   setLocalVideoRef: (ref: HTMLVideoElement | null) => void;
   setRemoteVideoRef: (ref: HTMLVideoElement | null) => void;
   setRemoteAudioRef: (ref: HTMLAudioElement | null) => void;
-  // Call manager instance
-  callManager: CloudflareCallManager | null;
 }
 
 const defaultCallState: CallState = {
@@ -60,8 +54,7 @@ const defaultCallState: CallState = {
   isSpeakerOn: true,
   isScreenSharing: false,
   callDuration: 0,
-  connectionStatus: 'initializing',
-  networkQuality: null,
+  connectionStatus: 'idle',
   localStream: null,
   remoteStream: null,
   otherUserId: null,
@@ -87,7 +80,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
   const [callState, setCallState] = useState<CallState>(defaultCallState);
   
-  const callManagerRef = useRef<CloudflareCallManager | null>(null);
+  const callManagerRef = useRef<WebRTCP2PManager | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -138,7 +131,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     otherUserId: string,
     isCaller: boolean
   ) => {
-    console.log('[CallContext] Starting call with Cloudflare SFU:', { callId, callType, otherUserId, isCaller });
+    console.log('[CallContext] Starting P2P call:', { callId, callType, otherUserId, isCaller });
 
     // Load other user's profile
     await loadOtherUserProfile(otherUserId);
@@ -161,15 +154,24 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isActive: true,
       isMinimized: false,
       otherUserId,
-      connectionStatus: 'initializing',
+      connectionStatus: 'connecting',
     }));
 
     try {
-      callManagerRef.current = new CloudflareCallManager(
+      // Create P2P call manager
+      callManagerRef.current = new WebRTCP2PManager(
         callId,
         user.id,
         otherUserId,
         {
+          onLocalStream: (stream) => {
+            console.log('[CallContext] Got local stream');
+            setCallState(prev => ({ ...prev, localStream: stream }));
+            
+            if (callType === 'video' && localVideoRef.current) {
+              localVideoRef.current.srcObject = stream;
+            }
+          },
           onRemoteStream: (stream) => {
             console.log('[CallContext] Got remote stream');
             setCallState(prev => ({ ...prev, remoteStream: stream }));
@@ -179,45 +181,29 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else if (remoteAudioRef.current) {
               remoteAudioRef.current.srcObject = stream;
             }
-            
-            setCallState(prev => {
-              if (!prev.isConnected) {
-                callSounds.stopAllSounds();
-                callSounds.playConnected();
-                startDurationTimer();
-                return { ...prev, isConnected: true, connectionStatus: 'connected' };
-              }
-              return prev;
-            });
           },
-          onConnectionStateChange: (state) => {
-            console.log('[CallContext] Connection state:', state);
-            if (state === 'connected') {
-              setCallState(prev => {
-                if (!prev.isConnected) {
-                  callSounds.stopAllSounds();
-                  callSounds.playConnected();
-                  startDurationTimer();
-                  return { ...prev, isConnected: true, connectionStatus: 'connected' };
-                }
-                return prev;
-              });
-            } else if (state === 'failed') {
-              setCallState(prev => ({ ...prev, connectionStatus: 'failed' }));
-            }
-          },
-          onDetailedStatusChange: (status, message) => {
-            console.log('[CallContext] Status:', status, message);
+          onStatusChange: (status, message) => {
+            console.log('[CallContext] Status change:', status, message);
             setCallState(prev => ({ ...prev, connectionStatus: status }));
-          },
-          onNetworkQuality: (quality) => {
-            setCallState(prev => ({ ...prev, networkQuality: quality }));
+            
+            if (status === 'connected') {
+              callSounds.stopAllSounds();
+              callSounds.playConnected();
+              startDurationTimer();
+              setCallState(prev => ({ ...prev, isConnected: true }));
+            } else if (status === 'failed') {
+              toast({
+                title: 'Connection Failed',
+                description: message || 'Unable to establish call connection',
+                variant: 'destructive',
+              });
+            }
           },
           onError: (error) => {
             console.error('[CallContext] Call error:', error);
             toast({
-              title: 'Connection Error',
-              description: error.message || 'Failed to establish call connection',
+              title: 'Call Error',
+              description: error.message || 'An error occurred during the call',
               variant: 'destructive',
             });
           },
@@ -225,12 +211,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
 
       const isVideo = callType === 'video';
-      const localStream = await callManagerRef.current.initialize(isVideo);
       
-      setCallState(prev => ({ ...prev, localStream }));
-      
-      if (localVideoRef.current && isVideo) {
-        localVideoRef.current.srcObject = localStream;
+      // Initialize as caller or receiver
+      if (isCaller) {
+        await callManagerRef.current.initializeAsCaller(isVideo);
+      } else {
+        await callManagerRef.current.initializeAsReceiver(isVideo);
       }
 
     } catch (error: any) {
@@ -308,24 +294,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [callState.isSpeakerOn, toast]);
 
-  const toggleScreenShare = useCallback(async () => {
-    if (!callManagerRef.current) return;
-    
-    if (callState.isScreenSharing) {
-      await callManagerRef.current.stopScreenShare();
-      setCallState(prev => ({ ...prev, isScreenSharing: false }));
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = callManagerRef.current.getLocalStream();
-      }
-    } else {
-      const screenStream = await callManagerRef.current.startScreenShare();
-      if (screenStream && localVideoRef.current) {
-        localVideoRef.current.srcObject = screenStream;
-        setCallState(prev => ({ ...prev, isScreenSharing: true }));
-      }
-    }
-  }, [callState.isScreenSharing]);
-
   const flipCamera = useCallback(async () => {
     if (callManagerRef.current) {
       const success = await callManagerRef.current.flipCamera();
@@ -333,31 +301,6 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localVideoRef.current.srcObject = callManagerRef.current.getLocalStream();
       }
     }
-  }, []);
-
-  const enterPiP = useCallback(async () => {
-    if (!remoteVideoRef.current || !document.pictureInPictureEnabled) {
-      toast({
-        title: 'PiP not available',
-        description: 'Picture-in-Picture is not supported on this device',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    try {
-      await remoteVideoRef.current.requestPictureInPicture();
-      setCallState(prev => ({ ...prev, isPiPActive: true }));
-    } catch (error) {
-      console.error('[CallContext] Failed to enter PiP:', error);
-    }
-  }, [toast]);
-
-  const exitPiP = useCallback(() => {
-    if (document.pictureInPictureElement) {
-      document.exitPictureInPicture().catch(() => {});
-    }
-    setCallState(prev => ({ ...prev, isPiPActive: false }));
   }, []);
 
   // Listen for PiP exit
@@ -402,14 +345,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toggleMute,
     toggleVideo,
     toggleSpeaker,
-    toggleScreenShare,
     flipCamera,
-    enterPiP,
-    exitPiP,
     setLocalVideoRef,
     setRemoteVideoRef,
     setRemoteAudioRef,
-    callManager: callManagerRef.current,
   };
 
   return (
