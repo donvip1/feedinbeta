@@ -35,7 +35,7 @@ const Call = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Get call context for Cloudflare SFU-based calling
+  // Get call context for P2P WebRTC calling
   const {
     callState,
     startCall,
@@ -43,7 +43,6 @@ const Call = () => {
     toggleMute: contextToggleMute,
     toggleVideo: contextToggleVideo,
     toggleSpeaker: contextToggleSpeaker,
-    toggleScreenShare: contextToggleScreenShare,
     flipCamera: contextFlipCamera,
     setLocalVideoRef,
     setRemoteVideoRef,
@@ -498,8 +497,12 @@ const Call = () => {
     await contextFlipCamera();
   };
 
+  // Screen share not supported in P2P mode
   const handleToggleScreenShare = async () => {
-    await contextToggleScreenShare();
+    toast({
+      title: 'Feature unavailable',
+      description: 'Screen sharing is not available in this call mode',
+    });
   };
 
   if (!callData) {
@@ -524,10 +527,13 @@ const Call = () => {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       </div>
 
-      {/* Network Quality Indicator */}
+      {/* Network Quality Indicator - shown when connected */}
       {callState.isConnected && (
         <div className="absolute top-4 right-4 z-20">
-          <NetworkQualityIndicator quality={callState.networkQuality} showDetails />
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 rounded-full border border-green-500/30">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-xs text-green-400 font-medium">Connected</span>
+          </div>
         </div>
       )}
 
