@@ -41,6 +41,8 @@ class CloudflareSFUClient {
   private onTrackCallback: ((track: MediaStreamTrack, peerId: string) => void) | null = null;
   private onConnectionStateChange: ((state: RTCPeerConnectionState) => void) | null = null;
   private remoteAudioElements: Map<string, HTMLAudioElement> = new Map();
+  private retryCount = 0;
+  private maxRetries = 3;
 
   /**
    * Create a new Cloudflare SFU session
@@ -53,18 +55,31 @@ class CloudflareSFUClient {
         body: { action: 'create-session' },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[CloudflareSFU] Edge function error:', error);
+        throw error;
+      }
       
       if (!data.success || !data.sessionId) {
+        console.error('[CloudflareSFU] Session creation failed:', data.error);
         throw new Error(data.error || 'Failed to create session');
       }
 
       this.sessionId = data.sessionId;
-      console.log('[CloudflareSFU] Session created:', this.sessionId.slice(0, 8));
+      console.log('[CloudflareSFU] ✅ Session created:', this.sessionId.slice(0, 8));
       
       return { success: true, sessionId: data.sessionId };
     } catch (error) {
-      console.error('[CloudflareSFU] Error creating session:', error);
+      console.error('[CloudflareSFU] ❌ Error creating session:', error);
+      
+      // Retry logic
+      if (this.retryCount < this.maxRetries) {
+        this.retryCount++;
+        console.log('[CloudflareSFU] Retrying session creation, attempt:', this.retryCount);
+        await new Promise(resolve => setTimeout(resolve, 1000 * this.retryCount));
+        return this.createSession();
+      }
+      
       return { 
         success: false, 
         error: error instanceof Error ? error.message : 'Failed to create session' 
@@ -77,7 +92,7 @@ class CloudflareSFUClient {
    */
   private initPeerConnection(): RTCPeerConnection {
     if (this.peerConnection && this.peerConnection.connectionState !== 'closed') {
-      console.log('[CloudflareSFU] Reusing existing peer connection');
+      console.log('[CloudflareSFU] Reusing existing peer connection, state:', this.peerConnection.connectionState);
       return this.peerConnection;
     }
 
@@ -89,6 +104,17 @@ class CloudflareSFUClient {
         { urls: 'stun:stun.cloudflare.com:3478' },
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
+        // Add TURN fallback for difficult networks
+        {
+          urls: 'turn:a.relay.metered.ca:80',
+          username: 'e8dd65c92f6d9f6e5f9ef455',
+          credential: 'uJE/KGrh5vKVE7ey',
+        },
+        {
+          urls: 'turn:a.relay.metered.ca:443?transport=tcp',
+          username: 'e8dd65c92f6d9f6e5f9ef455',
+          credential: 'uJE/KGrh5vKVE7ey',
+        },
       ],
       bundlePolicy: 'max-bundle',
       iceTransportPolicy: 'all',
@@ -96,7 +122,7 @@ class CloudflareSFUClient {
 
     // Handle incoming tracks (for listeners receiving audio)
     this.peerConnection.ontrack = (event) => {
-      console.log('[CloudflareSFU] ✅ Received remote track:', event.track.kind, 'id:', event.track.id);
+      console.log('[CloudflareSFU] ✅ Received remote track:', event.track.kind, 'id:', event.track.id, 'readyState:', event.track.readyState);
       
       if (event.track.kind === 'audio') {
         // Create audio element for playback
@@ -116,6 +142,11 @@ class CloudflareSFUClient {
       if (this.onConnectionStateChange && state) {
         this.onConnectionStateChange(state);
       }
+      
+      // Handle connection failures
+      if (state === 'failed') {
+        console.error('[CloudflareSFU] Connection failed - may need ICE restart');
+      }
     };
 
     this.peerConnection.oniceconnectionstatechange = () => {
@@ -124,6 +155,12 @@ class CloudflareSFUClient {
 
     this.peerConnection.onicegatheringstatechange = () => {
       console.log('[CloudflareSFU] ICE gathering state:', this.peerConnection?.iceGatheringState);
+    };
+
+    this.peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        console.log('[CloudflareSFU] ICE candidate:', event.candidate.type, event.candidate.protocol);
+      }
     };
 
     this.peerConnection.onnegotiationneeded = () => {
@@ -468,11 +505,15 @@ class CloudflareSFUClient {
     
     // Remove all audio elements
     this.remoteAudioElements.forEach((audio, peerId) => {
+      console.log('[CloudflareSFU] Removing audio element for peer:', peerId);
+      audio.pause();
+      audio.srcObject = null;
       audio.remove();
     });
     this.remoteAudioElements.clear();
 
     if (this.peerConnection) {
+      console.log('[CloudflareSFU] Closing peer connection');
       this.peerConnection.close();
       this.peerConnection = null;
     }
@@ -481,6 +522,9 @@ class CloudflareSFUClient {
     this.localTrackName = null;
     this.onTrackCallback = null;
     this.onConnectionStateChange = null;
+    this.retryCount = 0;
+    
+    console.log('[CloudflareSFU] Cleanup complete');
   }
 }
 
