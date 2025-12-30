@@ -400,7 +400,8 @@ const Call = () => {
         },
         async (payload) => {
           const newStatus = payload.new.status;
-          console.log('[Call] Call status updated:', newStatus);
+          const newCallType = payload.new.call_type as 'video' | 'voice';
+          console.log('[Call] Call status updated:', newStatus, 'setupComplete:', setupCompleteRef.current);
           
           if (newStatus === 'ended' || newStatus === 'rejected') {
             if (!hasEndedRef.current) {
@@ -413,9 +414,25 @@ const Call = () => {
               }, 1500);
             }
           } else if (newStatus === 'answered' && !setupCompleteRef.current) {
+            // CRITICAL FIX: Use data from payload.new, not stale data parameter
+            const updatedCallData: CallData = {
+              id: payload.new.id,
+              caller_id: payload.new.caller_id,
+              receiver_id: payload.new.receiver_id,
+              call_type: newCallType,
+              status: newStatus,
+              caller_profile: data.caller_profile,
+              receiver_profile: data.receiver_profile,
+            };
+            
+            console.log('[Call] Call answered - triggering setup for both parties');
             callSounds.stopRinging();
             setCallStatus('connecting');
-            await setupCall(data);
+            setConnectionMessage('Connecting to peer...');
+            
+            // Small delay to ensure database is synced
+            await new Promise(resolve => setTimeout(resolve, 300));
+            await setupCall(updatedCallData);
           }
         }
       )
