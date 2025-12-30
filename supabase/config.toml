@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.learn-tech-content]
 verify_jwt = false
+
+[functions.cloudflare-sfu]
+verify_jwt = true
