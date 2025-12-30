@@ -27,6 +27,7 @@ export interface SpaceRoomState {
 
 type StateChangeCallback = (state: SpaceRoomState) => void;
 type AudioLevelCallback = (levels: Record<string, number>) => void;
+type ConnectionStateCallback = (state: RTCPeerConnectionState) => void;
 
 class SpaceRoomManager {
   private spaceId: string | null = null;
@@ -40,6 +41,7 @@ class SpaceRoomManager {
   private audioLevelInterval: number | null = null;
   private onStateChange: StateChangeCallback | null = null;
   private onAudioLevels: AudioLevelCallback | null = null;
+  private onConnectionStateChange: ConnectionStateCallback | null = null;
   private realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
 
   /**
@@ -50,7 +52,8 @@ class SpaceRoomManager {
     userId: string, 
     isHost: boolean,
     onStateChange?: StateChangeCallback,
-    onAudioLevels?: AudioLevelCallback
+    onAudioLevels?: AudioLevelCallback,
+    onConnectionStateChange?: ConnectionStateCallback
   ): Promise<SFUSessionResult> {
     console.log('[SpaceRoomManager] Initializing for space:', spaceId, 'isHost:', isHost);
     
@@ -59,29 +62,38 @@ class SpaceRoomManager {
     this.isHost = isHost;
     this.onStateChange = onStateChange || null;
     this.onAudioLevels = onAudioLevels || null;
+    this.onConnectionStateChange = onConnectionStateChange || null;
+
+    // Set up SFU callbacks before creating session
+    cloudflareSFU.onTrack((track, peerId) => {
+      this.handleRemoteTrack(track, peerId);
+    });
+
+    cloudflareSFU.onStateChange((state) => {
+      console.log('[SpaceRoomManager] SFU connection state:', state);
+      if (this.onConnectionStateChange) {
+        this.onConnectionStateChange(state);
+      }
+    });
 
     // Create Cloudflare session
     const result = await cloudflareSFU.createSession();
     
     if (!result.success || !result.sessionId) {
-      console.error('[SpaceRoomManager] Failed to create SFU session');
+      console.error('[SpaceRoomManager] Failed to create SFU session:', result.error);
       return result;
     }
 
     this.sessionId = result.sessionId;
+    console.log('[SpaceRoomManager] SFU session created:', this.sessionId);
 
-    // Store session ID in database for this space
+    // Store session ID in database for this space (host only)
     if (isHost) {
       await this.updateSpaceSession(result.sessionId);
     }
 
-    // Subscribe to speaker changes
+    // Subscribe to speaker changes for real-time updates
     this.setupRealtimeSubscription();
-
-    // Set up track callback
-    cloudflareSFU.onTrack((track, peerId) => {
-      this.handleRemoteTrack(track, peerId);
-    });
 
     this.notifyStateChange();
     return result;

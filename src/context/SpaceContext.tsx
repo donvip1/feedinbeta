@@ -172,6 +172,17 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Audio levels callback
         (levels) => {
           setSpaceState(prev => ({ ...prev, audioLevels: levels }));
+        },
+        // Connection state callback
+        (connectionState) => {
+          console.log('[SpaceContext-SFU] Connection state:', connectionState);
+          if (connectionState === 'connected') {
+            setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
+          } else if (connectionState === 'failed') {
+            setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
+          } else if (connectionState === 'connecting') {
+            setSpaceState(prev => ({ ...prev, connectionStatus: 'connecting' }));
+          }
         }
       );
 

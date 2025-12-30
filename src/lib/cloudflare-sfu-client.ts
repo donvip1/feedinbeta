@@ -134,7 +134,7 @@ class CloudflareSFUClient {
       }
 
       // Add transceiver for sending audio
-      const transceiver = pc.addTransceiver(audioTrack, { 
+      pc.addTransceiver(audioTrack, { 
         direction: 'sendonly',
         streams: [localStream],
       });
@@ -145,7 +145,7 @@ class CloudflareSFUClient {
 
       console.log('[CloudflareSFU] Sending offer to SFU...');
 
-      // Push track to SFU
+      // Push track to SFU with the offer
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
         body: {
           action: 'push-track',
@@ -157,15 +157,31 @@ class CloudflareSFUClient {
 
       if (error) throw error;
       
-      if (!data.success || !data.sessionDescription) {
+      if (!data.success) {
         throw new Error(data.error || 'Failed to push track');
       }
 
-      // Set remote answer
-      await pc.setRemoteDescription({
-        type: 'answer',
-        sdp: data.sessionDescription.sdp,
-      });
+      // Handle the response - could be an answer or an offer
+      if (data.sessionDescription) {
+        if (data.sessionDescription.type === 'answer') {
+          // Standard flow: we sent offer, got answer
+          await pc.setRemoteDescription({
+            type: 'answer',
+            sdp: data.sessionDescription.sdp,
+          });
+        } else if (data.sessionDescription.type === 'offer') {
+          // Server offer flow: need to answer
+          await pc.setRemoteDescription({
+            type: 'offer',
+            sdp: data.sessionDescription.sdp,
+          });
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          
+          // Send the answer back via renegotiate
+          await this.renegotiate(sessionId, answer.sdp!);
+        }
+      }
 
       this.localTrackName = trackName;
       console.log('[CloudflareSFU] Audio track published successfully');
@@ -196,12 +212,7 @@ class CloudflareSFUClient {
       
       const pc = await this.initPeerConnection();
 
-      // Add recv-only transceivers for each remote track
-      for (const track of remoteTracks) {
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-      }
-
-      // Request tracks from SFU
+      // Request tracks from SFU - the SFU will send us an offer
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
         body: {
           action: 'pull-tracks',
@@ -218,6 +229,8 @@ class CloudflareSFUClient {
 
       // If we got an offer from the server, we need to answer it
       if (data.sessionDescription?.type === 'offer') {
+        console.log('[CloudflareSFU] Got offer from SFU, creating answer...');
+        
         await pc.setRemoteDescription({
           type: 'offer',
           sdp: data.sessionDescription.sdp,
@@ -226,10 +239,9 @@ class CloudflareSFUClient {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
 
-        // Send answer back via renegotiate
-        if (data.requiresImmediateRenegotiation) {
-          await this.renegotiate(sessionId, answer.sdp!);
-        }
+        // Always send answer back via renegotiate to complete the handshake
+        console.log('[CloudflareSFU] Sending answer to SFU...');
+        await this.renegotiate(sessionId, answer.sdp!);
       }
 
       console.log('[CloudflareSFU] Tracks pulled successfully');
