@@ -9,7 +9,7 @@ import { NetworkQualityIndicator } from '@/components/calls/NetworkQualityIndica
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { usePresence } from '@/hooks/usePresence';
 import { callSounds } from '@/utils/callSounds';
-import { WebRTCManager, ConnectionStatus as ConnectionStatusType, NetworkQuality } from '@/utils/webrtcManager';
+import { useCallContext } from '@/context/CallContext';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -35,28 +35,35 @@ const Call = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
+  // Get call context for Cloudflare SFU-based calling
+  const {
+    callState,
+    startCall,
+    endCall: contextEndCall,
+    toggleMute: contextToggleMute,
+    toggleVideo: contextToggleVideo,
+    toggleSpeaker: contextToggleSpeaker,
+    toggleScreenShare: contextToggleScreenShare,
+    flipCamera: contextFlipCamera,
+    setLocalVideoRef,
+    setRemoteVideoRef,
+    setRemoteAudioRef,
+  } = useCallContext();
+  
   const callId = searchParams.get('callId');
   
   const [callData, setCallData] = useState<CallData | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isSpeakerOn, setIsSpeakerOn] = useState(true);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'offline' | 'ended'>('connecting');
   const [otherUserProfile, setOtherUserProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatusType>('initializing');
   const [connectionMessage, setConnectionMessage] = useState('Starting call...');
   const [showRetry, setShowRetry] = useState(false);
-  const [networkQuality, setNetworkQuality] = useState<NetworkQuality | null>(null);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
   const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const startTimeRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const webrtcRef = useRef<WebRTCManager | null>(null);
   const hasEndedRef = useRef(false);
   const setupCompleteRef = useRef(false);
   const callTypeRef = useRef<'video' | 'voice'>('voice');
@@ -64,6 +71,42 @@ const Call = () => {
   const isCaller = callData?.caller_id === user?.id;
   const otherUserId = isCaller ? callData?.receiver_id : callData?.caller_id;
   const { isOnline } = usePresence(otherUserId);
+
+  // Sync video/audio refs with context
+  useEffect(() => {
+    if (localVideoRef.current) setLocalVideoRef(localVideoRef.current);
+    if (remoteVideoRef.current) setRemoteVideoRef(remoteVideoRef.current);
+    if (remoteAudioRef.current) setRemoteAudioRef(remoteAudioRef.current);
+  }, [setLocalVideoRef, setRemoteVideoRef, setRemoteAudioRef]);
+
+  // Monitor call state from context
+  useEffect(() => {
+    if (callState.isConnected && callStatus !== 'connected') {
+      callSounds.stopAllSounds();
+      callSounds.playConnected();
+      setCallStatus('connected');
+      startTimer();
+      setShowRetry(false);
+    }
+    
+    if (callState.connectionStatus === 'failed') {
+      setShowRetry(true);
+    }
+    
+    if (callState.connectionStatus) {
+      const statusMessages: Record<string, string> = {
+        'initializing': 'Starting call...',
+        'getting-media': 'Accessing camera/microphone...',
+        'creating-session': 'Creating session...',
+        'publishing': 'Publishing media...',
+        'signaling': 'Connecting to peer...',
+        'subscribing': 'Receiving remote stream...',
+        'connected': 'Connected',
+        'failed': 'Connection failed',
+      };
+      setConnectionMessage(statusMessages[callState.connectionStatus] || 'Connecting...');
+    }
+  }, [callState.isConnected, callState.connectionStatus, callStatus]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -161,7 +204,7 @@ const Call = () => {
         ? Math.floor((Date.now() - startTimeRef.current) / 1000)
         : 0;
 
-      const callLogStatus = isConnected ? 'answered' : 'missed';
+      const callLogStatus = callState.isConnected ? 'answered' : 'missed';
 
       await supabase
         .from('call_logs')
@@ -174,7 +217,7 @@ const Call = () => {
 
       await insertCallLogMessage(callLogStatus, duration);
 
-      if (isConnected && duration > 0 && user?.id) {
+      if (callState.isConnected && duration > 0 && user?.id) {
         const durationMinutes = Math.max(1, Math.ceil(duration / 60));
         const action = callTypeRef.current === 'video' ? 'video_call' : 'voice_call';
         
@@ -210,27 +253,27 @@ const Call = () => {
       intervalRef.current = null;
     }
     
-    await webrtcRef.current?.cleanup();
-    webrtcRef.current = null;
+    // End call via context (Cloudflare cleanup)
+    await contextEndCall();
 
     setTimeout(() => {
       navigate('/messages');
     }, 1500);
-  }, [callId, isConnected, user?.id, toast, navigate, callData, isCaller]);
+  }, [callId, callState.isConnected, user?.id, toast, navigate, callData, isCaller, contextEndCall]);
 
   const retryConnection = useCallback(async () => {
     if (!callData || !user) return;
     
     setShowRetry(false);
-    setConnectionStatus('initializing');
     setConnectionMessage('Retrying connection...');
     setupCompleteRef.current = false;
     
-    await webrtcRef.current?.cleanup();
-    webrtcRef.current = null;
+    // End current call state
+    await contextEndCall();
     
-    await setupWebRTC(callData);
-  }, [callData, user]);
+    // Restart
+    await setupCall(callData);
+  }, [callData, user, contextEndCall]);
 
   useEffect(() => {
     if (user === undefined) return;
@@ -329,7 +372,7 @@ const Call = () => {
         setCallStatus('ringing');
       } else if (callDataWithProfiles.status === 'answered') {
         setCallStatus('connecting');
-        await setupWebRTC(callDataWithProfiles);
+        await setupCall(callDataWithProfiles);
       }
 
       subscribeToCallUpdates(callDataWithProfiles);
@@ -357,7 +400,7 @@ const Call = () => {
         },
         async (payload) => {
           const newStatus = payload.new.status;
-          console.log('Call status updated:', newStatus);
+          console.log('[Call] Call status updated:', newStatus);
           
           if (newStatus === 'ended' || newStatus === 'rejected') {
             if (!hasEndedRef.current) {
@@ -372,7 +415,7 @@ const Call = () => {
           } else if (newStatus === 'answered' && !setupCompleteRef.current) {
             callSounds.stopRinging();
             setCallStatus('connecting');
-            await setupWebRTC(data);
+            await setupCall(data);
           }
         }
       )
@@ -383,9 +426,9 @@ const Call = () => {
     };
   };
 
-  const setupWebRTC = async (data: CallData) => {
-    if (webrtcRef.current || setupCompleteRef.current) {
-      console.log('[Call] WebRTC already setup, skipping');
+  const setupCall = async (data: CallData) => {
+    if (setupCompleteRef.current) {
+      console.log('[Call] Setup already complete, skipping');
       return;
     }
     
@@ -393,161 +436,53 @@ const Call = () => {
 
     const otherUserId = data.caller_id === user?.id ? data.receiver_id : data.caller_id;
     const isVideo = callTypeRef.current === 'video';
+    const isCaller = data.caller_id === user?.id;
 
-    console.log('[Call] Setting up WebRTC for', isVideo ? 'video' : 'voice', 'call');
+    console.log('[Call] Setting up Cloudflare SFU call for', isVideo ? 'video' : 'voice', 'call');
+    console.log('[Call] I am the', isCaller ? 'caller' : 'receiver');
 
     try {
-      webrtcRef.current = new WebRTCManager(
+      // Use CallContext's startCall which uses CloudflareCallManager
+      await startCall(
         callId!,
-        user!.id,
+        isVideo ? 'video' : 'voice',
         otherUserId,
-        {
-          onRemoteStream: (stream) => {
-            console.log('[Call] Got remote stream with tracks:', stream.getTracks().map(t => t.kind));
-            
-            if (isVideo && remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = stream;
-            } else if (remoteAudioRef.current) {
-              remoteAudioRef.current.srcObject = stream;
-            }
-            
-            if (!isConnected) {
-              callSounds.stopAllSounds();
-              callSounds.playConnected();
-              setIsConnected(true);
-              setCallStatus('connected');
-              startTimer();
-            }
-          },
-          onConnectionStateChange: (state) => {
-            console.log('[Call] Connection state:', state);
-            if (state === 'connected') {
-              if (!isConnected) {
-                setIsConnected(true);
-                setCallStatus('connected');
-                startTimer();
-              }
-              setShowRetry(false);
-            } else if (state === 'disconnected' || state === 'failed') {
-              if (!hasEndedRef.current) {
-                if (state === 'failed') {
-                  setShowRetry(true);
-                }
-              }
-            }
-          },
-          onIceConnectionStateChange: (state) => {
-            console.log('[Call] ICE state:', state);
-            if (state === 'connected' || state === 'completed') {
-              if (!isConnected) {
-                callSounds.stopAllSounds();
-                callSounds.playConnected();
-                setIsConnected(true);
-                setCallStatus('connected');
-                startTimer();
-              }
-            } else if (state === 'failed') {
-              setShowRetry(true);
-            }
-          },
-          onDetailedStatusChange: (status, message) => {
-            setConnectionStatus(status);
-            setConnectionMessage(message);
-            
-            if (status === 'failed') {
-              setShowRetry(true);
-            }
-          },
-          onNetworkQuality: (quality) => {
-            setNetworkQuality(quality);
-          },
-          onError: (error) => {
-            console.error('[Call] WebRTC error:', error);
-            setShowRetry(true);
-            toast({
-              title: 'Connection Error',
-              description: error.message || 'Failed to establish call connection',
-              variant: 'destructive',
-            });
-          },
-        }
+        isCaller
       );
-
-      const localStream = await webrtcRef.current.initialize(isVideo);
-      
-      if (localVideoRef.current && isVideo) {
-        localVideoRef.current.srcObject = localStream;
-      }
-
-      // Use presence-based synchronization
-      if (data.caller_id === user?.id) {
-        // Caller: wait for peer presence, then send offer
-        console.log('[Call] Caller waiting for peer and creating offer...');
-        await webrtcRef.current.waitForPeerAndCreateOffer(8000);
-      } else {
-        // Receiver: just wait for offer (presence is tracked automatically)
-        console.log('[Call] Receiver waiting for offer from caller...');
-      }
-      
     } catch (error: any) {
-      console.error('[Call] Error setting up WebRTC:', error);
+      console.error('[Call] Error setting up call:', error);
       setupCompleteRef.current = false;
       setShowRetry(true);
       toast({
-        title: 'Media Access Error',
-        description: error.message || 'Failed to access camera/microphone. Please check permissions.',
+        title: 'Connection Error',
+        description: error.message || 'Failed to establish call connection',
         variant: 'destructive',
       });
     }
   };
 
-  const toggleMute = () => {
-    if (webrtcRef.current) {
-      const isEnabled = webrtcRef.current.toggleMute();
-      setIsMuted(!isEnabled);
-    }
+  const handleToggleMute = () => {
+    contextToggleMute();
   };
 
-  const toggleVideo = () => {
-    if (webrtcRef.current) {
-      const isEnabled = webrtcRef.current.toggleVideo();
-      setIsVideoOff(!isEnabled);
-    }
+  const handleToggleVideo = () => {
+    contextToggleVideo();
   };
 
-  const toggleSpeaker = () => {
-    setIsSpeakerOn(!isSpeakerOn);
+  const handleToggleSpeaker = () => {
+    contextToggleSpeaker();
     toast({
-      title: isSpeakerOn ? 'Speaker Off' : 'Speaker On',
-      description: isSpeakerOn ? 'Switched to earpiece' : 'Switched to loudspeaker',
+      title: callState.isSpeakerOn ? 'Speaker Off' : 'Speaker On',
+      description: callState.isSpeakerOn ? 'Switched to earpiece' : 'Switched to loudspeaker',
     });
   };
 
-  const flipCamera = async () => {
-    if (webrtcRef.current) {
-      const success = await webrtcRef.current.flipCamera();
-      if (success && localVideoRef.current) {
-        localVideoRef.current.srcObject = webrtcRef.current.getLocalStream();
-      }
-    }
+  const handleFlipCamera = async () => {
+    await contextFlipCamera();
   };
 
-  const toggleScreenShare = async () => {
-    if (!webrtcRef.current) return;
-    
-    if (isScreenSharing) {
-      await webrtcRef.current.stopScreenShare();
-      setIsScreenSharing(false);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = webrtcRef.current.getLocalStream();
-      }
-    } else {
-      const screenStream = await webrtcRef.current.startScreenShare();
-      if (screenStream && localVideoRef.current) {
-        localVideoRef.current.srcObject = screenStream;
-        setIsScreenSharing(true);
-      }
-    }
+  const handleToggleScreenShare = async () => {
+    await contextToggleScreenShare();
   };
 
   if (!callData) {
@@ -573,17 +508,17 @@ const Call = () => {
       </div>
 
       {/* Network Quality Indicator */}
-      {isConnected && (
+      {callState.isConnected && (
         <div className="absolute top-4 right-4 z-20">
-          <NetworkQualityIndicator quality={networkQuality} showDetails />
+          <NetworkQualityIndicator quality={callState.networkQuality} showDetails />
         </div>
       )}
 
       {/* Connection Status Overlay */}
-      {callStatus === 'connecting' && connectionStatus !== 'connected' && (
+      {callStatus === 'connecting' && !callState.isConnected && (
         <div className="absolute top-4 left-4 right-20 z-20">
           <ConnectionStatus 
-            status={connectionStatus}
+            status={callState.connectionStatus || 'initializing'}
             message={connectionMessage}
             showRetry={showRetry}
             onRetry={retryConnection}
@@ -604,7 +539,7 @@ const Call = () => {
                 playsInline 
                 className="w-full h-full object-cover"
               />
-              {!isConnected && (
+              {!callState.isConnected && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                   <Avatar className="w-24 h-24 border-4 border-primary shadow-xl">
                     <AvatarImage src={otherUserProfile?.avatar_url || ''} />
@@ -628,14 +563,14 @@ const Call = () => {
                 autoPlay 
                 playsInline 
                 muted 
-                className={`w-full h-full object-cover ${isVideoOff ? 'hidden' : ''}`}
+                className={`w-full h-full object-cover ${callState.isVideoOff ? 'hidden' : ''}`}
               />
-              {isVideoOff && (
+              {callState.isVideoOff && (
                 <div className="w-full h-full flex items-center justify-center bg-gray-800">
                   <span className="text-gray-400 text-xs">Camera off</span>
                 </div>
               )}
-              {isScreenSharing && (
+              {callState.isScreenSharing && (
                 <div className="absolute bottom-1 left-1 right-1 bg-primary/80 text-xs text-center py-0.5 rounded">
                   Sharing
                 </div>
@@ -664,7 +599,7 @@ const Call = () => {
                   <div className="absolute inset-0 rounded-full border-4 border-primary/30 animate-ping" style={{ animationDelay: '300ms' }} />
                 </>
               )}
-              {isConnected && (
+              {callState.isConnected && (
                 <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse" />
               )}
               <Avatar className="w-40 h-40 border-8 border-primary/30 shadow-2xl shadow-primary/20 relative">
@@ -727,17 +662,17 @@ const Call = () => {
       {/* Call controls */}
       <div className="relative z-10 p-6 pb-10 bg-gradient-to-t from-black/50 to-transparent">
         <CallControls
-          isMuted={isMuted}
-          isVideoOff={isVideoOff}
-          isSpeakerOn={isSpeakerOn}
+          isMuted={callState.isMuted}
+          isVideoOff={callState.isVideoOff}
+          isSpeakerOn={callState.isSpeakerOn}
           isVideoCall={isVideoCall}
-          isScreenSharing={isScreenSharing}
-          onToggleMute={toggleMute}
-          onToggleVideo={toggleVideo}
-          onToggleSpeaker={toggleSpeaker}
+          isScreenSharing={callState.isScreenSharing}
+          onToggleMute={handleToggleMute}
+          onToggleVideo={handleToggleVideo}
+          onToggleSpeaker={handleToggleSpeaker}
           onEndCall={endCall}
-          onFlipCamera={isVideoCall && isMobileDevice ? flipCamera : undefined}
-          onToggleScreenShare={isVideoCall && !isMobileDevice ? toggleScreenShare : undefined}
+          onFlipCamera={isVideoCall && isMobileDevice ? handleFlipCamera : undefined}
+          onToggleScreenShare={isVideoCall && !isMobileDevice ? handleToggleScreenShare : undefined}
         />
       </div>
     </div>

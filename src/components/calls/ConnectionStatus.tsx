@@ -1,7 +1,22 @@
 import { Loader2, Wifi, WifiOff, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
-import { ConnectionStatus as ConnectionStatusType } from '@/utils/webrtcManager';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+
+// Connection status types for call UI
+export type ConnectionStatusType = 
+  | 'initializing' 
+  | 'getting_media' 
+  | 'signaling' 
+  | 'negotiating' 
+  | 'ice_checking' 
+  | 'connected' 
+  | 'reconnecting' 
+  | 'failed'
+  | 'creating-session'
+  | 'publishing'
+  | 'subscribing'
+  | 'getting-media'
+  | 'waiting_for_peer';
 
 interface ConnectionStatusProps {
   status: ConnectionStatusType;
