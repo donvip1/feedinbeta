@@ -26,21 +26,21 @@ serve(async (req) => {
     const appSecret = Deno.env.get('CLOUDFLARE_SFU_APP_SECRET');
 
     if (!appId || !appSecret) {
-      console.error('[Cloudflare-SFU] Missing credentials');
+      console.error('[Cloudflare-SFU] Missing credentials - APP_ID:', !!appId, 'APP_SECRET:', !!appSecret);
       return new Response(
-        JSON.stringify({ error: 'Cloudflare SFU credentials not configured' }),
+        JSON.stringify({ error: 'Cloudflare SFU credentials not configured', success: false }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const authHeader = `Bearer ${appSecret}`;
     const body: SessionRequest = await req.json();
-    console.log('[Cloudflare-SFU] Request:', body.action, body.sessionId?.slice(0, 8));
+    console.log('[Cloudflare-SFU] Request:', body.action, 'sessionId:', body.sessionId?.slice(0, 8) || 'none');
 
     switch (body.action) {
       case 'create-session': {
         console.log('[Cloudflare-SFU] Creating new session...');
-        // Note: /sessions/new does NOT require a body - just POST to create a new session
+        
         const response = await fetch(`${CLOUDFLARE_API_BASE}/apps/${appId}/sessions/new`, {
           method: 'POST',
           headers: {
@@ -55,7 +55,7 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log('[Cloudflare-SFU] Session created:', data.sessionId?.slice(0, 8));
+        console.log('[Cloudflare-SFU] ✅ Session created:', data.sessionId?.slice(0, 8));
         
         return new Response(
           JSON.stringify({ success: true, sessionId: data.sessionId }),
@@ -68,28 +68,29 @@ serve(async (req) => {
           throw new Error('Missing sessionId or trackName for push-track');
         }
 
-        console.log('[Cloudflare-SFU] Pushing track:', body.trackName, 'to session:', body.sessionId.slice(0, 8));
+        console.log('[Cloudflare-SFU] 🎤 Pushing track:', body.trackName, 'to session:', body.sessionId.slice(0, 8));
         
-        // Build request body based on whether we have an SDP offer or not
+        // Build request body with the local track we want to publish
         const requestBody: any = {
           tracks: [{
             location: 'local',
             trackName: body.trackName,
-            kind: 'audio',
           }],
         };
 
-        // If we have an SDP offer with a mid, include it
+        // Include SDP offer if provided
         if (body.sdp) {
           requestBody.sessionDescription = {
             type: 'offer',
             sdp: body.sdp,
           };
-          // Try to extract mid from SDP (the m= line index maps to mid)
-          // For audio-only, first m=audio line has mid "0"
-          requestBody.tracks[0].mid = '0';
         }
         
+        console.log('[Cloudflare-SFU] Push track request body:', JSON.stringify({
+          tracks: requestBody.tracks,
+          hasSessionDescription: !!requestBody.sessionDescription,
+        }));
+
         const response = await fetch(`${CLOUDFLARE_API_BASE}/apps/${appId}/sessions/${body.sessionId}/tracks/new`, {
           method: 'POST',
           headers: {
@@ -106,7 +107,12 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log('[Cloudflare-SFU] Track pushed successfully, tracks:', data.tracks?.length, 'requiresRenegotiation:', data.requiresImmediateRenegotiation);
+        console.log('[Cloudflare-SFU] ✅ Track pushed, response:', {
+          hasSessionDescription: !!data.sessionDescription,
+          sessionDescriptionType: data.sessionDescription?.type,
+          tracksCount: data.tracks?.length,
+          requiresRenegotiation: data.requiresImmediateRenegotiation,
+        });
         
         return new Response(
           JSON.stringify({ 
@@ -120,18 +126,22 @@ serve(async (req) => {
       }
 
       case 'pull-tracks': {
-        if (!body.sessionId || !body.remoteTracks) {
+        if (!body.sessionId || !body.remoteTracks || body.remoteTracks.length === 0) {
           throw new Error('Missing sessionId or remoteTracks for pull-tracks');
         }
 
-        console.log('[Cloudflare-SFU] Pulling', body.remoteTracks.length, 'tracks to session:', body.sessionId.slice(0, 8));
+        console.log('[Cloudflare-SFU] 🎧 Pulling', body.remoteTracks.length, 'tracks to session:', body.sessionId.slice(0, 8));
+        console.log('[Cloudflare-SFU] Remote tracks:', JSON.stringify(body.remoteTracks));
         
-        // For pull tracks, we need to make a request with the remote tracks we want to receive
+        // Build request to pull remote tracks
+        // Each remote track needs: location, sessionId (of the publisher), trackName (from the publisher)
         const tracksToRequest = body.remoteTracks.map(t => ({
           location: 'remote',
-          trackName: t.trackName,
           sessionId: t.sessionId,
+          trackName: t.trackName,
         }));
+
+        console.log('[Cloudflare-SFU] Requesting tracks:', JSON.stringify(tracksToRequest));
 
         const response = await fetch(`${CLOUDFLARE_API_BASE}/apps/${appId}/sessions/${body.sessionId}/tracks/new`, {
           method: 'POST',
@@ -151,7 +161,12 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log('[Cloudflare-SFU] Tracks pulled successfully');
+        console.log('[Cloudflare-SFU] ✅ Tracks pulled, response:', {
+          hasSessionDescription: !!data.sessionDescription,
+          sessionDescriptionType: data.sessionDescription?.type,
+          tracksCount: data.tracks?.length,
+          requiresRenegotiation: data.requiresImmediateRenegotiation,
+        });
         
         return new Response(
           JSON.stringify({ 
@@ -169,7 +184,7 @@ serve(async (req) => {
           throw new Error('Missing sessionId or sdp for renegotiate');
         }
 
-        console.log('[Cloudflare-SFU] Renegotiating session:', body.sessionId.slice(0, 8));
+        console.log('[Cloudflare-SFU] 🔄 Renegotiating session:', body.sessionId.slice(0, 8));
         
         const response = await fetch(`${CLOUDFLARE_API_BASE}/apps/${appId}/sessions/${body.sessionId}/renegotiate`, {
           method: 'PUT',
@@ -192,7 +207,7 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log('[Cloudflare-SFU] Renegotiation complete');
+        console.log('[Cloudflare-SFU] ✅ Renegotiation complete');
         
         return new Response(
           JSON.stringify({ success: true, sessionDescription: data.sessionDescription }),
@@ -225,7 +240,7 @@ serve(async (req) => {
           throw new Error(`Failed to close track: ${response.status} - ${errorText}`);
         }
 
-        console.log('[Cloudflare-SFU] Track closed successfully');
+        console.log('[Cloudflare-SFU] ✅ Track closed successfully');
         
         return new Response(
           JSON.stringify({ success: true }),
@@ -254,7 +269,7 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log('[Cloudflare-SFU] Session info retrieved');
+        console.log('[Cloudflare-SFU] ✅ Session info retrieved');
         
         return new Response(
           JSON.stringify({ success: true, session: data }),
@@ -267,7 +282,7 @@ serve(async (req) => {
     }
 
   } catch (error: unknown) {
-    console.error('[Cloudflare-SFU] Error:', error);
+    console.error('[Cloudflare-SFU] ❌ Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     return new Response(
