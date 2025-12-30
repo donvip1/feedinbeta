@@ -40,7 +40,7 @@ export const IncomingCallListener = () => {
         },
         async (payload) => {
           const call = payload.new;
-          console.log('[IncomingCallListener] New call:', call);
+          console.log('[IncomingCallListener] New call received:', call.id, 'status:', call.status);
           
           // Only show for pending calls
           if (call.status !== 'pending') {
@@ -50,7 +50,7 @@ export const IncomingCallListener = () => {
           
           // Don't show if we already have an incoming call
           if (incomingCall) {
-            console.log('[IncomingCallListener] Already have an incoming call');
+            console.log('[IncomingCallListener] Already have an incoming call, ignoring');
             return;
           }
 
@@ -62,7 +62,7 @@ export const IncomingCallListener = () => {
               .eq('id', call.caller_id)
               .single();
 
-            console.log('[IncomingCallListener] Setting incoming call from:', callerProfile?.display_name);
+            console.log('[IncomingCallListener] Incoming call from:', callerProfile?.display_name);
             
             setIncomingCall({
               callId: call.id,
@@ -72,6 +72,11 @@ export const IncomingCallListener = () => {
               callType: call.call_type as 'video' | 'voice',
             });
 
+            // Request notification permission if not granted
+            if ('Notification' in window && Notification.permission === 'default') {
+              await Notification.requestPermission();
+            }
+
             // Show browser notification if permission granted
             if ('Notification' in window && Notification.permission === 'granted') {
               const notification = new Notification('Incoming Call', {
@@ -79,12 +84,16 @@ export const IncomingCallListener = () => {
                 icon: callerProfile?.avatar_url || '/favicon.png',
                 tag: `call-${call.id}`,
                 requireInteraction: true,
+                silent: false,
               });
 
               notification.onclick = () => {
                 window.focus();
                 notification.close();
               };
+              
+              // Auto-close notification after 30 seconds
+              setTimeout(() => notification.close(), 30000);
             }
           } catch (error) {
             console.error('[IncomingCallListener] Error loading caller profile:', error);

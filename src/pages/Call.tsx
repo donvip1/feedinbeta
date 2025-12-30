@@ -80,32 +80,39 @@ const Call = () => {
 
   // Monitor call state from context
   useEffect(() => {
-    if (callState.isConnected && callStatus !== 'connected') {
+    // Update local status based on context status
+    if (callState.connectionStatus === 'connected' && callStatus !== 'connected') {
       callSounds.stopAllSounds();
       callSounds.playConnected();
       setCallStatus('connected');
       startTimer();
       setShowRetry(false);
-    }
-    
-    if (callState.connectionStatus === 'failed') {
+      setConnectionMessage('Connected');
+    } else if (callState.connectionStatus === 'ringing') {
+      setCallStatus('ringing');
+      setConnectionMessage('Ringing...');
+    } else if (callState.connectionStatus === 'connecting') {
+      if (callStatus !== 'connected') {
+        setCallStatus('connecting');
+      }
+    } else if (callState.connectionStatus === 'failed') {
       setShowRetry(true);
+      setConnectionMessage('Connection failed - tap to retry');
     }
     
-    if (callState.connectionStatus) {
-      const statusMessages: Record<string, string> = {
-        'initializing': 'Starting call...',
-        'getting-media': 'Accessing camera/microphone...',
-        'creating-session': 'Creating session...',
-        'publishing': 'Publishing media...',
-        'signaling': 'Connecting to peer...',
-        'subscribing': 'Receiving remote stream...',
-        'connected': 'Connected',
-        'failed': 'Connection failed',
-      };
-      setConnectionMessage(statusMessages[callState.connectionStatus] || 'Connecting...');
+    // Update connection message based on context status
+    const statusMessages: Record<string, string> = {
+      'idle': 'Initializing...',
+      'ringing': 'Ringing...',
+      'connecting': 'Connecting...',
+      'connected': 'Connected',
+      'failed': 'Connection failed',
+      'ended': 'Call ended',
+    };
+    if (callState.connectionStatus && statusMessages[callState.connectionStatus]) {
+      setConnectionMessage(statusMessages[callState.connectionStatus]);
     }
-  }, [callState.isConnected, callState.connectionStatus, callStatus]);
+  }, [callState.connectionStatus, callState.isConnected, callStatus]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -454,24 +461,28 @@ const Call = () => {
     const isVideo = callTypeRef.current === 'video';
     const isCaller = data.caller_id === user?.id;
 
-    console.log('[Call] Setting up Cloudflare SFU call for', isVideo ? 'video' : 'voice', 'call');
-    console.log('[Call] I am the', isCaller ? 'caller' : 'receiver');
+    console.log('[Call] Setting up P2P WebRTC call');
+    console.log('[Call] Call type:', isVideo ? 'video' : 'voice');
+    console.log('[Call] Role:', isCaller ? 'CALLER' : 'RECEIVER');
+    console.log('[Call] Other user:', otherUserId);
 
     try {
-      // Use CallContext's startCall which uses CloudflareCallManager
+      // Use CallContext's startCall which uses WebRTCP2PManager
       await startCall(
         callId!,
         isVideo ? 'video' : 'voice',
         otherUserId,
         isCaller
       );
+      
+      console.log('[Call] P2P call setup initiated successfully');
     } catch (error: any) {
       console.error('[Call] Error setting up call:', error);
       setupCompleteRef.current = false;
       setShowRetry(true);
       toast({
         title: 'Connection Error',
-        description: error.message || 'Failed to establish call connection',
+        description: error.message || 'Failed to establish call connection. Please try again.',
         variant: 'destructive',
       });
     }
