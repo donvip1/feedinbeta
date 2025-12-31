@@ -177,60 +177,100 @@ export const SpaceContentManager = ({ isOpen, onClose, onDeleted }: SpaceContent
         ? spaces.map(s => s.id)
         : Array.from(selectedIds);
 
+      if (idsToDelete.length === 0) {
+        toast.error('No spaces selected');
+        return;
+      }
+
+      console.log('[SpaceContentManager] Deleting content from spaces:', idsToDelete);
+
+      const errors: string[] = [];
+      const deletedTypes: string[] = [];
+
       // Delete messages
       if (deleteOptions.messages) {
-        await supabase
+        const { error } = await supabase
           .from('live_space_messages')
           .delete()
           .in('space_id', idsToDelete);
+        if (error) {
+          console.error('[SpaceContentManager] Error deleting messages:', error);
+          errors.push(`messages: ${error.message}`);
+        } else {
+          deletedTypes.push('messages');
+        }
       }
 
       // Delete reactions
       if (deleteOptions.reactions) {
-        await supabase
+        const { error } = await supabase
           .from('live_space_reactions')
           .delete()
           .in('space_id', idsToDelete);
+        if (error) {
+          console.error('[SpaceContentManager] Error deleting reactions:', error);
+          errors.push(`reactions: ${error.message}`);
+        } else {
+          deletedTypes.push('reactions');
+        }
       }
 
       // Delete gifts (only if explicitly enabled)
       if (deleteOptions.gifts) {
-        await supabase
+        const { error } = await supabase
           .from('live_space_gifts')
           .delete()
           .in('space_id', idsToDelete);
+        if (error) {
+          console.error('[SpaceContentManager] Error deleting gifts:', error);
+          errors.push(`gifts: ${error.message}`);
+        } else {
+          deletedTypes.push('gifts');
+        }
       }
 
       // Delete speaker records
       if (deleteOptions.speakers) {
-        await supabase
+        const { error } = await supabase
           .from('live_space_speakers')
           .delete()
           .in('space_id', idsToDelete);
+        if (error) {
+          console.error('[SpaceContentManager] Error deleting speakers:', error);
+          errors.push(`speaker records: ${error.message}`);
+        } else {
+          deletedTypes.push('speaker records');
+        }
       }
 
       // Clear recordings
       if (deleteOptions.recordings) {
-        await supabase
+        const { error } = await supabase
           .from('live_spaces')
           .update({ recording_url: null })
           .in('id', idsToDelete)
           .eq('user_id', user.id);
+        if (error) {
+          console.error('[SpaceContentManager] Error clearing recordings:', error);
+          errors.push(`recordings: ${error.message}`);
+        } else {
+          deletedTypes.push('recordings');
+        }
       }
 
-      const deletedTypes = [];
-      if (deleteOptions.messages) deletedTypes.push('messages');
-      if (deleteOptions.reactions) deletedTypes.push('reactions');
-      if (deleteOptions.gifts) deletedTypes.push('gifts');
-      if (deleteOptions.speakers) deletedTypes.push('speaker records');
-      if (deleteOptions.recordings) deletedTypes.push('recordings');
-
-      toast.success(`Deleted ${deletedTypes.join(', ')} from ${idsToDelete.length} space(s)`);
+      if (errors.length > 0) {
+        toast.error(`Some deletions failed: ${errors.join(', ')}`);
+      }
+      
+      if (deletedTypes.length > 0) {
+        toast.success(`Deleted ${deletedTypes.join(', ')} from ${idsToDelete.length} space(s)`);
+      }
+      
       setSelectedIds(new Set());
       await fetchSpaces();
       onDeleted?.();
     } catch (error) {
-      console.error('Error deleting content:', error);
+      console.error('[SpaceContentManager] Error deleting content:', error);
       toast.error('Failed to delete content');
     } finally {
       setDeleting(false);
