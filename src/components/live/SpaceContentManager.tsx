@@ -70,7 +70,6 @@ export const SpaceContentManager = ({ isOpen, onClose, onDeleted }: SpaceContent
   const [deleteOptions, setDeleteOptions] = useState({
     messages: true,
     reactions: true,
-    gifts: false, // Default off as gifts involve transactions
     speakers: true,
     recordings: false,
   });
@@ -182,88 +181,108 @@ export const SpaceContentManager = ({ isOpen, onClose, onDeleted }: SpaceContent
         return;
       }
 
-      console.log('[SpaceContentManager] Deleting content from spaces:', idsToDelete);
+      console.log('[SpaceContentManager] Starting deletion for spaces:', idsToDelete);
 
       const errors: string[] = [];
-      const deletedTypes: string[] = [];
+      const deletedCounts: Record<string, number> = {};
 
-      // Delete messages
+      // Delete messages - process each space individually for better RLS compliance
       if (deleteOptions.messages) {
-        const { error } = await supabase
-          .from('live_space_messages')
-          .delete()
-          .in('space_id', idsToDelete);
-        if (error) {
-          console.error('[SpaceContentManager] Error deleting messages:', error);
-          errors.push(`messages: ${error.message}`);
-        } else {
-          deletedTypes.push('messages');
+        let totalDeleted = 0;
+        for (const spaceId of idsToDelete) {
+          const { data, error } = await supabase
+            .from('live_space_messages')
+            .delete()
+            .eq('space_id', spaceId)
+            .select('id');
+          
+          if (error) {
+            console.error(`[SpaceContentManager] Error deleting messages for space ${spaceId}:`, error);
+            errors.push(`messages (${spaceId}): ${error.message}`);
+          } else {
+            totalDeleted += data?.length || 0;
+            console.log(`[SpaceContentManager] Deleted ${data?.length || 0} messages from space ${spaceId}`);
+          }
         }
+        if (totalDeleted > 0) deletedCounts['messages'] = totalDeleted;
       }
 
-      // Delete reactions
+      // Delete reactions - process each space individually
       if (deleteOptions.reactions) {
-        const { error } = await supabase
-          .from('live_space_reactions')
-          .delete()
-          .in('space_id', idsToDelete);
-        if (error) {
-          console.error('[SpaceContentManager] Error deleting reactions:', error);
-          errors.push(`reactions: ${error.message}`);
-        } else {
-          deletedTypes.push('reactions');
+        let totalDeleted = 0;
+        for (const spaceId of idsToDelete) {
+          const { data, error } = await supabase
+            .from('live_space_reactions')
+            .delete()
+            .eq('space_id', spaceId)
+            .select('id');
+          
+          if (error) {
+            console.error(`[SpaceContentManager] Error deleting reactions for space ${spaceId}:`, error);
+            errors.push(`reactions (${spaceId}): ${error.message}`);
+          } else {
+            totalDeleted += data?.length || 0;
+            console.log(`[SpaceContentManager] Deleted ${data?.length || 0} reactions from space ${spaceId}`);
+          }
         }
+        if (totalDeleted > 0) deletedCounts['reactions'] = totalDeleted;
       }
 
-      // Delete gifts (only if explicitly enabled)
-      if (deleteOptions.gifts) {
-        const { error } = await supabase
-          .from('live_space_gifts')
-          .delete()
-          .in('space_id', idsToDelete);
-        if (error) {
-          console.error('[SpaceContentManager] Error deleting gifts:', error);
-          errors.push(`gifts: ${error.message}`);
-        } else {
-          deletedTypes.push('gifts');
-        }
-      }
+      // Note: Gifts are intentionally NOT deleted to preserve transaction history
+      // Users' received/sent gifts remain in their accounts
 
-      // Delete speaker records
+      // Delete speaker records - process each space individually
       if (deleteOptions.speakers) {
-        const { error } = await supabase
-          .from('live_space_speakers')
-          .delete()
-          .in('space_id', idsToDelete);
-        if (error) {
-          console.error('[SpaceContentManager] Error deleting speakers:', error);
-          errors.push(`speaker records: ${error.message}`);
-        } else {
-          deletedTypes.push('speaker records');
+        let totalDeleted = 0;
+        for (const spaceId of idsToDelete) {
+          const { data, error } = await supabase
+            .from('live_space_speakers')
+            .delete()
+            .eq('space_id', spaceId)
+            .select('id');
+          
+          if (error) {
+            console.error(`[SpaceContentManager] Error deleting speakers for space ${spaceId}:`, error);
+            errors.push(`speakers (${spaceId}): ${error.message}`);
+          } else {
+            totalDeleted += data?.length || 0;
+            console.log(`[SpaceContentManager] Deleted ${data?.length || 0} speaker records from space ${spaceId}`);
+          }
         }
+        if (totalDeleted > 0) deletedCounts['speaker records'] = totalDeleted;
       }
 
       // Clear recordings
       if (deleteOptions.recordings) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('live_spaces')
           .update({ recording_url: null })
           .in('id', idsToDelete)
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .select('id');
+        
         if (error) {
           console.error('[SpaceContentManager] Error clearing recordings:', error);
           errors.push(`recordings: ${error.message}`);
-        } else {
-          deletedTypes.push('recordings');
+        } else if (data && data.length > 0) {
+          deletedCounts['recordings'] = data.length;
+          console.log(`[SpaceContentManager] Cleared ${data.length} recordings`);
         }
       }
 
       if (errors.length > 0) {
-        toast.error(`Some deletions failed: ${errors.join(', ')}`);
+        console.error('[SpaceContentManager] Deletion errors:', errors);
+        toast.error(`Some deletions failed. Check console for details.`);
       }
       
-      if (deletedTypes.length > 0) {
-        toast.success(`Deleted ${deletedTypes.join(', ')} from ${idsToDelete.length} space(s)`);
+      const deletedSummary = Object.entries(deletedCounts)
+        .map(([type, count]) => `${count} ${type}`)
+        .join(', ');
+      
+      if (deletedSummary) {
+        toast.success(`Successfully deleted: ${deletedSummary}`);
+      } else if (errors.length === 0) {
+        toast.info('No content found to delete');
       }
       
       setSelectedIds(new Set());
@@ -504,16 +523,12 @@ export const SpaceContentManager = ({ isOpen, onClose, onDeleted }: SpaceContent
                 Speaker/Listener Records
               </label>
             </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="delete-gifts" 
-                checked={deleteOptions.gifts}
-                onCheckedChange={(checked) => setDeleteOptions(prev => ({ ...prev, gifts: !!checked }))}
-              />
-              <label htmlFor="delete-gifts" className="text-sm flex items-center gap-2 text-amber-500">
-                <Gift className="w-4 h-4" />
-                Gifts (⚠️ Affects transaction history)
-              </label>
+            {/* Info about gifts - they are preserved */}
+            <div className="flex items-center space-x-2 opacity-60">
+              <Gift className="w-4 h-4 text-green-500 ml-6" />
+              <span className="text-sm text-muted-foreground">
+                Gifts are preserved (users keep their received/sent gifts)
+              </span>
             </div>
             <div className="flex items-center space-x-2">
               <Checkbox 
@@ -532,7 +547,7 @@ export const SpaceContentManager = ({ isOpen, onClose, onDeleted }: SpaceContent
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              disabled={deleting || (!deleteOptions.messages && !deleteOptions.reactions && !deleteOptions.gifts && !deleteOptions.speakers && !deleteOptions.recordings)}
+              disabled={deleting || (!deleteOptions.messages && !deleteOptions.reactions && !deleteOptions.speakers && !deleteOptions.recordings)}
               className="bg-destructive hover:bg-destructive/90"
             >
               {deleting ? (
