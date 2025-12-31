@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Send } from 'lucide-react';
+import { ArrowLeft, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 interface SpaceChatProps {
   spaceId: string;
   onClose: () => void;
+  navigateToLive?: boolean; // If true, navigate to /live instead of just closing
 }
 
 interface ChatMessage {
@@ -26,7 +27,7 @@ interface ChatMessage {
   };
 }
 
-export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
+export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceChatProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -144,6 +145,13 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
     }
   };
 
+  const handleBack = () => {
+    if (navigateToLive) {
+      navigate('/live');
+    }
+    onClose();
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with drag indicator */}
@@ -151,10 +159,10 @@ export const SpaceChat = ({ spaceId, onClose }: SpaceChatProps) => {
         <div className="w-12 h-1 bg-muted-foreground/30 rounded-full mb-2" />
       </div>
       <div className="flex items-center justify-between px-4 py-2 border-b">
-        <h3 className="font-semibold">Chat</h3>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="w-4 h-4" />
+        <Button variant="ghost" size="icon" onClick={handleBack} className="mr-2">
+          <ArrowLeft className="w-4 h-4" />
         </Button>
+        <h3 className="font-semibold flex-1">Chat</h3>
       </div>
 
       {/* Messages */}
