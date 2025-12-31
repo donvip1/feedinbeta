@@ -209,9 +209,18 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         schema: 'public',
         table: 'live_space_speakers',
         filter: `space_id=eq.${spaceId}`,
-      }, () => {
+      }, async () => {
         console.log('[LiveSpace] Speakers changed, refetching...');
-        fetchSpeakers();
+        await fetchSpeakers();
+        // Also update viewer count in realtime
+        const { count } = await supabase
+          .from('live_space_speakers')
+          .select('*', { count: 'exact', head: true })
+          .eq('space_id', spaceId)
+          .is('left_at', null);
+        if (count !== null && space) {
+          setSpace(prev => prev ? { ...prev, viewer_count: count } : null);
+        }
       })
       .on('postgres_changes', {
         event: 'INSERT',
@@ -322,7 +331,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         filter: `id=eq.${spaceId}`,
       }, async (payload: any) => {
         console.log('[LiveSpace] Space updated:', payload.new.status);
-        // Immediately disconnect all users when host ends the space
+        // Only handle ended status if this is a genuine transition from live to ended
         if (payload.new.status === 'ended' && payload.old?.status === 'live') {
           console.log('[LiveSpace] Space ended by host - disconnecting immediately');
           // Immediately leave the space and cleanup audio
@@ -332,7 +341,10 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           navigate('/live');
           return; // Don't update state since we're navigating away
         }
-        setSpace(payload.new);
+        // Update space data for other updates
+        if (payload.new.status === 'live') {
+          setSpace(payload.new);
+        }
       })
       .subscribe();
 
@@ -446,7 +458,16 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
     
     if (data) {
-      console.log('[LiveSpace] Space data loaded:', data.title, 'Owner:', data.user_id);
+      console.log('[LiveSpace] Space data loaded:', data.title, 'Status:', data.status, 'Owner:', data.user_id);
+      
+      // Check if space has actually ended
+      if (data.status === 'ended') {
+        console.log('[LiveSpace] Space is ended, redirecting...');
+        toast.info('This space has ended');
+        navigate('/live');
+        return;
+      }
+      
       setSpace(data);
     }
   };
@@ -985,10 +1006,33 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   }, [screenStream]);
 
   const promoteSpeaker = async (speakerId: string, newRole: 'speaker' | 'co_host') => {
+    // First get the user_id of the speaker being promoted
+    const speakerRecord = speakers.find(s => s.id === speakerId);
+    if (!speakerRecord) {
+      toast.error('Could not find speaker');
+      return;
+    }
+
     await supabase
       .from('live_space_speakers')
       .update({ role: newRole, has_raised_hand: false, mic_allowed: true, host_muted: false })
       .eq('id', speakerId);
+    
+    // Broadcast promotion notification to the specific user
+    const promotionChannel = supabase.channel(`speaker-promotion-${speakerRecord.user_id}`);
+    await promotionChannel.send({
+      type: 'broadcast',
+      event: 'promoted-to-speaker',
+      payload: { 
+        space_id: spaceId, 
+        role: newRole,
+        by: user?.id,
+      },
+    });
+    supabase.removeChannel(promotionChannel);
+    
+    // Refetch speakers immediately to update UI
+    await fetchSpeakers();
     
     toast.success(`User promoted to ${newRole === 'co_host' ? 'co-host' : 'speaker'}`);
   };

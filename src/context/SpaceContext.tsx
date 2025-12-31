@@ -418,9 +418,29 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Start broadcasting for a listener with permission
   const startListenerBroadcast = useCallback(async () => {
-    if (!spaceInfoRef.current) return;
+    if (!spaceInfoRef.current || !user) return false;
     
     console.log('[SpaceContext-SFU] Starting listener broadcast with permission...');
+    
+    // Check if we have a session - if not, we need to connect first
+    const sessionId = spaceRoomManager.getSessionId?.();
+    if (!sessionId) {
+      console.log('[SpaceContext-SFU] No session found, initializing first...');
+      // Re-initialize as a broadcasting user
+      const result = await spaceRoomManager.initialize(
+        spaceInfoRef.current.id,
+        user.id,
+        false,
+        undefined,
+        (levels) => setSpaceState(prev => ({ ...prev, audioLevels: levels })),
+        undefined
+      );
+      if (!result.success) {
+        console.error('[SpaceContext-SFU] Failed to initialize for listener broadcast');
+        return false;
+      }
+    }
+    
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -442,9 +462,12 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return success;
     } catch (error: any) {
       console.error('[SpaceContext-SFU] Failed to start listener broadcast:', error);
+      if (error.name === 'NotAllowedError') {
+        toast.error('Microphone access denied');
+      }
       return false;
     }
-  }, []);
+  }, [user]);
 
   // Handle beforeunload - cleanup on browser close
   useEffect(() => {
