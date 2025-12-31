@@ -60,6 +60,8 @@ const Live = () => {
       }
       return data || [];
     },
+    staleTime: 0, // Always consider stale for instant updates
+    refetchInterval: 3000, // Refresh every 3 seconds
   });
 
   const { data: scheduledStreams } = useQuery({

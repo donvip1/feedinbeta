@@ -21,6 +21,7 @@ import { useScrollPosition } from '@/hooks/useScrollPosition';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { FeedSkeleton } from '@/components/native/NativeLoadingSpinner';
 import { LiveFeedCard } from '@/components/feed/LiveFeedCard';
+import { InlineLiveCard } from '@/components/feed/InlineLiveCard';
 import { feedCache } from '@/lib/feed-cache';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
@@ -64,7 +65,7 @@ const Feed = () => {
   const allVideoPostsRef = useRef<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Fetch live content count for indicator (always enabled)
+  // Fetch live content count for indicator (always enabled) - real-time with fast refetch
   const { data: liveCount, refetch: refetchLiveCount } = useQuery({
     queryKey: ['feed-live-count'],
     queryFn: async () => {
@@ -74,10 +75,11 @@ const Feed = () => {
       ]);
       return (streamsCount || 0) + (spacesCount || 0);
     },
-    refetchInterval: 10000, // Refresh every 10 seconds to catch new live content
+    refetchInterval: 3000, // Refresh every 3 seconds for near-instant updates
+    staleTime: 0, // Always consider stale for fresh data
   });
 
-  // Fetch live content for the Live tab
+  // Fetch live content for the Live tab - optimized for real-time
   const { data: liveContent, refetch: refetchLive, isLoading: isLoadingLive } = useQuery({
     queryKey: ['feed-live-content'],
     queryFn: async () => {
@@ -94,7 +96,7 @@ const Feed = () => {
       if (streamsError) {
         console.error('[Feed] Error fetching streams:', streamsError);
       } else {
-        console.log('[Feed] Live streams found:', streams?.length || 0, streams);
+        console.log('[Feed] Live streams found:', streams?.length || 0);
       }
 
       // Fetch live spaces - use case-insensitive check
@@ -108,7 +110,7 @@ const Feed = () => {
       if (spacesError) {
         console.error('[Feed] Error fetching spaces:', spacesError);
       } else {
-        console.log('[Feed] Live spaces found:', spaces?.length || 0, spaces);
+        console.log('[Feed] Live spaces found:', spaces?.length || 0);
       }
 
       const allUserIds = [
@@ -117,18 +119,14 @@ const Feed = () => {
       ].filter(Boolean);
 
       if (allUserIds.length === 0) {
-        console.log('[Feed] No live content found - no user IDs');
+        console.log('[Feed] No live content found');
         return [];
       }
 
-      const { data: profiles, error: profileError } = await supabase
+      const { data: profiles } = await supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url')
         .in('id', allUserIds);
-
-      if (profileError) {
-        console.error('[Feed] Error fetching profiles:', profileError);
-      }
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
@@ -145,14 +143,66 @@ const Feed = () => {
         }))
       ];
 
-      console.log('[Feed] Total live items prepared:', liveItems.length);
+      console.log('[Feed] Total live items:', liveItems.length);
 
       // Sort by viewer count
       return liveItems.sort((a, b) => (b.viewer_count || 0) - (a.viewer_count || 0));
     },
-    enabled: activeTab === 'live',
-    refetchInterval: 10000, // Refresh every 10 seconds when on live tab
-    staleTime: 3000,
+    // Always fetch live content, not just when on live tab - for inline display
+    refetchInterval: 3000, // Refresh every 3 seconds for instant updates
+    staleTime: 0, // Always consider stale
+  });
+
+  // Fetch inline live content for For You feed (separate query for inline cards)
+  const { data: inlineLiveContent } = useQuery({
+    queryKey: ['feed-inline-live'],
+    queryFn: async () => {
+      // Get top 3 live content to show inline in feed
+      const [{ data: streams }, { data: spaces }] = await Promise.all([
+        supabase
+          .from('live_streams')
+          .select('id, title, status, viewer_count, thumbnail_url, user_id')
+          .eq('status', 'live')
+          .order('viewer_count', { ascending: false })
+          .limit(2),
+        supabase
+          .from('live_spaces')
+          .select('id, title, status, viewer_count, topic_category, user_id')
+          .eq('status', 'live')
+          .order('viewer_count', { ascending: false })
+          .limit(2),
+      ]);
+
+      const allUserIds = [
+        ...(streams || []).map(s => s.user_id),
+        ...(spaces || []).map(s => s.user_id)
+      ].filter(Boolean);
+
+      if (allUserIds.length === 0) return [];
+
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', allUserIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      return [
+        ...(streams || []).map(s => ({
+          ...s,
+          type: 'video' as const,
+          host: profileMap.get(s.user_id) || { display_name: 'Unknown Host', username: 'unknown', avatar_url: '' }
+        })),
+        ...(spaces || []).map(s => ({
+          ...s,
+          type: 'space' as const,
+          host: profileMap.get(s.user_id) || { display_name: 'Unknown Host', username: 'unknown', avatar_url: '' }
+        }))
+      ].slice(0, 3); // Max 3 inline items
+    },
+    enabled: activeTab !== 'live', // Only when not on live tab
+    refetchInterval: 5000,
+    staleTime: 0,
   });
 
   // Subscribe to live content changes for real-time updates
@@ -756,7 +806,27 @@ const Feed = () => {
           <FeedSkeleton />
         ) : displayPosts && displayPosts.length > 0 ? (
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
-            {displayPosts.map((post) => {
+            {/* Show inline live content at the top if available (only on following/forYou tabs) */}
+            {inlineLiveContent && inlineLiveContent.length > 0 && (
+              <div className="snap-start snap-always h-[calc(100vh-8rem)] flex items-start">
+                <InlineLiveCard
+                  item={{
+                    ...inlineLiveContent[0],
+                    status: inlineLiveContent[0].status as string,
+                    type: inlineLiveContent[0].type
+                  }}
+                  onClick={() => {
+                    if (inlineLiveContent[0].type === 'video') {
+                      navigate(`/live/stream/${inlineLiveContent[0].id}`);
+                    } else {
+                      navigate(`/live/space/${inlineLiveContent[0].id}`);
+                    }
+                  }}
+                />
+              </div>
+            )}
+
+            {displayPosts.map((post, index) => {
               const isStyledText = post.media_type === 'text_styled' && post.media_url && post.content;
               const isMedia = post.media_url && post.media_type !== 'text_styled';
               
@@ -766,23 +836,50 @@ const Feed = () => {
               
               const uniqueKey = post._cycleKey || post.id;
               
+              // Insert another live card after every 5 posts if we have more live content
+              const showInlineLive = inlineLiveContent && 
+                inlineLiveContent.length > 1 && 
+                (index === 4 || index === 9) &&
+                inlineLiveContent[index === 4 ? 1 : (inlineLiveContent[2] ? 2 : 1)];
+
               return (
-                <div key={uniqueKey} className={wrapperClass}>
-                  <PostCard
-                    post={post}
-                    isPromoted={post._isPromoted || false}
-                    promoterName={post._promoterName}
-                    boostLevel={post._boostLevel}
-                    allPosts={displayPosts}
-                    allVideoPosts={allVideoPostsRef.current}
-                    onLikeUpdate={() => refetch()}
-                    onCommentsOpenChange={setIsCommentsOpen}
-                    onInteractionStart={handleInteractionStart}
-                    onInteractionEnd={handleInteractionEnd}
-                    onView={() => markAsViewed(post.id)}
-                    onMarkAsViewed={markAsViewed}
-                  />
-                </div>
+                <>
+                  <div key={uniqueKey} className={wrapperClass}>
+                    <PostCard
+                      post={post}
+                      isPromoted={post._isPromoted || false}
+                      promoterName={post._promoterName}
+                      boostLevel={post._boostLevel}
+                      allPosts={displayPosts}
+                      allVideoPosts={allVideoPostsRef.current}
+                      onLikeUpdate={() => refetch()}
+                      onCommentsOpenChange={setIsCommentsOpen}
+                      onInteractionStart={handleInteractionStart}
+                      onInteractionEnd={handleInteractionEnd}
+                      onView={() => markAsViewed(post.id)}
+                      onMarkAsViewed={markAsViewed}
+                    />
+                  </div>
+                  {showInlineLive && (
+                    <div key={`live-${index}`} className="snap-start snap-always h-[calc(100vh-8rem)] flex items-start">
+                      <InlineLiveCard
+                        item={{
+                          ...inlineLiveContent[index === 4 ? 1 : 2],
+                          status: inlineLiveContent[index === 4 ? 1 : 2].status as string,
+                          type: inlineLiveContent[index === 4 ? 1 : 2].type
+                        }}
+                        onClick={() => {
+                          const liveItem = inlineLiveContent[index === 4 ? 1 : 2];
+                          if (liveItem.type === 'video') {
+                            navigate(`/live/stream/${liveItem.id}`);
+                          } else {
+                            navigate(`/live/space/${liveItem.id}`);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </>
               );
             })}
             
