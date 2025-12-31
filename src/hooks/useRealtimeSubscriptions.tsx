@@ -241,22 +241,40 @@ export const useRealtimeSubscriptions = () => {
       .subscribe();
     channelsRef.current.push(liveChannel);
 
-    // 9. Calls real-time
+    // 9. Calls real-time - with both incoming and outgoing call support
     const callsChannel = supabase
       .channel('realtime-calls')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'call_logs',
-      }, () => {
+      }, (payload) => {
+        console.log('[Realtime] Call log change:', payload.eventType, payload.new);
         invalidateQueries(['call-logs', 'call-history']);
       })
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
+        table: 'call_logs',
+        filter: `receiver_id=eq.${user.id}`,
+      }, (payload) => {
+        console.log('[Realtime] Incoming call detected:', payload.new);
+        invalidateQueries(['incoming-calls', 'call-logs']);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
         table: 'call_signals',
-      }, () => {
+      }, (payload) => {
+        console.log('[Realtime] Call signal:', payload.eventType);
         invalidateQueries(['call-signals']);
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'call_participants',
+      }, () => {
+        invalidateQueries(['call-participants']);
       })
       .subscribe();
     channelsRef.current.push(callsChannel);
