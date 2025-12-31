@@ -483,6 +483,72 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
   }, [spaceState.isActive, spaceState.connectionStatus, connectAudio]);
 
+  // Auto-reconnect on connection failure with exponential backoff
+  useEffect(() => {
+    let reconnectTimer: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 10;
+    const baseDelay = 2000; // Start with 2 seconds
+
+    if (spaceState.isActive && spaceState.connectionStatus === 'failed') {
+      const attemptReconnect = () => {
+        if (reconnectAttempts >= maxReconnectAttempts) {
+          console.log('[SpaceContext] Max reconnect attempts reached');
+          toast.error('Connection failed. Please rejoin the space.');
+          return;
+        }
+
+        reconnectAttempts++;
+        const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts - 1), 30000); // Max 30s
+        
+        console.log(`[SpaceContext] Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`);
+        setSpaceState(prev => ({ ...prev, connectionStatus: 'reconnecting' }));
+        
+        reconnectTimer = setTimeout(async () => {
+          if (!spaceState.isActive) return;
+          
+          console.log(`[SpaceContext] Reconnect attempt ${reconnectAttempts}...`);
+          try {
+            await connectAudio(roleRef.current);
+            reconnectAttempts = 0; // Reset on success
+          } catch (error) {
+            console.error('[SpaceContext] Reconnect failed:', error);
+            attemptReconnect(); // Try again
+          }
+        }, delay);
+      };
+
+      attemptReconnect();
+    }
+
+    // Handle network online/offline events
+    const handleOnline = () => {
+      console.log('[SpaceContext] Network online - attempting reconnect');
+      if (spaceState.isActive && spaceState.connectionStatus !== 'connected' && spaceState.connectionStatus !== 'connecting') {
+        toast.info('Network restored. Reconnecting...');
+        reconnectAttempts = 0;
+        connectAudio(roleRef.current);
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('[SpaceContext] Network offline');
+      if (spaceState.isActive) {
+        toast.warning('Network disconnected. Will reconnect when online.');
+        setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [spaceState.isActive, spaceState.connectionStatus, connectAudio]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
