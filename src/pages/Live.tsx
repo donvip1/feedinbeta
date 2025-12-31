@@ -807,6 +807,7 @@ const Live = () => {
                         stream={stream}
                         onClick={() => handleStreamClick(stream)}
                         isOwner
+                        onDeleted={() => refetchMyStreams()}
                       />
                     ))}
                   </div>
@@ -826,6 +827,7 @@ const Live = () => {
                         space={space as any}
                         onClick={() => handleSpaceClick(space)}
                         isOwner
+                        onDeleted={() => refetchMySpaces()}
                       />
                     ))}
                   </div>

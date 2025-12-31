@@ -1,10 +1,19 @@
-import { Mic, Users, Lock, Clock, Play, Sparkles, Gift, Crown } from 'lucide-react';
+import { useState } from 'react';
+import { Mic, Users, Lock, Clock, Play, Sparkles, Gift, Crown, MoreVertical, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { motion } from 'framer-motion';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface SpaceCardProps {
   space: {
@@ -34,12 +43,41 @@ interface SpaceCardProps {
   onClick: () => void;
   isOwner?: boolean;
   isJoined?: boolean;
+  onDeleted?: () => void;
 }
 
-export const SpaceCard = ({ space, speakers = [], onClick, isOwner, isJoined }: SpaceCardProps) => {
+export const SpaceCard = ({ space, speakers = [], onClick, isOwner, isJoined, onDeleted }: SpaceCardProps) => {
+  const [deleting, setDeleting] = useState(false);
   const isLive = space.status === 'live';
   const isEnded = space.status === 'ended';
   const isScheduled = space.status === 'scheduled';
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm("Delete this space and all related data?")) return;
+    
+    setDeleting(true);
+    try {
+      // Delete related data first
+      await supabase.from("live_space_messages").delete().eq("space_id", space.id);
+      await supabase.from("live_space_reactions").delete().eq("space_id", space.id);
+      await supabase.from("live_space_gifts").delete().eq("space_id", space.id);
+      await supabase.from("live_space_invitations").delete().eq("space_id", space.id);
+      await supabase.from("live_space_speakers").delete().eq("space_id", space.id);
+      
+      // Delete the space itself
+      const { error } = await supabase.from("live_spaces").delete().eq("id", space.id);
+      if (error) throw error;
+      
+      toast.success("Space deleted successfully");
+      onDeleted?.();
+    } catch (error: any) {
+      console.error("Failed to delete space:", error);
+      toast.error("Failed to delete space");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <motion.div 
@@ -63,8 +101,29 @@ export const SpaceCard = ({ space, speakers = [], onClick, isOwner, isJoined }: 
         </div>
       )}
 
+      {/* Owner delete menu */}
+      {isOwner && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="absolute top-2 right-2 z-10 bg-black/50 hover:bg-black/70 text-white h-8 w-8 rounded-full"
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem className="text-destructive" onClick={handleDelete} disabled={deleting}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              {deleting ? "Deleting..." : "Delete Space"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
       {/* Status badges */}
-      <div className="absolute -top-2 right-4 flex gap-2">
+      <div className={cn("absolute -top-2 flex gap-2", isOwner ? "right-12" : "right-4")}>
         {isLive && (
           <Badge className="bg-gradient-to-r from-red-500 to-pink-500 text-white border-0 shadow-lg shadow-red-500/30 animate-pulse gap-1.5">
             <span className="w-2 h-2 bg-white rounded-full animate-ping" />
