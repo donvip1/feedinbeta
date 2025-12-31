@@ -14,6 +14,7 @@ import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
 import { FloatingSpacePlayer } from "@/components/live/FloatingSpacePlayer";
 import { LiveInviteNotification } from "@/components/live/LiveInviteNotification";
 import { SpaceInviteNotification } from "@/components/live/SpaceInviteNotification";
+import { RealtimeProvider } from "@/components/shared/RealtimeProvider";
 import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
@@ -134,6 +135,7 @@ const App = () => {
                 <AuthProvider>
                   <CallProvider>
                     <SpaceProvider>
+                      <RealtimeProvider>
                     <Toaster />
                   <IncomingCallListener />
                   <FloatingCallWidget />
@@ -223,11 +225,11 @@ const App = () => {
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
             
-              {/* Catch-all */}
               <Route path="*" element={<NotFound />} />
               </Routes>
-                </SpaceProvider>
-                </CallProvider>
+                      </RealtimeProvider>
+                    </SpaceProvider>
+                  </CallProvider>
               </AuthProvider>
             </RefreshProvider>
           </NavigationProvider>
