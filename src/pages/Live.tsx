@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Radio, Users, Mic, Video, Clock, Play, Sparkles, Zap, Crown, TrendingUp, Calendar } from "lucide-react";
+import { Radio, Users, Mic, Video, Clock, Play, Sparkles, Zap, Crown, TrendingUp, Calendar, Trash2, Settings2 } from "lucide-react";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateLiveStreamModal } from "@/components/live/CreateLiveStreamModal";
 import { CreateSpaceModal } from "@/components/live/CreateSpaceModal";
@@ -14,6 +14,7 @@ import { LiveStreamViewerWebRTC } from "@/components/live/LiveStreamViewerWebRTC
 import { LiveBroadcaster } from "@/components/live/LiveBroadcaster";
 import { LiveSpaceRoom } from "@/components/live/LiveSpaceRoom";
 import { GoLiveDropdown } from "@/components/live/GoLiveDropdown";
+import { SpaceContentManager } from "@/components/live/SpaceContentManager";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -30,6 +31,7 @@ const Live = () => {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [broadcastStreamId, setBroadcastStreamId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("live");
+  const [showContentManager, setShowContentManager] = useState(false);
 
   // ===== VIDEO STREAMS QUERIES =====
   const { data: liveStreams, refetch: refetchLiveStreams } = useQuery({
@@ -775,6 +777,21 @@ const Live = () => {
 
             {/* MY CONTENT TAB */}
             <TabsContent value="my-content" className="mt-0 space-y-8">
+              {/* Manage Content Button */}
+              {myContentCount > 0 && (
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowContentManager(true)}
+                    className="gap-2"
+                  >
+                    <Settings2 className="w-4 h-4" />
+                    Manage Space Content
+                  </Button>
+                </div>
+              )}
+
               {myStreams && myStreams.length > 0 && (
                 <div>
                   <div className="flex items-center gap-2 mb-4">
@@ -839,6 +856,14 @@ const Live = () => {
         isOpen={createSpaceModalOpen}
         onClose={() => setCreateSpaceModalOpen(false)}
         onSpaceCreated={handleSpaceCreated}
+      />
+
+      <SpaceContentManager
+        isOpen={showContentManager}
+        onClose={() => setShowContentManager(false)}
+        onDeleted={() => {
+          refetchMySpaces();
+        }}
       />
 
       <BottomNav />
