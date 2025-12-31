@@ -122,13 +122,23 @@ class CloudflareSFUClient {
 
     // Handle incoming tracks (for listeners receiving audio)
     this.peerConnection.ontrack = (event) => {
-      console.log('[CloudflareSFU] ✅ Received remote track:', event.track.kind, 'id:', event.track.id, 'readyState:', event.track.readyState);
+      console.log('[CloudflareSFU] ✅ Received remote track:', {
+        kind: event.track.kind,
+        id: event.track.id,
+        readyState: event.track.readyState,
+        enabled: event.track.enabled,
+        muted: event.track.muted,
+        mid: event.transceiver?.mid,
+      });
       
       if (event.track.kind === 'audio') {
-        // Create audio element for playback
-        const peerId = event.transceiver?.mid || `remote-${Date.now()}`;
+        // Create a unique peerId based on mid or track id
+        const peerId = event.transceiver?.mid || event.track.id || `remote-${Date.now()}`;
+        
+        // Play audio through element
         this.playRemoteAudio(event.track, peerId);
         
+        // Notify callback
         if (this.onTrackCallback) {
           this.onTrackCallback(event.track, peerId);
         }
@@ -174,31 +184,72 @@ class CloudflareSFUClient {
    * Play remote audio through an audio element
    */
   private playRemoteAudio(track: MediaStreamTrack, peerId: string): void {
-    // Remove existing audio element if any
+    // Create unique ID with timestamp to avoid conflicts
+    const audioId = `sfu-audio-${peerId}-${Date.now()}`;
+    
+    // Remove all existing audio elements for this peer
+    document.querySelectorAll(`[id^="sfu-audio-${peerId}"]`).forEach(el => {
+      console.log('[CloudflareSFU] Removing old audio element:', el.id);
+      el.remove();
+    });
+    
+    // Also remove from map
     const existing = this.remoteAudioElements.get(peerId);
     if (existing) {
       existing.remove();
       this.remoteAudioElements.delete(peerId);
     }
 
+    const stream = new MediaStream([track]);
+    
     const audio = document.createElement('audio');
-    audio.id = `sfu-audio-${peerId}`;
+    audio.id = audioId;
     audio.autoplay = true;
-    audio.srcObject = new MediaStream([track]);
+    audio.srcObject = stream;
+    audio.volume = 1.0;
+    audio.muted = false;
+    
+    // Keep element in DOM but hidden
+    audio.style.position = 'fixed';
+    audio.style.left = '-9999px';
+    audio.style.top = '-9999px';
+    audio.style.opacity = '0';
+    audio.style.pointerEvents = 'none';
+    
     document.body.appendChild(audio);
     this.remoteAudioElements.set(peerId, audio);
 
-    audio.play().catch((err) => {
-      console.warn('[CloudflareSFU] Autoplay blocked:', err);
-      // Add click handler to enable audio
-      const enableAudio = () => {
-        audio.play().catch(console.error);
-        document.removeEventListener('click', enableAudio);
-      };
-      document.addEventListener('click', enableAudio);
-    });
+    // Handle track lifecycle
+    track.onended = () => {
+      console.log('[CloudflareSFU] Track ended for peer:', peerId);
+      audio.remove();
+      this.remoteAudioElements.delete(peerId);
+    };
 
-    console.log('[CloudflareSFU] 🔊 Playing remote audio for peer:', peerId);
+    const playPromise = audio.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        console.log('[CloudflareSFU] 🔊 Audio playing for peer:', peerId);
+      }).catch((err) => {
+        console.warn('[CloudflareSFU] Autoplay blocked:', err.name);
+        // Add click handler to enable audio
+        const enableAudio = async () => {
+          try {
+            await audio.play();
+            console.log('[CloudflareSFU] 🔊 Audio enabled after interaction for peer:', peerId);
+          } catch (playErr) {
+            console.error('[CloudflareSFU] Still cannot play:', playErr);
+          }
+          document.removeEventListener('click', enableAudio, true);
+          document.removeEventListener('touchstart', enableAudio, true);
+        };
+        document.addEventListener('click', enableAudio, true);
+        document.addEventListener('touchstart', enableAudio, true);
+      });
+    }
+
+    console.log('[CloudflareSFU] 🔊 Created audio element:', audioId);
   }
 
   /**

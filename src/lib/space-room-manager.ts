@@ -56,7 +56,10 @@ class SpaceRoomManager {
     onAudioLevels?: AudioLevelCallback,
     onConnectionStateChange?: ConnectionStateCallback
   ): Promise<SFUSessionResult> {
-    console.log('[SpaceRoomManager] Initializing for space:', spaceId, 'isHost:', isHost);
+    console.log('[SpaceRoomManager] Initializing for space:', spaceId, 'isHost:', isHost, 'userId:', userId);
+    
+    // Clean up any existing state first
+    await this.cleanup();
     
     this.spaceId = spaceId;
     this.userId = userId;
@@ -68,7 +71,7 @@ class SpaceRoomManager {
 
     // Set up SFU callbacks before creating session
     cloudflareSFU.onTrack((track, peerId) => {
-      console.log('[SpaceRoomManager] Received track from peer:', peerId);
+      console.log('[SpaceRoomManager] 🎧 Received track from peer:', peerId, 'kind:', track.kind, 'readyState:', track.readyState);
       this.handleRemoteTrack(track, peerId);
     });
 
@@ -79,7 +82,7 @@ class SpaceRoomManager {
       }
     });
 
-    // Create Cloudflare session
+    // Create Cloudflare session - each participant gets their own session
     const result = await cloudflareSFU.createSession();
     
     if (!result.success || !result.sessionId) {
@@ -88,7 +91,7 @@ class SpaceRoomManager {
     }
 
     this.sessionId = result.sessionId;
-    console.log('[SpaceRoomManager] SFU session created:', this.sessionId);
+    console.log('[SpaceRoomManager] ✅ SFU session created:', this.sessionId.slice(0, 8));
 
     // Store session ID in database for this space (host only)
     if (isHost) {
@@ -96,6 +99,7 @@ class SpaceRoomManager {
     }
 
     // Subscribe to speaker changes for real-time updates
+    // This is CRITICAL for discovering new speakers who join/broadcast
     this.setupRealtimeSubscription();
 
     this.notifyStateChange();
@@ -174,6 +178,7 @@ class SpaceRoomManager {
 
   /**
    * Subscribe to a speaker's audio track
+   * This pulls the remote track from the Cloudflare SFU to our local session
    */
   private async subscribeToSpeaker(speaker: SpaceSpeaker) {
     if (!this.sessionId || !speaker.cloudflare_session_id || !speaker.cloudflare_track_id) {
@@ -194,17 +199,24 @@ class SpaceRoomManager {
       mySession: this.sessionId.slice(0, 8),
     });
 
-    const result = await cloudflareSFU.pullTracks(this.sessionId, [{
-      location: 'remote',
-      trackName: speaker.cloudflare_track_id,
-      sessionId: speaker.cloudflare_session_id,
-    }]);
+    try {
+      const result = await cloudflareSFU.pullTracks(this.sessionId, [{
+        location: 'remote',
+        trackName: speaker.cloudflare_track_id,
+        sessionId: speaker.cloudflare_session_id,
+      }]);
 
-    if (!result.success) {
-      console.error('[SpaceRoomManager] ❌ Failed to subscribe to speaker:', result.error);
+      if (!result.success) {
+        console.error('[SpaceRoomManager] ❌ Failed to subscribe to speaker:', result.error);
+        this.subscribedSpeakers.delete(speaker.user_id); // Allow retry
+      } else {
+        console.log('[SpaceRoomManager] ✅ Successfully subscribed to speaker:', speaker.user_id, {
+          tracks: result.tracks?.length || 0,
+        });
+      }
+    } catch (error) {
+      console.error('[SpaceRoomManager] ❌ Error subscribing to speaker:', error);
       this.subscribedSpeakers.delete(speaker.user_id); // Allow retry
-    } else {
-      console.log('[SpaceRoomManager] ✅ Successfully subscribed to speaker:', speaker.user_id);
     }
   }
 
@@ -212,10 +224,20 @@ class SpaceRoomManager {
    * Handle incoming remote audio track
    */
   private handleRemoteTrack(track: MediaStreamTrack, peerId: string) {
-    console.log('[SpaceRoomManager] 🔊 Handling remote track from:', peerId, 'kind:', track.kind, 'readyState:', track.readyState);
+    console.log('[SpaceRoomManager] 🔊 Handling remote track from:', peerId, {
+      kind: track.kind,
+      readyState: track.readyState,
+      enabled: track.enabled,
+      muted: track.muted,
+    });
 
-    // Create audio element for playback (in addition to SFU's own element)
-    // This ensures audio is always played
+    // Skip if track is not live
+    if (track.readyState !== 'live') {
+      console.warn('[SpaceRoomManager] Track is not live, skipping playback');
+      return;
+    }
+
+    // Create audio element for playback
     this.playRemoteAudio(track, peerId);
     
     // Create analyzer for speaking indicator
@@ -226,47 +248,86 @@ class SpaceRoomManager {
    * Play remote audio through an audio element
    */
   private playRemoteAudio(track: MediaStreamTrack, peerId: string): void {
-    const elementId = `space-audio-${peerId}`;
+    const elementId = `space-audio-${peerId}-${Date.now()}`;
     
-    // Remove existing audio element if any
-    const existing = document.getElementById(elementId);
-    if (existing) {
-      existing.remove();
-    }
+    // Remove all existing audio elements for this peer
+    document.querySelectorAll(`[id^="space-audio-${peerId}"]`).forEach(el => {
+      console.log('[SpaceRoomManager] Removing old audio element:', el.id);
+      el.remove();
+    });
 
+    const stream = new MediaStream([track]);
+    
     const audio = document.createElement('audio');
     audio.id = elementId;
     audio.autoplay = true;
     (audio as any).playsInline = true;
-    audio.srcObject = new MediaStream([track]);
+    audio.srcObject = stream;
     audio.volume = 1.0;
-    audio.volume = 1.0;
+    audio.muted = false; // Ensure not muted
     
-    // Style to hide but keep functional
-    audio.style.position = 'absolute';
+    // Keep in DOM but hidden
+    audio.style.position = 'fixed';
     audio.style.left = '-9999px';
     audio.style.top = '-9999px';
+    audio.style.width = '1px';
+    audio.style.height = '1px';
+    audio.style.opacity = '0';
+    audio.style.pointerEvents = 'none';
     
     document.body.appendChild(audio);
 
-    // Try to play immediately
-    audio.play().then(() => {
-      console.log('[SpaceRoomManager] 🔊 Audio playing for peer:', peerId);
-    }).catch((err) => {
-      console.warn('[SpaceRoomManager] Autoplay blocked, will retry on user interaction:', err);
-      // Add click handler to enable audio
-      const enableAudio = () => {
-        audio.play().then(() => {
-          console.log('[SpaceRoomManager] 🔊 Audio enabled after user interaction for peer:', peerId);
-        }).catch(console.error);
-        document.removeEventListener('click', enableAudio);
-        document.removeEventListener('touchstart', enableAudio);
-      };
-      document.addEventListener('click', enableAudio);
-      document.addEventListener('touchstart', enableAudio);
-    });
+    // Handle track events
+    track.onended = () => {
+      console.log('[SpaceRoomManager] Track ended for peer:', peerId);
+      audio.remove();
+    };
+    
+    track.onmute = () => {
+      console.log('[SpaceRoomManager] Track muted for peer:', peerId);
+    };
+    
+    track.onunmute = () => {
+      console.log('[SpaceRoomManager] Track unmuted for peer:', peerId);
+      // Try to resume playback
+      audio.play().catch(console.error);
+    };
 
-    console.log('[SpaceRoomManager] 🔊 Created audio element for peer:', peerId);
+    // Try to play immediately
+    const playPromise = audio.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        console.log('[SpaceRoomManager] 🔊 Audio playing successfully for peer:', peerId);
+      }).catch((err) => {
+        console.warn('[SpaceRoomManager] Autoplay blocked, setting up user interaction handler:', err.name);
+        
+        // Add click/touch handler to enable audio
+        const enableAudio = async () => {
+          try {
+            // Resume audio context if suspended
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+              await this.audioContext.resume();
+            }
+            
+            await audio.play();
+            console.log('[SpaceRoomManager] 🔊 Audio enabled after user interaction for peer:', peerId);
+          } catch (playError) {
+            console.error('[SpaceRoomManager] Still cannot play audio:', playError);
+          }
+          
+          document.removeEventListener('click', enableAudio, true);
+          document.removeEventListener('touchstart', enableAudio, true);
+          document.removeEventListener('touchend', enableAudio, true);
+        };
+        
+        document.addEventListener('click', enableAudio, true);
+        document.addEventListener('touchstart', enableAudio, true);
+        document.addEventListener('touchend', enableAudio, true);
+      });
+    }
+
+    console.log('[SpaceRoomManager] 🔊 Created audio element:', elementId);
   }
 
   /**
@@ -371,15 +432,23 @@ class SpaceRoomManager {
 
   /**
    * Subscribe to all active speakers (for listeners joining)
+   * This should be called after initialization for ALL participants (listeners AND speakers)
    */
   async subscribeToAllSpeakers(): Promise<void> {
-    if (!this.spaceId || !this.sessionId) return;
+    if (!this.spaceId || !this.sessionId) {
+      console.warn('[SpaceRoomManager] Cannot subscribe - missing spaceId or sessionId');
+      return;
+    }
 
-    console.log('[SpaceRoomManager] 🔍 Looking for active speakers to subscribe to...');
+    console.log('[SpaceRoomManager] 🔍 Looking for active speakers to subscribe to...', {
+      spaceId: this.spaceId.slice(0, 8),
+      mySession: this.sessionId.slice(0, 8),
+      myUserId: this.userId,
+    });
 
-    // Retry logic to wait for host's track info to be saved
-    const maxRetries = 8;
-    const retryDelay = 1500;
+    // Retry logic to wait for other speakers' track info to be saved
+    const maxRetries = 10;
+    const retryDelay = 2000;
     
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       // Fetch all active speakers with track info
@@ -396,18 +465,31 @@ class SpaceRoomManager {
         return;
       }
 
+      // Filter out ourselves and already subscribed speakers
       const validSpeakers = (speakers || []).filter(
         s => s.user_id !== this.userId && !this.subscribedSpeakers.has(s.user_id)
       );
       
-      console.log('[SpaceRoomManager] Found speakers with tracks:', validSpeakers.length, 'attempt:', attempt + 1);
+      console.log('[SpaceRoomManager] Found speakers with tracks:', {
+        total: speakers?.length || 0,
+        toSubscribe: validSpeakers.length,
+        alreadySubscribed: this.subscribedSpeakers.size,
+        attempt: attempt + 1,
+      });
 
       if (validSpeakers.length > 0) {
-        // Subscribe to each speaker
+        // Subscribe to each speaker sequentially to avoid race conditions
         for (const speaker of validSpeakers) {
-          console.log('[SpaceRoomManager] Subscribing to speaker:', speaker.user_id, 'track:', speaker.cloudflare_track_id);
+          console.log('[SpaceRoomManager] 🎧 Subscribing to speaker:', {
+            userId: speaker.user_id,
+            sessionId: speaker.cloudflare_session_id?.slice(0, 8),
+            trackId: speaker.cloudflare_track_id,
+          });
           await this.subscribeToSpeaker(speaker as SpaceSpeaker);
+          // Small delay between subscriptions
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
+        console.log('[SpaceRoomManager] ✅ Subscribed to all found speakers');
         return;
       }
 
@@ -499,7 +581,10 @@ class SpaceRoomManager {
    * Cleanup all resources
    */
   async cleanup() {
-    console.log('[SpaceRoomManager] Cleaning up...');
+    console.log('[SpaceRoomManager] Cleaning up...', {
+      spaceId: this.spaceId?.slice(0, 8),
+      sessionId: this.sessionId?.slice(0, 8),
+    });
 
     // Stop audio level monitoring
     if (this.audioLevelInterval) {
@@ -510,8 +595,8 @@ class SpaceRoomManager {
     // Stop broadcasting
     await this.stopBroadcasting();
 
-    // Remove all audio elements created by this manager
-    document.querySelectorAll('[id^="space-audio-"]').forEach(el => {
+    // Remove all audio elements created by this manager and SFU client
+    document.querySelectorAll('[id^="space-audio-"], [id^="sfu-audio-"]').forEach(el => {
       console.log('[SpaceRoomManager] Removing audio element:', el.id);
       el.remove();
     });
@@ -522,7 +607,11 @@ class SpaceRoomManager {
 
     // Close audio context
     if (this.audioContext) {
-      await this.audioContext.close();
+      try {
+        await this.audioContext.close();
+      } catch (e) {
+        console.warn('[SpaceRoomManager] Error closing audio context:', e);
+      }
       this.audioContext = null;
     }
 
@@ -539,9 +628,13 @@ class SpaceRoomManager {
     this.spaceId = null;
     this.userId = null;
     this.sessionId = null;
+    this.localTrackName = null;
     this.isHost = false;
     this.onStateChange = null;
     this.onAudioLevels = null;
+    this.onConnectionStateChange = null;
+    
+    console.log('[SpaceRoomManager] ✅ Cleanup complete');
   }
 
   /**
