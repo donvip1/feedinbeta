@@ -544,7 +544,17 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
   // Toggle mute with host control checks
   const toggleMute = async () => {
-    if (!user || myRole === 'listener') return;
+    if (!user) return;
+    
+    // Check permissions based on role
+    const canToggle = canSpeak || (myRole === 'listener' && space?.allow_mic_for_all && myMicAllowed && !myHostMuted);
+    
+    if (!canToggle) {
+      if (myRole === 'listener') {
+        toast.error('Raise your hand to request speaking permission');
+      }
+      return;
+    }
 
     // Check if host has muted us - can't unmute
     if (myHostMuted && isMuted) {
@@ -553,7 +563,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
 
     // Check if mic is not allowed globally and we don't have permission
-    if (!space?.allow_mic_for_all && !myMicAllowed && isMuted) {
+    if (!space?.allow_mic_for_all && !myMicAllowed && isMuted && myRole === 'listener') {
       toast.error('Mic is currently disabled by host');
       return;
     }
@@ -1163,22 +1173,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
           {/* Action buttons */}
           <div className="flex gap-2">
-            {myRole === 'listener' ? (
-              <motion.div whileTap={{ scale: 0.95 }}>
-                <Button
-                  variant={hasRaisedHand ? "default" : "outline"}
-                  size="icon"
-                  className={cn(
-                    "h-12 w-12 rounded-xl",
-                    hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
-                  )}
-                  onClick={toggleRaiseHand}
-                  title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
-                >
-                  <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
-                </Button>
-              </motion.div>
-            ) : (
+            {/* Mic button for speakers/hosts */}
+            {canSpeak && (
               <motion.div whileTap={{ scale: 0.95 }}>
                 <Button
                   variant={isMuted ? "outline" : "default"}
@@ -1197,6 +1193,45 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   )}
                 </Button>
               </motion.div>
+            )}
+
+            {/* Listener controls: Raise hand OR Mic (if mic allowed for all) */}
+            {myRole === 'listener' && (
+              <>
+                {/* Always show raise hand for listeners */}
+                <motion.div whileTap={{ scale: 0.95 }}>
+                  <Button
+                    variant={hasRaisedHand ? "default" : "outline"}
+                    size="icon"
+                    className={cn(
+                      "h-12 w-12 rounded-xl",
+                      hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
+                    )}
+                    onClick={toggleRaiseHand}
+                    title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
+                  >
+                    <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
+                  </Button>
+                </motion.div>
+                
+                {/* Show mic button for listeners when mic is allowed for all */}
+                {space?.allow_mic_for_all && myMicAllowed && !myHostMuted && (
+                  <motion.div whileTap={{ scale: 0.95 }}>
+                    <Button
+                      variant={isMuted ? "outline" : "default"}
+                      size="icon"
+                      className={cn(
+                        "h-12 w-12 rounded-xl transition-all",
+                        !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0"
+                      )}
+                      onClick={toggleMute}
+                      title={isMuted ? "Unmute" : "Mute"}
+                    >
+                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </Button>
+                  </motion.div>
+                )}
+              </>
             )}
 
             {/* Test Audio Button - show for hosts/speakers */}
