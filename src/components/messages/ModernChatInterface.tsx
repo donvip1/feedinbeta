@@ -871,6 +871,22 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
 
       if (error) throw error;
 
+      // Send push notification to receiver
+      console.log('[Call] Sending push notification for call:', callData.id);
+      supabase.functions.invoke('send-call-notification', {
+        body: {
+          callId: callData.id,
+          callerId: user.id,
+          receiverId: otherUser.id,
+          callType,
+          callerName: user.user_metadata?.display_name || user.email,
+        },
+      }).then(result => {
+        console.log('[Call] Push notification result:', result.data);
+      }).catch(err => {
+        console.error('[Call] Failed to send push notification:', err);
+      });
+
       navigate(`/call?callId=${callData.id}&type=${callType}`);
     } catch (error: any) {
       console.error('Error initiating call:', error);
