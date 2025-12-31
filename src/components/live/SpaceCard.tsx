@@ -33,9 +33,10 @@ interface SpaceCardProps {
   }[];
   onClick: () => void;
   isOwner?: boolean;
+  isJoined?: boolean;
 }
 
-export const SpaceCard = ({ space, speakers = [], onClick, isOwner }: SpaceCardProps) => {
+export const SpaceCard = ({ space, speakers = [], onClick, isOwner, isJoined }: SpaceCardProps) => {
   const isLive = space.status === 'live';
   const isEnded = space.status === 'ended';
   const isScheduled = space.status === 'scheduled';
@@ -184,9 +185,14 @@ export const SpaceCard = ({ space, speakers = [], onClick, isOwner }: SpaceCardP
 
         {/* Action button */}
         {isLive && (
-          <Button className="w-full mt-4 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 shadow-lg shadow-purple-500/25 group-hover:shadow-purple-500/40 transition-shadow">
+          <Button className={cn(
+            "w-full mt-4 text-white border-0 shadow-lg transition-shadow",
+            isJoined 
+              ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-green-500/25 group-hover:shadow-green-500/40"
+              : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-purple-500/25 group-hover:shadow-purple-500/40"
+          )}>
             <Mic className="w-4 h-4 mr-2" />
-            Join Space
+            {isJoined ? 'Rejoin Space' : 'Join Space'}
           </Button>
         )}
 
