@@ -9,7 +9,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import { createSFUClient, type SFUSessionResult, type CloudflareSFUClient } from './cloudflare-sfu-client';
+import { UnifiedSFUClient, createUnifiedSFUClient, type SFUSessionResult } from './unified-sfu-client';
 import { audioPlaybackManager } from './audio-playback-manager';
 
 export interface SpaceSpeaker {
@@ -48,7 +48,7 @@ class SpaceRoomManager {
   private onConnectionStateChange: ConnectionStateCallback | null = null;
   private realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
   private subscribedSpeakers: Set<string> = new Set();
-  private sfuClient: CloudflareSFUClient | null = null;
+  private sfuClient: UnifiedSFUClient | null = null;
 
   /**
    * Initialize the room manager for a specific space
@@ -78,7 +78,7 @@ class SpaceRoomManager {
     this.subscribedSpeakers.clear();
 
     // Create a NEW SFU client for this session
-    this.sfuClient = createSFUClient();
+    this.sfuClient = createUnifiedSFUClient(`space-${spaceId}-${userId}`);
 
     // Set up SFU callbacks before creating session
     this.sfuClient.onTrack((track, peerId) => {
@@ -223,7 +223,7 @@ class SpaceRoomManager {
     console.log('[SpaceRoomManager] ========================================');
 
     try {
-      const result = await this.sfuClient.pullTracks(this.sessionId, [{
+      const result = await this.sfuClient.pullTracks([{
         location: 'remote',
         trackName: speaker.cloudflare_track_id,
         sessionId: speaker.cloudflare_session_id,
@@ -301,10 +301,10 @@ class SpaceRoomManager {
     this.createAnalyzer(stream, this.userId);
 
     // Publish to SFU
-    const result = await this.sfuClient.publishAudioTrack(
+    const result = await this.sfuClient.publishTrack(
       stream,
-      this.sessionId,
-      this.localTrackName
+      this.localTrackName,
+      'audio'
     );
 
     if (!result.success) {
@@ -364,7 +364,7 @@ class SpaceRoomManager {
     console.log('[SpaceRoomManager] Stopping broadcast...');
 
     try {
-      await this.sfuClient.closeTrack(this.sessionId, this.localTrackName);
+      await this.sfuClient.closeTrack(this.localTrackName);
     } catch (e) {
       console.warn('[SpaceRoomManager] Error closing track (may be expected):', e);
     }
