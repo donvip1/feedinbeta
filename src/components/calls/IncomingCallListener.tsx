@@ -110,19 +110,33 @@ export const IncomingCallListener = () => {
         },
         (payload) => {
           const call = payload.new;
-          console.log('[IncomingCallListener] Call updated:', call.status);
+          console.log('[IncomingCallListener] Call updated:', call.id, 'status:', call.status);
           
           // Clear incoming call if it's ended, rejected, or answered
           if (call.status === 'ended' || call.status === 'rejected' || call.status === 'answered') {
             setIncomingCall(prev => {
               if (prev?.callId === call.id) {
-                console.log('[IncomingCallListener] Clearing incoming call');
+                console.log('[IncomingCallListener] Clearing incoming call - status:', call.status);
                 callSounds.stopAllSounds();
                 return null;
               }
               return prev;
             });
           }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'call_logs',
+          filter: `caller_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const call = payload.new;
+          console.log('[IncomingCallListener] Outgoing call updated:', call.id, 'status:', call.status);
+          // This helps the caller know when the call is answered/rejected
         }
       )
       .subscribe((status) => {
@@ -142,7 +156,6 @@ export const IncomingCallListener = () => {
           .single()
           .then(({ data }) => {
             // Only dismiss if call has been explicitly ended or rejected
-            // Don't dismiss on 'answered' because we navigate to call page
             if (data?.status === 'ended' || data?.status === 'rejected') {
               console.log('[IncomingCallListener] Call status changed to:', data?.status);
               setIncomingCall(null);
@@ -150,7 +163,7 @@ export const IncomingCallListener = () => {
             }
           });
       }
-    }, 10000); // Check every 10 seconds instead of 5
+    }, 10000); // Check every 10 seconds
 
     return () => {
       console.log('[IncomingCallListener] Cleaning up');
@@ -160,7 +173,7 @@ export const IncomingCallListener = () => {
         channelRef.current = null;
       }
     };
-  }, [user]);
+  }, [user, incomingCall]);
 
   // Handle visibility change - keep listening even when tab is hidden
   useEffect(() => {
