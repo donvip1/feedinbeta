@@ -84,12 +84,25 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose }: SpeakerQueuePane
         .update({ 
           role: 'speaker', 
           has_raised_hand: false,
-          hand_raised_at: null 
+          hand_raised_at: null,
+          mic_allowed: true,
         })
         .eq('id', speaker.id);
 
+      // Send promotion notification via broadcast channel
+      const promotionChannel = supabase.channel(`speaker-promotion-${speaker.user_id}`);
+      await promotionChannel.send({
+        type: 'broadcast',
+        event: 'promoted-to-speaker',
+        payload: {
+          user_id: speaker.user_id,
+          space_id: spaceId,
+          role: 'speaker',
+        },
+      });
+      supabase.removeChannel(promotionChannel);
+
       toast.success(`${speaker.profile?.display_name || 'User'} is now a speaker!`);
-      // Play notification sound could be added here
     } catch (error) {
       toast.error('Failed to promote speaker');
     }
@@ -118,9 +131,23 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose }: SpeakerQueuePane
         .update({ 
           role: 'co_host', 
           has_raised_hand: false,
-          hand_raised_at: null 
+          hand_raised_at: null,
+          mic_allowed: true,
         })
         .eq('id', speaker.id);
+
+      // Send promotion notification via broadcast channel
+      const promotionChannel = supabase.channel(`speaker-promotion-${speaker.user_id}`);
+      await promotionChannel.send({
+        type: 'broadcast',
+        event: 'promoted-to-speaker',
+        payload: {
+          user_id: speaker.user_id,
+          space_id: spaceId,
+          role: 'co_host',
+        },
+      });
+      supabase.removeChannel(promotionChannel);
 
       toast.success(`${speaker.profile?.display_name || 'User'} is now a co-host!`);
     } catch (error) {

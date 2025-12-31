@@ -40,6 +40,7 @@ interface SpaceContextType {
   updateRole: (role: string) => void;
   connectAudio: (overrideRole?: string) => Promise<void>;
   disconnectAudio: () => void;
+  startListenerBroadcast: () => Promise<boolean | undefined>;
   localStream: MediaStream | null;
 }
 
@@ -88,10 +89,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     spaceInfoRef.current = spaceState.spaceInfo;
   }, [spaceState.spaceInfo]);
 
-  // Derived: can this user broadcast?
+  // Derived: can this user broadcast? (includes listeners with permission)
   const getCanBroadcast = useCallback((overrideRole?: string) => {
     const role = overrideRole || roleRef.current;
-    return role === 'host' || role === 'co_host' || role === 'speaker';
+    // Listeners can broadcast if they have mic permission (handled separately)
+    return role === 'host' || role === 'co_host' || role === 'speaker' || role === 'listener_with_mic';
   }, []);
 
   // Get local audio stream
@@ -399,6 +401,36 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [getLocalStream]);
 
+  // Start broadcasting for a listener with permission
+  const startListenerBroadcast = useCallback(async () => {
+    if (!spaceInfoRef.current) return;
+    
+    console.log('[SpaceContext-SFU] Starting listener broadcast with permission...');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 48000,
+        },
+        video: false,
+      });
+
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+
+      const success = await spaceRoomManager.startBroadcasting(stream);
+      if (success) {
+        console.log('[SpaceContext-SFU] ✅ Listener started broadcasting');
+      }
+      return success;
+    } catch (error: any) {
+      console.error('[SpaceContext-SFU] Failed to start listener broadcast:', error);
+      return false;
+    }
+  }, []);
+
   // Handle beforeunload - cleanup on browser close
   useEffect(() => {
     const handleBeforeUnload = () => {
@@ -471,6 +503,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateRole,
         connectAudio,
         disconnectAudio,
+        startListenerBroadcast,
         localStream,
       }}
     >

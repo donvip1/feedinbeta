@@ -315,10 +315,10 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         schema: 'public',
         table: 'live_spaces',
         filter: `id=eq.${spaceId}`,
-      }, (payload: any) => {
+      }, async (payload: any) => {
         console.log('[LiveSpace] Space updated:', payload.new.status);
-        if (payload.new.status === 'ended') {
-          // Show modal for 3 seconds then navigate away
+        // Only show ended modal if space status explicitly changed to 'ended'
+        if (payload.new.status === 'ended' && payload.old?.status === 'live') {
           setShowSpaceEndedModal(true);
           spaceContext?.leaveSpace();
           setTimeout(() => {
@@ -350,11 +350,42 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       })
       .subscribe();
 
+    // Subscribe to promotion notifications for this user
+    let promotionChannel: ReturnType<typeof supabase.channel> | null = null;
+    if (user) {
+      promotionChannel = supabase
+        .channel(`speaker-promotion-${user.id}`)
+        .on('broadcast', { event: 'promoted-to-speaker' }, async (payload: any) => {
+          console.log('[LiveSpace] Received promotion notification:', payload);
+          if (payload.payload?.space_id === spaceId) {
+            const newRole = payload.payload?.role || 'speaker';
+            toast.success(`🎉 You've been promoted to ${newRole === 'co_host' ? 'Co-Host' : 'Speaker'}! You can now speak.`);
+            
+            // Update local role and enable mic
+            setMyRole(newRole);
+            setMyMicAllowed(true);
+            setMyHostMuted(false);
+            
+            // Refetch speakers to update UI
+            await fetchSpeakers();
+            
+            // Start broadcasting if not already
+            if (spaceContext) {
+              spaceContext.updateRole(newRole);
+            }
+          }
+        })
+        .subscribe();
+    }
+
     return () => {
       // DON'T call leaveSpace or disconnect here - user may just be navigating away
       // Audio continues via SpaceContext. Only cleanup when user explicitly leaves.
       supabase.removeChannel(channel);
       supabase.removeChannel(broadcastChannel);
+      if (promotionChannel) {
+        supabase.removeChannel(promotionChannel);
+      }
     };
   }, [spaceId, user?.id]);
 
@@ -625,6 +656,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     // Update SpaceContext mute state for global audio control
     if (spaceContext) {
       spaceContext.setMuted(newMuteState);
+    }
+    
+    // If listener is unmuting for first time, need to start broadcasting
+    if (!newMuteState && listenerCanSpeak && spaceContext) {
+      console.log('[LiveSpace] Listener unmuting - starting broadcast');
+      await spaceContext.startListenerBroadcast();
     }
 
     await supabase
@@ -1505,6 +1542,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         hostId={selectedGiftRecipient || hosts[0]?.user_id || space?.user_id || ''}
         viewers={getViewersList()}
         isHost={isHost}
+        isSpace={true}
       />
 
       {/* End Space Confirmation */}
