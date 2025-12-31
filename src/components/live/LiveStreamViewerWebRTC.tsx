@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { CloudflareStreamSFU } from "@/lib/cloudflare-stream-sfu";
+import { UnifiedSFUClient, createUnifiedSFUClient } from "@/lib/unified-sfu-client";
 
 interface LiveStreamViewerWebRTCProps {
   streamId: string;
@@ -50,7 +50,7 @@ const GIFT_EMOJIS: Record<string, string> = {
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const sfuRef = useRef<CloudflareStreamSFU | null>(null);
+  const sfuRef = useRef<UnifiedSFUClient | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
@@ -212,15 +212,28 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           sfuRef.current = null;
         }
 
-        const sfu = new CloudflareStreamSFU(streamId, 'viewer');
+        // Fetch host session info from database
+        const { data: streamData } = await supabase
+          .from('live_streams')
+          .select('cloudflare_session_id, sfu_track_name')
+          .eq('id', streamId)
+          .single() as any;
+        
+        if (!streamData?.cloudflare_session_id || !streamData?.sfu_track_name) {
+          console.log("[Viewer-SFU] Host session not ready, will retry...");
+          return;
+        }
+
+        const sfu = createUnifiedSFUClient(`viewer-${streamId}`);
         sfuRef.current = sfu;
 
-        // Initialize viewer - the SFU class handles fetching host session internally
-        await sfu.initializeViewer((track, stream) => {
+        // Set up track callback before pulling
+        sfu.onTrack((track, peerId) => {
           console.log("[Viewer-SFU] Received track via callback:", track.kind);
           if (videoRef.current) {
-            if (videoRef.current.srcObject !== stream) {
-              videoRef.current.srcObject = stream;
+            const mediaStream = new MediaStream([track]);
+            if (videoRef.current.srcObject !== mediaStream) {
+              videoRef.current.srcObject = mediaStream;
             }
             setHasVideo(true);
             setIsConnecting(false);
@@ -237,6 +250,19 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
             };
           }
         });
+
+        // Pull tracks from host's session
+        const result = await sfu.pullTracks([{
+          location: 'remote',
+          sessionId: streamData.cloudflare_session_id,
+          trackName: streamData.sfu_track_name,
+        }]);
+
+        if (!result.success) {
+          console.error("[Viewer-SFU] Failed to pull tracks:", result.error);
+          setConnectionStatus('failed');
+          return;
+        }
 
         // Check connection state
         if (sfu.isConnected()) {

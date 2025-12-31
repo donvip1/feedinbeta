@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { FlyingChat } from './FlyingChat';
 import { ViewerListPanel } from './ViewerListPanel';
 import { motion, AnimatePresence } from "framer-motion";
-import { CloudflareStreamSFU } from "@/lib/cloudflare-stream-sfu";
+import { UnifiedSFUClient, createUnifiedSFUClient } from "@/lib/unified-sfu-client";
 
 interface LiveBroadcasterProps {
   streamId: string;
@@ -45,7 +45,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const sfuRef = useRef<CloudflareStreamSFU | null>(null);
+  const sfuRef = useRef<UnifiedSFUClient | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
   const [stream, setStream] = useState<any>(null);
@@ -111,10 +111,24 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       const mediaStream = await initializeMedia();
       
       // Create and initialize SFU connection
-      sfuRef.current = new CloudflareStreamSFU(streamId, 'host');
+      sfuRef.current = createUnifiedSFUClient(`host-${streamId}`);
       
       console.log('[Host] Publishing stream to Cloudflare SFU...');
-      await sfuRef.current.initializePublisher(mediaStream);
+      const trackName = `stream-${streamId}-${Date.now()}`;
+      const result = await sfuRef.current.publishTrack(mediaStream, trackName, 'video');
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to publish stream');
+      }
+      
+      // Store session info for viewers
+      await supabase
+        .from('live_streams')
+        .update({
+          cloudflare_session_id: sfuRef.current.getSessionId(),
+          sfu_track_name: sfuRef.current.getLocalTrackName(),
+        } as any)
+        .eq('id', streamId);
       
       // Update stream status to live
       const { error } = await supabase
@@ -167,11 +181,20 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     // Give viewers a moment to receive the message
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Clean up SFU connection
+    // Clean up SFU connection and clear session info
     if (sfuRef.current) {
-      await sfuRef.current.destroy();
+      sfuRef.current.destroy();
       sfuRef.current = null;
     }
+    
+    // Clear session info from database
+    await supabase
+      .from('live_streams')
+      .update({
+        cloudflare_session_id: null,
+        sfu_track_name: null,
+      } as any)
+      .eq('id', streamId);
     
     // Stop all tracks
     streamRef.current?.getTracks().forEach(track => track.stop());
@@ -239,9 +262,20 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       // For SFU, we need to republish with new stream
       if (sfuRef.current && isLive) {
         console.log("[Host] Reinitializing SFU with new camera...");
-        await sfuRef.current.destroy();
-        sfuRef.current = new CloudflareStreamSFU(streamId, 'host');
-        await sfuRef.current.initializePublisher(newStream);
+        sfuRef.current.destroy();
+        sfuRef.current = createUnifiedSFUClient(`host-${streamId}`);
+        const trackName = `stream-${streamId}-${Date.now()}`;
+        await sfuRef.current.publishTrack(newStream, trackName, 'video');
+        
+        // Update session info
+        await supabase
+          .from('live_streams')
+          .update({
+            cloudflare_session_id: sfuRef.current.getSessionId(),
+            sfu_track_name: sfuRef.current.getLocalTrackName(),
+          } as any)
+          .eq('id', streamId);
+        
         toast.success("Camera switched!");
       }
       
