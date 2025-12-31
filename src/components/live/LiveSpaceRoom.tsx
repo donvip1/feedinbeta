@@ -4,7 +4,7 @@ import {
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
   PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff,
-  AudioLines, Home, Minimize2, Monitor, MonitorOff, Speaker
+  AudioLines, Home, Monitor, MonitorOff, Speaker, ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -1199,15 +1199,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 size="icon" 
                 className="rounded-full" 
                 onClick={handleMinimize}
-                title="Minimize and continue listening"
+                title="Go back - audio continues in background"
               >
-                <Minimize2 className="w-4 h-4" />
+                <ArrowLeft className="w-5 h-5" />
               </Button>
               <Button variant="ghost" size="icon" className="rounded-full" onClick={handleShare}>
                 <Share2 className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="rounded-full" onClick={handleLeaveSpace}>
-                <X className="w-5 h-5" />
               </Button>
             </div>
           </div>
