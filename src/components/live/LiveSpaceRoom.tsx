@@ -4,7 +4,7 @@ import {
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
   PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff,
-  AudioLines, Home, Minimize2, Monitor, MonitorOff
+  AudioLines, Home, Minimize2, Monitor, MonitorOff, Speaker
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -122,6 +122,10 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
+  
+  // Listener audio output controls
+  const [isOutputMuted, setIsOutputMuted] = useState(false);
+  const [useLoudspeaker, setUseLoudspeaker] = useState(true);
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
   const isHost = space?.user_id === user?.id || myRole === 'host' || myRole === 'co_host';
@@ -1475,6 +1479,80 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 </span>
               )}
             </Button>
+
+            {/* Listener Audio Output Controls - visible to ALL for controlling their playback */}
+            <motion.div whileTap={{ scale: 0.95 }}>
+              <Button
+                variant={isOutputMuted ? "default" : "outline"}
+                size="icon"
+                className={cn(
+                  "h-12 w-12 rounded-xl transition-all",
+                  isOutputMuted && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 border-0"
+                )}
+                onClick={() => {
+                  setIsOutputMuted(!isOutputMuted);
+                  // Mute/unmute all remote audio elements
+                  document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"]').forEach(audio => {
+                    audio.muted = !isOutputMuted;
+                  });
+                  toast(isOutputMuted ? 'Speaker unmuted' : 'Speaker muted');
+                }}
+                title={isOutputMuted ? "Unmute speaker" : "Mute speaker"}
+              >
+                {isOutputMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </Button>
+            </motion.div>
+
+            {/* Toggle Loudspeaker/Earpiece */}
+            <motion.div whileTap={{ scale: 0.95 }}>
+              <Button
+                variant={useLoudspeaker ? "default" : "outline"}
+                size="icon"
+                className={cn(
+                  "h-12 w-12 rounded-xl transition-all",
+                  useLoudspeaker && "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 border-0"
+                )}
+                onClick={async () => {
+                  const newValue = !useLoudspeaker;
+                  setUseLoudspeaker(newValue);
+                  
+                  // Try to use setSinkId API if available (Chrome, Edge)
+                  const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"]');
+                  
+                  if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
+                    try {
+                      // Get available audio output devices
+                      const devices = await navigator.mediaDevices.enumerateDevices();
+                      const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+                      
+                      // Find earpiece or speaker device
+                      const targetDevice = audioOutputs.find(d => 
+                        newValue 
+                          ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
+                          : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
+                      );
+                      
+                      if (targetDevice) {
+                        for (const audio of audioElements) {
+                          await (audio as any).setSinkId(targetDevice.deviceId);
+                        }
+                        toast(newValue ? 'Using loudspeaker' : 'Using earpiece');
+                      } else {
+                        toast(newValue ? 'Loudspeaker active' : 'Earpiece mode (if available)');
+                      }
+                    } catch (error) {
+                      console.log('[LiveSpace] setSinkId not fully supported:', error);
+                      toast(newValue ? 'Loudspeaker active' : 'Earpiece mode');
+                    }
+                  } else {
+                    toast(newValue ? 'Loudspeaker active' : 'Earpiece mode');
+                  }
+                }}
+                title={useLoudspeaker ? "Switch to earpiece" : "Switch to loudspeaker"}
+              >
+                <Speaker className="w-5 h-5" />
+              </Button>
+            </motion.div>
 
             {/* Screen Share & Invite - only for hosts */}
             {isHost && (
