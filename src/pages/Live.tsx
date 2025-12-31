@@ -8,6 +8,7 @@ import { BottomNav } from "@/components/navigation/BottomNav";
 import { CreateLiveStreamModal } from "@/components/live/CreateLiveStreamModal";
 import { CreateSpaceModal } from "@/components/live/CreateSpaceModal";
 import { LiveStreamCard } from "@/components/live/LiveStreamCard";
+import { LiveStreamPreviewCard } from "@/components/live/LiveStreamPreviewCard";
 import { SpaceCard } from "@/components/live/SpaceCard";
 import { LiveStreamViewerWebRTC } from "@/components/live/LiveStreamViewerWebRTC";
 import { LiveBroadcaster } from "@/components/live/LiveBroadcaster";
@@ -556,9 +557,10 @@ const Live = () => {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: index * 0.1 }}
                             >
-                              <LiveStreamCard
+                              <LiveStreamPreviewCard
                                 stream={stream}
                                 onClick={() => handleStreamClick(stream)}
+                                autoPlay={true}
                               />
                             </motion.div>
                           ))}
