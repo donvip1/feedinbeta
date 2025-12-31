@@ -274,11 +274,19 @@ class SpaceRoomManager {
    */
   async startBroadcasting(stream: MediaStream): Promise<boolean> {
     if (!this.sessionId || !this.userId || !this.spaceId) {
-      console.error('[SpaceRoomManager] Cannot broadcast - not initialized');
+      console.error('[SpaceRoomManager] Cannot broadcast - not initialized', {
+        sessionId: this.sessionId,
+        userId: this.userId,
+        spaceId: this.spaceId,
+      });
       return false;
     }
 
-    console.log('[SpaceRoomManager] 🎤 Starting broadcast...');
+    console.log('[SpaceRoomManager] 🎤 Starting broadcast...', {
+      sessionId: this.sessionId.slice(0, 8),
+      userId: this.userId,
+      spaceId: this.spaceId.slice(0, 8),
+    });
     
     this.localStream = stream;
     this.localTrackName = `audio-${this.userId}-${Date.now()}`;
@@ -298,22 +306,44 @@ class SpaceRoomManager {
       return false;
     }
 
-    console.log('[SpaceRoomManager] ✅ Broadcast started, updating database...');
+    console.log('[SpaceRoomManager] ✅ SFU track published, updating database...');
 
     // Update speaker record with track info - this will trigger realtime update for listeners
-    const { error } = await supabase
-      .from('live_space_speakers')
-      .update({
-        cloudflare_session_id: this.sessionId,
-        cloudflare_track_id: this.localTrackName,
-      })
-      .eq('space_id', this.spaceId)
-      .eq('user_id', this.userId);
+    // Retry a few times to handle race conditions where speaker record might not exist yet
+    let updateSuccess = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data, error } = await supabase
+        .from('live_space_speakers')
+        .update({
+          cloudflare_session_id: this.sessionId,
+          cloudflare_track_id: this.localTrackName,
+        })
+        .eq('space_id', this.spaceId)
+        .eq('user_id', this.userId)
+        .select();
 
-    if (error) {
-      console.error('[SpaceRoomManager] Failed to update speaker track info:', error);
-    } else {
-      console.log('[SpaceRoomManager] ✅ Speaker track info saved to database');
+      if (error) {
+        console.error('[SpaceRoomManager] Attempt', attempt + 1, 'failed to update speaker track info:', error);
+        await new Promise(r => setTimeout(r, 500));
+        continue;
+      }
+      
+      if (data && data.length > 0) {
+        console.log('[SpaceRoomManager] ✅ Speaker track info saved to database:', {
+          sessionId: this.sessionId.slice(0, 8),
+          trackId: this.localTrackName,
+        });
+        updateSuccess = true;
+        break;
+      } else {
+        console.warn('[SpaceRoomManager] No speaker record found to update, attempt:', attempt + 1);
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+
+    if (!updateSuccess) {
+      console.error('[SpaceRoomManager] ❌ Failed to save track info to database after retries');
+      // Still return true since SFU publishing worked
     }
 
     this.notifyStateChange();

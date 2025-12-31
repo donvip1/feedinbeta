@@ -38,7 +38,7 @@ interface SpaceContextType {
   setMuted: (muted: boolean) => void;
   setConnectionStatus: (status: ConnectionStatus) => void;
   updateRole: (role: string) => void;
-  connectAudio: () => Promise<void>;
+  connectAudio: (overrideRole?: string) => Promise<void>;
   disconnectAudio: () => void;
   localStream: MediaStream | null;
 }
@@ -89,15 +89,15 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [spaceState.spaceInfo]);
 
   // Derived: can this user broadcast?
-  const getCanBroadcast = useCallback(() => {
-    const role = roleRef.current;
+  const getCanBroadcast = useCallback((overrideRole?: string) => {
+    const role = overrideRole || roleRef.current;
     return role === 'host' || role === 'co_host' || role === 'speaker';
   }, []);
 
   // Get local audio stream
-  const getLocalStream = useCallback(async () => {
-    const canBroadcast = getCanBroadcast();
-    console.log('[SpaceContext-SFU] getLocalStream called, canBroadcast:', canBroadcast, 'role:', roleRef.current);
+  const getLocalStream = useCallback(async (overrideRole?: string) => {
+    const canBroadcast = getCanBroadcast(overrideRole);
+    console.log('[SpaceContext-SFU] getLocalStream called, canBroadcast:', canBroadcast, 'role:', overrideRole || roleRef.current);
     
     if (localStreamRef.current) {
       console.log('[SpaceContext-SFU] Using existing local stream');
@@ -125,9 +125,10 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      // Set initial mute state
+      // Set initial mute state - hosts start unmuted
+      const isMuted = overrideRole === 'host' ? false : spaceState.isMuted;
       stream.getAudioTracks().forEach(track => {
-        track.enabled = !spaceState.isMuted;
+        track.enabled = !isMuted;
       });
 
       return stream;
@@ -145,7 +146,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [getCanBroadcast, spaceState.isMuted]);
 
   // Connect to space audio using Cloudflare SFU
-  const connectAudio = useCallback(async () => {
+  const connectAudio = useCallback(async (overrideRole?: string) => {
     if (!user || !spaceInfoRef.current || isConnectingRef.current) {
       console.log('[SpaceContext-SFU] Cannot connect - no user/space or already connecting');
       return;
@@ -154,10 +155,12 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     isConnectingRef.current = true;
     setSpaceState(prev => ({ ...prev, connectionStatus: 'connecting' }));
     
-    const canBroadcast = getCanBroadcast();
-    const isHost = roleRef.current === 'host' || roleRef.current === 'co_host';
+    // Use override role if provided (to handle race conditions)
+    const effectiveRole = overrideRole || roleRef.current;
+    const canBroadcast = getCanBroadcast(effectiveRole);
+    const isHost = effectiveRole === 'host' || effectiveRole === 'co_host';
     
-    console.log(`[SpaceContext-SFU] Connecting to space audio... role: ${roleRef.current}, canBroadcast: ${canBroadcast}`);
+    console.log(`[SpaceContext-SFU] Connecting to space audio... role: ${effectiveRole}, canBroadcast: ${canBroadcast}`);
 
     try {
       // Initialize the room manager with callbacks
@@ -192,12 +195,16 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       // If we can broadcast, start broadcasting
       if (canBroadcast) {
-        const stream = await getLocalStream();
+        const stream = await getLocalStream(effectiveRole);
         if (stream) {
           const broadcastResult = await spaceRoomManager.startBroadcasting(stream);
           if (!broadcastResult) {
             console.warn('[SpaceContext-SFU] Failed to start broadcasting');
+          } else {
+            console.log('[SpaceContext-SFU] ✅ Broadcasting started successfully');
           }
+        } else {
+          console.warn('[SpaceContext-SFU] ⚠️ No stream obtained, cannot broadcast');
         }
       } else {
         // We're a listener - subscribe to all active speakers
@@ -231,7 +238,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({
             user_id: user.id,
-            role: roleRef.current,
+            role: effectiveRole,
             canBroadcast,
           });
         }

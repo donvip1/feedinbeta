@@ -115,6 +115,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [totalGifts, setTotalGifts] = useState(0);
   const [myHostMuted, setMyHostMuted] = useState(false);
   const [myMicAllowed, setMyMicAllowed] = useState(true);
+  const [hasJoined, setHasJoined] = useState(false);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
@@ -297,24 +298,28 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   }, [space?.id, user?.id]);
 
-  // Connect audio via SpaceContext AFTER role is determined
+  // Connect audio via SpaceContext AFTER role is properly determined
+  // We need to wait for joinSpace to complete before connecting
   useEffect(() => {
-    if (space && user && myRole && spaceContext) {
+    if (space && user && myRole && spaceContext && hasJoined) {
       // Skip if already connected (e.g., returning from minimized state)
       if (spaceContext.spaceState.connectionStatus === 'connected') {
         console.log('[LiveSpace] Already connected, skipping connectAudio');
         return;
       }
       
+      // Skip if still connecting
+      if (spaceContext.spaceState.connectionStatus === 'connecting') {
+        console.log('[LiveSpace] Already connecting, skipping connectAudio');
+        return;
+      }
+      
       console.log('[LiveSpace] Role determined:', myRole, 'Connecting audio via SpaceContext...');
       spaceContext.updateRole(myRole);
-      // Small delay to allow state to update before connecting
-      const timer = setTimeout(() => {
-        spaceContext.connectAudio();
-      }, 200);
-      return () => clearTimeout(timer);
+      // Pass the role directly to avoid race conditions
+      spaceContext.connectAudio(myRole);
     }
-  }, [myRole, space?.id]);
+  }, [myRole, space?.id, hasJoined]);
 
   const fetchSpaceData = async () => {
     console.log('[LiveSpace] Fetching space data for:', spaceId);
@@ -449,6 +454,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     console.log('[LiveSpace] Joining space as:', user.id, 'Space owner:', space.user_id);
     const isOwner = space.user_id === user.id;
     const role = isOwner ? 'host' : 'listener';
+    
+    // Set role immediately to avoid race conditions
+    setMyRole(role);
+    if (isOwner) {
+      setIsMuted(false); // Host starts unmuted
+    }
 
     try {
       // First, clear any stale entries where left_at is set (user previously left)
@@ -509,6 +520,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
       // Refetch speakers to update UI
       await fetchSpeakers();
+      setHasJoined(true);
       toast.success('Joined space successfully!');
     } catch (error: any) {
       console.error('[LiveSpace] Join error:', error);
