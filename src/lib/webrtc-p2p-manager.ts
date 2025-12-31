@@ -209,6 +209,7 @@ export class WebRTCP2PManager {
       iceCandidatePoolSize: 10,
       iceTransportPolicy: 'all',
       bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
     });
 
     // Handle ICE candidates
@@ -222,6 +223,11 @@ export class WebRTCP2PManager {
       } else {
         console.log('[P2P] ICE gathering complete');
       }
+    };
+
+    // Handle ICE gathering state
+    this.pc.onicegatheringstatechange = () => {
+      console.log('[P2P] ICE gathering state:', this.pc?.iceGatheringState);
     };
 
     // Handle connection state changes
@@ -240,6 +246,12 @@ export class WebRTCP2PManager {
           if (this.isConnected) {
             console.log('[P2P] Connection lost, attempting to reconnect...');
             this.callbacks.onStatusChange('connecting', 'Reconnecting...');
+            // Give it a moment to recover before attempting ICE restart
+            setTimeout(() => {
+              if (this.pc?.connectionState === 'disconnected') {
+                this.attemptIceRestart();
+              }
+            }, 3000);
           }
           break;
         case 'failed':
@@ -285,11 +297,38 @@ export class WebRTCP2PManager {
         console.log('[P2P] Added track to new stream');
       }
       
+      // Monitor track state
+      event.track.onmute = () => {
+        console.log('[P2P] Remote track muted:', event.track.kind);
+      };
+      event.track.onunmute = () => {
+        console.log('[P2P] Remote track unmuted:', event.track.kind);
+      };
+      event.track.onended = () => {
+        console.log('[P2P] Remote track ended:', event.track.kind);
+      };
+      
       this.callbacks.onRemoteStream(this.remoteStream);
       
       // If we got a track, consider ourselves connected
       if (!this.isConnected) {
         this.handleConnected();
+      }
+    };
+
+    // Handle negotiation needed (for track changes)
+    this.pc.onnegotiationneeded = async () => {
+      console.log('[P2P] Negotiation needed');
+      // Only re-negotiate if we're already connected and are the caller
+      if (this.isConnected && this.isCaller) {
+        try {
+          const offer = await this.pc!.createOffer();
+          await this.pc!.setLocalDescription(offer);
+          await this.sendSignal({ type: 'offer', sdp: this.pc!.localDescription?.sdp });
+          console.log('[P2P] Renegotiation offer sent');
+        } catch (err) {
+          console.error('[P2P] Renegotiation error:', err);
+        }
       }
     };
 
@@ -560,25 +599,52 @@ export class WebRTCP2PManager {
   }
 
   private startConnectionMonitoring(): void {
-    this.connectionCheckInterval = setInterval(() => {
+    this.connectionCheckInterval = setInterval(async () => {
       if (!this.pc) return;
       
       const connState = this.pc.connectionState;
       const iceState = this.pc.iceConnectionState;
       
-      console.log('[P2P] Connection monitor:', connState, 'ICE:', iceState);
-      
       // Log stats if connected
       if (this.isConnected) {
-        this.pc.getStats().then(stats => {
+        try {
+          const stats = await this.pc.getStats();
+          let hasActiveConnection = false;
+          let bytesReceived = 0;
+          let packetLoss = 0;
+          let roundTripTime = 0;
+          
           stats.forEach(report => {
             if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-              console.log('[P2P] Active connection:', report.localCandidateId, '->', report.remoteCandidateId);
+              hasActiveConnection = true;
+              roundTripTime = report.currentRoundTripTime || 0;
+            }
+            if (report.type === 'inbound-rtp') {
+              bytesReceived += report.bytesReceived || 0;
+              if (report.packetsLost && report.packetsReceived) {
+                packetLoss = report.packetsLost / (report.packetsLost + report.packetsReceived) * 100;
+              }
             }
           });
-        });
+          
+          if (!hasActiveConnection && this.isConnected) {
+            console.log('[P2P] No active connection found, may need reconnection');
+          }
+          
+          // Log network quality periodically
+          if (roundTripTime > 0.3) {
+            console.log('[P2P] High latency detected:', Math.round(roundTripTime * 1000), 'ms');
+          }
+          if (packetLoss > 5) {
+            console.log('[P2P] Packet loss detected:', packetLoss.toFixed(1), '%');
+          }
+        } catch (err) {
+          // Stats may not be available
+        }
+      } else {
+        console.log('[P2P] Connection monitor:', connState, 'ICE:', iceState);
       }
-    }, 10000);
+    }, 5000);
   }
 
   private stopConnectionMonitoring(): void {
