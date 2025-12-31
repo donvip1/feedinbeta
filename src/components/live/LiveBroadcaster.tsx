@@ -338,19 +338,26 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   // Handle new viewer connection
   const handleViewerJoin = async (viewerId: string, channel: any) => {
     if (!streamRef.current) {
-      console.log("[Host] No stream available yet");
+      console.log("[Host] No stream available yet, queuing viewer:", viewerId);
+      // Queue this viewer for when stream is ready
+      setTimeout(() => handleViewerJoin(viewerId, channel), 1000);
       return;
     }
 
     // Check if we already have a connection for this viewer
     const existingPc = viewersRef.current.get(viewerId);
     if (existingPc) {
-      // If existing connection is still good, reuse it
-      if (existingPc.connectionState === 'connected' || existingPc.connectionState === 'connecting') {
-        console.log("[Host] Reusing existing connection for viewer:", viewerId);
+      // If existing connection is still good, resend the offer
+      if (existingPc.connectionState === 'connected') {
+        console.log("[Host] Connection already established for viewer:", viewerId);
+        return;
+      }
+      if (existingPc.connectionState === 'connecting' || existingPc.connectionState === 'new') {
+        console.log("[Host] Connection in progress for viewer:", viewerId);
         return;
       }
       // Close stale connection
+      console.log("[Host] Closing stale connection for viewer:", viewerId);
       existingPc.close();
       viewersRef.current.delete(viewerId);
     }
@@ -364,20 +371,33 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       rtcpMuxPolicy: 'require',
     });
 
-    // Add local stream tracks
-    streamRef.current.getTracks().forEach(track => {
-      console.log("[Host] Adding track:", track.kind, "enabled:", track.enabled);
-      pc.addTrack(track, streamRef.current!);
+    // Add local stream tracks - CRITICAL: make sure tracks are properly added
+    const tracks = streamRef.current.getTracks();
+    console.log("[Host] Available tracks:", tracks.length);
+    tracks.forEach(track => {
+      console.log("[Host] Adding track:", track.kind, "enabled:", track.enabled, "readyState:", track.readyState);
+      if (track.readyState === 'live') {
+        pc.addTrack(track, streamRef.current!);
+      }
     });
 
-    // Send ICE candidates to viewer
+    // Collect ICE candidates and send them
+    const iceCandidates: RTCIceCandidate[] = [];
+    let isIceGatheringComplete = false;
+    
     pc.onicecandidate = (event) => {
       if (event.candidate) {
+        iceCandidates.push(event.candidate);
+        // Send ICE candidates immediately
         channel.send({
           type: 'broadcast',
           event: 'ice-candidate-from-host',
           payload: { viewerId, candidate: event.candidate },
         });
+      } else {
+        // ICE gathering complete
+        isIceGatheringComplete = true;
+        console.log(`[Host] ICE gathering complete for ${viewerId}, sent ${iceCandidates.length} candidates`);
       }
     };
 
@@ -386,12 +406,22 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       if (pc.iceConnectionState === 'failed') {
         console.log(`[Host] ICE failed for ${viewerId}, restarting...`);
         pc.restartIce();
+      } else if (pc.iceConnectionState === 'disconnected') {
+        // Wait briefly for recovery
+        setTimeout(() => {
+          if (pc.iceConnectionState === 'disconnected') {
+            console.log(`[Host] ICE still disconnected for ${viewerId}, restarting...`);
+            pc.restartIce();
+          }
+        }, 2000);
       }
     };
 
     pc.onconnectionstatechange = () => {
       console.log(`[Host] Connection state for ${viewerId}:`, pc.connectionState);
-      if (pc.connectionState === 'disconnected') {
+      if (pc.connectionState === 'connected') {
+        console.log(`[Host] Successfully connected to viewer ${viewerId}`);
+      } else if (pc.connectionState === 'disconnected') {
         // Give it a moment to recover before cleaning up
         setTimeout(() => {
           if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
@@ -402,33 +432,40 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           }
         }, 5000);
       } else if (pc.connectionState === 'failed') {
+        console.log(`[Host] Connection failed for ${viewerId}`);
         viewersRef.current.delete(viewerId);
         setViewerCount(viewersRef.current.size);
         pc.close();
       }
     };
 
+    // Store the connection immediately so we don't create duplicates
+    viewersRef.current.set(viewerId, pc);
+    setViewerCount(viewersRef.current.size);
+
     try {
-      // Create offer with better compatibility
+      // Create offer with proper settings for sending media
       const offer = await pc.createOffer({
         offerToReceiveAudio: false,
         offerToReceiveVideo: false,
       });
       await pc.setLocalDescription(offer);
 
+      // Wait briefly for some ICE candidates to be gathered
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Send offer to viewer
       console.log("[Host] Sending offer to viewer:", viewerId);
       channel.send({
         type: 'broadcast',
         event: 'offer',
-        payload: { viewerId, offer },
+        payload: { viewerId, offer: pc.localDescription },
       });
-
-      viewersRef.current.set(viewerId, pc);
-      setViewerCount(viewersRef.current.size);
     } catch (err) {
       console.error("[Host] Error creating offer:", err);
       pc.close();
+      viewersRef.current.delete(viewerId);
+      setViewerCount(viewersRef.current.size);
     }
   };
 

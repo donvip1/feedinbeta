@@ -68,6 +68,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [viewers, setViewers] = useState<any[]>([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
+  const [connectionNotified, setConnectionNotified] = useState(false);
   
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
@@ -235,17 +236,27 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       pc.addTransceiver('video', { direction: 'recvonly' });
       pc.addTransceiver('audio', { direction: 'recvonly' });
 
+      // Track if we've already notified about connection
+      let hasNotifiedConnection = false;
+      
       pc.ontrack = (event) => {
         console.log("[Viewer] Received track:", event.track.kind, "readyState:", event.track.readyState);
         if (videoRef.current && event.streams[0]) {
-          videoRef.current.srcObject = event.streams[0];
+          // Only set srcObject if it's different to avoid resets
+          if (videoRef.current.srcObject !== event.streams[0]) {
+            videoRef.current.srcObject = event.streams[0];
+          }
           setHasVideo(true);
           setIsConnecting(false);
           
           if (retryTimeout) clearTimeout(retryTimeout);
           if (connectionTimeout) clearTimeout(connectionTimeout);
           
-          toast.success('Connected to stream!');
+          // Only show toast once per connection session
+          if (!hasNotifiedConnection) {
+            hasNotifiedConnection = true;
+            toast.success('Connected to stream!');
+          }
           
           // Monitor track for frozen state
           event.track.onmute = () => {
@@ -273,10 +284,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
             if (pc?.connectionState === 'connected') {
               pc.getStats().then(stats => {
                 let hasIncomingVideo = false;
+                let lastBytesReceived = 0;
                 stats.forEach(report => {
                   if (report.type === 'inbound-rtp' && report.kind === 'video') {
                     if (report.bytesReceived > 0) {
                       hasIncomingVideo = true;
+                      lastBytesReceived = report.bytesReceived;
                     }
                   }
                 });
@@ -286,19 +299,26 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
               });
             }
           }, 5000);
-        } else if (pc?.connectionState === 'failed' || pc?.connectionState === 'disconnected') {
+        } else if (pc?.connectionState === 'failed') {
           setIsConnecting(true);
           if (retryCount < maxRetries && isMounted) {
             retryTimeout = setTimeout(() => {
-              console.log(`[Viewer] Retrying connection (attempt ${retryCount + 1}/${maxRetries})`);
-              if (pc?.connectionState === 'failed') {
-                // Attempt ICE restart
-                pc.restartIce();
-              }
+              console.log(`[Viewer] Connection failed, retrying (attempt ${retryCount + 1}/${maxRetries})`);
+              pc.restartIce();
               announceViewerJoin();
             }, 2000 * Math.pow(1.5, retryCount));
             retryCount++;
           }
+        } else if (pc?.connectionState === 'disconnected') {
+          // Don't set isConnecting immediately - give it time to recover
+          console.log("[Viewer] Connection disconnected, waiting for recovery...");
+          setTimeout(() => {
+            if (pc?.connectionState === 'disconnected' && isMounted) {
+              setIsConnecting(true);
+              pc.restartIce();
+              announceViewerJoin();
+            }
+          }, 3000);
         } else if (pc?.connectionState === 'closed') {
           setHasVideo(false);
         }
@@ -309,6 +329,14 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         if (pc?.iceConnectionState === 'failed') {
           console.log("[Viewer] ICE failed, restarting...");
           pc.restartIce();
+        } else if (pc?.iceConnectionState === 'disconnected') {
+          // ICE disconnected - wait briefly then try to reconnect
+          setTimeout(() => {
+            if (pc?.iceConnectionState === 'disconnected') {
+              console.log("[Viewer] ICE still disconnected, restarting...");
+              pc.restartIce();
+            }
+          }, 2000);
         }
       };
 
