@@ -106,6 +106,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [myRole, setMyRole] = useState<string>('listener');
   const [reactions, setReactions] = useState<{ id: string; emoji: string; x: number; y: number }[]>([]);
+  const [giftAnimations, setGiftAnimations] = useState<{ id: string; emoji: string; senderName: string; receiverName: string; value: number }[]>([]);
   const [showSpeakerQueue, setShowSpeakerQueue] = useState(false);
   const [selectedGiftRecipient, setSelectedGiftRecipient] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
@@ -113,9 +114,10 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [showSpaceEndedModal, setShowSpaceEndedModal] = useState(false);
   const [duration, setDuration] = useState('0:00');
   const [totalGifts, setTotalGifts] = useState(0);
+  const [totalGiftValue, setTotalGiftValue] = useState(0);
   const [myHostMuted, setMyHostMuted] = useState(false);
   const [myMicAllowed, setMyMicAllowed] = useState(true);
-  // hasJoined state removed - we connect audio immediately in joinSpace
+  const [showListenersModal, setShowListenersModal] = useState(false);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
@@ -262,7 +264,49 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         schema: 'public',
         table: 'live_space_gifts',
         filter: `space_id=eq.${spaceId}`,
-      }, () => fetchTotalGifts())
+      }, async (payload: any) => {
+        fetchTotalGifts();
+        
+        // Show gift animation to everyone
+        const giftData = payload.new;
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('display_name, username')
+          .eq('id', giftData.sender_id)
+          .single();
+        
+        const { data: receiverProfile } = await supabase
+          .from('profiles')
+          .select('display_name, username')
+          .eq('id', giftData.receiver_id)
+          .single();
+        
+        const giftEmojis: Record<string, string> = {
+          'rose': '🌹',
+          'heart': '❤️',
+          'star': '⭐',
+          'crown': '👑',
+          'rocket': '🚀',
+          'diamond': '💎',
+          'fire': '🔥',
+          'kiss': '💋',
+          'cake': '🎂',
+          'money': '💰',
+        };
+        
+        const newGiftAnim = {
+          id: giftData.id,
+          emoji: giftEmojis[giftData.gift_type] || '🎁',
+          senderName: senderProfile?.display_name || senderProfile?.username || 'Someone',
+          receiverName: receiverProfile?.display_name || receiverProfile?.username || 'Host',
+          value: giftData.credit_value || 1,
+        };
+        
+        setGiftAnimations(prev => [...prev, newGiftAnim]);
+        setTimeout(() => {
+          setGiftAnimations(prev => prev.filter(g => g.id !== newGiftAnim.id));
+        }, 5000);
+      })
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
@@ -410,12 +454,14 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   const fetchTotalGifts = async () => {
-    const { count } = await supabase
+    const { data, count } = await supabase
       .from('live_space_gifts')
-      .select('*', { count: 'exact', head: true })
+      .select('credit_value', { count: 'exact' })
       .eq('space_id', spaceId);
     
     setTotalGifts(count || 0);
+    const total = data?.reduce((sum, g) => sum + (g.credit_value || 0), 0) || 0;
+    setTotalGiftValue(total);
   };
 
   const joinSpace = async (retryCount = 0) => {
@@ -525,8 +571,9 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const toggleMute = async () => {
     if (!user) return;
     
-    // Check permissions based on role
-    const canToggle = canSpeak || (myRole === 'listener' && space?.allow_mic_for_all && myMicAllowed && !myHostMuted);
+    // Check permissions based on role - listeners can speak if mic_allowed OR allow_mic_for_all
+    const listenerCanSpeak = myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted;
+    const canToggle = canSpeak || listenerCanSpeak;
     
     if (!canToggle) {
       if (myRole === 'listener') {
@@ -538,12 +585,6 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     // Check if host has muted us - can't unmute
     if (myHostMuted && isMuted) {
       toast.error('Host has muted you. Only the host can unmute you.');
-      return;
-    }
-
-    // Check if mic is not allowed globally and we don't have permission
-    if (!space?.allow_mic_for_all && !myMicAllowed && isMuted && myRole === 'listener') {
-      toast.error('Mic is currently disabled by host');
       return;
     }
 
@@ -849,6 +890,41 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         ))}
       </AnimatePresence>
 
+      {/* Gift animations - TikTok style notifications */}
+      <AnimatePresence>
+        {giftAnimations.map((gift) => (
+          <motion.div
+            key={gift.id}
+            initial={{ opacity: 0, x: -100, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 100, scale: 0.8 }}
+            transition={{ type: 'spring', damping: 20 }}
+            className="absolute left-4 top-1/3 z-50 max-w-[280px]"
+          >
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/90 to-pink-500/90 backdrop-blur-sm shadow-lg">
+              <motion.span 
+                className="text-3xl"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 0.5, repeat: 2 }}
+              >
+                {gift.emoji}
+              </motion.span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-semibold truncate">
+                  {gift.senderName}
+                </p>
+                <p className="text-white/80 text-xs truncate">
+                  sent {gift.emoji} to {gift.receiverName}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20">
+                <span className="text-white text-xs font-bold">+{gift.value}</span>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="sticky top-0 z-10 backdrop-blur-xl bg-background/80 border-b border-border/50">
         <div className="px-4 py-3">
@@ -875,12 +951,17 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   isHost={isHost}
                   onPromote={(speakerId) => promoteSpeaker(speakerId, 'speaker')}
                 />
-                {totalGifts > 0 && (
-                  <span className="flex items-center gap-1 text-amber-400">
-                    <Gift className="w-3 h-3" />
-                    {totalGifts} gifts
-                  </span>
-                )}
+                {/* TikTok-style gift counter */}
+                <div 
+                  className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-pink-500/20 border border-amber-500/30 cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => setShowGiftModal(true)}
+                >
+                  <Gift className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-amber-400 font-semibold text-xs">{totalGiftValue.toLocaleString()}</span>
+                  {totalGifts > 0 && (
+                    <span className="text-muted-foreground text-[10px]">({totalGifts})</span>
+                  )}
+                </div>
               </div>
             </div>
             
@@ -1174,39 +1255,41 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </motion.div>
             )}
 
-            {/* Listener controls: Raise hand OR Mic (if mic allowed for all) */}
+            {/* Listener controls: Raise hand AND/OR Mic (if permissions allow) */}
             {myRole === 'listener' && (
               <>
-                {/* Always show raise hand for listeners */}
-                <motion.div whileTap={{ scale: 0.95 }}>
-                  <Button
-                    variant={hasRaisedHand ? "default" : "outline"}
-                    size="icon"
-                    className={cn(
-                      "h-12 w-12 rounded-xl",
-                      hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
-                    )}
-                    onClick={toggleRaiseHand}
-                    title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
-                  >
-                    <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
-                  </Button>
-                </motion.div>
-                
-                {/* Show mic button for listeners when mic is allowed for all */}
-                {space?.allow_mic_for_all && myMicAllowed && !myHostMuted && (
+                {/* Mic button for listeners - show when mic is allowed globally OR individually */}
+                {(space?.allow_mic_for_all || myMicAllowed) && !myHostMuted && (
                   <motion.div whileTap={{ scale: 0.95 }}>
                     <Button
                       variant={isMuted ? "outline" : "default"}
                       size="icon"
                       className={cn(
-                        "h-12 w-12 rounded-xl transition-all",
+                        "h-12 w-12 rounded-xl transition-all relative",
                         !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0"
                       )}
                       onClick={toggleMute}
                       title={isMuted ? "Unmute" : "Mute"}
                     >
                       {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    </Button>
+                  </motion.div>
+                )}
+                
+                {/* Raise hand - show when user doesn't have mic permission yet */}
+                {!myMicAllowed && !space?.allow_mic_for_all && (
+                  <motion.div whileTap={{ scale: 0.95 }}>
+                    <Button
+                      variant={hasRaisedHand ? "default" : "outline"}
+                      size="icon"
+                      className={cn(
+                        "h-12 w-12 rounded-xl",
+                        hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
+                      )}
+                      onClick={toggleRaiseHand}
+                      title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
+                    >
+                      <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
                     </Button>
                   </motion.div>
                 )}
