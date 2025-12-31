@@ -93,6 +93,12 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const spaceInfoRef = useRef<SpaceInfo | null>(null);
   const isConnectingRef = useRef(false);
   const presenceChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const userRef = useRef(user);
+  
+  // Keep user ref in sync
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   // Keep refs in sync with state
   useEffect(() => {
@@ -163,8 +169,9 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Connect to space audio using Cloudflare SFU
   const connectAudio = useCallback(async (overrideRole?: string) => {
-    if (!user || !spaceInfoRef.current) {
-      console.log('[SpaceContext-SFU] Cannot connect - no user or space');
+    const currentUser = userRef.current;
+    if (!currentUser || !spaceInfoRef.current) {
+      console.log('[SpaceContext-SFU] Cannot connect - no user or space', { user: !!currentUser, space: !!spaceInfoRef.current });
       return;
     }
     
@@ -185,7 +192,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       role: effectiveRole,
       canBroadcast,
       isHost,
-      userId: user.id,
+      userId: currentUser.id,
       spaceId: spaceInfoRef.current.id,
     });
 
@@ -194,7 +201,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Each participant gets their own SFU session to receive tracks from others
       const result = await getSpaceRoomManager().initialize(
         spaceInfoRef.current.id,
-        user.id,
+        currentUser.id,
         isHost,
         // State change callback
         (state) => {
@@ -254,13 +261,13 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Set up presence channel for coordination (separate from SFU)
       const presenceChannel = supabase.channel(`space-presence-${spaceInfoRef.current.id}`, {
         config: {
-          presence: { key: user.id },
+          presence: { key: currentUser.id },
         },
       });
 
       presenceChannel
         .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-          if (key !== user.id) {
+          if (key !== currentUser.id) {
             console.log(`[SpaceContext-SFU] 👋 Peer joined: ${key}`, newPresences);
           }
         })
@@ -277,7 +284,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log(`[SpaceContext-SFU] Presence channel status: ${status}`);
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({
-            user_id: user.id,
+            user_id: currentUser.id,
             role: effectiveRole,
             canBroadcast,
           });
@@ -296,7 +303,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isConnectingRef.current = false;
       toast.error('Failed to connect to audio');
     }
-  }, [user, getCanBroadcast, getLocalStream]);
+  }, [getCanBroadcast, getLocalStream]);
 
   // Disconnect from space audio
   const disconnectAudio = useCallback(async () => {
@@ -341,13 +348,14 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Leave space - ONLY called on explicit user action
   const leaveSpace = useCallback(async () => {
     console.log('[SpaceContext-SFU] Leaving space explicitly');
+    const currentUser = userRef.current;
     
-    if (spaceInfoRef.current && user) {
+    if (spaceInfoRef.current && currentUser) {
       await supabase
         .from('live_space_speakers')
         .update({ left_at: new Date().toISOString() })
         .eq('space_id', spaceInfoRef.current.id)
-        .eq('user_id', user.id);
+        .eq('user_id', currentUser.id);
     }
     
     // Cleanup audio
@@ -362,7 +370,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     roleRef.current = 'listener';
     spaceInfoRef.current = null;
     setSpaceState(defaultState);
-  }, [user, disconnectAudio]);
+  }, [disconnectAudio]);
 
   const minimizeSpace = useCallback(() => {
     console.log('[SpaceContext-SFU] Minimizing space - audio continues');
@@ -433,7 +441,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Start broadcasting for a listener with permission
   const startListenerBroadcast = useCallback(async () => {
-    if (!spaceInfoRef.current || !user) return false;
+    const currentUser = userRef.current;
+    if (!spaceInfoRef.current || !currentUser) return false;
     
     console.log('[SpaceContext-SFU] Starting listener broadcast with permission...');
     
@@ -444,7 +453,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Re-initialize as a broadcasting user
       const result = await getSpaceRoomManager().initialize(
         spaceInfoRef.current.id,
-        user.id,
+        currentUser.id,
         false,
         undefined,
         (levels) => setSpaceState(prev => ({ ...prev, audioLevels: levels })),
@@ -482,14 +491,15 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       }
       return false;
     }
-  }, [user]);
+  }, []);
 
   // Handle beforeunload - cleanup on browser close
   useEffect(() => {
     const handleBeforeUnload = () => {
-      if (spaceState.isActive && spaceInfoRef.current && user) {
+      const currentUser = userRef.current;
+      if (spaceState.isActive && spaceInfoRef.current && currentUser) {
         // Send a beacon to mark user as left
-        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/live_space_speakers?space_id=eq.${spaceInfoRef.current.id}&user_id=eq.${user.id}`;
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/live_space_speakers?space_id=eq.${spaceInfoRef.current.id}&user_id=eq.${currentUser.id}`;
         
         navigator.sendBeacon(
           url,
@@ -500,7 +510,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [spaceState.isActive, user]);
+  }, [spaceState.isActive]);
 
   // Handle visibility change - keep connection alive when app is minimized
   useEffect(() => {
