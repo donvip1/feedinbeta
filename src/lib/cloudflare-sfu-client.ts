@@ -3,6 +3,8 @@
  * 
  * Client-side wrapper for interacting with Cloudflare Realtime SFU via edge function.
  * Manages WebRTC connections to the SFU for audio streaming in Live Spaces.
+ * 
+ * NOTE: Each instance manages ONE session. Create new instances per user/space.
  */
 
 import { supabase } from '@/integrations/supabase/client';
@@ -43,12 +45,16 @@ class CloudflareSFUClient {
   private remoteAudioElements: Map<string, HTMLAudioElement> = new Map();
   private retryCount = 0;
   private maxRetries = 3;
+  private isInitialized = false;
 
   /**
    * Create a new Cloudflare SFU session
    */
   async createSession(): Promise<SFUSessionResult> {
     try {
+      // Always cleanup before creating new session
+      this.cleanup();
+      
       console.log('[CloudflareSFU] Creating new session...');
       
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
@@ -66,6 +72,8 @@ class CloudflareSFUClient {
       }
 
       this.sessionId = data.sessionId;
+      this.isInitialized = true;
+      this.retryCount = 0;
       console.log('[CloudflareSFU] ✅ Session created:', this.sessionId.slice(0, 8));
       
       return { success: true, sessionId: data.sessionId };
@@ -89,11 +97,20 @@ class CloudflareSFUClient {
 
   /**
    * Initialize the peer connection to Cloudflare SFU
+   * Creates a NEW connection if the current one is unusable
    */
-  private initPeerConnection(): RTCPeerConnection {
-    if (this.peerConnection && this.peerConnection.connectionState !== 'closed') {
-      console.log('[CloudflareSFU] Reusing existing peer connection, state:', this.peerConnection.connectionState);
-      return this.peerConnection;
+  private initPeerConnection(forceNew: boolean = false): RTCPeerConnection {
+    // Check if existing connection is still usable
+    if (!forceNew && this.peerConnection) {
+      const state = this.peerConnection.connectionState;
+      if (state === 'connected' || state === 'connecting' || state === 'new') {
+        console.log('[CloudflareSFU] Reusing existing peer connection, state:', state);
+        return this.peerConnection;
+      }
+      // Connection is in failed/closed/disconnected state, clean it up
+      console.log('[CloudflareSFU] Existing connection unusable, state:', state);
+      this.peerConnection.close();
+      this.peerConnection = null;
     }
 
     console.log('[CloudflareSFU] Creating new peer connection...');
@@ -104,17 +121,6 @@ class CloudflareSFUClient {
         { urls: 'stun:stun.cloudflare.com:3478' },
         { urls: 'stun:stun.l.google.com:19302' },
         { urls: 'stun:stun1.l.google.com:19302' },
-        // Add TURN fallback for difficult networks
-        {
-          urls: 'turn:a.relay.metered.ca:80',
-          username: 'e8dd65c92f6d9f6e5f9ef455',
-          credential: 'uJE/KGrh5vKVE7ey',
-        },
-        {
-          urls: 'turn:a.relay.metered.ca:443?transport=tcp',
-          username: 'e8dd65c92f6d9f6e5f9ef455',
-          credential: 'uJE/KGrh5vKVE7ey',
-        },
       ],
       bundlePolicy: 'max-bundle',
       iceTransportPolicy: 'all',
@@ -129,6 +135,7 @@ class CloudflareSFUClient {
         enabled: event.track.enabled,
         muted: event.track.muted,
         mid: event.transceiver?.mid,
+        streams: event.streams.length,
       });
       
       if (event.track.kind === 'audio') {
@@ -154,8 +161,8 @@ class CloudflareSFUClient {
       }
       
       // Handle connection failures
-      if (state === 'failed') {
-        console.error('[CloudflareSFU] Connection failed - may need ICE restart');
+      if (state === 'failed' || state === 'disconnected') {
+        console.error('[CloudflareSFU] Connection failed/disconnected - may need to recreate session');
       }
     };
 
@@ -184,27 +191,30 @@ class CloudflareSFUClient {
    * Play remote audio through an audio element
    */
   private playRemoteAudio(track: MediaStreamTrack, peerId: string): void {
-    // Create unique ID with timestamp to avoid conflicts
-    const audioId = `sfu-audio-${peerId}-${Date.now()}`;
+    console.log('[CloudflareSFU] 🔊 Setting up audio playback for peer:', peerId);
     
-    // Remove all existing audio elements for this peer
-    document.querySelectorAll(`[id^="sfu-audio-${peerId}"]`).forEach(el => {
-      console.log('[CloudflareSFU] Removing old audio element:', el.id);
-      el.remove();
-    });
-    
-    // Also remove from map
-    const existing = this.remoteAudioElements.get(peerId);
-    if (existing) {
-      existing.remove();
+    // Remove any existing audio element for this peer
+    const existingAudio = this.remoteAudioElements.get(peerId);
+    if (existingAudio) {
+      console.log('[CloudflareSFU] Removing existing audio element for peer:', peerId);
+      existingAudio.pause();
+      existingAudio.srcObject = null;
+      existingAudio.remove();
       this.remoteAudioElements.delete(peerId);
     }
+    
+    // Also clean up any orphaned elements
+    document.querySelectorAll(`[id^="sfu-audio-${peerId}"]`).forEach(el => {
+      console.log('[CloudflareSFU] Removing orphaned audio element:', el.id);
+      el.remove();
+    });
 
     const stream = new MediaStream([track]);
     
     const audio = document.createElement('audio');
-    audio.id = audioId;
+    audio.id = `sfu-audio-${peerId}-${Date.now()}`;
     audio.autoplay = true;
+    (audio as any).playsInline = true;
     audio.srcObject = stream;
     audio.volume = 1.0;
     audio.muted = false;
@@ -222,8 +232,19 @@ class CloudflareSFUClient {
     // Handle track lifecycle
     track.onended = () => {
       console.log('[CloudflareSFU] Track ended for peer:', peerId);
+      audio.pause();
+      audio.srcObject = null;
       audio.remove();
       this.remoteAudioElements.delete(peerId);
+    };
+    
+    track.onmute = () => {
+      console.log('[CloudflareSFU] Track muted for peer:', peerId);
+    };
+    
+    track.onunmute = () => {
+      console.log('[CloudflareSFU] Track unmuted for peer:', peerId);
+      audio.play().catch(err => console.warn('[CloudflareSFU] Resume failed:', err));
     };
 
     const playPromise = audio.play();
@@ -249,13 +270,13 @@ class CloudflareSFUClient {
       });
     }
 
-    console.log('[CloudflareSFU] 🔊 Created audio element:', audioId);
+    console.log('[CloudflareSFU] 🔊 Created audio element:', audio.id);
   }
 
   /**
    * Wait for ICE gathering to complete (or timeout)
    */
-  private waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 3000): Promise<void> {
+  private waitForIceGathering(pc: RTCPeerConnection, timeoutMs = 2000): Promise<void> {
     return new Promise((resolve) => {
       if (pc.iceGatheringState === 'complete') {
         resolve();
@@ -288,9 +309,10 @@ class CloudflareSFUClient {
     trackName: string
   ): Promise<SFUTrackResult> {
     try {
-      console.log('[CloudflareSFU] Publishing audio track:', trackName);
+      console.log('[CloudflareSFU] Publishing audio track:', trackName, 'to session:', sessionId.slice(0, 8));
       
-      const pc = this.initPeerConnection();
+      // Create fresh peer connection for publishing
+      const pc = this.initPeerConnection(true);
       
       // Add local audio track
       const audioTrack = localStream.getAudioTracks()[0];
@@ -298,7 +320,13 @@ class CloudflareSFUClient {
         throw new Error('No audio track in stream');
       }
 
-      console.log('[CloudflareSFU] Adding audio track to peer connection...');
+      console.log('[CloudflareSFU] Audio track info:', {
+        id: audioTrack.id,
+        label: audioTrack.label,
+        enabled: audioTrack.enabled,
+        muted: audioTrack.muted,
+        readyState: audioTrack.readyState,
+      });
       
       // Add transceiver for sending audio
       const transceiver = pc.addTransceiver(audioTrack, { 
@@ -317,7 +345,7 @@ class CloudflareSFUClient {
 
       // Get the complete local description with ICE candidates
       const localDesc = pc.localDescription;
-      console.log('[CloudflareSFU] Sending offer to SFU with ICE candidates...');
+      console.log('[CloudflareSFU] Sending offer to SFU...');
 
       // Push track to SFU with the offer
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
@@ -329,13 +357,20 @@ class CloudflareSFUClient {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[CloudflareSFU] Push track edge function error:', error);
+        throw error;
+      }
       
       if (!data.success) {
+        console.error('[CloudflareSFU] Push track failed:', data.error);
         throw new Error(data.error || 'Failed to push track');
       }
 
-      console.log('[CloudflareSFU] Got response from SFU, type:', data.sessionDescription?.type);
+      console.log('[CloudflareSFU] Got response from SFU:', {
+        type: data.sessionDescription?.type,
+        hasDescription: !!data.sessionDescription,
+      });
 
       // Handle the response - could be an answer or an offer
       if (data.sessionDescription) {
@@ -385,16 +420,23 @@ class CloudflareSFUClient {
 
   /**
    * Subscribe to remote audio tracks (for listeners)
-   * This creates a NEW peer connection for receiving tracks
    */
   async pullTracks(
     sessionId: string,
     remoteTracks: PullTrackRequest[]
   ): Promise<SFUTrackResult> {
     try {
-      console.log('[CloudflareSFU] Pulling', remoteTracks.length, 'remote tracks...', remoteTracks);
+      console.log('[CloudflareSFU] Pulling', remoteTracks.length, 'remote tracks...');
+      console.log('[CloudflareSFU] Remote tracks to pull:', JSON.stringify(remoteTracks, null, 2));
       
+      // Use existing connection or create new one
       const pc = this.initPeerConnection();
+
+      // Add recv-only transceivers for each remote track we expect
+      for (let i = 0; i < remoteTracks.length; i++) {
+        console.log('[CloudflareSFU] Adding recvonly transceiver for:', remoteTracks[i].trackName);
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+      }
 
       // Request tracks from SFU - SFU will send us an offer with the tracks
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
@@ -405,13 +447,21 @@ class CloudflareSFUClient {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[CloudflareSFU] Pull tracks edge function error:', error);
+        throw error;
+      }
       
       if (!data.success) {
+        console.error('[CloudflareSFU] Pull tracks failed:', data.error);
         throw new Error(data.error || 'Failed to pull tracks');
       }
 
-      console.log('[CloudflareSFU] Got response from SFU, type:', data.sessionDescription?.type);
+      console.log('[CloudflareSFU] Got response from SFU:', {
+        type: data.sessionDescription?.type,
+        hasDescription: !!data.sessionDescription,
+        tracksCount: data.tracks?.length,
+      });
 
       // Handle the SFU response
       if (data.sessionDescription) {
@@ -468,7 +518,7 @@ class CloudflareSFUClient {
    */
   async renegotiate(sessionId: string, sdp: string): Promise<SFUTrackResult> {
     try {
-      console.log('[CloudflareSFU] Renegotiating session...');
+      console.log('[CloudflareSFU] Renegotiating session:', sessionId.slice(0, 8));
 
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
         body: {
@@ -478,16 +528,20 @@ class CloudflareSFUClient {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[CloudflareSFU] Renegotiate edge function error:', error);
+        throw error;
+      }
       
       if (!data.success) {
+        console.error('[CloudflareSFU] Renegotiate failed:', data.error);
         throw new Error(data.error || 'Failed to renegotiate');
       }
 
-      console.log('[CloudflareSFU] Renegotiation complete');
+      console.log('[CloudflareSFU] ✅ Renegotiation complete');
       return { success: true, sessionDescription: data.sessionDescription };
     } catch (error) {
-      console.error('[CloudflareSFU] Error renegotiating:', error);
+      console.error('[CloudflareSFU] ❌ Error renegotiating:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to renegotiate',
@@ -510,12 +564,15 @@ class CloudflareSFUClient {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.warn('[CloudflareSFU] Close track error (may be expected if session ended):', error);
+        return false;
+      }
       
       console.log('[CloudflareSFU] Track closed');
-      return data.success;
+      return data?.success || false;
     } catch (error) {
-      console.error('[CloudflareSFU] Error closing track:', error);
+      console.warn('[CloudflareSFU] Error closing track (may be expected):', error);
       return false;
     }
   }
@@ -549,6 +606,15 @@ class CloudflareSFUClient {
   }
 
   /**
+   * Check if connection is usable
+   */
+  isConnectionUsable(): boolean {
+    if (!this.peerConnection) return false;
+    const state = this.peerConnection.connectionState;
+    return state === 'connected' || state === 'connecting' || state === 'new';
+  }
+
+  /**
    * Cleanup all resources
    */
   cleanup() {
@@ -562,10 +628,19 @@ class CloudflareSFUClient {
       audio.remove();
     });
     this.remoteAudioElements.clear();
+    
+    // Also remove any orphaned elements
+    document.querySelectorAll('[id^="sfu-audio-"]').forEach(el => {
+      el.remove();
+    });
 
     if (this.peerConnection) {
       console.log('[CloudflareSFU] Closing peer connection');
-      this.peerConnection.close();
+      try {
+        this.peerConnection.close();
+      } catch (e) {
+        console.warn('[CloudflareSFU] Error closing peer connection:', e);
+      }
       this.peerConnection = null;
     }
 
@@ -574,12 +649,18 @@ class CloudflareSFUClient {
     this.onTrackCallback = null;
     this.onConnectionStateChange = null;
     this.retryCount = 0;
+    this.isInitialized = false;
     
-    console.log('[CloudflareSFU] Cleanup complete');
+    console.log('[CloudflareSFU] ✅ Cleanup complete');
   }
 }
 
-// Export singleton instance
+// Factory function to create new instances
+export const createSFUClient = (): CloudflareSFUClient => {
+  return new CloudflareSFUClient();
+};
+
+// Export singleton instance for backward compatibility
 export const cloudflareSFU = new CloudflareSFUClient();
 
 // Also export the class for testing
