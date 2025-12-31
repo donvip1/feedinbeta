@@ -314,7 +314,7 @@ class SpaceRoomManager {
     console.log('[SpaceRoomManager] ✅ SFU track published, updating database...');
 
     // Update speaker record with track info - this will trigger realtime update for listeners
-    // Retry a few times to handle race conditions where speaker record might not exist yet
+    // OPTIMIZED: Faster retries for instant updates
     let updateSuccess = false;
     for (let attempt = 0; attempt < 5; attempt++) {
       const { data, error } = await supabase
@@ -329,12 +329,12 @@ class SpaceRoomManager {
 
       if (error) {
         console.error('[SpaceRoomManager] Attempt', attempt + 1, 'failed to update speaker track info:', error);
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 100)); // Fast retry - 100ms
         continue;
       }
       
       if (data && data.length > 0) {
-        console.log('[SpaceRoomManager] ✅ Speaker track info saved to database:', {
+        console.log('[SpaceRoomManager] ✅ Speaker track info saved INSTANTLY:', {
           sessionId: this.sessionId.slice(0, 8),
           trackId: this.localTrackName,
         });
@@ -342,7 +342,7 @@ class SpaceRoomManager {
         break;
       } else {
         console.warn('[SpaceRoomManager] No speaker record found to update, attempt:', attempt + 1);
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 100)); // Fast retry
       }
     }
 
@@ -380,6 +380,7 @@ class SpaceRoomManager {
   /**
    * Subscribe to all active speakers (for listeners joining)
    * This should be called after initialization for ALL participants (listeners AND speakers)
+   * OPTIMIZED: No delays - instant subscription via realtime events
    */
   async subscribeToAllSpeakers(): Promise<void> {
     if (!this.spaceId || !this.sessionId) {
@@ -388,63 +389,45 @@ class SpaceRoomManager {
     }
 
     console.log('[SpaceRoomManager] ========================================');
-    console.log('[SpaceRoomManager] 🔍 SUBSCRIBING TO ALL SPEAKERS');
+    console.log('[SpaceRoomManager] 🔍 SUBSCRIBING TO ALL SPEAKERS (INSTANT)');
     console.log('[SpaceRoomManager] Space:', this.spaceId.slice(0, 8));
     console.log('[SpaceRoomManager] My session:', this.sessionId.slice(0, 8));
     console.log('[SpaceRoomManager] My user ID:', this.userId);
     console.log('[SpaceRoomManager] ========================================');
 
-    // Retry logic to wait for other speakers' track info to be saved
-    const maxRetries = 15;
-    const retryDelay = 2000;
-    
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      // Fetch all active speakers with track info
-      const { data: speakers, error } = await supabase
-        .from('live_space_speakers')
-        .select('*')
-        .eq('space_id', this.spaceId)
-        .is('left_at', null)
-        .not('cloudflare_track_id', 'is', null)
-        .not('cloudflare_session_id', 'is', null);
+    // Fetch all active speakers with track info - single attempt, no delays
+    const { data: speakers, error } = await supabase
+      .from('live_space_speakers')
+      .select('*')
+      .eq('space_id', this.spaceId)
+      .is('left_at', null)
+      .not('cloudflare_track_id', 'is', null)
+      .not('cloudflare_session_id', 'is', null);
 
-      if (error) {
-        console.error('[SpaceRoomManager] Failed to fetch speakers:', error);
-        return;
-      }
-
-      console.log('[SpaceRoomManager] Found speakers in DB:', speakers?.length || 0);
-      speakers?.forEach(s => {
-        console.log('[SpaceRoomManager]   - User:', s.user_id, 'Session:', s.cloudflare_session_id?.slice(0, 8), 'Track:', s.cloudflare_track_id?.slice(0, 30));
-      });
-
-      // Filter out ourselves and already subscribed speakers
-      const validSpeakers = (speakers || []).filter(
-        s => s.user_id !== this.userId && !this.subscribedSpeakers.has(s.user_id)
-      );
-      
-      console.log('[SpaceRoomManager] Speakers to subscribe to:', validSpeakers.length);
-
-      if (validSpeakers.length > 0) {
-        // Subscribe to each speaker sequentially to avoid race conditions
-        for (const speaker of validSpeakers) {
-          console.log('[SpaceRoomManager] 🎧 Subscribing to speaker:', speaker.user_id);
-          await this.subscribeToSpeaker(speaker as SpaceSpeaker);
-          // Small delay between subscriptions
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        console.log('[SpaceRoomManager] ✅ Subscribed to all found speakers');
-        return;
-      }
-
-      // No speakers found yet, wait and retry
-      if (attempt < maxRetries - 1) {
-        console.log('[SpaceRoomManager] ⏳ No speakers with tracks yet, retrying in', retryDelay, 'ms... (attempt', attempt + 1, '/', maxRetries, ')');
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-      }
+    if (error) {
+      console.error('[SpaceRoomManager] Failed to fetch speakers:', error);
+      return;
     }
 
-    console.log('[SpaceRoomManager] ⚠️ No speakers with tracks found after retries. Will subscribe when they publish via realtime.');
+    console.log('[SpaceRoomManager] Found speakers in DB:', speakers?.length || 0);
+
+    // Filter out ourselves and already subscribed speakers
+    const validSpeakers = (speakers || []).filter(
+      s => s.user_id !== this.userId && !this.subscribedSpeakers.has(s.user_id)
+    );
+    
+    console.log('[SpaceRoomManager] Speakers to subscribe to:', validSpeakers.length);
+
+    if (validSpeakers.length > 0) {
+      // Subscribe to each speaker in parallel for instant updates
+      await Promise.all(validSpeakers.map(async (speaker) => {
+        console.log('[SpaceRoomManager] 🎧 Subscribing to speaker:', speaker.user_id);
+        await this.subscribeToSpeaker(speaker as SpaceSpeaker);
+      }));
+      console.log('[SpaceRoomManager] ✅ Subscribed to all found speakers');
+    } else {
+      console.log('[SpaceRoomManager] No speakers with tracks yet - will subscribe instantly via realtime when they publish');
+    }
   }
 
   /**
