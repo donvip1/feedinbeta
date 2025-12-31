@@ -311,8 +311,8 @@ class CloudflareSFUClient {
     try {
       console.log('[CloudflareSFU] Publishing audio track:', trackName, 'to session:', sessionId.slice(0, 8));
       
-      // Create fresh peer connection for publishing
-      const pc = this.initPeerConnection(true);
+      // Use existing peer connection or create new one - don't force new for better stability
+      const pc = this.initPeerConnection(false);
       
       // Add local audio track
       const audioTrack = localStream.getAudioTracks()[0];
@@ -328,13 +328,19 @@ class CloudflareSFUClient {
         readyState: audioTrack.readyState,
       });
       
-      // Add transceiver for sending audio
-      const transceiver = pc.addTransceiver(audioTrack, { 
-        direction: 'sendonly',
-        streams: [localStream],
-      });
-
-      console.log('[CloudflareSFU] Transceiver created, mid:', transceiver.mid);
+      // Check if track is already added
+      const existingSenders = pc.getSenders().filter(s => s.track?.kind === 'audio');
+      if (existingSenders.length > 0) {
+        console.log('[CloudflareSFU] Replacing existing audio track');
+        await existingSenders[0].replaceTrack(audioTrack);
+      } else {
+        // Add transceiver for sending audio
+        const transceiver = pc.addTransceiver(audioTrack, { 
+          direction: 'sendonly',
+          streams: [localStream],
+        });
+        console.log('[CloudflareSFU] Transceiver created, mid:', transceiver.mid);
+      }
 
       // Create offer
       const offer = await pc.createOffer();
@@ -402,7 +408,7 @@ class CloudflareSFUClient {
       }
 
       this.localTrackName = trackName;
-      console.log('[CloudflareSFU] ✅ Audio track published successfully');
+      console.log('[CloudflareSFU] ✅ Audio track published successfully, connection state:', pc.connectionState);
 
       return {
         success: true,
@@ -431,11 +437,26 @@ class CloudflareSFUClient {
       
       // Use existing connection or create new one
       const pc = this.initPeerConnection();
+      
+      // Log current connection state
+      console.log('[CloudflareSFU] Current peer connection state:', pc.connectionState, 'signaling:', pc.signalingState);
 
       // Add recv-only transceivers for each remote track we expect
-      for (let i = 0; i < remoteTracks.length; i++) {
-        console.log('[CloudflareSFU] Adding recvonly transceiver for:', remoteTracks[i].trackName);
+      // Only add if not already present
+      const existingReceivers = pc.getTransceivers().filter(t => t.direction === 'recvonly' || t.direction === 'inactive');
+      const neededTransceivers = remoteTracks.length - existingReceivers.length;
+      
+      for (let i = 0; i < neededTransceivers; i++) {
+        console.log('[CloudflareSFU] Adding recvonly transceiver for track', i);
         pc.addTransceiver('audio', { direction: 'recvonly' });
+      }
+
+      // If connection is not established yet, we need to create an offer first
+      if (pc.signalingState === 'stable' && pc.connectionState !== 'connected') {
+        console.log('[CloudflareSFU] Creating initial offer before pulling tracks...');
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        await this.waitForIceGathering(pc);
       }
 
       // Request tracks from SFU - SFU will send us an offer with the tracks
@@ -465,9 +486,18 @@ class CloudflareSFUClient {
 
       // Handle the SFU response
       if (data.sessionDescription) {
+        const signalingState = pc.signalingState;
+        console.log('[CloudflareSFU] Signaling state before handling response:', signalingState);
+        
         if (data.sessionDescription.type === 'offer') {
           // SFU sends us an offer - we need to answer
           console.log('[CloudflareSFU] Got offer from SFU, setting remote description...');
+          
+          // If we're in have-local-offer state, we need to rollback first
+          if (signalingState === 'have-local-offer') {
+            console.log('[CloudflareSFU] Rolling back local offer before setting remote...');
+            await pc.setLocalDescription({ type: 'rollback' });
+          }
           
           await pc.setRemoteDescription({
             type: 'offer',
@@ -486,18 +516,20 @@ class CloudflareSFUClient {
           console.log('[CloudflareSFU] Sending answer to SFU...');
           await this.renegotiate(sessionId, answerSdp!);
           
-          console.log('[CloudflareSFU] ✅ WebRTC connection established for receiving');
+          console.log('[CloudflareSFU] ✅ WebRTC connection established for receiving, state:', pc.connectionState);
         } else if (data.sessionDescription.type === 'answer') {
-          // Unexpected but handle it
-          console.log('[CloudflareSFU] Got answer from SFU (unexpected)...');
-          await pc.setRemoteDescription({
-            type: 'answer',
-            sdp: data.sessionDescription.sdp,
-          });
+          // Got answer back - set it
+          console.log('[CloudflareSFU] Got answer from SFU...');
+          if (signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription({
+              type: 'answer',
+              sdp: data.sessionDescription.sdp,
+            });
+          }
         }
       }
 
-      console.log('[CloudflareSFU] ✅ Tracks pulled successfully');
+      console.log('[CloudflareSFU] ✅ Tracks pulled successfully, connection state:', pc.connectionState);
 
       return {
         success: true,
