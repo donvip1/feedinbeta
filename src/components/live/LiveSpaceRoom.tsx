@@ -115,7 +115,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [totalGifts, setTotalGifts] = useState(0);
   const [myHostMuted, setMyHostMuted] = useState(false);
   const [myMicAllowed, setMyMicAllowed] = useState(true);
-  const [hasJoined, setHasJoined] = useState(false);
+  // hasJoined state removed - we connect audio immediately in joinSpace
   const notifiedUsersRef = useRef<Set<string>>(new Set());
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
@@ -298,28 +298,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   }, [space?.id, user?.id]);
 
-  // Connect audio via SpaceContext AFTER role is properly determined
-  // We need to wait for joinSpace to complete before connecting
-  useEffect(() => {
-    if (space && user && myRole && spaceContext && hasJoined) {
-      // Skip if already connected (e.g., returning from minimized state)
-      if (spaceContext.spaceState.connectionStatus === 'connected') {
-        console.log('[LiveSpace] Already connected, skipping connectAudio');
-        return;
-      }
-      
-      // Skip if still connecting
-      if (spaceContext.spaceState.connectionStatus === 'connecting') {
-        console.log('[LiveSpace] Already connecting, skipping connectAudio');
-        return;
-      }
-      
-      console.log('[LiveSpace] Role determined:', myRole, 'Connecting audio via SpaceContext...');
-      spaceContext.updateRole(myRole);
-      // Pass the role directly to avoid race conditions
-      spaceContext.connectAudio(myRole);
-    }
-  }, [myRole, space?.id, hasJoined]);
+  // Audio connection now happens directly in joinSpace - no separate useEffect needed
 
   const fetchSpaceData = async () => {
     console.log('[LiveSpace] Fetching space data for:', spaceId);
@@ -462,18 +441,17 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
 
     try {
-      // First, clear any stale entries where left_at is set (user previously left)
+      // Clear any existing record for this user (simpler than upsert)
       await supabase
         .from('live_space_speakers')
         .delete()
         .eq('space_id', spaceId)
-        .eq('user_id', user.id)
-        .not('left_at', 'is', null);
+        .eq('user_id', user.id);
 
-      // Use upsert to handle both new joins and rejoins atomically
-      const { error: upsertError } = await supabase
+      // Insert fresh record
+      const { error: insertError } = await supabase
         .from('live_space_speakers')
-        .upsert({
+        .insert({
           space_id: spaceId,
           user_id: user.id,
           role: role,
@@ -482,28 +460,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           mic_allowed: true,
           left_at: null,
           joined_at: new Date().toISOString(),
-        }, {
-          onConflict: 'space_id,user_id',
-          ignoreDuplicates: false
         });
 
-      if (upsertError) {
-        console.error('[LiveSpace] Error upserting speaker:', upsertError);
-        // If upsert fails, try to just update existing entry
-        const { error: updateError } = await supabase
-          .from('live_space_speakers')
-          .update({
-            left_at: null,
-            joined_at: new Date().toISOString(),
-            role: isOwner ? 'host' : undefined, // Only update role if owner
-          })
-          .eq('space_id', spaceId)
-          .eq('user_id', user.id);
-        
-        if (updateError) {
-          console.error('[LiveSpace] Error updating speaker:', updateError);
-          throw updateError;
-        }
+      if (insertError) {
+        console.error('[LiveSpace] Error inserting speaker:', insertError);
+        throw insertError;
       }
 
       // Update viewer count
@@ -520,7 +481,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
       // Refetch speakers to update UI
       await fetchSpeakers();
-      setHasJoined(true);
+      
+      // Connect audio immediately after joining
+      if (spaceContext) {
+        spaceContext.updateRole(role);
+        spaceContext.connectAudio(role);
+      }
+      
       toast.success('Joined space successfully!');
     } catch (error: any) {
       console.error('[LiveSpace] Join error:', error);
