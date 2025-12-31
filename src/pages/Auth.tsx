@@ -8,6 +8,7 @@ import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { Card, CardContent } from '@/components/ui/card';
 import { LogIn, UserPlus } from 'lucide-react';
+import { AndroidAppBanner } from '@/components/native/AndroidAppBanner';
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -61,7 +62,9 @@ const Auth = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center auth-gradient p-4">
+    <div className="min-h-screen flex flex-col auth-gradient">
+      <AndroidAppBanner variant="banner" />
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo & Header */}
         <div className="flex flex-col items-center mb-6 animate-fade-in">
@@ -113,6 +116,7 @@ const Auth = () => {
         <p className="text-center text-xs text-muted-foreground mt-6">
           © 2024 FEEDIN. All rights reserved.
         </p>
+      </div>
       </div>
     </div>
   );
