@@ -21,7 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { FlyingChat } from './FlyingChat';
 import { ViewerListPanel } from './ViewerListPanel';
 import { motion, AnimatePresence } from "framer-motion";
-import { UnifiedSFUClient, createUnifiedSFUClient } from "@/lib/unified-sfu-client";
+// Using Cloudflare Stream HLS for scalable live streaming
 
 interface LiveBroadcasterProps {
   streamId: string;
@@ -45,7 +45,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const sfuRef = useRef<UnifiedSFUClient | null>(null);
+  const sfuRef = useRef<{ pc: RTCPeerConnection; liveInputId: string } | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
   const [stream, setStream] = useState<any>(null);
@@ -102,7 +102,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
-  // Start broadcasting - now using Cloudflare SFU
+  // Start broadcasting - using Cloudflare Stream HLS for scalable delivery
   const startBroadcast = async () => {
     setIsStarting(true);
     setConnectionStatus('connecting');
@@ -110,27 +110,86 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     try {
       const mediaStream = await initializeMedia();
       
-      // Create and initialize SFU connection
-      sfuRef.current = createUnifiedSFUClient(`host-${streamId}`);
+      // Step 1: Create Cloudflare Stream Live Input
+      console.log('[Host] Creating Cloudflare Stream Live Input...');
+      const { data: sessionData } = await supabase.auth.getSession();
       
-      console.log('[Host] Publishing stream to Cloudflare SFU...');
-      const trackName = `stream-${streamId}-${Date.now()}`;
-      const result = await sfuRef.current.publishTrack(mediaStream, trackName, 'video');
+      const createResponse = await supabase.functions.invoke('cloudflare-stream', {
+        body: {
+          action: 'create-live-input',
+          streamId: streamId,
+          title: stream?.title || 'Live Stream',
+          enableRecording: true,
+        },
+      });
       
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to publish stream');
+      if (createResponse.error || !createResponse.data?.success) {
+        throw new Error(createResponse.data?.error || 'Failed to create live input');
       }
       
-      // Store session info for viewers
-      await supabase
-        .from('live_streams')
-        .update({
-          cloudflare_session_id: sfuRef.current.getSessionId(),
-          sfu_track_name: sfuRef.current.getLocalTrackName(),
-        } as any)
-        .eq('id', streamId);
+      const { webrtcUrl, hlsUrl, liveInputId } = createResponse.data;
+      console.log('[Host] Live input created:', liveInputId);
+      console.log('[Host] WebRTC URL:', webrtcUrl);
+      console.log('[Host] HLS URL:', hlsUrl);
       
-      // Update stream status to live
+      // Step 2: Connect to Cloudflare via WHIP (WebRTC HTTP Ingest Protocol)
+      if (webrtcUrl) {
+        console.log('[Host] Publishing to Cloudflare Stream via WHIP...');
+        
+        // Create peer connection for WHIP
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+          bundlePolicy: 'max-bundle',
+        });
+        
+        // Add tracks from media stream
+        mediaStream.getTracks().forEach(track => {
+          pc.addTrack(track, mediaStream);
+        });
+        
+        // Create and set local description
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+        
+        // Wait for ICE gathering to complete
+        await new Promise<void>((resolve) => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+          } else {
+            pc.onicegatheringstatechange = () => {
+              if (pc.iceGatheringState === 'complete') {
+                resolve();
+              }
+            };
+          }
+        });
+        
+        // Send offer to Cloudflare WHIP endpoint
+        const whipResponse = await fetch(webrtcUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/sdp',
+          },
+          body: pc.localDescription?.sdp,
+        });
+        
+        if (!whipResponse.ok) {
+          throw new Error(`WHIP connection failed: ${whipResponse.status}`);
+        }
+        
+        const answerSdp = await whipResponse.text();
+        await pc.setRemoteDescription({
+          type: 'answer',
+          sdp: answerSdp,
+        });
+        
+        // Store peer connection for cleanup
+        (sfuRef as any).current = { pc, liveInputId };
+        
+        console.log('[Host] Successfully connected to Cloudflare Stream!');
+      }
+      
+      // Step 3: Update stream status to live
       const { error } = await supabase
         .from("live_streams")
         .update({ 
@@ -143,21 +202,8 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
 
       setIsLive(true);
       setConnectionStatus('connected');
-      toast.success("You are now live!");
+      toast.success("You are now live! Viewers can watch via HLS.");
       
-      // Monitor SFU connection
-      const connectionMonitor = setInterval(() => {
-        if (sfuRef.current) {
-          const state = sfuRef.current.getConnectionState();
-          if (state === 'connected') {
-            setConnectionStatus('connected');
-          } else if (state === 'failed') {
-            setConnectionStatus('failed');
-          }
-        }
-      }, 2000);
-      
-      return () => clearInterval(connectionMonitor);
     } catch (error: any) {
       console.error("Error starting broadcast:", error);
       setConnectionStatus('failed');
@@ -181,20 +227,19 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     // Give viewers a moment to receive the message
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Clean up SFU connection and clear session info
-    if (sfuRef.current) {
-      sfuRef.current.destroy();
-      sfuRef.current = null;
+    // Clean up WebRTC connection
+    if ((sfuRef as any).current?.pc) {
+      (sfuRef as any).current.pc.close();
     }
     
-    // Clear session info from database
-    await supabase
-      .from('live_streams')
-      .update({
-        cloudflare_session_id: null,
-        sfu_track_name: null,
-      } as any)
-      .eq('id', streamId);
+    // Optionally delete the live input (keeps recording if enabled)
+    const liveInputId = (sfuRef as any).current?.liveInputId;
+    if (liveInputId) {
+      // Don't delete - let Cloudflare keep the recording
+      console.log('[Host] Stream ended, recording available at live input:', liveInputId);
+    }
+    
+    sfuRef.current = null;
     
     // Stop all tracks
     streamRef.current?.getTracks().forEach(track => track.stop());
@@ -232,7 +277,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
-  // Switch camera - for SFU we need to republish
+  // Switch camera - reconnect to Cloudflare Stream
   const switchCamera = async () => {
     const oldStream = streamRef.current;
     setIsFrontCamera(!isFrontCamera);
@@ -259,22 +304,24 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       // Stop old tracks
       oldStream?.getTracks().forEach(track => track.stop());
       
-      // For SFU, we need to republish with new stream
-      if (sfuRef.current && isLive) {
-        console.log("[Host] Reinitializing SFU with new camera...");
-        sfuRef.current.destroy();
-        sfuRef.current = createUnifiedSFUClient(`host-${streamId}`);
-        const trackName = `stream-${streamId}-${Date.now()}`;
-        await sfuRef.current.publishTrack(newStream, trackName, 'video');
+      // For Cloudflare Stream, we need to replace tracks in the existing connection
+      if ((sfuRef as any).current?.pc && isLive) {
+        const pc = (sfuRef as any).current.pc as RTCPeerConnection;
+        const senders = pc.getSenders();
         
-        // Update session info
-        await supabase
-          .from('live_streams')
-          .update({
-            cloudflare_session_id: sfuRef.current.getSessionId(),
-            sfu_track_name: sfuRef.current.getLocalTrackName(),
-          } as any)
-          .eq('id', streamId);
+        // Replace video track
+        const videoTrack = newStream.getVideoTracks()[0];
+        const videoSender = senders.find(s => s.track?.kind === 'video');
+        if (videoSender && videoTrack) {
+          await videoSender.replaceTrack(videoTrack);
+        }
+        
+        // Replace audio track
+        const audioTrack = newStream.getAudioTracks()[0];
+        const audioSender = senders.find(s => s.track?.kind === 'audio');
+        if (audioSender && audioTrack) {
+          await audioSender.replaceTrack(audioTrack);
+        }
         
         toast.success("Camera switched!");
       }
@@ -303,11 +350,11 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     fetchStream();
   }, [streamId]);
 
-  // Clean up SFU on unmount
+  // Clean up WebRTC on unmount
   useEffect(() => {
     return () => {
-      if (sfuRef.current) {
-        sfuRef.current.destroy();
+      if (sfuRef.current?.pc) {
+        sfuRef.current.pc.close();
       }
     };
   }, []);

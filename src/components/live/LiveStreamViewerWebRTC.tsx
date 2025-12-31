@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { UnifiedSFUClient, createUnifiedSFUClient } from "@/lib/unified-sfu-client";
+import Hls from 'hls.js';
 
 interface LiveStreamViewerWebRTCProps {
   streamId: string;
@@ -50,7 +50,7 @@ const GIFT_EMOJIS: Record<string, string> = {
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const sfuRef = useRef<UnifiedSFUClient | null>(null);
+  const hlsRef = useRef<Hls | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
@@ -117,8 +117,9 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         console.log("[Viewer] Stream status changed:", payload.new.status);
         if (payload.new.status === 'ended') {
           toast.info("Stream has ended");
-          if (sfuRef.current) {
-            sfuRef.current.destroy();
+          if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
           }
           setTimeout(() => {
             onClose();
@@ -192,109 +193,129 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     return () => clearInterval(interval);
   }, [streamId]);
 
-  // SFU-based WebRTC connection
+  // HLS.js-based video playback for scalable streaming
   useEffect(() => {
     if (stream?.status !== 'live') return;
+    if (!stream?.cf_hls_url) {
+      console.log("[Viewer-HLS] No HLS URL available yet, waiting...");
+      return;
+    }
 
     let isMounted = true;
-    let hasNotifiedConnection = false;
-    let retryInterval: NodeJS.Timeout | null = null;
+    const hlsUrl = stream.cf_hls_url;
 
-    const setupSFUConnection = async () => {
-      console.log("[Viewer-SFU] Setting up SFU connection for stream:", streamId);
-      setConnectionStatus('connecting');
-      setIsConnecting(true);
+    console.log("[Viewer-HLS] Setting up HLS connection for stream:", streamId);
+    console.log("[Viewer-HLS] HLS URL:", hlsUrl);
+    setConnectionStatus('connecting');
+    setIsConnecting(true);
 
-      try {
-        // Cleanup previous connection
-        if (sfuRef.current) {
-          sfuRef.current.destroy();
-          sfuRef.current = null;
-        }
+    const setupHLS = () => {
+      if (!videoRef.current || !isMounted) return;
 
-        // Fetch host session info from database
-        const { data: streamData } = await supabase
-          .from('live_streams')
-          .select('cloudflare_session_id, sfu_track_name')
-          .eq('id', streamId)
-          .single() as any;
-        
-        if (!streamData?.cloudflare_session_id || !streamData?.sfu_track_name) {
-          console.log("[Viewer-SFU] Host session not ready, will retry...");
-          return;
-        }
+      // Cleanup previous instance
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
+      }
 
-        const sfu = createUnifiedSFUClient(`viewer-${streamId}`);
-        sfuRef.current = sfu;
+      // Check if HLS is natively supported (Safari)
+      if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+        console.log("[Viewer-HLS] Using native HLS support");
+        videoRef.current.src = hlsUrl;
+        videoRef.current.addEventListener('loadedmetadata', () => {
+          setHasVideo(true);
+          setIsConnecting(false);
+          setConnectionStatus('connected');
+          toast.success('Connected to stream!');
+        });
+        videoRef.current.addEventListener('error', (e) => {
+          console.error("[Viewer-HLS] Native HLS error:", e);
+          setConnectionStatus('failed');
+        });
+        return;
+      }
 
-        // Set up track callback before pulling
-        sfu.onTrack((track, peerId) => {
-          console.log("[Viewer-SFU] Received track via callback:", track.kind);
-          if (videoRef.current) {
-            const mediaStream = new MediaStream([track]);
-            if (videoRef.current.srcObject !== mediaStream) {
-              videoRef.current.srcObject = mediaStream;
+      // Use HLS.js for browsers that don't support native HLS
+      if (Hls.isSupported()) {
+        console.log("[Viewer-HLS] Using HLS.js");
+        const hls = new Hls({
+          enableWorker: true,
+          lowLatencyMode: true,
+          backBufferLength: 90,
+          maxBufferLength: 30,
+          maxMaxBufferLength: 60,
+          liveSyncDurationCount: 3,
+          liveMaxLatencyDurationCount: 10,
+        });
+
+        hlsRef.current = hls;
+
+        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+          console.log("[Viewer-HLS] Media attached, loading source...");
+          hls.loadSource(hlsUrl);
+        });
+
+        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+          console.log("[Viewer-HLS] Manifest parsed, levels:", data.levels.length);
+          setHasVideo(true);
+          setIsConnecting(false);
+          setConnectionStatus('connected');
+          toast.success('Connected to stream!');
+          
+          // Auto-play
+          videoRef.current?.play().catch((err) => {
+            console.warn("[Viewer-HLS] Autoplay failed:", err);
+          });
+        });
+
+        hls.on(Hls.Events.ERROR, (event, data) => {
+          console.error("[Viewer-HLS] Error:", data);
+          if (data.fatal) {
+            switch (data.type) {
+              case Hls.ErrorTypes.NETWORK_ERROR:
+                console.log("[Viewer-HLS] Network error, trying to recover...");
+                hls.startLoad();
+                break;
+              case Hls.ErrorTypes.MEDIA_ERROR:
+                console.log("[Viewer-HLS] Media error, trying to recover...");
+                hls.recoverMediaError();
+                break;
+              default:
+                console.error("[Viewer-HLS] Fatal error, cannot recover");
+                setConnectionStatus('failed');
+                break;
             }
-            setHasVideo(true);
-            setIsConnecting(false);
-            setConnectionStatus('connected');
-
-            if (!hasNotifiedConnection) {
-              hasNotifiedConnection = true;
-              toast.success('Connected to stream!');
-            }
-
-            track.onended = () => {
-              console.log("[Viewer-SFU] Track ended:", track.kind);
-              setHasVideo(false);
-            };
           }
         });
 
-        // Pull tracks from host's session
-        const result = await sfu.pullTracks([{
-          location: 'remote',
-          sessionId: streamData.cloudflare_session_id,
-          trackName: streamData.sfu_track_name,
-        }]);
-
-        if (!result.success) {
-          console.error("[Viewer-SFU] Failed to pull tracks:", result.error);
-          setConnectionStatus('failed');
-          return;
-        }
-
-        // Check connection state
-        if (sfu.isConnected()) {
-          setIsConnecting(false);
-          setConnectionStatus('connected');
-        }
-
-      } catch (err) {
-        console.error("[Viewer-SFU] Error setting up connection:", err);
+        hls.attachMedia(videoRef.current);
+      } else {
+        console.error("[Viewer-HLS] HLS is not supported in this browser");
+        toast.error("Your browser doesn't support live streaming");
         setConnectionStatus('failed');
       }
     };
 
-    setupSFUConnection();
+    // Try to connect immediately
+    setupHLS();
 
-    // Retry connection every 5 seconds if not connected
-    retryInterval = setInterval(() => {
-      if (connectionStatus !== 'connected' && isMounted && stream?.status === 'live') {
-        console.log("[Viewer-SFU] Retrying connection...");
-        setupSFUConnection();
+    // Retry connection if HLS URL becomes available later
+    const retryInterval = setInterval(() => {
+      if (connectionStatus !== 'connected' && isMounted && stream?.status === 'live' && stream?.cf_hls_url) {
+        console.log("[Viewer-HLS] Retrying connection...");
+        setupHLS();
       }
     }, 5000);
 
     return () => {
       isMounted = false;
-      if (retryInterval) clearInterval(retryInterval);
-      if (sfuRef.current) {
-        sfuRef.current.destroy();
-        sfuRef.current = null;
+      clearInterval(retryInterval);
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
     };
-  }, [stream?.status, streamId]);
+  }, [stream?.status, stream?.cf_hls_url, streamId]);
 
   // Subscribe to comments
   useEffect(() => {

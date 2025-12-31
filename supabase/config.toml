@@ -44,3 +44,6 @@ verify_jwt = true
 
 [functions.get-vapid-key]
 verify_jwt = false
+
+[functions.cloudflare-stream]
+verify_jwt = true

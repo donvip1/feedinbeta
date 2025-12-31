@@ -1764,6 +1764,10 @@ export type Database = {
       live_streams: {
         Row: {
           category: string | null
+          cf_hls_url: string | null
+          cf_live_input_id: string | null
+          cf_recording_uid: string | null
+          cf_webrtc_url: string | null
           cloudflare_session_id: string | null
           created_at: string | null
           description: string | null
@@ -1786,6 +1790,10 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          cf_hls_url?: string | null
+          cf_live_input_id?: string | null
+          cf_recording_uid?: string | null
+          cf_webrtc_url?: string | null
           cloudflare_session_id?: string | null
           created_at?: string | null
           description?: string | null
@@ -1808,6 +1816,10 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          cf_hls_url?: string | null
+          cf_live_input_id?: string | null
+          cf_recording_uid?: string | null
+          cf_webrtc_url?: string | null
           cloudflare_session_id?: string | null
           created_at?: string | null
           description?: string | null
