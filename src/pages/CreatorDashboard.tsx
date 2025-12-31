@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RecordingsManager } from '@/components/live/RecordingsManager';
 import { 
   ArrowLeft, 
   Eye, 
@@ -16,7 +17,8 @@ import {
   TrendingUp,
   Coins,
   BarChart3,
-  Calendar
+  Calendar,
+  Video
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
@@ -56,6 +58,7 @@ const CreatorDashboard = () => {
   const [topPosts, setTopPosts] = useState<TopPost[]>([]);
   const [growthData, setGrowthData] = useState<GrowthData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRecordingsManager, setShowRecordingsManager] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -176,6 +179,15 @@ const CreatorDashboard = () => {
               Creator Dashboard
             </h1>
           </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowRecordingsManager(true)}
+            className="gap-2"
+          >
+            <Video className="w-4 h-4" />
+            Recordings
+          </Button>
         </div>
       </header>
 
@@ -350,6 +362,12 @@ const CreatorDashboard = () => {
       </main>
 
       <BottomNav />
+
+      {/* Recordings Manager Modal */}
+      <RecordingsManager
+        isOpen={showRecordingsManager}
+        onClose={() => setShowRecordingsManager(false)}
+      />
     </div>
   );
 };
