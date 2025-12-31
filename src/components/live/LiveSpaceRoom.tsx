@@ -321,14 +321,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         filter: `id=eq.${spaceId}`,
       }, async (payload: any) => {
         console.log('[LiveSpace] Space updated:', payload.new.status);
-        // Only show ended modal if space status explicitly changed to 'ended'
+        // Immediately disconnect all users when host ends the space
         if (payload.new.status === 'ended' && payload.old?.status === 'live') {
-          setShowSpaceEndedModal(true);
-          spaceContext?.leaveSpace();
-          setTimeout(() => {
-            setShowSpaceEndedModal(false);
-            navigate('/live');
-          }, 3000);
+          console.log('[LiveSpace] Space ended by host - disconnecting immediately');
+          // Immediately leave the space and cleanup audio
+          await spaceContext?.leaveSpace();
+          // Show brief notification and redirect immediately
+          toast.info('Space has ended');
+          navigate('/live');
+          return; // Don't update state since we're navigating away
         }
         setSpace(payload.new);
       })
