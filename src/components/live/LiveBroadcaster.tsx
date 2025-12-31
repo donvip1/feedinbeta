@@ -180,13 +180,56 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
-  // Switch camera
+  // Switch camera - update all viewer connections
   const switchCamera = async () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-    }
+    const oldStream = streamRef.current;
     setIsFrontCamera(!isFrontCamera);
-    await initializeMedia();
+    
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: !isFrontCamera ? "user" : "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+
+      streamRef.current = newStream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+      }
+
+      // Replace tracks in all viewer peer connections
+      const newVideoTrack = newStream.getVideoTracks()[0];
+      const newAudioTrack = newStream.getAudioTracks()[0];
+
+      viewersRef.current.forEach((pc, viewerId) => {
+        pc.getSenders().forEach(sender => {
+          if (sender.track?.kind === 'video' && newVideoTrack) {
+            sender.replaceTrack(newVideoTrack).catch(err => {
+              console.error(`[Host] Error replacing video track for ${viewerId}:`, err);
+            });
+          } else if (sender.track?.kind === 'audio' && newAudioTrack) {
+            sender.replaceTrack(newAudioTrack).catch(err => {
+              console.error(`[Host] Error replacing audio track for ${viewerId}:`, err);
+            });
+          }
+        });
+      });
+
+      // Stop old tracks
+      oldStream?.getTracks().forEach(track => track.stop());
+      
+      console.log("[Host] Camera switched and tracks updated for all viewers");
+    } catch (error) {
+      console.error("[Host] Error switching camera:", error);
+      toast.error("Could not switch camera");
+    }
   };
 
   // Fetch stream details
@@ -270,6 +313,28 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     };
   }, [isLive, streamId]);
 
+  // Cache ICE servers for reuse
+  const iceServersRef = useRef<RTCIceServer[]>([
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ]);
+
+  // Fetch TURN credentials on mount
+  useEffect(() => {
+    const fetchTurnCredentials = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('get-turn-credentials');
+        if (!error && data?.iceServers) {
+          iceServersRef.current = data.iceServers;
+          console.log("[Host] Got TURN credentials, servers:", data.iceServers.length);
+        }
+      } catch (err) {
+        console.warn("[Host] Could not fetch TURN credentials:", err);
+      }
+    };
+    fetchTurnCredentials();
+  }, []);
+
   // Handle new viewer connection
   const handleViewerJoin = async (viewerId: string, channel: any) => {
     if (!streamRef.current) {
@@ -278,24 +343,30 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
 
     // Check if we already have a connection for this viewer
-    if (viewersRef.current.has(viewerId)) {
-      console.log("[Host] Already have connection for viewer:", viewerId);
+    const existingPc = viewersRef.current.get(viewerId);
+    if (existingPc) {
+      // If existing connection is still good, reuse it
+      if (existingPc.connectionState === 'connected' || existingPc.connectionState === 'connecting') {
+        console.log("[Host] Reusing existing connection for viewer:", viewerId);
+        return;
+      }
+      // Close stale connection
+      existingPc.close();
+      viewersRef.current.delete(viewerId);
     }
 
     console.log("[Host] Creating peer connection for viewer:", viewerId);
 
     const pc = new RTCPeerConnection({
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-        { urls: 'stun:stun2.l.google.com:19302' },
-        { urls: 'stun:stun3.l.google.com:19302' },
-      ]
+      iceServers: iceServersRef.current,
+      iceCandidatePoolSize: 10,
+      bundlePolicy: 'max-bundle',
+      rtcpMuxPolicy: 'require',
     });
 
     // Add local stream tracks
     streamRef.current.getTracks().forEach(track => {
-      console.log("[Host] Adding track:", track.kind);
+      console.log("[Host] Adding track:", track.kind, "enabled:", track.enabled);
       pc.addTrack(track, streamRef.current!);
     });
 
@@ -310,17 +381,39 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       }
     };
 
+    pc.oniceconnectionstatechange = () => {
+      console.log(`[Host] ICE state for ${viewerId}:`, pc.iceConnectionState);
+      if (pc.iceConnectionState === 'failed') {
+        console.log(`[Host] ICE failed for ${viewerId}, restarting...`);
+        pc.restartIce();
+      }
+    };
+
     pc.onconnectionstatechange = () => {
       console.log(`[Host] Connection state for ${viewerId}:`, pc.connectionState);
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      if (pc.connectionState === 'disconnected') {
+        // Give it a moment to recover before cleaning up
+        setTimeout(() => {
+          if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+            console.log(`[Host] Cleaning up stale connection for ${viewerId}`);
+            pc.close();
+            viewersRef.current.delete(viewerId);
+            setViewerCount(viewersRef.current.size);
+          }
+        }, 5000);
+      } else if (pc.connectionState === 'failed') {
         viewersRef.current.delete(viewerId);
         setViewerCount(viewersRef.current.size);
+        pc.close();
       }
     };
 
     try {
-      // Create offer
-      const offer = await pc.createOffer();
+      // Create offer with better compatibility
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: false,
+        offerToReceiveVideo: false,
+      });
       await pc.setLocalDescription(offer);
 
       // Send offer to viewer
