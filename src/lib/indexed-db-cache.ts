@@ -329,13 +329,50 @@ class IndexedDBCache {
   // Clear all data
   async clearAll(): Promise<void> {
     const db = await this.getDB();
-    const stores = ['conversations', 'messages', 'profiles', 'cache'];
+    const stores = ['conversations', 'messages', 'profiles', 'cache', 'app_data', 'stories', 'trending', 'wallet', 'live_content', 'media_urls'];
     
     for (const storeName of stores) {
-      const tx = db.transaction(storeName, 'readwrite');
-      const store = tx.objectStore(storeName);
-      store.clear();
+      try {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.clear();
+      } catch (e) {
+        // Store might not exist in older versions
+      }
     }
+  }
+
+  // Save feed posts for instant load
+  async saveFeedPosts(posts: any[], cacheKey: string = 'feed_posts'): Promise<void> {
+    return this.set(cacheKey, posts, 5 * 60 * 1000); // 5 min TTL
+  }
+
+  async getFeedPosts(cacheKey: string = 'feed_posts'): Promise<any[] | null> {
+    return this.get(cacheKey);
+  }
+
+  // Save user credits for instant wallet display
+  async saveUserCredits(userId: string, credits: any): Promise<void> {
+    return this.set(`credits_${userId}`, credits, 2 * 60 * 1000); // 2 min TTL
+  }
+
+  async getUserCredits(userId: string): Promise<any | null> {
+    return this.get(`credits_${userId}`);
+  }
+
+  // Save notifications count
+  async saveNotificationCount(userId: string, count: number): Promise<void> {
+    return this.set(`notif_count_${userId}`, count, 60 * 1000); // 1 min TTL
+  }
+
+  async getNotificationCount(userId: string): Promise<number | null> {
+    return this.get(`notif_count_${userId}`);
+  }
+
+  // Preload critical data - call this on app startup
+  async preloadCriticalData(userId: string): Promise<void> {
+    console.log('[IndexedDBCache] Preloading critical data for user:', userId);
+    // This is called by background-sync, data is fetched there
   }
 
   // Cleanup expired entries
@@ -355,6 +392,30 @@ class IndexedDBCache {
         cursor.continue();
       }
     };
+  }
+
+  // Get cache size estimate
+  async getCacheSize(): Promise<{ entries: number; stores: string[] }> {
+    const db = await this.getDB();
+    const stores = Array.from(db.objectStoreNames);
+    let totalEntries = 0;
+
+    for (const storeName of stores) {
+      try {
+        const tx = db.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const count = await new Promise<number>((resolve) => {
+          const req = store.count();
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(0);
+        });
+        totalEntries += count;
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+
+    return { entries: totalEntries, stores };
   }
 }
 
@@ -380,6 +441,21 @@ export const messageCache = {
 export const profileCache = {
   save: (profile: ProfileCache) => indexedDBCache.saveProfile(profile),
   get: (id: string) => indexedDBCache.getProfile(id),
+};
+
+export const feedCache = {
+  save: (posts: any[], key?: string) => indexedDBCache.saveFeedPosts(posts, key),
+  get: (key?: string) => indexedDBCache.getFeedPosts(key),
+};
+
+export const creditsCache = {
+  save: (userId: string, credits: any) => indexedDBCache.saveUserCredits(userId, credits),
+  get: (userId: string) => indexedDBCache.getUserCredits(userId),
+};
+
+export const notificationCache = {
+  saveCount: (userId: string, count: number) => indexedDBCache.saveNotificationCount(userId, count),
+  getCount: (userId: string) => indexedDBCache.getNotificationCount(userId),
 };
 
 export default indexedDBCache;

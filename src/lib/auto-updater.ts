@@ -12,9 +12,10 @@ class AutoUpdater {
   private isChecking = false;
   private lastCheck = 0;
   private pendingUpdate = false;
-  private readonly CHECK_INTERVAL = 2 * 60 * 1000; // 2 minutes for faster updates
-  private readonly MIN_CHECK_GAP = 30 * 1000; // 30 seconds minimum between checks
-  private readonly IDLE_THRESHOLD = 5 * 1000; // 5 seconds of inactivity to apply update
+  private readonly CHECK_INTERVAL = 60 * 1000; // 1 minute for faster updates
+  private readonly MIN_CHECK_GAP = 15 * 1000; // 15 seconds minimum between checks
+  private readonly IDLE_THRESHOLD = 3 * 1000; // 3 seconds of inactivity to apply update
+  private readonly FORCE_CHECK_ON_RESUME = true; // Always check when app resumes
 
   private constructor() {
     this.init();
@@ -72,13 +73,13 @@ class AutoUpdater {
       clearInterval(this.checkInterval);
     }
     
-    // Check every 2 minutes for faster updates
+    // Check every minute for faster updates on APK devices
     this.checkInterval = window.setInterval(() => {
       this.checkForUpdates();
     }, this.CHECK_INTERVAL);
 
-    // Initial check after 10 seconds (faster initial check)
-    setTimeout(() => this.checkForUpdates(), 10000);
+    // Initial check after 5 seconds (faster initial check for APK users)
+    setTimeout(() => this.checkForUpdates(), 5000);
   }
 
   private handleVisibilityChange = () => {
