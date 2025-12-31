@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Users, Video, MessageCircle, Link2 } from 'lucide-react';
+import { Users, Video, MessageCircle, Link2, Download, Smartphone } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import feedinLogo from '@/assets/feedin-logo.png';
+import { AndroidAppBanner } from '@/components/native/AndroidAppBanner';
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -25,7 +26,11 @@ export default function Welcome() {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-background to-secondary/20 p-6">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-secondary/20">
+      {/* Android App Banner */}
+      <AndroidAppBanner variant="banner" />
+      
+      <div className="flex-1 flex flex-col items-center justify-center p-6">
       <div className="max-w-md w-full space-y-8 text-center">
         {/* Shared Content Notice */}
         {sharedContent && (
@@ -94,6 +99,7 @@ export default function Welcome() {
         <p className="text-xs text-muted-foreground pt-4">
           Join our community and start sharing your moments today
         </p>
+      </div>
       </div>
     </div>
   );
