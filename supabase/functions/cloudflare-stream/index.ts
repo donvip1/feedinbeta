@@ -102,9 +102,12 @@ Deno.serve(async (req) => {
 
         const liveInput = result.result;
         
-        // Extract the WebRTC URL and HLS playback URL
-        const webrtcUrl = liveInput.webRTC?.url || liveInput.webRTCPlayback?.url;
-        const hlsUrl = `https://customer-${CLOUDFLARE_ACCOUNT_ID.slice(0, 8)}.cloudflarestream.com/${liveInput.uid}/manifest/video.m3u8`;
+        console.log('[cloudflare-stream] Full response:', JSON.stringify(liveInput, null, 2));
+        
+        // Extract the WebRTC URL for WHIP publishing
+        const webrtcUrl = liveInput.webRTC?.url;
+        // HLS playback URL from Cloudflare
+        const hlsUrl = `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${liveInput.uid}/manifest/video.m3u8`;
         
         // Update the live_streams table with Cloudflare info
         const { error: updateError } = await supabaseClient
@@ -131,7 +134,9 @@ Deno.serve(async (req) => {
             rtmpsStreamKey: liveInput.rtmps?.streamKey,
             srtUrl: liveInput.srt?.url,
             hlsUrl: hlsUrl,
-            dashUrl: `https://customer-${CLOUDFLARE_ACCOUNT_ID.slice(0, 8)}.cloudflarestream.com/${liveInput.uid}/manifest/video.mpd`,
+            dashUrl: `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${liveInput.uid}/manifest/video.mpd`,
+            // Also return raw CF response for debugging
+            rawWebRTC: liveInput.webRTC,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
