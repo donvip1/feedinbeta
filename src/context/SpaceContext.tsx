@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { AuthContext } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import type { SpaceRoomManager } from '@/lib/space-room-manager';
@@ -82,7 +82,8 @@ export const useOptionalSpaceContext = () => {
 };
 
 export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
+  const authContext = useContext(AuthContext);
+  const user = authContext?.user ?? null;
   const [spaceState, setSpaceState] = useState<SpaceState>(defaultState);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
