@@ -116,7 +116,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [totalGifts, setTotalGifts] = useState(0);
   const [totalGiftValue, setTotalGiftValue] = useState(0);
   const [myHostMuted, setMyHostMuted] = useState(false);
-  const [myMicAllowed, setMyMicAllowed] = useState(true);
+  const [myMicAllowed, setMyMicAllowed] = useState(false);
   const [showListenersModal, setShowListenersModal] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -592,11 +592,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         .from('live_space_speakers')
         .insert({
           space_id: spaceId,
-          user_id: user.id,
+        user_id: user.id,
           role: role,
           is_muted: !isOwner, // Host starts unmuted
           host_muted: false,
-          mic_allowed: true,
+          mic_allowed: isOwner, // Only host has mic permission by default, listeners need to raise hand
           left_at: null,
           joined_at: new Date().toISOString(),
         });
@@ -1503,8 +1503,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </motion.div>
             )}
 
-            {/* Raise hand - only for listeners without mic permission */}
-            {myRole === 'listener' && !myMicAllowed && !space?.allow_mic_for_all && (
+            {/* Raise hand - visible to all listeners to request speaking */}
+            {myRole === 'listener' && (
               <motion.div whileTap={{ scale: 0.95 }}>
                 <Button
                   variant={hasRaisedHand ? "default" : "outline"}
