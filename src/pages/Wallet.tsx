@@ -48,6 +48,44 @@ const Wallet = () => {
     }
   }, [user, authLoading, navigate]);
 
+  // Real-time subscription for credit updates
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('wallet-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_credits',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['user-credits', user.id] });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'credit_transactions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['credit-transactions', user.id] });
+          queryClient.invalidateQueries({ queryKey: ['user-credits', user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
+
   // Credits with offline-first caching
   const { data: credits, isStale: creditsStale } = useCachedQuery({
     cacheKey: `credits:${user?.id}`,
@@ -210,6 +248,10 @@ const Wallet = () => {
         title: 'Credits Sent',
         description: `Successfully sent ${amount} credits to @${recipientUsername}`,
       });
+
+      // Invalidate all wallet queries to refresh data
+      queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+      queryClient.invalidateQueries({ queryKey: ['credit-transactions'] });
 
       setSendAmount('');
       setRecipientUsername('');
