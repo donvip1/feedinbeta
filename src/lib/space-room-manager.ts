@@ -10,6 +10,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { createSFUClient, type SFUSessionResult, type CloudflareSFUClient } from './cloudflare-sfu-client';
+import { audioPlaybackManager } from './audio-playback-manager';
 
 export interface SpaceSpeaker {
   id: string;
@@ -527,11 +528,8 @@ class SpaceRoomManager {
     // Stop broadcasting
     await this.stopBroadcasting();
 
-    // Remove all audio elements created by this manager and SFU client
-    document.querySelectorAll('[id^="space-audio-"], [id^="sfu-audio-"]').forEach(el => {
-      console.log('[SpaceRoomManager] Removing audio element:', el.id);
-      el.remove();
-    });
+    // Use centralized audio manager for cleanup
+    audioPlaybackManager.cleanup();
 
     // Clear analyzers
     this.analyzers.clear();

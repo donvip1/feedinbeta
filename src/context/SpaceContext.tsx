@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { spaceRoomManager } from '@/lib/space-room-manager';
+import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 
 interface SpaceInfo {
   id: string;
@@ -339,8 +340,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Cleanup audio
     await disconnectAudio();
     
+    // Use centralized audio manager cleanup
+    audioPlaybackManager.cleanup();
+    
     // Remove any remaining audio elements
-    document.querySelectorAll('[id^="audio-"], [id^="sfu-audio-"]').forEach(el => el.remove());
+    document.querySelectorAll('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]').forEach(el => el.remove());
     
     roleRef.current = 'listener';
     spaceInfoRef.current = null;
