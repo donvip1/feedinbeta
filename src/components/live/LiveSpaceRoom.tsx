@@ -202,62 +202,77 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     
     initSpace();
 
+    // OPTIMIZED: Use single channel with instant updates - no delays
     const channel = supabase
-      .channel(`space-${spaceId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'live_space_speakers',
-        filter: `space_id=eq.${spaceId}`,
-      }, async () => {
-        console.log('[LiveSpace] Speakers changed, refetching...');
-        await fetchSpeakers();
-        // Also update viewer count in realtime
-        const { count } = await supabase
-          .from('live_space_speakers')
-          .select('*', { count: 'exact', head: true })
-          .eq('space_id', spaceId)
-          .is('left_at', null);
-        if (count !== null && space) {
-          setSpace(prev => prev ? { ...prev, viewer_count: count } : null);
-        }
-      })
+      .channel(`space-realtime-${spaceId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'live_space_speakers',
         filter: `space_id=eq.${spaceId}`,
       }, async (payload: any) => {
+        console.log('[LiveSpace] 🚀 NEW speaker/listener joined INSTANTLY');
+        // Immediately update viewer count (optimistic)
+        setSpace(prev => prev ? { ...prev, viewer_count: (prev.viewer_count || 0) + 1 } : null);
+        
+        // Refetch speakers for UI update
+        fetchSpeakers();
+        
         // Show "user joined" toast for new listeners
         const newUserId = payload.new.user_id;
         if (newUserId && newUserId !== user?.id && !notifiedUsersRef.current.has(newUserId)) {
           notifiedUsersRef.current.add(newUserId);
           
-          // Fetch profile of the new user
-          const { data: profile } = await supabase
+          // Fetch profile in parallel - don't block UI
+          supabase
             .from('profiles')
             .select('display_name, username, avatar_url')
             .eq('id', newUserId)
-            .single();
-          
-          if (profile) {
-            toast(
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
-                  {profile.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs font-medium">{profile.display_name?.[0] || 'U'}</span>
-                  )}
-                </div>
-                <span className="text-sm">
-                  <strong>{profile.display_name || profile.username}</strong> joined the space
-                </span>
-              </div>,
-              { duration: 3000 }
-            );
-          }
+            .single()
+            .then(({ data: profile }) => {
+              if (profile) {
+                toast(
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden">
+                      {profile.avatar_url ? (
+                        <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xs font-medium">{profile.display_name?.[0] || 'U'}</span>
+                      )}
+                    </div>
+                    <span className="text-sm">
+                      <strong>{profile.display_name || profile.username}</strong> joined the space
+                    </span>
+                  </div>,
+                  { duration: 2000 }
+                );
+              }
+            });
         }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'live_space_speakers',
+        filter: `space_id=eq.${spaceId}`,
+      }, async (payload: any) => {
+        console.log('[LiveSpace] 🔄 Speaker updated INSTANTLY:', payload.new);
+        // If someone left (left_at set), decrement count
+        if (payload.new.left_at && !payload.old?.left_at) {
+          setSpace(prev => prev ? { ...prev, viewer_count: Math.max(0, (prev.viewer_count || 1) - 1) } : null);
+        }
+        // Immediately refetch speakers for UI update
+        fetchSpeakers();
+      })
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'live_space_speakers',
+        filter: `space_id=eq.${spaceId}`,
+      }, async () => {
+        console.log('[LiveSpace] 🗑️ Speaker deleted INSTANTLY');
+        setSpace(prev => prev ? { ...prev, viewer_count: Math.max(0, (prev.viewer_count || 1) - 1) } : null);
+        fetchSpeakers();
       })
       .on('postgres_changes', {
         event: 'INSERT',
@@ -274,7 +289,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         setReactions(prev => [...prev, newReaction]);
         setTimeout(() => {
           setReactions(prev => prev.filter(r => r.id !== newReaction.id));
-        }, 3000);
+        }, 2000); // Faster cleanup for smoother animations
       })
       .on('postgres_changes', {
         event: 'INSERT',

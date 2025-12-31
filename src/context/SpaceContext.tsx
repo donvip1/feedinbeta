@@ -219,9 +219,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           if (!broadcastResult) {
             console.warn('[SpaceContext-SFU] Failed to start broadcasting');
           } else {
-            console.log('[SpaceContext-SFU] ✅ Broadcasting started successfully');
-            // Give time for track info to propagate to database
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            console.log('[SpaceContext-SFU] ✅ Broadcasting started successfully - no delay');
           }
         } else {
           console.warn('[SpaceContext-SFU] ⚠️ No stream obtained, cannot broadcast');
