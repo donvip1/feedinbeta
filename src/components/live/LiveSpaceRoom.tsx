@@ -355,6 +355,31 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       })
       .subscribe();
 
+    // Subscribe to host control broadcasts (mute all, etc.)
+    const controlChannel = supabase
+      .channel(`space-control-${spaceId}`)
+      .on('broadcast', { event: 'mute_all' }, (payload: any) => {
+        console.log('[LiveSpace] Host muted all participants');
+        // If we're not the host, mute ourselves
+        if (payload.payload?.by !== user?.id) {
+          setIsMuted(true);
+          setMyHostMuted(true);
+          // Also mute via SpaceContext
+          if (spaceContext) {
+            spaceContext.setMuted(true);
+          }
+          toast.info('You have been muted by the host');
+        }
+      })
+      .on('broadcast', { event: 'allow_unmute' }, (payload: any) => {
+        console.log('[LiveSpace] Host allowed unmuting');
+        if (payload.payload?.by !== user?.id) {
+          setMyHostMuted(false);
+          toast.info('You can now unmute');
+        }
+      })
+      .subscribe();
+
     // Subscribe to promotion notifications for this user
     let promotionChannel: ReturnType<typeof supabase.channel> | null = null;
     if (user) {
@@ -388,6 +413,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       // Audio continues via SpaceContext. Only cleanup when user explicitly leaves.
       supabase.removeChannel(channel);
       supabase.removeChannel(broadcastChannel);
+      supabase.removeChannel(controlChannel);
       if (promotionChannel) {
         supabase.removeChannel(promotionChannel);
       }
@@ -725,30 +751,63 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     toast.success(allowed ? 'Mic enabled for all' : 'Mic disabled for all');
   };
 
-  // Mute all speakers
+  // Mute all speakers (except host) - forcefully mutes everyone
   const muteAllSpeakers = async () => {
     if (!isHost) return;
     
-    await supabase
+    // Update all speakers and co-hosts (not the host themselves)
+    const { error } = await supabase
       .from('live_space_speakers')
-      .update({ is_muted: true, host_muted: true })
+      .update({ 
+        is_muted: true, 
+        host_muted: true 
+      })
       .eq('space_id', spaceId)
-      .neq('user_id', user?.id)
-      .in('role', ['speaker', 'co_host']);
+      .neq('user_id', user?.id);
     
-    toast.success('All speakers muted');
+    if (error) {
+      console.error('[LiveSpace] Failed to mute all:', error);
+      toast.error('Failed to mute all');
+      return;
+    }
+    
+    // Also broadcast a mute-all event for immediate effect
+    const channel = supabase.channel(`space-control-${spaceId}`);
+    await channel.send({
+      type: 'broadcast',
+      event: 'mute_all',
+      payload: { by: user?.id },
+    });
+    supabase.removeChannel(channel);
+    
+    toast.success('All participants muted');
   };
 
-  // Allow all to unmute
+  // Allow all to unmute (removes host_muted restriction)
   const allowAllToUnmute = async () => {
     if (!isHost) return;
     
-    await supabase
+    const { error } = await supabase
       .from('live_space_speakers')
       .update({ host_muted: false })
       .eq('space_id', spaceId);
     
-    toast.success('All users can now unmute');
+    if (error) {
+      console.error('[LiveSpace] Failed to allow unmute:', error);
+      toast.error('Failed to allow unmute');
+      return;
+    }
+    
+    // Broadcast unmute permission
+    const channel = supabase.channel(`space-control-${spaceId}`);
+    await channel.send({
+      type: 'broadcast',
+      event: 'allow_unmute',
+      payload: { by: user?.id },
+    });
+    supabase.removeChannel(channel);
+    
+    toast.success('All participants can now unmute');
   };
 
   const toggleRaiseHand = async () => {
@@ -1155,39 +1214,58 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
           {/* Host Controls Bar */}
           {isHost && (
-            <div className="flex items-center gap-2 mt-3 p-2 rounded-lg bg-muted/50 border border-border/50 flex-wrap sm:flex-nowrap">
-              <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex items-center gap-3 mt-3 p-3 rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20">
+              <div className="flex items-center gap-2 shrink-0">
                 <Switch 
                   checked={space?.allow_mic_for_all !== false}
                   onCheckedChange={toggleMicForAll}
                   id="mic-for-all"
                   className="scale-90"
                 />
-                <label htmlFor="mic-for-all" className="text-[10px] font-medium cursor-pointer whitespace-nowrap">
-                  Mic All
+                <label htmlFor="mic-for-all" className="text-xs font-medium cursor-pointer whitespace-nowrap">
+                  Allow Mic for All
                 </label>
               </div>
-              <div className="h-4 w-px bg-border shrink-0 hidden sm:block" />
-              <div className="flex items-center gap-1.5">
+              
+              <div className="h-6 w-px bg-border shrink-0" />
+              
+              <div className="flex items-center gap-2">
                 <Button 
-                  size="icon" 
-                  variant="outline" 
-                  className="h-7 w-7"
+                  size="sm" 
+                  variant="destructive"
+                  className="h-8 gap-1.5"
                   onClick={muteAllSpeakers}
-                  title="Mute All"
                 >
                   <VolumeX className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Mute All</span>
                 </Button>
                 <Button 
-                  size="icon" 
-                  variant="outline" 
-                  className="h-7 w-7"
+                  size="sm" 
+                  variant="outline"
+                  className="h-8 gap-1.5"
                   onClick={allowAllToUnmute}
-                  title="Allow Unmute"
                 >
                   <Volume2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Allow Unmute</span>
                 </Button>
               </div>
+              
+              <div className="h-6 w-px bg-border shrink-0 hidden sm:block" />
+              
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1.5 ml-auto hidden sm:flex"
+                onClick={() => setShowSpeakerQueue(true)}
+              >
+                <Hand className="w-3.5 h-3.5" />
+                Queue
+                {raisedHands.length > 0 && (
+                  <Badge className="h-5 w-5 p-0 justify-center bg-amber-500 text-white">
+                    {raisedHands.length}
+                  </Badge>
+                )}
+              </Button>
             </div>
           )}
         </div>

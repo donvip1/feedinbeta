@@ -269,11 +269,33 @@ export const SpeakerAvatarWithWaves = ({
         >
           {speaker.profile?.display_name || 'User'}
         </p>
+        
+        {/* Role badge */}
         {speaker.role !== 'listener' && speaker.role !== 'speaker' && (
           <Badge variant="secondary" className="text-[10px] h-4 mt-0.5">
             {speaker.role === 'host' ? 'Host' : 'Co-host'}
           </Badge>
         )}
+        
+        {/* Mute status text - visible to everyone */}
+        <div className="flex items-center justify-center gap-1 mt-0.5">
+          {speaker.host_muted ? (
+            <span className="text-[10px] text-red-400 flex items-center gap-0.5">
+              <Shield className="w-2.5 h-2.5" />
+              Host muted
+            </span>
+          ) : speaker.is_muted ? (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
+              <MicOff className="w-2.5 h-2.5" />
+              Muted
+            </span>
+          ) : (
+            <span className="text-[10px] text-green-400 flex items-center gap-0.5">
+              <Mic className="w-2.5 h-2.5" />
+              Speaking
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Gift button on hover */}
