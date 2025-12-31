@@ -10,7 +10,7 @@ import {
   Users, Send, Heart, X, Gift, 
   Volume2, VolumeX, Maximize, Minimize, Flame, 
   PartyPopper, ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Coins
+  MessageCircle, Home, Coins, Wifi, WifiOff
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { CloudflareStreamSFU } from "@/lib/cloudflare-stream-sfu";
 
 interface LiveStreamViewerWebRTCProps {
   streamId: string;
@@ -49,8 +50,7 @@ const GIFT_EMOJIS: Record<string, string> = {
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const viewerIdRef = useRef<string>(crypto.randomUUID());
+  const sfuRef = useRef<CloudflareStreamSFU | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
@@ -69,6 +69,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [viewers, setViewers] = useState<any[]>([]);
   const [isChatFocused, setIsChatFocused] = useState(false);
   const [connectionNotified, setConnectionNotified] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
@@ -116,8 +117,8 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         console.log("[Viewer] Stream status changed:", payload.new.status);
         if (payload.new.status === 'ended') {
           toast.info("Stream has ended");
-          if (pcRef.current) {
-            pcRef.current.close();
+          if (sfuRef.current) {
+            sfuRef.current.destroy();
           }
           setTimeout(() => {
             onClose();

@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { 
   Video, VideoOff, Mic, MicOff, FlipHorizontal,
   Users, Send, X, Gift, MessageCircle,
-  Maximize, Minimize, Radio, UserPlus, Coins, Share2, Home
+  Maximize, Minimize, Radio, UserPlus, Coins, Share2, Home, Wifi, WifiOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
@@ -21,6 +21,7 @@ import { useNavigate } from 'react-router-dom';
 import { FlyingChat } from './FlyingChat';
 import { ViewerListPanel } from './ViewerListPanel';
 import { motion, AnimatePresence } from "framer-motion";
+import { CloudflareStreamSFU } from "@/lib/cloudflare-stream-sfu";
 
 interface LiveBroadcasterProps {
   streamId: string;
@@ -44,7 +45,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const viewersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const sfuRef = useRef<CloudflareStreamSFU | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
   const [stream, setStream] = useState<any>(null);
@@ -64,6 +65,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [totalGiftsReceived, setTotalGiftsReceived] = useState(0);
   const [flyingGifts, setFlyingGifts] = useState<{ id: string; gift_type: string; sender_name: string; credit_value: number }[]>([]);
   const [coHosts, setCoHosts] = useState<string[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
 
   // Hide bottom navigation when broadcasting
   useEffect(() => {
@@ -100,11 +102,19 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
-  // Start broadcasting
+  // Start broadcasting - now using Cloudflare SFU
   const startBroadcast = async () => {
     setIsStarting(true);
+    setConnectionStatus('connecting');
+    
     try {
-      await initializeMedia();
+      const mediaStream = await initializeMedia();
+      
+      // Create and initialize SFU connection
+      sfuRef.current = new CloudflareStreamSFU(streamId, 'host');
+      
+      console.log('[Host] Publishing stream to Cloudflare SFU...');
+      await sfuRef.current.initializePublisher(mediaStream);
       
       // Update stream status to live
       const { error } = await supabase
@@ -118,9 +128,25 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       if (error) throw error;
 
       setIsLive(true);
+      setConnectionStatus('connected');
       toast.success("You are now live!");
+      
+      // Monitor SFU connection
+      const connectionMonitor = setInterval(() => {
+        if (sfuRef.current) {
+          const state = sfuRef.current.getConnectionState();
+          if (state === 'connected') {
+            setConnectionStatus('connected');
+          } else if (state === 'failed') {
+            setConnectionStatus('failed');
+          }
+        }
+      }, 2000);
+      
+      return () => clearInterval(connectionMonitor);
     } catch (error: any) {
       console.error("Error starting broadcast:", error);
+      setConnectionStatus('failed');
       toast.error(error.message || "Failed to start broadcast");
     } finally {
       setIsStarting(false);
@@ -129,10 +155,10 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
 
   // Stop broadcasting
   const stopBroadcast = async () => {
-    // Send stream-ended broadcast to all viewers FIRST
-    const endChannel = supabase.channel(`broadcast-${streamId}-end`);
-    await endChannel.subscribe();
-    await supabase.channel(`broadcast-${streamId}`).send({
+    // Notify viewers via Supabase broadcast
+    const channel = supabase.channel(`stream-notify-${streamId}`);
+    await channel.subscribe();
+    await channel.send({
       type: 'broadcast',
       event: 'stream-ended',
       payload: { streamId },
@@ -141,12 +167,14 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     // Give viewers a moment to receive the message
     await new Promise(resolve => setTimeout(resolve, 500));
     
+    // Clean up SFU connection
+    if (sfuRef.current) {
+      await sfuRef.current.destroy();
+      sfuRef.current = null;
+    }
+    
     // Stop all tracks
     streamRef.current?.getTracks().forEach(track => track.stop());
-    
-    // Close all peer connections
-    viewersRef.current.forEach(pc => pc.close());
-    viewersRef.current.clear();
 
     // Update stream status
     await supabase
@@ -157,8 +185,9 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       })
       .eq("id", streamId);
 
-    await supabase.removeChannel(endChannel);
+    await supabase.removeChannel(channel);
     setIsLive(false);
+    setConnectionStatus('idle');
     onClose();
   };
 
@@ -180,7 +209,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     }
   };
 
-  // Switch camera - update all viewer connections
+  // Switch camera - for SFU we need to republish
   const switchCamera = async () => {
     const oldStream = streamRef.current;
     setIsFrontCamera(!isFrontCamera);
@@ -204,28 +233,19 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         videoRef.current.srcObject = newStream;
       }
 
-      // Replace tracks in all viewer peer connections
-      const newVideoTrack = newStream.getVideoTracks()[0];
-      const newAudioTrack = newStream.getAudioTracks()[0];
-
-      viewersRef.current.forEach((pc, viewerId) => {
-        pc.getSenders().forEach(sender => {
-          if (sender.track?.kind === 'video' && newVideoTrack) {
-            sender.replaceTrack(newVideoTrack).catch(err => {
-              console.error(`[Host] Error replacing video track for ${viewerId}:`, err);
-            });
-          } else if (sender.track?.kind === 'audio' && newAudioTrack) {
-            sender.replaceTrack(newAudioTrack).catch(err => {
-              console.error(`[Host] Error replacing audio track for ${viewerId}:`, err);
-            });
-          }
-        });
-      });
-
       // Stop old tracks
       oldStream?.getTracks().forEach(track => track.stop());
       
-      console.log("[Host] Camera switched and tracks updated for all viewers");
+      // For SFU, we need to republish with new stream
+      if (sfuRef.current && isLive) {
+        console.log("[Host] Reinitializing SFU with new camera...");
+        await sfuRef.current.destroy();
+        sfuRef.current = new CloudflareStreamSFU(streamId, 'host');
+        await sfuRef.current.initializePublisher(newStream);
+        toast.success("Camera switched!");
+      }
+      
+      console.log("[Host] Camera switched successfully");
     } catch (error) {
       console.error("[Host] Error switching camera:", error);
       toast.error("Could not switch camera");
@@ -249,226 +269,14 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     fetchStream();
   }, [streamId]);
 
-  // Subscribe to signaling channel for viewer connections
+  // Clean up SFU on unmount
   useEffect(() => {
-    if (!isLive) return;
-
-    const channel = supabase
-      .channel(`broadcast-${streamId}`, {
-        config: {
-          broadcast: { self: false },
-        }
-      })
-      .on('broadcast', { event: 'viewer-join' }, async ({ payload }) => {
-        console.log("[Host] Viewer joining:", payload.viewerId);
-        await handleViewerJoin(payload.viewerId, channel);
-      })
-      .on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
-        const pc = viewersRef.current.get(payload.viewerId);
-        if (pc && payload.candidate) {
-          try {
-            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-          } catch (err) {
-            console.error("[Host] Error adding ICE candidate:", err);
-          }
-        }
-      })
-      .on('broadcast', { event: 'answer' }, async ({ payload }) => {
-        const pc = viewersRef.current.get(payload.viewerId);
-        if (pc) {
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
-            console.log("[Host] Received answer from viewer:", payload.viewerId);
-          } catch (err) {
-            console.error("[Host] Error setting remote description:", err);
-          }
-        }
-      });
-
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        console.log("[Host] Subscribed to broadcast channel");
-        // Signal to any waiting viewers that host is ready
-        channel.send({
-          type: 'broadcast',
-          event: 'host-ready',
-          payload: { streamId },
-        });
-        
-        // Send host-ready signal periodically to catch new viewers
-        const readyInterval = setInterval(() => {
-          channel.send({
-            type: 'broadcast',
-            event: 'host-ready',
-            payload: { streamId },
-          });
-        }, 5000);
-        
-        return () => clearInterval(readyInterval);
-      }
-    });
-
     return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [isLive, streamId]);
-
-  // Cache ICE servers for reuse
-  const iceServersRef = useRef<RTCIceServer[]>([
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ]);
-
-  // Fetch TURN credentials on mount
-  useEffect(() => {
-    const fetchTurnCredentials = async () => {
-      try {
-        const { data, error } = await supabase.functions.invoke('get-turn-credentials');
-        if (!error && data?.iceServers) {
-          iceServersRef.current = data.iceServers;
-          console.log("[Host] Got TURN credentials, servers:", data.iceServers.length);
-        }
-      } catch (err) {
-        console.warn("[Host] Could not fetch TURN credentials:", err);
+      if (sfuRef.current) {
+        sfuRef.current.destroy();
       }
     };
-    fetchTurnCredentials();
   }, []);
-
-  // Handle new viewer connection
-  const handleViewerJoin = async (viewerId: string, channel: any) => {
-    if (!streamRef.current) {
-      console.log("[Host] No stream available yet, queuing viewer:", viewerId);
-      // Queue this viewer for when stream is ready
-      setTimeout(() => handleViewerJoin(viewerId, channel), 1000);
-      return;
-    }
-
-    // Check if we already have a connection for this viewer
-    const existingPc = viewersRef.current.get(viewerId);
-    if (existingPc) {
-      // If existing connection is still good, resend the offer
-      if (existingPc.connectionState === 'connected') {
-        console.log("[Host] Connection already established for viewer:", viewerId);
-        return;
-      }
-      if (existingPc.connectionState === 'connecting' || existingPc.connectionState === 'new') {
-        console.log("[Host] Connection in progress for viewer:", viewerId);
-        return;
-      }
-      // Close stale connection
-      console.log("[Host] Closing stale connection for viewer:", viewerId);
-      existingPc.close();
-      viewersRef.current.delete(viewerId);
-    }
-
-    console.log("[Host] Creating peer connection for viewer:", viewerId);
-
-    const pc = new RTCPeerConnection({
-      iceServers: iceServersRef.current,
-      iceCandidatePoolSize: 10,
-      bundlePolicy: 'max-bundle',
-      rtcpMuxPolicy: 'require',
-    });
-
-    // Add local stream tracks - CRITICAL: make sure tracks are properly added
-    const tracks = streamRef.current.getTracks();
-    console.log("[Host] Available tracks:", tracks.length);
-    tracks.forEach(track => {
-      console.log("[Host] Adding track:", track.kind, "enabled:", track.enabled, "readyState:", track.readyState);
-      if (track.readyState === 'live') {
-        pc.addTrack(track, streamRef.current!);
-      }
-    });
-
-    // Collect ICE candidates and send them
-    const iceCandidates: RTCIceCandidate[] = [];
-    let isIceGatheringComplete = false;
-    
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        iceCandidates.push(event.candidate);
-        // Send ICE candidates immediately
-        channel.send({
-          type: 'broadcast',
-          event: 'ice-candidate-from-host',
-          payload: { viewerId, candidate: event.candidate },
-        });
-      } else {
-        // ICE gathering complete
-        isIceGatheringComplete = true;
-        console.log(`[Host] ICE gathering complete for ${viewerId}, sent ${iceCandidates.length} candidates`);
-      }
-    };
-
-    pc.oniceconnectionstatechange = () => {
-      console.log(`[Host] ICE state for ${viewerId}:`, pc.iceConnectionState);
-      if (pc.iceConnectionState === 'failed') {
-        console.log(`[Host] ICE failed for ${viewerId}, restarting...`);
-        pc.restartIce();
-      } else if (pc.iceConnectionState === 'disconnected') {
-        // Wait briefly for recovery
-        setTimeout(() => {
-          if (pc.iceConnectionState === 'disconnected') {
-            console.log(`[Host] ICE still disconnected for ${viewerId}, restarting...`);
-            pc.restartIce();
-          }
-        }, 2000);
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log(`[Host] Connection state for ${viewerId}:`, pc.connectionState);
-      if (pc.connectionState === 'connected') {
-        console.log(`[Host] Successfully connected to viewer ${viewerId}`);
-      } else if (pc.connectionState === 'disconnected') {
-        // Give it a moment to recover before cleaning up
-        setTimeout(() => {
-          if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-            console.log(`[Host] Cleaning up stale connection for ${viewerId}`);
-            pc.close();
-            viewersRef.current.delete(viewerId);
-            setViewerCount(viewersRef.current.size);
-          }
-        }, 5000);
-      } else if (pc.connectionState === 'failed') {
-        console.log(`[Host] Connection failed for ${viewerId}`);
-        viewersRef.current.delete(viewerId);
-        setViewerCount(viewersRef.current.size);
-        pc.close();
-      }
-    };
-
-    // Store the connection immediately so we don't create duplicates
-    viewersRef.current.set(viewerId, pc);
-    setViewerCount(viewersRef.current.size);
-
-    try {
-      // Create offer with proper settings for sending media
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: false,
-        offerToReceiveVideo: false,
-      });
-      await pc.setLocalDescription(offer);
-
-      // Wait briefly for some ICE candidates to be gathered
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Send offer to viewer
-      console.log("[Host] Sending offer to viewer:", viewerId);
-      channel.send({
-        type: 'broadcast',
-        event: 'offer',
-        payload: { viewerId, offer: pc.localDescription },
-      });
-    } catch (err) {
-      console.error("[Host] Error creating offer:", err);
-      pc.close();
-      viewersRef.current.delete(viewerId);
-      setViewerCount(viewersRef.current.size);
-    }
-  };
-
   // Subscribe to comments - FIXED: properly fetch and display with profiles
   useEffect(() => {
     const fetchComments = async () => {
