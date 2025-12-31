@@ -21,6 +21,7 @@ interface LiveGiftModalProps {
   hostId: string;
   viewers: Array<{ id: string; display_name: string; username: string; avatar_url: string }>;
   isHost: boolean;
+  isSpace?: boolean; // If true, inserts into live_space_gifts instead of live_stream_gifts
 }
 
 // Premium 3D animated gift types
@@ -44,6 +45,7 @@ export const LiveGiftModal = ({
   hostId,
   viewers,
   isHost,
+  isSpace = false,
 }: LiveGiftModalProps) => {
   const { user } = useAuth();
   const [selectedRecipient, setSelectedRecipient] = useState<string | null>(null);
@@ -109,14 +111,24 @@ export const LiveGiftModal = ({
         related_id: streamId,
       });
 
-      // Record the gift
-      await supabase.from('live_stream_gifts').insert({
-        stream_id: streamId,
-        sender_id: user.id,
-        receiver_id: recipientId,
-        gift_type: giftType,
-        credit_value: creditValue,
-      });
+      // Record the gift in the appropriate table
+      if (isSpace) {
+        await supabase.from('live_space_gifts').insert({
+          space_id: streamId,
+          sender_id: user.id,
+          receiver_id: recipientId,
+          gift_type: giftType,
+          credit_value: creditValue,
+        });
+      } else {
+        await supabase.from('live_stream_gifts').insert({
+          stream_id: streamId,
+          sender_id: user.id,
+          receiver_id: recipientId,
+          gift_type: giftType,
+          credit_value: creditValue,
+        });
+      }
 
       // Record gift analytics
       await supabase.from('gift_analytics').insert({

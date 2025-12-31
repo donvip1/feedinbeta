@@ -198,11 +198,21 @@ export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceCha
           value={newMessage}
           onChange={(value) => setNewMessage(value)}
           placeholder="Say something... (@ to mention)"
-          onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              sendMessage();
+            }
+          }}
           disabled={sending}
           spaceId={spaceId}
         />
-        <Button size="icon" onClick={sendMessage} disabled={sending || !newMessage.trim()}>
+        <Button 
+          size="icon" 
+          onClick={sendMessage} 
+          disabled={sending || !newMessage.trim()}
+          className="bg-primary hover:bg-primary/90 shrink-0"
+        >
           <Send className="w-4 h-4" />
         </Button>
       </div>
