@@ -124,6 +124,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       });
       
       if (createResponse.error || !createResponse.data?.success) {
+        console.error('[Host] Failed to create live input:', createResponse);
         throw new Error(createResponse.data?.error || 'Failed to create live input');
       }
       
@@ -136,33 +137,66 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       if (webrtcUrl) {
         console.log('[Host] Publishing to Cloudflare Stream via WHIP...');
         
-        // Create peer connection for WHIP
+        // Create peer connection for WHIP with robust ICE configuration
         const pc = new RTCPeerConnection({
-          iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+          iceServers: [
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: 'stun:stun.l.google.com:19302' },
+          ],
           bundlePolicy: 'max-bundle',
+          iceCandidatePoolSize: 10,
         });
+        
+        // Monitor connection state
+        pc.onconnectionstatechange = () => {
+          console.log('[Host] Connection state:', pc.connectionState);
+          if (pc.connectionState === 'connected') {
+            setConnectionStatus('connected');
+          } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            console.error('[Host] WebRTC connection failed');
+            setConnectionStatus('failed');
+          }
+        };
+        
+        pc.oniceconnectionstatechange = () => {
+          console.log('[Host] ICE connection state:', pc.iceConnectionState);
+        };
         
         // Add tracks from media stream
         mediaStream.getTracks().forEach(track => {
+          console.log('[Host] Adding track:', track.kind, track.label);
           pc.addTrack(track, mediaStream);
         });
         
         // Create and set local description
-        const offer = await pc.createOffer();
+        const offer = await pc.createOffer({
+          offerToReceiveAudio: false,
+          offerToReceiveVideo: false,
+        });
         await pc.setLocalDescription(offer);
+        console.log('[Host] Local SDP offer created');
         
-        // Wait for ICE gathering to complete
-        await new Promise<void>((resolve) => {
+        // Wait for ICE gathering to complete (with timeout)
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            console.log('[Host] ICE gathering timed out, proceeding...');
+            resolve();
+          }, 5000);
+          
           if (pc.iceGatheringState === 'complete') {
+            clearTimeout(timeout);
             resolve();
           } else {
             pc.onicegatheringstatechange = () => {
               if (pc.iceGatheringState === 'complete') {
+                clearTimeout(timeout);
                 resolve();
               }
             };
           }
         });
+        
+        console.log('[Host] Sending SDP to WHIP endpoint:', webrtcUrl);
         
         // Send offer to Cloudflare WHIP endpoint
         const whipResponse = await fetch(webrtcUrl, {
@@ -174,19 +208,27 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         });
         
         if (!whipResponse.ok) {
-          throw new Error(`WHIP connection failed: ${whipResponse.status}`);
+          const errorText = await whipResponse.text();
+          console.error('[Host] WHIP response error:', whipResponse.status, errorText);
+          throw new Error(`WHIP connection failed: ${whipResponse.status} - ${errorText}`);
         }
         
         const answerSdp = await whipResponse.text();
+        console.log('[Host] Received WHIP answer SDP');
+        
         await pc.setRemoteDescription({
           type: 'answer',
           sdp: answerSdp,
         });
         
+        console.log('[Host] Remote description set, connection establishing...');
+        
         // Store peer connection for cleanup
-        (sfuRef as any).current = { pc, liveInputId };
+        sfuRef.current = { pc, liveInputId };
         
         console.log('[Host] Successfully connected to Cloudflare Stream!');
+      } else {
+        throw new Error('No WebRTC URL returned from Cloudflare');
       }
       
       // Step 3: Update stream status to live
@@ -228,12 +270,12 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     await new Promise(resolve => setTimeout(resolve, 500));
     
     // Clean up WebRTC connection
-    if ((sfuRef as any).current?.pc) {
-      (sfuRef as any).current.pc.close();
+    if (sfuRef.current?.pc) {
+      sfuRef.current.pc.close();
     }
     
     // Optionally delete the live input (keeps recording if enabled)
-    const liveInputId = (sfuRef as any).current?.liveInputId;
+    const liveInputId = sfuRef.current?.liveInputId;
     if (liveInputId) {
       // Don't delete - let Cloudflare keep the recording
       console.log('[Host] Stream ended, recording available at live input:', liveInputId);
@@ -305,8 +347,8 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       oldStream?.getTracks().forEach(track => track.stop());
       
       // For Cloudflare Stream, we need to replace tracks in the existing connection
-      if ((sfuRef as any).current?.pc && isLive) {
-        const pc = (sfuRef as any).current.pc as RTCPeerConnection;
+      if (sfuRef.current?.pc && isLive) {
+        const pc = sfuRef.current.pc;
         const senders = pc.getSenders();
         
         // Replace video track

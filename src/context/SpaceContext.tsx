@@ -5,16 +5,16 @@ import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import type { SpaceRoomManager } from '@/lib/space-room-manager';
 
-// Lazy loaded to avoid circular dependencies
+// Lazy loaded to avoid circular dependencies - using ESM dynamic import
 let spaceRoomManagerInstance: SpaceRoomManager | null = null;
 
-const getSpaceRoomManager = (): SpaceRoomManager => {
+const getSpaceRoomManager = async (): Promise<SpaceRoomManager> => {
   if (!spaceRoomManagerInstance) {
-    // Dynamic require to break circular dependency
-    const module = require('@/lib/space-room-manager');
+    // Dynamic ESM import to break circular dependency (works in Vite/browser)
+    const module = await import('@/lib/space-room-manager');
     spaceRoomManagerInstance = module.spaceRoomManager;
   }
-  return spaceRoomManagerInstance!;
+  return spaceRoomManagerInstance;
 };
 
 interface SpaceInfo {
@@ -199,7 +199,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       // CRITICAL: Both hosts AND listeners need to initialize the room manager
       // Each participant gets their own SFU session to receive tracks from others
-      const result = await getSpaceRoomManager().initialize(
+      const roomManager = await getSpaceRoomManager();
+      const result = await roomManager.initialize(
         spaceInfoRef.current.id,
         currentUser.id,
         isHost,
@@ -236,7 +237,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log('[SpaceContext-SFU] 🎤 Starting broadcast as', effectiveRole);
         const stream = await getLocalStream(effectiveRole);
         if (stream) {
-          const broadcastResult = await getSpaceRoomManager().startBroadcasting(stream);
+          const broadcastResult = await roomManager.startBroadcasting(stream);
           if (!broadcastResult) {
             console.warn('[SpaceContext-SFU] Failed to start broadcasting');
           } else {
@@ -252,7 +253,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.log('[SpaceContext-SFU] 🎧 Subscribing to all active speakers...');
       
       // Start subscription in background - don't block connection
-      getSpaceRoomManager().subscribeToAllSpeakers().then(() => {
+      roomManager.subscribeToAllSpeakers().then(() => {
         console.log('[SpaceContext-SFU] ✅ Subscription to speakers complete');
       }).catch(err => {
         console.error('[SpaceContext-SFU] Error subscribing to speakers:', err);
@@ -310,7 +311,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     console.log('[SpaceContext-SFU] Disconnecting from space audio...');
     
     // Cleanup room manager (handles SFU cleanup internally)
-    await getSpaceRoomManager().cleanup();
+    const roomManager = await getSpaceRoomManager();
+    await roomManager.cleanup();
 
     // Stop local stream
     if (localStreamRef.current) {
@@ -403,7 +405,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
 
     // Also update room manager
-    getSpaceRoomManager().setMuted(muted);
+    getSpaceRoomManager().then(rm => rm.setMuted(muted));
   }, []);
 
   const setConnectionStatus = useCallback((status: ConnectionStatus) => {
@@ -431,7 +433,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       // Get microphone and start broadcasting
       const stream = await getLocalStream(role);
       if (stream) {
-        const success = await getSpaceRoomManager().startBroadcasting(stream);
+        const roomManager = await getSpaceRoomManager();
+        const success = await roomManager.startBroadcasting(stream);
         if (success) {
           console.log('[SpaceContext-SFU] ✅ Started broadcasting after role upgrade');
         }
@@ -447,11 +450,12 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     console.log('[SpaceContext-SFU] Starting listener broadcast with permission...');
     
     // Check if we have a session - if not, we need to connect first
-    const sessionId = getSpaceRoomManager().getSessionId?.();
+    const roomManager = await getSpaceRoomManager();
+    const sessionId = roomManager.getSessionId?.();
     if (!sessionId) {
       console.log('[SpaceContext-SFU] No session found, initializing first...');
       // Re-initialize as a broadcasting user
-      const result = await getSpaceRoomManager().initialize(
+      const result = await roomManager.initialize(
         spaceInfoRef.current.id,
         currentUser.id,
         false,
@@ -479,7 +483,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       localStreamRef.current = stream;
       setLocalStream(stream);
 
-      const success = await getSpaceRoomManager().startBroadcasting(stream);
+      const success = await roomManager.startBroadcasting(stream);
       if (success) {
         console.log('[SpaceContext-SFU] ✅ Listener started broadcasting');
       }
