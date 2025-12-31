@@ -126,6 +126,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   // Listener audio output controls
   const [isOutputMuted, setIsOutputMuted] = useState(false);
   const [useLoudspeaker, setUseLoudspeaker] = useState(true);
+  const [allParticipantsMuted, setAllParticipantsMuted] = useState(false);
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
   const isHost = space?.user_id === user?.id || myRole === 'host' || myRole === 'co_host';
@@ -751,63 +752,65 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     toast.success(allowed ? 'Mic enabled for all' : 'Mic disabled for all');
   };
 
-  // Mute all speakers (except host) - forcefully mutes everyone
-  const muteAllSpeakers = async () => {
+  // Toggle mute/unmute all participants
+  const toggleMuteAllParticipants = async () => {
     if (!isHost) return;
     
-    // Update all speakers and co-hosts (not the host themselves)
-    const { error } = await supabase
-      .from('live_space_speakers')
-      .update({ 
-        is_muted: true, 
-        host_muted: true 
-      })
-      .eq('space_id', spaceId)
-      .neq('user_id', user?.id);
+    const shouldMute = !allParticipantsMuted;
     
-    if (error) {
-      console.error('[LiveSpace] Failed to mute all:', error);
-      toast.error('Failed to mute all');
-      return;
+    if (shouldMute) {
+      // Mute all speakers (except host)
+      const { error } = await supabase
+        .from('live_space_speakers')
+        .update({ 
+          is_muted: true, 
+          host_muted: true 
+        })
+        .eq('space_id', spaceId)
+        .neq('user_id', user?.id);
+      
+      if (error) {
+        console.error('[LiveSpace] Failed to mute all:', error);
+        toast.error('Failed to mute all');
+        return;
+      }
+      
+      // Broadcast mute-all event for immediate effect
+      const channel = supabase.channel(`space-control-${spaceId}`);
+      await channel.send({
+        type: 'broadcast',
+        event: 'mute_all',
+        payload: { by: user?.id },
+      });
+      supabase.removeChannel(channel);
+      
+      setAllParticipantsMuted(true);
+      toast.success('All participants muted');
+    } else {
+      // Allow all to unmute (removes host_muted restriction)
+      const { error } = await supabase
+        .from('live_space_speakers')
+        .update({ host_muted: false })
+        .eq('space_id', spaceId);
+      
+      if (error) {
+        console.error('[LiveSpace] Failed to allow unmute:', error);
+        toast.error('Failed to allow unmute');
+        return;
+      }
+      
+      // Broadcast unmute permission
+      const channel = supabase.channel(`space-control-${spaceId}`);
+      await channel.send({
+        type: 'broadcast',
+        event: 'allow_unmute',
+        payload: { by: user?.id },
+      });
+      supabase.removeChannel(channel);
+      
+      setAllParticipantsMuted(false);
+      toast.success('All participants can now unmute');
     }
-    
-    // Also broadcast a mute-all event for immediate effect
-    const channel = supabase.channel(`space-control-${spaceId}`);
-    await channel.send({
-      type: 'broadcast',
-      event: 'mute_all',
-      payload: { by: user?.id },
-    });
-    supabase.removeChannel(channel);
-    
-    toast.success('All participants muted');
-  };
-
-  // Allow all to unmute (removes host_muted restriction)
-  const allowAllToUnmute = async () => {
-    if (!isHost) return;
-    
-    const { error } = await supabase
-      .from('live_space_speakers')
-      .update({ host_muted: false })
-      .eq('space_id', spaceId);
-    
-    if (error) {
-      console.error('[LiveSpace] Failed to allow unmute:', error);
-      toast.error('Failed to allow unmute');
-      return;
-    }
-    
-    // Broadcast unmute permission
-    const channel = supabase.channel(`space-control-${spaceId}`);
-    await channel.send({
-      type: 'broadcast',
-      event: 'allow_unmute',
-      payload: { by: user?.id },
-    });
-    supabase.removeChannel(channel);
-    
-    toast.success('All participants can now unmute');
   };
 
   const toggleRaiseHand = async () => {
@@ -1226,26 +1229,24 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               
               <div className="h-6 w-px bg-border shrink-0" />
               
-              <div className="flex items-center gap-2">
-                <Button 
-                  size="sm" 
-                  variant="destructive"
-                  className="h-8 gap-1.5"
-                  onClick={muteAllSpeakers}
-                >
-                  <VolumeX className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Mute All</span>
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="h-8 gap-1.5"
-                  onClick={allowAllToUnmute}
-                >
-                  <Volume2 className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Allow Unmute</span>
-                </Button>
-              </div>
+              <Button 
+                size="sm" 
+                variant={allParticipantsMuted ? "outline" : "destructive"}
+                className="h-8 gap-1.5"
+                onClick={toggleMuteAllParticipants}
+              >
+                {allParticipantsMuted ? (
+                  <>
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Unmute All</span>
+                  </>
+                ) : (
+                  <>
+                    <VolumeX className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Mute All</span>
+                  </>
+                )}
+              </Button>
               
               <div className="h-6 w-px bg-border shrink-0 hidden sm:block" />
               
