@@ -330,10 +330,31 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       })
       .subscribe();
 
+    // Also subscribe to broadcast channels for instant reactions/gifts
+    const broadcastChannel = supabase
+      .channel(`space-reactions-${spaceId}`)
+      .on('broadcast', { event: 'reaction' }, (payload: any) => {
+        // Only add if not our own (we already show optimistically)
+        if (payload.payload?.user_id !== user?.id) {
+          const newReaction = {
+            id: `broadcast-${Date.now()}-${Math.random()}`,
+            emoji: payload.payload?.emoji,
+            x: Math.random() * 60 + 20,
+            y: Math.random() * 20,
+          };
+          setReactions(prev => [...prev, newReaction]);
+          setTimeout(() => {
+            setReactions(prev => prev.filter(r => r.id !== newReaction.id));
+          }, 3000);
+        }
+      })
+      .subscribe();
+
     return () => {
       // DON'T call leaveSpace or disconnect here - user may just be navigating away
       // Audio continues via SpaceContext. Only cleanup when user explicitly leaves.
       supabase.removeChannel(channel);
+      supabase.removeChannel(broadcastChannel);
     };
   }, [spaceId, user?.id]);
 
@@ -437,11 +458,18 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       const mySpeaker = enrichedSpeakers.find(s => s.user_id === user?.id);
       if (mySpeaker) {
         console.log('[LiveSpace] My role from speakers:', mySpeaker.role);
+        const previousRole = myRole;
         setMyRole(mySpeaker.role);
         setIsMuted(mySpeaker.is_muted);
         setHasRaisedHand(mySpeaker.has_raised_hand);
         setMyHostMuted(mySpeaker.host_muted || false);
         setMyMicAllowed(mySpeaker.mic_allowed !== false);
+        
+        // If role changed and we have SpaceContext, update it (this triggers broadcasting for new speakers)
+        if (spaceContext && mySpeaker.role !== previousRole) {
+          console.log('[LiveSpace] Role changed from', previousRole, 'to', mySpeaker.role);
+          spaceContext.updateRole(mySpeaker.role);
+        }
       } else if (user?.id === space?.user_id) {
         // I'm the owner but not in speakers list yet - set as host
         console.log('[LiveSpace] I am the space owner, setting role to host');
@@ -715,6 +743,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }, 3000);
 
     try {
+      // Insert reaction to database (triggers realtime for all users)
       const { error } = await supabase.from('live_space_reactions').insert({
         space_id: spaceId,
         user_id: user.id,
@@ -724,6 +753,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       if (error) {
         console.error('[LiveSpace] Failed to send reaction:', error);
       }
+      
+      // Also broadcast for instant delivery
+      const broadcastChannel = supabase.channel(`space-reactions-${spaceId}`);
+      await broadcastChannel.send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: { emoji, user_id: user.id },
+      });
+      supabase.removeChannel(broadcastChannel);
     } catch (error) {
       console.error('[LiveSpace] Error sending reaction:', error);
     }

@@ -106,6 +106,33 @@ export const SpaceInviteModal = ({ isOpen, onClose, spaceId }: SpaceInviteModalP
           throw error;
         }
       } else {
+        // Create a notification for the invitee (ignore errors if table doesn't exist)
+        try {
+          await supabase.from('notifications').insert({
+            user_id: inviteeId,
+            type: 'space_invite',
+            title: 'Speaker Invitation',
+            content: `You've been invited to speak in a live space`,
+            related_id: spaceId,
+            read: false,
+          });
+        } catch {
+          // Ignore if notifications table doesn't exist
+        }
+        
+        // Also broadcast to the invitee for instant delivery
+        const broadcastChannel = supabase.channel(`space-invite-broadcast-${inviteeId}`);
+        await broadcastChannel.send({
+          type: 'broadcast',
+          event: 'space-invite',
+          payload: { 
+            space_id: spaceId, 
+            inviter_id: user.id,
+            invitee_id: inviteeId,
+          },
+        });
+        supabase.removeChannel(broadcastChannel);
+
         toast.success('Invitation sent!');
         fetchPendingInvites();
         setSearchResults(prev => prev.filter(u => u.id !== inviteeId));

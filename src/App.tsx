@@ -13,6 +13,7 @@ import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
 import { FloatingSpacePlayer } from "@/components/live/FloatingSpacePlayer";
 import { LiveInviteNotification } from "@/components/live/LiveInviteNotification";
+import { SpaceInviteNotification } from "@/components/live/SpaceInviteNotification";
 import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
@@ -139,6 +140,7 @@ const App = () => {
                   <FloatingSpacePlayer />
                   <ActiveCallIndicator />
                   <LiveInviteNotification />
+                  <SpaceInviteNotification />
                   <MobileInstallModal />
                   <BrowserInstallBanner />
                   <UpdatePromptModal 

@@ -373,14 +373,31 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }));
   }, []);
 
-  const updateRole = useCallback((role: string) => {
+  const updateRole = useCallback(async (role: string) => {
     console.log('[SpaceContext-SFU] Updating role to:', role);
+    const previousRole = roleRef.current;
     roleRef.current = role;
     setSpaceState(prev => ({
       ...prev,
       myRole: role as SpaceState['myRole'],
     }));
-  }, []);
+
+    // If promoted to speaker/co_host, start broadcasting
+    const canNowBroadcast = role === 'host' || role === 'co_host' || role === 'speaker';
+    const couldBroadcast = previousRole === 'host' || previousRole === 'co_host' || previousRole === 'speaker';
+
+    if (canNowBroadcast && !couldBroadcast && spaceInfoRef.current) {
+      console.log('[SpaceContext-SFU] Role upgraded to broadcaster, starting audio...');
+      // Get microphone and start broadcasting
+      const stream = await getLocalStream(role);
+      if (stream) {
+        const success = await spaceRoomManager.startBroadcasting(stream);
+        if (success) {
+          console.log('[SpaceContext-SFU] ✅ Started broadcasting after role upgrade');
+        }
+      }
+    }
+  }, [getLocalStream]);
 
   // Handle beforeunload - cleanup on browser close
   useEffect(() => {
@@ -388,11 +405,6 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (spaceState.isActive && spaceInfoRef.current && user) {
         // Send a beacon to mark user as left
         const url = `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/live_space_speakers?space_id=eq.${spaceInfoRef.current.id}&user_id=eq.${user.id}`;
-        const headers = {
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        };
         
         navigator.sendBeacon(
           url,
@@ -404,6 +416,40 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [spaceState.isActive, user]);
+
+  // Handle visibility change - keep connection alive when app is minimized
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // App is minimized or screen is off - keep connection alive
+        console.log('[SpaceContext] App hidden - maintaining connection');
+      } else if (document.visibilityState === 'visible') {
+        // App is visible again - check and reconnect if needed
+        console.log('[SpaceContext] App visible - checking connection');
+        if (spaceState.isActive && spaceState.connectionStatus !== 'connected') {
+          console.log('[SpaceContext] Reconnecting after visibility change...');
+          connectAudio(roleRef.current);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Also handle page focus
+    const handleFocus = () => {
+      if (spaceState.isActive && spaceState.connectionStatus !== 'connected' && spaceState.connectionStatus !== 'connecting') {
+        console.log('[SpaceContext] Page focused - reconnecting...');
+        connectAudio(roleRef.current);
+      }
+    };
+    
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [spaceState.isActive, spaceState.connectionStatus, connectAudio]);
 
   // Cleanup on unmount
   useEffect(() => {
