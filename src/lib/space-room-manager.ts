@@ -212,10 +212,61 @@ class SpaceRoomManager {
    * Handle incoming remote audio track
    */
   private handleRemoteTrack(track: MediaStreamTrack, peerId: string) {
-    console.log('[SpaceRoomManager] 🔊 Handling remote track from:', peerId);
+    console.log('[SpaceRoomManager] 🔊 Handling remote track from:', peerId, 'kind:', track.kind, 'readyState:', track.readyState);
 
+    // Create audio element for playback (in addition to SFU's own element)
+    // This ensures audio is always played
+    this.playRemoteAudio(track, peerId);
+    
     // Create analyzer for speaking indicator
     this.createAnalyzer(new MediaStream([track]), peerId);
+  }
+
+  /**
+   * Play remote audio through an audio element
+   */
+  private playRemoteAudio(track: MediaStreamTrack, peerId: string): void {
+    const elementId = `space-audio-${peerId}`;
+    
+    // Remove existing audio element if any
+    const existing = document.getElementById(elementId);
+    if (existing) {
+      existing.remove();
+    }
+
+    const audio = document.createElement('audio');
+    audio.id = elementId;
+    audio.autoplay = true;
+    (audio as any).playsInline = true;
+    audio.srcObject = new MediaStream([track]);
+    audio.volume = 1.0;
+    audio.volume = 1.0;
+    
+    // Style to hide but keep functional
+    audio.style.position = 'absolute';
+    audio.style.left = '-9999px';
+    audio.style.top = '-9999px';
+    
+    document.body.appendChild(audio);
+
+    // Try to play immediately
+    audio.play().then(() => {
+      console.log('[SpaceRoomManager] 🔊 Audio playing for peer:', peerId);
+    }).catch((err) => {
+      console.warn('[SpaceRoomManager] Autoplay blocked, will retry on user interaction:', err);
+      // Add click handler to enable audio
+      const enableAudio = () => {
+        audio.play().then(() => {
+          console.log('[SpaceRoomManager] 🔊 Audio enabled after user interaction for peer:', peerId);
+        }).catch(console.error);
+        document.removeEventListener('click', enableAudio);
+        document.removeEventListener('touchstart', enableAudio);
+      };
+      document.addEventListener('click', enableAudio);
+      document.addEventListener('touchstart', enableAudio);
+    });
+
+    console.log('[SpaceRoomManager] 🔊 Created audio element for peer:', peerId);
   }
 
   /**
@@ -428,6 +479,12 @@ class SpaceRoomManager {
 
     // Stop broadcasting
     await this.stopBroadcasting();
+
+    // Remove all audio elements created by this manager
+    document.querySelectorAll('[id^="space-audio-"]').forEach(el => {
+      console.log('[SpaceRoomManager] Removing audio element:', el.id);
+      el.remove();
+    });
 
     // Clear analyzers
     this.analyzers.clear();

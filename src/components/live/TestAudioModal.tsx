@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, CheckCircle, AlertCircle, Volume2 } from 'lucide-react';
+import { Mic, MicOff, CheckCircle, AlertCircle, Volume2, VolumeX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,6 +10,8 @@ import {
 } from '@/components/ui/dialog';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 interface TestAudioModalProps {
   isOpen: boolean;
@@ -23,11 +25,13 @@ export const TestAudioModal = ({ isOpen, onClose }: TestAudioModalProps) => {
   const [isListening, setIsListening] = useState(false);
   const [micDetected, setMicDetected] = useState(false);
   const [peakLevel, setPeakLevel] = useState(0);
+  const [playbackEnabled, setPlaybackEnabled] = useState(true);
   
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const peakTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gainNodeRef = useRef<GainNode | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,7 +48,7 @@ export const TestAudioModal = ({ isOpen, onClose }: TestAudioModalProps) => {
       setIsListening(true);
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
         audio: { 
-          echoCancellation: true,
+          echoCancellation: false, // Disable echo cancellation for playback test
           noiseSuppression: true,
           autoGainControl: true
         } 
@@ -53,14 +57,27 @@ export const TestAudioModal = ({ isOpen, onClose }: TestAudioModalProps) => {
       setStream(mediaStream);
       setHasPermission(true);
       
-      // Set up audio analysis
+      // Set up audio context and routing
       audioContextRef.current = new AudioContext();
       const source = audioContextRef.current.createMediaStreamSource(mediaStream);
+      
+      // Create analyzer for visualization
       const analyzer = audioContextRef.current.createAnalyser();
       analyzer.fftSize = 256;
       analyzer.smoothingTimeConstant = 0.8;
-      source.connect(analyzer);
       analyzerRef.current = analyzer;
+      
+      // Create gain node for playback control
+      const gainNode = audioContextRef.current.createGain();
+      gainNode.gain.value = playbackEnabled ? 0.8 : 0;
+      gainNodeRef.current = gainNode;
+      
+      // Connect: source -> analyzer (for visualization)
+      source.connect(analyzer);
+      
+      // Connect: source -> gain -> destination (for playback)
+      source.connect(gainNode);
+      gainNode.connect(audioContextRef.current.destination);
       
       // Start monitoring
       monitorAudio();
@@ -91,11 +108,19 @@ export const TestAudioModal = ({ isOpen, onClose }: TestAudioModalProps) => {
       clearTimeout(peakTimeoutRef.current);
     }
     
+    gainNodeRef.current = null;
     setIsListening(false);
     setAudioLevel(0);
     setMicDetected(false);
     setPeakLevel(0);
     setHasPermission(null);
+  };
+
+  const togglePlayback = (enabled: boolean) => {
+    setPlaybackEnabled(enabled);
+    if (gainNodeRef.current) {
+      gainNodeRef.current.gain.value = enabled ? 0.8 : 0;
+    }
   };
 
   const monitorAudio = () => {
@@ -149,7 +174,7 @@ export const TestAudioModal = ({ isOpen, onClose }: TestAudioModalProps) => {
             Test Your Microphone
           </DialogTitle>
           <DialogDescription>
-            Speak into your microphone to verify it's working properly.
+            Speak into your microphone to verify it's working. You'll hear your own voice.
           </DialogDescription>
         </DialogHeader>
 
@@ -182,6 +207,24 @@ export const TestAudioModal = ({ isOpen, onClose }: TestAudioModalProps) => {
               </div>
             )}
           </div>
+
+          {/* Audio playback toggle */}
+          {isListening && (
+            <div className="flex items-center justify-center gap-3 p-3 rounded-lg bg-muted/50 border border-border/50">
+              <Volume2 className={cn("w-5 h-5", playbackEnabled ? "text-primary" : "text-muted-foreground")} />
+              <Label htmlFor="playback-toggle" className="text-sm cursor-pointer">
+                Hear my voice
+              </Label>
+              <Switch
+                id="playback-toggle"
+                checked={playbackEnabled}
+                onCheckedChange={togglePlayback}
+              />
+              {!playbackEnabled && (
+                <VolumeX className="w-5 h-5 text-muted-foreground" />
+              )}
+            </div>
+          )}
 
           {/* Audio level visualizer */}
           <div className="relative h-32 bg-muted/30 rounded-xl overflow-hidden border border-border/50">
@@ -282,7 +325,7 @@ export const TestAudioModal = ({ isOpen, onClose }: TestAudioModalProps) => {
             ) : (
               <>
                 <p>Say something like "Hello, testing 1, 2, 3"</p>
-                <p className="text-xs">The bars should move when you speak</p>
+                <p className="text-xs">The bars should move and you should hear yourself</p>
               </>
             )}
           </div>
