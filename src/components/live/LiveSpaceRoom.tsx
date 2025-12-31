@@ -1521,200 +1521,237 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           ))}
         </div>
 
-        <div className="flex items-center justify-between gap-3 p-4">
-          {/* Leave/End button - only hosts see "End Space" */}
+        <div className="flex items-center gap-3 p-4">
+          {/* Leave/End button */}
           <Button 
             variant={isHost ? "destructive" : "outline"} 
             onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
             className={cn(
-              "flex-1 h-12 rounded-xl font-semibold",
+              "flex-shrink-0 h-12 px-4 rounded-xl font-semibold",
               isHost && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
             )}
           >
             <PhoneOff className="w-4 h-4 mr-2" />
-            {isHost ? 'End Space' : 'Leave'}
+            {isHost ? 'End' : 'Leave'}
           </Button>
 
-          {/* Action buttons - visible to ALL users */}
-          <div className="flex gap-2">
-            {/* Mic button - for everyone with mic permission */}
-            {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted)) && (
-              <motion.div whileTap={{ scale: 0.95 }}>
-                <Button
-                  variant={isMuted ? "outline" : "default"}
-                  size="icon"
-                  className={cn(
-                    "h-12 w-12 rounded-xl transition-all relative",
-                    !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0",
-                    myHostMuted && "opacity-50"
-                  )}
-                  onClick={toggleMute}
-                  disabled={myHostMuted && isMuted}
-                  title={isMuted ? "Unmute" : "Mute"}
-                >
-                  {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  {myHostMuted && (
-                    <Shield className="absolute -top-1 -right-1 w-4 h-4 text-red-500" />
-                  )}
-                </Button>
-              </motion.div>
-            )}
-
-            {/* Raise hand - visible to all listeners to request speaking */}
-            {myRole === 'listener' && (
-              <motion.div whileTap={{ scale: 0.95 }}>
-                <Button
-                  variant={hasRaisedHand ? "default" : "outline"}
-                  size="icon"
-                  className={cn(
-                    "h-12 w-12 rounded-xl",
-                    hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
-                  )}
-                  onClick={toggleRaiseHand}
-                  title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
-                >
-                  <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
-                </Button>
-              </motion.div>
-            )}
-
-            {/* Test Audio - visible to anyone who can speak */}
-            {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed))) && (
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-12 w-12 rounded-xl"
-                onClick={() => setShowTestAudio(true)}
-                title="Test Microphone"
-              >
-                <AudioLines className="w-5 h-5" />
-              </Button>
-            )}
-
-            {/* Chat - visible to ALL */}
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-12 w-12 rounded-xl"
-              onClick={() => setShowChat(!showChat)}
-            >
-              <MessageCircle className="w-5 h-5" />
-            </Button>
-
-            {/* Gift - visible to ALL */}
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-12 w-12 rounded-xl relative"
-              onClick={() => setShowGiftModal(true)}
-            >
-              <Gift className="w-5 h-5" />
-              {totalGifts > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full text-[10px] text-white flex items-center justify-center">
-                  {totalGifts > 99 ? '99+' : totalGifts}
-                </span>
+          {/* Horizontally scrollable action buttons */}
+          <div className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide">
+            <div className="flex gap-2 items-center min-w-max pb-1">
+              {/* Mic button - for everyone with mic permission */}
+              {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted)) && (
+                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
+                  <Button
+                    variant={isMuted ? "outline" : "default"}
+                    size="icon"
+                    className={cn(
+                      "h-12 w-12 rounded-xl transition-all relative",
+                      !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0",
+                      myHostMuted && "opacity-50"
+                    )}
+                    onClick={toggleMute}
+                    disabled={myHostMuted && isMuted}
+                    title={isMuted ? "Unmute" : "Mute"}
+                  >
+                    {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    {myHostMuted && (
+                      <Shield className="absolute -top-1 -right-1 w-4 h-4 text-red-500" />
+                    )}
+                  </Button>
+                </motion.div>
               )}
-            </Button>
 
-            {/* Listener Audio Output Controls - visible to ALL for controlling their playback */}
-            <motion.div whileTap={{ scale: 0.95 }}>
-              <Button
-                variant={isOutputMuted ? "default" : "outline"}
-                size="icon"
-                className={cn(
-                  "h-12 w-12 rounded-xl transition-all",
-                  isOutputMuted && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 border-0"
-                )}
-                onClick={() => {
-                  setIsOutputMuted(!isOutputMuted);
-                  // Mute/unmute all remote audio elements
-                  document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"]').forEach(audio => {
-                    audio.muted = !isOutputMuted;
-                  });
-                  toast(isOutputMuted ? 'Speaker unmuted' : 'Speaker muted');
-                }}
-                title={isOutputMuted ? "Unmute speaker" : "Mute speaker"}
-              >
-                {isOutputMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </Button>
-            </motion.div>
+              {/* Raise hand - for listeners */}
+              {myRole === 'listener' && (
+                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
+                  <Button
+                    variant={hasRaisedHand ? "default" : "outline"}
+                    size="icon"
+                    className={cn(
+                      "h-12 w-12 rounded-xl",
+                      hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
+                    )}
+                    onClick={toggleRaiseHand}
+                    title={hasRaisedHand ? "Lower hand" : "Raise hand"}
+                  >
+                    <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
+                  </Button>
+                </motion.div>
+              )}
 
-            {/* Toggle Loudspeaker/Earpiece */}
-            <motion.div whileTap={{ scale: 0.95 }}>
-              <Button
-                variant={useLoudspeaker ? "default" : "outline"}
-                size="icon"
-                className={cn(
-                  "h-12 w-12 rounded-xl transition-all",
-                  useLoudspeaker && "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 border-0"
-                )}
-                onClick={async () => {
-                  const newValue = !useLoudspeaker;
-                  setUseLoudspeaker(newValue);
-                  
-                  // Try to use setSinkId API if available (Chrome, Edge)
-                  const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"]');
-                  
-                  if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
-                    try {
-                      // Get available audio output devices
-                      const devices = await navigator.mediaDevices.enumerateDevices();
-                      const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-                      
-                      // Find earpiece or speaker device
-                      const targetDevice = audioOutputs.find(d => 
-                        newValue 
-                          ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
-                          : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
-                      );
-                      
-                      if (targetDevice) {
-                        for (const audio of audioElements) {
-                          await (audio as any).setSinkId(targetDevice.deviceId);
-                        }
-                        toast(newValue ? 'Using loudspeaker' : 'Using earpiece');
-                      } else {
-                        toast(newValue ? 'Loudspeaker active' : 'Earpiece mode (if available)');
-                      }
-                    } catch (error) {
-                      console.log('[LiveSpace] setSinkId not fully supported:', error);
-                      toast(newValue ? 'Loudspeaker active' : 'Earpiece mode');
-                    }
-                  } else {
-                    toast(newValue ? 'Loudspeaker active' : 'Earpiece mode');
-                  }
-                }}
-                title={useLoudspeaker ? "Switch to earpiece" : "Switch to loudspeaker"}
-              >
-                <Speaker className="w-5 h-5" />
-              </Button>
-            </motion.div>
-
-            {/* Screen Share & Invite - only for hosts */}
-            {isHost && (
-              <>
-                <Button 
-                  variant={isScreenSharing ? "default" : "outline"}
-                  size="icon" 
-                  className={cn(
-                    "h-12 w-12 rounded-xl",
-                    isScreenSharing && "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-0"
-                  )}
-                  onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                  title={isScreenSharing ? "Stop sharing" : "Share screen"}
-                >
-                  {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
-                </Button>
+              {/* Test Audio */}
+              {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed))) && (
                 <Button 
                   variant="outline" 
                   size="icon" 
-                  className="h-12 w-12 rounded-xl"
-                  onClick={() => setShowInviteModal(true)}
+                  className="h-12 w-12 rounded-xl flex-shrink-0"
+                  onClick={() => setShowTestAudio(true)}
+                  title="Test Mic"
                 >
-                  <UserPlus className="w-5 h-5" />
+                  <AudioLines className="w-5 h-5" />
                 </Button>
-              </>
-            )}
+              )}
+
+              {/* Chat */}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-12 w-12 rounded-xl flex-shrink-0"
+                onClick={() => setShowChat(!showChat)}
+                title="Chat"
+              >
+                <MessageCircle className="w-5 h-5" />
+              </Button>
+
+              {/* Gift */}
+              <Button 
+                variant="outline" 
+                size="icon" 
+                className="h-12 w-12 rounded-xl relative flex-shrink-0"
+                onClick={() => setShowGiftModal(true)}
+                title="Gifts"
+              >
+                <Gift className="w-5 h-5" />
+                {totalGifts > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full text-[10px] text-white flex items-center justify-center">
+                    {totalGifts > 99 ? '99+' : totalGifts}
+                  </span>
+                )}
+              </Button>
+
+              {/* Speaker/Mute Output */}
+              <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
+                <Button
+                  variant={isOutputMuted ? "default" : "outline"}
+                  size="icon"
+                  className={cn(
+                    "h-12 w-12 rounded-xl transition-all",
+                    isOutputMuted && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 border-0"
+                  )}
+                  onClick={() => {
+                    setIsOutputMuted(!isOutputMuted);
+                    document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]').forEach(audio => {
+                      audio.muted = !isOutputMuted;
+                    });
+                    toast(isOutputMuted ? 'Speaker unmuted' : 'Speaker muted');
+                  }}
+                  title={isOutputMuted ? "Unmute speaker" : "Mute speaker"}
+                >
+                  {isOutputMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                </Button>
+              </motion.div>
+
+              {/* Loudspeaker Toggle */}
+              <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
+                <Button
+                  variant={useLoudspeaker ? "default" : "outline"}
+                  size="icon"
+                  className={cn(
+                    "h-12 w-12 rounded-xl transition-all",
+                    useLoudspeaker && "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 border-0"
+                  )}
+                  onClick={async () => {
+                    const newValue = !useLoudspeaker;
+                    setUseLoudspeaker(newValue);
+                    
+                    const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]');
+                    
+                    if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
+                      try {
+                        const devices = await navigator.mediaDevices.enumerateDevices();
+                        const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+                        
+                        const targetDevice = audioOutputs.find(d => 
+                          newValue 
+                            ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
+                            : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
+                        );
+                        
+                        if (targetDevice) {
+                          for (const audio of audioElements) {
+                            await (audio as any).setSinkId(targetDevice.deviceId);
+                          }
+                          toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                        } else {
+                          toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                        }
+                      } catch (error) {
+                        console.log('[LiveSpace] setSinkId not supported:', error);
+                        toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                      }
+                    } else {
+                      toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                    }
+                  }}
+                  title={useLoudspeaker ? "Earpiece" : "Loudspeaker"}
+                >
+                  <Speaker className="w-5 h-5" />
+                </Button>
+              </motion.div>
+
+              {/* Host-only controls */}
+              {isHost && (
+                <>
+                  {/* Screen Share */}
+                  <Button 
+                    variant={isScreenSharing ? "default" : "outline"}
+                    size="icon" 
+                    className={cn(
+                      "h-12 w-12 rounded-xl flex-shrink-0",
+                      isScreenSharing && "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-0"
+                    )}
+                    onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                    title={isScreenSharing ? "Stop share" : "Share screen"}
+                  >
+                    {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+                  </Button>
+
+                  {/* Invite */}
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className="h-12 w-12 rounded-xl flex-shrink-0"
+                    onClick={() => setShowInviteModal(true)}
+                    title="Invite"
+                  >
+                    <UserPlus className="w-5 h-5" />
+                  </Button>
+
+                  {/* Settings/More for hosts */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="icon" 
+                        className="h-12 w-12 rounded-xl flex-shrink-0"
+                      >
+                        <Settings className="w-5 h-5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={toggleMuteAllParticipants}>
+                        {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
+                        {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleMicForAll(!space?.allow_mic_for_all)}>
+                        <Mic className="w-4 h-4 mr-2" />
+                        {space?.allow_mic_for_all ? 'Disable Open Mic' : 'Enable Open Mic'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setShowListenersModal(true)}>
+                        <Users className="w-4 h-4 mr-2" />
+                        View All Listeners
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </>
+              )}
+
+              {/* Swipe hint indicator */}
+              <div className="flex-shrink-0 pl-2 pr-1 opacity-40">
+                <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+              </div>
+            </div>
           </div>
         </div>
       </div>

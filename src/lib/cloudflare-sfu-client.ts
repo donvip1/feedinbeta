@@ -8,7 +8,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-
+import { audioPlaybackManager } from './audio-playback-manager';
 interface TrackInfo {
   trackName: string;
   mid: string;
@@ -188,89 +188,19 @@ class CloudflareSFUClient {
   }
 
   /**
-   * Play remote audio through an audio element
+   * Play remote audio through the centralized audio manager
    */
   private playRemoteAudio(track: MediaStreamTrack, peerId: string): void {
     console.log('[CloudflareSFU] 🔊 Setting up audio playback for peer:', peerId);
     
-    // Remove any existing audio element for this peer
-    const existingAudio = this.remoteAudioElements.get(peerId);
-    if (existingAudio) {
-      console.log('[CloudflareSFU] Removing existing audio element for peer:', peerId);
-      existingAudio.pause();
-      existingAudio.srcObject = null;
-      existingAudio.remove();
-      this.remoteAudioElements.delete(peerId);
-    }
-    
-    // Also clean up any orphaned elements
-    document.querySelectorAll(`[id^="sfu-audio-${peerId}"]`).forEach(el => {
-      console.log('[CloudflareSFU] Removing orphaned audio element:', el.id);
-      el.remove();
+    // Use the centralized audio playback manager for reliable playback
+    audioPlaybackManager.playTrack(peerId, track).then(success => {
+      if (success) {
+        console.log('[CloudflareSFU] ✅ Audio playing via AudioPlaybackManager for peer:', peerId);
+      } else {
+        console.warn('[CloudflareSFU] ⚠️ Audio playback queued or failed for peer:', peerId);
+      }
     });
-
-    const stream = new MediaStream([track]);
-    
-    const audio = document.createElement('audio');
-    audio.id = `sfu-audio-${peerId}-${Date.now()}`;
-    audio.autoplay = true;
-    (audio as any).playsInline = true;
-    audio.srcObject = stream;
-    audio.volume = 1.0;
-    audio.muted = false;
-    
-    // Keep element in DOM but hidden
-    audio.style.position = 'fixed';
-    audio.style.left = '-9999px';
-    audio.style.top = '-9999px';
-    audio.style.opacity = '0';
-    audio.style.pointerEvents = 'none';
-    
-    document.body.appendChild(audio);
-    this.remoteAudioElements.set(peerId, audio);
-
-    // Handle track lifecycle
-    track.onended = () => {
-      console.log('[CloudflareSFU] Track ended for peer:', peerId);
-      audio.pause();
-      audio.srcObject = null;
-      audio.remove();
-      this.remoteAudioElements.delete(peerId);
-    };
-    
-    track.onmute = () => {
-      console.log('[CloudflareSFU] Track muted for peer:', peerId);
-    };
-    
-    track.onunmute = () => {
-      console.log('[CloudflareSFU] Track unmuted for peer:', peerId);
-      audio.play().catch(err => console.warn('[CloudflareSFU] Resume failed:', err));
-    };
-
-    const playPromise = audio.play();
-    
-    if (playPromise !== undefined) {
-      playPromise.then(() => {
-        console.log('[CloudflareSFU] 🔊 Audio playing for peer:', peerId);
-      }).catch((err) => {
-        console.warn('[CloudflareSFU] Autoplay blocked:', err.name);
-        // Add click handler to enable audio
-        const enableAudio = async () => {
-          try {
-            await audio.play();
-            console.log('[CloudflareSFU] 🔊 Audio enabled after interaction for peer:', peerId);
-          } catch (playErr) {
-            console.error('[CloudflareSFU] Still cannot play:', playErr);
-          }
-          document.removeEventListener('click', enableAudio, true);
-          document.removeEventListener('touchstart', enableAudio, true);
-        };
-        document.addEventListener('click', enableAudio, true);
-        document.addEventListener('touchstart', enableAudio, true);
-      });
-    }
-
-    console.log('[CloudflareSFU] 🔊 Created audio element:', audio.id);
   }
 
   /**
@@ -652,19 +582,9 @@ class CloudflareSFUClient {
   cleanup() {
     console.log('[CloudflareSFU] Cleaning up...');
     
-    // Remove all audio elements
-    this.remoteAudioElements.forEach((audio, peerId) => {
-      console.log('[CloudflareSFU] Removing audio element for peer:', peerId);
-      audio.pause();
-      audio.srcObject = null;
-      audio.remove();
-    });
+    // Use centralized audio manager for cleanup
+    audioPlaybackManager.cleanup();
     this.remoteAudioElements.clear();
-    
-    // Also remove any orphaned elements
-    document.querySelectorAll('[id^="sfu-audio-"]').forEach(el => {
-      el.remove();
-    });
 
     if (this.peerConnection) {
       console.log('[CloudflareSFU] Closing peer connection');
