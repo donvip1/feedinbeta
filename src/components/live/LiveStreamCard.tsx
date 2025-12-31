@@ -35,9 +35,10 @@ interface LiveStreamCardProps {
   };
   onClick: () => void;
   isOwner?: boolean;
+  onDeleted?: () => void;
 }
 
-export const LiveStreamCard = ({ stream, onClick, isOwner }: LiveStreamCardProps) => {
+export const LiveStreamCard = ({ stream, onClick, isOwner, onDeleted }: LiveStreamCardProps) => {
   const [deleting, setDeleting] = useState(false);
   const isLive = stream.status === 'live';
   const isScheduled = stream.status === 'scheduled';
@@ -45,13 +46,25 @@ export const LiveStreamCard = ({ stream, onClick, isOwner }: LiveStreamCardProps
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Delete this stream?")) return;
+    if (!confirm("Delete this stream and all related data?")) return;
     
     setDeleting(true);
     try {
-      await supabase.from("live_streams").delete().eq("id", stream.id);
-      toast.success("Stream deleted");
+      // Delete related data first
+      await supabase.from("live_stream_comments").delete().eq("stream_id", stream.id);
+      await supabase.from("live_stream_reactions").delete().eq("stream_id", stream.id);
+      await supabase.from("live_stream_gifts").delete().eq("stream_id", stream.id);
+      await supabase.from("live_stream_invites").delete().eq("stream_id", stream.id);
+      await supabase.from("live_stream_viewers").delete().eq("stream_id", stream.id);
+      
+      // Delete the stream itself
+      const { error } = await supabase.from("live_streams").delete().eq("id", stream.id);
+      if (error) throw error;
+      
+      toast.success("Stream deleted successfully");
+      onDeleted?.();
     } catch (error: any) {
+      console.error("Failed to delete stream:", error);
       toast.error("Failed to delete stream");
     } finally {
       setDeleting(false);
