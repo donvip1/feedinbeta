@@ -99,8 +99,8 @@ export const LiveGiftModal = ({
         related_id: streamId,
       });
 
-      // Add credits to recipient (90% - 10% platform fee)
-      const recipientAmount = Math.floor(creditValue * 0.9);
+      // Add credits to recipient (85% - 15% platform fee)
+      const recipientAmount = Math.floor(creditValue * 0.85);
       await supabase.from('credit_transactions').insert({
         user_id: recipientId,
         amount: recipientAmount,
@@ -368,7 +368,7 @@ export const LiveGiftModal = ({
             </div>
 
             <p className="text-xs text-muted-foreground text-center">
-              10% platform fee applies. Recipient receives 90% of the amount.
+              15% platform fee applies. Recipient receives 85% of the amount.
             </p>
           </TabsContent>
         </Tabs>

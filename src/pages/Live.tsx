@@ -169,7 +169,24 @@ const Live = () => {
       return data || [];
     },
     staleTime: 0, // Always refetch to get latest live content
-    refetchInterval: 10000, // Refetch every 10 seconds
+    refetchInterval: 5000, // Refetch every 5 seconds for near-instant updates
+  });
+
+  // Track which spaces the current user is joined in
+  const { data: joinedSpaceIds } = useQuery({
+    queryKey: ["joined-spaces", user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data } = await supabase
+        .from("live_space_speakers")
+        .select("space_id")
+        .eq("user_id", user.id)
+        .is("left_at", null);
+      return data?.map(s => s.space_id) || [];
+    },
+    enabled: !!user,
+    staleTime: 0,
+    refetchInterval: 5000,
   });
 
   const { data: scheduledSpaces } = useQuery({
@@ -570,6 +587,8 @@ const Live = () => {
                               <SpaceCard
                                 space={space as any}
                                 onClick={() => handleSpaceClick(space)}
+                                isOwner={space.user_id === user?.id}
+                                isJoined={joinedSpaceIds?.includes(space.id)}
                               />
                             </motion.div>
                           ))}
@@ -662,6 +681,8 @@ const Live = () => {
                         key={space.id}
                         space={space as any}
                         onClick={() => handleSpaceClick(space)}
+                        isOwner={space.user_id === user?.id}
+                        isJoined={joinedSpaceIds?.includes(space.id)}
                       />
                     ))}
                   </div>
@@ -680,6 +701,8 @@ const Live = () => {
                         key={space.id}
                         space={space as any}
                         onClick={() => handleSpaceClick(space)}
+                        isOwner={space.user_id === user?.id}
+                        isJoined={joinedSpaceIds?.includes(space.id)}
                       />
                     ))}
                   </div>

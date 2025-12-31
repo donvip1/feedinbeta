@@ -4,7 +4,7 @@ import {
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
   PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff,
-  AudioLines, Home, Minimize2
+  AudioLines, Home, Minimize2, Monitor, MonitorOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -118,6 +118,9 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [myHostMuted, setMyHostMuted] = useState(false);
   const [myMicAllowed, setMyMicAllowed] = useState(true);
   const [showListenersModal, setShowListenersModal] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
 
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
@@ -790,6 +793,55 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   };
 
+  // Screen sharing - host only
+  const startScreenShare = async () => {
+    if (!isHost) {
+      toast.error('Only hosts can share screen');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { 
+          displaySurface: 'monitor',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: true
+      });
+
+      setScreenStream(stream);
+      setIsScreenSharing(true);
+
+      // Handle when user stops sharing via browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+
+      toast.success('Screen sharing started');
+    } catch (error: any) {
+      if (error.name !== 'NotAllowedError') {
+        toast.error('Failed to start screen sharing');
+      }
+    }
+  };
+
+  const stopScreenShare = () => {
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      setScreenStream(null);
+    }
+    setIsScreenSharing(false);
+    toast.success('Screen sharing stopped');
+  };
+
+  // Attach screen stream to video element
+  useEffect(() => {
+    if (screenVideoRef.current && screenStream) {
+      screenVideoRef.current.srcObject = screenStream;
+    }
+  }, [screenStream]);
+
   const promoteSpeaker = async (speakerId: string, newRole: 'speaker' | 'co_host') => {
     await supabase
       .from('live_space_speakers')
@@ -923,6 +975,43 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             </div>
           </motion.div>
         ))}
+      </AnimatePresence>
+
+      {/* Screen Share Display - visible to all when host is sharing */}
+      <AnimatePresence>
+        {isScreenSharing && screenStream && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-x-4 top-20 bottom-64 z-30 rounded-2xl overflow-hidden bg-black shadow-2xl border border-primary/30"
+          >
+            <video
+              ref={screenVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className="w-full h-full object-contain"
+            />
+            <div className="absolute top-4 left-4 flex items-center gap-2">
+              <Badge className="bg-red-500/90 text-white border-0 gap-1.5">
+                <Monitor className="w-3 h-3" />
+                Screen Sharing
+              </Badge>
+            </div>
+            {isHost && (
+              <Button
+                variant="destructive"
+                size="sm"
+                className="absolute top-4 right-4"
+                onClick={stopScreenShare}
+              >
+                <MonitorOff className="w-4 h-4 mr-1" />
+                Stop Sharing
+              </Button>
+            )}
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Header */}
@@ -1218,7 +1307,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         </div>
 
         <div className="flex items-center justify-between gap-3 p-4">
-          {/* Leave/End button */}
+          {/* Leave/End button - only hosts see "End Space" */}
           <Button 
             variant={isHost ? "destructive" : "outline"} 
             onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
@@ -1231,10 +1320,10 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             {isHost ? 'End Space' : 'Leave'}
           </Button>
 
-          {/* Action buttons */}
+          {/* Action buttons - visible to ALL users */}
           <div className="flex gap-2">
-            {/* Mic button for speakers/hosts */}
-            {canSpeak && (
+            {/* Mic button - for everyone with mic permission */}
+            {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted)) && (
               <motion.div whileTap={{ scale: 0.95 }}>
                 <Button
                   variant={isMuted ? "outline" : "default"}
@@ -1246,6 +1335,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   )}
                   onClick={toggleMute}
                   disabled={myHostMuted && isMuted}
+                  title={isMuted ? "Unmute" : "Mute"}
                 >
                   {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                   {myHostMuted && (
@@ -1255,49 +1345,26 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </motion.div>
             )}
 
-            {/* Listener controls: Raise hand AND/OR Mic (if permissions allow) */}
-            {myRole === 'listener' && (
-              <>
-                {/* Mic button for listeners - show when mic is allowed globally OR individually */}
-                {(space?.allow_mic_for_all || myMicAllowed) && !myHostMuted && (
-                  <motion.div whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant={isMuted ? "outline" : "default"}
-                      size="icon"
-                      className={cn(
-                        "h-12 w-12 rounded-xl transition-all relative",
-                        !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0"
-                      )}
-                      onClick={toggleMute}
-                      title={isMuted ? "Unmute" : "Mute"}
-                    >
-                      {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                    </Button>
-                  </motion.div>
-                )}
-                
-                {/* Raise hand - show when user doesn't have mic permission yet */}
-                {!myMicAllowed && !space?.allow_mic_for_all && (
-                  <motion.div whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant={hasRaisedHand ? "default" : "outline"}
-                      size="icon"
-                      className={cn(
-                        "h-12 w-12 rounded-xl",
-                        hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
-                      )}
-                      onClick={toggleRaiseHand}
-                      title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
-                    >
-                      <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
-                    </Button>
-                  </motion.div>
-                )}
-              </>
+            {/* Raise hand - only for listeners without mic permission */}
+            {myRole === 'listener' && !myMicAllowed && !space?.allow_mic_for_all && (
+              <motion.div whileTap={{ scale: 0.95 }}>
+                <Button
+                  variant={hasRaisedHand ? "default" : "outline"}
+                  size="icon"
+                  className={cn(
+                    "h-12 w-12 rounded-xl",
+                    hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
+                  )}
+                  onClick={toggleRaiseHand}
+                  title={hasRaisedHand ? "Lower hand" : "Raise hand to speak"}
+                >
+                  <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
+                </Button>
+              </motion.div>
             )}
 
-            {/* Test Audio Button - show for hosts/speakers */}
-            {canSpeak && (
+            {/* Test Audio - visible to anyone who can speak */}
+            {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed))) && (
               <Button 
                 variant="outline" 
                 size="icon" 
@@ -1309,6 +1376,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </Button>
             )}
 
+            {/* Chat - visible to ALL */}
             <Button 
               variant="outline" 
               size="icon" 
@@ -1318,6 +1386,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               <MessageCircle className="w-5 h-5" />
             </Button>
 
+            {/* Gift - visible to ALL */}
             <Button 
               variant="outline" 
               size="icon" 
@@ -1332,29 +1401,44 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               )}
             </Button>
 
+            {/* Screen Share & Invite - only for hosts */}
             {isHost && (
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className="h-12 w-12 rounded-xl"
-                onClick={() => setShowInviteModal(true)}
-              >
-                <UserPlus className="w-5 h-5" />
-              </Button>
+              <>
+                <Button 
+                  variant={isScreenSharing ? "default" : "outline"}
+                  size="icon" 
+                  className={cn(
+                    "h-12 w-12 rounded-xl",
+                    isScreenSharing && "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-0"
+                  )}
+                  onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                  title={isScreenSharing ? "Stop sharing" : "Share screen"}
+                >
+                  {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-12 w-12 rounded-xl"
+                  onClick={() => setShowInviteModal(true)}
+                >
+                  <UserPlus className="w-5 h-5" />
+                </Button>
+              </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Chat Panel */}
+      {/* Chat Panel - slides from bottom, semi-transparent so users can see reactions */}
       <AnimatePresence>
         {showChat && (
           <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25 }}
-            className="fixed right-0 top-0 bottom-0 w-full sm:w-96 bg-background border-l border-border z-50"
+            className="fixed inset-x-0 bottom-0 h-[60vh] bg-background/95 backdrop-blur-lg border-t border-border z-40 rounded-t-3xl"
           >
             <SpaceChat spaceId={spaceId} onClose={() => setShowChat(false)} />
           </motion.div>
