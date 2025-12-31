@@ -1,15 +1,16 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v8';
+const CACHE_VERSION = 'v9';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
 const CACHE_IMAGES = `${CACHE_NAME}-images`;
 const CACHE_MEDIA = `${CACHE_NAME}-media`;
+const CACHE_API = `${CACHE_NAME}-api`;
 
 // Build timestamp for version tracking
 const BUILD_TIMESTAMP = Date.now();
 
-// Assets to cache immediately - expanded for faster app load
+// AGGRESSIVE: Assets to cache immediately for instant app loads
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -19,12 +20,21 @@ const STATIC_ASSETS = [
 ];
 
 // Max cache sizes - increased for better offline experience
-const MAX_DYNAMIC_CACHE = 100;
-const MAX_IMAGE_CACHE = 300;
-const MAX_MEDIA_CACHE = 50;
+const MAX_DYNAMIC_CACHE = 150;
+const MAX_IMAGE_CACHE = 500;
+const MAX_MEDIA_CACHE = 100;
+const MAX_API_CACHE = 50;
 
-// Update check interval (5 minutes)
-const UPDATE_CHECK_INTERVAL = 5 * 60 * 1000;
+// Update check interval (1 minute for faster updates)
+const UPDATE_CHECK_INTERVAL = 60 * 1000;
+
+// API endpoints to cache for faster loads
+const CACHEABLE_API_PATTERNS = [
+  '/profiles',
+  '/posts',
+  '/user_credits',
+  '/notifications',
+];
 
 // Install - cache static assets and activate immediately
 self.addEventListener('install', (event) => {
@@ -327,18 +337,29 @@ async function syncMessages() {
   console.log('[SW] Syncing pending messages...');
 }
 
-// Fetch - smart caching strategy
+// Fetch - smart caching strategy with API caching for faster loads
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
   if (request.method !== 'GET') return;
 
-  if (
-    url.origin.includes('supabase.co') ||
-    url.pathname.startsWith('/api/') ||
-    url.pathname.includes('/functions/v1/')
-  ) {
+  // Cache certain Supabase API responses (read-only) for instant page loads
+  if (url.origin.includes('supabase.co') && url.pathname.includes('/rest/v1/')) {
+    // Check if this is a cacheable endpoint
+    const isCacheable = CACHEABLE_API_PATTERNS.some(pattern => 
+      url.pathname.includes(pattern)
+    );
+    
+    if (isCacheable) {
+      event.respondWith(staleWhileRevalidate(request, CACHE_API, MAX_API_CACHE));
+      return;
+    }
+    return; // Don't cache other API calls
+  }
+
+  // Skip edge functions
+  if (url.pathname.includes('/functions/v1/')) {
     return;
   }
 
@@ -348,15 +369,19 @@ self.addEventListener('fetch', (event) => {
     request.destination === 'script' ||
     request.destination === 'style'
   ) {
-    event.respondWith(networkFirstStrategy(request, CACHE_DYNAMIC, MAX_DYNAMIC_CACHE));
+    // Cache-first for JS/CSS for instant loads
+    event.respondWith(cacheFirstWithRevalidate(request, CACHE_DYNAMIC, MAX_DYNAMIC_CACHE));
   } else if (request.destination === 'font') {
     event.respondWith(cacheFirstStrategy(request, CACHE_STATIC));
+  } else if (request.destination === 'document') {
+    // HTML pages - network first but fast fallback
+    event.respondWith(networkFirstFast(request, CACHE_DYNAMIC, MAX_DYNAMIC_CACHE));
   } else {
-    event.respondWith(networkFirstStrategy(request, CACHE_DYNAMIC, MAX_DYNAMIC_CACHE));
+    event.respondWith(staleWhileRevalidate(request, CACHE_DYNAMIC, MAX_DYNAMIC_CACHE));
   }
 });
 
-// Cache First Strategy
+// Cache First Strategy - fastest for static assets
 async function cacheFirstStrategy(request, cacheName, maxItems) {
   const cached = await caches.match(request);
   if (cached) {
@@ -370,7 +395,7 @@ async function cacheFirstStrategy(request, cacheName, maxItems) {
       cache.put(request, response.clone());
       
       if (maxItems) {
-        await limitCacheSize(cacheName, maxItems);
+        limitCacheSize(cacheName, maxItems);
       }
     }
     return response;
@@ -380,7 +405,86 @@ async function cacheFirstStrategy(request, cacheName, maxItems) {
   }
 }
 
-// Network First Strategy
+// Cache First with background revalidate - serve cached, update in background
+async function cacheFirstWithRevalidate(request, cacheName, maxItems) {
+  const cached = await caches.match(request);
+  
+  // Always fetch in background to update cache
+  const fetchPromise = fetch(request).then(response => {
+    if (response.ok) {
+      const cache = caches.open(cacheName);
+      cache.then(c => {
+        c.put(request, response.clone());
+        if (maxItems) limitCacheSize(cacheName, maxItems);
+      });
+    }
+    return response;
+  }).catch(() => null);
+
+  // Return cached immediately if available
+  if (cached) {
+    return cached;
+  }
+
+  // Wait for network if no cache
+  const response = await fetchPromise;
+  return response || caches.match('/offline.html');
+}
+
+// Stale While Revalidate - serve cached, update in background
+async function staleWhileRevalidate(request, cacheName, maxItems) {
+  const cached = await caches.match(request);
+  
+  // Fetch fresh in background
+  const fetchPromise = fetch(request).then(response => {
+    if (response.ok) {
+      const cache = caches.open(cacheName);
+      cache.then(c => {
+        c.put(request, response.clone());
+        if (maxItems) limitCacheSize(cacheName, maxItems);
+      });
+    }
+    return response;
+  }).catch(err => {
+    console.log('[SW] Background fetch failed:', err);
+    return null;
+  });
+
+  // Return cached immediately, network will update for next time
+  if (cached) {
+    return cached;
+  }
+
+  // No cache, wait for network
+  const response = await fetchPromise;
+  return response || caches.match('/offline.html');
+}
+
+// Network First with fast timeout - quick fallback to cache
+async function networkFirstFast(request, cacheName, maxItems) {
+  const TIMEOUT = 2000; // 2 second timeout for fast fallback
+  
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT);
+    
+    const response = await fetch(request, { signal: controller.signal });
+    clearTimeout(timeoutId);
+    
+    if (response.ok) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
+      if (maxItems) limitCacheSize(cacheName, maxItems);
+    }
+    return response;
+  } catch (error) {
+    console.log('[SW] Network slow/failed, using cache:', error.message);
+    const cached = await caches.match(request);
+    return cached || caches.match('/offline.html');
+  }
+}
+
+// Network First Strategy - legacy fallback
 async function networkFirstStrategy(request, cacheName, maxItems) {
   try {
     const response = await fetch(request);
@@ -389,7 +493,7 @@ async function networkFirstStrategy(request, cacheName, maxItems) {
       cache.put(request, response.clone());
       
       if (maxItems) {
-        await limitCacheSize(cacheName, maxItems);
+        limitCacheSize(cacheName, maxItems);
       }
     }
     return response;
@@ -400,15 +504,16 @@ async function networkFirstStrategy(request, cacheName, maxItems) {
   }
 }
 
-// Limit cache size
-async function limitCacheSize(cacheName, maxItems) {
-  const cache = await caches.open(cacheName);
-  const keys = await cache.keys();
-  
-  if (keys.length > maxItems) {
-    const deleteCount = keys.length - maxItems;
-    for (let i = 0; i < deleteCount; i++) {
-      await cache.delete(keys[i]);
-    }
-  }
+// Limit cache size - non-blocking
+function limitCacheSize(cacheName, maxItems) {
+  caches.open(cacheName).then(cache => {
+    cache.keys().then(keys => {
+      if (keys.length > maxItems) {
+        const deleteCount = keys.length - maxItems;
+        for (let i = 0; i < deleteCount; i++) {
+          cache.delete(keys[i]);
+        }
+      }
+    });
+  });
 }
