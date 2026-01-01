@@ -22,10 +22,30 @@ class AudioPlaybackManager {
   private onPlaybackError: ((error: Error) => void) | null = null;
   private hasUserInteraction: boolean = false;
   private pendingStreams: Map<string, MediaStream> = new Map();
+  private pendingTracks: Map<string, MediaStreamTrack> = new Map();
+  private retryIntervalId: number | null = null;
 
   constructor() {
     // Listen for user interaction to enable audio
     this.setupUserInteractionListeners();
+    // Start retry mechanism for pending streams
+    this.startRetryMechanism();
+  }
+
+  /**
+   * Manually enable audio playback - call this when user clicks "Join" button
+   */
+  enableAudioPlayback(): void {
+    console.log('[AudioPlayback] 🔊 Audio playback manually enabled');
+    this.hasUserInteraction = true;
+    
+    // Resume audio context if suspended
+    if (this.audioContext?.state === 'suspended') {
+      this.audioContext.resume();
+    }
+    
+    // Play any pending streams immediately
+    this.playPendingStreams();
   }
 
   private setupUserInteractionListeners() {
@@ -52,12 +72,40 @@ class AudioPlaybackManager {
     document.addEventListener('keydown', enableAudio, true);
   }
 
+  /**
+   * Start a periodic retry mechanism for pending streams
+   */
+  private startRetryMechanism(): void {
+    // Check every 2 seconds if we have pending streams that can now be played
+    this.retryIntervalId = window.setInterval(() => {
+      if (this.hasUserInteraction && (this.pendingStreams.size > 0 || this.pendingTracks.size > 0)) {
+        console.log('[AudioPlayback] Retrying pending audio...', {
+          streams: this.pendingStreams.size,
+          tracks: this.pendingTracks.size,
+        });
+        this.playPendingStreams();
+      }
+    }, 2000);
+  }
+
   private async playPendingStreams() {
+    // Play pending streams
     for (const [peerId, stream] of this.pendingStreams.entries()) {
       console.log('[AudioPlayback] Playing pending stream for:', peerId);
-      await this.playStream(peerId, stream);
+      const success = await this.playStream(peerId, stream);
+      if (success) {
+        this.pendingStreams.delete(peerId);
+      }
     }
-    this.pendingStreams.clear();
+    
+    // Play pending tracks
+    for (const [peerId, track] of this.pendingTracks.entries()) {
+      console.log('[AudioPlayback] Playing pending track for:', peerId);
+      const success = await this.playTrack(peerId, track);
+      if (success) {
+        this.pendingTracks.delete(peerId);
+      }
+    }
   }
 
   /**
@@ -90,10 +138,19 @@ class AudioPlaybackManager {
       readyState: track.readyState,
       enabled: track.enabled,
       muted: track.muted,
+      hasUserInteraction: this.hasUserInteraction,
     });
 
+    // If no user interaction, queue the track for later
+    if (!this.hasUserInteraction) {
+      console.log('[AudioPlayback] No user interaction yet, queuing track for:', peerId);
+      this.pendingTracks.set(peerId, track);
+      return true; // Return true to indicate it will be played later
+    }
+
     if (track.readyState !== 'live') {
-      console.warn('[AudioPlayback] Track is not live, cannot play');
+      console.warn('[AudioPlayback] Track is not live, queuing for retry:', track.readyState);
+      this.pendingTracks.set(peerId, track);
       return false;
     }
 
@@ -333,6 +390,12 @@ class AudioPlaybackManager {
   cleanup() {
     console.log('[AudioPlayback] Cleaning up all audio...');
 
+    // Clear retry interval
+    if (this.retryIntervalId) {
+      clearInterval(this.retryIntervalId);
+      this.retryIntervalId = null;
+    }
+
     this.audioElements.forEach((audio, peerId) => {
       console.log('[AudioPlayback] Removing audio for peer:', peerId);
       audio.pause();
@@ -341,6 +404,7 @@ class AudioPlaybackManager {
     });
     this.audioElements.clear();
     this.pendingStreams.clear();
+    this.pendingTracks.clear();
 
     // Clean up any orphaned elements
     document.querySelectorAll('[id^="space-audio-"]').forEach(el => {
@@ -354,6 +418,13 @@ class AudioPlaybackManager {
     }
 
     console.log('[AudioPlayback] ✅ Cleanup complete');
+  }
+
+  /**
+   * Check if audio is enabled
+   */
+  isAudioEnabled(): boolean {
+    return this.hasUserInteraction;
   }
 }
 

@@ -259,16 +259,22 @@ export class UnifiedSFUClient {
   // ============= Subscribing =============
 
   /**
-   * Subscribe to remote tracks
+   * Subscribe to remote tracks with retry logic
    */
-  async pullTracks(remoteTracks: PullTrackRequest[]): Promise<SFUTrackResult> {
+  async pullTracks(remoteTracks: PullTrackRequest[], retryCount = 0): Promise<SFUTrackResult> {
+    const maxRetries = 3;
+    
     if (!this.sessionId) {
       const result = await this.createSession();
       if (!result.success) return result as SFUTrackResult;
     }
 
     try {
-      console.log(`[UnifiedSFU:${this.clientId}] Pulling ${remoteTracks.length} tracks...`);
+      console.log(`[UnifiedSFU:${this.clientId}] Pulling ${remoteTracks.length} tracks (attempt ${retryCount + 1})...`);
+      console.log(`[UnifiedSFU:${this.clientId}] Remote tracks:`, remoteTracks.map(t => ({
+        trackName: t.trackName?.slice(0, 30),
+        sessionId: t.sessionId?.slice(0, 8),
+      })));
       
       this.role = 'subscriber';
       const pc = this.initPeerConnection();
@@ -283,12 +289,10 @@ export class UnifiedSFUClient {
         pc.addTransceiver('audio', { direction: 'recvonly' });
       }
 
-      // Create offer if needed
-      if (pc.signalingState === 'stable' && pc.connectionState !== 'connected') {
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        await this.waitForIceGathering(pc);
-      }
+      // Always create offer for pull requests
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await this.waitForIceGathering(pc);
 
       // Pull from SFU
       const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
@@ -296,21 +300,31 @@ export class UnifiedSFUClient {
           action: 'pull-tracks',
           sessionId: this.sessionId,
           remoteTracks,
+          sdp: pc.localDescription?.sdp, // Include SDP for better handling
         },
       });
 
       if (error || !data?.success) {
-        throw new Error(data?.error || 'Failed to pull tracks');
+        throw new Error(data?.error || error?.message || 'Failed to pull tracks');
       }
 
       // Handle response
       await this.handleSdpResponse(pc, data.sessionDescription);
 
-      console.log(`[UnifiedSFU:${this.clientId}] ✅ Tracks pulled successfully`);
+      console.log(`[UnifiedSFU:${this.clientId}] ✅ Tracks pulled successfully, connection state:`, pc.connectionState);
       
       return { success: true, sessionDescription: data.sessionDescription, tracks: data.tracks };
     } catch (error) {
-      console.error(`[UnifiedSFU:${this.clientId}] ❌ Pull failed:`, error);
+      console.error(`[UnifiedSFU:${this.clientId}] ❌ Pull failed (attempt ${retryCount + 1}):`, error);
+      
+      // Retry with exponential backoff
+      if (retryCount < maxRetries) {
+        const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s
+        console.log(`[UnifiedSFU:${this.clientId}] Retrying in ${delay}ms...`);
+        await new Promise(r => setTimeout(r, delay));
+        return this.pullTracks(remoteTracks, retryCount + 1);
+      }
+      
       return { success: false, error: error instanceof Error ? error.message : 'Failed to pull tracks' };
     }
   }

@@ -610,6 +610,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     const isOwner = space.user_id === user.id;
     const role = isOwner ? 'host' : 'listener';
     
+    // CRITICAL: Enable audio playback BEFORE connecting
+    // This ensures the user's click to join counts as user interaction
+    const { audioPlaybackManager } = await import('@/lib/audio-playback-manager');
+    audioPlaybackManager.enableAudioPlayback();
+    console.log('[LiveSpace] 🔊 Audio playback enabled for listener');
+    
     // Set role immediately to avoid race conditions
     setMyRole(role);
     if (isOwner) {

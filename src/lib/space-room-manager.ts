@@ -381,7 +381,7 @@ class SpaceRoomManager {
   /**
    * Subscribe to all active speakers (for listeners joining)
    * This should be called after initialization for ALL participants (listeners AND speakers)
-   * OPTIMIZED: No delays - instant subscription via realtime events
+   * OPTIMIZED: Retry mechanism for when host hasn't published yet
    */
   async subscribeToAllSpeakers(): Promise<void> {
     if (!this.spaceId || !this.sessionId) {
@@ -390,45 +390,58 @@ class SpaceRoomManager {
     }
 
     console.log('[SpaceRoomManager] ========================================');
-    console.log('[SpaceRoomManager] 🔍 SUBSCRIBING TO ALL SPEAKERS (INSTANT)');
+    console.log('[SpaceRoomManager] 🔍 SUBSCRIBING TO ALL SPEAKERS');
     console.log('[SpaceRoomManager] Space:', this.spaceId.slice(0, 8));
     console.log('[SpaceRoomManager] My session:', this.sessionId.slice(0, 8));
     console.log('[SpaceRoomManager] My user ID:', this.userId);
     console.log('[SpaceRoomManager] ========================================');
 
-    // Fetch all active speakers with track info - single attempt, no delays
-    const { data: speakers, error } = await supabase
-      .from('live_space_speakers')
-      .select('*')
-      .eq('space_id', this.spaceId)
-      .is('left_at', null)
-      .not('cloudflare_track_id', 'is', null)
-      .not('cloudflare_session_id', 'is', null);
-
-    if (error) {
-      console.error('[SpaceRoomManager] Failed to fetch speakers:', error);
-      return;
-    }
-
-    console.log('[SpaceRoomManager] Found speakers in DB:', speakers?.length || 0);
-
-    // Filter out ourselves and already subscribed speakers
-    const validSpeakers = (speakers || []).filter(
-      s => s.user_id !== this.userId && !this.subscribedSpeakers.has(s.user_id)
-    );
+    // Try multiple times with short delays - host may not have published yet
+    const maxAttempts = 5;
+    const retryDelayMs = 1500;
     
-    console.log('[SpaceRoomManager] Speakers to subscribe to:', validSpeakers.length);
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      // Fetch all active speakers with track info
+      const { data: speakers, error } = await supabase
+        .from('live_space_speakers')
+        .select('*')
+        .eq('space_id', this.spaceId)
+        .is('left_at', null)
+        .not('cloudflare_track_id', 'is', null)
+        .not('cloudflare_session_id', 'is', null);
 
-    if (validSpeakers.length > 0) {
-      // Subscribe to each speaker in parallel for instant updates
-      await Promise.all(validSpeakers.map(async (speaker) => {
-        console.log('[SpaceRoomManager] 🎧 Subscribing to speaker:', speaker.user_id);
-        await this.subscribeToSpeaker(speaker as SpaceSpeaker);
-      }));
-      console.log('[SpaceRoomManager] ✅ Subscribed to all found speakers');
-    } else {
-      console.log('[SpaceRoomManager] No speakers with tracks yet - will subscribe instantly via realtime when they publish');
+      if (error) {
+        console.error('[SpaceRoomManager] Failed to fetch speakers:', error);
+        continue;
+      }
+
+      console.log(`[SpaceRoomManager] Attempt ${attempt}/${maxAttempts} - Found speakers with tracks:`, speakers?.length || 0);
+
+      // Filter out ourselves and already subscribed speakers
+      const validSpeakers = (speakers || []).filter(
+        s => s.user_id !== this.userId && !this.subscribedSpeakers.has(s.user_id)
+      );
+      
+      console.log('[SpaceRoomManager] Speakers to subscribe to:', validSpeakers.length);
+
+      if (validSpeakers.length > 0) {
+        // Subscribe to each speaker in parallel
+        await Promise.all(validSpeakers.map(async (speaker) => {
+          console.log('[SpaceRoomManager] 🎧 Subscribing to speaker:', speaker.user_id);
+          await this.subscribeToSpeaker(speaker as SpaceSpeaker);
+        }));
+        console.log('[SpaceRoomManager] ✅ Subscribed to all found speakers');
+        return; // Success, exit
+      }
+      
+      // No speakers found yet, wait and retry
+      if (attempt < maxAttempts) {
+        console.log(`[SpaceRoomManager] No speakers with tracks yet, retrying in ${retryDelayMs}ms...`);
+        await new Promise(r => setTimeout(r, retryDelayMs));
+      }
     }
+    
+    console.log('[SpaceRoomManager] No speakers with tracks after retries - will subscribe via realtime when they publish');
   }
 
   /**
