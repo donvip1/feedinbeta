@@ -99,7 +99,7 @@ const SpaceDetail = () => {
     // Note: Auto-join is now handled by a separate useEffect
   };
 
-  const handleJoin = () => {
+  const handleJoin = async () => {
     if (!user) {
       toast.error('Please sign in to join this space');
       // Store redirect in sessionStorage as backup
@@ -107,6 +107,13 @@ const SpaceDetail = () => {
       navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
       return;
     }
+    
+    // CRITICAL: Enable audio playback BEFORE showing room
+    // User clicking "Join Space" is a valid user interaction
+    const { audioPlaybackManager } = await import('@/lib/audio-playback-manager');
+    audioPlaybackManager.enableAudioPlayback();
+    console.log('[SpaceDetail] 🔊 Audio playback enabled on join');
+    
     setShowRoom(true);
   };
 
