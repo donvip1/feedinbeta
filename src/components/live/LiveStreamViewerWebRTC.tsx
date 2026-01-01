@@ -193,7 +193,17 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     return () => clearInterval(interval);
   }, [streamId]);
 
-  // HLS.js-based video playback for scalable streaming
+  // Detect if user is on slow network
+  const isSlowNetwork = useCallback(() => {
+    const connection = (navigator as any).connection;
+    if (connection) {
+      const type = connection.effectiveType;
+      return type === '2g' || type === 'slow-2g' || type === '3g' || (connection.downlink && connection.downlink < 1.5);
+    }
+    return false;
+  }, []);
+
+  // HLS.js-based video playback - optimized for slow networks
   useEffect(() => {
     if (stream?.status !== 'live') return;
     if (!stream?.cf_hls_url) {
@@ -202,10 +212,14 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     }
 
     let isMounted = true;
+    let retryCount = 0;
+    const maxRetries = 10;
     const hlsUrl = stream.cf_hls_url;
+    const slowNetwork = isSlowNetwork();
 
     console.log("[Viewer-HLS] Setting up HLS connection for stream:", streamId);
     console.log("[Viewer-HLS] HLS URL:", hlsUrl);
+    console.log("[Viewer-HLS] Slow network:", slowNetwork);
     setConnectionStatus('connecting');
     setIsConnecting(true);
 
@@ -222,32 +236,70 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
         console.log("[Viewer-HLS] Using native HLS support");
         videoRef.current.src = hlsUrl;
-        videoRef.current.addEventListener('loadedmetadata', () => {
+        
+        const onLoaded = () => {
           setHasVideo(true);
           setIsConnecting(false);
           setConnectionStatus('connected');
-          toast.success('Connected to stream!');
-        });
-        videoRef.current.addEventListener('error', (e) => {
-          console.error("[Viewer-HLS] Native HLS error:", e);
-          setConnectionStatus('failed');
-        });
+          if (!connectionNotified) {
+            toast.success('Connected to stream!');
+            setConnectionNotified(true);
+          }
+        };
+        
+        const onError = () => {
+          console.error("[Viewer-HLS] Native HLS error, retrying...");
+          retryCount++;
+          if (retryCount < maxRetries && isMounted) {
+            setTimeout(setupHLS, slowNetwork ? 2000 : 3000);
+          } else {
+            setConnectionStatus('failed');
+          }
+        };
+        
+        videoRef.current.addEventListener('loadedmetadata', onLoaded);
+        videoRef.current.addEventListener('error', onError);
         return;
       }
 
       // Use HLS.js for browsers that don't support native HLS
       if (Hls.isSupported()) {
         console.log("[Viewer-HLS] Using HLS.js");
-        const hls = new Hls({
+        
+        // Optimized config for slow networks
+        const hlsConfig = slowNetwork ? {
+          enableWorker: true,
+          lowLatencyMode: false, // Disable for stability on slow networks
+          backBufferLength: 30,
+          maxBufferLength: 15,
+          maxMaxBufferLength: 30,
+          liveSyncDurationCount: 5,
+          liveMaxLatencyDurationCount: 15,
+          manifestLoadingMaxRetry: 6,
+          manifestLoadingRetryDelay: 1000,
+          levelLoadingMaxRetry: 6,
+          levelLoadingRetryDelay: 1000,
+          fragLoadingMaxRetry: 6,
+          fragLoadingRetryDelay: 1000,
+          startLevel: 0, // Start with lowest quality
+          abrEwmaDefaultEstimate: 500000, // Assume 500kbps initially
+          abrBandWidthFactor: 0.7,
+          abrBandWidthUpFactor: 0.5,
+        } : {
           enableWorker: true,
           lowLatencyMode: true,
-          backBufferLength: 90,
+          backBufferLength: 60,
           maxBufferLength: 30,
           maxMaxBufferLength: 60,
           liveSyncDurationCount: 3,
           liveMaxLatencyDurationCount: 10,
-        });
-
+          manifestLoadingMaxRetry: 4,
+          levelLoadingMaxRetry: 4,
+          fragLoadingMaxRetry: 4,
+          startLevel: -1, // Auto select quality
+        };
+        
+        const hls = new Hls(hlsConfig);
         hlsRef.current = hls;
 
         hls.on(Hls.Events.MEDIA_ATTACHED, () => {
@@ -260,31 +312,64 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           setHasVideo(true);
           setIsConnecting(false);
           setConnectionStatus('connected');
-          toast.success('Connected to stream!');
+          retryCount = 0;
           
-          // Auto-play
+          if (!connectionNotified) {
+            toast.success(slowNetwork ? 'Connected (low quality for better stability)' : 'Connected to stream!');
+            setConnectionNotified(true);
+          }
+          
+          // Auto-play with muted fallback
           videoRef.current?.play().catch((err) => {
-            console.warn("[Viewer-HLS] Autoplay failed:", err);
+            console.warn("[Viewer-HLS] Autoplay failed, trying muted:", err);
+            if (videoRef.current) {
+              videoRef.current.muted = true;
+              videoRef.current.play().catch(() => {});
+            }
           });
         });
 
         hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error("[Viewer-HLS] Error:", data);
+          console.error("[Viewer-HLS] Error:", data.type, data.details);
+          
           if (data.fatal) {
             switch (data.type) {
               case Hls.ErrorTypes.NETWORK_ERROR:
                 console.log("[Viewer-HLS] Network error, trying to recover...");
-                hls.startLoad();
+                retryCount++;
+                if (retryCount < maxRetries) {
+                  setTimeout(() => {
+                    hls.startLoad();
+                  }, slowNetwork ? 1500 : 2000);
+                } else {
+                  setConnectionStatus('failed');
+                  toast.error("Connection lost - please refresh");
+                }
                 break;
               case Hls.ErrorTypes.MEDIA_ERROR:
                 console.log("[Viewer-HLS] Media error, trying to recover...");
                 hls.recoverMediaError();
                 break;
               default:
-                console.error("[Viewer-HLS] Fatal error, cannot recover");
-                setConnectionStatus('failed');
+                console.error("[Viewer-HLS] Fatal error, attempting restart...");
+                retryCount++;
+                if (retryCount < maxRetries && isMounted) {
+                  hls.destroy();
+                  setTimeout(setupHLS, slowNetwork ? 2000 : 3000);
+                } else {
+                  setConnectionStatus('failed');
+                }
                 break;
             }
+          }
+        });
+        
+        // Monitor for fragmentation loading issues on slow networks
+        hls.on(Hls.Events.FRAG_LOAD_EMERGENCY_ABORTED, () => {
+          console.log("[Viewer-HLS] Fragment load aborted, dropping to lower quality...");
+          // Drop to lower quality if available
+          if (hls.currentLevel > 0) {
+            hls.currentLevel = 0;
           }
         });
 
@@ -299,13 +384,14 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     // Try to connect immediately
     setupHLS();
 
-    // Retry connection if HLS URL becomes available later
+    // Faster retry for connection issues (2s for slow networks, 3s for fast)
+    const retryDelay = slowNetwork ? 2000 : 3000;
     const retryInterval = setInterval(() => {
-      if (connectionStatus !== 'connected' && isMounted && stream?.status === 'live' && stream?.cf_hls_url) {
-        console.log("[Viewer-HLS] Retrying connection...");
+      if (connectionStatus !== 'connected' && isMounted && stream?.status === 'live' && retryCount < maxRetries) {
+        console.log(`[Viewer-HLS] Retrying connection (attempt ${retryCount + 1})...`);
         setupHLS();
       }
-    }, 5000);
+    }, retryDelay);
 
     return () => {
       isMounted = false;
@@ -315,7 +401,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         hlsRef.current = null;
       }
     };
-  }, [stream?.status, stream?.cf_hls_url, streamId]);
+  }, [stream?.status, stream?.cf_hls_url, streamId, isSlowNetwork, connectionNotified]);
 
   // Subscribe to comments
   useEffect(() => {

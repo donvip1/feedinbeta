@@ -73,32 +73,71 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     return () => setHideBottomNav(false);
   }, [setHideBottomNav]);
 
-  // Initialize media stream
-  const initializeMedia = async () => {
+  // Initialize media stream - optimized for low bandwidth
+  const initializeMedia = async (lowBandwidth = false) => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
+      // Try high quality first, fall back to lower quality for slow networks
+      const constraints = lowBandwidth ? {
         video: {
           facingMode: isFrontCamera ? "user" : "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 640, max: 854 },
+          height: { ideal: 360, max: 480 },
+          frameRate: { ideal: 15, max: 24 },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 22050,
+        },
+      } : {
+        video: {
+          facingMode: isFrontCamera ? "user" : "environment",
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 30 },
         },
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         },
-      });
+      };
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
       streamRef.current = mediaStream;
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
       }
 
+      console.log(`[Host] Media initialized (${lowBandwidth ? 'low' : 'high'} bandwidth mode)`);
       return mediaStream;
     } catch (error) {
       console.error("Error accessing media devices:", error);
       toast.error("Could not access camera/microphone");
       throw error;
+    }
+  };
+
+  // Detect network quality
+  const detectNetworkQuality = async (): Promise<'high' | 'low'> => {
+    try {
+      // Check Network Information API if available
+      const connection = (navigator as any).connection;
+      if (connection) {
+        const effectiveType = connection.effectiveType;
+        console.log('[Host] Network type:', effectiveType);
+        if (effectiveType === '2g' || effectiveType === 'slow-2g' || effectiveType === '3g') {
+          return 'low';
+        }
+        if (connection.downlink && connection.downlink < 1.5) {
+          return 'low';
+        }
+      }
+      return 'high';
+    } catch {
+      return 'high';
     }
   };
 
@@ -108,11 +147,18 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
     setConnectionStatus('connecting');
     
     try {
-      const mediaStream = await initializeMedia();
+      // Detect network and use appropriate quality
+      const networkQuality = await detectNetworkQuality();
+      const useLowBandwidth = networkQuality === 'low';
+      
+      if (useLowBandwidth) {
+        toast.info("Slow network detected - using optimized quality");
+      }
+      
+      const mediaStream = await initializeMedia(useLowBandwidth);
       
       // Step 1: Create Cloudflare Stream Live Input
       console.log('[Host] Creating Cloudflare Stream Live Input...');
-      const { data: sessionData } = await supabase.auth.getSession();
       
       const createResponse = await supabase.functions.invoke('cloudflare-stream', {
         body: {
@@ -137,29 +183,43 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       if (webrtcUrl) {
         console.log('[Host] Publishing to Cloudflare Stream via WHIP...');
         
-        // Create peer connection for WHIP with robust ICE configuration
+        // Create peer connection with aggressive ICE settings for faster connection
         const pc = new RTCPeerConnection({
           iceServers: [
             { urls: 'stun:stun.cloudflare.com:3478' },
             { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
           ],
           bundlePolicy: 'max-bundle',
-          iceCandidatePoolSize: 10,
+          iceCandidatePoolSize: 5, // Reduced for faster gathering
+          iceTransportPolicy: 'all',
         });
         
-        // Monitor connection state
+        let connectionEstablished = false;
+        
+        // Monitor connection state with faster timeout
         pc.onconnectionstatechange = () => {
           console.log('[Host] Connection state:', pc.connectionState);
           if (pc.connectionState === 'connected') {
+            connectionEstablished = true;
             setConnectionStatus('connected');
-          } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            toast.success("Connected! You are now live.");
+          } else if (pc.connectionState === 'failed') {
             console.error('[Host] WebRTC connection failed');
-            setConnectionStatus('failed');
+            if (!connectionEstablished) {
+              setConnectionStatus('failed');
+            }
+          } else if (pc.connectionState === 'disconnected') {
+            // Try to recover on disconnect
+            console.log('[Host] Connection disconnected, attempting recovery...');
           }
         };
         
         pc.oniceconnectionstatechange = () => {
           console.log('[Host] ICE connection state:', pc.iceConnectionState);
+          if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+            setConnectionStatus('connected');
+          }
         };
         
         // Add tracks from media stream
@@ -176,52 +236,68 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         await pc.setLocalDescription(offer);
         console.log('[Host] Local SDP offer created');
         
-        // Wait for ICE gathering to complete (with timeout)
-        await new Promise<void>((resolve, reject) => {
+        // Fast ICE gathering - only wait 1.5s max for slow networks
+        const iceTimeout = useLowBandwidth ? 1500 : 2500;
+        await new Promise<void>((resolve) => {
           const timeout = setTimeout(() => {
-            console.log('[Host] ICE gathering timed out, proceeding...');
+            console.log('[Host] ICE gathering timeout, proceeding with available candidates...');
             resolve();
-          }, 5000);
+          }, iceTimeout);
           
           if (pc.iceGatheringState === 'complete') {
             clearTimeout(timeout);
             resolve();
           } else {
-            pc.onicegatheringstatechange = () => {
+            const checkComplete = () => {
               if (pc.iceGatheringState === 'complete') {
                 clearTimeout(timeout);
+                pc.onicegatheringstatechange = null;
                 resolve();
               }
             };
+            pc.onicegatheringstatechange = checkComplete;
           }
         });
         
-        console.log('[Host] Sending SDP to WHIP endpoint:', webrtcUrl);
+        console.log('[Host] Sending SDP to WHIP endpoint...');
         
-        // Send offer to Cloudflare WHIP endpoint
-        const whipResponse = await fetch(webrtcUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/sdp',
-          },
-          body: pc.localDescription?.sdp,
-        });
+        // Send offer to Cloudflare WHIP endpoint with timeout
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 10000);
         
-        if (!whipResponse.ok) {
-          const errorText = await whipResponse.text();
-          console.error('[Host] WHIP response error:', whipResponse.status, errorText);
-          throw new Error(`WHIP connection failed: ${whipResponse.status} - ${errorText}`);
+        try {
+          const whipResponse = await fetch(webrtcUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/sdp',
+            },
+            body: pc.localDescription?.sdp,
+            signal: controller.signal,
+          });
+          clearTimeout(fetchTimeout);
+          
+          if (!whipResponse.ok) {
+            const errorText = await whipResponse.text();
+            console.error('[Host] WHIP response error:', whipResponse.status, errorText);
+            throw new Error(`WHIP connection failed: ${whipResponse.status}`);
+          }
+          
+          const answerSdp = await whipResponse.text();
+          console.log('[Host] Received WHIP answer SDP');
+          
+          await pc.setRemoteDescription({
+            type: 'answer',
+            sdp: answerSdp,
+          });
+          
+          console.log('[Host] Remote description set, connection establishing...');
+        } catch (fetchError: any) {
+          clearTimeout(fetchTimeout);
+          if (fetchError.name === 'AbortError') {
+            throw new Error('Connection timed out - please check your network');
+          }
+          throw fetchError;
         }
-        
-        const answerSdp = await whipResponse.text();
-        console.log('[Host] Received WHIP answer SDP');
-        
-        await pc.setRemoteDescription({
-          type: 'answer',
-          sdp: answerSdp,
-        });
-        
-        console.log('[Host] Remote description set, connection establishing...');
         
         // Store peer connection for cleanup
         sfuRef.current = { pc, liveInputId };
@@ -244,7 +320,6 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
 
       setIsLive(true);
       setConnectionStatus('connected');
-      toast.success("You are now live! Viewers can watch via HLS.");
       
     } catch (error: any) {
       console.error("Error starting broadcast:", error);
