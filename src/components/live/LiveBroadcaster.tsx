@@ -44,6 +44,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const { setHideBottomNav } = useNavigation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const mobileVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const sfuRef = useRef<{ pc: RTCPeerConnection; liveInputId: string } | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -66,6 +67,22 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [flyingGifts, setFlyingGifts] = useState<{ id: string; gift_type: string; sender_name: string; credit_value: number }[]>([]);
   const [coHosts, setCoHosts] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
+
+  // Helper to set video stream on both desktop and mobile video elements
+  const setVideoStream = useCallback((mediaStream: MediaStream | null) => {
+    if (videoRef.current) {
+      videoRef.current.srcObject = mediaStream;
+      if (mediaStream) {
+        videoRef.current.play().catch(e => console.log('[Host] Desktop video play error:', e));
+      }
+    }
+    if (mobileVideoRef.current) {
+      mobileVideoRef.current.srcObject = mediaStream;
+      if (mediaStream) {
+        mobileVideoRef.current.play().catch(e => console.log('[Host] Mobile video play error:', e));
+      }
+    }
+  }, []);
 
   // Hide bottom navigation when broadcasting
   useEffect(() => {
@@ -107,9 +124,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
 
       streamRef.current = mediaStream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-      }
+      setVideoStream(mediaStream);
 
       console.log(`[Host] Media initialized (${lowBandwidth ? 'low' : 'high'} bandwidth mode)`);
       return mediaStream;
@@ -195,7 +210,14 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
         toast.info("Slow network detected - using optimized quality");
       }
       
-      const mediaStream = await initializeMedia(useLowBandwidth);
+      // Reuse existing media stream from preview, or initialize new one
+      let mediaStream = streamRef.current;
+      if (!mediaStream || mediaStream.getTracks().length === 0) {
+        console.log('[Host] No preview stream, initializing new media...');
+        mediaStream = await initializeMedia(useLowBandwidth);
+      } else {
+        console.log('[Host] Reusing existing preview stream');
+      }
       
       // Step 1: Create Cloudflare Stream Live Input
       console.log('[Host] Creating Cloudflare Stream Live Input...');
@@ -527,9 +549,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       });
 
       streamRef.current = newStream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
-      }
+      setVideoStream(newStream);
 
       // Stop old tracks
       oldStream?.getTracks().forEach(track => track.stop());
@@ -562,6 +582,51 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       toast.error("Could not switch camera");
     }
   };
+
+
+  // Initialize camera preview on mount - so users can see themselves before going live
+  useEffect(() => {
+    let isMounted = true;
+    
+    const initPreview = async () => {
+      try {
+        console.log('[Host] Initializing camera preview...');
+        const constraints = {
+          video: {
+            facingMode: isFrontCamera ? "user" : "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+          audio: true, // Request audio too so it's ready when we go live
+        };
+        
+        const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        if (isMounted) {
+          streamRef.current = mediaStream;
+          setVideoStream(mediaStream);
+          console.log('[Host] Camera preview started successfully');
+        } else {
+          // Component unmounted, stop tracks
+          mediaStream.getTracks().forEach(track => track.stop());
+        }
+      } catch (error) {
+        console.error('[Host] Error initializing camera preview:', error);
+        toast.error("Could not access camera. Please check permissions.");
+      }
+    };
+    
+    initPreview();
+    
+    return () => {
+      isMounted = false;
+      // Clean up media stream on unmount
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [setVideoStream]); // Run only on mount, camera switching is handled separately
 
   // Fetch stream details
   useEffect(() => {
@@ -1206,7 +1271,7 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
       {/* Mobile/Tablet: Full screen video */}
       <div className="lg:hidden absolute inset-0 bg-black">
         <video
-          ref={videoRef}
+          ref={mobileVideoRef}
           autoPlay
           playsInline
           muted
