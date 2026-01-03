@@ -104,18 +104,29 @@ Deno.serve(async (req) => {
         
         console.log('[cloudflare-stream] Full response:', JSON.stringify(liveInput, null, 2));
         
-        // Extract the WebRTC URL for WHIP publishing
-        const webrtcUrl = liveInput.webRTC?.url;
-        // HLS playback URL from Cloudflare
-        const hlsUrl = `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${liveInput.uid}/manifest/video.m3u8`;
+        // Extract URLs for WHIP publishing (host) and playback (viewers)
+        const webrtcUrl = liveInput.webRTC?.url;  // For host to publish
+        const webrtcPlaybackUrl = liveInput.webRTCPlayback?.url;  // For viewers - low latency!
         
-        // Update the live_streams table with Cloudflare info
+        // HLS playback URL - use the customer subdomain from webRTC URL
+        // Cloudflare uses different subdomains for different customers
+        const customerMatch = webrtcUrl?.match(/customer-([^.]+)/);
+        const customerSubdomain = customerMatch ? customerMatch[0] : `customer-${CLOUDFLARE_ACCOUNT_ID}`;
+        const hlsUrl = `https://${customerSubdomain}.cloudflarestream.com/${liveInput.uid}/manifest/video.m3u8`;
+        
+        console.log('[cloudflare-stream] WebRTC Publish URL:', webrtcUrl);
+        console.log('[cloudflare-stream] WebRTC Playback URL:', webrtcPlaybackUrl);
+        console.log('[cloudflare-stream] HLS URL:', hlsUrl);
+        
+        // Update the live_streams table with Cloudflare info - include WebRTC playback URL!
         const { error: updateError } = await supabaseClient
           .from('live_streams')
           .update({
             cf_live_input_id: liveInput.uid,
             cf_webrtc_url: webrtcUrl,
             cf_hls_url: hlsUrl,
+            // Store WebRTC playback URL in stream_url for viewers
+            stream_url: webrtcPlaybackUrl || hlsUrl,
           })
           .eq('id', streamId)
           .eq('user_id', user.id);
@@ -130,13 +141,14 @@ Deno.serve(async (req) => {
             success: true,
             liveInputId: liveInput.uid,
             webrtcUrl: webrtcUrl,
+            webrtcPlaybackUrl: webrtcPlaybackUrl,
             rtmpsUrl: liveInput.rtmps?.url,
             rtmpsStreamKey: liveInput.rtmps?.streamKey,
             srtUrl: liveInput.srt?.url,
             hlsUrl: hlsUrl,
-            dashUrl: `https://customer-${CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${liveInput.uid}/manifest/video.mpd`,
-            // Also return raw CF response for debugging
+            dashUrl: `https://${customerSubdomain}.cloudflarestream.com/${liveInput.uid}/manifest/video.mpd`,
             rawWebRTC: liveInput.webRTC,
+            rawWebRTCPlayback: liveInput.webRTCPlayback,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
