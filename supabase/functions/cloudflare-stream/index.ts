@@ -118,15 +118,15 @@ Deno.serve(async (req) => {
         console.log('[cloudflare-stream] WebRTC Playback URL:', webrtcPlaybackUrl);
         console.log('[cloudflare-stream] HLS URL:', hlsUrl);
         
-        // Update the live_streams table with Cloudflare info - include WebRTC playback URL!
+        // Update the live_streams table with Cloudflare info
+        // IMPORTANT: cf_webrtc_url should be the PLAYBACK URL (WHEP) for viewers, NOT the publish URL (WHIP)
         const { error: updateError } = await supabaseClient
           .from('live_streams')
           .update({
             cf_live_input_id: liveInput.uid,
-            cf_webrtc_url: webrtcUrl,
+            cf_webrtc_url: webrtcPlaybackUrl || null, // WHEP playback URL for viewers (NOT publish URL!)
             cf_hls_url: hlsUrl,
-            // Store WebRTC playback URL in stream_url for viewers
-            stream_url: webrtcPlaybackUrl || hlsUrl,
+            stream_key: liveInput.rtmps?.streamKey || '',
           })
           .eq('id', streamId)
           .eq('user_id', user.id);
