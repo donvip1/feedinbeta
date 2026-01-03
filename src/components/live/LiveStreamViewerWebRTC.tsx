@@ -82,12 +82,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       setCurrentUser(user);
 
       const { data: streamData, error } = await supabase
-        .from("live_streams")
+        .from("live_streams_public")
         .select(`*, profiles:user_id (*)`)
         .eq("id", streamId)
-        .single();
+        .maybeSingle();
 
-      if (error) {
+      if (error || !streamData) {
         toast.error("Failed to load stream");
         onClose();
         return;
