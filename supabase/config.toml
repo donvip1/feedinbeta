@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.cloudflare-stream]
 verify_jwt = true
+
+[functions.cloudflare-stream-v2]
+verify_jwt = true

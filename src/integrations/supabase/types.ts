@@ -1769,18 +1769,21 @@ export type Database = {
           cf_recording_uid: string | null
           cf_webrtc_url: string | null
           cloudflare_session_id: string | null
+          connection_state: string | null
           created_at: string | null
           description: string | null
           duration: number | null
           ended_at: string | null
           id: string
           is_premium: boolean | null
+          last_health_check: string | null
           peak_viewers: number | null
           scheduled_start: string | null
           sfu_track_name: string | null
           started_at: string | null
           status: string
           stream_key: string
+          stream_ready: boolean | null
           tags: string[] | null
           thumbnail_url: string | null
           title: string
@@ -1795,18 +1798,21 @@ export type Database = {
           cf_recording_uid?: string | null
           cf_webrtc_url?: string | null
           cloudflare_session_id?: string | null
+          connection_state?: string | null
           created_at?: string | null
           description?: string | null
           duration?: number | null
           ended_at?: string | null
           id?: string
           is_premium?: boolean | null
+          last_health_check?: string | null
           peak_viewers?: number | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
           started_at?: string | null
           status?: string
           stream_key: string
+          stream_ready?: boolean | null
           tags?: string[] | null
           thumbnail_url?: string | null
           title: string
@@ -1821,18 +1827,21 @@ export type Database = {
           cf_recording_uid?: string | null
           cf_webrtc_url?: string | null
           cloudflare_session_id?: string | null
+          connection_state?: string | null
           created_at?: string | null
           description?: string | null
           duration?: number | null
           ended_at?: string | null
           id?: string
           is_premium?: boolean | null
+          last_health_check?: string | null
           peak_viewers?: number | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
           started_at?: string | null
           status?: string
           stream_key?: string
+          stream_ready?: boolean | null
           tags?: string[] | null
           thumbnail_url?: string | null
           title?: string
@@ -4502,23 +4511,20 @@ export type Database = {
           category: string | null
           cf_hls_url: string | null
           cf_webrtc_url: string | null
-          cloudflare_session_id: string | null
+          connection_state: string | null
           created_at: string | null
           description: string | null
-          duration: number | null
           ended_at: string | null
           id: string | null
           is_premium: boolean | null
           peak_viewers: number | null
           scheduled_start: string | null
-          sfu_track_name: string | null
           started_at: string | null
           status: string | null
-          stream_key: string | null
+          stream_ready: boolean | null
           tags: string[] | null
           thumbnail_url: string | null
           title: string | null
-          updated_at: string | null
           user_id: string | null
           viewer_count: number | null
         }
@@ -4526,23 +4532,20 @@ export type Database = {
           category?: string | null
           cf_hls_url?: string | null
           cf_webrtc_url?: string | null
-          cloudflare_session_id?: string | null
+          connection_state?: string | null
           created_at?: string | null
           description?: string | null
-          duration?: number | null
           ended_at?: string | null
           id?: string | null
           is_premium?: boolean | null
           peak_viewers?: number | null
           scheduled_start?: string | null
-          sfu_track_name?: string | null
           started_at?: string | null
           status?: string | null
-          stream_key?: never
+          stream_ready?: boolean | null
           tags?: string[] | null
           thumbnail_url?: string | null
           title?: string | null
-          updated_at?: string | null
           user_id?: string | null
           viewer_count?: number | null
         }
@@ -4550,23 +4553,20 @@ export type Database = {
           category?: string | null
           cf_hls_url?: string | null
           cf_webrtc_url?: string | null
-          cloudflare_session_id?: string | null
+          connection_state?: string | null
           created_at?: string | null
           description?: string | null
-          duration?: number | null
           ended_at?: string | null
           id?: string | null
           is_premium?: boolean | null
           peak_viewers?: number | null
           scheduled_start?: string | null
-          sfu_track_name?: string | null
           started_at?: string | null
           status?: string | null
-          stream_key?: never
+          stream_ready?: boolean | null
           tags?: string[] | null
           thumbnail_url?: string | null
           title?: string | null
-          updated_at?: string | null
           user_id?: string | null
           viewer_count?: number | null
         }
