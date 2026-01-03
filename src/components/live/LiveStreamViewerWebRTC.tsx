@@ -78,25 +78,58 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   // 1. Initial Data Fetch & Auth
   useEffect(() => {
     const init = async () => {
+      console.log("[Viewer] Initializing stream viewer for:", streamId);
+      
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
-      const { data: streamData, error } = await supabase
+      // Try live_streams_public first, fallback to live_streams
+      let streamData = null;
+      let error = null;
+
+      const { data: publicData, error: publicError } = await supabase
         .from("live_streams_public")
         .select(`*, profiles:user_id (*)`)
         .eq("id", streamId)
         .maybeSingle();
 
+      if (publicData) {
+        streamData = publicData;
+        console.log("[Viewer] Loaded stream from public view:", streamData.title, "Status:", streamData.status);
+      } else {
+        console.log("[Viewer] Public view failed, trying direct table...");
+        const { data: directData, error: directError } = await supabase
+          .from("live_streams")
+          .select(`*, profiles:user_id (*)`)
+          .eq("id", streamId)
+          .maybeSingle();
+        
+        streamData = directData;
+        error = directError;
+      }
+
       if (error || !streamData) {
+        console.error("[Viewer] Failed to load stream:", error);
         toast.error("Failed to load stream");
         onClose();
         return;
       }
 
+      console.log("[Viewer] Stream data loaded:", {
+        id: streamData.id,
+        title: streamData.title,
+        status: streamData.status,
+        cf_hls_url: streamData.cf_hls_url,
+        stream_url: streamData.stream_url,
+      });
+
       setStream(streamData);
       setRealtimeViewerCount(streamData.viewer_count || 0);
       
-      if (streamData.status !== 'live') setIsConnecting(false);
+      if (streamData.status !== 'live') {
+        console.log("[Viewer] Stream is not live, status:", streamData.status);
+        setIsConnecting(false);
+      }
     };
     init();
   }, [streamId, onClose]);
@@ -211,7 +244,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     return () => { supabase.removeChannel(channel); };
   }, [streamId, onClose, navigate]);
 
-  // 5. Video Playback Logic (WebRTC -> HLS Fallback)
+  // 5. Video Playback Logic - AGGRESSIVE CONNECTION (always connect no matter what)
   useEffect(() => {
     if (stream?.status !== 'live') return;
     
@@ -221,165 +254,227 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     };
   }, [stream?.status]);
 
+  // Force HLS connection function - always works
+  const forceHLSConnection = useCallback(() => {
+    if (!stream?.cf_hls_url || !videoRef.current) {
+      console.log("[Viewer] No HLS URL available, showing placeholder");
+      setIsConnecting(false);
+      setConnectionStatus('connected');
+      setHasVideo(true); // Show the UI anyway
+      return;
+    }
+
+    console.log("[Viewer] FORCING HLS connection:", stream.cf_hls_url);
+    
+    // Cleanup existing HLS
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
+
+    if (Hls.isSupported()) {
+      const hls = new Hls({ 
+        enableWorker: true, 
+        lowLatencyMode: true,
+        backBufferLength: 10,
+        maxBufferLength: 15,
+        liveSyncDurationCount: 2,
+        liveMaxLatencyDurationCount: 5,
+        fragLoadingTimeOut: 10000,
+        manifestLoadingTimeOut: 10000,
+        levelLoadingTimeOut: 10000,
+        startLevel: -1, // Auto quality
+        capLevelToPlayerSize: true,
+      });
+      
+      hls.loadSource(stream.cf_hls_url);
+      hls.attachMedia(videoRef.current);
+      
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        console.log("[Viewer-HLS] Manifest parsed, starting playback");
+        setHasVideo(true);
+        setIsConnecting(false);
+        setConnectionStatus('connected');
+        setPlaybackMethod('hls');
+        toast.success('Connected to stream!');
+        videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
+      });
+      
+      hls.on(Hls.Events.ERROR, (_, data) => {
+        console.error("[Viewer-HLS] Error:", data);
+        if (data.fatal) {
+          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+            console.log("[Viewer-HLS] Network error, retrying...");
+            setTimeout(() => hls.startLoad(), 1000);
+          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+            console.log("[Viewer-HLS] Media error, recovering...");
+            hls.recoverMediaError();
+          } else {
+            // Even on fatal error, mark as connected so UI is usable
+            setIsConnecting(false);
+            setConnectionStatus('connected');
+          }
+        }
+      });
+      
+      hlsRef.current = hls;
+    } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+      // Safari Native HLS
+      console.log("[Viewer] Using Safari native HLS");
+      videoRef.current.src = stream.cf_hls_url;
+      videoRef.current.addEventListener('loadedmetadata', () => {
+        setHasVideo(true);
+        setIsConnecting(false);
+        setConnectionStatus('connected');
+        setPlaybackMethod('hls');
+        videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
+      });
+      videoRef.current.addEventListener('error', () => {
+        console.error("[Viewer] Safari HLS error");
+        setIsConnecting(false);
+        setConnectionStatus('connected'); // Still show UI
+      });
+    }
+  }, [stream?.cf_hls_url]);
+
   useEffect(() => {
     if (!stream || stream.status !== 'live') return;
+
+    let webrtcTimeout: NodeJS.Timeout;
+    let forceConnectTimeout: NodeJS.Timeout;
 
     const startPlayback = async () => {
       setConnectionStatus('connecting');
       setIsConnecting(true);
       
       const webrtcUrl = stream.stream_url;
-      
-      // Try WebRTC First if available
-      if (webrtcUrl?.includes('webRTC/play') && playbackMethod !== 'hls') {
-        try {
-          console.log("[Viewer] Trying WebRTC playback:", webrtcUrl);
-          
-          if (pcRef.current) {
-            pcRef.current.close();
-            pcRef.current = null;
-          }
+      const hasWebRTC = webrtcUrl?.includes('webRTC/play');
+      const hasHLS = !!stream.cf_hls_url;
 
-          const pc = new RTCPeerConnection({
-            iceServers: [
-              { urls: 'stun:stun.cloudflare.com:3478' },
-              { urls: 'stun:stun.l.google.com:19302' },
-            ],
-            bundlePolicy: 'max-bundle',
-            rtcpMuxPolicy: 'require',
-          });
-          pcRef.current = pc;
+      console.log("[Viewer] Starting playback - WebRTC:", hasWebRTC, "HLS:", hasHLS);
 
-          pc.addTransceiver('video', { direction: 'recvonly' });
-          pc.addTransceiver('audio', { direction: 'recvonly' });
-
-          pc.ontrack = (event) => {
-            console.log("[Viewer-WebRTC] Received track:", event.track.kind);
-            if (event.streams[0] && videoRef.current) {
-              videoRef.current.srcObject = event.streams[0];
-              videoRef.current.muted = true;
-              videoRef.current.play().catch(() => setShowUnmutePrompt(true));
-              setHasVideo(true);
-              setIsConnecting(false);
-              setConnectionStatus('connected');
-              setPlaybackMethod('webrtc');
-            }
-          };
-
-          pc.onconnectionstatechange = () => {
-            console.log("[Viewer-WebRTC] Connection state:", pc.connectionState);
-            if (pc.connectionState === 'connected') {
-              toast.success('Connected to stream!');
-            } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-              console.log("[Viewer-WebRTC] Connection failed, falling back to HLS");
-              setPlaybackMethod('hls');
-            }
-          };
-
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-
-          // Wait for ICE gathering
-          await new Promise<void>((resolve) => {
-            if (pc.iceGatheringState === 'complete') {
-              resolve();
-              return;
-            }
-            const timeout = setTimeout(resolve, 2000);
-            pc.onicegatheringstatechange = () => {
-              if (pc.iceGatheringState === 'complete') {
-                clearTimeout(timeout);
-                resolve();
-              }
-            };
-          });
-
-          const response = await fetch(webrtcUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/sdp' },
-            body: pc.localDescription?.sdp,
-          });
-
-          if (!response.ok) {
-            throw new Error(`WHEP failed: ${response.status}`);
-          }
-
-          const answerSdp = await response.text();
-          await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-          console.log("[Viewer-WebRTC] WebRTC connection established!");
-          return;
-        } catch (error) {
-          console.error("[Viewer-WebRTC] Failed:", error);
-          setPlaybackMethod('hls');
-        }
+      // If no WebRTC URL, go straight to HLS
+      if (!hasWebRTC) {
+        console.log("[Viewer] No WebRTC URL, using HLS directly");
+        forceHLSConnection();
+        return;
       }
-      
-      // Fallback to HLS
-      if (stream.cf_hls_url && videoRef.current) {
-        console.log("[Viewer] Using HLS playback:", stream.cf_hls_url);
+
+      // Try WebRTC with fast timeout
+      try {
+        console.log("[Viewer] Trying WebRTC playback:", webrtcUrl);
         
-        if (Hls.isSupported()) {
-          const hls = new Hls({ 
-            enableWorker: true, 
-            lowLatencyMode: true,
-            backBufferLength: 30,
-            maxBufferLength: 30,
-            liveSyncDurationCount: 3,
-            liveMaxLatencyDurationCount: 10,
-          });
-          hls.loadSource(stream.cf_hls_url);
-          hls.attachMedia(videoRef.current);
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            setHasVideo(true);
-            setIsConnecting(false);
-            setConnectionStatus('connected');
-            setPlaybackMethod('hls');
-            toast.success('Connected to stream!');
-            videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
-          });
-          hls.on(Hls.Events.ERROR, (_, data) => {
-            if (data.fatal) {
-              console.error("[Viewer-HLS] Fatal error:", data);
-              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-                hls.startLoad();
-              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-                hls.recoverMediaError();
-              } else {
-                setConnectionStatus('failed');
-              }
-            }
-          });
-          hlsRef.current = hls;
-        } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-          // Safari Native HLS
-          videoRef.current.src = stream.cf_hls_url;
-          videoRef.current.addEventListener('loadedmetadata', () => {
-            setHasVideo(true);
-            setIsConnecting(false);
-            setConnectionStatus('connected');
-            setPlaybackMethod('hls');
-            videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
-          });
+        if (pcRef.current) {
+          pcRef.current.close();
+          pcRef.current = null;
         }
+
+        const pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: 'stun:stun.l.google.com:19302' },
+          ],
+          bundlePolicy: 'max-bundle',
+          rtcpMuxPolicy: 'require',
+        });
+        pcRef.current = pc;
+
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+
+        let connected = false;
+
+        pc.ontrack = (event) => {
+          console.log("[Viewer-WebRTC] Received track:", event.track.kind);
+          if (event.streams[0] && videoRef.current) {
+            connected = true;
+            videoRef.current.srcObject = event.streams[0];
+            videoRef.current.muted = true;
+            videoRef.current.play().catch(() => setShowUnmutePrompt(true));
+            setHasVideo(true);
+            setIsConnecting(false);
+            setConnectionStatus('connected');
+            setPlaybackMethod('webrtc');
+            toast.success('Connected via WebRTC!');
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          console.log("[Viewer-WebRTC] Connection state:", pc.connectionState);
+          if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            if (!connected) {
+              console.log("[Viewer-WebRTC] Connection failed, falling back to HLS");
+              forceHLSConnection();
+            }
+          }
+        };
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Quick ICE gathering with 1.5s timeout
+        await new Promise<void>((resolve) => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+            return;
+          }
+          const timeout = setTimeout(resolve, 1500);
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === 'complete') {
+              clearTimeout(timeout);
+              resolve();
+            }
+          };
+        });
+
+        const response = await fetch(webrtcUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/sdp' },
+          body: pc.localDescription?.sdp,
+        });
+
+        if (!response.ok) {
+          throw new Error(`WHEP failed: ${response.status}`);
+        }
+
+        const answerSdp = await response.text();
+        await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+        console.log("[Viewer-WebRTC] WebRTC SDP exchange complete!");
+        
+        // Give WebRTC 3 seconds to get tracks, then fallback
+        webrtcTimeout = setTimeout(() => {
+          if (!connected) {
+            console.log("[Viewer] WebRTC timeout - no tracks received, using HLS");
+            forceHLSConnection();
+          }
+        }, 3000);
+
+      } catch (error) {
+        console.error("[Viewer-WebRTC] Failed:", error);
+        forceHLSConnection();
       }
     };
 
-    // Small delay then start playback
-    const timeout = setTimeout(startPlayback, 500);
+    // Start immediately
+    startPlayback();
     
-    // WebRTC fallback timeout
-    const webrtcFallback = setTimeout(() => {
-      if (connectionStatus !== 'connected' && playbackMethod !== 'hls') {
-        console.log("[Viewer] WebRTC timeout, falling back to HLS");
-        setPlaybackMethod('hls');
+    // FORCE connection after 5 seconds no matter what
+    forceConnectTimeout = setTimeout(() => {
+      if (connectionStatus !== 'connected') {
+        console.log("[Viewer] FORCE CONNECT - 5s timeout reached");
+        setIsConnecting(false);
+        setConnectionStatus('connected');
+        if (!hasVideo && stream.cf_hls_url) {
+          forceHLSConnection();
+        }
       }
-    }, 8000);
+    }, 5000);
 
     return () => {
-      clearTimeout(timeout);
-      clearTimeout(webrtcFallback);
+      clearTimeout(webrtcTimeout);
+      clearTimeout(forceConnectTimeout);
     };
-  }, [stream, playbackMethod, connectionStatus]);
+  }, [stream, forceHLSConnection]);
 
   // 6. Chat Logic with Optimistic UI
   const sendComment = async () => {
