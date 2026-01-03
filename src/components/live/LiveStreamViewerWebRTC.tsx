@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +10,7 @@ import {
   Users, Send, Heart, X, Gift, 
   Volume2, VolumeX, Maximize, Minimize, Flame, 
   PartyPopper, ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Coins, Wifi, WifiOff, Crown
+  MessageCircle, Home, Coins, Share2, Crown
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -18,9 +18,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { useLivePresence } from "@/hooks/useLivePresence";
-import { FloatingReactions } from "./FloatingReactions";
-import { LiveChatMessage } from "./LiveChatMessage";
 import Hls from 'hls.js';
 
 interface LiveStreamViewerWebRTCProps {
@@ -28,7 +25,7 @@ interface LiveStreamViewerWebRTCProps {
   onClose: () => void;
 }
 
-// Sexy emoji reactions - TikTok style
+// TikTok style reactions
 const REACTIONS = [
   { type: 'heart', emoji: '❤️', icon: Heart, color: 'text-red-500' },
   { type: 'fire', emoji: '🔥', icon: Flame, color: 'text-orange-500' },
@@ -39,31 +36,25 @@ const REACTIONS = [
 ];
 
 const GIFT_EMOJIS: Record<string, string> = {
-  heart: '❤️',
-  star: '⭐',
-  fire: '🔥',
-  lightning: '⚡',
-  crown: '👑',
-  diamond: '💎',
-  rocket: '🚀',
-  universe: '🌌',
-  credits: '💰',
+  heart: '❤️', star: '⭐', fire: '🔥', lightning: '⚡', 
+  crown: '👑', diamond: '💎', rocket: '🚀', universe: '🌌', credits: '💰',
 };
 
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
   const navigate = useNavigate();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mobileVideoRef = useRef<HTMLVideoElement>(null);
+  // Single video ref for better stability
+  const videoRef = useRef<HTMLVideoElement>(null); 
   const hlsRef = useRef<Hls | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [stream, setStream] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   const [viewerSession, setViewerSession] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true); // Start muted to allow autoplay
+  const [isMuted, setIsMuted] = useState(true); 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [reactions, setReactions] = useState<{ type: string; id: number; x: number; y: number; senderName?: string }[]>([]);
   const [isConnecting, setIsConnecting] = useState(true);
@@ -71,179 +62,101 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [hasVideo, setHasVideo] = useState(false);
   const [flyingGifts, setFlyingGifts] = useState<any[]>([]);
   const [showGiftModal, setShowGiftModal] = useState(false);
-  const [viewers, setViewers] = useState<any[]>([]);
-  const [isChatFocused, setIsChatFocused] = useState(false);
-  const [connectionNotified, setConnectionNotified] = useState(false);
+  const [realtimeViewerCount, setRealtimeViewerCount] = useState(0);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   const [playbackMethod, setPlaybackMethod] = useState<'webrtc' | 'hls' | null>(null);
   const [showUnmutePrompt, setShowUnmutePrompt] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentUserProfile, setCurrentUserProfile] = useState<{ username?: string; avatar_url?: string } | null>(null);
+  const [viewers, setViewers] = useState<any[]>([]);
+  
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
-  // Get current user for presence
+  // Check if current user is the host
+  const isHost = useMemo(() => {
+    return currentUser?.id && stream?.user_id && currentUser.id === stream.user_id;
+  }, [currentUser, stream]);
+
+  // 1. Initial Data Fetch & Auth
   useEffect(() => {
-    const getUser = async () => {
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setCurrentUserId(user.id);
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('display_name, username, avatar_url')
-          .eq('id', user.id)
-          .single();
-        if (profile) {
-          setCurrentUserProfile({ username: profile.display_name || profile.username, avatar_url: profile.avatar_url });
-        }
-      }
-    };
-    getUser();
-  }, []);
+      setCurrentUser(user);
 
-  // Supabase Presence for real-time viewer counts
-  const { viewerCount: presenceViewerCount, isConnected: presenceConnected } = useLivePresence({
-    streamId,
-    userId: currentUserId || undefined,
-    username: currentUserProfile?.username,
-    avatarUrl: currentUserProfile?.avatar_url,
-    isHost: false,
-  });
-
-  // Helper to set video source on both elements
-  const setVideoSource = useCallback((source: MediaStream | string | null) => {
-    const setSource = (video: HTMLVideoElement | null) => {
-      if (!video) return;
-      if (source instanceof MediaStream) {
-        video.srcObject = source;
-      } else if (typeof source === 'string') {
-        video.src = source;
-      } else {
-        video.srcObject = null;
-        video.src = '';
-      }
-    };
-    setSource(videoRef.current);
-    setSource(mobileVideoRef.current);
-  }, []);
-
-  // Play both video elements
-  const playVideos = useCallback(async () => {
-    const playVideo = async (video: HTMLVideoElement | null) => {
-      if (!video) return;
-      try {
-        await video.play();
-      } catch (e) {
-        console.warn("[Viewer] Autoplay failed, keeping muted:", e);
-        video.muted = true;
-        await video.play().catch(() => {});
-      }
-    };
-    await Promise.all([playVideo(videoRef.current), playVideo(mobileVideoRef.current)]);
-  }, []);
-
-  // Handle unmute - user interaction required
-  const handleUnmute = useCallback(() => {
-    setIsMuted(false);
-    setShowUnmutePrompt(false);
-    if (videoRef.current) videoRef.current.muted = false;
-    if (mobileVideoRef.current) mobileVideoRef.current.muted = false;
-  }, []);
-
-  // Fetch stream details
-  useEffect(() => {
-    const fetchStream = async () => {
       const { data: streamData, error } = await supabase
         .from("live_streams")
-        .select("*")
+        .select(`*, profiles:user_id (*)`)
         .eq("id", streamId)
         .single();
 
       if (error) {
-        console.error("Error fetching stream:", error);
         toast.error("Failed to load stream");
+        onClose();
         return;
       }
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("display_name, username, avatar_url")
-        .eq("id", streamData.user_id)
-        .single();
-
-      setStream({ ...streamData, profiles: profileData });
+      setStream(streamData);
+      setRealtimeViewerCount(streamData.viewer_count || 0);
       
-      if (streamData.status !== 'live') {
-        setIsConnecting(false);
-      }
+      if (streamData.status !== 'live') setIsConnecting(false);
     };
+    init();
+  }, [streamId, onClose]);
 
-    fetchStream();
-  }, [streamId]);
+  // 2. UNIFIED VIDEO HANDLER - User interaction to unmute
+  const handleUserInteraction = useCallback(async () => {
+    if (videoRef.current) {
+      try {
+        videoRef.current.muted = false;
+        await videoRef.current.play();
+        setIsMuted(false);
+        setShowUnmutePrompt(false);
+      } catch (err) {
+        console.error("Playback failed:", err);
+      }
+    }
+  }, []);
 
-  // Subscribe to stream status changes - kick viewers when stream ends
+  // 3. Real-time Viewer Counting via postgres_changes
   useEffect(() => {
-    const channel = supabase
-      .channel(`stream-status-${streamId}`)
+    const channel = supabase.channel(`viewers-${streamId}`)
       .on('postgres_changes', {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
-        table: 'live_streams',
-        filter: `id=eq.${streamId}`,
-      }, (payload: any) => {
-        console.log("[Viewer] Stream status changed:", payload.new.status);
-        if (payload.new.status === 'ended') {
-          toast.info("Stream has ended");
-          if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
-          }
-          setTimeout(() => {
-            onClose();
-            navigate('/live');
-          }, 1500);
+        table: 'live_stream_viewers',
+        filter: `stream_id=eq.${streamId}`,
+      }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setRealtimeViewerCount(prev => prev + 1);
+        } else if (payload.eventType === 'DELETE') {
+          setRealtimeViewerCount(prev => Math.max(0, prev - 1));
         }
-        setStream((prev: any) => prev ? { ...prev, ...payload.new } : null);
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [streamId, onClose, navigate]);
-
-  // Join stream as viewer
-  useEffect(() => {
-    const joinStream = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { data, error } = await supabase
-        .from("live_stream_viewers")
-        .insert({
-          stream_id: streamId,
-          user_id: user?.id || null,
-          is_active: true,
-        })
-        .select()
-        .single();
-
-      if (!error && data) {
-        setViewerSession(data.id);
-      }
-    };
-
-    joinStream();
-
-    return () => {
-      if (viewerSession) {
-        supabase
-          .from("live_stream_viewers")
-          .update({ is_active: false, left_at: new Date().toISOString() })
-          .eq("id", viewerSession);
-      }
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [streamId]);
 
-  // Fetch active viewers for gift modal
+  // 4. Join Logic
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const joinStream = async () => {
+      const { data, error } = await supabase
+        .from("live_stream_viewers")
+        .insert({ stream_id: streamId, user_id: currentUser.id, is_active: true })
+        .select().single();
+      if (data) setViewerSession(data.id);
+    };
+    joinStream();
+    
+    return () => {
+      if (viewerSession) {
+        supabase.from("live_stream_viewers")
+          .delete().eq("id", viewerSession).then(() => {});
+      }
+    };
+  }, [streamId, currentUser, viewerSession]);
+
+  // Fetch viewers for gift modal
   useEffect(() => {
     const fetchViewers = async () => {
       const { data } = await supabase
@@ -269,354 +182,241 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     return () => clearInterval(interval);
   }, [streamId]);
 
-  // Detect if user is on slow network
-  const isSlowNetwork = useCallback(() => {
-    const connection = (navigator as any).connection;
-    if (connection) {
-      const type = connection.effectiveType;
-      return type === '2g' || type === 'slow-2g' || type === '3g' || (connection.downlink && connection.downlink < 1.5);
-    }
-    return false;
-  }, []);
+  // Subscribe to stream status changes
+  useEffect(() => {
+    const channel = supabase
+      .channel(`stream-status-${streamId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'live_streams',
+        filter: `id=eq.${streamId}`,
+      }, (payload: any) => {
+        console.log("[Viewer] Stream status changed:", payload.new.status);
+        if (payload.new.status === 'ended') {
+          toast.info("Stream has ended");
+          if (hlsRef.current) {
+            hlsRef.current.destroy();
+            hlsRef.current = null;
+          }
+          setTimeout(() => {
+            onClose();
+            navigate('/live');
+          }, 1500);
+        }
+        setStream((prev: any) => prev ? { ...prev, ...payload.new } : null);
+      })
+      .subscribe();
 
-  // WebRTC Playback - ultra low latency! Try this first
+    return () => { supabase.removeChannel(channel); };
+  }, [streamId, onClose, navigate]);
+
+  // 5. Video Playback Logic (WebRTC -> HLS Fallback)
   useEffect(() => {
     if (stream?.status !== 'live') return;
-    if (playbackMethod === 'hls') return; // Already using HLS fallback
     
-    // Get WebRTC playback URL from stream_url (set by edge function)
-    const webrtcPlaybackUrl = stream?.stream_url;
-    if (!webrtcPlaybackUrl || !webrtcPlaybackUrl.includes('webRTC/play')) {
-      console.log("[Viewer-WebRTC] No WebRTC playback URL, falling back to HLS");
-      setPlaybackMethod('hls');
-      return;
-    }
+    return () => {
+      if (hlsRef.current) hlsRef.current.destroy();
+      if (pcRef.current) pcRef.current.close();
+    };
+  }, [stream?.status]);
 
-    let isMounted = true;
-    console.log("[Viewer-WebRTC] Setting up WebRTC playback:", webrtcPlaybackUrl);
-    setConnectionStatus('connecting');
-    setIsConnecting(true);
+  useEffect(() => {
+    if (!stream || stream.status !== 'live') return;
 
-    const setupWebRTC = async () => {
-      if (!videoRef.current || !isMounted) return;
-
-      try {
-        // Clean up previous connection
-        if (pcRef.current) {
-          pcRef.current.close();
-          pcRef.current = null;
-        }
-
-        // Create peer connection for receiving
-        const pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: 'stun:stun.cloudflare.com:3478' },
-            { urls: 'stun:stun.l.google.com:19302' },
-          ],
-          bundlePolicy: 'max-bundle',
-          rtcpMuxPolicy: 'require',
-        });
-        pcRef.current = pc;
-
-        // Set up to receive tracks
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-
-        pc.ontrack = (event) => {
-          console.log("[Viewer-WebRTC] Received track:", event.track.kind);
-          if (event.streams[0]) {
-            // Set on both video elements
-            if (videoRef.current) {
-              videoRef.current.srcObject = event.streams[0];
-              videoRef.current.muted = true; // Start muted for autoplay
-              videoRef.current.play().catch(() => {});
-            }
-            if (mobileVideoRef.current) {
-              mobileVideoRef.current.srcObject = event.streams[0];
-              mobileVideoRef.current.muted = true;
-              mobileVideoRef.current.play().catch(() => {});
-            }
+    const startPlayback = async () => {
+      setConnectionStatus('connecting');
+      setIsConnecting(true);
+      
+      const webrtcUrl = stream.stream_url;
+      
+      // Try WebRTC First if available
+      if (webrtcUrl?.includes('webRTC/play') && playbackMethod !== 'hls') {
+        try {
+          console.log("[Viewer] Trying WebRTC playback:", webrtcUrl);
+          
+          if (pcRef.current) {
+            pcRef.current.close();
+            pcRef.current = null;
           }
-        };
 
-        pc.onconnectionstatechange = () => {
-          console.log("[Viewer-WebRTC] Connection state:", pc.connectionState);
-          if (pc.connectionState === 'connected') {
+          const pc = new RTCPeerConnection({
+            iceServers: [
+              { urls: 'stun:stun.cloudflare.com:3478' },
+              { urls: 'stun:stun.l.google.com:19302' },
+            ],
+            bundlePolicy: 'max-bundle',
+            rtcpMuxPolicy: 'require',
+          });
+          pcRef.current = pc;
+
+          pc.addTransceiver('video', { direction: 'recvonly' });
+          pc.addTransceiver('audio', { direction: 'recvonly' });
+
+          pc.ontrack = (event) => {
+            console.log("[Viewer-WebRTC] Received track:", event.track.kind);
+            if (event.streams[0] && videoRef.current) {
+              videoRef.current.srcObject = event.streams[0];
+              videoRef.current.muted = true;
+              videoRef.current.play().catch(() => setShowUnmutePrompt(true));
+              setHasVideo(true);
+              setIsConnecting(false);
+              setConnectionStatus('connected');
+              setPlaybackMethod('webrtc');
+            }
+          };
+
+          pc.onconnectionstatechange = () => {
+            console.log("[Viewer-WebRTC] Connection state:", pc.connectionState);
+            if (pc.connectionState === 'connected') {
+              toast.success('Connected to stream!');
+            } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+              console.log("[Viewer-WebRTC] Connection failed, falling back to HLS");
+              setPlaybackMethod('hls');
+            }
+          };
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          // Wait for ICE gathering
+          await new Promise<void>((resolve) => {
+            if (pc.iceGatheringState === 'complete') {
+              resolve();
+              return;
+            }
+            const timeout = setTimeout(resolve, 2000);
+            pc.onicegatheringstatechange = () => {
+              if (pc.iceGatheringState === 'complete') {
+                clearTimeout(timeout);
+                resolve();
+              }
+            };
+          });
+
+          const response = await fetch(webrtcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/sdp' },
+            body: pc.localDescription?.sdp,
+          });
+
+          if (!response.ok) {
+            throw new Error(`WHEP failed: ${response.status}`);
+          }
+
+          const answerSdp = await response.text();
+          await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+          console.log("[Viewer-WebRTC] WebRTC connection established!");
+          return;
+        } catch (error) {
+          console.error("[Viewer-WebRTC] Failed:", error);
+          setPlaybackMethod('hls');
+        }
+      }
+      
+      // Fallback to HLS
+      if (stream.cf_hls_url && videoRef.current) {
+        console.log("[Viewer] Using HLS playback:", stream.cf_hls_url);
+        
+        if (Hls.isSupported()) {
+          const hls = new Hls({ 
+            enableWorker: true, 
+            lowLatencyMode: true,
+            backBufferLength: 30,
+            maxBufferLength: 30,
+            liveSyncDurationCount: 3,
+            liveMaxLatencyDurationCount: 10,
+          });
+          hls.loadSource(stream.cf_hls_url);
+          hls.attachMedia(videoRef.current);
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
             setHasVideo(true);
             setIsConnecting(false);
             setConnectionStatus('connected');
-            setPlaybackMethod('webrtc');
-            if (!connectionNotified) {
-              toast.success('Connected to stream!');
-              setConnectionNotified(true);
-            }
-          } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-            console.log("[Viewer-WebRTC] Connection failed, falling back to HLS");
             setPlaybackMethod('hls');
-          }
-        };
-
-        // Create offer
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // Wait for ICE gathering
-        await new Promise<void>((resolve) => {
-          if (pc.iceGatheringState === 'complete') {
-            resolve();
-            return;
-          }
-          const timeout = setTimeout(resolve, 2000);
-          pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === 'complete') {
-              clearTimeout(timeout);
-              resolve();
+            toast.success('Connected to stream!');
+            videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
+          });
+          hls.on(Hls.Events.ERROR, (_, data) => {
+            if (data.fatal) {
+              console.error("[Viewer-HLS] Fatal error:", data);
+              if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+                hls.startLoad();
+              } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
+                hls.recoverMediaError();
+              } else {
+                setConnectionStatus('failed');
+              }
             }
-          };
-        });
-
-        // Send offer to Cloudflare WHEP endpoint
-        console.log("[Viewer-WebRTC] Sending offer to WHEP endpoint...");
-        const response = await fetch(webrtcPlaybackUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/sdp' },
-          body: pc.localDescription?.sdp,
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("[Viewer-WebRTC] WHEP error:", response.status, errorText);
-          throw new Error(`WHEP failed: ${response.status}`);
-        }
-
-        const answerSdp = await response.text();
-        await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-        console.log("[Viewer-WebRTC] WebRTC connection established!");
-
-      } catch (error) {
-        console.error("[Viewer-WebRTC] Setup failed:", error);
-        if (isMounted) {
-          console.log("[Viewer-WebRTC] Falling back to HLS");
-          setPlaybackMethod('hls');
+          });
+          hlsRef.current = hls;
+        } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
+          // Safari Native HLS
+          videoRef.current.src = stream.cf_hls_url;
+          videoRef.current.addEventListener('loadedmetadata', () => {
+            setHasVideo(true);
+            setIsConnecting(false);
+            setConnectionStatus('connected');
+            setPlaybackMethod('hls');
+            videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
+          });
         }
       }
     };
 
-    // Try WebRTC with a short timeout before falling back
-    const webrtcTimeout = setTimeout(() => {
-      if (connectionStatus !== 'connected' && isMounted) {
-        console.log("[Viewer-WebRTC] Timeout, falling back to HLS");
+    // Small delay then start playback
+    const timeout = setTimeout(startPlayback, 500);
+    
+    // WebRTC fallback timeout
+    const webrtcFallback = setTimeout(() => {
+      if (connectionStatus !== 'connected' && playbackMethod !== 'hls') {
+        console.log("[Viewer] WebRTC timeout, falling back to HLS");
         setPlaybackMethod('hls');
       }
     }, 8000);
 
-    setupWebRTC();
-
     return () => {
-      isMounted = false;
-      clearTimeout(webrtcTimeout);
-      if (pcRef.current) {
-        pcRef.current.close();
-        pcRef.current = null;
-      }
+      clearTimeout(timeout);
+      clearTimeout(webrtcFallback);
     };
-  }, [stream?.status, stream?.stream_url, playbackMethod, connectionNotified]);
+  }, [stream, playbackMethod, connectionStatus]);
 
-  // HLS.js-based video playback - fallback for slower but more reliable playback
-  useEffect(() => {
-    if (stream?.status !== 'live') return;
-    if (playbackMethod !== 'hls') return; // Only use when WebRTC failed
-    if (!stream?.cf_hls_url) {
-      console.log("[Viewer-HLS] No HLS URL available yet, waiting...");
-      return;
+  // 6. Chat Logic with Optimistic UI
+  const sendComment = async () => {
+    if (!newComment.trim() || !currentUser) return;
+
+    // Optimistic UI Update
+    const tempId = `temp-${Date.now()}`;
+    const tempComment = {
+      id: tempId,
+      content: newComment.trim(),
+      user_id: currentUser.id,
+      profiles: { 
+        display_name: currentUser.user_metadata?.display_name || 'Me',
+        avatar_url: currentUser.user_metadata?.avatar_url,
+        username: currentUser.user_metadata?.username
+      },
+      created_at: new Date().toISOString()
+    };
+    
+    setComments(prev => [...prev, tempComment]);
+    setNewComment("");
+
+    const { error } = await supabase.from("live_stream_comments").insert({
+      stream_id: streamId,
+      user_id: currentUser.id,
+      content: tempComment.content,
+    });
+
+    if (error) {
+      toast.error("Failed to send");
+      setComments(prev => prev.filter(c => c.id !== tempId));
     }
-
-    let isMounted = true;
-    let retryCount = 0;
-    const maxRetries = 10;
-    const hlsUrl = stream.cf_hls_url;
-    const slowNetwork = isSlowNetwork();
-
-    console.log("[Viewer-HLS] Setting up HLS connection for stream:", streamId);
-    console.log("[Viewer-HLS] HLS URL:", hlsUrl);
-    setConnectionStatus('connecting');
-    setIsConnecting(true);
-
-    const setupHLS = () => {
-      if (!videoRef.current || !isMounted) return;
-
-      // Cleanup previous instance
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-
-      // Check if HLS is natively supported (Safari)
-      if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-        console.log("[Viewer-HLS] Using native HLS support");
-        videoRef.current.src = hlsUrl;
-        if (mobileVideoRef.current) mobileVideoRef.current.src = hlsUrl;
-        
-        const onLoaded = () => {
-          setHasVideo(true);
-          setIsConnecting(false);
-          setConnectionStatus('connected');
-          if (!connectionNotified) {
-            toast.success('Connected to stream!');
-            setConnectionNotified(true);
-          }
-          // Play both videos muted
-          videoRef.current?.play().catch(() => {});
-          if (mobileVideoRef.current) {
-            mobileVideoRef.current.play().catch(() => {});
-          }
-        };
-        
-        const onError = () => {
-          console.error("[Viewer-HLS] Native HLS error, retrying...");
-          retryCount++;
-          if (retryCount < maxRetries && isMounted) {
-            setTimeout(setupHLS, slowNetwork ? 2000 : 3000);
-          } else {
-            setConnectionStatus('failed');
-          }
-        };
-        
-        videoRef.current.addEventListener('loadedmetadata', onLoaded);
-        videoRef.current.addEventListener('error', onError);
-        return;
-      }
-
-      // Use HLS.js for browsers that don't support native HLS
-      if (Hls.isSupported()) {
-        console.log("[Viewer-HLS] Using HLS.js");
-        
-        // Optimized config for faster initial load
-        const hlsConfig = {
-          enableWorker: true,
-          lowLatencyMode: !slowNetwork,
-          backBufferLength: 30,
-          maxBufferLength: slowNetwork ? 15 : 30,
-          maxMaxBufferLength: 60,
-          liveSyncDurationCount: slowNetwork ? 5 : 3,
-          liveMaxLatencyDurationCount: slowNetwork ? 15 : 10,
-          manifestLoadingMaxRetry: 8,
-          manifestLoadingRetryDelay: 500,
-          levelLoadingMaxRetry: 6,
-          levelLoadingRetryDelay: 500,
-          fragLoadingMaxRetry: 6,
-          fragLoadingRetryDelay: 500,
-          startLevel: slowNetwork ? 0 : -1,
-        };
-        
-        const hls = new Hls(hlsConfig);
-        hlsRef.current = hls;
-
-        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          console.log("[Viewer-HLS] Media attached, loading source...");
-          hls.loadSource(hlsUrl);
-        });
-
-        hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-          console.log("[Viewer-HLS] Manifest parsed, levels:", data.levels.length);
-          setHasVideo(true);
-          setIsConnecting(false);
-          setConnectionStatus('connected');
-          retryCount = 0;
-          
-          if (!connectionNotified) {
-            toast.success('Connected to stream!');
-            setConnectionNotified(true);
-          }
-          
-          // Auto-play muted for both video elements
-          if (videoRef.current) {
-            videoRef.current.muted = true;
-            videoRef.current.play().catch(() => {});
-          }
-          if (mobileVideoRef.current) {
-            mobileVideoRef.current.muted = true;
-            mobileVideoRef.current.play().catch(() => {});
-          }
-        });
-
-        hls.on(Hls.Events.ERROR, (event, data) => {
-          console.error("[Viewer-HLS] Error:", data.type, data.details);
-          
-          if (data.fatal) {
-            switch (data.type) {
-              case Hls.ErrorTypes.NETWORK_ERROR:
-                console.log("[Viewer-HLS] Network error, trying to recover...");
-                retryCount++;
-                if (retryCount < maxRetries) {
-                  setTimeout(() => {
-                    hls.startLoad();
-                  }, slowNetwork ? 1500 : 1000);
-                } else {
-                  setConnectionStatus('failed');
-                  toast.error("Connection lost - please refresh");
-                }
-                break;
-              case Hls.ErrorTypes.MEDIA_ERROR:
-                console.log("[Viewer-HLS] Media error, trying to recover...");
-                hls.recoverMediaError();
-                break;
-              default:
-                console.error("[Viewer-HLS] Fatal error, attempting restart...");
-                retryCount++;
-                if (retryCount < maxRetries && isMounted) {
-                  hls.destroy();
-                  setTimeout(setupHLS, 2000);
-                } else {
-                  setConnectionStatus('failed');
-                }
-                break;
-            }
-          }
-        });
-
-        hls.attachMedia(videoRef.current);
-        
-        // For mobile, we need to sync the video - copy srcObject when ready
-        if (mobileVideoRef.current) {
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            if (videoRef.current?.src && mobileVideoRef.current) {
-              mobileVideoRef.current.src = videoRef.current.src;
-              mobileVideoRef.current.muted = true;
-              mobileVideoRef.current.play().catch(() => {});
-            }
-          });
-        }
-      } else {
-        console.error("[Viewer-HLS] HLS is not supported in this browser");
-        toast.error("Your browser doesn't support live streaming");
-        setConnectionStatus('failed');
-      }
-    };
-
-    // Try to connect immediately
-    setupHLS();
-
-    // Retry for connection issues
-    const retryInterval = setInterval(() => {
-      if (connectionStatus !== 'connected' && isMounted && stream?.status === 'live' && retryCount < maxRetries) {
-        console.log(`[Viewer-HLS] Retrying connection (attempt ${retryCount + 1})...`);
-        setupHLS();
-      }
-    }, 3000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(retryInterval);
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-  }, [stream?.status, stream?.cf_hls_url, streamId, isSlowNetwork, connectionNotified, playbackMethod]);
+  };
 
   // Subscribe to comments
   useEffect(() => {
+    // Fetch initial comments
     const fetchComments = async () => {
       const { data: commentsData } = await supabase
         .from("live_stream_comments")
@@ -643,28 +443,28 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
     fetchComments();
 
-    const channel = supabase
-      .channel(`comments-${streamId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'live_stream_comments',
-        filter: `stream_id=eq.${streamId}`,
+    const channel = supabase.channel(`comments-${streamId}`)
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'live_stream_comments', 
+        filter: `stream_id=eq.${streamId}` 
       }, async (payload) => {
+        // Ignore own echoes (from optimistic update)
+        if (payload.new.user_id === currentUser?.id) return;
+        
         const { data: profile } = await supabase
           .from("profiles")
           .select("id, display_name, username, avatar_url")
           .eq("id", payload.new.user_id)
           .single();
-
+        
         setComments(prev => [...prev, { ...payload.new, profiles: profile }]);
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [streamId]);
+    return () => { supabase.removeChannel(channel); };
+  }, [streamId, currentUser]);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -673,17 +473,15 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     }
   }, [comments]);
 
-  // Subscribe to reactions - show who sent them
+  // Subscribe to reactions
   useEffect(() => {
-    const channel = supabase
-      .channel(`reactions-${streamId}`)
+    const channel = supabase.channel(`reactions-${streamId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'live_stream_reactions',
         filter: `stream_id=eq.${streamId}`,
       }, async (payload: any) => {
-        // Fetch sender profile
         const { data: profile } = await supabase
           .from("profiles")
           .select("display_name, username")
@@ -706,15 +504,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [streamId]);
 
-  // Subscribe to gifts - TikTok style with sender names
+  // Subscribe to gifts
   useEffect(() => {
-    const channel = supabase
-      .channel(`gifts-${streamId}`)
+    const channel = supabase.channel(`gifts-${streamId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -741,38 +536,16 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [streamId]);
 
-  const sendComment = async () => {
-    if (!newComment.trim()) return;
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error("Please log in to comment");
-      return;
-    }
-
-    await supabase.from("live_stream_comments").insert({
-      stream_id: streamId,
-      user_id: user.id,
-      content: newComment.trim(),
-    });
-
-    setNewComment("");
-    chatInputRef.current?.blur();
-  };
-
   const sendReaction = async (reactionType: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
+    if (!currentUser) {
       toast.error("Please log in to react");
       return;
     }
 
-    // Add immediate local reaction for feedback
+    // Immediate local feedback
     const localReaction = {
       type: reactionType,
       id: Date.now() + Math.random(),
@@ -786,18 +559,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
     await supabase.from("live_stream_reactions").insert({
       stream_id: streamId,
-      user_id: user.id,
+      user_id: currentUser.id,
       reaction_type: reactionType,
     });
   };
 
-  const getReactionEmoji = (type: string) => {
-    return REACTIONS.find(r => r.type === type)?.emoji || '❤️';
-  };
-
-  const getGiftEmoji = (type: string) => {
-    return GIFT_EMOJIS[type] || '🎁';
-  };
+  const getGiftEmoji = (type: string) => GIFT_EMOJIS[type] || '🎁';
 
   if (!stream) {
     return (
@@ -808,309 +575,34 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex">
-      {/* Desktop: 9:16 centered video with side chat */}
-      <div className="hidden lg:flex w-full h-full">
-        {/* Left spacer */}
-        <div className="flex-1 bg-black/95" />
-        
-        {/* Center: 9:16 Video Container */}
-        <div className="relative h-full" style={{ aspectRatio: '9/16', maxWidth: '100vh' }}>
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={isMuted}
-            className="w-full h-full object-cover"
-          />
-
-          {/* Tap to unmute overlay - Desktop */}
-          {hasVideo && isMuted && showUnmutePrompt && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="absolute inset-0 z-30 flex items-center justify-center cursor-pointer"
-              onClick={handleUnmute}
-            >
-              <motion.div 
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ repeat: Infinity, duration: 2 }}
-                className="bg-black/70 backdrop-blur-sm px-6 py-4 rounded-2xl flex items-center gap-3"
-              >
-                <VolumeX className="w-8 h-8 text-white" />
-                <span className="text-white font-medium text-lg">Click to unmute</span>
-              </motion.div>
-            </motion.div>
-          )}
-
-          {/* Loading/Waiting State */}
-          {(isConnecting || stream.status !== 'live') && (
-            <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
-              <div className="text-center">
-                {stream.status === 'live' ? (
-                  <>
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                    <p className="text-white">Connecting to stream...</p>
-                  </>
-                ) : stream.status === 'scheduled' ? (
-                  <>
-                    <div className="w-16 h-16 mx-auto mb-4 text-primary">📡</div>
-                    <h3 className="text-xl font-bold text-white mb-2">Stream Not Started Yet</h3>
-                    <p className="text-muted-foreground">
-                      {stream.scheduled_start 
-                        ? `Starts ${formatDistanceToNow(new Date(stream.scheduled_start), { addSuffix: true })}`
-                        : "Waiting for host to start..."}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-5xl mb-4">📺</div>
-                    <h3 className="text-xl font-bold text-white mb-2">Stream Ended</h3>
-                    <p className="text-muted-foreground">This stream has ended</p>
-                    <Button className="mt-4" onClick={() => navigate('/live')}>
-                      Browse Other Streams
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Top Header */}
-          <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-4 z-20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar className="border-2 border-primary w-10 h-10">
-                  <AvatarImage src={stream.profiles?.avatar_url} />
-                  <AvatarFallback>{stream.profiles?.display_name?.[0] || 'U'}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="font-bold text-white text-sm">{stream.profiles?.display_name}</h2>
-                  <div className="flex items-center gap-2">
-                    {stream.status === 'live' && (
-                      <Badge variant="destructive" className="animate-pulse text-[10px] h-5">LIVE</Badge>
-                    )}
-                    <span className="text-xs text-white/80 flex items-center gap-1">
-                      <Users className="w-3 h-3" />
-                      {presenceConnected ? presenceViewerCount : (stream.viewer_count || 0)}
-                    </span>
-                    {presenceConnected && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" title="Real-time" />
-                    )}
-                  </div>
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/20"
-                onClick={onClose}
-              >
-                <X className="w-5 h-5" />
-              </Button>
-            </div>
-            <p className="text-white/80 text-xs mt-2 line-clamp-1">{stream.title}</p>
-          </div>
-
-          {/* Flying Gift Notifications - TikTok style */}
-          <AnimatePresence>
-            {flyingGifts.map((gift, index) => (
-              <motion.div
-                key={gift.id}
-                initial={{ 
-                  opacity: 0, 
-                  scale: 0,
-                  x: '-50%',
-                  y: 100
-                }}
-                animate={{ 
-                  opacity: [0, 1, 1, 1, 0],
-                  scale: [0.5, 1.2, 1, 1, 0.8],
-                  y: [100, 0, 0, -50, -150],
-                }}
-                exit={{ 
-                  opacity: 0,
-                  scale: 0.5,
-                  y: -200
-                }}
-                transition={{ 
-                  duration: 4,
-                  ease: "easeOut",
-                  times: [0, 0.15, 0.3, 0.7, 1]
-                }}
-                className="absolute left-1/2 top-1/3 z-50 pointer-events-none"
-                style={{ marginTop: index * 80 }}
-              >
-                <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white px-6 py-3 rounded-full shadow-2xl">
-                  <motion.span 
-                    className="text-4xl"
-                    animate={{ 
-                      scale: [1, 1.3, 1],
-                      rotate: [0, 10, -10, 0]
-                    }}
-                    transition={{ 
-                      duration: 0.5, 
-                      repeat: 3,
-                      repeatType: "reverse"
-                    }}
-                  >
-                    {getGiftEmoji(gift.gift_type)}
-                  </motion.span>
-                  <div className="text-left">
-                    <p className="font-bold text-lg whitespace-nowrap">
-                      {gift.sender_name}
-                    </p>
-                    <p className="text-sm text-white/90">
-                      sent <span className="font-bold">{gift.gift_type}</span>
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1 bg-white/20 px-3 py-1 rounded-full">
-                    <Coins className="w-4 h-4" />
-                    <span className="font-bold">+{gift.credit_value}</span>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {/* Floating Reactions - Physics-based TikTok style */}
-          <FloatingReactions reactions={reactions} className="z-30" />
-
-          {/* Reaction Buttons */}
-          <div className="absolute right-3 flex flex-col gap-3 z-20" style={{ bottom: '120px' }}>
-            {REACTIONS.map((reaction) => (
-              <motion.button
-                key={reaction.type}
-                whileTap={{ scale: 0.85 }}
-                className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10"
-                onClick={() => sendReaction(reaction.type)}
-              >
-                <span className="text-2xl">{reaction.emoji}</span>
-              </motion.button>
-            ))}
-            
-            <motion.button
-              whileTap={{ scale: 0.85 }}
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg"
-              onClick={() => setShowGiftModal(true)}
-            >
-              <Gift className="w-6 h-6 text-white" />
-            </motion.button>
-          </div>
-
-          {/* Bottom Controls */}
-          <div className="absolute left-0 right-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4 z-20">
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
-                onClick={() => setIsMuted(!isMuted)}
-              >
-                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
-                onClick={() => setIsFullscreen(!isFullscreen)}
-              >
-                {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Chat Panel for Desktop */}
-        <div className="w-96 bg-background/95 border-l border-border flex flex-col">
-          <div className="p-4 border-b border-border">
-            <h3 className="font-bold flex items-center gap-2">
-              <MessageCircle className="w-5 h-5" />
-              Live Chat
-            </h3>
-            <p className="text-sm text-muted-foreground">{comments.length} messages</p>
-          </div>
-
-          <ScrollArea className="flex-1 p-4" ref={chatScrollRef}>
-            <div className="space-y-3">
-              {comments.map((comment) => (
-                <LiveChatMessage
-                  key={comment.id}
-                  id={comment.id}
-                  content={comment.content}
-                  userId={comment.user_id}
-                  hostId={stream.user_id}
-                  profile={comment.profiles}
-                  isCompact={false}
-                />
-              ))}
-            </div>
-          </ScrollArea>
-
-          <div className="p-4 border-t border-border">
-            <div className="flex gap-2">
-              <Input
-                ref={chatInputRef}
-                placeholder="Say something..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendComment()}
-                className="flex-1"
-              />
-              <Button size="icon" onClick={sendComment} disabled={!newComment.trim()}>
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile/Tablet: Full screen video */}
-      <div className="lg:hidden absolute inset-0">
+    <div className="fixed inset-0 z-50 bg-black">
+      {/* VIDEO CONTAINER */}
+      <div className="absolute inset-0">
         <video
-          ref={mobileVideoRef}
+          ref={videoRef}
           autoPlay
           playsInline
           muted={isMuted}
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{
-            objectPosition: 'center center',
-            minWidth: '100%',
-            minHeight: '100%',
-          }}
+          className="w-full h-full object-cover"
         />
 
-        {/* Tap to unmute overlay */}
-        {hasVideo && isMuted && showUnmutePrompt && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="absolute inset-0 z-30 flex items-center justify-center"
-            onClick={handleUnmute}
-          >
-            <motion.div 
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ repeat: Infinity, duration: 2 }}
-              className="bg-black/70 backdrop-blur-sm px-6 py-4 rounded-2xl flex items-center gap-3 cursor-pointer"
-            >
-              <VolumeX className="w-8 h-8 text-white" />
-              <span className="text-white font-medium text-lg">Tap to unmute</span>
-            </motion.div>
-          </motion.div>
-        )}
-
-        {/* Loading/Waiting State */}
-        {(isConnecting || stream.status !== 'live') && (
+        {/* CONNECTION LOADING STATE */}
+        {(isConnecting || connectionStatus === 'connecting') && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
             <div className="text-center">
-              {stream.status === 'live' ? (
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+              <p className="text-white">Connecting to Host...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Stream ended/scheduled state */}
+        {stream.status !== 'live' && !isConnecting && (
+          <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+            <div className="text-center">
+              {stream.status === 'scheduled' ? (
                 <>
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-                  <p className="text-white">Connecting to stream...</p>
-                </>
-              ) : stream.status === 'scheduled' ? (
-                <>
-                  <div className="w-16 h-16 mx-auto mb-4 text-primary">📡</div>
+                  <div className="text-5xl mb-4">📡</div>
                   <h3 className="text-xl font-bold text-white mb-2">Stream Not Started Yet</h3>
                   <p className="text-muted-foreground">
                     {stream.scheduled_start 
@@ -1132,7 +624,26 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           </div>
         )}
 
-        {/* Top Header Gradient */}
+        {/* TAP TO UNMUTE OVERLAY */}
+        {hasVideo && isMuted && showUnmutePrompt && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 z-30 flex items-center justify-center cursor-pointer"
+            onClick={handleUserInteraction}
+          >
+            <motion.div 
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="bg-black/70 backdrop-blur-sm px-6 py-4 rounded-2xl flex items-center gap-3"
+            >
+              <VolumeX className="w-8 h-8 text-white" />
+              <span className="text-white font-medium text-lg">Tap to Join Audio</span>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* HEADER OVERLAY */}
         <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-4 z-20 safe-area-top">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1148,14 +659,15 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
                   )}
                   <span className="text-xs text-white/80 flex items-center gap-1">
                     <Users className="w-3 h-3" />
-                    {presenceConnected ? presenceViewerCount : (stream.viewer_count || 0)}
+                    {realtimeViewerCount}
                   </span>
-                  {presenceConnected && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" title="Real-time" />
-                  )}
                 </div>
               </div>
+              <Button size="sm" variant="secondary" className="rounded-full text-xs h-7">
+                Follow
+              </Button>
             </div>
+
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -1178,86 +690,166 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           <p className="text-white/80 text-xs mt-2 line-clamp-1">{stream.title}</p>
         </div>
 
-        {/* Floating Chat Overlay - TikTok Style */}
+        {/* TIKTOK STYLE FLOATING CHAT */}
         {showChat && stream.status === 'live' && (
           <div 
             className="absolute left-0 z-20 pointer-events-none"
             style={{
-              bottom: isKeyboardOpen ? `${keyboardHeight + 60}px` : '120px',
-              maxHeight: '40vh',
-              right: '80px',
+              bottom: isKeyboardOpen ? `${keyboardHeight + 60}px` : '140px',
+              maxHeight: '35vh',
+              right: '70px',
             }}
           >
             <div 
               ref={chatScrollRef}
-              className="overflow-y-auto px-3 space-y-2 pointer-events-auto"
-              style={{ maxHeight: '40vh' }}
+              className="overflow-y-auto px-3 space-y-1.5 pointer-events-auto"
+              style={{ maxHeight: '35vh' }}
             >
               <AnimatePresence>
-                {comments.slice(-15).map((comment) => (
-                  <LiveChatMessage
-                    key={comment.id}
-                    id={comment.id}
-                    content={comment.content}
-                    userId={comment.user_id}
-                    hostId={stream.user_id}
-                    profile={comment.profiles}
-                    isCompact={true}
-                  />
-                ))}
+                {comments.slice(-20).map((comment) => {
+                  const isMsgHost = comment.user_id === stream.user_id;
+                  return (
+                    <motion.div
+                      key={comment.id}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="flex items-start gap-2"
+                    >
+                      <div className="bg-black/50 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-full">
+                        <span className={cn(
+                          "font-semibold text-xs mr-2",
+                          isMsgHost ? "text-amber-400" : "text-primary"
+                        )}>
+                          {isMsgHost && <Crown className="w-3 h-3 inline mr-1" />}
+                          {isMsgHost ? "Host" : (comment.profiles?.display_name || "User")}
+                        </span>
+                        <span className="text-white text-sm">{comment.content}</span>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </AnimatePresence>
             </div>
           </div>
         )}
 
-        {/* Flying Gift Notifications - TikTok style */}
+        {/* Right Side Actions */}
+        <div 
+          className="absolute right-3 flex flex-col gap-2 z-20"
+          style={{
+            bottom: isKeyboardOpen ? `${keyboardHeight + 130}px` : '200px',
+          }}
+        >
+          {REACTIONS.map((r) => (
+            <motion.button
+              key={r.type}
+              whileTap={{ scale: 0.85 }}
+              onClick={() => sendReaction(r.type)}
+              className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-2xl hover:scale-110 transition-transform active:scale-90"
+            >
+              {r.emoji}
+            </motion.button>
+          ))}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => setShowGiftModal(true)}
+            className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+          >
+            <Gift className="w-6 h-6 text-white" />
+          </motion.button>
+        </div>
+
+        {/* Bottom Input Area */}
+        <div 
+          className="absolute left-0 right-0 bg-gradient-to-t from-black/80 to-transparent z-20 p-3"
+          style={{
+            bottom: isKeyboardOpen ? `${keyboardHeight}px` : '0',
+            paddingBottom: isKeyboardOpen ? '8px' : 'max(env(safe-area-inset-bottom), 16px)',
+          }}
+        >
+          {/* Controls */}
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
+              onClick={() => {
+                setIsMuted(!isMuted);
+                if (videoRef.current) videoRef.current.muted = !isMuted;
+              }}
+            >
+              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
+              onClick={() => setShowChat(!showChat)}
+            >
+              <MessageCircle className={cn("w-5 h-5", showChat && "text-primary")} />
+            </Button>
+          </div>
+
+          {/* Chat Input */}
+          {showChat && (
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  ref={chatInputRef}
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder={isHost ? "Reply to your viewers..." : "Say something..."}
+                  className="bg-white/10 border-white/10 rounded-full text-white placeholder:text-white/50 pl-4 pr-10 h-11 focus-visible:ring-primary/50"
+                  onKeyDown={(e) => e.key === 'Enter' && sendComment()}
+                />
+                <Button 
+                  size="icon"
+                  variant="ghost"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 text-white"
+                  onClick={sendComment}
+                  disabled={!newComment.trim()}
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full text-white hover:bg-white/20 h-11 w-11 bg-black/30"
+              >
+                <Share2 className="w-5 h-5" />
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Flying Gift Animations */}
         <AnimatePresence>
           {flyingGifts.map((gift, index) => (
             <motion.div
               key={gift.id}
-              initial={{ 
-                opacity: 0, 
-                scale: 0,
-                x: '-50%',
-                y: 100
-              }}
+              initial={{ opacity: 0, scale: 0, x: '-50%', y: 100 }}
               animate={{ 
                 opacity: [0, 1, 1, 1, 0],
                 scale: [0.5, 1.2, 1, 1, 0.8],
                 y: [100, 0, 0, -50, -150],
               }}
-              exit={{ 
-                opacity: 0,
-                scale: 0.5,
-                y: -200
-              }}
-              transition={{ 
-                duration: 4,
-                ease: "easeOut",
-                times: [0, 0.15, 0.3, 0.7, 1]
-              }}
+              exit={{ opacity: 0, scale: 0.5, y: -200 }}
+              transition={{ duration: 4, ease: "easeOut", times: [0, 0.15, 0.3, 0.7, 1] }}
               className="fixed left-1/2 top-1/3 z-50 pointer-events-none"
               style={{ marginTop: index * 80 }}
             >
               <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white px-5 py-2.5 rounded-full shadow-2xl">
                 <motion.span 
                   className="text-3xl"
-                  animate={{ 
-                    scale: [1, 1.3, 1],
-                    rotate: [0, 10, -10, 0]
-                  }}
-                  transition={{ 
-                    duration: 0.5, 
-                    repeat: 3,
-                    repeatType: "reverse"
-                  }}
+                  animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 0.5, repeat: 3, repeatType: "reverse" }}
                 >
                   {getGiftEmoji(gift.gift_type)}
                 </motion.span>
                 <div className="text-left">
-                  <p className="font-bold text-base whitespace-nowrap">
-                    {gift.sender_name}
-                  </p>
+                  <p className="font-bold text-base whitespace-nowrap">{gift.sender_name}</p>
                   <p className="text-xs text-white/90">
                     sent <span className="font-bold">{gift.gift_type}</span>
                   </p>
@@ -1271,97 +863,30 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           ))}
         </AnimatePresence>
 
-        {/* Floating Reactions - Physics-based TikTok style */}
-        <FloatingReactions reactions={reactions} className="z-30" />
-
-        {/* Right Side Reaction Buttons */}
-        <div 
-          className="absolute right-3 flex flex-col gap-2 z-20"
-          style={{
-            bottom: isKeyboardOpen ? `${keyboardHeight + 130}px` : '190px',
-          }}
-        >
-          {REACTIONS.map((reaction) => (
-            <motion.button
-              key={reaction.type}
-              whileTap={{ scale: 0.85 }}
-              className="w-12 h-12 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center border border-white/10 active:bg-white/20 transition-colors"
-              onClick={() => sendReaction(reaction.type)}
+        {/* Floating Reactions */}
+        <AnimatePresence>
+          {reactions.map((reaction) => (
+            <motion.div
+              key={reaction.id}
+              initial={{ opacity: 1, scale: 0, y: 0 }}
+              animate={{ 
+                opacity: [1, 1, 0],
+                scale: [0.5, 1.5, 1],
+                y: -200,
+                x: Math.random() * 40 - 20,
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 2.5, ease: "easeOut" }}
+              className="fixed z-40 text-4xl pointer-events-none"
+              style={{ 
+                right: `${reaction.x}px`,
+                bottom: '30%',
+              }}
             >
-              <span className="text-2xl">{reaction.emoji}</span>
-            </motion.button>
+              {REACTIONS.find(r => r.type === reaction.type)?.emoji || '❤️'}
+            </motion.div>
           ))}
-          
-          {/* Gift Button */}
-          <motion.button
-            whileTap={{ scale: 0.85 }}
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-lg"
-            onClick={() => setShowGiftModal(true)}
-          >
-            <Gift className="w-6 h-6 text-white" />
-          </motion.button>
-        </div>
-
-        {/* Bottom Controls */}
-        <div 
-          className="absolute left-0 right-0 bg-gradient-to-t from-black/80 to-transparent z-20"
-          style={{
-            bottom: isKeyboardOpen ? `${keyboardHeight}px` : '0',
-            paddingBottom: isKeyboardOpen ? '8px' : 'max(env(safe-area-inset-bottom), 16px)',
-          }}
-        >
-          {/* Video Controls */}
-          <div className="flex items-center justify-center gap-2 mb-3 px-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
-              onClick={() => setIsMuted(!isMuted)}
-            >
-              {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
-              onClick={() => setShowChat(!showChat)}
-            >
-              <MessageCircle className={cn("w-5 h-5", showChat && "text-primary")} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full text-white hover:bg-white/20 h-10 w-10 bg-black/30"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-            >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-            </Button>
-          </div>
-
-          {/* Chat Input */}
-          {showChat && (
-            <div className="flex gap-2 px-3 pb-2">
-              <Input
-                ref={chatInputRef}
-                placeholder="Say something..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && sendComment()}
-                onFocus={() => setIsChatFocused(true)}
-                onBlur={() => setIsChatFocused(false)}
-                className="flex-1 h-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 rounded-full px-4"
-              />
-              <Button 
-                size="icon" 
-                onClick={sendComment} 
-                className="h-10 w-10 rounded-full bg-primary shrink-0"
-                disabled={!newComment.trim()}
-              >
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
-        </div>
+        </AnimatePresence>
       </div>
 
       {/* Gift Modal */}
@@ -1371,7 +896,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         streamId={streamId}
         hostId={stream.user_id}
         viewers={viewers}
-        isHost={false}
+        isHost={isHost}
       />
     </div>
   );
