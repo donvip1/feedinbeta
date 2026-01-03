@@ -34,9 +34,10 @@ const Live = () => {
   const [showContentManager, setShowContentManager] = useState(false);
 
   // ===== VIDEO STREAMS QUERIES =====
-  const { data: liveStreams, refetch: refetchLiveStreams } = useQuery({
+  const { data: liveStreams, refetch: refetchLiveStreams, isLoading: loadingLiveStreams } = useQuery({
     queryKey: ["live-streams", "live"],
     queryFn: async () => {
+      console.log('[Live] Fetching live video streams...');
       const { data, error } = await supabase
         .from("live_streams")
         .select("*")
@@ -44,6 +45,8 @@ const Live = () => {
         .order("viewer_count", { ascending: false });
       
       if (error) throw error;
+      
+      console.log('[Live] Found live streams:', data?.length || 0);
       
       if (data && data.length > 0) {
         const userIds = [...new Set(data.map(s => s.user_id))];
@@ -60,8 +63,11 @@ const Live = () => {
       }
       return data || [];
     },
-    staleTime: 0, // Always consider stale for instant updates
-    refetchInterval: 3000, // Refresh every 3 seconds
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache
+    refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchInterval: 5000, // Refresh every 5 seconds
   });
 
   const { data: scheduledStreams } = useQuery({
@@ -124,7 +130,7 @@ const Live = () => {
   });
 
   // ===== AUDIO SPACES QUERIES =====
-  const { data: liveSpaces, refetch: refetchLiveSpaces } = useQuery({
+  const { data: liveSpaces, refetch: refetchLiveSpaces, isLoading: loadingLiveSpaces } = useQuery({
     queryKey: ["live-spaces", "live"],
     queryFn: async () => {
       console.log('[Live] Fetching live spaces...');
@@ -173,8 +179,11 @@ const Live = () => {
       }
       return data || [];
     },
-    staleTime: 0, // Always refetch to get latest live content
-    refetchInterval: 5000, // Refetch every 5 seconds for near-instant updates
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 0, // Don't cache
+    refetchOnMount: 'always', // Always refetch when component mounts
+    refetchOnWindowFocus: true, // Refetch when window gains focus
+    refetchInterval: 5000, // Refresh every 5 seconds
   });
 
   // Track which spaces the current user is joined in

@@ -1,5 +1,5 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v9';
+const CACHE_VERSION = 'v10';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
@@ -25,15 +25,27 @@ const MAX_IMAGE_CACHE = 500;
 const MAX_MEDIA_CACHE = 100;
 const MAX_API_CACHE = 50;
 
-// Update check interval (1 minute for faster updates)
-const UPDATE_CHECK_INTERVAL = 60 * 1000;
+// Update check interval (30 seconds for faster updates on mobile)
+const UPDATE_CHECK_INTERVAL = 30 * 1000;
 
-// API endpoints to cache for faster loads
+// IMPORTANT: These API patterns should NEVER be cached - always network first
+// This ensures mobile app always gets fresh data
+const NEVER_CACHE_PATTERNS = [
+  '/rest/v1/live_streams',
+  '/rest/v1/live_spaces',
+  '/rest/v1/live_space_speakers',
+  '/rest/v1/notifications',
+  '/rest/v1/messages',
+  '/rest/v1/conversations',
+  '/rest/v1/posts',
+  '/rest/v1/stories',
+  '/realtime/',
+];
+
+// API endpoints to cache for faster loads (only static-ish data)
 const CACHEABLE_API_PATTERNS = [
   '/profiles',
-  '/posts',
   '/user_credits',
-  '/notifications',
 ];
 
 // Install - cache static assets and activate immediately
@@ -343,6 +355,16 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
 
   if (request.method !== 'GET') return;
+
+  // CRITICAL: Never cache real-time/live data endpoints - always use network
+  const shouldNeverCache = NEVER_CACHE_PATTERNS.some(pattern => 
+    url.pathname.includes(pattern) || url.href.includes(pattern)
+  );
+  
+  if (shouldNeverCache) {
+    // Network only - no caching for live data
+    return;
+  }
 
   // Cache certain Supabase API responses (read-only) for instant page loads
   if (url.origin.includes('supabase.co') && url.pathname.includes('/rest/v1/')) {
