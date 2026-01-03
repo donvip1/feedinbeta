@@ -50,6 +50,7 @@ const GIFT_EMOJIS: Record<string, string> = {
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const mobileVideoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
@@ -59,7 +60,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   const [viewerSession, setViewerSession] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true); // Start muted to allow autoplay
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [reactions, setReactions] = useState<{ type: string; id: number; x: number; y: number; senderName?: string }[]>([]);
   const [isConnecting, setIsConnecting] = useState(true);
@@ -72,7 +73,48 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [connectionNotified, setConnectionNotified] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   const [playbackMethod, setPlaybackMethod] = useState<'webrtc' | 'hls' | null>(null);
+  const [showUnmutePrompt, setShowUnmutePrompt] = useState(true);
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
+
+  // Helper to set video source on both elements
+  const setVideoSource = useCallback((source: MediaStream | string | null) => {
+    const setSource = (video: HTMLVideoElement | null) => {
+      if (!video) return;
+      if (source instanceof MediaStream) {
+        video.srcObject = source;
+      } else if (typeof source === 'string') {
+        video.src = source;
+      } else {
+        video.srcObject = null;
+        video.src = '';
+      }
+    };
+    setSource(videoRef.current);
+    setSource(mobileVideoRef.current);
+  }, []);
+
+  // Play both video elements
+  const playVideos = useCallback(async () => {
+    const playVideo = async (video: HTMLVideoElement | null) => {
+      if (!video) return;
+      try {
+        await video.play();
+      } catch (e) {
+        console.warn("[Viewer] Autoplay failed, keeping muted:", e);
+        video.muted = true;
+        await video.play().catch(() => {});
+      }
+    };
+    await Promise.all([playVideo(videoRef.current), playVideo(mobileVideoRef.current)]);
+  }, []);
+
+  // Handle unmute - user interaction required
+  const handleUnmute = useCallback(() => {
+    setIsMuted(false);
+    setShowUnmutePrompt(false);
+    if (videoRef.current) videoRef.current.muted = false;
+    if (mobileVideoRef.current) mobileVideoRef.current.muted = false;
+  }, []);
 
   // Fetch stream details
   useEffect(() => {
@@ -249,15 +291,18 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
         pc.ontrack = (event) => {
           console.log("[Viewer-WebRTC] Received track:", event.track.kind);
-          if (videoRef.current && event.streams[0]) {
-            videoRef.current.srcObject = event.streams[0];
-            videoRef.current.play().catch(e => {
-              console.warn("[Viewer-WebRTC] Autoplay failed, trying muted:", e);
-              if (videoRef.current) {
-                videoRef.current.muted = true;
-                videoRef.current.play().catch(() => {});
-              }
-            });
+          if (event.streams[0]) {
+            // Set on both video elements
+            if (videoRef.current) {
+              videoRef.current.srcObject = event.streams[0];
+              videoRef.current.muted = true; // Start muted for autoplay
+              videoRef.current.play().catch(() => {});
+            }
+            if (mobileVideoRef.current) {
+              mobileVideoRef.current.srcObject = event.streams[0];
+              mobileVideoRef.current.muted = true;
+              mobileVideoRef.current.play().catch(() => {});
+            }
           }
         };
 
@@ -377,6 +422,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
         console.log("[Viewer-HLS] Using native HLS support");
         videoRef.current.src = hlsUrl;
+        if (mobileVideoRef.current) mobileVideoRef.current.src = hlsUrl;
         
         const onLoaded = () => {
           setHasVideo(true);
@@ -385,6 +431,11 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           if (!connectionNotified) {
             toast.success('Connected to stream!');
             setConnectionNotified(true);
+          }
+          // Play both videos muted
+          videoRef.current?.play().catch(() => {});
+          if (mobileVideoRef.current) {
+            mobileVideoRef.current.play().catch(() => {});
           }
         };
         
@@ -445,14 +496,15 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
             setConnectionNotified(true);
           }
           
-          // Auto-play with muted fallback
-          videoRef.current?.play().catch((err) => {
-            console.warn("[Viewer-HLS] Autoplay failed, trying muted:", err);
-            if (videoRef.current) {
-              videoRef.current.muted = true;
-              videoRef.current.play().catch(() => {});
-            }
-          });
+          // Auto-play muted for both video elements
+          if (videoRef.current) {
+            videoRef.current.muted = true;
+            videoRef.current.play().catch(() => {});
+          }
+          if (mobileVideoRef.current) {
+            mobileVideoRef.current.muted = true;
+            mobileVideoRef.current.play().catch(() => {});
+          }
         });
 
         hls.on(Hls.Events.ERROR, (event, data) => {
@@ -491,6 +543,17 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         });
 
         hls.attachMedia(videoRef.current);
+        
+        // For mobile, we need to sync the video - copy srcObject when ready
+        if (mobileVideoRef.current) {
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (videoRef.current?.src && mobileVideoRef.current) {
+              mobileVideoRef.current.src = videoRef.current.src;
+              mobileVideoRef.current.muted = true;
+              mobileVideoRef.current.play().catch(() => {});
+            }
+          });
+        }
       } else {
         console.error("[Viewer-HLS] HLS is not supported in this browser");
         toast.error("Your browser doesn't support live streaming");
@@ -727,6 +790,25 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
             muted={isMuted}
             className="w-full h-full object-cover"
           />
+
+          {/* Tap to unmute overlay - Desktop */}
+          {hasVideo && isMuted && showUnmutePrompt && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="absolute inset-0 z-30 flex items-center justify-center cursor-pointer"
+              onClick={handleUnmute}
+            >
+              <motion.div 
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ repeat: Infinity, duration: 2 }}
+                className="bg-black/70 backdrop-blur-sm px-6 py-4 rounded-2xl flex items-center gap-3"
+              >
+                <VolumeX className="w-8 h-8 text-white" />
+                <span className="text-white font-medium text-lg">Click to unmute</span>
+              </motion.div>
+            </motion.div>
+          )}
 
           {/* Loading/Waiting State */}
           {(isConnecting || stream.status !== 'live') && (
@@ -982,7 +1064,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       {/* Mobile/Tablet: Full screen video */}
       <div className="lg:hidden absolute inset-0">
         <video
-          ref={videoRef}
+          ref={mobileVideoRef}
           autoPlay
           playsInline
           muted={isMuted}
@@ -993,6 +1075,25 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
             minHeight: '100%',
           }}
         />
+
+        {/* Tap to unmute overlay */}
+        {hasVideo && isMuted && showUnmutePrompt && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="absolute inset-0 z-30 flex items-center justify-center"
+            onClick={handleUnmute}
+          >
+            <motion.div 
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="bg-black/70 backdrop-blur-sm px-6 py-4 rounded-2xl flex items-center gap-3 cursor-pointer"
+            >
+              <VolumeX className="w-8 h-8 text-white" />
+              <span className="text-white font-medium text-lg">Tap to unmute</span>
+            </motion.div>
+          </motion.div>
+        )}
 
         {/* Loading/Waiting State */}
         {(isConnecting || stream.status !== 'live') && (
