@@ -3,12 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
   Users, Send, Heart, X, Gift, 
-  Volume2, VolumeX, Maximize, Minimize, Flame, 
+  Volume2, VolumeX, Flame, 
   PartyPopper, ThumbsUp, Star, Sparkles, 
   MessageCircle, Home, Coins, Share2, Crown
 } from "lucide-react";
@@ -18,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import Hls from 'hls.js';
+import { useStreamPlayback } from "@/hooks/useStreamPlayback";
 
 interface LiveStreamViewerWebRTCProps {
   streamId: string;
@@ -42,10 +41,7 @@ const GIFT_EMOJIS: Record<string, string> = {
 
 export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWebRTCProps) => {
   const navigate = useNavigate();
-  // Single video ref for better stability
-  const videoRef = useRef<HTMLVideoElement>(null); 
-  const hlsRef = useRef<Hls | null>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
@@ -54,21 +50,28 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
   const [viewerSession, setViewerSession] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true); 
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
   const [reactions, setReactions] = useState<{ type: string; id: number; x: number; y: number; senderName?: string }[]>([]);
-  const [isConnecting, setIsConnecting] = useState(true);
   const [showChat, setShowChat] = useState(true);
-  const [hasVideo, setHasVideo] = useState(false);
   const [flyingGifts, setFlyingGifts] = useState<any[]>([]);
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [realtimeViewerCount, setRealtimeViewerCount] = useState(0);
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
-  const [playbackMethod, setPlaybackMethod] = useState<'webrtc' | 'hls' | null>(null);
-  const [showUnmutePrompt, setShowUnmutePrompt] = useState(true);
   const [viewers, setViewers] = useState<any[]>([]);
   
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
+
+  // Use the new stream playback hook
+  const {
+    status: connectionStatus,
+    hasVideo,
+    showUnmutePrompt,
+    unmute,
+    cleanup: cleanupPlayback,
+  } = useStreamPlayback({
+    cfHlsUrl: stream?.cf_hls_url,
+    cfWhepUrl: stream?.cf_webrtc_url,
+    videoRef,
+  });
 
   // Check if current user is the host
   const isHost = useMemo(() => {
@@ -107,30 +110,17 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
       setStream(streamData);
       setRealtimeViewerCount(streamData.viewer_count || 0);
-      
-      if (streamData.status !== 'live') {
-        console.log("[Viewer] Stream is not live, status:", streamData.status);
-        setIsConnecting(false);
-      }
     };
     init();
   }, [streamId, onClose]);
 
-  // 2. UNIFIED VIDEO HANDLER - User interaction to unmute
+  // Handle unmute with the hook's unmute function
   const handleUserInteraction = useCallback(async () => {
-    if (videoRef.current) {
-      try {
-        videoRef.current.muted = false;
-        await videoRef.current.play();
-        setIsMuted(false);
-        setShowUnmutePrompt(false);
-      } catch (err) {
-        console.error("Playback failed:", err);
-      }
-    }
-  }, []);
+    await unmute();
+    setIsMuted(false);
+  }, [unmute]);
 
-  // 3. Real-time Viewer Counting via postgres_changes
+  // Real-time Viewer Counting via postgres_changes
   useEffect(() => {
     const channel = supabase.channel(`viewers-${streamId}`)
       .on('postgres_changes', {
@@ -150,12 +140,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     return () => { supabase.removeChannel(channel); };
   }, [streamId]);
 
-  // 4. Join Logic
+  // Join Logic
   useEffect(() => {
     if (!currentUser) return;
     
     const joinStream = async () => {
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from("live_stream_viewers")
         .insert({ stream_id: streamId, user_id: currentUser.id, is_active: true })
         .select().single();
@@ -210,10 +200,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         console.log("[Viewer] Stream status changed:", payload.new.status);
         if (payload.new.status === 'ended') {
           toast.info("Stream has ended");
-          if (hlsRef.current) {
-            hlsRef.current.destroy();
-            hlsRef.current = null;
-          }
+          cleanupPlayback();
           setTimeout(() => {
             onClose();
             navigate('/live');
@@ -224,246 +211,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [streamId, onClose, navigate]);
+  }, [streamId, onClose, navigate, cleanupPlayback]);
 
-  // 5. Video Playback Logic - AGGRESSIVE CONNECTION (always connect no matter what)
-  useEffect(() => {
-    if (stream?.status !== 'live') return;
-    
-    return () => {
-      if (hlsRef.current) hlsRef.current.destroy();
-      if (pcRef.current) pcRef.current.close();
-    };
-  }, [stream?.status]);
-
-  // Force HLS connection function - always works
-  const forceHLSConnection = useCallback(() => {
-    if (!stream?.cf_hls_url || !videoRef.current) {
-      console.log("[Viewer] No HLS URL available, showing placeholder");
-      setIsConnecting(false);
-      setConnectionStatus('connected');
-      setHasVideo(true); // Show the UI anyway
-      return;
-    }
-
-    console.log("[Viewer] FORCING HLS connection:", stream.cf_hls_url);
-    
-    // Cleanup existing HLS
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
-    if (Hls.isSupported()) {
-      const hls = new Hls({ 
-        enableWorker: true, 
-        lowLatencyMode: true,
-        backBufferLength: 10,
-        maxBufferLength: 15,
-        liveSyncDurationCount: 2,
-        liveMaxLatencyDurationCount: 5,
-        fragLoadingTimeOut: 10000,
-        manifestLoadingTimeOut: 10000,
-        levelLoadingTimeOut: 10000,
-        startLevel: -1, // Auto quality
-        capLevelToPlayerSize: true,
-      });
-      
-      hls.loadSource(stream.cf_hls_url);
-      hls.attachMedia(videoRef.current);
-      
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log("[Viewer-HLS] Manifest parsed, starting playback");
-        setHasVideo(true);
-        setIsConnecting(false);
-        setConnectionStatus('connected');
-        setPlaybackMethod('hls');
-        toast.success('Connected to stream!');
-        videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
-      });
-      
-      hls.on(Hls.Events.ERROR, (_, data) => {
-        console.error("[Viewer-HLS] Error:", data);
-        if (data.fatal) {
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            console.log("[Viewer-HLS] Network error, retrying...");
-            setTimeout(() => hls.startLoad(), 1000);
-          } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
-            console.log("[Viewer-HLS] Media error, recovering...");
-            hls.recoverMediaError();
-          } else {
-            // Even on fatal error, mark as connected so UI is usable
-            setIsConnecting(false);
-            setConnectionStatus('connected');
-          }
-        }
-      });
-      
-      hlsRef.current = hls;
-    } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari Native HLS
-      console.log("[Viewer] Using Safari native HLS");
-      videoRef.current.src = stream.cf_hls_url;
-      videoRef.current.addEventListener('loadedmetadata', () => {
-        setHasVideo(true);
-        setIsConnecting(false);
-        setConnectionStatus('connected');
-        setPlaybackMethod('hls');
-        videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
-      });
-      videoRef.current.addEventListener('error', () => {
-        console.error("[Viewer] Safari HLS error");
-        setIsConnecting(false);
-        setConnectionStatus('connected'); // Still show UI
-      });
-    }
-  }, [stream?.cf_hls_url]);
-
-  useEffect(() => {
-    if (!stream || stream.status !== 'live') return;
-
-    let webrtcTimeout: NodeJS.Timeout;
-    let forceConnectTimeout: NodeJS.Timeout;
-
-    const startPlayback = async () => {
-      setConnectionStatus('connecting');
-      setIsConnecting(true);
-      
-      // Use cf_webrtc_url for WebRTC playback (the correct column name)
-      const webrtcUrl = stream.cf_webrtc_url;
-      const hasWebRTC = webrtcUrl?.includes('webRTC');
-      const hasHLS = !!stream.cf_hls_url;
-
-      console.log("[Viewer] Starting playback - WebRTC:", hasWebRTC, "HLS:", hasHLS);
-
-      // If no WebRTC URL, go straight to HLS
-      if (!hasWebRTC) {
-        console.log("[Viewer] No WebRTC URL, using HLS directly");
-        forceHLSConnection();
-        return;
-      }
-
-      // Try WebRTC with fast timeout
-      try {
-        console.log("[Viewer] Trying WebRTC playback:", webrtcUrl);
-        
-        if (pcRef.current) {
-          pcRef.current.close();
-          pcRef.current = null;
-        }
-
-        const pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: 'stun:stun.cloudflare.com:3478' },
-            { urls: 'stun:stun.l.google.com:19302' },
-          ],
-          bundlePolicy: 'max-bundle',
-          rtcpMuxPolicy: 'require',
-        });
-        pcRef.current = pc;
-
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-
-        let connected = false;
-
-        pc.ontrack = (event) => {
-          console.log("[Viewer-WebRTC] Received track:", event.track.kind);
-          if (event.streams[0] && videoRef.current) {
-            connected = true;
-            videoRef.current.srcObject = event.streams[0];
-            videoRef.current.muted = true;
-            videoRef.current.play().catch(() => setShowUnmutePrompt(true));
-            setHasVideo(true);
-            setIsConnecting(false);
-            setConnectionStatus('connected');
-            setPlaybackMethod('webrtc');
-            toast.success('Connected via WebRTC!');
-          }
-        };
-
-        pc.onconnectionstatechange = () => {
-          console.log("[Viewer-WebRTC] Connection state:", pc.connectionState);
-          if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-            if (!connected) {
-              console.log("[Viewer-WebRTC] Connection failed, falling back to HLS");
-              forceHLSConnection();
-            }
-          }
-        };
-
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-
-        // Quick ICE gathering with 1.5s timeout
-        await new Promise<void>((resolve) => {
-          if (pc.iceGatheringState === 'complete') {
-            resolve();
-            return;
-          }
-          const timeout = setTimeout(resolve, 1500);
-          pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === 'complete') {
-              clearTimeout(timeout);
-              resolve();
-            }
-          };
-        });
-
-        const response = await fetch(webrtcUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/sdp' },
-          body: pc.localDescription?.sdp,
-        });
-
-        if (!response.ok) {
-          throw new Error(`WHEP failed: ${response.status}`);
-        }
-
-        const answerSdp = await response.text();
-        await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
-        console.log("[Viewer-WebRTC] WebRTC SDP exchange complete!");
-        
-        // Give WebRTC 3 seconds to get tracks, then fallback
-        webrtcTimeout = setTimeout(() => {
-          if (!connected) {
-            console.log("[Viewer] WebRTC timeout - no tracks received, using HLS");
-            forceHLSConnection();
-          }
-        }, 3000);
-
-      } catch (error) {
-        console.error("[Viewer-WebRTC] Failed:", error);
-        forceHLSConnection();
-      }
-    };
-
-    // Start immediately
-    startPlayback();
-    
-    // FORCE connection after 5 seconds no matter what
-    forceConnectTimeout = setTimeout(() => {
-      if (connectionStatus !== 'connected') {
-        console.log("[Viewer] FORCE CONNECT - 5s timeout reached");
-        setIsConnecting(false);
-        setConnectionStatus('connected');
-        if (!hasVideo && stream.cf_hls_url) {
-          forceHLSConnection();
-        }
-      }
-    }, 5000);
-
-    return () => {
-      clearTimeout(webrtcTimeout);
-      clearTimeout(forceConnectTimeout);
-    };
-  }, [stream, forceHLSConnection]);
-
-  // 6. Chat Logic with Optimistic UI
+  // Chat Logic with Optimistic UI
   const sendComment = async () => {
     if (!newComment.trim() || !currentUser) return;
 
-    // Optimistic UI Update
     const tempId = `temp-${Date.now()}`;
     const tempComment = {
       id: tempId,
@@ -494,7 +247,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
   // Subscribe to comments
   useEffect(() => {
-    // Fetch initial comments
     const fetchComments = async () => {
       const { data: commentsData } = await supabase
         .from("live_stream_comments")
@@ -528,7 +280,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         table: 'live_stream_comments', 
         filter: `stream_id=eq.${streamId}` 
       }, async (payload) => {
-        // Ignore own echoes (from optimistic update)
         if (payload.new.user_id === currentUser?.id) return;
         
         const { data: profile } = await supabase
@@ -623,7 +374,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       return;
     }
 
-    // Immediate local feedback
     const localReaction = {
       type: reactionType,
       id: Date.now() + Math.random(),
@@ -665,7 +415,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         />
 
         {/* CONNECTION LOADING STATE */}
-        {(isConnecting || connectionStatus === 'connecting') && (
+        {connectionStatus === 'connecting' && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
@@ -675,7 +425,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         )}
 
         {/* Stream ended/scheduled state */}
-        {stream.status !== 'live' && !isConnecting && (
+        {stream.status !== 'live' && connectionStatus !== 'connecting' && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
             <div className="text-center">
               {stream.status === 'scheduled' ? (
