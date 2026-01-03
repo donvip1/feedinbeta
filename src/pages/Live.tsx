@@ -573,6 +573,7 @@ const Live = () => {
                               <LiveStreamPreviewCard
                                 stream={stream}
                                 onClick={() => handleStreamClick(stream)}
+                                isOwner={stream.user_id === user?.id}
                                 autoPlay={true}
                               />
                             </motion.div>
@@ -666,6 +667,7 @@ const Live = () => {
                       <LiveStreamCard
                         stream={stream}
                         onClick={() => handleStreamClick(stream)}
+                        isOwner={stream.user_id === user?.id}
                       />
                     </motion.div>
                   ))}
@@ -750,6 +752,7 @@ const Live = () => {
                         key={stream.id}
                         stream={stream}
                         onClick={() => handleStreamClick(stream)}
+                        isOwner={stream.user_id === user?.id}
                       />
                     ))}
                   </div>

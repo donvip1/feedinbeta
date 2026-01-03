@@ -65,6 +65,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     status: connectionStatus,
     hasVideo,
     showUnmutePrompt,
+    errorMessage,
     unmute,
     cleanup: cleanupPlayback,
   } = useStreamPlayback({
@@ -415,11 +416,30 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         />
 
         {/* CONNECTION LOADING STATE */}
-        {connectionStatus === 'connecting' && (
+        {(connectionStatus === 'connecting' || connectionStatus === 'retrying') && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-              <p className="text-white">Connecting to Host...</p>
+              <p className="text-white">{errorMessage || 'Connecting to stream...'}</p>
+            </div>
+          </div>
+        )}
+
+        {/* CONNECTION FAILED STATE */}
+        {connectionStatus === 'failed' && (
+          <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+            <div className="text-center">
+              <div className="text-5xl mb-4">📡</div>
+              <h3 className="text-xl font-bold text-white mb-2">Connection Failed</h3>
+              <p className="text-muted-foreground mb-4">{errorMessage || 'Unable to connect to stream'}</p>
+              <div className="flex gap-3 justify-center">
+                <Button variant="outline" onClick={onClose}>
+                  Go Back
+                </Button>
+                <Button onClick={() => window.location.reload()}>
+                  Try Again
+                </Button>
+              </div>
             </div>
           </div>
         )}
