@@ -83,30 +83,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
-      // Try live_streams_public first, fallback to live_streams
-      let streamData = null;
-      let error = null;
-
-      const { data: publicData, error: publicError } = await supabase
-        .from("live_streams_public")
-        .select(`*, profiles:user_id (*)`)
+      // Query directly from live_streams table to get all columns including cf_hls_url
+      const { data: streamData, error } = await supabase
+        .from("live_streams")
+        .select(`*, profiles:user_id (id, display_name, username, avatar_url)`)
         .eq("id", streamId)
         .maybeSingle();
-
-      if (publicData) {
-        streamData = publicData;
-        console.log("[Viewer] Loaded stream from public view:", streamData.title, "Status:", streamData.status);
-      } else {
-        console.log("[Viewer] Public view failed, trying direct table...");
-        const { data: directData, error: directError } = await supabase
-          .from("live_streams")
-          .select(`*, profiles:user_id (*)`)
-          .eq("id", streamId)
-          .maybeSingle();
-        
-        streamData = directData;
-        error = directError;
-      }
 
       if (error || !streamData) {
         console.error("[Viewer] Failed to load stream:", error);
@@ -120,7 +102,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         title: streamData.title,
         status: streamData.status,
         cf_hls_url: streamData.cf_hls_url,
-        stream_url: streamData.stream_url,
+        cf_webrtc_url: streamData.cf_webrtc_url,
       });
 
       setStream(streamData);
@@ -347,8 +329,9 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       setConnectionStatus('connecting');
       setIsConnecting(true);
       
-      const webrtcUrl = stream.stream_url;
-      const hasWebRTC = webrtcUrl?.includes('webRTC/play');
+      // Use cf_webrtc_url for WebRTC playback (the correct column name)
+      const webrtcUrl = stream.cf_webrtc_url;
+      const hasWebRTC = webrtcUrl?.includes('webRTC');
       const hasHLS = !!stream.cf_hls_url;
 
       console.log("[Viewer] Starting playback - WebRTC:", hasWebRTC, "HLS:", hasHLS);
