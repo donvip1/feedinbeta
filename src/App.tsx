@@ -20,6 +20,7 @@ import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
 import { BrowserInstallBanner } from "@/components/pwa/BrowserInstallBanner";
 import { UPDATE_AVAILABLE_EVENT, autoUpdater } from "@/lib/auto-updater";
+import { appDataSync } from "@/lib/app-data-sync";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -75,7 +76,25 @@ import Investors from "./pages/Investors";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import SpaceDetail from "./pages/SpaceDetail";
 
-const queryClient = new QueryClient();
+// Create QueryClient with aggressive refetch settings for mobile
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Shorter stale time for fresher data
+      staleTime: 5 * 1000, // 5 seconds
+      // Refetch on window focus (critical for mobile app switching)
+      refetchOnWindowFocus: true,
+      // Refetch when reconnecting
+      refetchOnReconnect: true,
+      // Retry failed requests
+      retry: 2,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    },
+  },
+});
+
+// Initialize app data sync with the query client
+appDataSync.initialize(queryClient);
 
 const App = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
