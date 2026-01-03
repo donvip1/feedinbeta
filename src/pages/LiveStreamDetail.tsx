@@ -30,9 +30,9 @@ const LiveStreamDetail = () => {
 
   const loadStream = async () => {
     try {
-      // Query from live_streams table to get all columns including cf_hls_url
+      // Query from live_streams_public view - accessible to all users
       const { data, error } = await supabase
-        .from('live_streams')
+        .from('live_streams_public')
         .select('*, profiles:user_id (id, display_name, username, avatar_url)')
         .eq('id', streamId)
         .maybeSingle();

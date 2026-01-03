@@ -83,9 +83,9 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
-      // Query directly from live_streams table to get all columns including cf_hls_url
+      // Query from live_streams_public view - accessible to all users
       const { data: streamData, error } = await supabase
-        .from("live_streams")
+        .from("live_streams_public")
         .select(`*, profiles:user_id (id, display_name, username, avatar_url)`)
         .eq("id", streamId)
         .maybeSingle();

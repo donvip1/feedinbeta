@@ -4500,6 +4500,9 @@ export type Database = {
       live_streams_public: {
         Row: {
           category: string | null
+          cf_hls_url: string | null
+          cf_webrtc_url: string | null
+          cloudflare_session_id: string | null
           created_at: string | null
           description: string | null
           duration: number | null
@@ -4508,6 +4511,7 @@ export type Database = {
           is_premium: boolean | null
           peak_viewers: number | null
           scheduled_start: string | null
+          sfu_track_name: string | null
           started_at: string | null
           status: string | null
           stream_key: string | null
@@ -4520,6 +4524,9 @@ export type Database = {
         }
         Insert: {
           category?: string | null
+          cf_hls_url?: string | null
+          cf_webrtc_url?: string | null
+          cloudflare_session_id?: string | null
           created_at?: string | null
           description?: string | null
           duration?: number | null
@@ -4528,6 +4535,7 @@ export type Database = {
           is_premium?: boolean | null
           peak_viewers?: number | null
           scheduled_start?: string | null
+          sfu_track_name?: string | null
           started_at?: string | null
           status?: string | null
           stream_key?: never
@@ -4540,6 +4548,9 @@ export type Database = {
         }
         Update: {
           category?: string | null
+          cf_hls_url?: string | null
+          cf_webrtc_url?: string | null
+          cloudflare_session_id?: string | null
           created_at?: string | null
           description?: string | null
           duration?: number | null
@@ -4548,6 +4559,7 @@ export type Database = {
           is_premium?: boolean | null
           peak_viewers?: number | null
           scheduled_start?: string | null
+          sfu_track_name?: string | null
           started_at?: string | null
           status?: string | null
           stream_key?: never
