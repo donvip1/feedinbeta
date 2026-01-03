@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { toast } from 'sonner';
 
-type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'failed';
+type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'failed' | 'retrying';
 type PlaybackMethod = 'webrtc' | 'hls' | null;
 
 interface UseStreamPlaybackProps {
@@ -16,11 +16,14 @@ export function useStreamPlayback({ cfHlsUrl, cfWhepUrl, videoRef }: UseStreamPl
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timersRef = useRef<number[]>([]);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
   
   const [status, setStatus] = useState<ConnectionStatus>('idle');
   const [method, setMethod] = useState<PlaybackMethod>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [showUnmutePrompt, setShowUnmutePrompt] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const clearTimers = () => {
     timersRef.current.forEach(t => clearTimeout(t));
@@ -46,19 +49,24 @@ export function useStreamPlayback({ cfHlsUrl, cfWhepUrl, videoRef }: UseStreamPl
     }
   }, []);
 
-  const connectHLS = useCallback(() => {
-    console.log('[StreamPlayback] Connecting via HLS:', cfHlsUrl);
-    cleanup();
+  const connectHLS = useCallback((isRetry = false) => {
+    console.log('[StreamPlayback] Connecting via HLS:', cfHlsUrl, isRetry ? `(retry ${retryCountRef.current})` : '');
+    
+    if (!isRetry) {
+      cleanup();
+    }
     
     if (!cfHlsUrl || !videoRef.current) {
       console.warn('[StreamPlayback] No HLS URL or video element');
       setStatus('failed');
+      setErrorMessage('No stream URL available');
       setHasVideo(false);
       setMethod(null);
       return;
     }
 
-    setStatus('connecting');
+    setStatus(isRetry ? 'retrying' : 'connecting');
+    setErrorMessage(isRetry ? 'Reconnecting...' : null);
 
     if (Hls.isSupported()) {
       const hls = new Hls({
@@ -68,11 +76,13 @@ export function useStreamPlayback({ cfHlsUrl, cfWhepUrl, videoRef }: UseStreamPl
         maxBufferLength: 15,
         liveSyncDurationCount: 2,
         liveMaxLatencyDurationCount: 5,
-        fragLoadingTimeOut: 10000,
-        manifestLoadingTimeOut: 10000,
-        levelLoadingTimeOut: 10000,
+        fragLoadingTimeOut: 15000,
+        manifestLoadingTimeOut: 15000,
+        levelLoadingTimeOut: 15000,
         startLevel: -1,
         capLevelToPlayerSize: true,
+        maxLoadingDelay: 4,
+        maxBufferHole: 0.5,
       });
 
       hls.loadSource(cfHlsUrl);
@@ -83,23 +93,38 @@ export function useStreamPlayback({ cfHlsUrl, cfWhepUrl, videoRef }: UseStreamPl
         setHasVideo(true);
         setStatus('connected');
         setMethod('hls');
+        setErrorMessage(null);
+        retryCountRef.current = 0;
         toast.success('Connected to stream');
         videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
       });
 
       hls.on(Hls.Events.ERROR, (_, data) => {
-        console.error('[StreamPlayback] HLS error:', data);
+        console.error('[StreamPlayback] HLS error:', data.type, data.details);
         if (data.fatal) {
           if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-            console.log('[StreamPlayback] HLS network error, retrying...');
-            const t = window.setTimeout(() => hls.startLoad(), 1000);
-            timersRef.current.push(t);
+            if (retryCountRef.current < maxRetries) {
+              retryCountRef.current++;
+              console.log(`[StreamPlayback] HLS network error, retry ${retryCountRef.current}/${maxRetries}...`);
+              setErrorMessage(`Stream starting... (${retryCountRef.current}/${maxRetries})`);
+              const delay = 2000 * retryCountRef.current; // Exponential backoff
+              const t = window.setTimeout(() => {
+                hls.destroy();
+                connectHLS(true);
+              }, delay);
+              timersRef.current.push(t);
+            } else {
+              console.error('[StreamPlayback] HLS failed after retries');
+              setStatus('failed');
+              setErrorMessage('Unable to connect. Stream may have ended.');
+            }
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             console.log('[StreamPlayback] HLS media error, recovering...');
             hls.recoverMediaError();
           } else {
             console.error('[StreamPlayback] Fatal HLS error');
             setStatus('failed');
+            setErrorMessage('Failed to load stream');
           }
         }
       });
@@ -115,12 +140,23 @@ export function useStreamPlayback({ cfHlsUrl, cfWhepUrl, videoRef }: UseStreamPl
         setHasVideo(true);
         setStatus('connected');
         setMethod('hls');
+        setErrorMessage(null);
+        retryCountRef.current = 0;
         videoRef.current?.play().catch(() => setShowUnmutePrompt(true));
       };
       
       const onError = () => {
         console.error('[StreamPlayback] Safari HLS error');
-        setStatus('failed');
+        if (retryCountRef.current < maxRetries) {
+          retryCountRef.current++;
+          const delay = 2000 * retryCountRef.current;
+          setErrorMessage(`Stream starting... (${retryCountRef.current}/${maxRetries})`);
+          const t = window.setTimeout(() => connectHLS(true), delay);
+          timersRef.current.push(t);
+        } else {
+          setStatus('failed');
+          setErrorMessage('Unable to connect to stream');
+        }
       };
       
       videoRef.current.addEventListener('loadedmetadata', onLoaded, { once: true });
@@ -128,6 +164,7 @@ export function useStreamPlayback({ cfHlsUrl, cfWhepUrl, videoRef }: UseStreamPl
     } else {
       console.error('[StreamPlayback] HLS not supported');
       setStatus('failed');
+      setErrorMessage('HLS not supported on this browser');
     }
   }, [cfHlsUrl, videoRef, cleanup]);
 
@@ -273,6 +310,7 @@ export function useStreamPlayback({ cfHlsUrl, cfWhepUrl, videoRef }: UseStreamPl
     method,
     hasVideo,
     showUnmutePrompt,
+    errorMessage,
     unmute,
     cleanup,
   };

@@ -1,12 +1,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Users, Clock, Radio, Play, Trash2, MoreVertical, Gift, Crown, Sparkles, Volume2, VolumeX } from "lucide-react";
+import { Users, Clock, Radio, Play, Trash2, MoreVertical, Crown, Sparkles } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   DropdownMenu,
@@ -40,161 +40,10 @@ interface LiveStreamPreviewCardProps {
 
 export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = true }: LiveStreamPreviewCardProps) => {
   const [deleting, setDeleting] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
-  const [hasVideo, setHasVideo] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const pcRef = useRef<RTCPeerConnection | null>(null);
-  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const viewerIdRef = useRef<string>(crypto.randomUUID());
-  const mountedRef = useRef(true);
   
   const isLive = stream.status === 'live';
   const isScheduled = stream.status === 'scheduled';
   const isEnded = stream.status === 'ended';
-
-  // Connect to stream preview when card is visible and stream is live
-  useEffect(() => {
-    if (!isLive || !autoPlay) return;
-    
-    mountedRef.current = true;
-    let retryTimeout: NodeJS.Timeout | null = null;
-
-    const connectPreview = async () => {
-      if (!mountedRef.current) return;
-      setIsConnecting(true);
-      
-      const viewerId = viewerIdRef.current;
-      
-      // Fetch TURN credentials
-      let iceServers: RTCIceServer[] = [
-        { urls: 'stun:stun.l.google.com:19302' },
-      ];
-      
-      try {
-        const { data } = await supabase.functions.invoke('get-turn-credentials');
-        if (data?.iceServers) {
-          iceServers = data.iceServers;
-        }
-      } catch (err) {
-        console.log('[Preview] Using fallback STUN servers');
-      }
-
-      if (!mountedRef.current) return;
-
-      const pc = new RTCPeerConnection({
-        iceServers,
-        iceCandidatePoolSize: 5,
-      });
-      pcRef.current = pc;
-
-      pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
-
-      pc.ontrack = (event) => {
-        console.log('[Preview] Got track:', event.track.kind);
-        if (videoRef.current && event.streams[0]) {
-          videoRef.current.srcObject = event.streams[0];
-          setHasVideo(true);
-          setIsConnecting(false);
-        }
-      };
-
-      pc.onconnectionstatechange = () => {
-        console.log('[Preview] Connection state:', pc.connectionState);
-        if (pc.connectionState === 'connected') {
-          setIsConnecting(false);
-        } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
-          setHasVideo(false);
-        }
-      };
-
-      const channel = supabase
-        .channel(`preview-${stream.id}-${viewerId.slice(0, 8)}`, {
-          config: { broadcast: { self: false } }
-        })
-        .on('broadcast', { event: 'offer' }, async ({ payload }) => {
-          if (payload.viewerId !== viewerId || !pcRef.current) return;
-          
-          try {
-            await pcRef.current.setRemoteDescription(new RTCSessionDescription(payload.offer));
-            const answer = await pcRef.current.createAnswer();
-            await pcRef.current.setLocalDescription(answer);
-            
-            channel.send({
-              type: 'broadcast',
-              event: 'answer',
-              payload: { viewerId, answer },
-            });
-          } catch (err) {
-            console.error('[Preview] Error handling offer:', err);
-          }
-        })
-        .on('broadcast', { event: 'ice-candidate-from-host' }, async ({ payload }) => {
-          if (payload.viewerId !== viewerId || !pcRef.current) return;
-          if (payload.candidate) {
-            try {
-              await pcRef.current.addIceCandidate(new RTCIceCandidate(payload.candidate));
-            } catch (err) {
-              console.error('[Preview] Error adding ICE:', err);
-            }
-          }
-        })
-        .on('broadcast', { event: 'host-ready' }, () => {
-          channel.send({
-            type: 'broadcast',
-            event: 'viewer-join',
-            payload: { viewerId },
-          });
-        });
-
-      channelRef.current = channel;
-
-      pc.onicecandidate = (event) => {
-        if (event.candidate) {
-          channel.send({
-            type: 'broadcast',
-            event: 'ice-candidate',
-            payload: { viewerId, candidate: event.candidate },
-          });
-        }
-      };
-
-      channel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          // Announce join to get stream
-          channel.send({
-            type: 'broadcast',
-            event: 'viewer-join',
-            payload: { viewerId },
-          });
-          
-          // Retry after delay if no connection
-          retryTimeout = setTimeout(() => {
-            if (!hasVideo && mountedRef.current) {
-              channel.send({
-                type: 'broadcast',
-                event: 'viewer-join',
-                payload: { viewerId },
-              });
-            }
-          }, 3000);
-        }
-      });
-    };
-
-    connectPreview();
-
-    return () => {
-      mountedRef.current = false;
-      if (retryTimeout) clearTimeout(retryTimeout);
-      pcRef.current?.close();
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-      }
-    };
-  }, [isLive, stream.id, autoPlay]);
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -210,14 +59,6 @@ export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = tru
       setDeleting(false);
     }
   };
-
-  const toggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (videoRef.current) {
-      videoRef.current.muted = !videoRef.current.muted;
-      setIsMuted(!isMuted);
-    }
-  };
   
   return (
     <motion.div
@@ -229,66 +70,43 @@ export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = tru
         isEnded && "opacity-70"
       )}
     >
-      {/* Video Preview Area */}
+      {/* Thumbnail/Placeholder Area */}
       <div className="relative aspect-video bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        {/* Live Video Preview */}
-        {isLive && (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted={isMuted}
-            className={cn(
-              "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
-              hasVideo ? "opacity-100" : "opacity-0"
-            )}
+        {/* Thumbnail or Placeholder */}
+        {stream.thumbnail_url ? (
+          <img 
+            src={stream.thumbnail_url} 
+            alt={stream.title} 
+            className="w-full h-full object-cover"
           />
-        )}
-        
-        {/* Fallback Thumbnail or Placeholder */}
-        {(!isLive || !hasVideo) && (
-          <>
-            {stream.thumbnail_url ? (
-              <img 
-                src={stream.thumbnail_url} 
-                alt={stream.title} 
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className={cn(
-                  "relative",
-                  isLive && "animate-pulse"
-                )}>
-                  {isLive && (
-                    <div className="absolute inset-0 bg-red-500/30 rounded-full blur-2xl animate-ping" />
-                  )}
-                  <div className={cn(
-                    "w-16 h-16 rounded-full flex items-center justify-center",
-                    isLive 
-                      ? "bg-gradient-to-br from-red-500 to-pink-500" 
-                      : "bg-gradient-to-br from-muted to-muted/50"
-                  )}>
-                    <Radio className={cn("w-8 h-8", isLive ? "text-white" : "text-muted-foreground")} />
-                  </div>
-                </div>
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className={cn(
+              "relative",
+              isLive && "animate-pulse"
+            )}>
+              {isLive && (
+                <div className="absolute inset-0 bg-red-500/30 rounded-full blur-2xl animate-ping" />
+              )}
+              <div className={cn(
+                "w-16 h-16 rounded-full flex items-center justify-center",
+                isLive 
+                  ? "bg-gradient-to-br from-red-500 to-pink-500" 
+                  : "bg-gradient-to-br from-muted to-muted/50"
+              )}>
+                <Radio className={cn("w-8 h-8", isLive ? "text-white" : "text-muted-foreground")} />
               </div>
-            )}
-          </>
-        )}
-
-        {/* Connecting indicator */}
-        {isLive && isConnecting && !hasVideo && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className="flex flex-col items-center gap-2">
-              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs text-white/80">Connecting...</span>
             </div>
           </div>
         )}
         
         {/* Status Badges */}
         <div className="absolute top-3 left-3 flex gap-2">
+          {isOwner && (
+            <Badge className="bg-primary/90 text-primary-foreground border-0 shadow-lg gap-1">
+              Your Stream
+            </Badge>
+          )}
           {isLive && (
             <Badge className="bg-gradient-to-r from-red-500 to-pink-500 text-white border-0 shadow-lg shadow-red-500/30 animate-pulse gap-1.5">
               <span className="w-2 h-2 bg-white rounded-full" />
@@ -317,20 +135,8 @@ export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = tru
           </Badge>
         )}
 
-        {/* Mute/Unmute Button for live preview */}
-        {isLive && hasVideo && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleMute}
-            className="absolute top-3 right-3 bg-black/50 hover:bg-black/70 text-white h-8 w-8 rounded-full"
-          >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </Button>
-        )}
-
         {/* Owner Menu */}
-        {isOwner && !hasVideo && (
+        {isOwner && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button 
@@ -358,15 +164,20 @@ export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = tru
           </div>
         </div>
 
-        {/* Watch Now Button - overlaid on video */}
+        {/* Action Button - overlaid on thumbnail */}
         {isLive && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
             <Button 
               onClick={onClick}
-              className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white shadow-lg shadow-red-500/30 gap-2"
+              className={cn(
+                "shadow-lg gap-2",
+                isOwner 
+                  ? "bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-white shadow-primary/30"
+                  : "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white shadow-red-500/30"
+              )}
             >
               <Play className="w-4 h-4" />
-              Watch Now
+              {isOwner ? "Resume Broadcasting" : "Watch Now"}
             </Button>
           </div>
         )}
@@ -426,10 +237,15 @@ export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = tru
             <Button 
               onClick={onClick}
               variant="outline" 
-              className="w-full gap-2 border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+              className={cn(
+                "w-full gap-2",
+                isOwner 
+                  ? "border-primary/30 text-primary hover:bg-primary/10"
+                  : "border-red-500/30 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+              )}
             >
               <Play className="w-4 h-4" />
-              Watch & Interact
+              {isOwner ? "Resume Broadcasting" : "Watch & Interact"}
             </Button>
           </div>
         )}
