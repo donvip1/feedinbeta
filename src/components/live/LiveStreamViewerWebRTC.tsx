@@ -51,6 +51,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
@@ -70,7 +71,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [isChatFocused, setIsChatFocused] = useState(false);
   const [connectionNotified, setConnectionNotified] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
-  
+  const [playbackMethod, setPlaybackMethod] = useState<'webrtc' | 'hls' | null>(null);
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
   // Fetch stream details
@@ -203,9 +204,150 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     return false;
   }, []);
 
-  // HLS.js-based video playback - optimized for slow networks
+  // WebRTC Playback - ultra low latency! Try this first
   useEffect(() => {
     if (stream?.status !== 'live') return;
+    if (playbackMethod === 'hls') return; // Already using HLS fallback
+    
+    // Get WebRTC playback URL from stream_url (set by edge function)
+    const webrtcPlaybackUrl = stream?.stream_url;
+    if (!webrtcPlaybackUrl || !webrtcPlaybackUrl.includes('webRTC/play')) {
+      console.log("[Viewer-WebRTC] No WebRTC playback URL, falling back to HLS");
+      setPlaybackMethod('hls');
+      return;
+    }
+
+    let isMounted = true;
+    console.log("[Viewer-WebRTC] Setting up WebRTC playback:", webrtcPlaybackUrl);
+    setConnectionStatus('connecting');
+    setIsConnecting(true);
+
+    const setupWebRTC = async () => {
+      if (!videoRef.current || !isMounted) return;
+
+      try {
+        // Clean up previous connection
+        if (pcRef.current) {
+          pcRef.current.close();
+          pcRef.current = null;
+        }
+
+        // Create peer connection for receiving
+        const pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: 'stun:stun.cloudflare.com:3478' },
+            { urls: 'stun:stun.l.google.com:19302' },
+          ],
+          bundlePolicy: 'max-bundle',
+          rtcpMuxPolicy: 'require',
+        });
+        pcRef.current = pc;
+
+        // Set up to receive tracks
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+
+        pc.ontrack = (event) => {
+          console.log("[Viewer-WebRTC] Received track:", event.track.kind);
+          if (videoRef.current && event.streams[0]) {
+            videoRef.current.srcObject = event.streams[0];
+            videoRef.current.play().catch(e => {
+              console.warn("[Viewer-WebRTC] Autoplay failed, trying muted:", e);
+              if (videoRef.current) {
+                videoRef.current.muted = true;
+                videoRef.current.play().catch(() => {});
+              }
+            });
+          }
+        };
+
+        pc.onconnectionstatechange = () => {
+          console.log("[Viewer-WebRTC] Connection state:", pc.connectionState);
+          if (pc.connectionState === 'connected') {
+            setHasVideo(true);
+            setIsConnecting(false);
+            setConnectionStatus('connected');
+            setPlaybackMethod('webrtc');
+            if (!connectionNotified) {
+              toast.success('Connected to stream!');
+              setConnectionNotified(true);
+            }
+          } else if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
+            console.log("[Viewer-WebRTC] Connection failed, falling back to HLS");
+            setPlaybackMethod('hls');
+          }
+        };
+
+        // Create offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Wait for ICE gathering
+        await new Promise<void>((resolve) => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+            return;
+          }
+          const timeout = setTimeout(resolve, 2000);
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === 'complete') {
+              clearTimeout(timeout);
+              resolve();
+            }
+          };
+        });
+
+        // Send offer to Cloudflare WHEP endpoint
+        console.log("[Viewer-WebRTC] Sending offer to WHEP endpoint...");
+        const response = await fetch(webrtcPlaybackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/sdp' },
+          body: pc.localDescription?.sdp,
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("[Viewer-WebRTC] WHEP error:", response.status, errorText);
+          throw new Error(`WHEP failed: ${response.status}`);
+        }
+
+        const answerSdp = await response.text();
+        await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+        console.log("[Viewer-WebRTC] WebRTC connection established!");
+
+      } catch (error) {
+        console.error("[Viewer-WebRTC] Setup failed:", error);
+        if (isMounted) {
+          console.log("[Viewer-WebRTC] Falling back to HLS");
+          setPlaybackMethod('hls');
+        }
+      }
+    };
+
+    // Try WebRTC with a short timeout before falling back
+    const webrtcTimeout = setTimeout(() => {
+      if (connectionStatus !== 'connected' && isMounted) {
+        console.log("[Viewer-WebRTC] Timeout, falling back to HLS");
+        setPlaybackMethod('hls');
+      }
+    }, 8000);
+
+    setupWebRTC();
+
+    return () => {
+      isMounted = false;
+      clearTimeout(webrtcTimeout);
+      if (pcRef.current) {
+        pcRef.current.close();
+        pcRef.current = null;
+      }
+    };
+  }, [stream?.status, stream?.stream_url, playbackMethod, connectionNotified]);
+
+  // HLS.js-based video playback - fallback for slower but more reliable playback
+  useEffect(() => {
+    if (stream?.status !== 'live') return;
+    if (playbackMethod !== 'hls') return; // Only use when WebRTC failed
     if (!stream?.cf_hls_url) {
       console.log("[Viewer-HLS] No HLS URL available yet, waiting...");
       return;
@@ -219,7 +361,6 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
 
     console.log("[Viewer-HLS] Setting up HLS connection for stream:", streamId);
     console.log("[Viewer-HLS] HLS URL:", hlsUrl);
-    console.log("[Viewer-HLS] Slow network:", slowNetwork);
     setConnectionStatus('connecting');
     setIsConnecting(true);
 
@@ -266,37 +407,22 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
       if (Hls.isSupported()) {
         console.log("[Viewer-HLS] Using HLS.js");
         
-        // Optimized config for slow networks
-        const hlsConfig = slowNetwork ? {
+        // Optimized config for faster initial load
+        const hlsConfig = {
           enableWorker: true,
-          lowLatencyMode: false, // Disable for stability on slow networks
+          lowLatencyMode: !slowNetwork,
           backBufferLength: 30,
-          maxBufferLength: 15,
-          maxMaxBufferLength: 30,
-          liveSyncDurationCount: 5,
-          liveMaxLatencyDurationCount: 15,
-          manifestLoadingMaxRetry: 6,
-          manifestLoadingRetryDelay: 1000,
-          levelLoadingMaxRetry: 6,
-          levelLoadingRetryDelay: 1000,
-          fragLoadingMaxRetry: 6,
-          fragLoadingRetryDelay: 1000,
-          startLevel: 0, // Start with lowest quality
-          abrEwmaDefaultEstimate: 500000, // Assume 500kbps initially
-          abrBandWidthFactor: 0.7,
-          abrBandWidthUpFactor: 0.5,
-        } : {
-          enableWorker: true,
-          lowLatencyMode: true,
-          backBufferLength: 60,
-          maxBufferLength: 30,
+          maxBufferLength: slowNetwork ? 15 : 30,
           maxMaxBufferLength: 60,
-          liveSyncDurationCount: 3,
-          liveMaxLatencyDurationCount: 10,
-          manifestLoadingMaxRetry: 4,
-          levelLoadingMaxRetry: 4,
-          fragLoadingMaxRetry: 4,
-          startLevel: -1, // Auto select quality
+          liveSyncDurationCount: slowNetwork ? 5 : 3,
+          liveMaxLatencyDurationCount: slowNetwork ? 15 : 10,
+          manifestLoadingMaxRetry: 8,
+          manifestLoadingRetryDelay: 500,
+          levelLoadingMaxRetry: 6,
+          levelLoadingRetryDelay: 500,
+          fragLoadingMaxRetry: 6,
+          fragLoadingRetryDelay: 500,
+          startLevel: slowNetwork ? 0 : -1,
         };
         
         const hls = new Hls(hlsConfig);
@@ -315,7 +441,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           retryCount = 0;
           
           if (!connectionNotified) {
-            toast.success(slowNetwork ? 'Connected (low quality for better stability)' : 'Connected to stream!');
+            toast.success('Connected to stream!');
             setConnectionNotified(true);
           }
           
@@ -340,7 +466,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
                 if (retryCount < maxRetries) {
                   setTimeout(() => {
                     hls.startLoad();
-                  }, slowNetwork ? 1500 : 2000);
+                  }, slowNetwork ? 1500 : 1000);
                 } else {
                   setConnectionStatus('failed');
                   toast.error("Connection lost - please refresh");
@@ -355,21 +481,12 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
                 retryCount++;
                 if (retryCount < maxRetries && isMounted) {
                   hls.destroy();
-                  setTimeout(setupHLS, slowNetwork ? 2000 : 3000);
+                  setTimeout(setupHLS, 2000);
                 } else {
                   setConnectionStatus('failed');
                 }
                 break;
             }
-          }
-        });
-        
-        // Monitor for fragmentation loading issues on slow networks
-        hls.on(Hls.Events.FRAG_LOAD_EMERGENCY_ABORTED, () => {
-          console.log("[Viewer-HLS] Fragment load aborted, dropping to lower quality...");
-          // Drop to lower quality if available
-          if (hls.currentLevel > 0) {
-            hls.currentLevel = 0;
           }
         });
 
@@ -384,14 +501,13 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
     // Try to connect immediately
     setupHLS();
 
-    // Faster retry for connection issues (2s for slow networks, 3s for fast)
-    const retryDelay = slowNetwork ? 2000 : 3000;
+    // Retry for connection issues
     const retryInterval = setInterval(() => {
       if (connectionStatus !== 'connected' && isMounted && stream?.status === 'live' && retryCount < maxRetries) {
         console.log(`[Viewer-HLS] Retrying connection (attempt ${retryCount + 1})...`);
         setupHLS();
       }
-    }, retryDelay);
+    }, 3000);
 
     return () => {
       isMounted = false;
@@ -401,7 +517,7 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
         hlsRef.current = null;
       }
     };
-  }, [stream?.status, stream?.cf_hls_url, streamId, isSlowNetwork, connectionNotified]);
+  }, [stream?.status, stream?.cf_hls_url, streamId, isSlowNetwork, connectionNotified, playbackMethod]);
 
   // Subscribe to comments
   useEffect(() => {
