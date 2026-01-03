@@ -10,7 +10,7 @@ import {
   Users, Send, Heart, X, Gift, 
   Volume2, VolumeX, Maximize, Minimize, Flame, 
   PartyPopper, ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Coins, Wifi, WifiOff
+  MessageCircle, Home, Coins, Wifi, WifiOff, Crown
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { useLivePresence } from "@/hooks/useLivePresence";
+import { FloatingReactions } from "./FloatingReactions";
+import { LiveChatMessage } from "./LiveChatMessage";
 import Hls from 'hls.js';
 
 interface LiveStreamViewerWebRTCProps {
@@ -74,7 +77,37 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   const [playbackMethod, setPlaybackMethod] = useState<'webrtc' | 'hls' | null>(null);
   const [showUnmutePrompt, setShowUnmutePrompt] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserProfile, setCurrentUserProfile] = useState<{ username?: string; avatar_url?: string } | null>(null);
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
+
+  // Get current user for presence
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, username, avatar_url')
+          .eq('id', user.id)
+          .single();
+        if (profile) {
+          setCurrentUserProfile({ username: profile.display_name || profile.username, avatar_url: profile.avatar_url });
+        }
+      }
+    };
+    getUser();
+  }, []);
+
+  // Supabase Presence for real-time viewer counts
+  const { viewerCount: presenceViewerCount, isConnected: presenceConnected } = useLivePresence({
+    streamId,
+    userId: currentUserId || undefined,
+    username: currentUserProfile?.username,
+    avatarUrl: currentUserProfile?.avatar_url,
+    isHost: false,
+  });
 
   // Helper to set video source on both elements
   const setVideoSource = useCallback((source: MediaStream | string | null) => {
@@ -859,8 +892,11 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
                     )}
                     <span className="text-xs text-white/80 flex items-center gap-1">
                       <Users className="w-3 h-3" />
-                      {stream.viewer_count || 0}
+                      {presenceConnected ? presenceViewerCount : (stream.viewer_count || 0)}
                     </span>
+                    {presenceConnected && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" title="Real-time" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -937,35 +973,8 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
             ))}
           </AnimatePresence>
 
-          {/* Floating Reactions with sender names */}
-          <AnimatePresence>
-            {reactions.map((reaction) => (
-              <motion.div
-                key={reaction.id}
-                initial={{ opacity: 1, y: 0, scale: 1 }}
-                animate={{ 
-                  opacity: 0, 
-                  y: -200, 
-                  scale: [1, 1.4, 1.2],
-                  x: [0, Math.random() * 40 - 20, Math.random() * 60 - 30]
-                }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 3, ease: "easeOut" }}
-                className="absolute text-4xl pointer-events-none z-30 flex flex-col items-center"
-                style={{
-                  right: `${100 - reaction.x}%`,
-                  bottom: `${reaction.y}%`,
-                }}
-              >
-                <span>{getReactionEmoji(reaction.type)}</span>
-                {reaction.senderName && (
-                  <span className="text-xs text-white bg-black/50 px-2 py-0.5 rounded-full mt-1">
-                    {reaction.senderName}
-                  </span>
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {/* Floating Reactions - Physics-based TikTok style */}
+          <FloatingReactions reactions={reactions} className="z-30" />
 
           {/* Reaction Buttons */}
           <div className="absolute right-3 flex flex-col gap-3 z-20" style={{ bottom: '120px' }}>
@@ -1025,20 +1034,15 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           <ScrollArea className="flex-1 p-4" ref={chatScrollRef}>
             <div className="space-y-3">
               {comments.map((comment) => (
-                <div key={comment.id} className="flex gap-3 items-start">
-                  <Avatar className="w-8 h-8 shrink-0">
-                    <AvatarImage src={comment.profiles?.avatar_url} />
-                    <AvatarFallback className="text-xs bg-primary/20">
-                      {comment.profiles?.display_name?.[0] || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <span className="font-semibold text-sm text-primary">
-                      {comment.profiles?.display_name || 'Anonymous'}
-                    </span>
-                    <p className="text-sm break-words">{comment.content}</p>
-                  </div>
-                </div>
+                <LiveChatMessage
+                  key={comment.id}
+                  id={comment.id}
+                  content={comment.content}
+                  userId={comment.user_id}
+                  hostId={stream.user_id}
+                  profile={comment.profiles}
+                  isCompact={false}
+                />
               ))}
             </div>
           </ScrollArea>
@@ -1144,8 +1148,11 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
                   )}
                   <span className="text-xs text-white/80 flex items-center gap-1">
                     <Users className="w-3 h-3" />
-                    {stream.viewer_count || 0}
+                    {presenceConnected ? presenceViewerCount : (stream.viewer_count || 0)}
                   </span>
+                  {presenceConnected && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500" title="Real-time" />
+                  )}
                 </div>
               </div>
             </div>
@@ -1188,27 +1195,15 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
             >
               <AnimatePresence>
                 {comments.slice(-15).map((comment) => (
-                  <motion.div
+                  <LiveChatMessage
                     key={comment.id}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="flex items-start gap-2"
-                  >
-                    <Avatar className="w-7 h-7 shrink-0 border border-white/20">
-                      <AvatarImage src={comment.profiles?.avatar_url} />
-                      <AvatarFallback className="text-[10px] bg-primary/50">
-                        {comment.profiles?.display_name?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="bg-black/50 backdrop-blur-sm rounded-2xl px-3 py-1.5 max-w-[85%]">
-                      <span className="text-primary text-xs font-semibold">
-                        {comment.profiles?.display_name || 'Anonymous'}
-                      </span>
-                      <p className="text-white text-sm break-words">{comment.content}</p>
-                    </div>
-                  </motion.div>
+                    id={comment.id}
+                    content={comment.content}
+                    userId={comment.user_id}
+                    hostId={stream.user_id}
+                    profile={comment.profiles}
+                    isCompact={true}
+                  />
                 ))}
               </AnimatePresence>
             </div>
@@ -1276,35 +1271,8 @@ export const LiveStreamViewerWebRTC = ({ streamId, onClose }: LiveStreamViewerWe
           ))}
         </AnimatePresence>
 
-        {/* Floating Reactions with sender names */}
-        <AnimatePresence>
-          {reactions.map((reaction) => (
-            <motion.div
-              key={reaction.id}
-              initial={{ opacity: 1, y: 0, scale: 1 }}
-              animate={{ 
-                opacity: 0, 
-                y: -200, 
-                scale: [1, 1.4, 1.2],
-                x: [0, Math.random() * 40 - 20, Math.random() * 60 - 30]
-              }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 3, ease: "easeOut" }}
-              className="absolute text-4xl pointer-events-none z-30 flex flex-col items-center"
-              style={{
-                right: `${100 - reaction.x}%`,
-                bottom: `${reaction.y}%`,
-              }}
-            >
-              <span>{getReactionEmoji(reaction.type)}</span>
-              {reaction.senderName && (
-                <span className="text-xs text-white bg-black/50 px-2 py-0.5 rounded-full mt-1">
-                  {reaction.senderName}
-                </span>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {/* Floating Reactions - Physics-based TikTok style */}
+        <FloatingReactions reactions={reactions} className="z-30" />
 
         {/* Right Side Reaction Buttons */}
         <div 

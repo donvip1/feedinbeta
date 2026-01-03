@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { 
   Video, VideoOff, Mic, MicOff, FlipHorizontal,
   Users, Send, X, Gift, MessageCircle,
-  Maximize, Minimize, Radio, UserPlus, Coins, Share2, Home, Wifi, WifiOff
+  Maximize, Minimize, Radio, UserPlus, Coins, Share2, Home, Wifi, WifiOff, Crown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
@@ -21,6 +21,9 @@ import { useNavigate } from 'react-router-dom';
 import { FlyingChat } from './FlyingChat';
 import { ViewerListPanel } from './ViewerListPanel';
 import { motion, AnimatePresence } from "framer-motion";
+import { useLivePresence } from "@/hooks/useLivePresence";
+import { FloatingReactions } from "./FloatingReactions";
+import { LiveChatMessage } from "./LiveChatMessage";
 // Using Cloudflare Stream HLS for scalable live streaming
 
 interface LiveBroadcasterProps {
@@ -67,6 +70,15 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
   const [flyingGifts, setFlyingGifts] = useState<{ id: string; gift_type: string; sender_name: string; credit_value: number }[]>([]);
   const [coHosts, setCoHosts] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
+
+  // Supabase Presence for real-time viewer counts
+  const { viewerCount: presenceViewerCount, isConnected: presenceConnected } = useLivePresence({
+    streamId,
+    userId: user?.id,
+    username: user?.user_metadata?.display_name || user?.user_metadata?.username,
+    avatarUrl: user?.user_metadata?.avatar_url,
+    isHost: true,
+  });
 
   // Helper to set video stream on both desktop and mobile video elements
   const setVideoStream = useCallback((mediaStream: MediaStream | null) => {
@@ -1065,9 +1077,10 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
                 <span className="w-2 h-2 bg-white rounded-full mr-2 animate-ping" />
                 LIVE
               </Badge>
-              <Badge variant="secondary" className="px-3 py-1">
-                <Users className="w-4 h-4 mr-1" />
-                {viewerCount}
+              <Badge variant="secondary" className="px-3 py-1 flex items-center gap-1">
+                <Users className="w-4 h-4" />
+                {presenceConnected ? presenceViewerCount : viewerCount}
+                {presenceConnected && <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1" />}
               </Badge>
               {totalGiftsReceived > 0 && (
                 <Badge className="bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-3 py-1">
@@ -1095,39 +1108,14 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
             <FlyingChat 
               messages={comments} 
               gifts={flyingGifts}
+              hostId={user?.id}
               maxMessages={10}
             />
           )}
 
-          {/* Floating Reactions with sender names */}
-          <AnimatePresence>
-            {reactions.map((reaction) => (
-              <motion.div
-                key={reaction.id}
-                initial={{ opacity: 1, y: 0, scale: 1 }}
-                animate={{ 
-                  opacity: 0, 
-                  y: -200, 
-                  scale: [1, 1.4, 1.2],
-                  x: [0, Math.random() * 40 - 20, Math.random() * 60 - 30]
-                }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 3, ease: "easeOut" }}
-                className="absolute text-4xl pointer-events-none z-30 flex flex-col items-center"
-                style={{
-                  right: `${100 - reaction.x}%`,
-                  bottom: `${reaction.y}%`,
-                }}
-              >
-                <span>{getReactionEmoji(reaction.type)}</span>
-                {reaction.senderName && (
-                  <span className="text-xs text-white bg-black/50 px-2 py-0.5 rounded-full mt-1">
-                    {reaction.senderName}
-                  </span>
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {/* Floating Reactions - Physics-based TikTok style */}
+          <FloatingReactions reactions={reactions} className="z-30" />
+
 
           {/* Host Action Buttons */}
           {isLive && (
@@ -1229,20 +1217,15 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
             <ScrollArea className="flex-1 p-4" ref={chatScrollRef}>
               <div className="space-y-3">
                 {comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-3 items-start">
-                    <Avatar className="w-8 h-8 shrink-0">
-                      <AvatarImage src={comment.profiles?.avatar_url} />
-                      <AvatarFallback className="text-xs bg-primary/20">
-                        {comment.profiles?.display_name?.[0] || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-sm text-primary">
-                        {comment.profiles?.display_name || 'Anonymous'}
-                      </span>
-                      <p className="text-sm break-words">{comment.content}</p>
-                    </div>
-                  </div>
+                  <LiveChatMessage
+                    key={comment.id}
+                    id={comment.id}
+                    content={comment.content}
+                    userId={comment.user_id}
+                    hostId={user?.id || ''}
+                    profile={comment.profiles}
+                    isCompact={false}
+                  />
                 ))}
               </div>
             </ScrollArea>
@@ -1314,9 +1297,10 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
               <span className="w-2 h-2 bg-white rounded-full mr-2 animate-ping" />
               LIVE
             </Badge>
-            <Badge variant="secondary" className="px-3 py-1">
-              <Users className="w-4 h-4 mr-1" />
-              {viewerCount}
+            <Badge variant="secondary" className="px-3 py-1 flex items-center gap-1">
+              <Users className="w-4 h-4" />
+              {presenceConnected ? presenceViewerCount : viewerCount}
+              {presenceConnected && <span className="w-1.5 h-1.5 rounded-full bg-green-500 ml-1" />}
             </Badge>
           </div>
         )}
@@ -1347,39 +1331,14 @@ export const LiveBroadcaster = ({ streamId, onClose }: LiveBroadcasterProps) => 
           <FlyingChat 
             messages={comments} 
             gifts={flyingGifts}
+            hostId={user?.id}
             maxMessages={8}
           />
         )}
 
-        {/* Floating Reactions with sender names */}
-        <AnimatePresence>
-          {reactions.map((reaction) => (
-            <motion.div
-              key={reaction.id}
-              initial={{ opacity: 1, y: 0, scale: 1 }}
-              animate={{ 
-                opacity: 0, 
-                y: -200, 
-                scale: [1, 1.4, 1.2],
-                x: [0, Math.random() * 40 - 20, Math.random() * 60 - 30]
-              }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 3, ease: "easeOut" }}
-              className="absolute text-4xl pointer-events-none z-30 flex flex-col items-center"
-              style={{
-                right: `${100 - reaction.x}%`,
-                bottom: `${reaction.y}%`,
-              }}
-            >
-              <span>{getReactionEmoji(reaction.type)}</span>
-              {reaction.senderName && (
-                <span className="text-xs text-white bg-black/50 px-2 py-0.5 rounded-full mt-1">
-                  {reaction.senderName}
-                </span>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
+        {/* Floating Reactions - Physics-based TikTok style */}
+        <FloatingReactions reactions={reactions} className="z-30" />
+
 
         {/* Gifts Received Badge */}
         {isLive && totalGiftsReceived > 0 && (

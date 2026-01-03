@@ -3,7 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AnimatedGiftEmoji } from '@/components/shared/AnimatedGiftEmoji';
-import { Coins } from 'lucide-react';
+import { Coins, Crown } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -27,6 +27,7 @@ interface FlyingGift {
 interface FlyingChatProps {
   messages: ChatMessage[];
   gifts?: FlyingGift[];
+  hostId?: string;
   maxMessages?: number;
   className?: string;
 }
@@ -46,6 +47,7 @@ const GIFT_EMOJIS: Record<string, string> = {
 export const FlyingChat = ({ 
   messages, 
   gifts = [], 
+  hostId,
   maxMessages = 12,
   className 
 }: FlyingChatProps) => {
@@ -180,34 +182,59 @@ export const FlyingChat = ({
       {/* Chat Messages */}
       <div className="flex flex-col gap-2 px-3">
         <AnimatePresence mode="popLayout">
-          {displayedMessages.map((message) => (
-            <motion.div
-              key={message._key}
-              initial={{ x: -50, opacity: 0, scale: 0.9 }}
-              animate={{ x: 0, opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, y: -20, scale: 0.8 }}
-              transition={{ 
-                duration: 0.3,
-                delay: 0.05
-              }}
-              className="flex items-start gap-2 max-w-[90%]"
-            >
-              <Avatar className="w-8 h-8 shrink-0 ring-2 ring-white/20">
-                <AvatarImage src={message.profiles?.avatar_url} />
-                <AvatarFallback className="text-xs bg-primary/20 text-primary">
-                  {message.profiles?.display_name?.[0] || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="bg-black/70 backdrop-blur-sm rounded-2xl px-3 py-2 shadow-lg">
-                <span className="text-primary text-sm font-bold mr-2">
-                  {message.profiles?.display_name || 'Anonymous'}
-                </span>
-                <span className="text-white text-sm break-words">
-                  {renderContent(message.content)}
-                </span>
-              </div>
-            </motion.div>
-          ))}
+          {displayedMessages.map((message) => {
+            const isHost = hostId && message.user_id === hostId;
+            const displayName = message.profiles?.display_name || 'Anonymous';
+            
+            return (
+              <motion.div
+                key={message._key}
+                initial={{ x: -50, opacity: 0, scale: 0.9 }}
+                animate={{ x: 0, opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, y: -20, scale: 0.8 }}
+                transition={{ 
+                  duration: 0.3,
+                  delay: 0.05
+                }}
+                className="flex items-start gap-2 max-w-[90%]"
+              >
+                <Avatar className={cn(
+                  "w-8 h-8 shrink-0 ring-2",
+                  isHost ? "ring-amber-400" : "ring-white/20"
+                )}>
+                  <AvatarImage src={message.profiles?.avatar_url} />
+                  <AvatarFallback className={cn(
+                    "text-xs",
+                    isHost ? "bg-amber-500/50 text-amber-100" : "bg-primary/20 text-primary"
+                  )}>
+                    {displayName[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className={cn(
+                  "backdrop-blur-sm rounded-2xl px-3 py-2 shadow-lg",
+                  isHost 
+                    ? "bg-gradient-to-r from-amber-500/30 to-orange-500/30 border border-amber-400/30" 
+                    : "bg-black/70"
+                )}>
+                  <div className="flex items-center gap-1.5">
+                    {isHost && (
+                      <Crown className="w-3 h-3 text-amber-400 shrink-0" />
+                    )}
+                    <span className={cn(
+                      "text-sm font-bold mr-2",
+                      isHost ? "text-amber-400" : "text-primary"
+                    )}>
+                      {displayName}
+                      {isHost && <span className="text-[10px] text-amber-300/80 ml-1">• Host</span>}
+                    </span>
+                  </div>
+                  <span className="text-white text-sm break-words">
+                    {renderContent(message.content)}
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </div>
     </div>
