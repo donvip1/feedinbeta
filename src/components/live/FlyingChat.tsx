@@ -30,6 +30,7 @@ interface FlyingChatProps {
   hostId?: string;
   maxMessages?: number;
   className?: string;
+  bottomOffset?: number;
 }
 
 const GIFT_EMOJIS: Record<string, string> = {
@@ -49,7 +50,8 @@ export const FlyingChat = ({
   gifts = [], 
   hostId,
   maxMessages = 12,
-  className 
+  className,
+  bottomOffset = 112
 }: FlyingChatProps) => {
   const [displayedMessages, setDisplayedMessages] = useState<(ChatMessage & { _key: string })[]>([]);
   const [flyingGifts, setFlyingGifts] = useState<(FlyingGift & { _animKey: string })[]>([]);
@@ -114,10 +116,13 @@ export const FlyingChat = ({
   const getGiftEmoji = (type: string) => GIFT_EMOJIS[type] || '🎁';
 
   return (
-    <div className={cn(
-      "absolute bottom-28 left-0 right-16 pointer-events-none overflow-hidden",
-      className
-    )}>
+    <div 
+      className={cn(
+        "absolute left-0 right-16 pointer-events-none overflow-hidden z-20",
+        className
+      )}
+      style={{ bottom: `${bottomOffset}px`, maxHeight: '40vh' }}
+    >
       {/* TikTok-Style Flying Gifts - Center screen, prominent */}
       <AnimatePresence>
         {flyingGifts.map((gift, index) => (

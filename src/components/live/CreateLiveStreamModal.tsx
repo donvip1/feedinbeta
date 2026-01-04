@@ -99,8 +99,9 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           category: category.trim() || null,
           is_premium: isPremium,
           stream_key: streamKeyData || `stream_${Date.now()}`,
-          status: isScheduled ? 'scheduled' : 'scheduled', // Still 'scheduled' but will go live immediately when broadcaster connects
+          status: isScheduled ? 'scheduled' : 'live', // Instant streams start as 'live' - broadcaster will set stream_ready when connected
           scheduled_start: scheduledStart,
+          started_at: isScheduled ? null : new Date().toISOString(),
           connection_state: 'idle',
         })
         .select()
