@@ -180,6 +180,22 @@ export function useCloudflarePlayback({
         retryCountRef.current = 0;
         isConnectedRef.current = true;
         
+        // Verify video is actually playing with dimensions
+        const video = videoRef.current;
+        if (video) {
+          video.onloadeddata = () => {
+            console.log('[CloudflarePlayback] HLS video data loaded, dimensions:', 
+              video.videoWidth, 'x', video.videoHeight);
+            
+            if (video.videoWidth > 0 && video.videoHeight > 0) {
+              setState(prev => ({
+                ...prev,
+                hasVideo: true,
+              }));
+            }
+          };
+        }
+        
         setState(prev => ({
           ...prev,
           status: 'playing',
@@ -312,21 +328,43 @@ export function useCloudflarePlayback({
     let gotTrack = false;
 
     pc.ontrack = (event) => {
-      console.log('[CloudflarePlayback] Received track:', event.track.kind);
+      console.log('[CloudflarePlayback] Received track:', event.track.kind, 'readyState:', event.track.readyState);
+      
       if (event.streams[0] && videoRef.current) {
-        gotTrack = true;
-        isConnectedRef.current = true;
         videoRef.current.srcObject = event.streams[0];
         videoRef.current.muted = true;
         
-        setState(prev => ({
-          ...prev,
-          status: 'playing',
-          method: 'webrtc',
-          hasVideo: true,
-          errorMessage: null,
-          connectionQuality: 'good',
-        }));
+        // For video tracks, verify video is actually playing with dimensions
+        if (event.track.kind === 'video') {
+          const checkVideoPlaying = () => {
+            const video = videoRef.current;
+            if (video && video.videoWidth > 0 && video.videoHeight > 0) {
+              console.log('[CloudflarePlayback] Video confirmed playing:', video.videoWidth, 'x', video.videoHeight);
+              gotTrack = true;
+              isConnectedRef.current = true;
+              
+              setState(prev => ({
+                ...prev,
+                status: 'playing',
+                method: 'webrtc',
+                hasVideo: true,
+                errorMessage: null,
+                connectionQuality: 'good',
+              }));
+            } else {
+              // Check again in 500ms
+              setTimeout(checkVideoPlaying, 500);
+            }
+          };
+          
+          // Check on loadedmetadata and also with a timeout
+          videoRef.current.onloadedmetadata = checkVideoPlaying;
+          setTimeout(checkVideoPlaying, 1000);
+        } else {
+          // Audio track
+          gotTrack = true;
+          isConnectedRef.current = true;
+        }
         
         videoRef.current.play().catch(() => {
           setState(prev => ({ ...prev, showUnmutePrompt: true }));
@@ -355,13 +393,13 @@ export function useCloudflarePlayback({
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Wait for ICE gathering with timeout
+    // Wait for ICE gathering with extended timeout
       await new Promise<void>((resolve) => {
         if (pc.iceGatheringState === 'complete') {
           resolve();
           return;
         }
-        const timeout = setTimeout(resolve, 3000);
+        const timeout = setTimeout(resolve, 5000); // Increased from 3000
         pc.onicegatheringstatechange = () => {
           if (pc.iceGatheringState === 'complete') {
             clearTimeout(timeout);
@@ -384,14 +422,14 @@ export function useCloudflarePlayback({
       const answerSdp = await response.text();
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
-      // Fallback to HLS if no tracks received
+      // Fallback to HLS if no tracks received - extended timeout
       setTimeout(() => {
         if (!gotTrack) {
           console.log('[CloudflarePlayback] No tracks after timeout, falling back to HLS');
           pc.close();
           connectHLS();
         }
-      }, 5000);
+      }, 8000); // Increased from 5000
     } catch (error) {
       console.error('[CloudflarePlayback] WHEP error:', error);
       pc.close();

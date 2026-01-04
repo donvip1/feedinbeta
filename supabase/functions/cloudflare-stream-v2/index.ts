@@ -46,13 +46,21 @@ interface GetStreamInfoRequest {
   liveInputId: string;
 }
 
+interface VerifyStreamPlayableRequest {
+  action: 'verify-stream-playable';
+  streamId: string;
+  liveInputId: string;
+  maxWaitSeconds?: number;
+}
+
 type RequestBody = 
   | CreateStreamRequest 
   | CheckHealthRequest 
   | CheckManifestRequest 
   | UpdateStateRequest 
   | EndStreamRequest
-  | GetStreamInfoRequest;
+  | GetStreamInfoRequest
+  | VerifyStreamPlayableRequest;
 
 // Helper to check if HLS manifest is accessible
 async function checkHlsManifest(hlsUrl: string): Promise<{ accessible: boolean; error?: string }> {
@@ -382,6 +390,62 @@ Deno.serve(async (req) => {
             liveInput: result.result,
             ...cfStatus,
           }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'verify-stream-playable': {
+        const { streamId, liveInputId, maxWaitSeconds = 30 } = body as VerifyStreamPlayableRequest;
+        
+        console.log('[CF-Stream-V2] Verifying stream playability for:', streamId, 'input:', liveInputId);
+        
+        let attempts = 0;
+        const pollInterval = 2000; // 2 seconds
+        const maxAttempts = Math.ceil(maxWaitSeconds / 2);
+        
+        while (attempts < maxAttempts) {
+          attempts++;
+          console.log(`[CF-Stream-V2] Verification attempt ${attempts}/${maxAttempts}`);
+          
+          // Get the stream's HLS URL
+          const { data: stream } = await supabaseClient
+            .from('live_streams')
+            .select('cf_hls_url')
+            .eq('id', streamId)
+            .single();
+          
+          if (stream?.cf_hls_url) {
+            const manifestCheck = await checkHlsManifest(stream.cf_hls_url);
+            
+            if (manifestCheck.accessible) {
+              console.log('[CF-Stream-V2] Manifest is accessible! Setting stream_ready = true');
+              
+              // Manifest ready! Set stream_ready = true
+              await supabaseClient
+                .from('live_streams')
+                .update({ 
+                  stream_ready: true, 
+                  status: 'live',
+                  connection_state: 'live',
+                  last_health_check: new Date().toISOString(),
+                })
+                .eq('id', streamId);
+              
+              return new Response(
+                JSON.stringify({ success: true, attempts, message: 'Stream is now playable' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          }
+          
+          // Wait before next attempt
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        }
+        
+        console.log('[CF-Stream-V2] Verification timed out after', attempts, 'attempts');
+        
+        return new Response(
+          JSON.stringify({ success: false, error: 'Timeout waiting for manifest', attempts }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
