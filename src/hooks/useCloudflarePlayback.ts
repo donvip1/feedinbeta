@@ -43,7 +43,7 @@ export function useCloudflarePlayback({
   });
 
   const retryCountRef = useRef(0);
-  const maxRetries = 10; // More retries for viewer connection
+  const maxRetries = 20; // Even more retries - HLS can take time to become available
   const isConnectedRef = useRef(false);
 
   // Update status and notify
@@ -150,17 +150,17 @@ export function useCloudflarePlayback({
         if (data.fatal) {
           hls.destroy();
           
-          // Quick retry for manifest errors (stream might still be starting)
-          if (data.type === Hls.ErrorTypes.NETWORK_ERROR && retryCountRef.current < maxRetries) {
+          // Quick retry for ALL errors - stream might still be starting
+          if (retryCountRef.current < maxRetries) {
             retryCountRef.current++;
-            const delay = 1500; // Fast retry
+            const delay = 1000; // Even faster retry - 1 second
             console.log(`[Playback] Retry ${retryCountRef.current}/${maxRetries} in ${delay}ms`);
-            updateStatus('waiting', 'Connecting...');
+            updateStatus('connecting', 'Connecting to stream...');
             retryTimeoutRef.current = window.setTimeout(connectHLS, delay);
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
           } else {
-            updateStatus('error', 'Stream unavailable');
+            updateStatus('error', 'Stream unavailable - please try again');
           }
         }
       });
