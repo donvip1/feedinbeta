@@ -575,9 +575,10 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
     return () => { supabase.removeChannel(channel); };
   }, [streamId]);
 
-  // Subscribe to viewer updates
+  // Subscribe to viewer updates and fetch viewer profiles for gift modal
   useEffect(() => {
     const fetchViewers = async () => {
+      // Get count
       const { count } = await supabase
         .from("live_stream_viewers")
         .select("*", { count: 'exact', head: true })
@@ -585,9 +586,30 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
         .eq("is_active", true);
 
       setViewerCount(count || 0);
+      
+      // Fetch viewer profiles for gift modal
+      const { data } = await supabase
+        .from("live_stream_viewers")
+        .select("user_id")
+        .eq("stream_id", streamId)
+        .eq("is_active", true)
+        .not("user_id", "is", null);
+
+      if (data && data.length > 0) {
+        const userIds = data.map(v => v.user_id);
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, display_name, username, avatar_url")
+          .in("id", userIds);
+        
+        setViewers(profiles || []);
+      } else {
+        setViewers([]);
+      }
     };
 
     fetchViewers();
+    const interval = setInterval(fetchViewers, 10000); // Refresh every 10s
 
     const channel = supabase
       .channel(`viewers-v2-${streamId}`)
@@ -599,7 +621,10 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
       }, fetchViewers)
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { 
+      clearInterval(interval);
+      supabase.removeChannel(channel); 
+    };
   }, [streamId]);
 
   // Subscribe to gifts
@@ -817,7 +842,7 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
       </div>
       
       {/* CONTROLS */}
-      <div className="bg-background border-t p-4 flex justify-center gap-4">
+      <div className="bg-background border-t p-4 flex justify-center gap-3 flex-wrap">
         <Button
           variant="outline"
           size="icon"
@@ -843,6 +868,26 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           onClick={switchCamera}
         >
           <FlipHorizontal className="w-5 h-5" />
+        </Button>
+        
+        {/* Gift Button - Host can send to viewers */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="rounded-full w-12 h-12 border-amber-500/50 hover:bg-amber-500/10"
+          onClick={() => setShowGiftModal(true)}
+        >
+          <Gift className="w-5 h-5 text-amber-500" />
+        </Button>
+        
+        {/* Invite Co-Host Button */}
+        <Button
+          variant="outline"
+          size="icon"
+          className="rounded-full w-12 h-12 border-blue-500/50 hover:bg-blue-500/10"
+          onClick={() => setShowInviteModal(true)}
+        >
+          <Users className="w-5 h-5 text-blue-500" />
         </Button>
         
         <Button
