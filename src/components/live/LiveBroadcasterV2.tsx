@@ -716,6 +716,23 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           )}
         />
         
+        {/* Idle state - Ready to go live */}
+        {broadcastState === 'idle' && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 flex flex-col items-center justify-center z-10">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="text-center"
+            >
+              <div className="w-20 h-20 rounded-full bg-red-600/20 border-2 border-red-500 flex items-center justify-center mx-auto mb-4">
+                <Radio className="w-10 h-10 text-red-500" />
+              </div>
+              <p className="text-white font-bold text-lg mb-2">Ready to Go Live</p>
+              <p className="text-white/70 text-sm mb-6">Tap the "Go Live" button below to start broadcasting</p>
+            </motion.div>
+          </div>
+        )}
+        
         {/* Connection overlay */}
         {isConnecting && (
           <div className="absolute inset-0 bg-black/70 flex items-center justify-center z-10">
@@ -899,7 +916,8 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           <Share2 className="w-5 h-5" />
         </Button>
         
-        {!isLive && broadcastState === 'idle' && (
+        {/* Go Live button - show when idle or error */}
+        {(broadcastState === 'idle' || broadcastState === 'error') && (
           <Button
             className="rounded-full px-8 bg-red-600 hover:bg-red-700"
             onClick={startBroadcast}
@@ -909,7 +927,8 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           </Button>
         )}
         
-        {isLive && (
+        {/* End Stream button - show when live, reconnecting, or connecting */}
+        {(isLive || broadcastState === 'reconnecting' || isConnecting) && (
           <Button
             variant="destructive"
             className="rounded-full px-8"
@@ -920,11 +939,18 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           </Button>
         )}
         
+        {/* Close/Home button - always visible */}
         <Button
           variant="outline"
           size="icon"
           className="rounded-full w-12 h-12"
-          onClick={isLive ? stopBroadcast : onClose}
+          onClick={() => {
+            if (isLive || broadcastState === 'reconnecting' || isConnecting) {
+              stopBroadcast();
+            } else {
+              onClose();
+            }
+          }}
         >
           <Home className="w-5 h-5" />
         </Button>
