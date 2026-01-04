@@ -548,19 +548,25 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
         table: 'live_stream_comments',
         filter: `stream_id=eq.${streamId}`,
       }, async (payload) => {
+        // Skip if already added via optimistic update (own messages)
+        if (payload.new.user_id === user?.id) return;
+        
+        // Add immediately, then fetch profile
+        const newComment = { ...payload.new, profiles: null };
+        setComments(prev => [...prev, newComment]);
+        
+        // Fetch profile in background
         const { data: profile } = await supabase
           .from("profiles")
           .select("id, display_name, username, avatar_url")
           .eq("id", payload.new.user_id)
           .single();
 
-        setComments(prev => [...prev, { ...payload.new, profiles: profile }]);
-        
-        setTimeout(() => {
-          if (chatScrollRef.current) {
-            chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-          }
-        }, 100);
+        if (profile) {
+          setComments(prev => prev.map(c => 
+            c.id === payload.new.id ? { ...c, profiles: profile } : c
+          ));
+        }
       })
       .subscribe();
 
@@ -653,9 +659,23 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
     };
   }, [streamId]);
 
-  // Subscribe to gifts
+  // Subscribe to gifts and load initial total
   useEffect(() => {
     if (!user) return;
+
+    // Fetch initial total gifts received
+    const fetchInitialGifts = async () => {
+      const { data: gifts } = await supabase
+        .from('live_stream_gifts')
+        .select('credit_value')
+        .eq('stream_id', streamId)
+        .eq('receiver_id', user.id);
+      
+      const total = gifts?.reduce((sum, g) => sum + (g.credit_value || 0), 0) || 0;
+      setTotalGiftsReceived(total);
+    };
+    
+    fetchInitialGifts();
 
     const channel = supabase
       .channel(`gifts-v2-${streamId}`)
@@ -668,25 +688,36 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
         if (payload.new.receiver_id === user.id) {
           setTotalGiftsReceived(prev => prev + (payload.new.credit_value || 0));
           
+          // Show gift immediately, fetch profile in background
+          const gift = {
+            id: payload.new.id,
+            gift_type: payload.new.gift_type,
+            sender_name: 'Loading...',
+            credit_value: payload.new.credit_value || 0,
+          };
+          
+          setFlyingGifts(prev => [...prev, gift]);
+          
+          // Fetch sender profile
           const { data: sender } = await supabase
             .from('profiles')
             .select('display_name, username')
             .eq('id', payload.new.sender_id)
             .single();
           
-          const gift = {
-            id: payload.new.id,
-            gift_type: payload.new.gift_type,
-            sender_name: sender?.display_name || sender?.username || 'Someone',
-            credit_value: payload.new.credit_value || 0,
-          };
+          if (sender) {
+            setFlyingGifts(prev => prev.map(g => 
+              g.id === gift.id 
+                ? { ...g, sender_name: sender.display_name || sender.username || 'Someone' }
+                : g
+            ));
+          }
           
-          setFlyingGifts(prev => [...prev, gift]);
           setTimeout(() => {
             setFlyingGifts(prev => prev.filter(g => g.id !== gift.id));
           }, 5000);
           
-          toast.success(`🎁 ${gift.sender_name} sent ${payload.new.gift_type}!`);
+          toast.success(`🎁 ${sender?.display_name || 'Someone'} sent ${payload.new.gift_type}!`);
         }
       })
       .subscribe();
@@ -697,13 +728,34 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
   const sendComment = async () => {
     if (!newComment.trim() || !user) return;
     
-    await supabase.from("live_stream_comments").insert({
+    const content = newComment.trim();
+    
+    // Optimistic update - show immediately
+    const tempComment = {
+      id: `temp-${Date.now()}`,
+      content,
+      user_id: user.id,
+      profiles: { 
+        display_name: user.user_metadata?.display_name || 'Me',
+        username: user.user_metadata?.username,
+        avatar_url: user.user_metadata?.avatar_url,
+      },
+      created_at: new Date().toISOString(),
+    };
+    
+    setComments(prev => [...prev, tempComment]);
+    setNewComment("");
+    
+    const { error } = await supabase.from("live_stream_comments").insert({
       stream_id: streamId,
       user_id: user.id,
-      content: newComment.trim(),
+      content,
     });
-    
-    setNewComment("");
+
+    if (error) {
+      toast.error("Failed to send");
+      setComments(prev => prev.filter(c => c.id !== tempComment.id));
+    }
   };
 
   const handleShare = async () => {

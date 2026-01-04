@@ -404,31 +404,36 @@ export function useCloudflarePlayback({
     cleanup();
     retryCountRef.current = 0;
 
-    // If stream not ready, wait and poll
+    // If stream not ready, wait and poll more aggressively
     if (!streamReady) {
-      console.log('[CloudflarePlayback] Stream not ready, waiting...');
+      console.log('[CloudflarePlayback] Stream not ready, polling...');
       updateStatus('waiting', 'Waiting for host to start streaming...');
       
-      // Poll for stream readiness
+      // Poll for manifest accessibility every 2 seconds (faster)
       manifestCheckIntervalRef.current = window.setInterval(async () => {
         const accessible = await checkManifestAccessible();
         if (accessible) {
+          console.log('[CloudflarePlayback] Manifest now accessible, connecting...');
           if (manifestCheckIntervalRef.current) {
             clearInterval(manifestCheckIntervalRef.current);
             manifestCheckIntervalRef.current = null;
           }
+          // Go directly to HLS for better compatibility
           connectHLS();
         }
-      }, 3000);
+      }, 2000);
       
       return;
     }
 
-    // Try WebRTC first if available, then HLS
-    if (whepUrl && /play|whep/i.test(whepUrl)) {
-      connectWHEP();
-    } else if (hlsUrl) {
+    // Stream is ready - prefer HLS for reliability over WebRTC
+    // HLS has better compatibility and the manifest check ensures it works
+    if (hlsUrl) {
+      console.log('[CloudflarePlayback] Stream ready, using HLS');
       connectHLS();
+    } else if (whepUrl && /play|whep/i.test(whepUrl)) {
+      console.log('[CloudflarePlayback] No HLS, trying WHEP');
+      connectWHEP();
     } else {
       updateStatus('error', 'No stream URL available');
     }
@@ -452,17 +457,27 @@ export function useCloudflarePlayback({
     connect();
   }, [connect]);
 
-  // Effect to start connection
+  // Effect to start connection when URLs or readiness changes
   useEffect(() => {
+    console.log('[CloudflarePlayback] Effect triggered - hlsUrl:', !!hlsUrl, 'whepUrl:', !!whepUrl, 'streamReady:', streamReady);
+    
     if (!hlsUrl && !whepUrl) {
-      console.log('[CloudflarePlayback] No URLs provided yet');
+      console.log('[CloudflarePlayback] No URLs provided yet, waiting...');
+      updateStatus('waiting', 'Waiting for stream...');
+      return;
+    }
+    
+    // If we're already connected and playing, don't reconnect
+    if (isConnectedRef.current) {
+      console.log('[CloudflarePlayback] Already connected, skipping reconnect');
       return;
     }
     
     connect();
     
     return () => cleanup();
-  }, [hlsUrl, whepUrl, connect, cleanup]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hlsUrl, whepUrl, streamReady]); // Intentionally limited deps to avoid reconnect loops
 
   return {
     ...state,
