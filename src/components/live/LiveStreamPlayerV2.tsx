@@ -26,10 +26,14 @@ interface LiveStreamPlayerV2Props {
   onClose: () => void;
 }
 
+import { PartyPopper, Coins } from "lucide-react";
+import { LiveChatMessage } from "./LiveChatMessage";
+
 const REACTIONS = [
   { type: 'heart', emoji: '❤️', icon: Heart, color: 'text-red-500' },
   { type: 'fire', emoji: '🔥', icon: Flame, color: 'text-orange-500' },
   { type: 'star', emoji: '⭐', icon: Star, color: 'text-yellow-500' },
+  { type: 'clap', emoji: '👏', icon: PartyPopper, color: 'text-purple-500' },
   { type: 'like', emoji: '👍', icon: ThumbsUp, color: 'text-blue-500' },
   { type: 'love', emoji: '😍', icon: Sparkles, color: 'text-pink-500' },
 ];
@@ -558,90 +562,108 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
           ))}
         </AnimatePresence>
 
-        {/* FLYING GIFTS */}
+        {/* FLYING GIFTS - Enhanced Animation */}
         <AnimatePresence>
-          {flyingGifts.map(gift => (
+          {flyingGifts.map((gift, index) => (
             <motion.div
               key={gift.id}
-              initial={{ x: -100, y: '60%', opacity: 0, scale: 0.5 }}
-              animate={{ x: '30%', y: '30%', opacity: 1, scale: 1.2 }}
-              exit={{ x: '100%', y: '10%', opacity: 0, scale: 0.5 }}
-              transition={{ duration: 2.5, ease: "easeOut" }}
-              className="fixed z-50 flex items-center gap-3 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full"
+              initial={{ opacity: 0, scale: 0, x: '-50%', y: 100 }}
+              animate={{ 
+                opacity: [0, 1, 1, 1, 0],
+                scale: [0.5, 1.2, 1, 1, 0.8],
+                y: [100, 0, 0, -50, -150],
+              }}
+              exit={{ opacity: 0, scale: 0.5, y: -200 }}
+              transition={{ duration: 4, ease: "easeOut", times: [0, 0.15, 0.3, 0.7, 1] }}
+              className="fixed left-1/2 top-1/3 z-50 pointer-events-none"
+              style={{ marginTop: index * 80 }}
             >
-              <span className="text-4xl">{GIFT_EMOJIS[gift.gift_type] || '🎁'}</span>
-              <div>
-                <p className="text-white font-bold">{gift.sender_name}</p>
-                <p className="text-yellow-400 text-sm">+{gift.credit_value} credits</p>
+              <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white px-5 py-2.5 rounded-full shadow-2xl">
+                <motion.span 
+                  className="text-3xl"
+                  animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 0.5, repeat: 3, repeatType: "reverse" }}
+                >
+                  {GIFT_EMOJIS[gift.gift_type] || '🎁'}
+                </motion.span>
+                <div className="text-left">
+                  <p className="font-bold text-base whitespace-nowrap">{gift.sender_name}</p>
+                  <p className="text-xs text-white/90">
+                    sent <span className="font-bold">{gift.gift_type}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-sm">
+                  <Coins className="w-3 h-3" />
+                  <span className="font-bold">+{gift.credit_value}</span>
+                </div>
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
 
-        {/* CHAT OVERLAY */}
+        {/* CHAT OVERLAY - TikTok Style */}
         {showChat && (
           <div 
-            className="absolute left-0 right-0 bottom-24 h-48 pointer-events-none z-20"
-            style={{ paddingBottom: isKeyboardOpen ? keyboardHeight : 0 }}
+            className="absolute left-0 z-20 pointer-events-none"
+            style={{
+              bottom: isKeyboardOpen ? `${keyboardHeight + 60}px` : '140px',
+              maxHeight: '35vh',
+              right: '70px',
+            }}
           >
             <div 
               ref={chatScrollRef}
-              className="h-full overflow-y-auto px-4 space-y-2"
+              className="overflow-y-auto px-3 space-y-1.5 pointer-events-auto"
+              style={{ maxHeight: '35vh' }}
             >
-              {comments.slice(-20).map(comment => (
-                <motion.div
-                  key={comment.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-start gap-2"
-                >
-                  <Avatar className="w-6 h-6 flex-shrink-0">
-                    <AvatarImage src={comment.profiles?.avatar_url} />
-                    <AvatarFallback className="text-xs">
-                      {comment.profiles?.display_name?.[0] || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="bg-black/50 backdrop-blur-sm rounded-lg px-2 py-1 max-w-[80%]">
-                    <span className="text-primary text-xs font-medium">
-                      {comment.profiles?.display_name || 'User'}
-                    </span>
-                    <p className="text-white text-sm">{comment.content}</p>
-                  </div>
-                </motion.div>
-              ))}
+              <AnimatePresence>
+                {comments.slice(-20).map(comment => (
+                  <LiveChatMessage
+                    key={comment.id}
+                    id={comment.id}
+                    content={comment.content}
+                    userId={comment.user_id}
+                    hostId={stream.user_id}
+                    profile={comment.profiles}
+                    isCompact={true}
+                  />
+                ))}
+              </AnimatePresence>
             </div>
           </div>
         )}
 
-        {/* RIGHT SIDE ACTIONS */}
-        <div className="absolute right-4 bottom-32 flex flex-col gap-4 z-20">
-          {REACTIONS.slice(0, 3).map(reaction => (
-            <Button
-              key={reaction.type}
-              variant="ghost"
-              size="icon"
-              className="bg-black/40 hover:bg-black/60 rounded-full w-12 h-12"
-              onClick={() => sendReaction(reaction.type)}
+        {/* RIGHT SIDE ACTIONS - All Reactions */}
+        <div 
+          className="absolute right-3 flex flex-col gap-2 z-20"
+          style={{
+            bottom: isKeyboardOpen ? `${keyboardHeight + 130}px` : '200px',
+          }}
+        >
+          {REACTIONS.map((r) => (
+            <motion.button
+              key={r.type}
+              whileTap={{ scale: 0.85 }}
+              onClick={() => sendReaction(r.type)}
+              className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-2xl hover:scale-110 transition-transform active:scale-90"
             >
-              <span className="text-xl">{reaction.emoji}</span>
-            </Button>
+              {r.emoji}
+            </motion.button>
           ))}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-black/40 hover:bg-black/60 rounded-full w-12 h-12"
+          <motion.button
+            whileTap={{ scale: 0.85 }}
             onClick={() => setShowGiftModal(true)}
+            className="w-12 h-12 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
           >
-            <Gift className="w-6 h-6 text-yellow-500" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-black/40 hover:bg-black/60 rounded-full w-12 h-12"
+            <Gift className="w-6 h-6 text-white" />
+          </motion.button>
+          <motion.button
+            whileTap={{ scale: 0.85 }}
             onClick={handleShare}
+            className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center hover:scale-110 transition-transform"
           >
-            <Share2 className="w-6 h-6 text-white" />
-          </Button>
+            <Share2 className="w-5 h-5 text-white" />
+          </motion.button>
         </div>
 
         {/* BOTTOM INPUT */}
