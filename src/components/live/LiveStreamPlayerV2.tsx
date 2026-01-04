@@ -160,7 +160,7 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
     };
   }, [streamId, currentUser, isHost, viewerSession]);
 
-  // Subscribe to stream status
+  // Subscribe to stream status - crucial for detecting when host goes live
   useEffect(() => {
     const channel = supabase
       .channel(`stream-status-v2-${streamId}`)
@@ -170,7 +170,11 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
         table: 'live_streams',
         filter: `id=eq.${streamId}`,
       }, (payload: any) => {
-        console.log("[PlayerV2] Stream status changed:", payload.new.status);
+        console.log("[PlayerV2] Stream update received:", {
+          status: payload.new.status,
+          stream_ready: payload.new.stream_ready,
+          cf_hls_url: !!payload.new.cf_hls_url,
+        });
         
         if (payload.new.status === 'ended') {
           toast.info("Stream has ended");
@@ -181,29 +185,48 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
           }, 1500);
         }
         
+        // When stream becomes ready, update state and attempt reconnect
+        const wasNotReady = !stream?.stream_ready && !stream?.status?.includes('live');
+        const isNowReady = payload.new.stream_ready || payload.new.status === 'live';
+        
+        if (wasNotReady && isNowReady) {
+          console.log("[PlayerV2] Stream just went live! Triggering retry...");
+          toast.success("Stream is now live!");
+          // Small delay to ensure HLS manifest is ready
+          setTimeout(() => retry(), 1000);
+        }
+        
         setStream((prev: any) => prev ? { ...prev, ...payload.new } : null);
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [streamId, onClose, navigate, cleanup]);
+  }, [streamId, onClose, navigate, cleanup, retry, stream?.stream_ready, stream?.status]);
 
-  // Subscribe to viewer count
+  // Subscribe to viewer count - fetch immediately and on changes
   useEffect(() => {
+    // Fetch initial count
+    const fetchViewerCount = async () => {
+      const { count } = await supabase
+        .from("live_stream_viewers")
+        .select("*", { count: 'exact', head: true })
+        .eq("stream_id", streamId)
+        .eq("is_active", true);
+      
+      setViewerCount(count || 0);
+    };
+    
+    fetchViewerCount();
+    
     const channel = supabase.channel(`viewers-v2-${streamId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'live_stream_viewers',
         filter: `stream_id=eq.${streamId}`,
-      }, async () => {
-        const { count } = await supabase
-          .from("live_stream_viewers")
-          .select("*", { count: 'exact', head: true })
-          .eq("stream_id", streamId)
-          .eq("is_active", true);
-        
-        setViewerCount(count || 0);
+      }, () => {
+        // Debounce slightly to avoid multiple rapid fetches
+        fetchViewerCount();
       })
       .subscribe();
 
@@ -244,15 +267,25 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
         table: 'live_stream_comments', 
         filter: `stream_id=eq.${streamId}` 
       }, async (payload) => {
+        // Skip if already added via optimistic update
         if (payload.new.user_id === currentUser?.id) return;
         
+        // Add immediately with placeholder, then update with profile
+        const newComment = { ...payload.new, profiles: null };
+        setComments(prev => [...prev, newComment]);
+        
+        // Fetch profile in background and update
         const { data: profile } = await supabase
           .from("profiles")
           .select("id, display_name, username, avatar_url")
           .eq("id", payload.new.user_id)
           .single();
         
-        setComments(prev => [...prev, { ...payload.new, profiles: profile }]);
+        if (profile) {
+          setComments(prev => prev.map(c => 
+            c.id === payload.new.id ? { ...c, profiles: profile } : c
+          ));
+        }
       })
       .subscribe();
 
