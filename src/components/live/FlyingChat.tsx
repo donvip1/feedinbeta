@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,7 @@ interface FlyingGift {
   gift_type: string;
   sender_name: string;
   credit_value: number;
+  sender_id?: string;
 }
 
 interface FlyingChatProps {
@@ -31,6 +33,7 @@ interface FlyingChatProps {
   maxMessages?: number;
   className?: string;
   bottomOffset?: number;
+  onMentionClick?: (username: string) => void;
 }
 
 const GIFT_EMOJIS: Record<string, string> = {
@@ -43,6 +46,10 @@ const GIFT_EMOJIS: Record<string, string> = {
   rocket: '🚀',
   universe: '🌌',
   credits: '💰',
+  rose: '🌹',
+  kiss: '💋',
+  cake: '🎂',
+  money: '💰',
 };
 
 export const FlyingChat = ({ 
@@ -51,8 +58,10 @@ export const FlyingChat = ({
   hostId,
   maxMessages = 12,
   className,
-  bottomOffset = 112
+  bottomOffset = 112,
+  onMentionClick
 }: FlyingChatProps) => {
+  const navigate = useNavigate();
   const [displayedMessages, setDisplayedMessages] = useState<(ChatMessage & { _key: string })[]>([]);
   const [flyingGifts, setFlyingGifts] = useState<(FlyingGift & { _animKey: string })[]>([]);
   const messageCountRef = useRef(0);
@@ -96,7 +105,13 @@ export const FlyingChat = ({
     }
   }, [gifts]);
 
-  // Highlight @mentions in text
+  // Navigate to user profile
+  const handleProfileClick = (userId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/profile/${userId}`);
+  };
+
+  // Highlight @mentions in text and make them clickable
   const renderContent = (content: string) => {
     const mentionRegex = /@(\w+)/g;
     const parts = content.split(mentionRegex);
@@ -104,7 +119,14 @@ export const FlyingChat = ({
     return parts.map((part, i) => {
       if (i % 2 === 1) {
         return (
-          <span key={i} className="text-primary font-semibold">
+          <span 
+            key={i} 
+            className="text-primary font-semibold cursor-pointer hover:underline pointer-events-auto"
+            onClick={(e) => {
+              e.stopPropagation();
+              onMentionClick?.(part);
+            }}
+          >
             @{part}
           </span>
         );
@@ -149,8 +171,9 @@ export const FlyingChat = ({
               ease: "easeOut",
               times: [0, 0.15, 0.3, 0.7, 1]
             }}
-            className="fixed left-1/2 top-1/3 z-50 pointer-events-none"
+            className="fixed left-1/2 top-1/3 z-50 pointer-events-auto cursor-pointer"
             style={{ marginTop: index * 80 }}
+            onClick={(e) => gift.sender_id && handleProfileClick(gift.sender_id, e)}
           >
             <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white px-6 py-3 rounded-full shadow-2xl">
               <motion.span 
@@ -168,7 +191,7 @@ export const FlyingChat = ({
                 {getGiftEmoji(gift.gift_type)}
               </motion.span>
               <div className="text-left">
-                <p className="font-bold text-lg whitespace-nowrap">
+                <p className="font-bold text-lg whitespace-nowrap hover:underline">
                   {gift.sender_name}
                 </p>
                 <p className="text-sm text-white/90">
@@ -189,7 +212,7 @@ export const FlyingChat = ({
         <AnimatePresence mode="popLayout">
           {displayedMessages.map((message) => {
             const isHost = hostId && message.user_id === hostId;
-            const displayName = message.profiles?.display_name || 'Anonymous';
+            const displayName = message.profiles?.display_name || message.profiles?.username || 'Anonymous';
             
             return (
               <motion.div
@@ -201,12 +224,16 @@ export const FlyingChat = ({
                   duration: 0.3,
                   delay: 0.05
                 }}
-                className="flex items-start gap-2 max-w-[90%]"
+                className="flex items-start gap-2 max-w-[90%] pointer-events-auto"
               >
-                <Avatar className={cn(
-                  "w-8 h-8 shrink-0 ring-2",
-                  isHost ? "ring-amber-400" : "ring-white/20"
-                )}>
+                {/* Clickable Avatar */}
+                <Avatar 
+                  className={cn(
+                    "w-8 h-8 shrink-0 ring-2 cursor-pointer hover:scale-110 transition-transform",
+                    isHost ? "ring-amber-400" : "ring-white/20"
+                  )}
+                  onClick={(e) => handleProfileClick(message.user_id, e)}
+                >
                   <AvatarImage src={message.profiles?.avatar_url} />
                   <AvatarFallback className={cn(
                     "text-xs",
@@ -225,10 +252,14 @@ export const FlyingChat = ({
                     {isHost && (
                       <Crown className="w-3 h-3 text-amber-400 shrink-0" />
                     )}
-                    <span className={cn(
-                      "text-sm font-bold mr-2",
-                      isHost ? "text-amber-400" : "text-primary"
-                    )}>
+                    {/* Clickable Username */}
+                    <span 
+                      className={cn(
+                        "text-sm font-bold mr-2 cursor-pointer hover:underline",
+                        isHost ? "text-amber-400" : "text-primary"
+                      )}
+                      onClick={(e) => handleProfileClick(message.user_id, e)}
+                    >
                       {displayName}
                       {isHost && <span className="text-[10px] text-amber-300/80 ml-1">• Host</span>}
                     </span>
