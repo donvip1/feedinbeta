@@ -21,6 +21,7 @@ import { useLivePresence } from "@/hooks/useLivePresence";
 import { FloatingReactions } from "./FloatingReactions";
 import { LiveChatMessage } from "./LiveChatMessage";
 import { StreamHealthIndicator } from "./StreamHealthIndicator";
+import { FlyingChat } from "./FlyingChat";
 
 interface LiveBroadcasterV2Props {
   streamId: string;

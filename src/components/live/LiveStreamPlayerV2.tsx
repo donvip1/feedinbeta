@@ -9,7 +9,8 @@ import {
   Users, Send, Heart, X, Gift, 
   Volume2, VolumeX, Flame, 
   ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Share2, Crown
+  MessageCircle, Home, Share2, Crown,
+  PartyPopper, Coins
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -20,14 +21,12 @@ import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { useCloudflarePlayback } from "@/hooks/useCloudflarePlayback";
 import { StreamReadyGate } from "./StreamReadyGate";
 import { StreamHealthIndicator } from "./StreamHealthIndicator";
+import { FlyingChat } from "./FlyingChat";
 
 interface LiveStreamPlayerV2Props {
   streamId: string;
   onClose: () => void;
 }
-
-import { PartyPopper, Coins } from "lucide-react";
-import { LiveChatMessage } from "./LiveChatMessage";
 
 const REACTIONS = [
   { type: 'heart', emoji: '❤️', icon: Heart, color: 'text-red-500' },
@@ -601,36 +600,16 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
           ))}
         </AnimatePresence>
 
-        {/* CHAT OVERLAY - TikTok Style */}
+        {/* CHAT OVERLAY - TikTok Style Flying Chat */}
         {showChat && (
-          <div 
-            className="absolute left-0 z-20 pointer-events-none"
-            style={{
-              bottom: isKeyboardOpen ? `${keyboardHeight + 60}px` : '140px',
-              maxHeight: '35vh',
-              right: '70px',
-            }}
-          >
-            <div 
-              ref={chatScrollRef}
-              className="overflow-y-auto px-3 space-y-1.5 pointer-events-auto"
-              style={{ maxHeight: '35vh' }}
-            >
-              <AnimatePresence>
-                {comments.slice(-20).map(comment => (
-                  <LiveChatMessage
-                    key={comment.id}
-                    id={comment.id}
-                    content={comment.content}
-                    userId={comment.user_id}
-                    hostId={stream.user_id}
-                    profile={comment.profiles}
-                    isCompact={true}
-                  />
-                ))}
-              </AnimatePresence>
-            </div>
-          </div>
+          <FlyingChat
+            messages={comments}
+            gifts={flyingGifts}
+            hostId={stream.user_id}
+            maxMessages={15}
+            bottomOffset={isKeyboardOpen ? keyboardHeight + 80 : 140}
+            className="pointer-events-auto"
+          />
         )}
 
         {/* RIGHT SIDE ACTIONS - All Reactions */}
