@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Radio } from 'lucide-react';
-import { LiveStreamViewerWebRTC } from '@/components/live/LiveStreamViewerWebRTC';
+import { SimpleViewer } from '@/components/live/SimpleViewer';
 
 const LiveStreamDetail = () => {
   const { user, loading: authLoading } = useAuth();
@@ -90,7 +90,7 @@ const LiveStreamDetail = () => {
   }
 
   return (
-    <LiveStreamViewerWebRTC
+    <SimpleViewer
       streamId={streamId!}
       onClose={() => navigate('/live')}
     />
