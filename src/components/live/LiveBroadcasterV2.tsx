@@ -234,27 +234,40 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           setBroadcastState('live');
           setConnectionQuality('good');
           reconnectAttemptRef.current = 0;
-          toast.success("You are now live!");
+          toast.success("Going live! Verifying playback...");
           
-          // CRITICAL: Set stream_ready to true so viewers can connect
-          updateConnectionState('live', true);
-          
-          // Also directly update database to ensure stream_ready is set
-          supabase
-            .from("live_streams")
-            .update({ 
-              stream_ready: true, 
-              status: "live",
-              connection_state: "live"
-            })
-            .eq("id", streamId)
-            .then(({ error }) => {
-              if (error) {
-                console.error('[BroadcasterV2] Failed to set stream_ready:', error);
-              } else {
-                console.log('[BroadcasterV2] Stream marked as ready for viewers');
-              }
+          // Use the new verify-stream-playable action that polls until manifest is ready
+          const verifyPlayback = async () => {
+            console.log('[BroadcasterV2] Verifying stream playability...');
+            
+            const { data: verifyResult } = await supabase.functions.invoke('cloudflare-stream-v2', {
+              body: {
+                action: 'verify-stream-playable',
+                streamId,
+                liveInputId: liveInputIdRef.current,
+                maxWaitSeconds: 20,
+              },
             });
+            
+            if (verifyResult?.success) {
+              console.log('[BroadcasterV2] Stream verified as playable after', verifyResult.attempts, 'attempts');
+              toast.success("You are now live! Viewers can see you.");
+            } else {
+              console.warn('[BroadcasterV2] Verification timed out, forcing stream_ready');
+              // Force it after timeout as fallback
+              await supabase.from("live_streams")
+                .update({ 
+                  stream_ready: true, 
+                  status: "live",
+                  connection_state: "live"
+                })
+                .eq("id", streamId);
+              toast.success("You are now live!");
+            }
+          };
+          
+          // Start verification in background
+          verifyPlayback();
           
           // Start health check interval
           healthCheckIntervalRef.current = window.setInterval(async () => {
@@ -297,9 +310,9 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
       });
       await pc.setLocalDescription(offer);
       
-      // Wait for ICE gathering
+      // Wait for ICE gathering with extended timeout for slow networks
       await new Promise<void>((resolve) => {
-        const timeout = setTimeout(resolve, 3000);
+        const timeout = setTimeout(resolve, 5000); // Increased from 3000
         if (pc.iceGatheringState === 'complete') {
           clearTimeout(timeout);
           resolve();
