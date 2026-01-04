@@ -7,9 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Video, Sparkles, Crown, Unlock } from "lucide-react";
+import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock } from "lucide-react";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import { useNavigation } from "@/context/NavigationContext";
+import { cn } from "@/lib/utils";
 
 // ADMIN CONFIG: Set to true to restrict live streaming to premium users only
 // When false, all users can create live streams (current default for launch)
@@ -27,6 +28,9 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [isPremium, setIsPremium] = useState(false);
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDate, setScheduledDate] = useState("");
+  const [scheduledTime, setScheduledTime] = useState("");
   const [loading, setLoading] = useState(false);
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
 
@@ -49,6 +53,19 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       return;
     }
 
+    // Validate scheduled date/time if scheduling
+    if (isScheduled) {
+      if (!scheduledDate || !scheduledTime) {
+        toast.error("Please select a date and time for the scheduled stream");
+        return;
+      }
+      const scheduledDateTime = new Date(`${scheduledDate}T${scheduledTime}`);
+      if (scheduledDateTime <= new Date()) {
+        toast.error("Scheduled time must be in the future");
+        return;
+      }
+    }
+
     // Check premium requirement if enabled
     if (REQUIRE_PREMIUM_FOR_STREAMING && !userIsPremium) {
       toast.error("Premium subscription required to create live streams");
@@ -67,6 +84,12 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       // Generate stream key
       const { data: streamKeyData } = await supabase.rpc('generate_stream_key');
       
+      // Build scheduled_start if scheduling
+      let scheduledStart = null;
+      if (isScheduled && scheduledDate && scheduledTime) {
+        scheduledStart = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
+      }
+
       const { data, error } = await supabase
         .from("live_streams")
         .insert({
@@ -76,14 +99,16 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           category: category.trim() || null,
           is_premium: isPremium,
           stream_key: streamKeyData || `stream_${Date.now()}`,
-          status: 'scheduled',
+          status: isScheduled ? 'scheduled' : 'scheduled', // Still 'scheduled' but will go live immediately when broadcaster connects
+          scheduled_start: scheduledStart,
+          connection_state: 'idle',
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      toast.success("Live stream created!");
+      toast.success(isScheduled ? "Stream scheduled!" : "Starting live stream...");
       onStreamCreated(data.id);
       onClose();
       
@@ -92,6 +117,9 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       setDescription("");
       setCategory("");
       setIsPremium(false);
+      setIsScheduled(false);
+      setScheduledDate("");
+      setScheduledTime("");
     } catch (error: any) {
       console.error("Error creating stream:", error);
       toast.error(error.message || "Failed to create stream");
@@ -136,6 +164,9 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
     );
   }
 
+  // Get min date (today) for scheduling
+  const today = new Date().toISOString().split('T')[0];
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
@@ -153,6 +184,36 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
         </DialogHeader>
         
         <div className="space-y-4">
+          {/* Stream Type Toggle */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setIsScheduled(false)}
+              className={cn(
+                "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+                !isScheduled 
+                  ? "border-red-500 bg-red-500/10 text-red-500" 
+                  : "border-muted hover:border-muted-foreground/50"
+              )}
+            >
+              <Radio className="w-6 h-6" />
+              <span className="font-medium text-sm">Go Live Now</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsScheduled(true)}
+              className={cn(
+                "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
+                isScheduled 
+                  ? "border-blue-500 bg-blue-500/10 text-blue-500" 
+                  : "border-muted hover:border-muted-foreground/50"
+              )}
+            >
+              <Calendar className="w-6 h-6" />
+              <span className="font-medium text-sm">Schedule</span>
+            </button>
+          </div>
+
           <div>
             <Label htmlFor="title">Title *</Label>
             <Input
@@ -187,6 +248,37 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
             />
           </div>
 
+          {/* Schedule Date/Time */}
+          {isScheduled && (
+            <div className="space-y-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
+              <div className="flex items-center gap-2 text-blue-500">
+                <Clock className="w-4 h-4" />
+                <span className="text-sm font-medium">Schedule Time</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="scheduled-date" className="text-xs">Date</Label>
+                  <Input
+                    id="scheduled-date"
+                    type="date"
+                    min={today}
+                    value={scheduledDate}
+                    onChange={(e) => setScheduledDate(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="scheduled-time" className="text-xs">Time</Label>
+                  <Input
+                    id="scheduled-time"
+                    type="time"
+                    value={scheduledTime}
+                    onChange={(e) => setScheduledTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
@@ -208,8 +300,15 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
             <Button variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={loading || premiumLoading} className="flex-1">
-              {loading ? "Creating..." : "Go Live"}
+            <Button 
+              onClick={handleCreate} 
+              disabled={loading || premiumLoading} 
+              className={cn(
+                "flex-1",
+                !isScheduled && "bg-red-600 hover:bg-red-700"
+              )}
+            >
+              {loading ? "Creating..." : isScheduled ? "Schedule Stream" : "Go Live"}
             </Button>
           </div>
         </div>
