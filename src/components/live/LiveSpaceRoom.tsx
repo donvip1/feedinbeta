@@ -1753,6 +1753,33 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 </>
               )}
 
+              {/* Leave/End Space Button - CRITICAL for all users */}
+              {isHost ? (
+                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="h-12 w-12 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 border-0"
+                    onClick={() => setShowEndConfirm(true)}
+                    title="End Space"
+                  >
+                    <PhoneOff className="w-5 h-5" />
+                  </Button>
+                </motion.div>
+              ) : (
+                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-12 w-12 rounded-xl border-red-500/50 text-red-500 hover:bg-red-500/10 hover:text-red-400"
+                    onClick={handleLeaveSpace}
+                    title="Leave Space"
+                  >
+                    <PhoneOff className="w-5 h-5" />
+                  </Button>
+                </motion.div>
+              )}
+
               {/* Swipe hint indicator */}
               <div className="flex-shrink-0 pl-2 pr-1 opacity-40">
                 <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
