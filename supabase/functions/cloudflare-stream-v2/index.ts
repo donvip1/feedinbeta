@@ -62,18 +62,24 @@ type RequestBody =
   | GetStreamInfoRequest
   | VerifyStreamPlayableRequest;
 
-// Helper to check if HLS manifest is accessible
+// Helper to check if HLS manifest is accessible - uses GET to verify actual content
 async function checkHlsManifest(hlsUrl: string): Promise<{ accessible: boolean; error?: string }> {
   try {
     console.log('[CF-Stream-V2] Checking HLS manifest:', hlsUrl);
     const response = await fetch(hlsUrl, {
-      method: 'HEAD',
+      method: 'GET',  // Use GET to check actual content
       signal: AbortSignal.timeout(5000),
     });
     
     if (response.ok) {
-      console.log('[CF-Stream-V2] Manifest accessible');
-      return { accessible: true };
+      const body = await response.text();
+      // Verify it's actually an m3u8 manifest, not empty HTML
+      if (body.includes('#EXTM3U')) {
+        console.log('[CF-Stream-V2] Manifest accessible with valid content');
+        return { accessible: true };
+      }
+      console.log('[CF-Stream-V2] Manifest empty or invalid:', body.substring(0, 100));
+      return { accessible: false, error: 'Empty or invalid manifest' };
     }
     
     // 404 means stream not publishing yet
@@ -399,16 +405,22 @@ Deno.serve(async (req) => {
         
         console.log('[CF-Stream-V2] Verifying stream playability for:', streamId, 'input:', liveInputId);
         
+        // Use service role client to bypass any RLS issues for critical updates
+        const serviceClient = createClient(
+          Deno.env.get('SUPABASE_URL')!,
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        );
+        
         let attempts = 0;
-        const pollInterval = 2000; // 2 seconds
-        const maxAttempts = Math.ceil(maxWaitSeconds / 2);
+        const pollInterval = 1500; // 1.5 seconds - faster polling
+        const maxAttempts = Math.ceil(maxWaitSeconds / 1.5);
         
         while (attempts < maxAttempts) {
           attempts++;
           console.log(`[CF-Stream-V2] Verification attempt ${attempts}/${maxAttempts}`);
           
           // Get the stream's HLS URL
-          const { data: stream } = await supabaseClient
+          const { data: stream } = await serviceClient
             .from('live_streams')
             .select('cf_hls_url')
             .eq('id', streamId)
@@ -420,8 +432,8 @@ Deno.serve(async (req) => {
             if (manifestCheck.accessible) {
               console.log('[CF-Stream-V2] Manifest is accessible! Setting stream_ready = true');
               
-              // Manifest ready! Set stream_ready = true
-              await supabaseClient
+              // Use service role to ensure update goes through
+              const { error: updateError } = await serviceClient
                 .from('live_streams')
                 .update({ 
                   stream_ready: true, 
@@ -430,6 +442,12 @@ Deno.serve(async (req) => {
                   last_health_check: new Date().toISOString(),
                 })
                 .eq('id', streamId);
+              
+              if (updateError) {
+                console.error('[CF-Stream-V2] Failed to update stream_ready:', updateError);
+              } else {
+                console.log('[CF-Stream-V2] stream_ready set to true successfully');
+              }
               
               return new Response(
                 JSON.stringify({ success: true, attempts, message: 'Stream is now playable' }),
