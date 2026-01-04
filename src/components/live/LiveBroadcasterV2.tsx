@@ -226,7 +226,7 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
       }
       
       // Connection state handling
-      pc.onconnectionstatechange = () => {
+      pc.onconnectionstatechange = async () => {
         const state = pc.connectionState;
         console.log('[BroadcasterV2] Connection state:', state);
         
@@ -234,42 +234,30 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           setBroadcastState('live');
           setConnectionQuality('good');
           reconnectAttemptRef.current = 0;
-          toast.success("Going live! Verifying playback...");
           
-          // Use the new verify-stream-playable action that polls until manifest is ready
-          const verifyPlayback = async () => {
-            console.log('[BroadcasterV2] Verifying stream playability...');
-            
-            const { data: verifyResult } = await supabase.functions.invoke('cloudflare-stream-v2', {
-              body: {
-                action: 'verify-stream-playable',
-                streamId,
-                liveInputId: liveInputIdRef.current,
-                maxWaitSeconds: 20,
-              },
-            });
-            
-            if (verifyResult?.success) {
-              console.log('[BroadcasterV2] Stream verified as playable after', verifyResult.attempts, 'attempts');
-              toast.success("You are now live! Viewers can see you.");
-            } else {
-              console.warn('[BroadcasterV2] Verification timed out, forcing stream_ready');
-              // Force it after timeout as fallback
-              await supabase.from("live_streams")
-                .update({ 
-                  stream_ready: true, 
-                  status: "live",
-                  connection_state: "live"
-                })
-                .eq("id", streamId);
-              toast.success("You are now live!");
-            }
-          };
+          // IMMEDIATELY set stream_ready = true when WebRTC connects
+          // Don't wait for Cloudflare API verification - it has lag
+          console.log('[BroadcasterV2] WebRTC connected! Setting stream_ready = true immediately');
           
-          // Start verification in background
-          verifyPlayback();
+          const { error: updateError } = await supabase
+            .from("live_streams")
+            .update({ 
+              stream_ready: true, 
+              status: "live",
+              connection_state: "live",
+              started_at: new Date().toISOString(),
+            })
+            .eq("id", streamId);
           
-          // Start health check interval
+          if (updateError) {
+            console.error('[BroadcasterV2] Failed to update stream_ready:', updateError);
+          } else {
+            console.log('[BroadcasterV2] ✅ stream_ready set to true');
+          }
+          
+          toast.success("You are now live! Viewers can join.");
+          
+          // Start health check interval (reduced frequency)
           healthCheckIntervalRef.current = window.setInterval(async () => {
             if (liveInputIdRef.current) {
               try {
@@ -284,7 +272,8 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
                 console.log('[BroadcasterV2] Health check failed:', e);
               }
             }
-          }, 10000);
+          }, 15000); // Less frequent health checks
+          
         } else if (state === 'disconnected') {
           setConnectionQuality('poor');
           setBroadcastState('reconnecting');
@@ -345,14 +334,10 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
       
       console.log('[BroadcasterV2] Connected to Cloudflare!');
       
-      // Update stream status
+      // Update HLS URL (stream_ready is set in onconnectionstatechange)
       await supabase
         .from("live_streams")
-        .update({ 
-          status: "live",
-          started_at: new Date().toISOString(),
-          cf_hls_url: hlsUrl,
-        })
+        .update({ cf_hls_url: hlsUrl })
         .eq("id", streamId);
       
     } catch (error: any) {

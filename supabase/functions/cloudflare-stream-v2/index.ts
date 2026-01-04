@@ -248,15 +248,18 @@ Deno.serve(async (req) => {
       case 'check-health': {
         const { streamId, liveInputId } = body as CheckHealthRequest;
         
-        // Check Cloudflare stream status
-        const cfStatus = await getCloudflareStreamStatus(liveInputId);
+        // Just update the health check timestamp - don't change stream_ready
+        // The broadcaster sets stream_ready when WebRTC connects
+        // Cloudflare API status has lag and shouldn't override broadcaster state
         
-        // Get the stream's HLS URL
         const { data: stream } = await supabaseClient
           .from('live_streams')
-          .select('cf_hls_url, connection_state')
+          .select('cf_hls_url, connection_state, stream_ready')
           .eq('id', streamId)
           .single();
+        
+        // Only check Cloudflare status for logging, don't update stream_ready based on it
+        const cfStatus = await getCloudflareStreamStatus(liveInputId);
         
         let manifestAccessible = false;
         if (stream?.cf_hls_url) {
@@ -264,16 +267,11 @@ Deno.serve(async (req) => {
           manifestAccessible = manifestCheck.accessible;
         }
         
-        // Determine stream ready status
-        const streamReady = cfStatus.isLive && manifestAccessible;
-        
-        // Update database
+        // Update last health check timestamp only
         await supabaseClient
           .from('live_streams')
           .update({
-            stream_ready: streamReady,
             last_health_check: new Date().toISOString(),
-            connection_state: cfStatus.isLive ? 'live' : stream?.connection_state || 'idle',
           })
           .eq('id', streamId);
         
@@ -283,7 +281,8 @@ Deno.serve(async (req) => {
             isLive: cfStatus.isLive,
             hasVideo: cfStatus.hasVideo,
             manifestAccessible,
-            streamReady,
+            streamReady: stream?.stream_ready || false,
+            connectionState: stream?.connection_state,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
