@@ -8,7 +8,7 @@ interface UseCloudflarePlaybackProps {
   hlsUrl?: string | null;
   whepUrl?: string | null;
   videoRef: React.RefObject<HTMLVideoElement>;
-  streamReady?: boolean;
+  streamReady?: boolean; // Now ignored - we connect immediately
   onStatusChange?: (status: PlaybackStatus) => void;
 }
 
@@ -26,7 +26,7 @@ export function useCloudflarePlayback({
   hlsUrl,
   whepUrl,
   videoRef,
-  streamReady = true,
+  streamReady = true, // Ignored - we connect immediately regardless
   onStatusChange,
 }: UseCloudflarePlaybackProps) {
   const hlsRef = useRef<Hls | null>(null);
@@ -43,7 +43,7 @@ export function useCloudflarePlayback({
   });
 
   const retryCountRef = useRef(0);
-  const maxRetries = 5;
+  const maxRetries = 10; // More retries for viewer connection
   const isConnectedRef = useRef(false);
 
   // Update status and notify
@@ -91,7 +91,9 @@ export function useCloudflarePlayback({
         liveSyncDurationCount: 2,
         liveMaxLatencyDurationCount: 4,
         fragLoadingTimeOut: 10000,
-        manifestLoadingTimeOut: 8000,
+        manifestLoadingTimeOut: 5000,  // Faster timeout
+        manifestLoadingMaxRetry: 10,   // More retries
+        manifestLoadingRetryDelay: 1000, // 1 second between retries
         levelLoadingTimeOut: 8000,
         startLevel: -1,
         capLevelToPlayerSize: true,
@@ -233,9 +235,9 @@ export function useCloudflarePlayback({
     connect();
   }, [connect]);
 
-  // Effect to start connection when HLS URL is available
+  // Effect to start connection when HLS URL is available - IGNORE streamReady!
   useEffect(() => {
-    console.log('[Playback] URL changed - hlsUrl:', !!hlsUrl, 'streamReady:', streamReady);
+    console.log('[Playback] URL changed - hlsUrl:', !!hlsUrl, '(streamReady ignored for instant connect)');
     
     if (!hlsUrl) {
       updateStatus('waiting', 'Waiting for stream...');
@@ -247,11 +249,12 @@ export function useCloudflarePlayback({
       return;
     }
     
-    // INSTANT CONNECTION - no delays!
+    // INSTANT CONNECTION - don't wait for streamReady!
+    // HLS.js will automatically retry if manifest isn't ready yet
     connect();
     
     return () => cleanup();
-  }, [hlsUrl, streamReady, connect, cleanup, updateStatus]);
+  }, [hlsUrl, connect, cleanup, updateStatus]); // Removed streamReady dependency
 
   return {
     ...state,
