@@ -9,19 +9,21 @@ import { toast } from "sonner";
 import { 
   Video, VideoOff, Mic, MicOff, FlipHorizontal,
   Users, Send, X, Gift, Radio, 
-  Wifi, WifiOff, Share2, Home, Coins, Crown, Loader2, AlertCircle
+  Wifi, WifiOff, Share2, Home, Coins, Crown, Loader2, AlertCircle,
+  Volume2, VolumeX, MessageCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { LiveInviteModal } from "./LiveInviteModal";
+import { ViewerListPanel } from "./ViewerListPanel";
 import { useNavigation } from '@/context/NavigationContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { useLivePresence } from "@/hooks/useLivePresence";
 import { FloatingReactions } from "./FloatingReactions";
-import { LiveChatMessage } from "./LiveChatMessage";
 import { StreamHealthIndicator } from "./StreamHealthIndicator";
 import { FlyingChat } from "./FlyingChat";
+import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 
 interface LiveBroadcasterV2Props {
   streamId: string;
@@ -64,6 +66,10 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
   const [flyingGifts, setFlyingGifts] = useState<any[]>([]);
   const [connectionQuality, setConnectionQuality] = useState<'good' | 'fair' | 'poor'>('good');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showChat, setShowChat] = useState(true);
+  const [coHosts, setCoHosts] = useState<string[]>([]);
+
+  const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
   // Presence for viewer count
   const { viewerCount: presenceViewerCount, isConnected: presenceConnected } = useLivePresence({
@@ -229,7 +235,26 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           setConnectionQuality('good');
           reconnectAttemptRef.current = 0;
           toast.success("You are now live!");
+          
+          // CRITICAL: Set stream_ready to true so viewers can connect
           updateConnectionState('live', true);
+          
+          // Also directly update database to ensure stream_ready is set
+          supabase
+            .from("live_streams")
+            .update({ 
+              stream_ready: true, 
+              status: "live",
+              connection_state: "live"
+            })
+            .eq("id", streamId)
+            .then(({ error }) => {
+              if (error) {
+                console.error('[BroadcasterV2] Failed to set stream_ready:', error);
+              } else {
+                console.log('[BroadcasterV2] Stream marked as ready for viewers');
+              }
+            });
           
           // Start health check interval
           healthCheckIntervalRef.current = window.setInterval(async () => {
@@ -702,10 +727,19 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
   const isConnecting = broadcastState === 'initializing' || broadcastState === 'publishing';
   const displayViewerCount = presenceConnected ? presenceViewerCount : viewerCount;
 
+  // Handle invite to speak (co-host functionality)
+  const handleInviteToSpeak = useCallback((userId: string) => {
+    // For now just toggle the co-host status locally
+    setCoHosts(prev => 
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+    toast.success("Invited to speak!");
+  }, []);
+
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* VIDEO PREVIEW */}
-      <div className="relative flex-1">
+    <div className="fixed inset-0 z-50 bg-black">
+      {/* FULL SCREEN VIDEO PREVIEW */}
+      <div className="absolute inset-0">
         <video
           ref={videoRef}
           autoPlay
@@ -717,19 +751,19 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           )}
         />
         
-        {/* Idle state - Ready to go live */}
+        {/* Idle state overlay - subtle prompt */}
         {broadcastState === 'idle' && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 flex flex-col items-center justify-center z-10">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/40 flex flex-col items-center justify-center z-10">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               className="text-center"
             >
-              <div className="w-20 h-20 rounded-full bg-red-600/20 border-2 border-red-500 flex items-center justify-center mx-auto mb-4">
-                <Radio className="w-10 h-10 text-red-500" />
+              <div className="w-16 h-16 rounded-full bg-red-600/30 border-2 border-red-500 flex items-center justify-center mx-auto mb-3">
+                <Radio className="w-8 h-8 text-red-500" />
               </div>
-              <p className="text-white font-bold text-lg mb-2">Ready to Go Live</p>
-              <p className="text-white/70 text-sm mb-6">Tap the "Go Live" button below to start broadcasting</p>
+              <p className="text-white font-bold text-lg mb-1">Ready to Go Live</p>
+              <p className="text-white/60 text-sm">Tap "Go Live" below</p>
             </motion.div>
           </div>
         )}
@@ -740,7 +774,7 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
             <div className="text-center">
               <Loader2 className="w-12 h-12 text-primary animate-spin mx-auto mb-4" />
               <p className="text-white font-medium">
-                {broadcastState === 'initializing' ? 'Setting up stream...' : 'Connecting to Cloudflare...'}
+                {broadcastState === 'initializing' ? 'Setting up stream...' : 'Connecting...'}
               </p>
             </div>
           </div>
@@ -760,45 +794,64 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
             <div className="text-center">
               <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
               <p className="text-white font-medium mb-2">Connection Error</p>
-              <p className="text-muted-foreground text-sm mb-4">{errorMessage}</p>
+              <p className="text-white/60 text-sm mb-4">{errorMessage}</p>
               <Button onClick={startBroadcast}>Try Again</Button>
             </div>
           </div>
         )}
         
-        {/* Header */}
-        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 to-transparent p-4 z-20">
+        {/* HEADER - TikTok Style */}
+        <div className="absolute top-0 left-0 right-0 bg-gradient-to-b from-black/80 via-black/40 to-transparent p-4 z-20 safe-area-top">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Avatar className="border-2 border-white w-10 h-10">
+              <Avatar className="border-2 border-primary w-10 h-10">
                 <AvatarImage src={user?.user_metadata?.avatar_url} />
                 <AvatarFallback>{user?.user_metadata?.display_name?.[0] || 'H'}</AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-white font-medium text-sm">{stream?.title || 'Live Stream'}</p>
                 <div className="flex items-center gap-2">
+                  <p className="text-white font-medium text-sm">{stream?.title || 'Live Stream'}</p>
                   {isLive && (
-                    <Badge variant="destructive" className="animate-pulse">
-                      <Radio className="w-3 h-3 mr-1" /> LIVE
+                    <Badge variant="destructive" className="animate-pulse text-xs px-2 py-0">
+                      <Radio className="w-2 h-2 mr-1" /> LIVE
                     </Badge>
                   )}
+                </div>
+                <div className="flex items-center gap-2">
                   <StreamHealthIndicator 
                     quality={connectionQuality}
                     isConnecting={isConnecting}
                   />
+                  <span className="text-white/60 text-xs">
+                    {isLive ? 'Broadcasting' : broadcastState}
+                  </span>
                 </div>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1">
+              <Badge variant="secondary" className="gap-1 bg-black/40 border-white/20">
                 <Users className="w-3 h-3" />
                 {displayViewerCount}
               </Badge>
-              <Badge variant="secondary" className="gap-1">
-                <Coins className="w-3 h-3" />
+              <Badge variant="secondary" className="gap-1 bg-black/40 border-white/20">
+                <Coins className="w-3 h-3 text-yellow-400" />
                 {totalGiftsReceived}
               </Badge>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20"
+                onClick={() => {
+                  if (isLive || broadcastState === 'reconnecting' || isConnecting) {
+                    stopBroadcast();
+                  } else {
+                    onClose();
+                  }
+                }}
+              >
+                <X className="w-6 h-6" />
+              </Button>
             </div>
           </div>
         </div>
@@ -808,153 +861,201 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
         
         {/* Flying gifts */}
         <AnimatePresence>
-          {flyingGifts.map(gift => (
+          {flyingGifts.map((gift, index) => (
             <motion.div
               key={gift.id}
-              initial={{ x: -100, y: '80%', opacity: 0, scale: 0.5 }}
-              animate={{ x: '40%', y: '40%', opacity: 1, scale: 1.2 }}
-              exit={{ x: '100%', y: '20%', opacity: 0, scale: 0.5 }}
-              transition={{ duration: 2, ease: "easeOut" }}
-              className="fixed z-50 flex items-center gap-3 bg-black/60 backdrop-blur-sm px-4 py-2 rounded-full"
+              initial={{ opacity: 0, scale: 0, x: '-50%', y: 100 }}
+              animate={{ 
+                opacity: [0, 1, 1, 1, 0],
+                scale: [0.5, 1.2, 1, 1, 0.8],
+                y: [100, 0, 0, -50, -150],
+              }}
+              exit={{ opacity: 0, scale: 0.5, y: -200 }}
+              transition={{ duration: 4, ease: "easeOut", times: [0, 0.15, 0.3, 0.7, 1] }}
+              className="fixed left-1/2 top-1/3 z-50 pointer-events-none"
+              style={{ marginTop: index * 80 }}
             >
-              <span className="text-3xl">{REACTION_EMOJIS[gift.gift_type] || '🎁'}</span>
-              <div>
-                <p className="text-white font-bold text-sm">{gift.sender_name}</p>
-                <p className="text-yellow-400 text-xs">+{gift.credit_value} credits</p>
+              <div className="flex items-center gap-3 bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white px-5 py-2.5 rounded-full shadow-2xl">
+                <motion.span 
+                  className="text-3xl"
+                  animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 0.5, repeat: 3, repeatType: "reverse" }}
+                >
+                  {REACTION_EMOJIS[gift.gift_type] || '🎁'}
+                </motion.span>
+                <div className="text-left">
+                  <p className="font-bold text-base whitespace-nowrap">{gift.sender_name}</p>
+                  <p className="text-xs text-white/90">
+                    sent <span className="font-bold">{gift.gift_type}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 bg-white/20 px-2 py-0.5 rounded-full text-sm">
+                  <Coins className="w-3 h-3" />
+                  <span className="font-bold">+{gift.credit_value}</span>
+                </div>
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
-      </div>
-      
-      {/* CHAT AREA */}
-      <div className="h-48 bg-background/95 flex flex-col">
-        <div 
-          ref={chatScrollRef}
-          className="flex-1 overflow-y-auto px-3 py-2 space-y-1"
-        >
-          {comments.map(comment => (
-            <LiveChatMessage 
-              key={comment.id} 
-              id={comment.id}
-              content={comment.content}
-              userId={comment.user_id}
-              hostId={user?.id || ''}
-              profile={comment.profiles}
-            />
-          ))}
-        </div>
         
-        <div className="p-3 border-t flex gap-2">
-          <Input
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && sendComment()}
-            placeholder="Say something..."
-            className="flex-1"
+        {/* FLYING CHAT OVERLAY - TikTok Style */}
+        {showChat && (
+          <FlyingChat
+            messages={comments}
+            gifts={flyingGifts}
+            hostId={user?.id || ''}
+            maxMessages={12}
+            bottomOffset={isKeyboardOpen ? keyboardHeight + 80 : 160}
+            className="pointer-events-auto"
           />
-          <Button size="icon" onClick={sendComment}>
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-      
-      {/* CONTROLS */}
-      <div className="bg-background border-t p-4 flex justify-center gap-3 flex-wrap">
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={toggleVideo}
-        >
-          {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5 text-red-500" />}
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={toggleAudio}
-        >
-          {isAudioOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5 text-red-500" />}
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={switchCamera}
-        >
-          <FlipHorizontal className="w-5 h-5" />
-        </Button>
-        
-        {/* Gift Button - Host can send to viewers */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-12 h-12 border-amber-500/50 hover:bg-amber-500/10"
-          onClick={() => setShowGiftModal(true)}
-        >
-          <Gift className="w-5 h-5 text-amber-500" />
-        </Button>
-        
-        {/* Invite Co-Host Button */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-12 h-12 border-blue-500/50 hover:bg-blue-500/10"
-          onClick={() => setShowInviteModal(true)}
-        >
-          <Users className="w-5 h-5 text-blue-500" />
-        </Button>
-        
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={handleShare}
-        >
-          <Share2 className="w-5 h-5" />
-        </Button>
-        
-        {/* Go Live button - show when idle or error */}
-        {(broadcastState === 'idle' || broadcastState === 'error') && (
-          <Button
-            className="rounded-full px-8 bg-red-600 hover:bg-red-700"
-            onClick={startBroadcast}
-          >
-            <Radio className="w-5 h-5 mr-2" />
-            Go Live
-          </Button>
         )}
         
-        {/* End Stream button - show when live, reconnecting, or connecting */}
-        {(isLive || broadcastState === 'reconnecting' || isConnecting) && (
-          <Button
-            variant="destructive"
-            className="rounded-full px-8"
-            onClick={stopBroadcast}
-          >
-            <X className="w-5 h-5 mr-2" />
-            End Stream
-          </Button>
-        )}
-        
-        {/* Close/Home button - always visible */}
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full w-12 h-12"
-          onClick={() => {
-            if (isLive || broadcastState === 'reconnecting' || isConnecting) {
-              stopBroadcast();
-            } else {
-              onClose();
-            }
+        {/* RIGHT SIDE ACTION BUTTONS */}
+        <div 
+          className="absolute right-3 flex flex-col gap-2 z-20"
+          style={{
+            bottom: isKeyboardOpen ? `${keyboardHeight + 160}px` : '220px',
           }}
         >
-          <Home className="w-5 h-5" />
-        </Button>
+          {/* Toggle Video */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={toggleVideo}
+            className={cn(
+              "w-11 h-11 rounded-full backdrop-blur flex items-center justify-center",
+              isVideoOn ? "bg-black/40" : "bg-red-500/80"
+            )}
+          >
+            {isVideoOn ? <Video className="w-5 h-5 text-white" /> : <VideoOff className="w-5 h-5 text-white" />}
+          </motion.button>
+          
+          {/* Toggle Audio */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={toggleAudio}
+            className={cn(
+              "w-11 h-11 rounded-full backdrop-blur flex items-center justify-center",
+              isAudioOn ? "bg-black/40" : "bg-red-500/80"
+            )}
+          >
+            {isAudioOn ? <Mic className="w-5 h-5 text-white" /> : <MicOff className="w-5 h-5 text-white" />}
+          </motion.button>
+          
+          {/* Switch Camera */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={switchCamera}
+            className="w-11 h-11 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"
+          >
+            <FlipHorizontal className="w-5 h-5 text-white" />
+          </motion.button>
+          
+          {/* Viewer List Panel */}
+          <ViewerListPanel
+            viewers={viewers}
+            viewerCount={displayViewerCount}
+            streamId={streamId}
+            onInviteToSpeak={handleInviteToSpeak}
+            coHosts={coHosts}
+            maxCoHosts={4}
+          />
+          
+          {/* Gift Button */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => setShowGiftModal(true)}
+            className="w-12 h-12 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center shadow-lg"
+          >
+            <Gift className="w-6 h-6 text-white" />
+          </motion.button>
+          
+          {/* Invite Co-Host */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={() => setShowInviteModal(true)}
+            className="w-11 h-11 rounded-full bg-blue-500/80 backdrop-blur flex items-center justify-center"
+          >
+            <Users className="w-5 h-5 text-white" />
+          </motion.button>
+          
+          {/* Share */}
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            onClick={handleShare}
+            className="w-11 h-11 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"
+          >
+            <Share2 className="w-5 h-5 text-white" />
+          </motion.button>
+        </div>
+        
+        {/* BOTTOM INPUT + CONTROLS - TikTok Style */}
+        <div 
+          className="absolute left-0 right-0 bottom-0 p-4 z-20"
+          style={{ paddingBottom: Math.max(16, isKeyboardOpen ? keyboardHeight + 8 : 24) }}
+        >
+          {/* Go Live / End Stream Buttons */}
+          <div className="flex justify-center mb-3">
+            {(broadcastState === 'idle' || broadcastState === 'error') && (
+              <Button
+                className="rounded-full px-10 py-5 bg-red-600 hover:bg-red-700 text-lg font-bold shadow-lg"
+                onClick={startBroadcast}
+              >
+                <Radio className="w-5 h-5 mr-2" />
+                Go Live
+              </Button>
+            )}
+            
+            {(isLive || broadcastState === 'reconnecting' || isConnecting) && (
+              <Button
+                variant="destructive"
+                className="rounded-full px-8"
+                onClick={stopBroadcast}
+              >
+                <X className="w-5 h-5 mr-2" />
+                End Stream
+              </Button>
+            )}
+          </div>
+          
+          {/* Chat Input */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-black/40 hover:bg-black/60 rounded-full shrink-0"
+              onClick={() => setShowChat(!showChat)}
+            >
+              <MessageCircle className={cn("w-5 h-5", showChat ? "text-primary" : "text-white")} />
+            </Button>
+            
+            <div className="flex-1 relative">
+              <Input
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendComment()}
+                placeholder="Say something..."
+                className="bg-black/40 border-white/20 text-white placeholder:text-white/50 rounded-full pr-12"
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 hover:bg-white/20"
+                onClick={sendComment}
+              >
+                <Send className="w-4 h-4 text-white" />
+              </Button>
+            </div>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-black/40 hover:bg-black/60 rounded-full shrink-0"
+              onClick={() => navigate('/live')}
+            >
+              <Home className="w-5 h-5 text-white" />
+            </Button>
+          </div>
+        </div>
       </div>
       
       {/* Modals */}

@@ -46,8 +46,9 @@ export function useCloudflarePlayback({
   });
 
   const retryCountRef = useRef(0);
-  const maxRetries = 5;
+  const maxRetries = 8; // Increased from 5 for better reliability
   const isConnectedRef = useRef(false);
+  const streamReadyPollingRef = useRef<number | null>(null);
 
   // Update status and notify
   const updateStatus = useCallback((status: PlaybackStatus, errorMessage: string | null = null) => {
@@ -72,6 +73,11 @@ export function useCloudflarePlayback({
     if (manifestCheckIntervalRef.current) {
       clearInterval(manifestCheckIntervalRef.current);
       manifestCheckIntervalRef.current = null;
+    }
+    
+    if (streamReadyPollingRef.current) {
+      clearInterval(streamReadyPollingRef.current);
+      streamReadyPollingRef.current = null;
     }
     
     if (hlsRef.current) {
