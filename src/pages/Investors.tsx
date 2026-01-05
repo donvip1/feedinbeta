@@ -144,6 +144,17 @@ const Investors = () => {
           </h2>
           <div className="space-y-3">
             <Button
+              variant="default"
+              className="w-full justify-between"
+              onClick={() => navigate('/settings/investment-docs')}
+            >
+              <span className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4" />
+                View Investment Memorandum
+              </span>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
               variant="outline"
               className="w-full justify-between"
               onClick={() => navigate('/admin/analytics')}
