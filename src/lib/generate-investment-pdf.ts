@@ -1,13 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
-// Extend jsPDF type for autotable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable: { finalY: number };
-  }
-}
+import autoTable from 'jspdf-autotable';
 
 export const generateInvestmentPDF = () => {
   const doc = new jsPDF();
@@ -176,7 +168,7 @@ export const generateInvestmentPDF = () => {
   
   drawSectionHeader('DEVELOPMENT TIMELINE & PROGRESS');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['What We Did', 'When', 'Done?', 'Details']],
     body: [
@@ -202,11 +194,11 @@ export const generateInvestmentPDF = () => {
     }
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('WHERE THE MONEY GOES');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['What We Spend On', 'Total Needed', 'Already Spent', 'Still Need']],
     body: [
@@ -225,7 +217,7 @@ export const generateInvestmentPDF = () => {
     margin: { left: margin, right: margin },
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('WHAT YOUR MONEY WILL DO');
   
@@ -251,33 +243,33 @@ export const generateInvestmentPDF = () => {
   
   drawSectionHeader('PLATFORM FEATURES (BUILT)');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Feature', 'Status', 'Description']],
     body: [
-      ['Social Feed', '✓ Complete', 'Posts with images, videos, likes, comments, shares'],
-      ['Stories', '✓ Complete', '24-hour ephemeral content with views tracking'],
-      ['User Profiles', '✓ Complete', 'Customizable profiles, followers, following'],
-      ['Direct Messaging', '✓ Complete', 'Real-time chat with media sharing'],
-      ['Credit System', '✓ Complete', 'Virtual currency for gifts and promotions'],
-      ['Gifting', '✓ Complete', 'Send gifts to creators, 85% payout rate'],
-      ['AI Copilot', '✓ Complete', 'Chat assistant powered by advanced AI'],
-      ['Image Generation', '✓ Complete', 'AI-powered image creation'],
-      ['Groups', '✓ Complete', 'Community groups with posts and members'],
-      ['Search & Hashtags', '✓ Complete', 'Discover content and trending topics'],
-      ['Premium Subscriptions', '✓ Complete', 'Monthly plans with exclusive features'],
-      ['Creator Payouts', '✓ Complete', 'Withdraw earnings to bank/wallet'],
+      ['Social Feed', 'Complete', 'Posts with images, videos, likes, comments, shares'],
+      ['Stories', 'Complete', '24-hour content with views tracking'],
+      ['User Profiles', 'Complete', 'Customizable profiles, followers, following'],
+      ['Direct Messaging', 'Complete', 'Real-time chat with media sharing'],
+      ['Credit System', 'Complete', 'Virtual currency for gifts and promotions'],
+      ['Gifting', 'Complete', 'Send gifts to creators, 85% payout rate'],
+      ['AI Copilot', 'Complete', 'Chat assistant powered by advanced AI'],
+      ['Image Generation', 'Complete', 'AI-powered image creation'],
+      ['Groups', 'Complete', 'Community groups with posts and members'],
+      ['Search & Hashtags', 'Complete', 'Discover content and trending topics'],
+      ['Premium Subscriptions', 'Complete', 'Monthly plans with exclusive features'],
+      ['Creator Payouts', 'Complete', 'Withdraw earnings to bank/wallet'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
     margin: { left: margin, right: margin },
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('HOW FEEDIN MAKES MONEY');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['How We Earn', 'Portion', 'Simple Explanation']],
     body: [
@@ -292,11 +284,11 @@ export const generateInvestmentPDF = () => {
     margin: { left: margin, right: margin },
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('WHAT WE EXPECT TO HAPPEN (After Launch)');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['What We Measure', '3 Months After Launch', '9 Months After Launch', '1 Year Later']],
     body: [
@@ -317,7 +309,7 @@ export const generateInvestmentPDF = () => {
   
   drawSectionHeader('WHO OWNS WHAT (After Investment)');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Who', 'Ownership %', 'What This Means']],
     body: [
@@ -333,7 +325,7 @@ export const generateInvestmentPDF = () => {
     margin: { left: margin, right: margin },
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('HOW YOU CAN INVEST');
   
@@ -372,7 +364,7 @@ export const generateInvestmentPDF = () => {
   
   drawSectionHeader('OUR PLAN FOR 2026');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['When', 'What We Will Do', 'What This Means']],
     body: [
@@ -389,28 +381,28 @@ export const generateInvestmentPDF = () => {
     margin: { left: margin, right: margin },
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('COMPETITIVE ADVANTAGES');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['Feature', 'FEEDIN', 'Instagram', 'TikTok', 'Patreon']],
     body: [
-      ['Instant Monetization', '✓', '✗', '✗', '✓'],
-      ['Integrated Live Streaming', '✓', '✓', '✓', '✗'],
-      ['AI Content Tools', '✓', '✗', '✗', '✗'],
-      ['Built-in Credit Economy', '✓', '✗', '✓', '✗'],
+      ['Instant Monetization', 'Yes', 'No', 'No', 'Yes'],
+      ['Integrated Live Streaming', 'Yes', 'Yes', 'Yes', 'No'],
+      ['AI Content Tools', 'Yes', 'No', 'No', 'No'],
+      ['Built-in Credit Economy', 'Yes', 'No', 'Yes', 'No'],
       ['Creator Payout Rate', '85%+', '55%', '50%', '88%'],
-      ['Direct Messaging', '✓', '✓', '✓', '✗'],
-      ['Voice/Video Calls', '✓', '✗', '✗', '✗'],
+      ['Direct Messaging', 'Yes', 'Yes', 'Yes', 'No'],
+      ['Voice/Video Calls', 'Yes', 'No', 'No', 'No'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
     margin: { left: margin, right: margin },
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('WHY INVEST NOW?');
   
@@ -434,7 +426,7 @@ export const generateInvestmentPDF = () => {
   
   drawSectionHeader('WHAT COULD GO WRONG (And How We Handle It)');
   
-  doc.autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [['The Risk', 'How We Deal With It']],
     body: [
@@ -453,7 +445,7 @@ export const generateInvestmentPDF = () => {
     }
   });
   
-  yPos = doc.lastAutoTable.finalY + 15;
+  yPos = (doc as any).lastAutoTable.finalY + 15;
   
   drawSectionHeader('WHO WE ARE');
   
