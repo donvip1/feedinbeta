@@ -59,7 +59,7 @@ export const generateInvestmentPDF = () => {
   doc.setFontSize(12);
   doc.setTextColor(180, 180, 180);
   doc.text('CONFIDENTIAL', pageWidth / 2, 135, { align: 'center' });
-  doc.text('Series Seed Funding Round', pageWidth / 2, 145, { align: 'center' });
+  doc.text('Pre-Seed / MVP Funding Round', pageWidth / 2, 145, { align: 'center' });
   doc.text('January 2026', pageWidth / 2, 155, { align: 'center' });
   
   // Key metrics on cover
@@ -70,10 +70,10 @@ export const generateInvestmentPDF = () => {
   doc.setFontSize(20);
   doc.setFont('helvetica', 'bold');
   const metrics = [
-    { label: 'Raising', value: '$1M' },
-    { label: 'Valuation', value: '$5M' },
-    { label: 'Equity', value: '20%' },
-    { label: 'Runway', value: '18 mo' }
+    { label: 'MVP Budget', value: '$15K' },
+    { label: 'Spent', value: '$4K+' },
+    { label: 'Needed', value: '$11K' },
+    { label: 'Launch', value: 'Q1 2026' }
   ];
   
   const metricWidth = (pageWidth - 2 * margin) / 4;
@@ -108,17 +108,23 @@ export const generateInvestmentPDF = () => {
     'networking, live streaming, AI-powered tools, and an integrated credit economy to enable creators',
     'to monetize their content from day one—no follower thresholds, no waiting periods.',
     '',
-    'Our platform addresses the fundamental problem with existing social media: creators do the work,',
-    'but platforms capture most of the value. FEEDIN flips this model by giving creators 85%+ of their',
-    'earnings and providing instant monetization from their very first post.',
+    'We started building FEEDIN in September 2025 and have made significant progress over the past',
+    '4 months. Our MVP budget is $15,000, of which we have invested $4,000+ of our own capital.',
+    'We are seeking funding to complete the remaining features and launch in Q1 2026.',
     '',
-    'Key Differentiators:',
-    '• Instant monetization through credit-based gifts and tips (no follower requirements)',
-    '• Integrated AI suite for content creation, image generation, and smart assistance',
-    '• Unified experience: social feed, live streaming, messaging, and monetization in one app',
-    '• Proprietary credit economy that creates engagement loops and revenue predictability',
-    '• Low-latency WebRTC live streaming with real-time gifts and reactions',
-    '• Privacy-first architecture with row-level security and encrypted messaging'
+    'What We Have Built (70% Complete):',
+    '• Full social feed with posts, stories, likes, comments, and shares',
+    '• User profiles, follows, friends system, and direct messaging',
+    '• Credit economy with purchases, gifts, and creator payouts',
+    '• AI Copilot, image generation, thesis writer, and educational Q&A',
+    '• Groups, hashtags, trending content, and search functionality',
+    '• Premium subscriptions and promotional tools',
+    '',
+    'What We Need to Complete (30% Remaining):',
+    '• Live streaming with real-time gifts and reactions',
+    '• Voice and video calling functionality',
+    '• Learn AI section with tech education content',
+    '• Mobile app optimization and PWA enhancements'
   ];
   
   execSummary.forEach(line => {
@@ -126,8 +132,8 @@ export const generateInvestmentPDF = () => {
     yPos += 6;
   });
   
-  yPos += 10;
-  drawSectionHeader('THE PROBLEM');
+  yPos += 5;
+  drawSectionHeader('THE PROBLEM WE SOLVE');
   
   doc.setFont('helvetica', 'bold');
   doc.text('For Creators:', margin, yPos);
@@ -147,37 +153,118 @@ export const generateInvestmentPDF = () => {
   
   yPos += 5;
   doc.setFont('helvetica', 'bold');
-  doc.text('For Users:', margin, yPos);
+  doc.text('Our Solution:', margin, yPos);
   yPos += 7;
   doc.setFont('helvetica', 'normal');
   
-  const userProblems = [
-    '• Fragmented experience across multiple apps for different needs',
-    '• No way to directly support favorite creators without platform taking large cut',
-    '• Bombarded with ads and algorithmic content they didnt ask for',
-    '• Privacy concerns with data harvesting and tracking'
+  const solutions = [
+    '• Instant monetization through credit-based gifts and tips (no follower requirements)',
+    '• Transparent feed with paid promotion as an option, not requirement',
+    '• Creators keep 85%+ of earnings—competitive with best-in-class platforms',
+    '• Direct messaging, calls, and live interaction with followers'
   ];
-  userProblems.forEach(line => {
+  solutions.forEach(line => {
     doc.text(line, margin, yPos);
     yPos += 6;
   });
   
-  // Page 3 - Traction
+  // Page 3 - Development Progress & Roadmap
   doc.addPage();
   yPos = 20;
   
-  drawSectionHeader('TRACTION & KEY METRICS');
+  drawSectionHeader('DEVELOPMENT TIMELINE & PROGRESS');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Metric', 'Current Value', 'YoY Growth']],
+    head: [['Phase', 'Timeline', 'Status', 'Details']],
     body: [
-      ['Monthly Active Users', '50,000+', '+340%'],
-      ['Daily Posts Created', '10,000+', '+280%'],
-      ['Countries Reached', '25+', 'Expanding'],
-      ['Credits Transacted', '1,000,000+', '+450%'],
-      ['Live Streams Hosted', '5,000+', '+520%'],
-      ['Messages Sent Daily', '100,000+', '+380%'],
+      ['Project Start', 'Sep 2025', 'Completed', 'Initial architecture and planning'],
+      ['Core Social Features', 'Sep-Oct 2025', 'Completed', 'Feed, profiles, posts, stories'],
+      ['Messaging & Friends', 'Oct-Nov 2025', 'Completed', 'DMs, friend requests, follows'],
+      ['Credit Economy', 'Nov 2025', 'Completed', 'Purchases, gifts, transactions'],
+      ['AI Features', 'Nov-Dec 2025', 'Completed', 'Copilot, image gen, thesis writer'],
+      ['Groups & Search', 'Dec 2025', 'Completed', 'Groups, hashtags, trending'],
+      ['Live Streaming', 'Jan 2026', 'In Progress', 'WebRTC streaming with gifts'],
+      ['Voice/Video Calls', 'Jan-Feb 2026', 'Pending', 'P2P calling functionality'],
+      ['Learn AI Section', 'Feb 2026', 'Pending', 'Tech education content'],
+      ['MVP Launch', 'Q1 2026', 'Target', 'Public launch and user acquisition'],
+    ],
+    theme: 'striped',
+    headStyles: { fillColor: [99, 102, 241] },
+    margin: { left: margin, right: margin },
+    columnStyles: {
+      0: { cellWidth: 40 },
+      1: { cellWidth: 25 },
+      2: { cellWidth: 25 },
+      3: { cellWidth: 75 }
+    }
+  });
+  
+  yPos = doc.lastAutoTable.finalY + 15;
+  
+  drawSectionHeader('MVP BUDGET BREAKDOWN');
+  
+  doc.autoTable({
+    startY: yPos,
+    head: [['Category', 'Budget', 'Spent', 'Remaining', 'Status']],
+    body: [
+      ['Infrastructure & Hosting', '$3,000', '$1,200', '$1,800', 'Ongoing'],
+      ['API Services & AI', '$2,500', '$800', '$1,700', 'Ongoing'],
+      ['Development Tools', '$1,500', '$500', '$1,000', 'Partial'],
+      ['Design & Assets', '$1,000', '$400', '$600', 'Partial'],
+      ['Live Streaming Infrastructure', '$3,000', '$600', '$2,400', 'In Progress'],
+      ['Calling & WebRTC', '$2,000', '$300', '$1,700', 'Pending'],
+      ['Testing & QA', '$1,000', '$200', '$800', 'Pending'],
+      ['Marketing & Launch', '$1,000', '$0', '$1,000', 'Pending'],
+      ['TOTAL', '$15,000', '$4,000+', '~$11,000', '-'],
+    ],
+    theme: 'striped',
+    headStyles: { fillColor: [99, 102, 241] },
+    margin: { left: margin, right: margin },
+  });
+  
+  yPos = doc.lastAutoTable.finalY + 15;
+  
+  drawSectionHeader('WHAT YOUR INVESTMENT ENABLES');
+  
+  doc.setFontSize(11);
+  const investmentImpact = [
+    'With the remaining ~$11,000 needed to complete MVP, your investment will:',
+    '',
+    '• Complete live streaming with real-time gifts, reactions, and WebRTC infrastructure',
+    '• Build voice and video calling for direct creator-fan communication',
+    '• Develop the Learn AI section with curated tech education content',
+    '• Optimize mobile experience and PWA for app-like performance',
+    '• Cover infrastructure costs for launch and initial user growth',
+    '• Fund initial marketing and creator onboarding campaigns'
+  ];
+  investmentImpact.forEach(line => {
+    doc.text(line, margin, yPos);
+    yPos += 7;
+  });
+  
+  // Page 4 - Features & Revenue
+  doc.addPage();
+  yPos = 20;
+  
+  drawSectionHeader('PLATFORM FEATURES (BUILT)');
+  
+  doc.autoTable({
+    startY: yPos,
+    head: [['Feature', 'Status', 'Description']],
+    body: [
+      ['Social Feed', '✓ Complete', 'Posts with images, videos, likes, comments, shares'],
+      ['Stories', '✓ Complete', '24-hour ephemeral content with views tracking'],
+      ['User Profiles', '✓ Complete', 'Customizable profiles, followers, following'],
+      ['Direct Messaging', '✓ Complete', 'Real-time chat with media sharing'],
+      ['Credit System', '✓ Complete', 'Virtual currency for gifts and promotions'],
+      ['Gifting', '✓ Complete', 'Send gifts to creators, 85% payout rate'],
+      ['AI Copilot', '✓ Complete', 'Chat assistant powered by advanced AI'],
+      ['Image Generation', '✓ Complete', 'AI-powered image creation'],
+      ['Groups', '✓ Complete', 'Community groups with posts and members'],
+      ['Search & Hashtags', '✓ Complete', 'Discover content and trending topics'],
+      ['Premium Subscriptions', '✓ Complete', 'Monthly plans with exclusive features'],
+      ['Creator Payouts', '✓ Complete', 'Withdraw earnings to bank/wallet'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -194,9 +281,9 @@ export const generateInvestmentPDF = () => {
     body: [
       ['Credit Purchases', '40%', 'Users buy credits for gifts, promotions, AI features'],
       ['Premium Subscriptions', '25%', 'Monthly/annual premium memberships'],
-      ['Platform Transaction Fees', '20%', '10-15% fee on gifts, P2P trades, payouts'],
+      ['Platform Transaction Fees', '20%', '10-15% fee on gifts and creator payouts'],
       ['Promoted Content', '10%', 'Creators pay to boost visibility'],
-      ['Enterprise & API', '5%', 'B2B integrations and white-label solutions'],
+      ['Enterprise & API', '5%', 'B2B integrations (future)'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -205,38 +292,39 @@ export const generateInvestmentPDF = () => {
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('FINANCIAL PROJECTIONS');
+  drawSectionHeader('FINANCIAL PROJECTIONS (POST-LAUNCH)');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Metric', 'Year 1', 'Year 2', 'Year 3']],
+    head: [['Metric', 'Q2 2026', 'Q4 2026', 'Q4 2027']],
     body: [
-      ['Monthly Active Users', '100K', '500K', '2M'],
-      ['Premium Subscribers', '5K', '35K', '150K'],
-      ['Monthly Revenue', '$50K', '$350K', '$1.5M'],
-      ['Annual Revenue', '$600K', '$4.2M', '$18M'],
-      ['Gross Margin', '70%', '75%', '80%'],
+      ['Monthly Active Users', '1,000', '10,000', '100,000'],
+      ['Premium Subscribers', '50', '500', '5,000'],
+      ['Monthly Revenue', '$500', '$5,000', '$50,000'],
+      ['Monthly Costs', '$800', '$2,000', '$15,000'],
+      ['Break-even Target', '-', 'Q3 2026', 'Profitable'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
     margin: { left: margin, right: margin },
   });
   
-  // Page 4 - Cap Table & Use of Funds
+  // Page 5 - Cap Table & Investment
   doc.addPage();
   yPos = 20;
   
-  drawSectionHeader('CAP TABLE (POST-INVESTMENT)');
+  drawSectionHeader('EQUITY STRUCTURE (POST-INVESTMENT)');
   
   doc.autoTable({
     startY: yPos,
     head: [['Shareholder', 'Equity %', 'Notes']],
     body: [
-      ['Founders (CEO & Co-Founder)', '50%', 'Vested over 4 years with 1-year cliff'],
-      ['Series Seed Investors', '20%', 'Current funding round allocation'],
-      ['ESOP (Employee Stock Pool)', '15%', 'Reserved for key hires and team expansion'],
-      ['Advisors & Strategic Partners', '10%', 'Industry experts and growth partners'],
-      ['Future Rounds Reserve', '5%', 'Reserved for Series A and beyond'],
+      ['Founder & CEO', '40%', 'Full-time, vested over 4 years'],
+      ['Co-Founder', '10%', 'Vested over 4 years with 1-year cliff'],
+      ['Pre-Seed Investors', '20%', 'Current funding round'],
+      ['ESOP (Employee Pool)', '15%', 'Reserved for key hires'],
+      ['Advisors', '10%', 'Industry experts and mentors'],
+      ['Future Rounds Reserve', '5%', 'Reserved for Series A'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -245,43 +333,39 @@ export const generateInvestmentPDF = () => {
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('USE OF FUNDS ($1M RAISE)');
-  
-  doc.autoTable({
-    startY: yPos,
-    head: [['Category', 'Amount', 'Allocation', 'Details']],
-    body: [
-      ['Product Development', '$350,000', '35%', 'AI features, streaming, mobile apps'],
-      ['User Acquisition', '$250,000', '25%', 'Marketing, influencers, growth campaigns'],
-      ['Team Expansion', '$200,000', '20%', 'Engineering, design, community'],
-      ['Infrastructure', '$120,000', '12%', 'Servers, CDN, security, compliance'],
-      ['Operations & Legal', '$80,000', '8%', 'Legal, accounting, office, misc'],
-    ],
-    theme: 'striped',
-    headStyles: { fillColor: [99, 102, 241] },
-    margin: { left: margin, right: margin },
-  });
-  
-  yPos = doc.lastAutoTable.finalY + 15;
-  
-  drawSectionHeader('INVESTMENT TERMS');
+  drawSectionHeader('INVESTMENT OPPORTUNITY');
   
   doc.setFontSize(11);
-  const terms = [
-    '• Instrument: SAFE (Simple Agreement for Future Equity)',
-    '• Valuation Cap: $5,000,000 (pre-money)',
-    '• Discount: 20% on next priced round',
-    '• Minimum Investment: $25,000',
-    '• Pro-rata Rights: Yes, for investments ≥ $50,000',
-    '• Information Rights: Quarterly updates for all investors',
-    '• Board Seat: Observer seat for lead investor ($250K+)'
+  doc.setFont('helvetica', 'bold');
+  doc.text('What We Are Seeking:', margin, yPos);
+  yPos += 8;
+  doc.setFont('helvetica', 'normal');
+  
+  const investmentDetails = [
+    '• Total Raise: $15,000 - $50,000 (flexible based on investor interest)',
+    '• Minimum Investment: $1,000',
+    '• Equity Offered: 20% (for full $15K raise) - negotiable for larger amounts',
+    '• Instrument: SAFE (Simple Agreement for Future Equity) or direct equity',
+    '• Valuation Cap: $75,000 pre-money (at MVP stage)',
+    '',
+    'Investment Tiers:',
+    '',
+    '$1,000 - $4,999:    2-5% equity + investor updates + early access',
+    '$5,000 - $9,999:    6-10% equity + advisory role + product input',
+    '$10,000 - $15,000:  12-20% equity + board observer + strategic partner',
+    '',
+    'Additional benefits for all investors:',
+    '• Lifetime premium subscription to FEEDIN',
+    '• Recognition as founding investor on platform',
+    '• Quarterly progress reports and financial updates',
+    '• Direct access to founding team'
   ];
-  terms.forEach(term => {
-    doc.text(term, margin, yPos);
-    yPos += 7;
+  investmentDetails.forEach(line => {
+    doc.text(line, margin, yPos);
+    yPos += 6;
   });
   
-  // Page 5 - Milestones & Team
+  // Page 6 - Roadmap & Milestones
   doc.addPage();
   yPos = 20;
   
@@ -289,12 +373,15 @@ export const generateInvestmentPDF = () => {
   
   doc.autoTable({
     startY: yPos,
-    head: [['Quarter', 'Goal', 'Key Initiatives']],
+    head: [['Timeline', 'Milestone', 'Key Deliverables']],
     body: [
-      ['Q1 2026', '100K MAU', 'Launch mobile apps (iOS/Android), expand AI features'],
-      ['Q2 2026', '250K MAU', 'Enter 10 new markets, creator partnership program'],
-      ['Q3 2026', '500K MAU', 'Launch premium subscriptions at scale'],
-      ['Q4 2026', '1M MAU', 'Series A preparation, break-even trajectory'],
+      ['Jan 2026', 'Complete Live Streaming', 'WebRTC streaming, real-time gifts, reactions'],
+      ['Feb 2026', 'Voice/Video Calling', 'P2P calls, call history, notifications'],
+      ['Feb 2026', 'Learn AI Section', 'Tech tutorials, AI-curated content'],
+      ['Mar 2026', 'MVP Launch', 'Public launch, initial marketing push'],
+      ['Q2 2026', '1,000 MAU', 'Creator onboarding, community building'],
+      ['Q3 2026', '5,000 MAU', 'Revenue optimization, break-even target'],
+      ['Q4 2026', '10,000 MAU', 'Series A preparation, team expansion'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -303,66 +390,7 @@ export const generateInvestmentPDF = () => {
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('TEAM & KEY HIRES');
-  
-  doc.setFontSize(11);
-  doc.setFont('helvetica', 'bold');
-  doc.text('Current Team:', margin, yPos);
-  yPos += 7;
-  doc.setFont('helvetica', 'normal');
-  doc.text('Founder-led team with full-stack development, product design, and go-to-market experience.', margin, yPos);
-  yPos += 6;
-  doc.text('Built the entire platform from scratch with a focus on scalability and user experience.', margin, yPos);
-  yPos += 12;
-  
-  doc.setFont('helvetica', 'bold');
-  doc.text('Planned Hires (Post-Funding):', margin, yPos);
-  yPos += 7;
-  
-  doc.autoTable({
-    startY: yPos,
-    head: [['Role', 'Priority', 'Timeline']],
-    body: [
-      ['CTO / Lead Engineer', 'Critical', 'Q1 2026'],
-      ['Head of Growth', 'High', 'Q1 2026'],
-      ['Senior Full-Stack Engineers (2)', 'High', 'Q1-Q2 2026'],
-      ['Mobile Developer (iOS/Android)', 'High', 'Q2 2026'],
-      ['Community Manager', 'Medium', 'Q2 2026'],
-      ['Content & Creator Relations', 'Medium', 'Q2 2026'],
-    ],
-    theme: 'striped',
-    headStyles: { fillColor: [99, 102, 241] },
-    margin: { left: margin, right: margin },
-  });
-  
-  // Page 6 - Risks & Contact
-  doc.addPage();
-  yPos = 20;
-  
-  drawSectionHeader('RISK FACTORS & MITIGATION');
-  
-  doc.autoTable({
-    startY: yPos,
-    head: [['Risk', 'Mitigation Strategy']],
-    body: [
-      ['Market Competition', 'Focus on creator-first features; rapid iteration and innovation'],
-      ['User Acquisition Cost', 'Viral referral system with credit incentives; organic growth'],
-      ['Regulatory Changes', 'Privacy-first architecture; compliance-ready; legal counsel'],
-      ['Technology Scaling', 'Cloud-native architecture; CDN; modular microservices'],
-      ['Creator Retention', 'Competitive 85%+ payout rates; instant monetization'],
-    ],
-    theme: 'striped',
-    headStyles: { fillColor: [99, 102, 241] },
-    margin: { left: margin, right: margin },
-    columnStyles: {
-      0: { cellWidth: 50 },
-      1: { cellWidth: 120 }
-    }
-  });
-  
-  yPos = doc.lastAutoTable.finalY + 15;
-  
-  drawSectionHeader('COMPETITIVE LANDSCAPE');
+  drawSectionHeader('COMPETITIVE ADVANTAGES');
   
   doc.autoTable({
     startY: yPos,
@@ -374,45 +402,111 @@ export const generateInvestmentPDF = () => {
       ['Built-in Credit Economy', '✓', '✗', '✓', '✗'],
       ['Creator Payout Rate', '85%+', '55%', '50%', '88%'],
       ['Direct Messaging', '✓', '✓', '✓', '✗'],
-      ['P2P Trading', '✓', '✗', '✗', '✗'],
+      ['Voice/Video Calls', '✓', '✗', '✗', '✗'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
     margin: { left: margin, right: margin },
   });
   
-  yPos = doc.lastAutoTable.finalY + 20;
+  yPos = doc.lastAutoTable.finalY + 15;
   
+  drawSectionHeader('WHY INVEST NOW?');
+  
+  doc.setFontSize(11);
+  const whyNow = [
+    '• Ground Floor Opportunity: Join at pre-seed/MVP stage with maximum upside',
+    '• 70% Already Built: Majority of platform is functional and demonstrable',
+    '• Small Capital Needed: Only ~$11K to complete MVP and launch',
+    '• Creator Economy Boom: $250B+ market growing 20%+ annually',
+    '• Proven Team Execution: Built complex platform in 4 months with minimal capital',
+    '• First-Mover Features: AI integration + instant monetization is unique combination'
+  ];
+  whyNow.forEach(line => {
+    doc.text(line, margin, yPos);
+    yPos += 7;
+  });
+  
+  // Page 7 - Risks & Contact
+  doc.addPage();
+  yPos = 20;
+  
+  drawSectionHeader('RISK FACTORS');
+  
+  doc.autoTable({
+    startY: yPos,
+    head: [['Risk', 'Mitigation Strategy']],
+    body: [
+      ['Early Stage', 'MVP 70% complete; demonstrable product; lean operations'],
+      ['Market Competition', 'Focus on underserved creator needs; rapid iteration'],
+      ['User Acquisition', 'Credit incentives; creator referrals; organic growth'],
+      ['Technical Scaling', 'Cloud-native architecture; CDN; modular design'],
+      ['Revenue Timeline', 'Multiple revenue streams from day one; low burn rate'],
+    ],
+    theme: 'striped',
+    headStyles: { fillColor: [99, 102, 241] },
+    margin: { left: margin, right: margin },
+    columnStyles: {
+      0: { cellWidth: 40 },
+      1: { cellWidth: 125 }
+    }
+  });
+  
+  yPos = doc.lastAutoTable.finalY + 15;
+  
+  drawSectionHeader('TEAM');
+  
+  doc.setFontSize(11);
+  const team = [
+    'Founder & CEO',
+    '• Full-stack developer with experience in React, Node.js, and cloud infrastructure',
+    '• Built entire FEEDIN platform from scratch over 4 months',
+    '• Passionate about creator empowerment and fair monetization',
+    '',
+    'Co-Founder',
+    '• Supports product vision and business development',
+    '• Contributes to strategic planning and partnerships',
+    '',
+    'Post-Funding Hires (Planned):',
+    '• Senior Developer (Q2 2026) - Scale infrastructure and features',
+    '• Community Manager (Q2 2026) - Creator relations and growth'
+  ];
+  team.forEach(line => {
+    doc.text(line, margin, yPos);
+    yPos += 6;
+  });
+  
+  yPos += 10;
   drawSectionHeader('NEXT STEPS');
   
   doc.setFontSize(11);
   const nextSteps = [
-    '1. Schedule an intro call with our founding team',
-    '2. Receive detailed financial projections and data room access',
-    '3. Complete due diligence and legal review',
-    '4. Sign SAFE agreement and wire funds'
+    '1. Review this memorandum and explore the live platform at feedin.app',
+    '2. Schedule a call with our founder to discuss the opportunity',
+    '3. Receive demo access and see features in action',
+    '4. Complete investment via SAFE agreement or direct equity',
+    '5. Join us as a founding investor in the creator economy revolution'
   ];
   nextSteps.forEach(step => {
     doc.text(step, margin, yPos);
-    yPos += 8;
+    yPos += 7;
   });
   
   yPos += 10;
   doc.setFillColor(240, 240, 250);
-  doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 40, 3, 3, 'F');
+  doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 35, 3, 3, 'F');
   
   doc.setFont('helvetica', 'bold');
   doc.text('Contact Information', margin + 5, yPos + 10);
   doc.setFont('helvetica', 'normal');
   doc.text('Investor Relations: investors@feedin.app', margin + 5, yPos + 20);
   doc.text('Founding Team: founders@feedin.app', margin + 5, yPos + 28);
-  doc.text('We typically respond within 24-48 hours', margin + 5, yPos + 36);
   
   // Disclaimer footer
-  yPos += 55;
+  yPos += 50;
   doc.setFontSize(8);
   doc.setTextColor(100, 100, 100);
-  const disclaimer = 'DISCLAIMER: This document is for informational purposes only and does not constitute an offer to sell or solicitation to buy securities. All investments carry risk and past performance does not guarantee future results. Prospective investors should conduct their own due diligence and consult with financial, legal, and tax advisors before making any investment decision.';
+  const disclaimer = 'DISCLAIMER: This document is for informational purposes only and does not constitute an offer to sell or solicitation to buy securities. All investments carry risk, especially at the early stage. Past performance does not guarantee future results. Prospective investors should conduct their own due diligence and consult with financial, legal, and tax advisors before making any investment decision. FEEDIN is a pre-revenue startup and investment may result in total loss of capital.';
   const splitDisclaimer = doc.splitTextToSize(disclaimer, pageWidth - 2 * margin);
   doc.text(splitDisclaimer, margin, yPos);
   
