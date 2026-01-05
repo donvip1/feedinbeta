@@ -30,15 +30,37 @@ const LiveStreamDetail = () => {
 
   const loadStream = async () => {
     try {
-      // Query from live_streams_public view - accessible to all users
-      const { data, error } = await supabase
+      // First, fetch the stream from the public view
+      const { data: streamData, error: streamError } = await supabase
         .from('live_streams_public')
-        .select('*, profiles:user_id (id, display_name, username, avatar_url)')
+        .select('*')
         .eq('id', streamId)
         .maybeSingle();
 
-      if (error) throw error;
-      setStream(data);
+      if (streamError) {
+        console.error('Error loading stream:', streamError);
+        setLoading(false);
+        return;
+      }
+
+      if (!streamData) {
+        console.log('Stream not found');
+        setLoading(false);
+        return;
+      }
+
+      // Then fetch the profile separately to avoid view join issues
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .eq('id', streamData.user_id)
+        .maybeSingle();
+
+      // Combine the data
+      setStream({
+        ...streamData,
+        profiles: profileData
+      });
     } catch (error) {
       console.error('Error loading stream:', error);
     } finally {

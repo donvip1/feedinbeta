@@ -75,21 +75,41 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
-      const { data: streamData, error } = await supabase
+      // Fetch stream data first (from view without join to avoid issues)
+      const { data: streamData, error: streamError } = await supabase
         .from("live_streams_public")
-        .select(`*, profiles:user_id (id, display_name, username, avatar_url)`)
+        .select("*")
         .eq("id", streamId)
         .maybeSingle();
 
-      if (error || !streamData) {
-        console.error("[Viewer] Failed to load stream:", error);
+      if (streamError) {
+        console.error("[Viewer] Failed to load stream:", streamError);
         toast.error("Failed to load stream");
         onClose();
         return;
       }
 
-      console.log("[Viewer] Stream data loaded:", streamData);
-      setStream(streamData);
+      if (!streamData) {
+        console.error("[Viewer] Stream not found");
+        toast.error("Stream not found");
+        onClose();
+        return;
+      }
+
+      // Fetch profile data separately
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id, display_name, username, avatar_url")
+        .eq("id", streamData.user_id)
+        .maybeSingle();
+
+      const fullStreamData = {
+        ...streamData,
+        profiles: profileData
+      };
+
+      console.log("[Viewer] Stream data loaded:", fullStreamData);
+      setStream(fullStreamData);
       setRealtimeViewerCount(streamData.viewer_count || 0);
       
       // If stream is live, connect via P2P
