@@ -73,6 +73,7 @@ import Install from "./pages/Install";
 import MusicDiscovery from "./pages/MusicDiscovery";
 import AdminAnalytics from "./pages/AdminAnalytics";
 import Investors from "./pages/Investors";
+import InvestmentDocs from "./pages/InvestmentDocs";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import SpaceDetail from "./pages/SpaceDetail";
 
@@ -241,6 +242,7 @@ const App = () => {
             <Route path="/settings/help" element={<HelpSupport />} />
             <Route path="/settings/sessions" element={<SessionManagement />} />
             <Route path="/settings/investors" element={<Investors />} />
+            <Route path="/settings/investment-docs" element={<InvestmentDocs />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
             
