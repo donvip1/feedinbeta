@@ -23,7 +23,6 @@ import { useLivePresence } from "@/hooks/useLivePresence";
 import { FloatingReactions } from "./FloatingReactions";
 import { FlyingChat } from "./FlyingChat";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { LiveStreamP2P, ConnectionStatus } from "@/lib/live-stream-p2p";
 
 interface SimpleBroadcasterProps {
   streamId: string;
@@ -42,10 +41,10 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
   const videoRef = useRef<HTMLVideoElement>(null);
   const mobileVideoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const p2pManagerRef = useRef<LiveStreamP2P | null>(null);
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
   const [stream, setStream] = useState<any>(null);
   const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState("");
@@ -58,7 +57,8 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
   const [totalGiftsReceived, setTotalGiftsReceived] = useState(0);
   const [flyingGifts, setFlyingGifts] = useState<any[]>([]);
   const [showChat, setShowChat] = useState(true);
-  const [p2pViewerCount, setP2pViewerCount] = useState(0);
+  const [whipUrl, setWhipUrl] = useState<string | null>(null);
+  const [liveInputId, setLiveInputId] = useState<string | null>(null);
 
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
@@ -119,7 +119,7 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
     }
   }, [isFrontCamera, setVideoStream]);
 
-  // Start broadcasting with P2P
+  // Start broadcasting with Cloudflare WebRTC WHIP
   const startBroadcast = useCallback(async () => {
     if (!user) return;
     
@@ -132,69 +132,157 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
         mediaStream = await initializePreview();
       }
       
-      console.log('[Broadcaster] Starting P2P broadcast...');
+      console.log('[Broadcaster] Creating Cloudflare live input...');
       
-      // Create P2P manager
-      const p2p = new LiveStreamP2P(streamId, user.id, 'broadcaster', {
-        onStatusChange: (status, message) => {
-          console.log('[Broadcaster] Status:', status, message);
-          setConnectionStatus(status);
-        },
-        onViewerJoined: (viewerId) => {
-          console.log('[Broadcaster] Viewer joined:', viewerId.slice(0, 8));
-          setP2pViewerCount(prev => prev + 1);
-        },
-        onViewerLeft: (viewerId) => {
-          console.log('[Broadcaster] Viewer left:', viewerId.slice(0, 8));
-          setP2pViewerCount(prev => Math.max(0, prev - 1));
-        },
-        onError: (error) => {
-          console.error('[Broadcaster] P2P error:', error);
-          toast.error(error.message);
-        },
+      // 1. Create Cloudflare Live Input via edge function
+      const { data: cfData, error: cfError } = await supabase.functions.invoke('cloudflare-stream-v2', {
+        body: {
+          action: 'create-stream',
+          streamId,
+          title: stream?.title || 'Live Stream',
+          enableRecording: true,
+        }
       });
+
+      if (cfError || !cfData?.success) {
+        throw new Error(cfData?.error || 'Failed to create Cloudflare stream');
+      }
+
+      const { webrtcPublishUrl, liveInputId: inputId, hlsUrl } = cfData;
+      console.log('[Broadcaster] Got WHIP URL:', webrtcPublishUrl);
+      console.log('[Broadcaster] HLS URL for viewers:', hlsUrl);
       
-      p2pManagerRef.current = p2p;
-      
-      // Start broadcasting
-      await p2p.startBroadcast(mediaStream);
-      
-      toast.success("You are now live! Viewers can join instantly.");
+      setWhipUrl(webrtcPublishUrl);
+      setLiveInputId(inputId);
+
+      // 2. Create RTCPeerConnection and push to Cloudflare WHIP
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+        bundlePolicy: 'max-bundle',
+      });
+      peerConnectionRef.current = pc;
+
+      // Add tracks to peer connection
+      mediaStream.getTracks().forEach(track => {
+        pc.addTrack(track, mediaStream);
+      });
+
+      // Create offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // Wait for ICE gathering to complete
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === 'complete') {
+          resolve();
+        } else {
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === 'complete') resolve();
+          };
+          // Timeout after 5 seconds
+          setTimeout(resolve, 5000);
+        }
+      });
+
+      const localDescription = pc.localDescription;
+      if (!localDescription) {
+        throw new Error('Failed to create local description');
+      }
+
+      console.log('[Broadcaster] Sending WHIP offer to Cloudflare...');
+
+      // 3. Send offer to Cloudflare WHIP endpoint
+      const whipResponse = await fetch(webrtcPublishUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/sdp',
+        },
+        body: localDescription.sdp,
+      });
+
+      if (!whipResponse.ok) {
+        const errorText = await whipResponse.text();
+        console.error('[Broadcaster] WHIP error:', errorText);
+        throw new Error(`WHIP connection failed: ${whipResponse.status}`);
+      }
+
+      const answerSdp = await whipResponse.text();
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+      console.log('[Broadcaster] Connected to Cloudflare! Setting stream_ready...');
+
+      // 4. Update stream status
+      await supabase
+        .from('live_streams')
+        .update({ 
+          status: 'live',
+          stream_ready: true,
+          connection_state: 'live',
+          started_at: new Date().toISOString(),
+        })
+        .eq('id', streamId);
+
+      // Also verify stream is playable in background
+      supabase.functions.invoke('cloudflare-stream-v2', {
+        body: {
+          action: 'verify-stream-playable',
+          streamId,
+          liveInputId: inputId,
+          maxWaitSeconds: 30,
+        }
+      }).then(result => {
+        console.log('[Broadcaster] Stream verification result:', result.data);
+      });
+
+      setConnectionStatus('connected');
+      toast.success("You are now live! Viewers can join.");
       
     } catch (error: any) {
       console.error('[Broadcaster] Broadcast error:', error);
       setConnectionStatus('failed');
       toast.error(error.message || 'Failed to start broadcast');
+      
+      // Cleanup on failure
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
     }
-  }, [streamId, user, initializePreview]);
+  }, [streamId, user, initializePreview, stream?.title]);
 
   // Stop broadcast
   const stopBroadcast = useCallback(async () => {
     console.log('[Broadcaster] Stopping broadcast...');
     
-    // Cleanup P2P
-    if (p2pManagerRef.current) {
-      p2pManagerRef.current.destroy();
-      p2pManagerRef.current = null;
+    // Cleanup WebRTC connection
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close();
+      peerConnectionRef.current = null;
     }
     
     // Stop media
     streamRef.current?.getTracks().forEach(track => track.stop());
     streamRef.current = null;
     
-    // Update database
-    await supabase
-      .from("live_streams")
-      .update({ 
-        status: 'ended', 
-        stream_ready: false,
-        ended_at: new Date().toISOString(),
-        connection_state: 'ended'
-      })
-      .eq("id", streamId);
+    // End stream via edge function
+    if (liveInputId) {
+      await supabase.functions.invoke('cloudflare-stream-v2', {
+        body: { action: 'end-stream', streamId, liveInputId }
+      });
+    } else {
+      await supabase
+        .from("live_streams")
+        .update({ 
+          status: 'ended', 
+          stream_ready: false,
+          ended_at: new Date().toISOString(),
+          connection_state: 'ended'
+        })
+        .eq("id", streamId);
+    }
     
     onClose();
-  }, [streamId, onClose]);
+  }, [streamId, onClose, liveInputId]);
 
   // Toggle video/audio
   const toggleVideo = useCallback(() => {
@@ -229,13 +317,19 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
       
       oldStream?.getTracks().forEach(track => track.stop());
       
-      // Replace tracks in P2P connections
-      if (p2pManagerRef.current && connectionStatus === 'connected') {
+      // Replace tracks in WebRTC connection
+      if (peerConnectionRef.current && connectionStatus === 'connected') {
+        const senders = peerConnectionRef.current.getSenders();
         const videoTrack = newStream.getVideoTracks()[0];
         const audioTrack = newStream.getAudioTracks()[0];
         
-        if (videoTrack) await p2pManagerRef.current.replaceTrack(videoTrack);
-        if (audioTrack) await p2pManagerRef.current.replaceTrack(audioTrack);
+        for (const sender of senders) {
+          if (sender.track?.kind === 'video' && videoTrack) {
+            await sender.replaceTrack(videoTrack);
+          } else if (sender.track?.kind === 'audio' && audioTrack) {
+            await sender.replaceTrack(audioTrack);
+          }
+        }
       }
       
       toast.success("Camera switched!");
@@ -250,8 +344,9 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
     initializePreview();
     
     return () => {
-      if (p2pManagerRef.current) {
-        p2pManagerRef.current.destroy();
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
       }
       streamRef.current?.getTracks().forEach(track => track.stop());
     };
@@ -396,7 +491,7 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
     if (!error) setNewComment("");
   };
 
-  const totalViewers = Math.max(presenceViewerCount, p2pViewerCount);
+  const totalViewers = presenceViewerCount;
   const isLive = connectionStatus === 'connected';
 
   return (
