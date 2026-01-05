@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark, Music, Disc3, Sparkles, BarChart3 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,6 +17,99 @@ import RefeedModal from './RefeedModal';
 import CaptionText from './CaptionText';
 import FullscreenMediaViewer from './FullscreenMediaViewer';
 import PromotionStatsModal from './PromotionStatsModal';
+import { cn } from '@/lib/utils';
+
+// Optimized image component with skeleton loading
+const ImageWithSkeleton = memo(function ImageWithSkeleton({ 
+  src, 
+  alt, 
+  className, 
+  priority = false,
+  onContextMenu 
+}: { 
+  src: string; 
+  alt: string; 
+  className?: string;
+  priority?: boolean;
+  onContextMenu?: (e: React.MouseEvent) => void;
+}) {
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <div className={cn('bg-muted flex items-center justify-center', className)}>
+        <span className="text-muted-foreground text-sm">Failed to load</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {!isLoaded && <Skeleton className="absolute inset-0 w-full h-full" />}
+      <img
+        src={src}
+        alt={alt}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
+        className={cn(className, 'transition-opacity duration-150', isLoaded ? 'opacity-100' : 'opacity-0')}
+        onLoad={() => setIsLoaded(true)}
+        onError={() => setHasError(true)}
+        onContextMenu={onContextMenu}
+        draggable={false}
+      />
+    </>
+  );
+});
+
+// Optimized video component with skeleton loading
+const VideoWithSkeleton = memo(function VideoWithSkeleton({
+  src,
+  className,
+  muted,
+  playsInline,
+  loop,
+  onClick,
+  onPlay,
+  onPause,
+  onContextMenu,
+  videoRef,
+}: {
+  src: string;
+  className?: string;
+  muted?: boolean;
+  playsInline?: boolean;
+  loop?: boolean;
+  onClick?: () => void;
+  onPlay?: () => void;
+  onPause?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  videoRef?: React.RefObject<HTMLVideoElement>;
+}) {
+  const [isReady, setIsReady] = useState(false);
+
+  return (
+    <>
+      {!isReady && <Skeleton className="absolute inset-0 w-full h-full" />}
+      <video
+        ref={videoRef}
+        src={src}
+        className={cn(className, 'transition-opacity duration-150', isReady ? 'opacity-100' : 'opacity-0')}
+        muted={muted}
+        playsInline={playsInline}
+        loop={loop}
+        preload="auto"
+        onClick={onClick}
+        onCanPlay={() => setIsReady(true)}
+        onPlay={onPlay}
+        onPause={onPause}
+        onContextMenu={onContextMenu}
+        controlsList="nodownload nofullscreen noremoteplayback"
+        disablePictureInPicture
+      />
+    </>
+  );
+});
 
 interface PostCardProps {
   post: {
@@ -757,11 +851,11 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
 
               {currentMediaType === 'image' ? (
                 <>
-                  <img
+                  <ImageWithSkeleton
                     src={currentMediaUrl}
                     alt="Post content"
                     className="w-full h-full object-cover no-download-media"
-                    draggable={false}
+                    priority={currentMediaIndex === 0}
                     onContextMenu={(e) => e.preventDefault()}
                   />
                   {/* Controls for images - positioned to not overlap with music indicator */}
@@ -776,19 +870,17 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
                 </>
               ) : (
                 <>
-                  <video
-                    ref={videoRef}
+                  <VideoWithSkeleton
+                    videoRef={videoRef}
                     src={currentMediaUrl}
                     className="w-full h-full object-cover no-download-media"
-                    playsInline
                     muted={isMuted}
+                    playsInline
                     loop
                     onClick={togglePlayPause}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
                     onContextMenu={(e) => e.preventDefault()}
-                    controlsList="nodownload nofullscreen noremoteplayback"
-                    disablePictureInPicture
                   />
                   
                   {/* Play/Pause icon in center */}
