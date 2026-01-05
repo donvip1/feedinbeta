@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
-  Users, Send, Heart, X, Gift, 
+  Users, Send, Heart, Gift, 
   Volume2, VolumeX, Flame, 
   PartyPopper, ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Coins, Share2, Crown, Loader2, RefreshCw
+  MessageCircle, Home, Loader2, RefreshCw, ArrowLeft
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -560,17 +560,10 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
               variant="ghost"
               size="icon"
               className="text-white hover:bg-white/20"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/live')}
+              title="Go back to streams"
             >
-              <Home className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/20"
-              onClick={onClose}
-            >
-              <X className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5" />
             </Button>
           </div>
         </div>
