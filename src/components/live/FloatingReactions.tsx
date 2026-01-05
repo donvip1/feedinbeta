@@ -53,7 +53,7 @@ export const FloatingReactions = ({ reactions, className }: FloatingReactionsPro
       id: `${latestReaction.id}-${Date.now()}-${Math.random()}`,
       emoji: REACTION_EMOJIS[latestReaction.type] || '❤️',
       senderName: latestReaction.senderName,
-      x: 70 + Math.random() * 25, // Right side of screen (70-95%)
+      x: 10 + Math.random() * 30, // Left-center of screen (10-40%) to be fully visible
       size: 1 + Math.random() * 0.5, // 1x to 1.5x scale
       rotation: -15 + Math.random() * 30, // -15 to 15 degrees
       duration: 2.5 + Math.random() * 1.5, // 2.5 to 4 seconds
@@ -91,14 +91,14 @@ const PhysicsReaction = ({ reaction }: { reaction: FloatingReaction }) => {
       initial={{
         opacity: 0,
         y: '100vh',
-        x: `${reaction.x}%`,
+        left: `${reaction.x}%`,
         scale: 0.3,
         rotate: reaction.rotation,
       }}
       animate={{
         opacity: [0, 1, 1, 1, 0.8, 0],
         y: ['100vh', '70vh', '40vh', '20vh', '-5vh'],
-        x: [`${reaction.x}%`, `${reaction.x + xDrift * 0.3}%`, `${reaction.x + xDrift * 0.6}%`, `${reaction.x + xDrift}%`, `${reaction.x + xDrift * 1.2}%`],
+        left: [`${reaction.x}%`, `${reaction.x + xDrift * 0.3}%`, `${reaction.x + xDrift * 0.6}%`, `${reaction.x + xDrift}%`, `${reaction.x + xDrift * 1.2}%`],
         scale: [0.3, reaction.size, reaction.size * 1.2, reaction.size, reaction.size * 0.8],
         rotate: [reaction.rotation, reaction.rotation - 10, reaction.rotation + 5, reaction.rotation - 5, reaction.rotation],
       }}
@@ -112,7 +112,6 @@ const PhysicsReaction = ({ reaction }: { reaction: FloatingReaction }) => {
         times: [0, 0.2, 0.5, 0.75, 1],
       }}
       className="absolute z-40 flex flex-col items-center"
-      style={{ right: 0 }}
     >
       {/* Emoji with glow effect */}
       <motion.span

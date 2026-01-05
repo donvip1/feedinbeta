@@ -171,26 +171,32 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
     return () => { supabase.removeChannel(channel); };
   }, [streamId]);
 
-  // Join Logic
+  // Join Logic - only once when currentUser is available
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || viewerSession) return;
+    
+    let sessionId: string | null = null;
     
     const joinStream = async () => {
       const { data } = await supabase
         .from("live_stream_viewers")
         .insert({ stream_id: streamId, user_id: currentUser.id, is_active: true })
         .select().single();
-      if (data) setViewerSession(data.id);
+      if (data) {
+        sessionId = data.id;
+        setViewerSession(data.id);
+      }
     };
     joinStream();
     
     return () => {
-      if (viewerSession) {
+      const idToDelete = sessionId || viewerSession;
+      if (idToDelete) {
         supabase.from("live_stream_viewers")
-          .delete().eq("id", viewerSession).then(() => {});
+          .delete().eq("id", idToDelete).then(() => {});
       }
     };
-  }, [streamId, currentUser, viewerSession]);
+  }, [streamId, currentUser?.id]); // Remove viewerSession from deps to prevent infinite loop
 
   // Subscribe to stream status changes (for HLS URL updates)
   useEffect(() => {
