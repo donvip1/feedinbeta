@@ -71,9 +71,9 @@ export const generateInvestmentPDF = () => {
   doc.setFont('helvetica', 'bold');
   const metrics = [
     { label: 'MVP Budget', value: '$15K' },
-    { label: 'Spent', value: '$4K+' },
-    { label: 'Needed', value: '$11K' },
-    { label: 'Launch', value: 'Q1 2026' }
+    { label: 'Spent So Far', value: '$4K+' },
+    { label: 'Still Needed', value: '$11K' },
+    { label: 'Launch Target', value: 'Q1 2026' }
   ];
   
   const metricWidth = (pageWidth - 2 * margin) / 4;
@@ -99,32 +99,34 @@ export const generateInvestmentPDF = () => {
   doc.setTextColor(0, 0, 0);
   yPos = 20;
   
-  drawSectionHeader('EXECUTIVE SUMMARY');
+  drawSectionHeader('WHAT IS FEEDIN?');
   
   doc.setFontSize(11);
   doc.setFont('helvetica', 'normal');
   const execSummary = [
-    'FEEDIN is a next-generation social media platform that puts creators first. We combine social',
-    'networking, live streaming, AI-powered tools, and an integrated credit economy to enable creators',
-    'to monetize their content from day one—no follower thresholds, no waiting periods.',
+    'FEEDIN is a social media app that helps content creators make money from day one.',
+    'Unlike Instagram or TikTok where you need thousands of followers before you can earn,',
+    'FEEDIN lets anyone receive tips and gifts immediately.',
     '',
-    'We started building FEEDIN in September 2025 and have made significant progress over the past',
-    '4 months. Our MVP budget is $15,000, of which we have invested $4,000+ of our own capital.',
-    'We are seeking funding to complete the remaining features and launch in Q1 2026.',
+    'Think of it as: Instagram + TikTok + Patreon, all in one app.',
     '',
-    'What We Have Built (70% Complete):',
-    '• Full social feed with posts, stories, likes, comments, and shares',
-    '• User profiles, follows, friends system, and direct messaging',
-    '• Credit economy with purchases, gifts, and creator payouts',
-    '• AI Copilot, image generation, thesis writer, and educational Q&A',
-    '• Groups, hashtags, trending content, and search functionality',
-    '• Premium subscriptions and promotional tools',
+    'HOW FAR WE HAVE COME:',
     '',
-    'What We Need to Complete (30% Remaining):',
-    '• Live streaming with real-time gifts and reactions',
-    '• Voice and video calling functionality',
-    '• Learn AI section with tech education content',
-    '• Mobile app optimization and PWA enhancements'
+    'We started building FEEDIN about 4 months ago (September 2025). So far, we have spent',
+    'over $4,000 of our own money and built about 40% of the full app.',
+    '',
+    'WHAT IS ALREADY WORKING (40% Complete):',
+    '• Social feed - Users can post photos, videos, like, comment, and share',
+    '• User profiles - People can create accounts and follow each other',
+    '• Messaging - Private chats between users',
+    '• Credits system - Virtual money that users can buy and send as gifts',
+    '• AI tools - Chat assistant and image creation',
+    '',
+    'WHAT WE STILL NEED TO BUILD (60% Remaining):',
+    '• Live streaming - Go live and receive gifts in real-time',
+    '• Voice and video calls - Talk directly with followers',
+    '• Learn AI section - Educational content about technology',
+    '• Final testing and polish before launch'
   ];
   
   execSummary.forEach(line => {
@@ -176,18 +178,18 @@ export const generateInvestmentPDF = () => {
   
   doc.autoTable({
     startY: yPos,
-    head: [['Phase', 'Timeline', 'Status', 'Details']],
+    head: [['What We Did', 'When', 'Done?', 'Details']],
     body: [
-      ['Project Start', 'Sep 2025', 'Completed', 'Initial architecture and planning'],
-      ['Core Social Features', 'Sep-Oct 2025', 'Completed', 'Feed, profiles, posts, stories'],
-      ['Messaging & Friends', 'Oct-Nov 2025', 'Completed', 'DMs, friend requests, follows'],
-      ['Credit Economy', 'Nov 2025', 'Completed', 'Purchases, gifts, transactions'],
-      ['AI Features', 'Nov-Dec 2025', 'Completed', 'Copilot, image gen, thesis writer'],
-      ['Groups & Search', 'Dec 2025', 'Completed', 'Groups, hashtags, trending'],
-      ['Live Streaming', 'Jan 2026', 'In Progress', 'WebRTC streaming with gifts'],
-      ['Voice/Video Calls', 'Jan-Feb 2026', 'Pending', 'P2P calling functionality'],
-      ['Learn AI Section', 'Feb 2026', 'Pending', 'Tech education content'],
-      ['MVP Launch', 'Q1 2026', 'Target', 'Public launch and user acquisition'],
+      ['Started the Project', 'Sep 2025', 'Yes', 'Planning and setup'],
+      ['Built the Social Feed', 'Sep-Oct 2025', 'Yes', 'Posts, photos, videos, likes'],
+      ['Added Messaging', 'Oct-Nov 2025', 'Yes', 'Private chats, friend requests'],
+      ['Built Credits System', 'Nov 2025', 'Yes', 'Buy credits, send gifts'],
+      ['Added AI Tools', 'Nov-Dec 2025', 'Yes', 'Chat assistant, image creation'],
+      ['Built Groups & Search', 'Dec 2025', 'Yes', 'Community groups, find content'],
+      ['Live Streaming', 'Jan 2026', 'Building Now', 'Go live, get gifts'],
+      ['Voice/Video Calls', 'Jan-Feb 2026', 'Not Started', 'Call your followers'],
+      ['Learn AI Section', 'Feb 2026', 'Not Started', 'Tech education content'],
+      ['Launch the App', 'Mar 2026', 'Goal', 'Open to the public'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -195,28 +197,28 @@ export const generateInvestmentPDF = () => {
     columnStyles: {
       0: { cellWidth: 40 },
       1: { cellWidth: 25 },
-      2: { cellWidth: 25 },
-      3: { cellWidth: 75 }
+      2: { cellWidth: 30 },
+      3: { cellWidth: 70 }
     }
   });
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('MVP BUDGET BREAKDOWN');
+  drawSectionHeader('WHERE THE MONEY GOES');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Category', 'Budget', 'Spent', 'Remaining', 'Status']],
+    head: [['What We Spend On', 'Total Needed', 'Already Spent', 'Still Need']],
     body: [
-      ['Infrastructure & Hosting', '$3,000', '$1,200', '$1,800', 'Ongoing'],
-      ['API Services & AI', '$2,500', '$800', '$1,700', 'Ongoing'],
-      ['Development Tools', '$1,500', '$500', '$1,000', 'Partial'],
-      ['Design & Assets', '$1,000', '$400', '$600', 'Partial'],
-      ['Live Streaming Infrastructure', '$3,000', '$600', '$2,400', 'In Progress'],
-      ['Calling & WebRTC', '$2,000', '$300', '$1,700', 'Pending'],
-      ['Testing & QA', '$1,000', '$200', '$800', 'Pending'],
-      ['Marketing & Launch', '$1,000', '$0', '$1,000', 'Pending'],
-      ['TOTAL', '$15,000', '$4,000+', '~$11,000', '-'],
+      ['Servers & Hosting', '$3,000', '$1,200', '$1,800'],
+      ['AI Services (for AI features)', '$2,500', '$800', '$1,700'],
+      ['Software Tools', '$1,500', '$500', '$1,000'],
+      ['Design & Images', '$1,000', '$400', '$600'],
+      ['Live Streaming Tech', '$3,000', '$600', '$2,400'],
+      ['Video Calling Tech', '$2,000', '$300', '$1,700'],
+      ['Testing', '$1,000', '$200', '$800'],
+      ['Marketing at Launch', '$1,000', '$0', '$1,000'],
+      ['TOTAL', '$15,000', '$4,000+', '~$11,000'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -225,18 +227,18 @@ export const generateInvestmentPDF = () => {
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('WHAT YOUR INVESTMENT ENABLES');
+  drawSectionHeader('WHAT YOUR MONEY WILL DO');
   
   doc.setFontSize(11);
   const investmentImpact = [
-    'With the remaining ~$11,000 needed to complete MVP, your investment will:',
+    'We need about $11,000 more to finish and launch FEEDIN. Your investment helps us:',
     '',
-    '• Complete live streaming with real-time gifts, reactions, and WebRTC infrastructure',
-    '• Build voice and video calling for direct creator-fan communication',
-    '• Develop the Learn AI section with curated tech education content',
-    '• Optimize mobile experience and PWA for app-like performance',
-    '• Cover infrastructure costs for launch and initial user growth',
-    '• Fund initial marketing and creator onboarding campaigns'
+    '• Finish live streaming - So creators can go live and earn money in real-time',
+    '• Build voice and video calls - So creators can talk directly with fans',
+    '• Create the Learn AI section - Tech education for our users',
+    '• Make the app work smoothly on phones',
+    '• Pay for servers when users start joining',
+    '• Tell people about the app when we launch'
   ];
   investmentImpact.forEach(line => {
     doc.text(line, margin, yPos);
@@ -273,17 +275,17 @@ export const generateInvestmentPDF = () => {
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('REVENUE MODEL');
+  drawSectionHeader('HOW FEEDIN MAKES MONEY');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Revenue Stream', 'Share', 'Description']],
+    head: [['How We Earn', 'Portion', 'Simple Explanation']],
     body: [
-      ['Credit Purchases', '40%', 'Users buy credits for gifts, promotions, AI features'],
-      ['Premium Subscriptions', '25%', 'Monthly/annual premium memberships'],
-      ['Platform Transaction Fees', '20%', '10-15% fee on gifts and creator payouts'],
-      ['Promoted Content', '10%', 'Creators pay to boost visibility'],
-      ['Enterprise & API', '5%', 'B2B integrations (future)'],
+      ['Credit Sales', '40%', 'Users buy credits with real money to send gifts'],
+      ['Premium Memberships', '25%', 'Users pay monthly for extra features'],
+      ['Small Fees on Gifts', '20%', 'We keep 15% when creators cash out gifts'],
+      ['Promoted Posts', '10%', 'Creators pay to show their posts to more people'],
+      ['Business Accounts', '5%', 'Companies pay for special features (in the future)'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -292,17 +294,17 @@ export const generateInvestmentPDF = () => {
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('FINANCIAL PROJECTIONS (POST-LAUNCH)');
+  drawSectionHeader('WHAT WE EXPECT TO HAPPEN (After Launch)');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Metric', 'Q2 2026', 'Q4 2026', 'Q4 2027']],
+    head: [['What We Measure', '3 Months After Launch', '9 Months After Launch', '1 Year Later']],
     body: [
-      ['Monthly Active Users', '1,000', '10,000', '100,000'],
-      ['Premium Subscribers', '50', '500', '5,000'],
-      ['Monthly Revenue', '$500', '$5,000', '$50,000'],
-      ['Monthly Costs', '$800', '$2,000', '$15,000'],
-      ['Break-even Target', '-', 'Q3 2026', 'Profitable'],
+      ['Users Each Month', '1,000', '10,000', '100,000'],
+      ['Paying Members', '50', '500', '5,000'],
+      ['Money Coming In (Monthly)', '$500', '$5,000', '$50,000'],
+      ['Our Costs (Monthly)', '$800', '$2,000', '$15,000'],
+      ['When We Make Profit', 'Not yet', 'Getting close', 'Making money'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -313,18 +315,18 @@ export const generateInvestmentPDF = () => {
   doc.addPage();
   yPos = 20;
   
-  drawSectionHeader('EQUITY STRUCTURE (POST-INVESTMENT)');
+  drawSectionHeader('WHO OWNS WHAT (After Investment)');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Shareholder', 'Equity %', 'Notes']],
+    head: [['Who', 'Ownership %', 'What This Means']],
     body: [
-      ['Founder & CEO', '40%', 'Full-time, vested over 4 years'],
-      ['Co-Founder', '10%', 'Vested over 4 years with 1-year cliff'],
-      ['Pre-Seed Investors', '20%', 'Current funding round'],
-      ['ESOP (Employee Pool)', '15%', 'Reserved for key hires'],
-      ['Advisors', '10%', 'Industry experts and mentors'],
-      ['Future Rounds Reserve', '5%', 'Reserved for Series A'],
+      ['Founder & CEO', '40%', 'The person who built the app and runs it daily'],
+      ['Co-Founder', '10%', 'Partner helping with business and strategy'],
+      ['Investors (You)', '20%', 'The investment being offered now'],
+      ['Future Employees', '15%', 'Saved for people we hire later'],
+      ['Advisors', '10%', 'Experts who guide us'],
+      ['Future Investors', '5%', 'Saved for bigger investments later'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -333,32 +335,31 @@ export const generateInvestmentPDF = () => {
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('INVESTMENT OPPORTUNITY');
+  drawSectionHeader('HOW YOU CAN INVEST');
   
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.text('What We Are Seeking:', margin, yPos);
+  doc.text('What We Are Looking For:', margin, yPos);
   yPos += 8;
   doc.setFont('helvetica', 'normal');
   
   const investmentDetails = [
-    '• Total Raise: $15,000 - $50,000 (flexible based on investor interest)',
-    '• Minimum Investment: $1,000',
-    '• Equity Offered: 20% (for full $15K raise) - negotiable for larger amounts',
-    '• Instrument: SAFE (Simple Agreement for Future Equity) or direct equity',
-    '• Valuation Cap: $75,000 pre-money (at MVP stage)',
+    '• We want to raise: $15,000 or more',
+    '• Smallest investment: $1,000',
+    '• What you get: 20% of the company (if we raise the full $15K)',
+    '• How we value FEEDIN right now: $75,000',
     '',
-    'Investment Tiers:',
+    'INVESTMENT OPTIONS:',
     '',
-    '$1,000 - $4,999:    2-5% equity + investor updates + early access',
-    '$5,000 - $9,999:    6-10% equity + advisory role + product input',
-    '$10,000 - $15,000:  12-20% equity + board observer + strategic partner',
+    '$1,000 - $4,999:    You get 2-5% ownership + regular updates + early access to app',
+    '$5,000 - $9,999:    You get 6-10% ownership + help guide the product',
+    '$10,000 - $15,000:  You get 12-20% ownership + become a key partner',
     '',
-    'Additional benefits for all investors:',
-    '• Lifetime premium subscription to FEEDIN',
-    '• Recognition as founding investor on platform',
-    '• Quarterly progress reports and financial updates',
-    '• Direct access to founding team'
+    'EVERY INVESTOR GETS:',
+    '• Free premium membership forever',
+    '• Your name recognized as a founding investor',
+    '• Updates every 3 months on how we are doing',
+    '• Direct contact with the founders anytime'
   ];
   investmentDetails.forEach(line => {
     doc.text(line, margin, yPos);
@@ -369,19 +370,19 @@ export const generateInvestmentPDF = () => {
   doc.addPage();
   yPos = 20;
   
-  drawSectionHeader('2026 ROADMAP & MILESTONES');
+  drawSectionHeader('OUR PLAN FOR 2026');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Timeline', 'Milestone', 'Key Deliverables']],
+    head: [['When', 'What We Will Do', 'What This Means']],
     body: [
-      ['Jan 2026', 'Complete Live Streaming', 'WebRTC streaming, real-time gifts, reactions'],
-      ['Feb 2026', 'Voice/Video Calling', 'P2P calls, call history, notifications'],
-      ['Feb 2026', 'Learn AI Section', 'Tech tutorials, AI-curated content'],
-      ['Mar 2026', 'MVP Launch', 'Public launch, initial marketing push'],
-      ['Q2 2026', '1,000 MAU', 'Creator onboarding, community building'],
-      ['Q3 2026', '5,000 MAU', 'Revenue optimization, break-even target'],
-      ['Q4 2026', '10,000 MAU', 'Series A preparation, team expansion'],
+      ['January 2026', 'Finish Live Streaming', 'Creators can go live and get gifts'],
+      ['February 2026', 'Add Voice/Video Calls', 'Users can call each other directly'],
+      ['February 2026', 'Build Learn AI Section', 'Tech education for our users'],
+      ['March 2026', 'LAUNCH THE APP', 'Open to everyone, start marketing'],
+      ['April-June 2026', 'Get 1,000 users', 'Invite creators, build community'],
+      ['July-Sep 2026', 'Get 5,000 users', 'Start making profit'],
+      ['Oct-Dec 2026', 'Get 10,000 users', 'Hire more people, grow bigger'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
@@ -415,12 +416,12 @@ export const generateInvestmentPDF = () => {
   
   doc.setFontSize(11);
   const whyNow = [
-    '• Ground Floor Opportunity: Join at pre-seed/MVP stage with maximum upside',
-    '• 70% Already Built: Majority of platform is functional and demonstrable',
-    '• Small Capital Needed: Only ~$11K to complete MVP and launch',
-    '• Creator Economy Boom: $250B+ market growing 20%+ annually',
-    '• Proven Team Execution: Built complex platform in 4 months with minimal capital',
-    '• First-Mover Features: AI integration + instant monetization is unique combination'
+    '• Get in Early: This is the earliest and cheapest time to invest',
+    '• 40% Already Built: You can see and test what we have made so far',
+    '• Small Amount Needed: We only need about $11,000 more to finish and launch',
+    '• Big Market: The creator economy is worth over $250 billion and growing fast',
+    '• We Build Fast: We built a complex app in 4 months with very little money',
+    '• Unique App: No other app combines AI tools with instant creator payments like us'
   ];
   whyNow.forEach(line => {
     doc.text(line, margin, yPos);
@@ -431,45 +432,45 @@ export const generateInvestmentPDF = () => {
   doc.addPage();
   yPos = 20;
   
-  drawSectionHeader('RISK FACTORS');
+  drawSectionHeader('WHAT COULD GO WRONG (And How We Handle It)');
   
   doc.autoTable({
     startY: yPos,
-    head: [['Risk', 'Mitigation Strategy']],
+    head: [['The Risk', 'How We Deal With It']],
     body: [
-      ['Early Stage', 'MVP 70% complete; demonstrable product; lean operations'],
-      ['Market Competition', 'Focus on underserved creator needs; rapid iteration'],
-      ['User Acquisition', 'Credit incentives; creator referrals; organic growth'],
-      ['Technical Scaling', 'Cloud-native architecture; CDN; modular design'],
-      ['Revenue Timeline', 'Multiple revenue streams from day one; low burn rate'],
+      ['We are just starting out', 'We already built 40% of the app; you can try it yourself'],
+      ['Big companies like Instagram exist', 'We focus on helping small creators who they ignore'],
+      ['Getting users is hard', 'We give free credits to attract people; creators invite their fans'],
+      ['App might slow down with many users', 'We built it to handle growth from the start'],
+      ['Might take time to make money', 'We have many ways to earn money; we spend carefully'],
     ],
     theme: 'striped',
     headStyles: { fillColor: [99, 102, 241] },
     margin: { left: margin, right: margin },
     columnStyles: {
-      0: { cellWidth: 40 },
-      1: { cellWidth: 125 }
+      0: { cellWidth: 50 },
+      1: { cellWidth: 115 }
     }
   });
   
   yPos = doc.lastAutoTable.finalY + 15;
   
-  drawSectionHeader('TEAM');
+  drawSectionHeader('WHO WE ARE');
   
   doc.setFontSize(11);
   const team = [
     'Founder & CEO',
-    '• Full-stack developer with experience in React, Node.js, and cloud infrastructure',
-    '• Built entire FEEDIN platform from scratch over 4 months',
-    '• Passionate about creator empowerment and fair monetization',
+    '• A web developer who builds apps using modern technology',
+    '• Built the entire FEEDIN app by hand over the past 4 months',
+    '• Cares deeply about helping creators earn money fairly',
     '',
     'Co-Founder',
-    '• Supports product vision and business development',
-    '• Contributes to strategic planning and partnerships',
+    '• Helps with business ideas and planning',
+    '• Works on finding partners and growing the business',
     '',
-    'Post-Funding Hires (Planned):',
-    '• Senior Developer (Q2 2026) - Scale infrastructure and features',
-    '• Community Manager (Q2 2026) - Creator relations and growth'
+    'People We Plan to Hire (After We Get Funding):',
+    '• Another developer to help build faster',
+    '• Someone to help creators and build our community'
   ];
   team.forEach(line => {
     doc.text(line, margin, yPos);
@@ -477,15 +478,15 @@ export const generateInvestmentPDF = () => {
   });
   
   yPos += 10;
-  drawSectionHeader('NEXT STEPS');
+  drawSectionHeader('HOW TO INVEST');
   
   doc.setFontSize(11);
   const nextSteps = [
-    '1. Review this memorandum and explore the live platform at feedin.app',
-    '2. Schedule a call with our founder to discuss the opportunity',
-    '3. Receive demo access and see features in action',
-    '4. Complete investment via SAFE agreement or direct equity',
-    '5. Join us as a founding investor in the creator economy revolution'
+    '1. Read this document carefully',
+    '2. Contact us to schedule a call and ask questions',
+    '3. We will show you the app and answer all your concerns',
+    '4. If you decide to invest, we sign a simple agreement',
+    '5. You become a founding investor in FEEDIN!'
   ];
   nextSteps.forEach(step => {
     doc.text(step, margin, yPos);
