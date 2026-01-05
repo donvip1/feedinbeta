@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -26,12 +27,37 @@ import {
   Lock,
   Award,
   FileText,
-  Mail
+  Mail,
+  Download,
+  Loader2
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
+import { generateInvestmentPDF } from '@/lib/generate-investment-pdf';
+import { useToast } from '@/hooks/use-toast';
 
 const InvestmentDocs = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    setIsGenerating(true);
+    try {
+      generateInvestmentPDF();
+      toast({
+        title: "PDF Downloaded",
+        description: "Investment Memorandum has been saved to your downloads folder.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download Failed",
+        description: "There was an error generating the PDF. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const platformMetrics = [
     { label: 'Monthly Active Users', value: '50K+', growth: '+340% YoY', icon: Users },
@@ -112,9 +138,19 @@ const InvestmentDocs = () => {
               <img src={feedinLogo} alt="FEEDIN" className="w-8 h-8" />
               <span className="text-xl font-bold">Investment Memorandum</span>
             </div>
-            <Button variant="outline" size="sm" className="gap-2">
-              <FileText className="w-4 h-4" />
-              Download PDF
+            <Button 
+              variant="default" 
+              size="sm" 
+              className="gap-2"
+              onClick={handleDownloadPDF}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {isGenerating ? 'Generating...' : 'Download PDF'}
             </Button>
           </div>
         </div>
