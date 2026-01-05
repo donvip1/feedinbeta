@@ -313,8 +313,7 @@ export const generateInvestmentPDF = () => {
     startY: yPos,
     head: [['Who', 'Ownership %', 'What This Means']],
     body: [
-      ['Founder & CEO', '40%', 'The person who built the app and runs it daily'],
-      ['Co-Founder', '10%', 'Partner helping with business and strategy'],
+      ['Founders (CEO & Co-Founder)', '50%', 'The team who built the app and runs it daily'],
       ['Investors (You)', '20%', 'The investment being offered now'],
       ['Future Employees', '15%', 'Saved for people we hire later'],
       ['Advisors', '10%', 'Experts who guide us'],
