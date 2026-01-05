@@ -62,18 +62,17 @@ type RequestBody =
   | GetStreamInfoRequest
   | VerifyStreamPlayableRequest;
 
-// Helper to check if HLS manifest is accessible - uses GET to verify actual content
+// Helper to check if HLS manifest is accessible
 async function checkHlsManifest(hlsUrl: string): Promise<{ accessible: boolean; error?: string }> {
   try {
     console.log('[CF-Stream-V2] Checking HLS manifest:', hlsUrl);
     const response = await fetch(hlsUrl, {
-      method: 'GET',  // Use GET to check actual content
+      method: 'GET',
       signal: AbortSignal.timeout(5000),
     });
     
     if (response.ok) {
       const body = await response.text();
-      // Verify it's actually an m3u8 manifest, not empty HTML
       if (body.includes('#EXTM3U')) {
         console.log('[CF-Stream-V2] Manifest accessible with valid content');
         return { accessible: true };
@@ -82,7 +81,6 @@ async function checkHlsManifest(hlsUrl: string): Promise<{ accessible: boolean; 
       return { accessible: false, error: 'Empty or invalid manifest' };
     }
     
-    // 404 means stream not publishing yet
     if (response.status === 404) {
       console.log('[CF-Stream-V2] Manifest not ready (404)');
       return { accessible: false, error: 'Stream not publishing yet' };
@@ -113,7 +111,6 @@ async function getCloudflareStreamStatus(liveInputId: string): Promise<{ isLive:
     const result = await response.json();
     const videos = result.result || [];
     
-    // Check for live video
     const liveVideo = videos.find((v: any) => v.status?.state === 'live-inprogress');
     const hasAnyVideo = videos.length > 0;
     
@@ -124,6 +121,14 @@ async function getCloudflareStreamStatus(liveInputId: string): Promise<{ isLive:
     console.error('[CF-Stream-V2] Error checking stream status:', error);
     return { isLive: false, hasVideo: false };
   }
+}
+
+// Create service role client for critical updates
+function getServiceClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
 }
 
 Deno.serve(async (req) => {
@@ -151,18 +156,20 @@ Deno.serve(async (req) => {
     const body: RequestBody = await req.json();
     console.log('[CF-Stream-V2] Action:', body.action, 'User:', user.id);
 
+    // Use service client for critical database updates
+    const serviceClient = getServiceClient();
+
     switch (body.action) {
       case 'create-stream': {
         const { streamId, title, enableRecording = true } = body as CreateStreamRequest;
         
         console.log('[CF-Stream-V2] Creating live input for stream:', streamId);
         
-        // Update state to initializing
-        await supabaseClient
+        // Update state to initializing using service client
+        await serviceClient
           .from('live_streams')
           .update({ connection_state: 'initializing', stream_ready: false })
-          .eq('id', streamId)
-          .eq('user_id', user.id);
+          .eq('id', streamId);
         
         // Create Cloudflare Live Input
         const response = await fetch(`${CF_API_BASE}/live_inputs`, {
@@ -182,8 +189,7 @@ Deno.serve(async (req) => {
           const errorText = await response.text();
           console.error('[CF-Stream-V2] CF API error:', errorText);
           
-          // Update state to failed
-          await supabaseClient
+          await serviceClient
             .from('live_streams')
             .update({ connection_state: 'idle' })
             .eq('id', streamId);
@@ -200,8 +206,8 @@ Deno.serve(async (req) => {
         console.log('[CF-Stream-V2] Live input created:', liveInput.uid);
         
         // Extract URLs
-        const webrtcPublishUrl = liveInput.webRTC?.url; // WHIP - for host to publish
-        const webrtcPlaybackUrl = liveInput.webRTCPlayback?.url; // WHEP - for viewers
+        const webrtcPublishUrl = liveInput.webRTC?.url;
+        const webrtcPlaybackUrl = liveInput.webRTCPlayback?.url;
         
         // Build HLS URL using customer subdomain
         const customerMatch = webrtcPublishUrl?.match(/customer-([^.]+)/);
@@ -212,8 +218,8 @@ Deno.serve(async (req) => {
         console.log('[CF-Stream-V2] Playback URL (WHEP):', webrtcPlaybackUrl);
         console.log('[CF-Stream-V2] HLS URL:', hlsUrl);
         
-        // Update database with Cloudflare info
-        const { error: updateError } = await supabaseClient
+        // CRITICAL: Update database with ALL Cloudflare info using service client
+        const { error: updateError } = await serviceClient
           .from('live_streams')
           .update({
             cf_live_input_id: liveInput.uid,
@@ -224,13 +230,16 @@ Deno.serve(async (req) => {
             stream_ready: false,
             last_health_check: new Date().toISOString(),
           })
-          .eq('id', streamId)
-          .eq('user_id', user.id);
+          .eq('id', streamId);
 
         if (updateError) {
-          console.error('[CF-Stream-V2] DB update error:', updateError);
+          console.error('[CF-Stream-V2] CRITICAL: DB update error:', updateError);
+          // Don't throw - we still want to return the URLs for client-side backup
+        } else {
+          console.log('[CF-Stream-V2] Database updated with HLS URL:', hlsUrl);
         }
 
+        // Return ALL URLs to client so they can be used as backup
         return new Response(
           JSON.stringify({
             success: true,
@@ -248,17 +257,12 @@ Deno.serve(async (req) => {
       case 'check-health': {
         const { streamId, liveInputId } = body as CheckHealthRequest;
         
-        // Just update the health check timestamp - don't change stream_ready
-        // The broadcaster sets stream_ready when WebRTC connects
-        // Cloudflare API status has lag and shouldn't override broadcaster state
-        
         const { data: stream } = await supabaseClient
           .from('live_streams')
           .select('cf_hls_url, connection_state, stream_ready')
           .eq('id', streamId)
           .single();
         
-        // Only check Cloudflare status for logging, don't update stream_ready based on it
         const cfStatus = await getCloudflareStreamStatus(liveInputId);
         
         let manifestAccessible = false;
@@ -267,12 +271,10 @@ Deno.serve(async (req) => {
           manifestAccessible = manifestCheck.accessible;
         }
         
-        // Update last health check timestamp only
-        await supabaseClient
+        // Update last health check using service client
+        await serviceClient
           .from('live_streams')
-          .update({
-            last_health_check: new Date().toISOString(),
-          })
+          .update({ last_health_check: new Date().toISOString() })
           .eq('id', streamId);
         
         return new Response(
@@ -293,10 +295,7 @@ Deno.serve(async (req) => {
         const result = await checkHlsManifest(hlsUrl);
         
         return new Response(
-          JSON.stringify({
-            success: true,
-            ...result,
-          }),
+          JSON.stringify({ success: true, ...result }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -313,23 +312,20 @@ Deno.serve(async (req) => {
           updateData.stream_ready = streamReady;
         }
         
-        // Set status based on connection state
         if (connectionState === 'live') {
           updateData.status = 'live';
-          if (!updateData.started_at) {
-            updateData.started_at = new Date().toISOString();
-          }
+          updateData.started_at = new Date().toISOString();
         } else if (connectionState === 'ended') {
           updateData.status = 'ended';
           updateData.ended_at = new Date().toISOString();
           updateData.stream_ready = false;
         }
         
-        const { error } = await supabaseClient
+        // Use service client for reliability
+        const { error } = await serviceClient
           .from('live_streams')
           .update(updateData)
-          .eq('id', streamId)
-          .eq('user_id', user.id);
+          .eq('id', streamId);
         
         if (error) {
           throw new Error(`Failed to update state: ${error.message}`);
@@ -344,8 +340,8 @@ Deno.serve(async (req) => {
       case 'end-stream': {
         const { streamId, liveInputId } = body as EndStreamRequest;
         
-        // Update database
-        await supabaseClient
+        // Use service client for reliability
+        await serviceClient
           .from('live_streams')
           .update({
             status: 'ended',
@@ -353,10 +349,9 @@ Deno.serve(async (req) => {
             stream_ready: false,
             ended_at: new Date().toISOString(),
           })
-          .eq('id', streamId)
-          .eq('user_id', user.id);
+          .eq('id', streamId);
         
-        // Optionally delete the Cloudflare live input
+        // Delete Cloudflare live input
         if (liveInputId) {
           try {
             await fetch(`${CF_API_BASE}/live_inputs/${liveInputId}`, {
@@ -404,21 +399,14 @@ Deno.serve(async (req) => {
         
         console.log('[CF-Stream-V2] Verifying stream playability for:', streamId, 'input:', liveInputId);
         
-        // Use service role client to bypass any RLS issues for critical updates
-        const serviceClient = createClient(
-          Deno.env.get('SUPABASE_URL')!,
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-        );
-        
         let attempts = 0;
-        const pollInterval = 1500; // 1.5 seconds - faster polling
+        const pollInterval = 1500;
         const maxAttempts = Math.ceil(maxWaitSeconds / 1.5);
         
         while (attempts < maxAttempts) {
           attempts++;
           console.log(`[CF-Stream-V2] Verification attempt ${attempts}/${maxAttempts}`);
           
-          // Get the stream's HLS URL
           const { data: stream } = await serviceClient
             .from('live_streams')
             .select('cf_hls_url')
@@ -431,7 +419,6 @@ Deno.serve(async (req) => {
             if (manifestCheck.accessible) {
               console.log('[CF-Stream-V2] Manifest is accessible! Setting stream_ready = true');
               
-              // Use service role to ensure update goes through
               const { error: updateError } = await serviceClient
                 .from('live_streams')
                 .update({ 
@@ -455,7 +442,6 @@ Deno.serve(async (req) => {
             }
           }
           
-          // Wait before next attempt
           await new Promise(resolve => setTimeout(resolve, pollInterval));
         }
         

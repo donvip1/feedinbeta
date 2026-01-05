@@ -2,13 +2,13 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 
 export type PlaybackStatus = 'idle' | 'waiting' | 'connecting' | 'buffering' | 'playing' | 'error';
-export type PlaybackMethod = 'hls' | 'webrtc' | null;
+export type PlaybackMethod = 'hls' | 'whep' | null;
 
 interface UseCloudflarePlaybackProps {
   hlsUrl?: string | null;
   whepUrl?: string | null;
   videoRef: React.RefObject<HTMLVideoElement>;
-  streamReady?: boolean; // Now ignored - we connect immediately
+  streamReady?: boolean;
   onStatusChange?: (status: PlaybackStatus) => void;
 }
 
@@ -26,10 +26,11 @@ export function useCloudflarePlayback({
   hlsUrl,
   whepUrl,
   videoRef,
-  streamReady = true, // Ignored - we connect immediately regardless
+  streamReady = true,
   onStatusChange,
 }: UseCloudflarePlaybackProps) {
   const hlsRef = useRef<Hls | null>(null);
+  const whepPcRef = useRef<RTCPeerConnection | null>(null);
   const retryTimeoutRef = useRef<number | null>(null);
   
   const [state, setState] = useState<PlaybackState>({
@@ -43,16 +44,15 @@ export function useCloudflarePlayback({
   });
 
   const retryCountRef = useRef(0);
-  const maxRetries = 20; // Even more retries - HLS can take time to become available
+  const maxRetries = 15;
   const isConnectedRef = useRef(false);
 
-  // Update status and notify
   const updateStatus = useCallback((status: PlaybackStatus, errorMessage: string | null = null) => {
     setState(prev => ({ ...prev, status, errorMessage }));
     onStatusChange?.(status);
   }, [onStatusChange]);
 
-  // Cleanup
+  // Cleanup all connections
   const cleanup = useCallback(() => {
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
@@ -64,6 +64,11 @@ export function useCloudflarePlayback({
       hlsRef.current = null;
     }
     
+    if (whepPcRef.current) {
+      whepPcRef.current.close();
+      whepPcRef.current = null;
+    }
+    
     if (videoRef.current) {
       videoRef.current.srcObject = null;
       videoRef.current.src = '';
@@ -72,14 +77,116 @@ export function useCloudflarePlayback({
     isConnectedRef.current = false;
   }, [videoRef]);
 
-  // INSTANT HLS CONNECTION - No manifest pre-check, just connect!
+  // WHEP Connection (WebRTC playback - lowest latency)
+  const connectWHEP = useCallback(async (): Promise<boolean> => {
+    if (!whepUrl || !videoRef.current) {
+      console.log('[Playback] No WHEP URL, skipping');
+      return false;
+    }
+
+    console.log('[Playback] 🎯 Attempting WHEP connection:', whepUrl);
+    
+    try {
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+        bundlePolicy: 'max-bundle',
+      });
+      whepPcRef.current = pc;
+
+      // Add transceivers for receiving
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+
+      // Handle incoming tracks
+      pc.ontrack = (event) => {
+        console.log('[Playback] ✅ WHEP received track:', event.track.kind);
+        if (videoRef.current && event.streams[0]) {
+          videoRef.current.srcObject = event.streams[0];
+          isConnectedRef.current = true;
+          setState(prev => ({
+            ...prev,
+            status: 'playing',
+            method: 'whep',
+            hasVideo: true,
+            errorMessage: null,
+            connectionQuality: 'good',
+          }));
+          videoRef.current.play().catch(() => {
+            setState(prev => ({ ...prev, showUnmutePrompt: true }));
+          });
+        }
+      };
+
+      // Create offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // Wait for ICE gathering
+      await new Promise<void>((resolve) => {
+        if (pc.iceGatheringState === 'complete') {
+          resolve();
+        } else {
+          const checkState = () => {
+            if (pc.iceGatheringState === 'complete') {
+              resolve();
+            }
+          };
+          pc.onicegatheringstatechange = checkState;
+          setTimeout(resolve, 3000);
+        }
+      });
+
+      const localDesc = pc.localDescription;
+      if (!localDesc) {
+        throw new Error('No local description');
+      }
+
+      // Send offer to WHEP endpoint
+      const response = await fetch(whepUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: localDesc.sdp,
+      });
+
+      if (!response.ok) {
+        throw new Error(`WHEP failed: ${response.status}`);
+      }
+
+      const answerSdp = await response.text();
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+      // Wait for track to arrive
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('WHEP timeout')), 5000);
+        const checkTrack = setInterval(() => {
+          if (isConnectedRef.current) {
+            clearTimeout(timeout);
+            clearInterval(checkTrack);
+            resolve();
+          }
+        }, 100);
+      });
+
+      console.log('[Playback] ✅ WHEP connected successfully');
+      return true;
+    } catch (error) {
+      console.log('[Playback] WHEP failed:', error);
+      if (whepPcRef.current) {
+        whepPcRef.current.close();
+        whepPcRef.current = null;
+      }
+      return false;
+    }
+  }, [whepUrl, videoRef]);
+
+  // HLS Connection (reliable fallback)
   const connectHLS = useCallback(() => {
     if (!hlsUrl || !videoRef.current) {
       updateStatus('error', 'No stream URL available');
       return;
     }
 
-    console.log('[Playback] 🚀 Instant HLS connect:', hlsUrl);
+    console.log('[Playback] 🎬 Connecting HLS:', hlsUrl);
     updateStatus('connecting');
 
     if (Hls.isSupported()) {
@@ -91,9 +198,9 @@ export function useCloudflarePlayback({
         liveSyncDurationCount: 2,
         liveMaxLatencyDurationCount: 4,
         fragLoadingTimeOut: 10000,
-        manifestLoadingTimeOut: 5000,  // Faster timeout
-        manifestLoadingMaxRetry: 10,   // More retries
-        manifestLoadingRetryDelay: 1000, // 1 second between retries
+        manifestLoadingTimeOut: 8000,
+        manifestLoadingMaxRetry: 8,
+        manifestLoadingRetryDelay: 1500,
         levelLoadingTimeOut: 8000,
         startLevel: -1,
         capLevelToPlayerSize: true,
@@ -127,7 +234,6 @@ export function useCloudflarePlayback({
         setState(prev => ({ ...prev, isBuffering: false }));
       });
 
-      // Handle stalling
       if (videoRef.current) {
         videoRef.current.onwaiting = () => {
           setState(prev => ({ ...prev, isBuffering: true, status: 'buffering' }));
@@ -138,7 +244,6 @@ export function useCloudflarePlayback({
         videoRef.current.onloadeddata = () => {
           const video = videoRef.current;
           if (video && video.videoWidth > 0) {
-            console.log('[Playback] Video dimensions:', video.videoWidth, 'x', video.videoHeight);
             setState(prev => ({ ...prev, hasVideo: true }));
           }
         };
@@ -150,24 +255,23 @@ export function useCloudflarePlayback({
         if (data.fatal) {
           hls.destroy();
           
-          // Quick retry for ALL errors - stream might still be starting
           if (retryCountRef.current < maxRetries) {
             retryCountRef.current++;
-            const delay = 1000; // Even faster retry - 1 second
+            const delay = Math.min(1500 * Math.pow(1.3, retryCountRef.current - 1), 8000);
             console.log(`[Playback] Retry ${retryCountRef.current}/${maxRetries} in ${delay}ms`);
             updateStatus('connecting', 'Connecting to stream...');
             retryTimeoutRef.current = window.setTimeout(connectHLS, delay);
           } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
             hls.recoverMediaError();
           } else {
-            updateStatus('error', 'Stream unavailable - please try again');
+            updateStatus('error', 'Stream unavailable - broadcaster may not be live yet');
           }
         }
       });
 
       hlsRef.current = hls;
     } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-      // Safari native HLS - even faster!
+      // Safari native HLS
       console.log('[Playback] 🍎 Safari native HLS');
       videoRef.current.src = hlsUrl;
       
@@ -190,8 +294,8 @@ export function useCloudflarePlayback({
       videoRef.current.onerror = () => {
         if (retryCountRef.current < maxRetries) {
           retryCountRef.current++;
-          updateStatus('waiting', 'Connecting...');
-          retryTimeoutRef.current = window.setTimeout(connectHLS, 1500);
+          updateStatus('connecting', 'Connecting...');
+          retryTimeoutRef.current = window.setTimeout(connectHLS, 2000);
         } else {
           updateStatus('error', 'Stream unavailable');
         }
@@ -201,23 +305,38 @@ export function useCloudflarePlayback({
     }
   }, [hlsUrl, videoRef, updateStatus]);
 
-  // Main connection - INSTANT, no waiting
-  const connect = useCallback(() => {
+  // Main connection logic - try WHEP first, fall back to HLS
+  const connect = useCallback(async () => {
     cleanup();
     retryCountRef.current = 0;
 
-    if (!hlsUrl) {
-      console.log('[Playback] No HLS URL yet');
+    if (!hlsUrl && !whepUrl) {
+      console.log('[Playback] No URLs available yet');
       updateStatus('waiting', 'Waiting for stream...');
       return;
     }
 
-    // INSTANT CONNECTION - just try HLS immediately!
-    console.log('[Playback] 🎬 Starting instant connection');
-    connectHLS();
-  }, [cleanup, hlsUrl, connectHLS, updateStatus]);
+    updateStatus('connecting', 'Connecting to stream...');
 
-  // Unmute
+    // Try WHEP first for lowest latency
+    if (whepUrl) {
+      const whepSuccess = await connectWHEP();
+      if (whepSuccess) {
+        console.log('[Playback] Using WHEP (WebRTC) playback');
+        return;
+      }
+    }
+
+    // Fall back to HLS
+    if (hlsUrl) {
+      console.log('[Playback] Falling back to HLS');
+      connectHLS();
+    } else {
+      updateStatus('error', 'No playback URL available');
+    }
+  }, [cleanup, hlsUrl, whepUrl, connectWHEP, connectHLS, updateStatus]);
+
+  // Unmute function
   const unmute = useCallback(async () => {
     if (!videoRef.current) return;
     try {
@@ -229,32 +348,29 @@ export function useCloudflarePlayback({
     }
   }, [videoRef]);
 
-  // Retry
+  // Retry function
   const retry = useCallback(() => {
     retryCountRef.current = 0;
     connect();
   }, [connect]);
 
-  // Effect to start connection when HLS URL is available - IGNORE streamReady!
+  // Effect to start connection when URLs change
   useEffect(() => {
-    console.log('[Playback] URL changed - hlsUrl:', !!hlsUrl, '(streamReady ignored for instant connect)');
+    console.log('[Playback] URLs changed - hlsUrl:', !!hlsUrl, 'whepUrl:', !!whepUrl);
     
-    if (!hlsUrl) {
+    if (!hlsUrl && !whepUrl) {
       updateStatus('waiting', 'Waiting for stream...');
       return;
     }
     
-    // If already connected, don't reconnect
     if (isConnectedRef.current) {
       return;
     }
     
-    // INSTANT CONNECTION - don't wait for streamReady!
-    // HLS.js will automatically retry if manifest isn't ready yet
     connect();
     
     return () => cleanup();
-  }, [hlsUrl, connect, cleanup, updateStatus]); // Removed streamReady dependency
+  }, [hlsUrl, whepUrl, connect, cleanup, updateStatus]);
 
   return {
     ...state,
