@@ -32,6 +32,7 @@ import { InfiniteScrollSkeleton } from '@/components/feed/InfiniteScrollSkeleton
 import { PullToRefresh } from '@/components/feed/PullToRefresh';
 import { SwipeableTabs } from '@/components/feed/SwipeableTabs';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
+import { useFeedPreloader } from '@/hooks/useFeedPreloader';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -440,7 +441,9 @@ const Feed = () => {
     refetchOnMount: true,
   });
 
-  // Pull-to-refresh with haptic feedback - defined after refetch is available
+  // Aggressive media preloading for app-like speed
+  useFeedPreloader(posts || [], !!posts && posts.length > 0);
+
   const handleRefresh = useCallback(async () => {
     if (isOffline) {
       toast({

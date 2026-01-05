@@ -16,9 +16,9 @@ interface PreloadedVideo {
 class VideoPreloadManager {
   private preloadCache: Map<string, PreloadedVideo> = new Map();
   private preloadQueue: string[] = [];
-  private maxCacheSize = 8; // Keep max 8 videos in cache
-  private preloadAhead = 3; // Preload 3 videos ahead
-  private preloadBehind = 1; // Preload 1 video behind
+  private maxCacheSize = 12; // Increased: Keep max 12 videos in cache
+  private preloadAhead = 5; // Increased: Preload 5 videos ahead
+  private preloadBehind = 2; // Increased: Preload 2 videos behind
 
   /**
    * Update preload queue based on current video index
@@ -76,6 +76,15 @@ class VideoPreloadManager {
     // Create hidden video element for preloading
     const video = document.createElement('video');
     video.preload = 'auto';
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = 'anonymous';
+    
+    // Set buffer target for faster loading
+    if ('mozHasAudio' in video) {
+      // Firefox specific
+    }
+    
     video.muted = true;
     video.playsInline = true;
     video.crossOrigin = 'anonymous';
