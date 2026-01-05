@@ -72,8 +72,7 @@ const InvestmentDocs = () => {
   ];
 
   const capTable = [
-    { holder: 'Founder & CEO', percentage: 40, description: 'Person who built the app and runs daily operations' },
-    { holder: 'Co-Founder', percentage: 10, description: 'Partner helping with business and strategy' },
+    { holder: 'Founders (CEO & Co-Founder)', percentage: 50, description: 'The team who built the app and runs it daily' },
     { holder: 'Investors (You)', percentage: 20, description: 'What we are offering in this round' },
     { holder: 'Future Employees', percentage: 15, description: 'Saved for people we hire later' },
     { holder: 'Advisors', percentage: 10, description: 'Experts who guide us' },
