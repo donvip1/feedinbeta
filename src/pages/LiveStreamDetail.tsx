@@ -30,9 +30,9 @@ const LiveStreamDetail = () => {
 
   const loadStream = async () => {
     try {
-      // First, fetch the stream from the public view
+      // Fetch from live_streams table directly (not the view)
       const { data: streamData, error: streamError } = await supabase
-        .from('live_streams_public')
+        .from('live_streams')
         .select('*')
         .eq('id', streamId)
         .maybeSingle();
@@ -49,7 +49,7 @@ const LiveStreamDetail = () => {
         return;
       }
 
-      // Then fetch the profile separately to avoid view join issues
+      // Then fetch the profile separately
       const { data: profileData } = await supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url')

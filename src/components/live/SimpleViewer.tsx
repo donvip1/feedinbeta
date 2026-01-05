@@ -9,7 +9,7 @@ import {
   Users, Send, Heart, X, Gift, 
   Volume2, VolumeX, Flame, 
   PartyPopper, ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Coins, Share2, Crown, Loader2
+  MessageCircle, Home, Coins, Share2, Crown, Loader2, RefreshCw
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -17,9 +17,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { LiveStreamP2P, ConnectionStatus } from "@/lib/live-stream-p2p";
 import { FloatingReactions } from "./FloatingReactions";
 import { FlyingChat } from "./FlyingChat";
+import { useCloudflarePlayback } from "@/hooks/useCloudflarePlayback";
 
 interface SimpleViewerProps {
   streamId: string;
@@ -44,7 +44,6 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
-  const p2pManagerRef = useRef<LiveStreamP2P | null>(null);
   
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [stream, setStream] = useState<any>(null);
@@ -57,10 +56,26 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
   const [flyingGifts, setFlyingGifts] = useState<any[]>([]);
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [realtimeViewerCount, setRealtimeViewerCount] = useState(0);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('idle');
-  const [hasVideo, setHasVideo] = useState(false);
   
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
+
+  // Use Cloudflare HLS playback
+  const { 
+    status: playbackStatus, 
+    hasVideo, 
+    showUnmutePrompt,
+    errorMessage,
+    unmute: playbackUnmute,
+    retry: playbackRetry,
+    cleanup: playbackCleanup,
+  } = useCloudflarePlayback({
+    hlsUrl: stream?.cf_hls_url,
+    videoRef,
+    streamReady: stream?.stream_ready,
+    onStatusChange: (status) => {
+      console.log('[Viewer] Playback status:', status);
+    },
+  });
 
   // Check if current user is the host
   const isHost = useMemo(() => {
@@ -75,9 +90,9 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       setCurrentUser(user);
 
-      // Fetch stream data first (from view without join to avoid issues)
+      // Fetch stream data from live_streams table
       const { data: streamData, error: streamError } = await supabase
-        .from("live_streams_public")
+        .from("live_streams")
         .select("*")
         .eq("id", streamId)
         .maybeSingle();
@@ -109,48 +124,18 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
       };
 
       console.log("[Viewer] Stream data loaded:", fullStreamData);
+      console.log("[Viewer] HLS URL:", fullStreamData.cf_hls_url);
+      console.log("[Viewer] Stream ready:", fullStreamData.stream_ready);
+      
       setStream(fullStreamData);
       setRealtimeViewerCount(streamData.viewer_count || 0);
-      
-      // If stream is live, connect via P2P
-      if (streamData.status === 'live' && user) {
-        connectToStream(user.id);
-      }
     };
     init();
+    
+    return () => {
+      playbackCleanup();
+    };
   }, [streamId, onClose]);
-
-  // Connect to stream via P2P
-  const connectToStream = useCallback(async (userId: string) => {
-    console.log('[Viewer] Connecting to P2P stream...');
-    setConnectionStatus('connecting');
-    
-    const p2p = new LiveStreamP2P(streamId, userId, 'viewer', {
-      onRemoteStream: (stream) => {
-        console.log('[Viewer] Got remote stream!');
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.muted = true;
-          videoRef.current.play().catch(() => {});
-          setHasVideo(true);
-        }
-      },
-      onStatusChange: (status, message) => {
-        console.log('[Viewer] Status:', status, message);
-        setConnectionStatus(status);
-        if (status === 'connected') {
-          toast.success('Connected to stream!');
-        }
-      },
-      onError: (error) => {
-        console.error('[Viewer] P2P error:', error);
-        toast.error('Connection error: ' + error.message);
-      },
-    });
-    
-    p2pManagerRef.current = p2p;
-    await p2p.joinStream();
-  }, [streamId]);
 
   // Handle unmute
   const handleUnmute = useCallback(async () => {
@@ -159,20 +144,12 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
       try {
         await videoRef.current.play();
         setIsMuted(false);
+        playbackUnmute();
       } catch (e) {
         console.log('[Viewer] Unmute failed:', e);
       }
     }
-  }, []);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (p2pManagerRef.current) {
-        p2pManagerRef.current.destroy();
-      }
-    };
-  }, []);
+  }, [playbackUnmute]);
 
   // Real-time Viewer Counting
   useEffect(() => {
@@ -215,7 +192,7 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
     };
   }, [streamId, currentUser, viewerSession]);
 
-  // Subscribe to stream status changes
+  // Subscribe to stream status changes (for HLS URL updates)
   useEffect(() => {
     const channel = supabase
       .channel(`stream-status-${streamId}`)
@@ -225,23 +202,24 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
         table: 'live_streams',
         filter: `id=eq.${streamId}`,
       }, (payload: any) => {
-        console.log("[Viewer] Stream status changed:", payload.new.status);
+        console.log("[Viewer] Stream update:", payload.new.status, 'ready:', payload.new.stream_ready);
+        
         if (payload.new.status === 'ended') {
           toast.info("Stream has ended");
-          if (p2pManagerRef.current) {
-            p2pManagerRef.current.destroy();
-          }
+          playbackCleanup();
           setTimeout(() => {
             onClose();
             navigate('/live');
           }, 1500);
         }
+        
+        // Update stream data including HLS URL and stream_ready
         setStream((prev: any) => prev ? { ...prev, ...payload.new } : null);
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [streamId, onClose, navigate]);
+  }, [streamId, onClose, navigate, playbackCleanup]);
 
   // Chat Logic
   const sendComment = async () => {
@@ -437,27 +415,43 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
         />
 
         {/* CONNECTION LOADING STATE */}
-        {connectionStatus === 'connecting' && (
+        {(playbackStatus === 'connecting' || playbackStatus === 'waiting') && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
             <div className="text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
-              <p className="text-white">Connecting to stream...</p>
+              <p className="text-white">
+                {playbackStatus === 'waiting' ? 'Waiting for stream...' : 'Connecting to stream...'}
+              </p>
+              {stream?.cf_hls_url && (
+                <p className="text-muted-foreground text-sm mt-2">Using HLS playback</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* BUFFERING STATE */}
+        {playbackStatus === 'buffering' && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+            <div className="text-center">
+              <Loader2 className="w-10 h-10 animate-spin text-white mx-auto mb-2" />
+              <p className="text-white/80 text-sm">Buffering...</p>
             </div>
           </div>
         )}
 
         {/* CONNECTION FAILED STATE */}
-        {connectionStatus === 'failed' && (
+        {playbackStatus === 'error' && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
             <div className="text-center">
               <div className="text-5xl mb-4">📡</div>
               <h3 className="text-xl font-bold text-white mb-2">Connection Failed</h3>
-              <p className="text-muted-foreground mb-4">Unable to connect to stream</p>
+              <p className="text-muted-foreground mb-4">{errorMessage || 'Unable to connect to stream'}</p>
               <div className="flex gap-3 justify-center">
                 <Button variant="outline" onClick={onClose}>
                   Go Back
                 </Button>
-                <Button onClick={() => currentUser && connectToStream(currentUser.id)}>
+                <Button onClick={playbackRetry}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
                   Try Again
                 </Button>
               </div>
@@ -466,7 +460,7 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
         )}
 
         {/* Stream ended/scheduled state */}
-        {stream.status !== 'live' && connectionStatus !== 'connecting' && (
+        {stream.status !== 'live' && playbackStatus !== 'connecting' && playbackStatus !== 'waiting' && (
           <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
             <div className="text-center">
               {stream.status === 'scheduled' ? (
@@ -494,7 +488,7 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
         )}
 
         {/* TAP TO UNMUTE OVERLAY */}
-        {hasVideo && isMuted && (
+        {hasVideo && isMuted && showUnmutePrompt && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
