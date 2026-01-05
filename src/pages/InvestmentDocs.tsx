@@ -43,15 +43,18 @@ const InvestmentDocs = () => {
   const handleDownloadPDF = async () => {
     setIsGenerating(true);
     try {
+      console.log('Starting PDF generation...');
       generateInvestmentPDF();
+      console.log('PDF generation completed successfully');
       toast({
         title: "PDF Downloaded",
         description: "Investment Memorandum has been saved to your downloads folder.",
       });
     } catch (error) {
+      console.error('PDF generation error:', error);
       toast({
         title: "Download Failed",
-        description: "There was an error generating the PDF. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error generating the PDF. Please try again.",
         variant: "destructive",
       });
     } finally {
