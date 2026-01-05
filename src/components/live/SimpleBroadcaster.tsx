@@ -124,6 +124,7 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
     if (!user) return;
     
     setConnectionStatus('connecting');
+    toast.info("Setting up broadcast...");
     
     try {
       // Initialize media if needed
@@ -145,25 +146,66 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
       });
 
       if (cfError || !cfData?.success) {
+        console.error('[Broadcaster] Edge function error:', cfError, cfData);
         throw new Error(cfData?.error || 'Failed to create Cloudflare stream');
       }
 
-      const { webrtcPublishUrl, liveInputId: inputId, hlsUrl } = cfData;
+      const { webrtcPublishUrl, liveInputId: inputId, hlsUrl, webrtcPlaybackUrl } = cfData;
       console.log('[Broadcaster] Got WHIP URL:', webrtcPublishUrl);
+      console.log('[Broadcaster] Got WHEP URL:', webrtcPlaybackUrl);
       console.log('[Broadcaster] HLS URL for viewers:', hlsUrl);
+      
+      if (!webrtcPublishUrl) {
+        throw new Error('No WHIP publish URL received from Cloudflare');
+      }
       
       setWhipUrl(webrtcPublishUrl);
       setLiveInputId(inputId);
 
-      // 2. Create RTCPeerConnection and push to Cloudflare WHIP
+      // 2. CRITICAL: Ensure HLS URL is saved to database as backup
+      // (edge function should have done this, but let's verify)
+      if (hlsUrl) {
+        console.log('[Broadcaster] Verifying HLS URL is in database...');
+        const { error: dbError } = await supabase
+          .from('live_streams')
+          .update({ 
+            cf_hls_url: hlsUrl,
+            cf_webrtc_url: webrtcPlaybackUrl || null,
+            cf_live_input_id: inputId,
+          })
+          .eq('id', streamId);
+        
+        if (dbError) {
+          console.error('[Broadcaster] Warning: Could not save HLS URL to DB:', dbError);
+        } else {
+          console.log('[Broadcaster] HLS URL saved to database');
+        }
+      }
+
+      // 3. Create RTCPeerConnection and push to Cloudflare WHIP
+      toast.info("Connecting to streaming server...");
+      
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+        iceServers: [
+          { urls: 'stun:stun.cloudflare.com:3478' },
+          { urls: 'stun:stun.l.google.com:19302' },
+        ],
         bundlePolicy: 'max-bundle',
       });
       peerConnectionRef.current = pc;
 
+      // Monitor connection state
+      pc.onconnectionstatechange = () => {
+        console.log('[Broadcaster] Connection state:', pc.connectionState);
+        if (pc.connectionState === 'failed') {
+          toast.error("Connection lost. Please try again.");
+          setConnectionStatus('failed');
+        }
+      };
+
       // Add tracks to peer connection
       mediaStream.getTracks().forEach(track => {
+        console.log('[Broadcaster] Adding track:', track.kind, track.label);
         pc.addTrack(track, mediaStream);
       });
 
@@ -176,22 +218,25 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
         if (pc.iceGatheringState === 'complete') {
           resolve();
         } else {
-          pc.onicegatheringstatechange = () => {
-            if (pc.iceGatheringState === 'complete') resolve();
+          const onComplete = () => {
+            if (pc.iceGatheringState === 'complete') {
+              pc.removeEventListener('icegatheringstatechange', onComplete);
+              resolve();
+            }
           };
-          // Timeout after 5 seconds
+          pc.addEventListener('icegatheringstatechange', onComplete);
           setTimeout(resolve, 5000);
         }
       });
 
       const localDescription = pc.localDescription;
-      if (!localDescription) {
+      if (!localDescription || !localDescription.sdp) {
         throw new Error('Failed to create local description');
       }
 
       console.log('[Broadcaster] Sending WHIP offer to Cloudflare...');
 
-      // 3. Send offer to Cloudflare WHIP endpoint
+      // 4. Send offer to Cloudflare WHIP endpoint
       const whipResponse = await fetch(webrtcPublishUrl, {
         method: 'POST',
         headers: {
@@ -202,17 +247,17 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
 
       if (!whipResponse.ok) {
         const errorText = await whipResponse.text();
-        console.error('[Broadcaster] WHIP error:', errorText);
+        console.error('[Broadcaster] WHIP error:', whipResponse.status, errorText);
         throw new Error(`WHIP connection failed: ${whipResponse.status}`);
       }
 
       const answerSdp = await whipResponse.text();
       await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
-      console.log('[Broadcaster] Connected to Cloudflare! Setting stream_ready...');
+      console.log('[Broadcaster] WebRTC connected to Cloudflare!');
 
-      // 4. Update stream status
-      await supabase
+      // 5. Update stream status to LIVE immediately
+      const { error: statusError } = await supabase
         .from('live_streams')
         .update({ 
           status: 'live',
@@ -222,20 +267,30 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
         })
         .eq('id', streamId);
 
-      // Also verify stream is playable in background
+      if (statusError) {
+        console.error('[Broadcaster] Warning: Could not update stream status:', statusError);
+      }
+
+      // 6. Start background verification for HLS manifest
+      console.log('[Broadcaster] Starting background HLS verification...');
       supabase.functions.invoke('cloudflare-stream-v2', {
         body: {
           action: 'verify-stream-playable',
           streamId,
           liveInputId: inputId,
-          maxWaitSeconds: 30,
+          maxWaitSeconds: 45,
         }
       }).then(result => {
         console.log('[Broadcaster] Stream verification result:', result.data);
+        if (result.data?.success) {
+          toast.success("Stream is fully live - viewers can now join!");
+        }
+      }).catch(err => {
+        console.log('[Broadcaster] Background verification error:', err);
       });
 
       setConnectionStatus('connected');
-      toast.success("You are now live! Viewers can join.");
+      toast.success("You are now live!");
       
     } catch (error: any) {
       console.error('[Broadcaster] Broadcast error:', error);

@@ -59,9 +59,10 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
   
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
 
-  // Use Cloudflare HLS playback
+  // Use Cloudflare playback (WHEP first, HLS fallback)
   const { 
     status: playbackStatus, 
+    method: playbackMethod,
     hasVideo, 
     showUnmutePrompt,
     errorMessage,
@@ -70,10 +71,11 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
     cleanup: playbackCleanup,
   } = useCloudflarePlayback({
     hlsUrl: stream?.cf_hls_url,
+    whepUrl: stream?.cf_webrtc_url,
     videoRef,
     streamReady: stream?.stream_ready,
     onStatusChange: (status) => {
-      console.log('[Viewer] Playback status:', status);
+      console.log('[Viewer] Playback status:', status, 'method:', playbackMethod);
     },
   });
 
@@ -125,7 +127,9 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
 
       console.log("[Viewer] Stream data loaded:", fullStreamData);
       console.log("[Viewer] HLS URL:", fullStreamData.cf_hls_url);
+      console.log("[Viewer] WHEP URL:", fullStreamData.cf_webrtc_url);
       console.log("[Viewer] Stream ready:", fullStreamData.stream_ready);
+      console.log("[Viewer] Stream status:", fullStreamData.status);
       
       setStream(fullStreamData);
       setRealtimeViewerCount(streamData.viewer_count || 0);
@@ -426,10 +430,12 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
             <div className="text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
               <p className="text-white">
-                {playbackStatus === 'waiting' ? 'Waiting for stream...' : 'Connecting to stream...'}
+                {playbackStatus === 'waiting' ? 'Waiting for broadcaster...' : 'Connecting to stream...'}
               </p>
-              {stream?.cf_hls_url && (
-                <p className="text-muted-foreground text-sm mt-2">Using HLS playback</p>
+              {(stream?.cf_hls_url || stream?.cf_webrtc_url) && (
+                <p className="text-muted-foreground text-sm mt-2">
+                  {stream?.cf_webrtc_url ? 'Trying low-latency mode...' : 'Using HLS playback'}
+                </p>
               )}
             </div>
           </div>
