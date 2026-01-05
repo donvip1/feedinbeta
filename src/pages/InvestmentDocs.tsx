@@ -59,36 +59,41 @@ const InvestmentDocs = () => {
     }
   };
 
-  const platformMetrics = [
-    { label: 'Monthly Active Users', value: '50K+', growth: '+340% YoY', icon: Users },
-    { label: 'Daily Posts Created', value: '10K+', growth: '+280% YoY', icon: BarChart3 },
-    { label: 'Countries Reached', value: '25+', growth: 'Expanding', icon: Globe },
-    { label: 'Credits Transacted', value: '1M+', growth: '+450% YoY', icon: Coins },
-    { label: 'Live Streams Hosted', value: '5K+', growth: '+520% YoY', icon: Video },
-    { label: 'Messages Sent Daily', value: '100K+', growth: '+380% YoY', icon: MessageCircle },
+  const developmentProgress = [
+    { label: 'App Completion', value: '40%', status: 'In Development', icon: BarChart3 },
+    { label: 'MVP Budget', value: '$15K', status: 'Total Cost', icon: Coins },
+    { label: 'Already Spent', value: '$4K+', status: 'Invested', icon: DollarSign },
+    { label: 'Still Needed', value: '~$11K', status: 'To Complete', icon: Target },
+    { label: 'Development Time', value: '4 Months', status: 'Since Sep 2025', icon: Calendar },
+    { label: 'Target Launch', value: 'Q1 2026', status: 'March 2026', icon: Rocket },
   ];
 
   const capTable = [
-    { holder: 'Founders (CEO & Co-Founder)', percentage: 50, description: 'Vested over 4 years with 1-year cliff' },
-    { holder: 'Series Seed Investors', percentage: 20, description: 'Current funding round allocation' },
-    { holder: 'ESOP (Employee Stock Option Pool)', percentage: 15, description: 'Reserved for key hires and team expansion' },
-    { holder: 'Advisors & Strategic Partners', percentage: 10, description: 'Industry experts and growth partners' },
-    { holder: 'Future Rounds Reserve', percentage: 5, description: 'Reserved for Series A and beyond' },
+    { holder: 'Founder & CEO', percentage: 40, description: 'Person who built the app and runs daily operations' },
+    { holder: 'Co-Founder', percentage: 10, description: 'Partner helping with business and strategy' },
+    { holder: 'Investors (You)', percentage: 20, description: 'What we are offering in this round' },
+    { holder: 'Future Employees', percentage: 15, description: 'Saved for people we hire later' },
+    { holder: 'Advisors', percentage: 10, description: 'Experts who guide us' },
+    { holder: 'Future Investors', percentage: 5, description: 'Saved for bigger investments later' },
   ];
 
   const useOfFunds = [
-    { category: 'Product Development', percentage: 35, amount: '$350K', description: 'AI features, streaming infrastructure, mobile apps' },
-    { category: 'User Acquisition', percentage: 25, amount: '$250K', description: 'Marketing, influencer partnerships, growth campaigns' },
-    { category: 'Team Expansion', percentage: 20, amount: '$200K', description: 'Engineering, design, community management' },
-    { category: 'Infrastructure', percentage: 12, amount: '$120K', description: 'Servers, CDN, security, compliance' },
-    { category: 'Operations & Legal', percentage: 8, amount: '$80K', description: 'Legal, accounting, office, misc' },
+    { category: 'Servers & Hosting', percentage: 20, amount: '$3,000', spent: '$1,200', description: 'Cloud infrastructure to run the app' },
+    { category: 'AI Services', percentage: 17, amount: '$2,500', spent: '$800', description: 'AI features for chat and image creation' },
+    { category: 'Live Streaming Tech', percentage: 20, amount: '$3,000', spent: '$600', description: 'Go live and receive gifts in real-time' },
+    { category: 'Video Calling Tech', percentage: 13, amount: '$2,000', spent: '$300', description: 'Voice and video calls between users' },
+    { category: 'Software & Tools', percentage: 10, amount: '$1,500', spent: '$500', description: 'Development tools and licenses' },
+    { category: 'Design & Images', percentage: 7, amount: '$1,000', spent: '$400', description: 'UI design and graphics' },
+    { category: 'Testing & Launch', percentage: 13, amount: '$2,000', spent: '$200', description: 'Testing and marketing at launch' },
   ];
 
   const milestones = [
-    { quarter: 'Q1 2026', goal: '100K MAU', status: 'In Progress', details: 'Launch mobile apps, expand AI features' },
-    { quarter: 'Q2 2026', goal: '250K MAU', status: 'Planned', details: 'Enter 10 new markets, creator partnerships' },
-    { quarter: 'Q3 2026', goal: '500K MAU', status: 'Planned', details: 'Launch premium subscriptions at scale' },
-    { quarter: 'Q4 2026', goal: '1M MAU', status: 'Target', details: 'Series A preparation, break-even trajectory' },
+    { quarter: 'Jan 2026', goal: 'Finish Live Streaming', status: 'In Progress', details: 'Creators can go live and receive gifts' },
+    { quarter: 'Feb 2026', goal: 'Add Voice/Video Calls', status: 'Planned', details: 'Users can call each other directly' },
+    { quarter: 'Feb 2026', goal: 'Build Learn AI Section', status: 'Planned', details: 'Tech education content for users' },
+    { quarter: 'Mar 2026', goal: 'LAUNCH THE APP', status: 'Target', details: 'Open to everyone, start marketing' },
+    { quarter: 'Q2 2026', goal: 'Get 1,000 Users', status: 'Goal', details: 'Invite creators, build community' },
+    { quarter: 'Q3-Q4 2026', goal: 'Get 5,000+ Users', status: 'Goal', details: 'Start making profit, grow bigger' },
   ];
 
   const revenueStreams = [
@@ -109,20 +114,16 @@ const InvestmentDocs = () => {
   ];
 
   const teamRequirements = [
-    { role: 'CTO / Lead Engineer', priority: 'Critical', timeline: 'Q1 2026' },
-    { role: 'Head of Growth', priority: 'High', timeline: 'Q1 2026' },
-    { role: 'Senior Full-Stack Engineers (2)', priority: 'High', timeline: 'Q1-Q2 2026' },
-    { role: 'Mobile Developer (iOS/Android)', priority: 'High', timeline: 'Q2 2026' },
-    { role: 'Community Manager', priority: 'Medium', timeline: 'Q2 2026' },
-    { role: 'Content & Creator Relations', priority: 'Medium', timeline: 'Q2 2026' },
+    { role: 'Another Developer', priority: 'High', timeline: 'After Launch' },
+    { role: 'Community Manager', priority: 'Medium', timeline: 'After Launch' },
   ];
 
   const risks = [
-    { risk: 'Market Competition', mitigation: 'Focus on creator-first features that established platforms ignore; rapid iteration' },
-    { risk: 'User Acquisition Cost', mitigation: 'Viral referral system with credit incentives; organic creator-driven growth' },
-    { risk: 'Regulatory Changes', mitigation: 'Privacy-first architecture; compliance-ready infrastructure; legal counsel' },
-    { risk: 'Technology Scaling', mitigation: 'Cloud-native architecture; CDN for global delivery; modular microservices' },
-    { risk: 'Creator Retention', mitigation: 'Competitive payout rates (85%+); instant monetization; exclusive features' },
+    { risk: 'We are just starting out', mitigation: 'We already built 40% of the app; you can try it yourself before investing' },
+    { risk: 'Big companies like Instagram exist', mitigation: 'We focus on helping small creators who they ignore' },
+    { risk: 'Getting users is hard', mitigation: 'We give free credits to attract people; creators invite their fans' },
+    { risk: 'App might slow down with many users', mitigation: 'We built it to handle growth from the start' },
+    { risk: 'Might take time to make money', mitigation: 'We have many ways to earn money and we spend carefully' },
   ];
 
   return (
@@ -166,33 +167,36 @@ const InvestmentDocs = () => {
             </div>
             <div>
               <h1 className="text-2xl font-bold">FEEDIN Investment Memorandum</h1>
-              <p className="text-muted-foreground">Confidential • Series Seed • January 2026</p>
+              <p className="text-muted-foreground">Confidential • Pre-Seed / MVP Stage • January 2026</p>
             </div>
           </div>
           
           <div className="space-y-4 text-foreground/90">
             <p className="text-lg leading-relaxed">
-              <strong>FEEDIN</strong> is a next-generation social media platform that puts creators first. 
-              We combine social networking, live streaming, AI-powered tools, and an integrated credit economy 
-              to enable creators to monetize their content from day one—no follower thresholds, no waiting periods.
+              <strong>FEEDIN</strong> is a social media app that helps content creators make money from day one. 
+              Unlike Instagram or TikTok where you need thousands of followers before you can earn,
+              FEEDIN lets anyone receive tips and gifts immediately.
+            </p>
+            <p className="leading-relaxed">
+              Think of it as: <strong>Instagram + TikTok + Patreon, all in one app.</strong>
             </p>
             
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
               <div className="bg-background/50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-primary">$1M</div>
-                <div className="text-xs text-muted-foreground">Raising</div>
+                <div className="text-2xl font-bold text-primary">$15K</div>
+                <div className="text-xs text-muted-foreground">MVP Budget</div>
               </div>
               <div className="bg-background/50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-primary">$5M</div>
-                <div className="text-xs text-muted-foreground">Pre-Money Valuation</div>
+                <div className="text-2xl font-bold text-primary">$4K+</div>
+                <div className="text-xs text-muted-foreground">Already Spent</div>
               </div>
               <div className="bg-background/50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-primary">20%</div>
-                <div className="text-xs text-muted-foreground">Equity Offered</div>
+                <div className="text-2xl font-bold text-primary">~$11K</div>
+                <div className="text-xs text-muted-foreground">Still Needed</div>
               </div>
               <div className="bg-background/50 rounded-lg p-3 text-center">
-                <div className="text-2xl font-bold text-primary">18 mo</div>
-                <div className="text-xs text-muted-foreground">Runway</div>
+                <div className="text-2xl font-bold text-primary">40%</div>
+                <div className="text-xs text-muted-foreground">Built So Far</div>
               </div>
             </div>
           </div>
@@ -258,21 +262,47 @@ const InvestmentDocs = () => {
           </div>
         </Card>
 
-        {/* Platform Metrics */}
+        {/* Development Progress */}
         <Card className="bg-card border-border p-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-green-500" />
-            Traction & Key Metrics
+            Development Progress
           </h2>
+          <p className="text-muted-foreground mb-4">
+            We started building FEEDIN about 4 months ago (September 2025). So far, we have spent over $4,000 and built about 40% of the app.
+          </p>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {platformMetrics.map((metric, index) => (
+            {developmentProgress.map((item, index) => (
               <div key={index} className="bg-secondary/30 rounded-lg p-4">
-                <metric.icon className="w-5 h-5 text-primary mb-2" />
-                <div className="text-2xl font-bold">{metric.value}</div>
-                <div className="text-sm text-muted-foreground">{metric.label}</div>
-                <div className="text-xs text-green-500 mt-1">{metric.growth}</div>
+                <item.icon className="w-5 h-5 text-primary mb-2" />
+                <div className="text-2xl font-bold">{item.value}</div>
+                <div className="text-sm text-muted-foreground">{item.label}</div>
+                <div className="text-xs text-primary mt-1">{item.status}</div>
               </div>
             ))}
+          </div>
+          
+          <div className="mt-6 grid md:grid-cols-2 gap-4">
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+              <h3 className="font-semibold text-green-500 mb-2">✓ What's Already Built (40%)</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Social feed - Posts, photos, videos, likes, comments</li>
+                <li>• User profiles - Accounts, followers, following</li>
+                <li>• Private messaging - Real-time chats</li>
+                <li>• Credits system - Buy credits, send gifts</li>
+                <li>• AI tools - Chat assistant, image creation</li>
+                <li>• Groups & search - Community features</li>
+              </ul>
+            </div>
+            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+              <h3 className="font-semibold text-yellow-500 mb-2">⏳ Still Need to Build (60%)</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Live streaming - Go live and receive gifts</li>
+                <li>• Voice and video calls - Talk with followers</li>
+                <li>• Learn AI section - Tech education content</li>
+                <li>• Final testing and polish before launch</li>
+              </ul>
+            </div>
           </div>
         </Card>
 
@@ -326,7 +356,7 @@ const InvestmentDocs = () => {
         <Card className="bg-gradient-to-br from-accent/10 to-primary/5 border-primary/20 p-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <PieChart className="w-6 h-6 text-primary" />
-            Cap Table (Post-Investment)
+            Who Owns What (After Investment)
           </h2>
           <div className="space-y-3">
             {capTable.map((row, index) => (
@@ -347,14 +377,21 @@ const InvestmentDocs = () => {
           </div>
           
           <div className="mt-6 p-4 bg-background/30 rounded-lg border border-primary/20">
-            <h3 className="font-semibold mb-2">Investment Terms</h3>
+            <h3 className="font-semibold mb-2">How You Can Invest</h3>
             <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• <strong>Instrument:</strong> SAFE (Simple Agreement for Future Equity)</li>
-              <li>• <strong>Valuation Cap:</strong> $5M</li>
-              <li>• <strong>Discount:</strong> 20% on next priced round</li>
-              <li>• <strong>Minimum Investment:</strong> $25,000</li>
-              <li>• <strong>Pro-rata Rights:</strong> Yes, for investments ≥$50K</li>
+              <li>• <strong>We want to raise:</strong> $15,000 or more</li>
+              <li>• <strong>Smallest investment:</strong> $1,000</li>
+              <li>• <strong>What you get:</strong> 20% of the company (if we raise the full $15K)</li>
+              <li>• <strong>How we value FEEDIN:</strong> $75,000</li>
             </ul>
+            <div className="mt-4 text-sm">
+              <p className="font-medium mb-2">Investment Options:</p>
+              <ul className="text-muted-foreground space-y-1">
+                <li>• <strong>$1,000 - $4,999:</strong> 2-5% ownership + updates + early access</li>
+                <li>• <strong>$5,000 - $9,999:</strong> 6-10% ownership + help guide the product</li>
+                <li>• <strong>$10,000 - $15,000:</strong> 12-20% ownership + become a key partner</li>
+              </ul>
+            </div>
           </div>
         </Card>
 
@@ -362,7 +399,7 @@ const InvestmentDocs = () => {
         <Card className="bg-card border-border p-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Building2 className="w-6 h-6 text-primary" />
-            Use of Funds ($1M Raise)
+            Where The Money Goes ($15K Total Budget)
           </h2>
           <div className="space-y-4">
             {useOfFunds.map((item, index) => (
@@ -371,18 +408,23 @@ const InvestmentDocs = () => {
                   <span className="font-semibold">{item.category}</span>
                   <div className="text-right">
                     <span className="text-primary font-bold">{item.amount}</span>
-                    <span className="text-muted-foreground text-sm ml-2">({item.percentage}%)</span>
+                    <span className="text-muted-foreground text-sm ml-2">(spent: {item.spent})</span>
                   </div>
                 </div>
                 <div className="h-2 bg-secondary rounded-full overflow-hidden mb-2">
                   <div 
                     className="h-full bg-primary rounded-full"
-                    style={{ width: `${item.percentage}%` }}
+                    style={{ width: `${item.percentage * 5}%` }}
                   />
                 </div>
                 <p className="text-sm text-muted-foreground">{item.description}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+            <p className="text-sm">
+              <strong>Total spent so far:</strong> $4,000+ | <strong>Still needed:</strong> ~$11,000
+            </p>
           </div>
         </Card>
 
@@ -390,7 +432,7 @@ const InvestmentDocs = () => {
         <Card className="bg-card border-border p-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Rocket className="w-6 h-6 text-primary" />
-            2026 Milestones & Roadmap
+            Our Plan for 2026
           </h2>
           <div className="space-y-4">
             {milestones.map((milestone, index) => (
@@ -406,6 +448,8 @@ const InvestmentDocs = () => {
                         ? 'bg-yellow-500/20 text-yellow-500'
                         : milestone.status === 'Planned'
                         ? 'bg-blue-500/20 text-blue-500'
+                        : milestone.status === 'Goal'
+                        ? 'bg-purple-500/20 text-purple-500'
                         : 'bg-green-500/20 text-green-500'
                     }`}>
                       {milestone.status}
@@ -423,18 +467,28 @@ const InvestmentDocs = () => {
         <Card className="bg-card border-border p-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <Users className="w-6 h-6 text-primary" />
-            Team & Key Hires
+            Who We Are
           </h2>
           
-          <div className="mb-6 p-4 bg-primary/10 rounded-lg">
-            <h3 className="font-semibold mb-2">Current Team</h3>
-            <p className="text-sm text-muted-foreground">
-              Founder-led team with full-stack development, product design, and go-to-market experience. 
-              Built the entire platform from scratch with a focus on scalability and user experience.
-            </p>
+          <div className="mb-6 space-y-4">
+            <div className="p-4 bg-primary/10 rounded-lg">
+              <h3 className="font-semibold mb-2">Founder & CEO</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• A web developer who builds apps using modern technology</li>
+                <li>• Built the entire FEEDIN app by hand over the past 4 months</li>
+                <li>• Cares deeply about helping creators earn money fairly</li>
+              </ul>
+            </div>
+            <div className="p-4 bg-secondary/30 rounded-lg">
+              <h3 className="font-semibold mb-2">Co-Founder</h3>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>• Helps with business ideas and planning</li>
+                <li>• Works on finding partners and growing the business</li>
+              </ul>
+            </div>
           </div>
 
-          <h3 className="font-semibold mb-3">Planned Hires (Post-Funding)</h3>
+          <h3 className="font-semibold mb-3">People We Plan to Hire (After We Get Funding)</h3>
           <div className="grid md:grid-cols-2 gap-3">
             {teamRequirements.map((hire, index) => (
               <div key={index} className="bg-secondary/20 rounded-lg p-3 flex items-center justify-between">
@@ -460,7 +514,7 @@ const InvestmentDocs = () => {
         <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/30 p-6">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2 text-destructive">
             <Shield className="w-6 h-6" />
-            Risk Factors & Mitigation
+            What Could Go Wrong (And How We Handle It)
           </h2>
           <div className="space-y-4">
             {risks.map((item, index) => (
@@ -470,7 +524,7 @@ const InvestmentDocs = () => {
                   <div>
                     <h3 className="font-semibold text-destructive">{item.risk}</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      <strong>Mitigation:</strong> {item.mitigation}
+                      <strong>How we deal with it:</strong> {item.mitigation}
                     </p>
                   </div>
                 </div>
@@ -480,10 +534,9 @@ const InvestmentDocs = () => {
           
           <div className="mt-6 p-4 bg-background/30 rounded-lg border border-destructive/20">
             <p className="text-sm text-foreground/80">
-              <strong>Disclaimer:</strong> This document is for informational purposes only and does not constitute 
-              an offer to sell or solicitation to buy securities. All investments carry risk and past performance 
-              does not guarantee future results. Prospective investors should conduct their own due diligence and 
-              consult with financial, legal, and tax advisors before making any investment decision.
+              <strong>Important Note:</strong> All investments carry risk. This document is to give you information 
+              about FEEDIN so you can decide if you want to invest. Please talk to a financial advisor before 
+              making any investment decision.
             </p>
           </div>
         </Card>
@@ -501,19 +554,19 @@ const InvestmentDocs = () => {
               <ol className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
                   <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">1</span>
-                  <span>Schedule an intro call with our founding team</span>
+                  <span>Send us an email to talk about investing</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">2</span>
-                  <span>Receive detailed financial projections and data room access</span>
+                  <span>We'll show you the app and answer your questions</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">3</span>
-                  <span>Complete due diligence and legal review</span>
+                  <span>Decide how much you want to invest</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="bg-primary text-primary-foreground w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">4</span>
-                  <span>Sign SAFE agreement and wire funds</span>
+                  <span>Sign agreement and send funds</span>
                 </li>
               </ol>
             </div>
