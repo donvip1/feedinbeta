@@ -107,10 +107,48 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
+  const [showControls, setShowControls] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-hide controls after 3 seconds
+  const resetControlsTimer = () => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    setShowControls(true);
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  };
+
+  // Hide controls on scroll (called from parent via intersection observer)
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowControls(false);
+      resetControlsTimer();
+    };
+
+    const container = postRef.current?.parentElement;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+    }
+
+    // Initial timer
+    resetControlsTimer();
+
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Determine media to display
   const isRefeed = post.post_type === 'refeed' || post.post_type === 'quote';
@@ -273,6 +311,18 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       }
       setShowPlayIcon(true);
       setTimeout(() => setShowPlayIcon(false), 500);
+      
+      // Toggle controls visibility on tap
+      setShowControls(prev => !prev);
+      if (!showControls) {
+        resetControlsTimer();
+      }
+    } else {
+      // For non-video posts, just toggle controls
+      setShowControls(prev => !prev);
+      if (!showControls) {
+        resetControlsTimer();
+      }
     }
   };
 
@@ -525,7 +575,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         </div>
 
         {/* Right Side - Action Buttons (Vertical Stack) */}
-        <div className="absolute right-3 bottom-32 flex flex-col items-center gap-2.5 z-10">
+        <div className={cn(
+          "absolute right-3 bottom-32 flex flex-col items-center gap-2.5 z-10 transition-opacity duration-300",
+          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}>
           {/* Like */}
           <button 
             onClick={handleLike}
@@ -533,7 +586,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           >
             <Heart 
               className={cn(
-                "w-5 h-5 drop-shadow-lg transition-transform group-active:scale-90", 
+                "w-6 h-6 drop-shadow-lg transition-transform group-active:scale-90", 
                 liked ? "text-red-500 fill-red-500" : "text-white"
               )} 
             />
@@ -545,7 +598,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             onClick={() => handleCommentsOpenChange(true)}
             className="flex flex-col items-center gap-0.5 group"
           >
-            <MessageCircle className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <MessageCircle className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
             <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
           </button>
 
@@ -554,7 +607,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }}
             className="flex flex-col items-center gap-0.5 group"
           >
-            <Repeat className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <Repeat className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
             <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
           </button>
 
@@ -563,7 +616,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             onClick={() => { setGiftOpen(true); onInteractionStart?.(); }}
             className="flex flex-col items-center gap-0.5 group"
           >
-            <Gift className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <Gift className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
             <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
           </button>
 
@@ -572,7 +625,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             onClick={() => { setShareOpen(true); onInteractionStart?.(); }}
             className="flex flex-col items-center gap-0.5 group"
           >
-            <Share2 className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <Share2 className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
           </button>
 
           {/* Mute/Unmute for videos */}
@@ -582,9 +635,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               className="flex flex-col items-center gap-0.5"
             >
               {isMuted ? (
-                <VolumeX className="w-5 h-5 text-white drop-shadow-lg" />
+                <VolumeX className="w-6 h-6 text-white drop-shadow-lg" />
               ) : (
-                <Volume2 className="w-5 h-5 text-white drop-shadow-lg" />
+                <Volume2 className="w-6 h-6 text-white drop-shadow-lg" />
               )}
             </button>
           )}
