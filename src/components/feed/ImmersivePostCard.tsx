@@ -712,20 +712,23 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Promote CTA - Under Caption for all post types */}
-          {user && user.id === post.user_id && !isPromoted && (
+        </div>
+
+        {/* Promote CTA - Fixed Overlay at Bottom Center */}
+        {user && user.id === post.user_id && !isPromoted && (
+          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-20">
             <button 
               onClick={(e) => {
                 e.stopPropagation();
                 navigate(`/promote/${post.id}`);
               }}
-              className="flex items-center gap-1.5 text-white text-xs font-semibold bg-primary hover:bg-primary/80 backdrop-blur-sm px-4 py-2 rounded-full transition-colors mt-2 shadow-lg border border-white/20"
+              className="flex items-center gap-2 text-white text-sm font-semibold bg-primary hover:bg-primary/80 backdrop-blur-md px-5 py-2.5 rounded-full transition-all shadow-xl border border-white/30 animate-pulse"
             >
               <TrendingUp className="w-4 h-4" />
               Promote this post
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Modals */}
