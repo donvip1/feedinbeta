@@ -591,7 +591,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* Right Side - Action Buttons (Vertical Stack) */}
         <div className={cn(
-          "absolute right-3 bottom-32 flex flex-col items-center gap-2.5 z-10",
+          "absolute right-3 bottom-32 flex flex-col items-center gap-3 z-10",
           showControls ? "visible" : "invisible"
         )}>
           {/* Like */}
