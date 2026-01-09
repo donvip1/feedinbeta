@@ -160,7 +160,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             className="text-primary font-semibold cursor-pointer hover:underline"
             onClick={(e) => {
               e.stopPropagation();
-              navigate(`/hashtag/${hashtag}`);
+              navigate(`/feed/hashtag/${encodeURIComponent(hashtag)}`);
             }}
           >
             {part}
