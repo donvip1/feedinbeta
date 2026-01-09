@@ -38,8 +38,8 @@ const options = [
   },
   {
     id: 'text',
-    label: 'Text',
-    description: 'Write a post',
+    label: 'Text Card',
+    description: 'Create a styled text card',
     icon: Type,
     gradient: 'from-orange-500 to-amber-400',
     action: 'onTextSelect',
