@@ -669,8 +669,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
         </div>
 
-        {/* Promote CTA - Inside card, above caption */}
-        {user && user.id === post.user_id && !isPromoted && (
+        {/* Promote CTA - Inside card, above caption - shows for all logged-in users */}
+        {user && !isPromoted && (
           <div className="absolute bottom-28 left-4 z-30">
             <button 
               onClick={(e) => {
