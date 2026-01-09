@@ -114,18 +114,17 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const touchEndX = useRef<number>(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-hide controls after 3 seconds
+  // Auto-show controls after 1 second of inactivity
   const resetControlsTimer = () => {
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
     }
-    setShowControls(true);
     controlsTimeoutRef.current = setTimeout(() => {
-      setShowControls(false);
-    }, 3000);
+      setShowControls(true);
+    }, 1000);
   };
 
-  // Hide controls on scroll (called from parent via intersection observer)
+  // Hide controls on scroll start
   useEffect(() => {
     const handleScroll = () => {
       setShowControls(false);
@@ -137,9 +136,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       container.addEventListener('scroll', handleScroll, { passive: true });
     }
 
-    // Initial timer
-    resetControlsTimer();
-
     return () => {
       if (container) {
         container.removeEventListener('scroll', handleScroll);
@@ -149,6 +145,31 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       }
     };
   }, []);
+
+  // Parse hashtags from caption
+  const renderCaptionWithHashtags = (text: string) => {
+    const hashtagRegex = /(#\w+)/g;
+    const parts = text.split(hashtagRegex);
+    
+    return parts.map((part, index) => {
+      if (part.match(hashtagRegex)) {
+        const hashtag = part.slice(1); // Remove # for navigation
+        return (
+          <span
+            key={index}
+            className="text-primary font-semibold cursor-pointer hover:underline"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/hashtag/${hashtag}`);
+            }}
+          >
+            {part}
+          </span>
+        );
+      }
+      return part;
+    });
+  };
 
   // Determine media to display
   const isRefeed = post.post_type === 'refeed' || post.post_type === 'quote';
@@ -301,6 +322,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   }, [post.id]);
 
   const togglePlayPause = () => {
+    // Toggle controls visibility on any tap
+    setShowControls(prev => !prev);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -311,18 +338,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       }
       setShowPlayIcon(true);
       setTimeout(() => setShowPlayIcon(false), 500);
-      
-      // Toggle controls visibility on tap
-      setShowControls(prev => !prev);
-      if (!showControls) {
-        resetControlsTimer();
-      }
-    } else {
-      // For non-video posts, just toggle controls
-      setShowControls(prev => !prev);
-      if (!showControls) {
-        resetControlsTimer();
-      }
     }
   };
 
@@ -576,8 +591,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* Right Side - Action Buttons (Vertical Stack) */}
         <div className={cn(
-          "absolute right-3 bottom-32 flex flex-col items-center gap-2.5 z-10 transition-opacity duration-300",
-          showControls ? "opacity-100" : "opacity-0 pointer-events-none"
+          "absolute right-3 bottom-32 flex flex-col items-center gap-2.5 z-10",
+          showControls ? "visible" : "invisible"
         )}>
           {/* Like */}
           <button 
@@ -656,19 +671,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Caption (for non-text-styled posts) */}
           {!isTextStyled && caption && (
             <div className="mb-3">
-              <p 
-                className="text-white text-sm leading-relaxed drop-shadow-lg cursor-pointer"
-                onClick={() => setShowFullCaption(!showFullCaption)}
-              >
+              <p className="text-white text-sm leading-relaxed drop-shadow-lg">
                 <span className="font-semibold mr-1">@{username}</span>
-                {showFullCaption ? caption : truncatedCaption}
+                {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
               </p>
               {caption.length > 150 && (
                 <button 
-                  onClick={() => setShowFullCaption(!showFullCaption)}
-                  className="text-white/70 text-xs mt-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFullCaption(!showFullCaption);
+                  }}
+                  className="text-primary text-xs mt-1 font-medium"
                 >
-                  {showFullCaption ? 'Show less' : 'Show more'}
+                  {showFullCaption ? 'Show less' : 'Show more...'}
                 </button>
               )}
             </div>
