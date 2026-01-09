@@ -828,7 +828,6 @@ const Feed = () => {
                       isPromoted={post._isPromoted || false}
                       promoterName={post._promoterName}
                       boostLevel={post._boostLevel}
-                      onLikeUpdate={() => refetch()}
                       onCommentsOpenChange={setIsCommentsOpen}
                       onInteractionStart={handleInteractionStart}
                       onInteractionEnd={handleInteractionEnd}
@@ -869,7 +868,6 @@ const Feed = () => {
                   <ImmersivePostCard
                     post={post as any}
                     isPromoted={false}
-                    onLikeUpdate={() => {}}
                     onCommentsOpenChange={setIsCommentsOpen}
                     onInteractionStart={handleInteractionStart}
                     onInteractionEnd={handleInteractionEnd}
