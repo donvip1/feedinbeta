@@ -669,6 +669,22 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
         </div>
 
+        {/* Promote CTA - Inside card, above caption */}
+        {user && user.id === post.user_id && !isPromoted && (
+          <div className="absolute bottom-28 left-4 z-30">
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/promote/${post.id}`);
+              }}
+              className="flex items-center gap-2 text-white text-sm font-bold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 px-5 py-2.5 rounded-full transition-all shadow-2xl border-2 border-white/40 animate-pulse"
+            >
+              <TrendingUp className="w-4 h-4" />
+              Promote this post
+            </button>
+          </div>
+        )}
+
         {/* Bottom Left - Caption & Music */}
         <div className="absolute left-4 right-20 bottom-4 z-10">
           {/* Refeed indicator */}
@@ -682,11 +698,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Caption - shown for all post types */}
           {caption && (
             <div className="mb-3">
-              <p className="text-white text-sm leading-relaxed drop-shadow-lg">
+              <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
                 <span className="font-semibold mr-1">@{username}</span>
-                {!isTextStyled && (showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption))}
+                {!isTextStyled && renderCaptionWithHashtags(truncatedCaption)}
               </p>
-              {!isTextStyled && caption.length > 150 && (
+              {!isTextStyled && caption.length > 100 && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -713,22 +729,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
 
         </div>
-
-        {/* Promote CTA - Fixed Overlay Above Caption */}
-        {user && user.id === post.user_id && !isPromoted && (
-          <div className="absolute bottom-36 left-1/2 -translate-x-1/2 z-30">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/promote/${post.id}`);
-              }}
-              className="flex items-center gap-2 text-white text-sm font-bold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 px-6 py-3 rounded-full transition-all shadow-2xl border-2 border-white/40 animate-pulse"
-            >
-              <TrendingUp className="w-5 h-5" />
-              Promote this post
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Modals */}
