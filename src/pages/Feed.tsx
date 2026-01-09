@@ -14,7 +14,7 @@ import NativeCameraView from '@/components/post/NativeCameraView';
 import NativeGalleryPicker from '@/components/post/NativeGalleryPicker';
 import TextPostCreator from '@/components/post/TextPostCreator';
 import PostDetails from '@/components/post/PostDetails';
-import PostCard from '@/components/feed/PostCard';
+import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
 import { useViewedPosts } from '@/hooks/useViewedPosts';
 import { useScrollPosition } from '@/hooks/useScrollPosition';
@@ -744,7 +744,7 @@ const Feed = () => {
       >
         <div
           ref={containerRef}
-          className="max-w-2xl mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100vh-8rem)] scroll-smooth native-scroll-container relative"
+          className="w-full snap-y snap-mandatory overflow-y-scroll h-[calc(100dvh-8rem)] scroll-smooth native-scroll-container relative"
           data-scrollable="true"
         >
           {/* Pull to Refresh Indicator */}
@@ -811,7 +811,7 @@ const Feed = () => {
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
             {/* Show inline live content at the top if available (only on following/forYou tabs) */}
             {inlineLiveContent && inlineLiveContent.length > 0 && (
-              <div className="snap-start snap-always h-[calc(100vh-8rem)] flex items-start">
+              <div className="snap-start snap-always h-[calc(100dvh-8rem)] flex items-center justify-center">
                 <InlineLiveCard
                   item={{
                     ...inlineLiveContent[0],
@@ -830,13 +830,6 @@ const Feed = () => {
             )}
 
             {displayPosts.map((post, index) => {
-              const isStyledText = post.media_type === 'text_styled' && post.media_url && post.content;
-              const isMedia = post.media_url && post.media_type !== 'text_styled';
-              
-              const wrapperClass = (isStyledText || isMedia)
-                ? "snap-start snap-always h-[calc(100vh-8rem)] flex items-start" 
-                : "snap-start mb-4";
-              
               const uniqueKey = post._cycleKey || post.id;
               
               // Insert another live card after every 5 posts if we have more live content
@@ -847,24 +840,21 @@ const Feed = () => {
 
               return (
                 <>
-                  <div key={uniqueKey} className={wrapperClass}>
-                    <PostCard
+                  <div key={uniqueKey} className="snap-start snap-always">
+                    <ImmersivePostCard
                       post={post}
                       isPromoted={post._isPromoted || false}
                       promoterName={post._promoterName}
                       boostLevel={post._boostLevel}
-                      allPosts={displayPosts}
-                      allVideoPosts={allVideoPostsRef.current}
                       onLikeUpdate={() => refetch()}
                       onCommentsOpenChange={setIsCommentsOpen}
                       onInteractionStart={handleInteractionStart}
                       onInteractionEnd={handleInteractionEnd}
                       onView={() => markAsViewed(post.id)}
-                      onMarkAsViewed={markAsViewed}
                     />
                   </div>
                   {showInlineLive && (
-                    <div key={`live-${index}`} className="snap-start snap-always h-[calc(100vh-8rem)] flex items-start">
+                    <div key={`live-${index}`} className="snap-start snap-always h-[calc(100dvh-8rem)] flex items-center justify-center">
                       <InlineLiveCard
                         item={{
                           ...inlineLiveContent[index === 4 ? 1 : 2],
@@ -893,18 +883,15 @@ const Feed = () => {
             {cachedPosts.map((post) => {
               const uniqueKey = (post as any)._cycleKey || post.id;
               return (
-                <div key={uniqueKey} className="snap-start mb-4">
-                  <PostCard
+                <div key={uniqueKey} className="snap-start snap-always">
+                  <ImmersivePostCard
                     post={post as any}
                     isPromoted={false}
-                    allPosts={cachedPosts as any}
-                    allVideoPosts={[]}
                     onLikeUpdate={() => {}}
                     onCommentsOpenChange={setIsCommentsOpen}
                     onInteractionStart={handleInteractionStart}
                     onInteractionEnd={handleInteractionEnd}
                     onView={() => {}}
-                    onMarkAsViewed={() => {}}
                   />
                 </div>
               );
