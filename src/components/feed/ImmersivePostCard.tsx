@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Maximize } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
+import FullscreenMediaViewer from './FullscreenMediaViewer';
 import { cn } from '@/lib/utils';
 
 // Format count for display (e.g., 1.2K, 3.5M)
@@ -73,6 +74,9 @@ interface ImmersivePostCardProps {
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
   onView?: () => void;
+  allPosts?: any[];
+  allVideoPosts?: any[];
+  onMarkAsViewed?: (postId: string) => void;
 }
 
 const ImmersivePostCard = memo(function ImmersivePostCard({ 
@@ -84,7 +88,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   onCommentsOpenChange, 
   onInteractionStart, 
   onInteractionEnd, 
-  onView 
+  onView,
+  allPosts,
+  allVideoPosts,
+  onMarkAsViewed
 }: ImmersivePostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -108,6 +115,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
@@ -600,6 +608,23 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </DropdownMenu>
         </div>
 
+        {/* Fullscreen Button - Below three-dot menu */}
+        {(allPosts && allPosts.length > 0) && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              if (videoRef.current) {
+                videoRef.current.pause();
+              }
+              setShowFullscreenViewer(true);
+              onInteractionStart?.();
+            }}
+            className="absolute top-20 right-4 z-10 p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/50 transition-colors"
+          >
+            <Maximize className="w-5 h-5 text-white" />
+          </button>
+        )}
+
         {/* Right Side - Action Buttons (Vertical Stack) */}
         <div className={cn(
           "absolute right-3 bottom-32 flex flex-col items-center gap-3 z-10",
@@ -787,6 +812,26 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Fullscreen Media Viewer */}
+      {allPosts && allPosts.length > 0 && (
+        <FullscreenMediaViewer
+          post={isRefeed && displayPost ? displayPost as any : post}
+          allPosts={allPosts}
+          allVideoPosts={allVideoPosts}
+          isOpen={showFullscreenViewer}
+          onClose={() => {
+            setShowFullscreenViewer(false);
+            onInteractionEnd?.();
+          }}
+          onMarkAsViewed={onMarkAsViewed}
+          parentLikesCount={likesCount}
+          parentCommentsCount={commentsCount}
+          parentRefeedsCount={refeedsCount}
+          actualPostId={post.id}
+          initialMuted={isMuted}
+        />
+      )}
     </>
   );
 });
