@@ -832,6 +832,9 @@ const Feed = () => {
                       onInteractionStart={handleInteractionStart}
                       onInteractionEnd={handleInteractionEnd}
                       onView={() => markAsViewed(post.id)}
+                      allPosts={displayPosts}
+                      allVideoPosts={allVideoPostsRef.current}
+                      onMarkAsViewed={markAsViewed}
                     />
                   </div>
                   {showInlineLive && (
@@ -872,6 +875,8 @@ const Feed = () => {
                     onInteractionStart={handleInteractionStart}
                     onInteractionEnd={handleInteractionEnd}
                     onView={() => {}}
+                    allPosts={cachedPosts as any[]}
+                    onMarkAsViewed={() => {}}
                   />
                 </div>
               );
