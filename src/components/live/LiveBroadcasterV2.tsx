@@ -10,7 +10,7 @@ import {
   Video, VideoOff, Mic, MicOff, FlipHorizontal,
   Users, Send, X, Gift, Radio, 
   Wifi, WifiOff, Share2, Home, Coins, Crown, Loader2, AlertCircle,
-  Volume2, VolumeX, MessageCircle
+  Volume2, VolumeX, MessageCircle, Monitor, MonitorOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
@@ -24,6 +24,8 @@ import { FloatingReactions } from "./FloatingReactions";
 import { StreamHealthIndicator } from "./StreamHealthIndicator";
 import { FlyingChat } from "./FlyingChat";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { ScreenShareButton } from "./ScreenShareButton";
+import { CoHostPanel } from "./CoHostPanel";
 
 interface LiveBroadcasterV2Props {
   streamId: string;
@@ -67,6 +69,8 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
   const [connectionQuality, setConnectionQuality] = useState<'good' | 'fair' | 'poor'>('good');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showChat, setShowChat] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const screenStreamRef = useRef<MediaStream | null>(null);
   const [coHosts, setCoHosts] = useState<string[]>([]);
 
   const { keyboardHeight, isKeyboardOpen } = useKeyboardHeight();
@@ -472,6 +476,64 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
       toast.error("Could not switch camera");
     }
   }, [isFrontCamera, broadcastState, setVideoStream]);
+
+  // Handle screen share
+  const handleScreenShare = useCallback(async (screenStream: MediaStream | null) => {
+    if (screenStream) {
+      // Start screen sharing
+      screenStreamRef.current = screenStream;
+      setIsScreenSharing(true);
+      
+      // Replace video track with screen share in peer connection
+      if (pcRef.current && broadcastState === 'live') {
+        const senders = pcRef.current.getSenders();
+        const videoTrack = screenStream.getVideoTracks()[0];
+        const videoSender = senders.find(s => s.track?.kind === 'video');
+        
+        if (videoSender && videoTrack) {
+          await videoSender.replaceTrack(videoTrack);
+          console.log('[BroadcasterV2] Replaced video track with screen share');
+        }
+
+        // If screen share has audio, add it
+        const audioTrack = screenStream.getAudioTracks()[0];
+        if (audioTrack) {
+          const audioSender = senders.find(s => s.track?.kind === 'audio');
+          if (audioSender) {
+            // Mix screen audio with mic audio (for now, just use screen audio)
+            await audioSender.replaceTrack(audioTrack);
+          }
+        }
+      }
+      
+      // Update local preview to show screen
+      setVideoStream(screenStream);
+      
+    } else {
+      // Stop screen sharing - revert to camera
+      screenStreamRef.current = null;
+      setIsScreenSharing(false);
+      
+      // Re-enable camera
+      if (streamRef.current && pcRef.current && broadcastState === 'live') {
+        const senders = pcRef.current.getSenders();
+        
+        const videoTrack = streamRef.current.getVideoTracks()[0];
+        const videoSender = senders.find(s => s.track?.kind === 'video');
+        if (videoSender && videoTrack) {
+          await videoSender.replaceTrack(videoTrack);
+        }
+        
+        const audioTrack = streamRef.current.getAudioTracks()[0];
+        const audioSender = senders.find(s => s.track?.kind === 'audio');
+        if (audioSender && audioTrack) {
+          await audioSender.replaceTrack(audioTrack);
+        }
+        
+        setVideoStream(streamRef.current);
+      }
+    }
+  }, [broadcastState, setVideoStream]);
 
   // Initialize preview on mount
   useEffect(() => {
@@ -995,10 +1057,21 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
           <motion.button
             whileTap={{ scale: 0.85 }}
             onClick={switchCamera}
-            className="w-11 h-11 rounded-full bg-black/40 backdrop-blur flex items-center justify-center"
+            disabled={isScreenSharing}
+            className={cn(
+              "w-11 h-11 rounded-full bg-black/40 backdrop-blur flex items-center justify-center",
+              isScreenSharing && "opacity-50"
+            )}
           >
             <FlipHorizontal className="w-5 h-5 text-white" />
           </motion.button>
+          
+          {/* Screen Share Button */}
+          <ScreenShareButton
+            onScreenStream={handleScreenShare}
+            disabled={broadcastState !== 'live'}
+            size="md"
+          />
           
           {/* Viewer List Panel */}
           <ViewerListPanel
