@@ -490,14 +490,29 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Text/Styled text background */}
           {(isTextStyled || (!currentMediaUrl && !hasVideo && !hasImage)) && (
             <div 
-              className="w-full h-full flex items-center justify-center p-8 overflow-hidden"
+              className="w-full h-full flex flex-col items-center justify-center p-6 overflow-hidden"
               style={{ 
                 background: isTextStyled ? getTextBackground() : 'linear-gradient(135deg, hsl(230, 85%, 25%) 0%, hsl(280, 70%, 35%) 100%)'
               }}
+              onClick={togglePlayPause}
             >
-              <p className="text-white text-2xl md:text-3xl font-semibold text-center leading-relaxed max-w-lg drop-shadow-lg break-words overflow-hidden">
-                {caption}
+              <p className="text-white text-xl md:text-2xl font-semibold text-center leading-relaxed max-w-[85%] drop-shadow-lg break-words whitespace-pre-wrap">
+                {renderCaptionWithHashtags(caption)}
               </p>
+              
+              {/* Promote CTA for text posts */}
+              {user && user.id === post.user_id && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="flex items-center gap-1.5 text-white/90 text-sm font-medium hover:text-white transition-colors mt-6 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  Promote this post
+                </button>
+              )}
             </div>
           )}
         </div>
