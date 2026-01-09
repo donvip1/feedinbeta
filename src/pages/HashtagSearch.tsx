@@ -85,7 +85,7 @@ const HashtagSearch = () => {
           </div>
         </header>
 
-        <div className="container mx-auto px-4 py-4 max-w-2xl">
+        <div className="mx-auto px-4 py-4 max-w-[430px]">
           {loading ? (
             <div className="space-y-4">
               {[1, 2].map((i) => (
