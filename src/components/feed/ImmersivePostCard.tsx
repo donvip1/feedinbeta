@@ -719,9 +719,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 e.stopPropagation();
                 navigate(`/promote/${post.id}`);
               }}
-              className="flex items-center gap-1.5 text-white text-xs font-semibold bg-primary/90 hover:bg-primary px-3 py-1.5 rounded-full transition-colors mt-2 shadow-lg"
+              className="flex items-center gap-1.5 text-white text-xs font-semibold bg-primary hover:bg-primary/80 backdrop-blur-sm px-4 py-2 rounded-full transition-colors mt-2 shadow-lg border border-white/20"
             >
-              <TrendingUp className="w-3.5 h-3.5" />
+              <TrendingUp className="w-4 h-4" />
               Promote this post
             </button>
           )}
