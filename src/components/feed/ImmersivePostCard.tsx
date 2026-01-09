@@ -454,11 +454,16 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 "w-full h-full object-cover transition-opacity duration-300",
                 isMediaLoaded ? "opacity-100" : "opacity-0"
               )}
+              style={{ touchAction: 'manipulation' }}
               muted={isMuted}
               playsInline
               loop
               preload="auto"
-              onClick={togglePlayPause}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                togglePlayPause();
+              }}
               onCanPlay={() => setIsMediaLoaded(true)}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
@@ -490,29 +495,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Text/Styled text background */}
           {(isTextStyled || (!currentMediaUrl && !hasVideo && !hasImage)) && (
             <div 
-              className="w-full h-full flex flex-col items-center justify-center p-6 overflow-hidden"
+              className="w-full h-full flex flex-col items-center justify-center px-4 pr-20 py-6 overflow-hidden"
               style={{ 
-                background: isTextStyled ? getTextBackground() : 'linear-gradient(135deg, hsl(230, 85%, 25%) 0%, hsl(280, 70%, 35%) 100%)'
+                background: isTextStyled ? getTextBackground() : 'linear-gradient(135deg, hsl(230, 85%, 25%) 0%, hsl(280, 70%, 35%) 100%)',
+                touchAction: 'manipulation'
               }}
-              onClick={togglePlayPause}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                togglePlayPause();
+              }}
             >
-              <p className="text-white text-xl md:text-2xl font-semibold text-center leading-relaxed max-w-[85%] drop-shadow-lg break-words whitespace-pre-wrap">
+              <p className="text-white text-xl md:text-2xl font-semibold text-center leading-relaxed max-w-full drop-shadow-lg break-words whitespace-pre-wrap">
                 {renderCaptionWithHashtags(caption)}
               </p>
-              
-              {/* Promote CTA for text posts */}
-              {user && user.id === post.user_id && !isPromoted && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
-                  }}
-                  className="flex items-center gap-1.5 text-white/90 text-sm font-medium hover:text-white transition-colors mt-6 bg-white/20 backdrop-blur-sm px-4 py-2 rounded-full"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  Promote this post
-                </button>
-              )}
             </div>
           )}
         </div>
@@ -683,14 +679,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Caption (for non-text-styled posts) */}
-          {!isTextStyled && caption && (
+          {/* Caption - shown for all post types */}
+          {caption && (
             <div className="mb-3">
               <p className="text-white text-sm leading-relaxed drop-shadow-lg">
                 <span className="font-semibold mr-1">@{username}</span>
-                {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+                {!isTextStyled && (showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption))}
               </p>
-              {caption.length > 150 && (
+              {!isTextStyled && caption.length > 150 && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -716,14 +712,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Promote CTA - Under Caption */}
+          {/* Promote CTA - Under Caption for all post types */}
           {user && user.id === post.user_id && !isPromoted && (
             <button 
               onClick={(e) => {
                 e.stopPropagation();
                 navigate(`/promote/${post.id}`);
               }}
-              className="flex items-center gap-1.5 text-white text-xs font-semibold bg-primary/90 hover:bg-primary px-3 py-1.5 rounded-full transition-colors mt-3 shadow-lg"
+              className="flex items-center gap-1.5 text-white text-xs font-semibold bg-primary/90 hover:bg-primary px-3 py-1.5 rounded-full transition-colors mt-2 shadow-lg"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Promote this post
