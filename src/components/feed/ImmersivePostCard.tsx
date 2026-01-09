@@ -434,7 +434,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     <>
       <div 
         ref={postRef}
-        className="relative w-full h-[calc(100dvh-8rem)] bg-black overflow-hidden"
+        className="relative w-full max-w-[430px] mx-auto h-[calc(100dvh-8rem)] bg-black overflow-hidden rounded-none sm:rounded-2xl"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >

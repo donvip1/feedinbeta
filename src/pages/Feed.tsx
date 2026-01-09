@@ -734,7 +734,7 @@ const Feed = () => {
       >
         <div
           ref={containerRef}
-          className="w-full snap-y snap-mandatory overflow-y-scroll h-[calc(100dvh-8rem)] scroll-smooth native-scroll-container relative"
+          className="w-full max-w-[430px] mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100dvh-8rem)] scroll-smooth native-scroll-container relative"
           data-scrollable="true"
         >
           {/* Pull to Refresh Indicator */}
