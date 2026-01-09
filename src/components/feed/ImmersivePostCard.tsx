@@ -669,24 +669,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
         </div>
 
-        {/* Promote CTA - Inside card, above caption - shows for all logged-in users */}
-        {user && !isPromoted && (
-          <div className="absolute bottom-28 left-4 z-30">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/promote/${post.id}`);
-              }}
-              className="flex items-center gap-2 text-white text-sm font-bold bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 px-5 py-2.5 rounded-full transition-all shadow-2xl border-2 border-white/40 animate-pulse"
-            >
-              <TrendingUp className="w-4 h-4" />
-              Promote this post
-            </button>
-          </div>
-        )}
-
         {/* Bottom Left - Caption & Music */}
-        <div className="absolute left-4 right-20 bottom-4 z-10">
+        <div className="absolute left-4 right-20 bottom-8 z-10">
           {/* Refeed indicator */}
           {isRefeed && (
             <div className="flex items-center gap-1.5 mb-2">
@@ -697,7 +681,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* Caption - shown for all post types */}
           {caption && (
-            <div className="mb-3">
+            <div className="mb-2">
               <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
                 <span className="font-semibold mr-1">@{username}</span>
                 {!isTextStyled && renderCaptionWithHashtags(truncatedCaption)}
@@ -714,6 +698,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </button>
               )}
             </div>
+          )}
+
+          {/* Promote CTA - Just under caption as clickable text */}
+          {user && !isPromoted && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/promote/${post.id}`);
+              }}
+              className="flex items-center gap-1.5 text-white/90 hover:text-white text-xs font-medium transition-all animate-pulse"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span className="underline underline-offset-2">Promote this post</span>
+            </button>
           )}
 
           {/* Music indicator */}
