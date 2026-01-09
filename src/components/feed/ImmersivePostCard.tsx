@@ -425,12 +425,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Text/Styled text background */}
           {(isTextStyled || (!currentMediaUrl && !hasVideo && !hasImage)) && (
             <div 
-              className="w-full h-full flex items-center justify-center p-8"
+              className="w-full h-full flex items-center justify-center p-8 overflow-hidden"
               style={{ 
                 background: isTextStyled ? getTextBackground() : 'linear-gradient(135deg, hsl(230, 85%, 25%) 0%, hsl(280, 70%, 35%) 100%)'
               }}
             >
-              <p className="text-white text-2xl md:text-3xl font-semibold text-center leading-relaxed max-w-lg drop-shadow-lg">
+              <p className="text-white text-2xl md:text-3xl font-semibold text-center leading-relaxed max-w-lg drop-shadow-lg break-words overflow-hidden">
                 {caption}
               </p>
             </div>
@@ -525,79 +525,67 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         </div>
 
         {/* Right Side - Action Buttons (Vertical Stack) */}
-        <div className="absolute right-3 bottom-32 flex flex-col items-center gap-5 z-10">
+        <div className="absolute right-3 bottom-32 flex flex-col items-center gap-2.5 z-10">
           {/* Like */}
           <button 
             onClick={handleLike}
-            className="flex flex-col items-center gap-1 group"
+            className="flex flex-col items-center gap-0.5 group"
           >
-            <div className={cn(
-              "p-3 rounded-full bg-black/30 backdrop-blur-sm transition-all",
-              liked ? "bg-red-500/80" : "hover:bg-black/50"
-            )}>
-              <Heart 
-                className={cn("w-7 h-7 transition-transform group-active:scale-90", liked ? "text-white fill-white" : "text-white")} 
-              />
-            </div>
-            <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
+            <Heart 
+              className={cn(
+                "w-5 h-5 drop-shadow-lg transition-transform group-active:scale-90", 
+                liked ? "text-red-500 fill-red-500" : "text-white"
+              )} 
+            />
+            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
           </button>
 
           {/* Comments */}
           <button 
             onClick={() => handleCommentsOpenChange(true)}
-            className="flex flex-col items-center gap-1 group"
+            className="flex flex-col items-center gap-0.5 group"
           >
-            <div className="p-3 rounded-full bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-all">
-              <MessageCircle className="w-7 h-7 text-white transition-transform group-active:scale-90" />
-            </div>
-            <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+            <MessageCircle className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
           </button>
 
           {/* Refeed */}
           <button 
             onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }}
-            className="flex flex-col items-center gap-1 group"
+            className="flex flex-col items-center gap-0.5 group"
           >
-            <div className="p-3 rounded-full bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-all">
-              <Repeat className="w-7 h-7 text-white transition-transform group-active:scale-90" />
-            </div>
-            <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+            <Repeat className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
           </button>
 
           {/* Gift */}
           <button 
             onClick={() => { setGiftOpen(true); onInteractionStart?.(); }}
-            className="flex flex-col items-center gap-1 group"
+            className="flex flex-col items-center gap-0.5 group"
           >
-            <div className="p-3 rounded-full bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-all">
-              <Gift className="w-7 h-7 text-white transition-transform group-active:scale-90" />
-            </div>
-            <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+            <Gift className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
           </button>
 
           {/* Share */}
           <button 
             onClick={() => { setShareOpen(true); onInteractionStart?.(); }}
-            className="flex flex-col items-center gap-1 group"
+            className="flex flex-col items-center gap-0.5 group"
           >
-            <div className="p-3 rounded-full bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-all">
-              <Share2 className="w-7 h-7 text-white transition-transform group-active:scale-90" />
-            </div>
+            <Share2 className="w-5 h-5 text-white drop-shadow-lg transition-transform group-active:scale-90" />
           </button>
 
           {/* Mute/Unmute for videos */}
           {hasVideo && (
             <button 
               onClick={toggleMute}
-              className="flex flex-col items-center gap-1"
+              className="flex flex-col items-center gap-0.5"
             >
-              <div className="p-3 rounded-full bg-black/30 backdrop-blur-sm hover:bg-black/50 transition-all">
-                {isMuted ? (
-                  <VolumeX className="w-6 h-6 text-white" />
-                ) : (
-                  <Volume2 className="w-6 h-6 text-white" />
-                )}
-              </div>
+              {isMuted ? (
+                <VolumeX className="w-5 h-5 text-white drop-shadow-lg" />
+              ) : (
+                <Volume2 className="w-5 h-5 text-white drop-shadow-lg" />
+              )}
             </button>
           )}
         </div>
@@ -635,7 +623,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* Music indicator */}
           {hasMusic && (
-            <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
+            <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit mb-2">
               <Music className="w-4 h-4 text-white animate-pulse" />
               <div className="overflow-hidden">
                 <p className="text-white text-xs font-medium truncate max-w-[180px]">
@@ -644,20 +632,18 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               </div>
             </div>
           )}
-        </div>
 
-        {/* Bottom Center - Promote CTA */}
-        {user && user.id === post.user_id && !isPromoted && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
+          {/* Promote CTA - Under Caption */}
+          {user && user.id === post.user_id && !isPromoted && (
             <button 
               onClick={() => navigate(`/promote/${post.id}`)}
-              className="flex items-center gap-2 bg-primary/80 backdrop-blur-sm text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-primary transition-colors shadow-lg"
+              className="flex items-center gap-1.5 text-white/80 text-xs font-medium hover:text-white transition-colors mt-2"
             >
-              <TrendingUp className="w-4 h-4" />
-              Promote
+              <TrendingUp className="w-3.5 h-3.5" />
+              Promote this post
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Modals */}
