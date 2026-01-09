@@ -719,8 +719,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Promote CTA - Under Caption */}
           {user && user.id === post.user_id && !isPromoted && (
             <button 
-              onClick={() => navigate(`/promote/${post.id}`)}
-              className="flex items-center gap-1.5 text-white/80 text-xs font-medium hover:text-white transition-colors mt-2"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/promote/${post.id}`);
+              }}
+              className="flex items-center gap-1.5 text-white text-xs font-semibold bg-primary/90 hover:bg-primary px-3 py-1.5 rounded-full transition-colors mt-3 shadow-lg"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               Promote this post

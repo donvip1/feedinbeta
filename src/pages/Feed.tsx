@@ -286,160 +286,150 @@ const Feed = () => {
     }));
   };
 
-  // Fetch posts using personalized feed algorithms
-  const { data: posts, isLoading, error: feedError, refetch } = useQuery({
-    queryKey: ['feed-posts', activeTab, user?.id],
+  // Helper function to fetch posts for a specific tab
+  const fetchTabPosts = useCallback(async (tab: 'following' | 'forYou', userId: string) => {
+    let feedData: { post_id: string; is_promoted: boolean; boost_level: string; relevance_score?: number }[] = [];
+    let useFallback = false;
+    
+    try {
+      if (tab === 'following') {
+        const { data, error } = await supabase.rpc('get_following_feed', {
+          p_user_id: userId,
+          p_limit: 100,
+          p_offset: 0
+        });
+        
+        if (error) {
+          console.error('Following feed error:', error);
+          useFallback = true;
+        } else {
+          feedData = data || [];
+        }
+      } else {
+        const { data, error } = await supabase.rpc('get_personalized_for_you_feed', {
+          p_user_id: userId,
+          p_limit: 100,
+          p_offset: 0
+        });
+        
+        if (error) {
+          console.error('For You feed error:', error);
+          useFallback = true;
+        } else {
+          feedData = data || [];
+        }
+      }
+    } catch (err) {
+      console.error('Feed RPC error:', err);
+      useFallback = true;
+    }
+
+    if (useFallback || feedData.length === 0) {
+      return await fetchFallbackPosts(userId);
+    }
+
+    const promotedMap = new Map(feedData.map(p => [p.post_id, { 
+      is_promoted: p.is_promoted, 
+      boost_level: p.boost_level,
+      relevance_score: (p as any).relevance_score || 0
+    }]));
+
+    const postIds = feedData.map(p => p.post_id);
+
+    const { data: fullPosts, error: postsError } = await supabase
+      .from('posts')
+      .select(`
+        *,
+        profiles:user_id (username, display_name, avatar_url),
+        original_post:original_post_id (
+          id, user_id, content, media_url, media_type, media_urls, media_types, created_at,
+          profiles:user_id (username, display_name, avatar_url)
+        )
+      `)
+      .in('id', postIds);
+
+    if (postsError) {
+      console.error('Posts fetch error:', postsError);
+      return await fetchFallbackPosts(userId);
+    }
+
+    const postMap = new Map((fullPosts || []).map(p => [p.id, p]));
+    const orderedPosts = postIds
+      .map(id => postMap.get(id))
+      .filter(Boolean)
+      .map(post => {
+        const promo = promotedMap.get(post!.id);
+        return {
+          ...post!,
+          _isPromoted: promo?.is_promoted || false,
+          _boostLevel: promo?.boost_level || null,
+          _relevanceScore: promo?.relevance_score || 0,
+          _promoterName: null
+        };
+      });
+
+    if (orderedPosts.length === 0) {
+      return await fetchFallbackPosts(userId);
+    }
+
+    // Cache the results
+    feedCache.set(tab, orderedPosts);
+
+    return orderedPosts;
+  }, []);
+
+  // Separate queries for each tab - enables instant tab switching
+  const { data: forYouPosts, isLoading: isLoadingForYou, refetch: refetchForYou } = useQuery({
+    queryKey: ['feed-posts-forYou', user?.id],
     queryFn: async () => {
       if (!user) return [];
-
-      // Try cache first for instant display (don't wait for network)
-      const cacheKey = activeTab === 'live' ? 'forYou' : activeTab;
-      const cached = await feedCache.get(cacheKey as 'following' | 'forYou');
+      // Show cache immediately if available
+      const cached = await feedCache.get('forYou');
       if (cached && cached.length > 0) {
-        // Set display posts immediately from cache
-        setDisplayPosts(cached);
-        allLoadedPostsRef.current = cached;
-        allVideoPostsRef.current = cached.filter((p: any) => 
-          p.media_type === 'video' || 
-          ((p.post_type === 'refeed' || p.post_type === 'quote') && p.original_post?.media_type === 'video')
-        );
+        // Trigger background refresh after returning cache
+        setTimeout(() => fetchTabPosts('forYou', user.id), 100);
+        return cached;
       }
+      return await fetchTabPosts('forYou', user.id);
+    },
+    enabled: !!user,
+    staleTime: 60000,
+    gcTime: 300000,
+    refetchOnWindowFocus: false,
+  });
 
-      // Use the appropriate feed function based on tab
-      let feedData: { post_id: string; is_promoted: boolean; boost_level: string; relevance_score?: number }[] = [];
-      let useFallback = false;
-      
-      try {
-        if (activeTab === 'following') {
-          // Following tab: Only posts from people user follows
-          const { data, error } = await supabase.rpc('get_following_feed', {
-            p_user_id: user.id,
-            p_limit: 100,
-            p_offset: 0
-          });
-          
-          if (error) {
-            console.error('Following feed error:', error);
-            useFallback = true;
-          } else {
-            feedData = data || [];
-          }
-        } else {
-          // For You tab: Personalized feed based on interests, location, engagement
-          const { data, error } = await supabase.rpc('get_personalized_for_you_feed', {
-            p_user_id: user.id,
-            p_limit: 100,
-            p_offset: 0
-          });
-          
-          if (error) {
-            console.error('For You feed error:', error);
-            useFallback = true;
-          } else {
-            feedData = data || [];
-          }
-        }
-      } catch (err) {
-        console.error('Feed RPC error:', err);
-        useFallback = true;
+  const { data: followingPosts, isLoading: isLoadingFollowing, refetch: refetchFollowing } = useQuery({
+    queryKey: ['feed-posts-following', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const cached = await feedCache.get('following');
+      if (cached && cached.length > 0) {
+        setTimeout(() => fetchTabPosts('following', user.id), 100);
+        return cached;
       }
+      return await fetchTabPosts('following', user.id);
+    },
+    enabled: !!user,
+    staleTime: 60000,
+    gcTime: 300000,
+    refetchOnWindowFocus: false,
+  });
 
-      // If RPC failed, use fallback query
-      if (useFallback) {
-        return await fetchFallbackPosts(user.id);
-      }
+  // Derive current posts based on active tab
+  const posts = activeTab === 'following' ? followingPosts : forYouPosts;
+  const isLoading = activeTab === 'following' ? isLoadingFollowing : isLoadingForYou;
+  const refetch = activeTab === 'following' ? refetchFollowing : refetchForYou;
 
-      // If no posts from algorithm, always use fallback (never show empty)
-      if (feedData.length === 0) {
-        // Both tabs should fall back to trending/recent posts - never empty
-        return await fetchFallbackPosts(user.id);
-      }
-
-      // Create maps for promotion data
-      const promotedMap = new Map(feedData.map(p => [p.post_id, { 
-        is_promoted: p.is_promoted, 
-        boost_level: p.boost_level,
-        relevance_score: (p as any).relevance_score || 0
-      }]));
-
-      // Get post IDs to fetch full data
-      const postIds = feedData.map(p => p.post_id);
-
-      // Fetch full post data
-      const { data: fullPosts, error: postsError } = await supabase
-        .from('posts')
-        .select(`
-          *,
-          profiles:user_id (
-            username,
-            display_name,
-            avatar_url
-          ),
-          original_post:original_post_id (
-            id,
-            user_id,
-            content,
-            media_url,
-            media_type,
-            media_urls,
-            media_types,
-            created_at,
-            profiles:user_id (
-              username,
-              display_name,
-              avatar_url
-            )
-          )
-        `)
-        .in('id', postIds);
-
-      if (postsError) {
-        console.error('Posts fetch error:', postsError);
-        // Fallback if post fetch fails
-        return await fetchFallbackPosts(user.id);
-      }
-
-      // Sort posts by the order returned from the feed function (preserves ranking)
-      const postMap = new Map((fullPosts || []).map(p => [p.id, p]));
-      const orderedPosts = postIds
-        .map(id => postMap.get(id))
-        .filter(Boolean)
-        .map(post => {
-          const promo = promotedMap.get(post!.id);
-          return {
-            ...post!,
-            _isPromoted: promo?.is_promoted || false,
-            _boostLevel: promo?.boost_level || null,
-            _relevanceScore: promo?.relevance_score || 0,
-            _promoterName: null
-          };
-        });
-
-      // If no posts after mapping, use fallback
-      if (orderedPosts.length === 0) {
-        return await fetchFallbackPosts(user.id);
-      }
-
-      // Store all video posts for fullscreen navigation
-      allVideoPostsRef.current = orderedPosts.filter(p => 
+  // Update refs when posts change
+  useEffect(() => {
+    if (posts && posts.length > 0) {
+      allLoadedPostsRef.current = posts;
+      allVideoPostsRef.current = posts.filter((p: any) => 
         p.media_type === 'video' || 
         ((p.post_type === 'refeed' || p.post_type === 'quote') && p.original_post?.media_type === 'video')
       );
-
-      // Store all posts for infinite scroll
-      allLoadedPostsRef.current = orderedPosts;
-      
-      // Cache the results
-      const cacheKeySet = activeTab === 'live' ? 'forYou' : activeTab;
-      feedCache.set(cacheKeySet as 'following' | 'forYou', orderedPosts);
-
-      return orderedPosts;
-    },
-    enabled: !!user,
-    staleTime: 30000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: true,
-  });
+    }
+  }, [posts]);
 
   // Aggressive media preloading for app-like speed
   useFeedPreloader(posts || [], !!posts && posts.length > 0);
@@ -796,14 +786,6 @@ const Feed = () => {
                 </Button>
               </div>
             )}
-          </div>
-        ) : feedError && displayPosts.length === 0 ? (
-          <div className="p-4">
-            <QueryErrorFallback 
-              error={feedError as Error} 
-              onRetry={() => refetch()} 
-              message="Unable to load your feed. Please try again."
-            />
           </div>
         ) : isLoading && displayPosts.length === 0 ? (
           <FeedSkeleton />
