@@ -67,8 +67,8 @@ export default function PostCreationSelector({
             <Type className="w-6 h-6 text-primary" />
           </div>
           <div className="flex-1 text-left">
-            <h3 className="font-semibold text-foreground">Text</h3>
-            <p className="text-sm text-muted-foreground">Create a text post</p>
+            <h3 className="font-semibold text-foreground">Text Card</h3>
+            <p className="text-sm text-muted-foreground">Create a styled text card</p>
           </div>
         </button>
 
