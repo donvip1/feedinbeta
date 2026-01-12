@@ -848,13 +848,58 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
 
   // Function to initiate a call
   const initiateCall = async (callType: 'voice' | 'video') => {
-    if (!user || !otherUser?.id) {
+    if (!user) {
       toast({
         title: 'Cannot start call',
-        description: 'User information not available',
+        description: 'Please sign in to make calls',
         variant: 'destructive',
       });
       return;
+    }
+
+    // If otherUser is not loaded yet, fetch it on-demand
+    let targetUserId = otherUser?.id;
+    
+    if (!targetUserId) {
+      toast({
+        title: 'Loading...',
+        description: 'Getting user information, please wait',
+      });
+      
+      try {
+        // Fetch other user on-demand from the conversation
+        const { data: participant, error: participantError } = await supabase
+          .from('conversation_participants')
+          .select('user_id')
+          .eq('conversation_id', conversationId)
+          .neq('user_id', user.id)
+          .maybeSingle();
+        
+        if (participantError || !participant?.user_id) {
+          throw new Error('Could not find other user in conversation');
+        }
+        
+        targetUserId = participant.user_id;
+        
+        // Also fetch and cache their profile for display
+        const { data: profile } = await supabase
+          .from('public_profiles')
+          .select('id, display_name, username, avatar_url')
+          .eq('id', targetUserId)
+          .single();
+        
+        if (profile) {
+          setOtherUser(profile);
+        }
+      } catch (error: any) {
+        console.error('[Call] Error fetching other user:', error);
+        toast({
+          title: 'Cannot start call',
+          description: 'User information not available. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
 
     try {
@@ -862,7 +907,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         .from('call_logs')
         .insert({
           caller_id: user.id,
-          receiver_id: otherUser.id,
+          receiver_id: targetUserId,
           call_type: callType,
           status: 'pending',
         })
@@ -877,7 +922,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         body: {
           callId: callData.id,
           callerId: user.id,
-          receiverId: otherUser.id,
+          receiverId: targetUserId,
           callType,
           callerName: user.user_metadata?.display_name || user.email,
         },

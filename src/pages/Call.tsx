@@ -66,6 +66,7 @@ const Call = () => {
   const setupCompleteRef = useRef(false);
   const callTypeRef = useRef<'video' | 'voice'>('voice');
   const callStatusSubscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const ringingPollRef = useRef<NodeJS.Timeout | null>(null);
 
   const isCaller = callData?.caller_id === user?.id;
 
@@ -312,6 +313,10 @@ const Call = () => {
       if (callStatusSubscriptionRef.current) {
         supabase.removeChannel(callStatusSubscriptionRef.current);
       }
+      if (ringingPollRef.current) {
+        clearInterval(ringingPollRef.current);
+        ringingPollRef.current = null;
+      }
     };
   }, [callId, user]);
 
@@ -368,10 +373,50 @@ const Call = () => {
         setConnectionMessage('Ringing...');
         callSounds.playRinging();
         
+        // Poll-based fallback to check if call was answered (backup for realtime)
+        ringingPollRef.current = setInterval(async () => {
+          try {
+            const { data: updatedCall } = await supabase
+              .from('call_logs')
+              .select('status')
+              .eq('id', callId)
+              .single();
+            
+            console.log('[Call] Poll check - call status:', updatedCall?.status);
+            
+            if (updatedCall?.status === 'answered' && !setupCompleteRef.current) {
+              console.log('[Call] Call answered detected via poll');
+              if (ringingPollRef.current) {
+                clearInterval(ringingPollRef.current);
+                ringingPollRef.current = null;
+              }
+              callSounds.stopRinging();
+              setCallStatus('connecting');
+              setConnectionMessage('Connecting...');
+              await setupCall(callDataWithProfiles);
+            } else if (updatedCall?.status === 'ended' || updatedCall?.status === 'rejected') {
+              console.log('[Call] Call ended/rejected detected via poll');
+              if (ringingPollRef.current) {
+                clearInterval(ringingPollRef.current);
+                ringingPollRef.current = null;
+              }
+              if (!hasEndedRef.current) {
+                endCall();
+              }
+            }
+          } catch (error) {
+            console.error('[Call] Error polling call status:', error);
+          }
+        }, 2000);
+        
         // Set timeout for unanswered calls
         const ringingTimeout = setTimeout(() => {
           if (!hasEndedRef.current && callStatus === 'ringing') {
             console.log('[Call] Call not answered within 60 seconds');
+            if (ringingPollRef.current) {
+              clearInterval(ringingPollRef.current);
+              ringingPollRef.current = null;
+            }
             toast({
               title: 'No Answer',
               description: 'The call was not answered.',
@@ -380,7 +425,13 @@ const Call = () => {
           }
         }, 60000);
         
-        return () => clearTimeout(ringingTimeout);
+        return () => {
+          clearTimeout(ringingTimeout);
+          if (ringingPollRef.current) {
+            clearInterval(ringingPollRef.current);
+            ringingPollRef.current = null;
+          }
+        };
       } else if (data.receiver_id === user?.id && data.status === 'pending') {
         // Receiver sees pending call - should be handled by IncomingCall component
         // This shouldn't happen normally, but redirect to messages if it does
