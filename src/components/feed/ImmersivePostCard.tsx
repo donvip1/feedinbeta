@@ -732,10 +732,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 e.stopPropagation();
                 navigate(`/promote/${post.id}`);
               }}
-              className="flex items-center gap-1.5 text-white/90 hover:text-white text-xs font-medium transition-all animate-pulse"
+              className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs font-bold transition-all animate-pulse"
             >
               <TrendingUp className="w-3.5 h-3.5" />
-              <span className="underline underline-offset-2">Promote this post</span>
+              <span>Promote this post</span>
             </button>
           )}
 
