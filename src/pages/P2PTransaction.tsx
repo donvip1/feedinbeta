@@ -3,17 +3,19 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/context/CurrencyContext';
+import { useP2PEligibility } from '@/hooks/useP2PEligibility';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { ArrowLeft, Coins, DollarSign, Check, X, MessageCircle, FileImage, Shield } from 'lucide-react';
+import { ArrowLeft, Coins, DollarSign, Check, X, MessageCircle, FileImage, Shield, AlertTriangle } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { P2PChat } from '@/components/p2p/P2PChat';
 import { P2PDisputePanel } from '@/components/p2p/P2PDisputePanel';
 import { P2PProofUploader } from '@/components/p2p/P2PProofUploader';
 import { P2PTransactionTimeline } from '@/components/p2p/P2PTransactionTimeline';
+import { CancelOrderModal } from '@/components/p2p/CancelOrderModal';
 import { format } from 'date-fns';
 import { useState } from 'react';
 
@@ -22,6 +24,7 @@ const P2PTransaction = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { formatPrice, convertFromUSD, currencySymbol } = useCurrency();
+  const { eligibility, refetch: refetchEligibility } = useP2PEligibility();
   const queryClient = useQueryClient();
   const [processing, setProcessing] = useState(false);
 
@@ -100,14 +103,28 @@ const P2PTransaction = () => {
     }
   };
 
-  const handleCancel = async () => {
+  const handleCancel = async (reason?: string) => {
     setProcessing(true);
     try {
-      const { error } = await supabase.functions.invoke('p2p-escrow', {
-        body: { action: 'cancel_transaction', transactionId },
+      const { data, error } = await supabase.functions.invoke('p2p-escrow', {
+        body: { 
+          action: 'cancel_transaction', 
+          transactionId,
+          cancellationReason: reason,
+        },
       });
       if (error) throw error;
-      toast.success('Transaction cancelled');
+      
+      // Show warning if applicable
+      if (data?.warning) {
+        toast.warning(data.warning);
+      } else {
+        toast.success('Transaction cancelled');
+      }
+      
+      // Refetch eligibility to get updated cancellation count
+      refetchEligibility();
+      
       navigate('/wallet/p2p');
     } catch (error: any) {
       toast.error(error.message || 'Failed to cancel');
@@ -206,9 +223,15 @@ const P2PTransaction = () => {
             {/* Action Buttons */}
             {isBuyer && transaction.status === 'pending' && (
               <div className="flex gap-2">
-                <Button variant="destructive" onClick={handleCancel} disabled={processing}>
-                  <X className="w-4 h-4 mr-2" /> Cancel
-                </Button>
+                <CancelOrderModal
+                  onConfirm={handleCancel}
+                  isProcessing={processing}
+                  cancellationCount={eligibility.buyerCancellationCount}
+                >
+                  <Button variant="destructive" disabled={processing}>
+                    <X className="w-4 h-4 mr-2" /> Cancel Order
+                  </Button>
+                </CancelOrderModal>
               </div>
             )}
 
@@ -227,7 +250,7 @@ const P2PTransaction = () => {
             )}
 
             {isSeller && transaction.status === 'pending' && (
-              <Button variant="outline" onClick={handleCancel} disabled={processing}>
+              <Button variant="outline" onClick={() => handleCancel()} disabled={processing}>
                 Cancel Transaction
               </Button>
             )}

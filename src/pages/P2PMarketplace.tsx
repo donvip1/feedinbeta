@@ -87,8 +87,12 @@ const P2PMarketplace = () => {
       return;
     }
 
-    if (!eligibility.canTrade) {
-      toast.error('Please complete your P2P setup first');
+    if (!eligibility.canBuy) {
+      if (eligibility.isBuyerBanned) {
+        toast.error(`You are banned from buying until ${new Date(eligibility.buyerBanUntil!).toLocaleDateString()}`);
+      } else {
+        toast.error('Please complete your P2P setup first');
+      }
       return;
     }
 

@@ -5,6 +5,7 @@ import { P2P_CONFIG } from '@/lib/p2p-config';
 
 interface P2PEligibility {
   canTrade: boolean;
+  canBuy: boolean;
   minTradeAmount: number;
   hasPurchasedPack: boolean;
   hasPaymentMethod: boolean;
@@ -15,6 +16,9 @@ interface P2PEligibility {
   requiresPaymentSetup: boolean;
   userCountry: string | null;
   reasons: string[];
+  buyerCancellationCount: number;
+  buyerBanUntil: string | null;
+  isBuyerBanned: boolean;
 }
 
 export const useP2PEligibility = () => {
@@ -26,6 +30,7 @@ export const useP2PEligibility = () => {
       if (!user?.id) {
         return {
           canTrade: false,
+          canBuy: false,
           minTradeAmount: P2P_CONFIG.MIN_TRADE_FIRST_TIME,
           hasPurchasedPack: false,
           hasPaymentMethod: false,
@@ -36,6 +41,9 @@ export const useP2PEligibility = () => {
           requiresPaymentSetup: true,
           userCountry: null,
           reasons: ['Please sign in to trade'],
+          buyerCancellationCount: 0,
+          buyerBanUntil: null,
+          isBuyerBanned: false,
         };
       }
 
@@ -67,6 +75,11 @@ export const useP2PEligibility = () => {
       const totalTrades = eligibilityData?.total_trades ?? 0;
       const totalVolumeUsd = Number(eligibilityData?.total_volume_usd ?? 0);
       const userCountry = profile?.country ?? null;
+      const buyerCancellationCount = (eligibilityData as any)?.buyer_cancellation_count ?? 0;
+      const buyerBanUntil = (eligibilityData as any)?.buyer_ban_until ?? null;
+
+      // Check if buyer is currently banned
+      const isBuyerBanned = buyerBanUntil ? new Date(buyerBanUntil) > new Date() : false;
 
       // Determine minimum trade amount
       let minTradeAmount = P2P_CONFIG.MIN_TRADE_FIRST_TIME;
@@ -85,10 +98,16 @@ export const useP2PEligibility = () => {
         reasons.push('Set your country in profile settings');
       }
 
+      if (isBuyerBanned) {
+        reasons.push(`You are banned from buying until ${new Date(buyerBanUntil!).toLocaleDateString()}`);
+      }
+
       const canTrade = hasPaymentMethod && !!userCountry;
+      const canBuy = canTrade && !isBuyerBanned;
 
       return {
         canTrade,
+        canBuy,
         minTradeAmount,
         hasPurchasedPack,
         hasPaymentMethod,
@@ -99,6 +118,9 @@ export const useP2PEligibility = () => {
         requiresPaymentSetup: !hasPaymentMethod,
         userCountry,
         reasons,
+        buyerCancellationCount,
+        buyerBanUntil,
+        isBuyerBanned,
       };
     },
     enabled: !!user?.id,
@@ -108,6 +130,7 @@ export const useP2PEligibility = () => {
   return {
     eligibility: eligibility ?? {
       canTrade: false,
+      canBuy: false,
       minTradeAmount: P2P_CONFIG.MIN_TRADE_FIRST_TIME,
       hasPurchasedPack: false,
       hasPaymentMethod: false,
@@ -118,6 +141,9 @@ export const useP2PEligibility = () => {
       requiresPaymentSetup: true,
       userCountry: null,
       reasons: ['Loading...'],
+      buyerCancellationCount: 0,
+      buyerBanUntil: null,
+      isBuyerBanned: false,
     },
     isLoading,
     refetch,

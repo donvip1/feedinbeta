@@ -2991,6 +2991,8 @@ export type Database = {
         Row: {
           buyer_confirmed_at: string | null
           buyer_id: string
+          cancellation_reason: string | null
+          cancelled_by: string | null
           chat_enabled: boolean | null
           created_at: string
           credits_amount: number
@@ -3010,6 +3012,8 @@ export type Database = {
         Insert: {
           buyer_confirmed_at?: string | null
           buyer_id: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
           chat_enabled?: boolean | null
           created_at?: string
           credits_amount: number
@@ -3029,6 +3033,8 @@ export type Database = {
         Update: {
           buyer_confirmed_at?: string | null
           buyer_id?: string
+          cancellation_reason?: string | null
+          cancelled_by?: string | null
           chat_enabled?: boolean | null
           created_at?: string
           credits_amount?: number
@@ -3085,11 +3091,14 @@ export type Database = {
       }
       p2p_user_eligibility: {
         Row: {
+          buyer_ban_until: string | null
+          buyer_cancellation_count: number | null
           created_at: string | null
           first_p2p_trade_completed: boolean | null
           has_purchased_pack: boolean | null
           id: string
           is_reseller: boolean | null
+          last_cancellation_at: string | null
           min_trade_amount: number | null
           total_trades: number | null
           total_volume_usd: number | null
@@ -3097,11 +3106,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          buyer_ban_until?: string | null
+          buyer_cancellation_count?: number | null
           created_at?: string | null
           first_p2p_trade_completed?: boolean | null
           has_purchased_pack?: boolean | null
           id?: string
           is_reseller?: boolean | null
+          last_cancellation_at?: string | null
           min_trade_amount?: number | null
           total_trades?: number | null
           total_volume_usd?: number | null
@@ -3109,11 +3121,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          buyer_ban_until?: string | null
+          buyer_cancellation_count?: number | null
           created_at?: string | null
           first_p2p_trade_completed?: boolean | null
           has_purchased_pack?: boolean | null
           id?: string
           is_reseller?: boolean | null
+          last_cancellation_at?: string | null
           min_trade_amount?: number | null
           total_trades?: number | null
           total_volume_usd?: number | null
