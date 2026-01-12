@@ -66,20 +66,28 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
   };
 
   const handleDeletePost = async () => {
-    if (!deletePostId) return;
+    if (!deletePostId || !user) return;
 
     try {
+      // Update post status to deleted and track deletion metadata
       const { error } = await supabase
         .from('posts')
-        .update({ status: 'deleted' })
-        .eq('id', deletePostId);
+        .update({ 
+          status: 'deleted',
+          deleted_at: new Date().toISOString(),
+          deleted_by: user.id
+        })
+        .eq('id', deletePostId)
+        .eq('user_id', user.id); // Ensure user can only delete their own posts
 
       if (error) throw error;
 
+      // Remove from local state
       setPosts(posts.filter(p => p.id !== deletePostId));
+      
       toast({
         title: "Post deleted",
-        description: "Your post has been deleted successfully.",
+        description: "Your post has been permanently removed.",
       });
     } catch (error) {
       console.error('Error deleting post:', error);
