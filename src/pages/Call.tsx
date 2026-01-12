@@ -5,9 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CallControls } from '@/components/calls/CallControls';
 import { ConnectionStatus } from '@/components/calls/ConnectionStatus';
-import { NetworkQualityIndicator } from '@/components/calls/NetworkQualityIndicator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { usePresence } from '@/hooks/usePresence';
 import { callSounds } from '@/utils/callSounds';
 import { useCallContext } from '@/context/CallContext';
 import { Loader2, RefreshCw } from 'lucide-react';
@@ -35,7 +33,6 @@ const Call = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  // Get call context for P2P WebRTC calling
   const {
     callState,
     startCall,
@@ -44,6 +41,8 @@ const Call = () => {
     toggleVideo: contextToggleVideo,
     toggleSpeaker: contextToggleSpeaker,
     flipCamera: contextFlipCamera,
+    startScreenShare: contextStartScreenShare,
+    stopScreenShare: contextStopScreenShare,
     setLocalVideoRef,
     setRemoteVideoRef,
     setRemoteAudioRef,
@@ -53,7 +52,7 @@ const Call = () => {
   
   const [callData, setCallData] = useState<CallData | null>(null);
   const [callDuration, setCallDuration] = useState(0);
-  const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'offline' | 'ended'>('connecting');
+  const [callStatus, setCallStatus] = useState<'connecting' | 'ringing' | 'connected' | 'offline' | 'ended' | 'waiting_for_peer'>('connecting');
   const [otherUserProfile, setOtherUserProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
   const [connectionMessage, setConnectionMessage] = useState('Starting call...');
   const [showRetry, setShowRetry] = useState(false);
@@ -66,10 +65,9 @@ const Call = () => {
   const hasEndedRef = useRef(false);
   const setupCompleteRef = useRef(false);
   const callTypeRef = useRef<'video' | 'voice'>('voice');
+  const callStatusSubscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const isCaller = callData?.caller_id === user?.id;
-  const otherUserId = isCaller ? callData?.receiver_id : callData?.caller_id;
-  const { isOnline } = usePresence(otherUserId);
 
   // Sync video/audio refs with context
   useEffect(() => {
@@ -80,39 +78,35 @@ const Call = () => {
 
   // Monitor call state from context
   useEffect(() => {
-    // Update local status based on context status
-    if (callState.connectionStatus === 'connected' && callStatus !== 'connected') {
+    const status = callState.connectionStatus;
+    
+    if (status === 'connected' && callStatus !== 'connected') {
       callSounds.stopAllSounds();
       callSounds.playConnected();
       setCallStatus('connected');
       startTimer();
       setShowRetry(false);
       setConnectionMessage('Connected');
-    } else if (callState.connectionStatus === 'ringing') {
+    } else if (status === 'waiting_for_peer') {
+      setCallStatus('waiting_for_peer');
+      setConnectionMessage('Waiting for other user to join...');
+    } else if (status === 'ringing') {
       setCallStatus('ringing');
       setConnectionMessage('Ringing...');
-    } else if (callState.connectionStatus === 'connecting') {
-      if (callStatus !== 'connected') {
+    } else if (status === 'connecting') {
+      if (callStatus !== 'connected' && callStatus !== 'waiting_for_peer') {
         setCallStatus('connecting');
+        setConnectionMessage('Connecting...');
       }
-    } else if (callState.connectionStatus === 'failed') {
+    } else if (status === 'failed') {
       setShowRetry(true);
       setConnectionMessage('Connection failed - tap to retry');
+    } else if (status === 'ended' || status === 'disconnected') {
+      if (!hasEndedRef.current) {
+        endCall();
+      }
     }
-    
-    // Update connection message based on context status
-    const statusMessages: Record<string, string> = {
-      'idle': 'Initializing...',
-      'ringing': 'Ringing...',
-      'connecting': 'Connecting...',
-      'connected': 'Connected',
-      'failed': 'Connection failed',
-      'ended': 'Call ended',
-    };
-    if (callState.connectionStatus && statusMessages[callState.connectionStatus]) {
-      setConnectionMessage(statusMessages[callState.connectionStatus]);
-    }
-  }, [callState.connectionStatus, callState.isConnected, callStatus]);
+  }, [callState.connectionStatus, callStatus]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -200,9 +194,16 @@ const Call = () => {
     if (hasEndedRef.current) return;
     hasEndedRef.current = true;
 
+    console.log('[Call] Ending call');
     callSounds.stopAllSounds();
     callSounds.playDisconnected();
     setCallStatus('ended');
+    
+    // Clean up subscription
+    if (callStatusSubscriptionRef.current) {
+      await supabase.removeChannel(callStatusSubscriptionRef.current);
+      callStatusSubscriptionRef.current = null;
+    }
     
     try {
       const endTime = new Date().toISOString();
@@ -259,7 +260,6 @@ const Call = () => {
       intervalRef.current = null;
     }
     
-    // End call via context (Cloudflare cleanup)
     await contextEndCall();
 
     setTimeout(() => {
@@ -274,10 +274,7 @@ const Call = () => {
     setConnectionMessage('Retrying connection...');
     setupCompleteRef.current = false;
     
-    // End current call state
     await contextEndCall();
-    
-    // Restart
     await setupCall(callData);
   }, [callData, user, contextEndCall]);
 
@@ -311,6 +308,9 @@ const Call = () => {
       callSounds.stopAllSounds();
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
+      }
+      if (callStatusSubscriptionRef.current) {
+        supabase.removeChannel(callStatusSubscriptionRef.current);
       }
     };
   }, [callId, user]);
@@ -349,6 +349,9 @@ const Call = () => {
         : callerProfile.data;
       setOtherUserProfile(otherProfile);
 
+      // Set up realtime subscription FIRST before checking status
+      subscribeToCallUpdates(callDataWithProfiles);
+
       if (data.status === 'ended' || data.status === 'rejected') {
         toast({
           title: 'Call unavailable',
@@ -358,10 +361,14 @@ const Call = () => {
         return;
       }
 
-      if (callDataWithProfiles.caller_id === user?.id && callDataWithProfiles.status === 'pending') {
+      // Handle different call states
+      if (data.caller_id === user?.id && data.status === 'pending') {
+        // Caller waiting for receiver to answer - DON'T connect to LiveKit yet
         setCallStatus('ringing');
+        setConnectionMessage('Ringing...');
         callSounds.playRinging();
         
+        // Set timeout for unanswered calls
         const ringingTimeout = setTimeout(() => {
           if (!hasEndedRef.current && callStatus === 'ringing') {
             console.log('[Call] Call not answered within 60 seconds');
@@ -374,14 +381,17 @@ const Call = () => {
         }, 60000);
         
         return () => clearTimeout(ringingTimeout);
-      } else if (callDataWithProfiles.receiver_id === user?.id && callDataWithProfiles.status === 'pending') {
-        setCallStatus('ringing');
-      } else if (callDataWithProfiles.status === 'answered') {
+      } else if (data.receiver_id === user?.id && data.status === 'pending') {
+        // Receiver sees pending call - should be handled by IncomingCall component
+        // This shouldn't happen normally, but redirect to messages if it does
+        navigate('/messages');
+        return;
+      } else if (data.status === 'answered') {
+        // Call already answered - connect to LiveKit
         setCallStatus('connecting');
+        setConnectionMessage('Connecting...');
         await setupCall(callDataWithProfiles);
       }
-
-      subscribeToCallUpdates(callDataWithProfiles);
     } catch (error: any) {
       console.error('Error loading call:', error);
       toast({
@@ -394,8 +404,15 @@ const Call = () => {
   };
 
   const subscribeToCallUpdates = (data: CallData) => {
-    const channel = supabase
-      .channel(`call-updates:${callId}`)
+    // Clean up existing subscription
+    if (callStatusSubscriptionRef.current) {
+      supabase.removeChannel(callStatusSubscriptionRef.current);
+    }
+
+    console.log('[Call] Subscribing to call updates for:', callId);
+
+    callStatusSubscriptionRef.current = supabase
+      .channel(`call-page-${callId}-${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -411,16 +428,18 @@ const Call = () => {
           
           if (newStatus === 'ended' || newStatus === 'rejected') {
             if (!hasEndedRef.current) {
+              console.log('[Call] Call ended/rejected by other party');
               callSounds.stopAllSounds();
               callSounds.playDisconnected();
               setCallStatus('ended');
               
+              // Navigate immediately
               setTimeout(() => {
                 navigate('/messages');
-              }, 1500);
+              }, 1000);
             }
           } else if (newStatus === 'answered' && !setupCompleteRef.current) {
-            // CRITICAL FIX: Use data from payload.new, not stale data parameter
+            // CRITICAL: When call is answered, BOTH parties should now connect to LiveKit
             const updatedCallData: CallData = {
               id: payload.new.id,
               caller_id: payload.new.caller_id,
@@ -431,22 +450,20 @@ const Call = () => {
               receiver_profile: data.receiver_profile,
             };
             
-            console.log('[Call] Call answered - triggering setup for both parties');
+            console.log('[Call] Call answered - connecting to LiveKit');
             callSounds.stopRinging();
             setCallStatus('connecting');
-            setConnectionMessage('Connecting to peer...');
+            setConnectionMessage('Connecting...');
             
-            // Small delay to ensure database is synced
-            await new Promise(resolve => setTimeout(resolve, 300));
+            // Small delay to ensure database is fully synced
+            await new Promise(resolve => setTimeout(resolve, 200));
             await setupCall(updatedCallData);
           }
         }
       )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      .subscribe((status) => {
+        console.log('[Call] Subscription status:', status);
+      });
   };
 
   const setupCall = async (data: CallData) => {
@@ -461,13 +478,12 @@ const Call = () => {
     const isVideo = callTypeRef.current === 'video';
     const isCaller = data.caller_id === user?.id;
 
-    console.log('[Call] Setting up P2P WebRTC call');
+    console.log('[Call] Setting up LiveKit call');
     console.log('[Call] Call type:', isVideo ? 'video' : 'voice');
     console.log('[Call] Role:', isCaller ? 'CALLER' : 'RECEIVER');
     console.log('[Call] Other user:', otherUserId);
 
     try {
-      // Use CallContext's startCall which uses WebRTCP2PManager
       await startCall(
         callId!,
         isVideo ? 'video' : 'voice',
@@ -475,7 +491,7 @@ const Call = () => {
         isCaller
       );
       
-      console.log('[Call] P2P call setup initiated successfully');
+      console.log('[Call] LiveKit call setup initiated successfully');
     } catch (error: any) {
       console.error('[Call] Error setting up call:', error);
       setupCompleteRef.current = false;
@@ -508,12 +524,12 @@ const Call = () => {
     await contextFlipCamera();
   };
 
-  // Screen share not supported in P2P mode
   const handleToggleScreenShare = async () => {
-    toast({
-      title: 'Feature unavailable',
-      description: 'Screen sharing is not available in this call mode',
-    });
+    if (callState.isScreenSharing) {
+      await contextStopScreenShare();
+    } else {
+      await contextStartScreenShare();
+    }
   };
 
   if (!callData) {
@@ -529,8 +545,13 @@ const Call = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex flex-col relative overflow-hidden">
-      {/* Hidden audio element for voice calls */}
-      <audio ref={remoteAudioRef} autoPlay playsInline />
+      {/* Hidden audio element for voice calls - with explicit attributes */}
+      <audio 
+        ref={remoteAudioRef} 
+        autoPlay 
+        playsInline
+        style={{ display: 'none' }}
+      />
       
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -549,10 +570,10 @@ const Call = () => {
       )}
 
       {/* Connection Status Overlay */}
-      {callStatus === 'connecting' && !callState.isConnected && (
+      {(callStatus === 'connecting' || callStatus === 'waiting_for_peer' || callStatus === 'ringing') && !callState.isConnected && (
         <div className="absolute top-4 left-4 right-20 z-20">
           <ConnectionStatus 
-            status={callState.connectionStatus || 'initializing'}
+            status={callState.connectionStatus || 'connecting'}
             message={connectionMessage}
             showRetry={showRetry}
             onRetry={retryConnection}
@@ -584,7 +605,7 @@ const Call = () => {
                   <p className="text-lg text-gray-300">{otherUserProfile?.display_name || 'Unknown User'}</p>
                   <div className="flex items-center gap-2 text-sm text-gray-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    {callStatus === 'ringing' ? 'Ringing...' : 'Connecting...'}
+                    {callStatus === 'ringing' ? 'Ringing...' : callStatus === 'waiting_for_peer' ? 'Waiting for user...' : 'Connecting...'}
                   </div>
                 </div>
               )}
@@ -627,7 +648,7 @@ const Call = () => {
           /* Voice call layout */
           <div className="flex flex-col items-center justify-center gap-8">
             <div className="relative">
-              {(callStatus === 'ringing' || callStatus === 'connecting') && (
+              {(callStatus === 'ringing' || callStatus === 'connecting' || callStatus === 'waiting_for_peer') && (
                 <>
                   <div className="absolute inset-0 rounded-full border-4 border-primary/50 animate-ping" />
                   <div className="absolute inset-0 rounded-full border-4 border-primary/30 animate-ping" style={{ animationDelay: '300ms' }} />
@@ -659,6 +680,12 @@ const Call = () => {
                     Connecting...
                   </span>
                 )}
+                {callStatus === 'waiting_for_peer' && (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Waiting for user to join...
+                  </span>
+                )}
                 {callStatus === 'ringing' && (
                   <span className="flex items-center justify-center gap-2 text-primary">
                     <span className="w-2 h-2 bg-primary rounded-full animate-pulse" />
@@ -672,11 +699,6 @@ const Call = () => {
                   <span className="text-gray-400">Call ended</span>
                 )}
               </p>
-              {callStatus === 'offline' && (
-                <p className="text-sm text-gray-400 max-w-md mx-auto">
-                  This user isn't available at the moment. Please try again later.
-                </p>
-              )}
               
               {showRetry && callStatus !== 'connected' && callStatus !== 'ended' && (
                 <Button
