@@ -19,6 +19,7 @@ import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
 import { BrowserInstallBanner } from "@/components/pwa/BrowserInstallBanner";
+import { ProfileCompletionModal } from "@/components/auth/ProfileCompletionModal";
 import { UPDATE_AVAILABLE_EVENT, autoUpdater } from "@/lib/auto-updater";
 import { appDataSync } from "@/lib/app-data-sync";
 import Index from "./pages/Index";
@@ -166,6 +167,7 @@ const App = () => {
                   <SpaceInviteNotification />
                   <MobileInstallModal />
                   <BrowserInstallBanner />
+                  <ProfileCompletionModal />
                   <UpdatePromptModal 
                     open={showUpdateModal} 
                     onUpdate={handleUpdate} 
