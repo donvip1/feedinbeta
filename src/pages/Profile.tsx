@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 import { FollowersModal } from '@/components/profile/FollowersModal';
+import { FriendsModal } from '@/components/profile/FriendsModal';
 import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
@@ -40,6 +41,7 @@ interface Profile {
   post_count: number;
   followers_count: number;
   following_count: number;
+  friends_count: number;
   instagram_url?: string | null;
   twitter_url?: string | null;
   linkedin_url?: string | null;
@@ -76,6 +78,8 @@ const Profile = () => {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
+  const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [friendsCount, setFriendsCount] = useState(0);
   const [isFollowingMe, setIsFollowingMe] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
@@ -213,12 +217,18 @@ const Profile = () => {
       const isOwnProfile = resolvedUserId === user?.id;
       
       // Fetch profile and counts in parallel
-      const [profileResult, postCountResult, totalLikesResult] = await Promise.all([
+      const [profileResult, postCountResult, totalLikesResult, friendsCountResult] = await Promise.all([
         isOwnProfile 
           ? supabase.from('profiles').select('*').eq('id', resolvedUserId).maybeSingle()
           : supabase.from('public_profiles').select('*').eq('id', resolvedUserId).maybeSingle(),
         supabase.rpc('get_user_post_count', { user_uuid: resolvedUserId }),
-        supabase.rpc('get_user_total_likes', { user_uuid: resolvedUserId })
+        supabase.rpc('get_user_total_likes', { user_uuid: resolvedUserId }),
+        // Count friends (accepted friend requests where user is sender or receiver)
+        supabase
+          .from('friend_requests')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'accepted')
+          .or(`sender_id.eq.${resolvedUserId},receiver_id.eq.${resolvedUserId}`)
       ]);
 
       if (profileResult.error) throw profileResult.error;
@@ -236,10 +246,14 @@ const Profile = () => {
         return;
       }
 
+      const friendsTotal = friendsCountResult.count || 0;
+      setFriendsCount(friendsTotal);
+
       const fullProfile = {
         ...(profileResult.data as any),
         post_count: postCountResult.data || 0,
         total_views: totalLikesResult.data || 0,
+        friends_count: friendsTotal,
       } as Profile;
 
       setProfile(fullProfile);
@@ -814,8 +828,8 @@ const Profile = () => {
             )}
           </div>
 
-          {/* Followers, Following & Views - Same line, Centered */}
-          <div className="flex gap-8 mb-6 justify-center">
+          {/* Followers, Following, Friends & Likes - Same line, Centered */}
+          <div className="flex gap-6 mb-6 justify-center flex-wrap">
             <button
               onClick={() => { setFollowersModalTab('followers'); setShowFollowersModal(true); }}
               className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
@@ -830,6 +844,14 @@ const Profile = () => {
             >
               <p className="text-2xl font-bold text-foreground">{profile.following_count}</p>
               <p className="text-xs text-muted-foreground">Following</p>
+            </button>
+
+            <button
+              onClick={() => setShowFriendsModal(true)}
+              className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
+            >
+              <p className="text-2xl font-bold text-foreground">{friendsCount}</p>
+              <p className="text-xs text-muted-foreground">Friends</p>
             </button>
 
             <div className="flex flex-col items-center">
@@ -1187,6 +1209,14 @@ const Profile = () => {
         onClose={() => setShowFollowersModal(false)}
         userId={resolvedUserId || ''}
         defaultTab={followersModalTab}
+      />
+
+      {/* Friends Modal */}
+      <FriendsModal
+        open={showFriendsModal}
+        onClose={() => setShowFriendsModal(false)}
+        userId={resolvedUserId || ''}
+        friendsCount={friendsCount}
       />
 
       {/* Profile Image Modals */}
