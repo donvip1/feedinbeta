@@ -572,7 +572,7 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
       <FloatingReactions reactions={reactions.map(r => ({ ...r, emoji: REACTION_EMOJIS[r.type] || '❤️' }))} />
 
       {/* Flying Gifts */}
-      <FlyingChat gifts={flyingGifts} giftEmojis={GIFT_EMOJIS} />
+      <FlyingChat messages={[]} gifts={flyingGifts} hostId={stream?.user_id} />
 
       {/* TOP HEADER */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4">
@@ -706,11 +706,12 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
 
       {/* Gift Modal */}
       <LiveGiftModal
-        open={showGiftModal}
-        onOpenChange={setShowGiftModal}
+        isOpen={showGiftModal}
+        onClose={() => setShowGiftModal(false)}
         streamId={streamId}
         hostId={stream?.user_id || ''}
         viewers={[]}
+        isHost={isHost}
       />
     </div>
   );

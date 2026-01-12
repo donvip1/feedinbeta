@@ -544,11 +544,9 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
 
       {/* Flying Gifts */}
       <FlyingChat 
-        gifts={flyingGifts} 
-        giftEmojis={{
-          heart: '❤️', star: '⭐', fire: '🔥', lightning: '⚡', 
-          crown: '👑', diamond: '💎', rocket: '🚀', universe: '🌌', credits: '💰',
-        }} 
+        messages={[]} 
+        gifts={flyingGifts}
+        hostId={user?.id}
       />
 
       {/* TOP HEADER */}
@@ -760,18 +758,18 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
 
       {/* Modals */}
       <LiveGiftModal
-        open={showGiftModal}
-        onOpenChange={setShowGiftModal}
+        isOpen={showGiftModal}
+        onClose={() => setShowGiftModal(false)}
         streamId={streamId}
         hostId={user?.id || ''}
         viewers={viewers}
+        isHost={true}
       />
       
       <LiveInviteModal
-        open={showInviteModal}
-        onOpenChange={setShowInviteModal}
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
         streamId={streamId}
-        onInvite={() => {}}
       />
     </div>
   );
