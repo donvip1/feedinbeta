@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Globe, MapPin, RefreshCw, Check, Search } from 'lucide-react';
+import { ArrowLeft, Globe, MapPin, RefreshCw, Check, Search, TrendingUp, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCurrency } from '@/context/CurrencyContext';
 import { getCountryFlag } from '@/lib/location-service';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { formatDistanceToNow } from 'date-fns';
 
 const CurrencySettings = () => {
   const navigate = useNavigate();
@@ -18,8 +20,10 @@ const CurrencySettings = () => {
     exchangeRate,
     availableCurrencies,
     userLocation,
+    lastRateUpdate,
     setCurrency,
     detectAndSetLocation,
+    refreshRates,
     formatPrice,
     formatCreditsValue,
   } = useCurrency();
@@ -27,6 +31,7 @@ const CurrencySettings = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDetecting, setIsDetecting] = useState(false);
   const [isChanging, setIsChanging] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const filteredCurrencies = availableCurrencies.filter(currency =>
     currency.currency_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -60,6 +65,18 @@ const CurrencySettings = () => {
       toast.error('Failed to change currency');
     } finally {
       setIsChanging(false);
+    }
+  };
+
+  const handleRefreshRates = async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshRates();
+      toast.success('Exchange rates updated with live market data');
+    } catch {
+      toast.error('Failed to refresh rates');
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -136,7 +153,13 @@ const CurrencySettings = () => {
           
           {/* Conversion Preview */}
           <div className="bg-muted/50 rounded-lg p-3 space-y-2">
-            <p className="text-sm font-medium text-muted-foreground">Conversion Preview</p>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-muted-foreground">Live Conversion Preview</p>
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Live Rates
+              </Badge>
+            </div>
             <div className="grid grid-cols-2 gap-2 text-sm">
               <div>
                 <p className="text-muted-foreground">100 credits =</p>
@@ -152,6 +175,32 @@ const CurrencySettings = () => {
                 Exchange rate: 1 USD = {currencySymbol}{exchangeRate.toLocaleString()}
               </p>
             )}
+          </div>
+
+          {/* Rate Update Info */}
+          <div className="flex items-center justify-between pt-2 border-t border-border">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" />
+              {lastRateUpdate ? (
+                <span>Updated {formatDistanceToNow(lastRateUpdate, { addSuffix: true })}</span>
+              ) : (
+                <span>Fetching rates...</span>
+              )}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshRates}
+              disabled={isRefreshing}
+              className="h-7 text-xs"
+            >
+              {isRefreshing ? (
+                <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+              ) : (
+                <RefreshCw className="h-3 w-3 mr-1" />
+              )}
+              Refresh
+            </Button>
           </div>
         </Card>
 
@@ -218,10 +267,18 @@ const CurrencySettings = () => {
         </div>
 
         {/* Info */}
-        <Card className="p-4 bg-muted/30 border-border">
+        <Card className="p-4 bg-muted/30 border-border space-y-2">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-green-500" />
+            <p className="text-sm font-medium">Live Market Rates</p>
+          </div>
           <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Currency conversion is for display purposes. All transactions are processed in credits, 
-            where 100 credits = $1 USD. Exchange rates are updated periodically and may vary.
+            Exchange rates are fetched in real-time from multiple sources including Bybit P2P for accurate 
+            NGN pricing. Rates refresh automatically every 30 minutes.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <strong>Note:</strong> All transactions are processed in credits (100 credits = $1 USD). 
+            Currency display is for convenience only.
           </p>
         </Card>
       </div>
