@@ -125,6 +125,47 @@ export type Database = {
         }
         Relationships: []
       }
+      call_invites: {
+        Row: {
+          call_id: string | null
+          created_at: string | null
+          created_by: string
+          expires_at: string
+          id: string
+          invite_code: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          call_id?: string | null
+          created_at?: string | null
+          created_by: string
+          expires_at?: string
+          id?: string
+          invite_code: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          call_id?: string | null
+          created_at?: string | null
+          created_by?: string
+          expires_at?: string
+          id?: string
+          invite_code?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_invites_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "call_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       call_logs: {
         Row: {
           call_type: string

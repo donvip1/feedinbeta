@@ -2,12 +2,14 @@ import { Loader2, Wifi, WifiOff, RefreshCw, CheckCircle2, AlertCircle } from 'lu
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-// Connection status types for call UI - compatible with P2P manager
+// Connection status types for call UI - compatible with LiveKit call manager
 export type ConnectionStatusType = 
   | 'idle'
   | 'ringing'
   | 'connecting'
   | 'connected'
+  | 'reconnecting'
+  | 'disconnected'
   | 'failed'
   | 'ended'
   | 'initializing' 
@@ -15,7 +17,6 @@ export type ConnectionStatusType =
   | 'signaling' 
   | 'negotiating' 
   | 'ice_checking' 
-  | 'reconnecting' 
   | 'creating-session'
   | 'publishing'
   | 'subscribing'
@@ -52,6 +53,7 @@ export const ConnectionStatus = ({
         return <RefreshCw className="w-5 h-5 animate-spin text-yellow-400" />;
       case 'failed':
       case 'ended':
+      case 'disconnected':
         return <AlertCircle className="w-5 h-5 text-red-400" />;
       default:
         return <Wifi className="w-5 h-5" />;

@@ -76,6 +76,7 @@ import Investors from "./pages/Investors";
 import InvestmentDocs from "./pages/InvestmentDocs";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import SpaceDetail from "./pages/SpaceDetail";
+import CallInvite from "./pages/CallInvite";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -192,6 +193,7 @@ const App = () => {
             <Route path="/messages" element={<Messages />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/call" element={<Call />} />
+            <Route path="/call/join/:inviteCode" element={<CallInvite />} />
             <Route path="/call/history" element={<CallHistory />} />
             
             {/* Live & Stories */}
