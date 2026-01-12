@@ -15,7 +15,7 @@ const P2P_CONFIG = {
 
 // Input validation
 const validateInput = (data: any) => {
-  const { action, transactionId, proofUrl, listingId } = data;
+  const { action, transactionId, proofUrl, listingId, cancellationReason } = data;
   
   const validActions = ["validate_listing", "create_transaction", "upload_proof", "confirm_payment", "cancel_transaction"];
   if (!validActions.includes(action)) {
@@ -38,8 +38,15 @@ const validateInput = (data: any) => {
       throw new Error("Invalid proofUrl");
     }
   }
+
+  if (action === "cancel_transaction") {
+    // cancellationReason is optional for sellers, required for buyers (checked later)
+    if (cancellationReason && typeof cancellationReason !== "string") {
+      throw new Error("Invalid cancellationReason");
+    }
+  }
   
-  return { action, transactionId, proofUrl, listingId };
+  return { action, transactionId, proofUrl, listingId, cancellationReason };
 };
 
 serve(async (req) => {
@@ -76,7 +83,7 @@ serve(async (req) => {
 
     // Validate input (no userId accepted from client)
     const requestData = await req.json();
-    const { action, transactionId, proofUrl, listingId } = validateInput(requestData);
+    const { action, transactionId, proofUrl, listingId, cancellationReason } = validateInput(requestData);
     
     // Use authenticated user ID
     const userId = user.id;
@@ -367,6 +374,109 @@ serve(async (req) => {
           );
         }
 
+        const isBuyer = userId === transaction.buyer_id;
+        
+        // BUYER CANCELLATION LOGIC - requires reason and has penalties
+        if (isBuyer) {
+          // Only count as cancellation if transaction was "pending" (order placed but not completed)
+          if (transaction.status === "pending") {
+            // Require cancellation reason for buyers
+            if (!cancellationReason || cancellationReason.trim().length < 10) {
+              return new Response(
+                JSON.stringify({ 
+                  error: "Reason required", 
+                  message: "Please provide a reason for cancellation (min 10 characters)" 
+                }),
+                { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+              );
+            }
+
+            // Get buyer's current eligibility
+            const { data: buyerEligibility } = await supabaseService
+              .from("p2p_user_eligibility")
+              .select("buyer_cancellation_count, buyer_ban_until")
+              .eq("user_id", userId)
+              .single();
+
+            // Check if buyer is currently banned
+            if (buyerEligibility?.buyer_ban_until) {
+              const banUntil = new Date(buyerEligibility.buyer_ban_until);
+              if (banUntil > new Date()) {
+                return new Response(
+                  JSON.stringify({ 
+                    error: "Banned from buying", 
+                    message: `You are banned from buying until ${banUntil.toLocaleDateString()}`,
+                    ban_until: buyerEligibility.buyer_ban_until
+                  }),
+                  { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+                );
+              }
+            }
+
+            const currentCancelCount = buyerEligibility?.buyer_cancellation_count ?? 0;
+            const newCancelCount = currentCancelCount + 1;
+            
+            // If this is the 3rd cancellation, apply 2-week ban
+            let banUntil = null;
+            let warningMessage = null;
+            
+            if (newCancelCount >= 3) {
+              banUntil = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(); // 2 weeks
+              warningMessage = "You have been banned from buying credits for 2 weeks due to excessive cancellations.";
+            } else if (newCancelCount === 2) {
+              warningMessage = "Warning: One more cancellation will result in a 2-week ban from buying credits.";
+            }
+
+            // Update buyer's cancellation count
+            await supabaseService
+              .from("p2p_user_eligibility")
+              .upsert({
+                user_id: userId,
+                buyer_cancellation_count: newCancelCount,
+                buyer_ban_until: banUntil,
+                last_cancellation_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              }, { onConflict: "user_id" });
+
+            // Store cancellation reason
+            await supabaseService
+              .from("p2p_transactions")
+              .update({ 
+                status: "cancelled", 
+                escrow_locked: false,
+                cancellation_reason: cancellationReason,
+                cancelled_by: userId,
+              })
+              .eq("id", transactionId);
+
+            // Refund credits to seller
+            await supabaseService.from("credit_transactions").insert({
+              user_id: transaction.seller_id,
+              type: "refund",
+              amount: transaction.credits_amount,
+              description: "P2P transaction cancelled by buyer - escrow refund",
+              related_id: transactionId,
+            });
+
+            // Update escrow status
+            await supabaseService
+              .from("p2p_escrow")
+              .update({ status: "refunded" })
+              .eq("transaction_id", transactionId);
+
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                warning: warningMessage,
+                cancellation_count: newCancelCount,
+                banned_until: banUntil
+              }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+        }
+
+        // SELLER CANCELLATION - no penalty, just refund
         // Refund credits to seller
         await supabaseService.from("credit_transactions").insert({
           user_id: transaction.seller_id,
@@ -384,7 +494,12 @@ serve(async (req) => {
 
         await supabaseService
           .from("p2p_transactions")
-          .update({ status: "cancelled", escrow_locked: false })
+          .update({ 
+            status: "cancelled", 
+            escrow_locked: false,
+            cancelled_by: userId,
+            cancellation_reason: cancellationReason || null,
+          })
           .eq("id", transactionId);
 
         return new Response(
