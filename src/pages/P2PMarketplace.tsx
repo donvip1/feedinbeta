@@ -3,29 +3,29 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Plus, DollarSign, Coins } from 'lucide-react';
+import { ArrowLeft, Coins, Shield, History, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { P2PListingCard } from '@/components/p2p/P2PListingCard';
+import { CreateListingModal } from '@/components/p2p/CreateListingModal';
+import { useCurrency } from '@/context/CurrencyContext';
 
 const P2PMarketplace = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [creditsAmount, setCreditsAmount] = useState('');
-  const [priceUsd, setPriceUsd] = useState('');
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const { formatCreditsValue } = useCurrency();
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const { data: listings, refetch } = useQuery({
+  const { data: listings, isLoading: listingsLoading } = useQuery({
     queryKey: ['p2p-listings'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('p2p_listings')
-        .select('*, profiles(display_name, username)')
+        .select('*, profiles(display_name, username, avatar_url)')
         .eq('status', 'active')
         .order('created_at', { ascending: false });
       
@@ -47,214 +47,175 @@ const P2PMarketplace = () => {
       if (error) throw error;
       return data;
     },
+    enabled: !!user,
   });
 
-  const handleCreateListing = async () => {
-    if (!creditsAmount || !priceUsd) {
-      toast.error('Please fill in all fields');
-      return;
-    }
-
-    const credits = parseInt(creditsAmount);
-    const price = parseFloat(priceUsd);
-
-    if (credits <= 0 || price <= 0) {
-      toast.error('Invalid amounts');
-      return;
-    }
-
-    if (myCredits && credits > myCredits.balance) {
-      toast.error('Insufficient credits');
-      return;
-    }
-
-    const { error } = await supabase.from('p2p_listings').insert({
-      seller_id: user?.id,
-      credits_amount: credits,
-      price_usd: price,
-    });
-
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    toast.success('Listing created successfully');
-    setCreditsAmount('');
-    setPriceUsd('');
-    setIsCreateModalOpen(false);
-    refetch();
-  };
+  const { data: myTransactions } = useQuery({
+    queryKey: ['my-p2p-transactions', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+      const { data, error } = await supabase
+        .from('p2p_transactions')
+        .select('*')
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+        .order('created_at', { ascending: false })
+        .limit(5);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
 
   const handleBuyCredits = async (listingId: string, sellerId: string, creditsAmount: number, priceUsd: number) => {
-    const { data, error } = await supabase.from('p2p_transactions').insert({
-      listing_id: listingId,
-      buyer_id: user?.id,
-      seller_id: sellerId,
-      credits_amount: creditsAmount,
-      price_usd: priceUsd,
-    }).select().single();
-
-    if (error) {
-      toast.error(error.message);
+    if (!user) {
+      toast.error('Please sign in to buy credits');
       return;
     }
 
-    // Create escrow
-    const { error: escrowError } = await supabase.functions.invoke('p2p-escrow', {
-      body: {
-        action: 'create_transaction',
-        transactionId: data.id,
-        userId: user?.id,
-      },
-    });
+    setProcessingId(listingId);
+    try {
+      const { data, error } = await supabase.from('p2p_transactions').insert({
+        listing_id: listingId,
+        buyer_id: user.id,
+        seller_id: sellerId,
+        credits_amount: creditsAmount,
+        price_usd: priceUsd,
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+      }).select().single();
 
-    if (escrowError) {
-      toast.error(escrowError.message);
-      return;
+      if (error) throw error;
+
+      const { error: escrowError } = await supabase.functions.invoke('p2p-escrow', {
+        body: { action: 'create_transaction', transactionId: data.id },
+      });
+
+      if (escrowError) throw escrowError;
+
+      toast.success('Transaction created! Proceed with payment.');
+      navigate(`/wallet/p2p/${data.id}`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create transaction');
+    } finally {
+      setProcessingId(null);
     }
-
-    toast.success('Transaction created! Please proceed with payment.');
-    navigate(`/wallet/p2p/${data.id}`);
   };
+
+  const activeCount = myTransactions?.filter(t => !['completed', 'cancelled'].includes(t.status)).length || 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-sm border-b border-border/50">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate(-1)}
-                className="text-gray-400 hover:text-white"
-              >
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-bold">P2P Credit Marketplace</h1>
-                <p className="text-sm text-muted-foreground">
-                  Trade credits securely
+                <h1 className="text-xl font-bold">P2P Marketplace</h1>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Shield className="w-3 h-3" /> Escrow Protected Trading
                 </p>
               </div>
             </div>
-            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Sell Credits
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create Listing</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <Label>Credits Amount</Label>
-                    <Input
-                      type="number"
-                      placeholder="100"
-                      value={creditsAmount}
-                      onChange={(e) => setCreditsAmount(e.target.value)}
-                    />
-                    {myCredits && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Available: {myCredits.balance} credits
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <Label>Price (USD)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="1.00"
-                      value={priceUsd}
-                      onChange={(e) => setPriceUsd(e.target.value)}
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Rate: ~85 credits per $1
-                    </p>
-                  </div>
-                  <Button onClick={handleCreateListing} className="w-full">
-                    Create Listing
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            {myCredits && <CreateListingModal userCredits={myCredits.balance} />}
           </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Balance Card */}
         {myCredits && (
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Coins className="w-5 h-5" />
-                Your Credits
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold">{myCredits.balance}</p>
+          <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Your Balance</p>
+                  <p className="text-3xl font-bold flex items-center gap-2">
+                    <Coins className="w-6 h-6 text-primary" />
+                    {myCredits.balance.toLocaleString()}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    ≈ {formatCreditsValue(myCredits.balance)}
+                  </p>
+                </div>
+                {activeCount > 0 && (
+                  <Badge variant="secondary" className="gap-1">
+                    <History className="w-3 h-3" />
+                    {activeCount} Active
+                  </Badge>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
 
-        <h2 className="text-xl font-semibold mb-4">Active Listings</h2>
-        <div className="grid gap-4">
-          {listings?.map((listing) => (
-            <Card key={listing.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Coins className="w-5 h-5" />
-                      {listing.credits_amount} Credits
-                    </CardTitle>
-                    <CardDescription>
-                      Seller: @{listing.profiles?.username || 'Unknown'}
-                    </CardDescription>
-                  </div>
-                  <Badge variant="secondary">
-                    <DollarSign className="w-3 h-3 mr-1" />
-                    ${listing.price_usd}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  Rate: ~{Math.round(listing.credits_amount / listing.price_usd)} credits per $1
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button
-                  className="w-full"
-                  onClick={() =>
-                    handleBuyCredits(
-                      listing.id,
-                      listing.seller_id,
-                      listing.credits_amount,
-                      listing.price_usd
-                    )
-                  }
-                  disabled={listing.seller_id === user?.id}
+        <Tabs defaultValue="listings">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="listings">Available Listings</TabsTrigger>
+            <TabsTrigger value="my-orders">My Orders</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="listings" className="mt-4 space-y-4">
+            {listingsLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              </div>
+            ) : listings?.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No active listings available</p>
+                  <p className="text-sm">Be the first to sell your credits!</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4">
+                {listings?.map((listing) => (
+                  <P2PListingCard
+                    key={listing.id}
+                    listing={listing}
+                    onBuy={handleBuyCredits}
+                    isProcessing={processingId === listing.id}
+                  />
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="my-orders" className="mt-4 space-y-4">
+            {myTransactions?.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground">
+                  <p>No transactions yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              myTransactions?.map((tx) => (
+                <Card 
+                  key={tx.id} 
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => navigate(`/wallet/p2p/${tx.id}`)}
                 >
-                  {listing.seller_id === user?.id ? 'Your Listing' : 'Buy Credits'}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-          {listings?.length === 0 && (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No active listings available
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{tx.credits_amount} Credits</p>
+                        <p className="text-sm text-muted-foreground">
+                          {tx.buyer_id === user?.id ? 'Buying' : 'Selling'} • ${tx.price_usd}
+                        </p>
+                      </div>
+                      <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'}>
+                        {tx.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
       <BottomNav />
     </div>
