@@ -107,7 +107,7 @@ serve(async (req) => {
         user_id: user.id,
         amount: -totalCost,
         description,
-        type: "deduction",
+        type: "spent",
         related_id: targetUserId || null,
       });
 
