@@ -37,12 +37,57 @@ export const getCachedCounts = (userId: string): ProfileCounts | null => {
 };
 
 /**
- * Hook for INSTANT profile counts - reads directly from profiles table
- * All counts are denormalized and updated via database triggers
+ * Fetch all counts in parallel using efficient queries
+ */
+const fetchAllCounts = async (userId: string): Promise<ProfileCounts> => {
+  // Run ALL count queries in parallel for maximum speed
+  const [postsResult, likesResult, friendsResult, followersResult, followingResult] = await Promise.all([
+    // Posts count
+    supabase
+      .from('posts')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .neq('status', 'deleted'),
+    
+    // Likes received on user's posts
+    supabase.rpc('get_user_total_likes', { user_uuid: userId }),
+    
+    // Friends count (accepted friend requests)
+    supabase
+      .from('friend_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'accepted')
+      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`),
+    
+    // Followers count
+    supabase
+      .from('follows')
+      .select('id', { count: 'exact', head: true })
+      .eq('following_id', userId),
+    
+    // Following count
+    supabase
+      .from('follows')
+      .select('id', { count: 'exact', head: true })
+      .eq('follower_id', userId),
+  ]);
+
+  return {
+    postsCount: postsResult.count || 0,
+    likesCount: likesResult.data || 0,
+    friendsCount: friendsResult.count || 0,
+    followersCount: followersResult.count || 0,
+    followingCount: followingResult.count || 0,
+  };
+};
+
+/**
+ * Hook for profile counts with aggressive caching and prefetching
  */
 export const useProfileCounts = (userId: string | null | undefined): UseProfileCountsResult => {
   const cacheKey = userId ? `profile-counts:${userId}` : null;
   const hasInitialized = useRef(false);
+  const fetchInProgress = useRef(false);
   
   // INSTANT: Get from memory cache synchronously
   const cachedCounts = useMemo(() => {
@@ -54,31 +99,16 @@ export const useProfileCounts = (userId: string | null | undefined): UseProfileC
   const [isLoading, setIsLoading] = useState(!cachedCounts);
 
   const fetchCounts = useCallback(async (showLoading = true) => {
-    if (!userId) return;
+    if (!userId || fetchInProgress.current) return;
+    
+    fetchInProgress.current = true;
     
     if (showLoading && !cachedCounts) {
       setIsLoading(true);
     }
 
     try {
-      // SINGLE QUERY - all counts from profiles table (instant!)
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('posts_count, likes_count, friends_count, followers_count, following_count')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-
-      // Cast to any to handle new columns before types regenerate
-      const profileData = data as any;
-      const newCounts: ProfileCounts = {
-        postsCount: profileData?.posts_count || 0,
-        likesCount: profileData?.likes_count || 0,
-        friendsCount: profileData?.friends_count || 0,
-        followersCount: profileData?.followers_count || 0,
-        followingCount: profileData?.following_count || 0,
-      };
+      const newCounts = await fetchAllCounts(userId);
 
       setCounts(newCounts);
       
@@ -90,6 +120,7 @@ export const useProfileCounts = (userId: string | null | undefined): UseProfileC
       console.error('[useProfileCounts] Error:', error);
     } finally {
       setIsLoading(false);
+      fetchInProgress.current = false;
     }
   }, [userId, cacheKey, cachedCounts]);
 
@@ -99,51 +130,66 @@ export const useProfileCounts = (userId: string | null | undefined): UseProfileC
     hasInitialized.current = true;
     
     if (cachedCounts) {
-      // Already have cached data, just do a silent background refresh
+      setCounts(cachedCounts);
+      setIsLoading(false);
+      // Silent background refresh
       fetchCounts(false);
     } else {
       // No cache, fetch with loading
       fetchCounts(true);
     }
-  }, [userId]);
+  }, [userId, cachedCounts, fetchCounts]);
 
-  // Real-time: Subscribe to profile changes only (triggers update counts automatically)
+  // Real-time: Subscribe to changes that affect counts
   useEffect(() => {
     if (!userId) return;
 
+    // Subscribe to posts, likes, friends, follows changes
     const channel = supabase
-      .channel(`profile-counts-${userId}`)
+      .channel(`profile-counts-realtime-${userId}`)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE',
+          event: '*',
           schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${userId}`,
+          table: 'posts',
+          filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
-          // INSTANT update from realtime payload - no refetch needed!
-          const newData = payload.new as any;
-          const newCounts: ProfileCounts = {
-            postsCount: newData.posts_count || 0,
-            likesCount: newData.likes_count || 0,
-            friendsCount: newData.friends_count || 0,
-            followersCount: newData.followers_count || 0,
-            followingCount: newData.following_count || 0,
-          };
-          setCounts(newCounts);
-          
-          if (cacheKey) {
-            memoryCache.set(cacheKey, newCounts, CACHE_TTL);
-          }
-        }
+        () => fetchCounts(false)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'post_likes',
+        },
+        () => fetchCounts(false)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'friend_requests',
+        },
+        () => fetchCounts(false)
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'follows',
+        },
+        () => fetchCounts(false)
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId, cacheKey]);
+  }, [userId, fetchCounts]);
 
   return {
     counts,
@@ -154,7 +200,6 @@ export const useProfileCounts = (userId: string | null | undefined): UseProfileC
 
 /**
  * Prefetch profile counts - call this EARLY (on app load for current user, on hover for others)
- * This is the key to instant counts - prefetch before user navigates to profile
  */
 export const prefetchProfileCounts = async (userId: string): Promise<void> => {
   const cacheKey = `profile-counts:${userId}`;
@@ -165,24 +210,7 @@ export const prefetchProfileCounts = async (userId: string): Promise<void> => {
   prefetchingUsers.add(userId);
 
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('posts_count, likes_count, friends_count, followers_count, following_count')
-      .eq('id', userId)
-      .single();
-
-    if (error) throw error;
-
-    // Cast to any to handle new columns before types regenerate
-    const profileData = data as any;
-    const counts: ProfileCounts = {
-      postsCount: profileData?.posts_count || 0,
-      likesCount: profileData?.likes_count || 0,
-      friendsCount: profileData?.friends_count || 0,
-      followersCount: profileData?.followers_count || 0,
-      followingCount: profileData?.following_count || 0,
-    };
-
+    const counts = await fetchAllCounts(userId);
     memoryCache.set(cacheKey, counts, CACHE_TTL);
     prefetchedUsers.add(userId);
   } catch (error) {
@@ -194,13 +222,24 @@ export const prefetchProfileCounts = async (userId: string): Promise<void> => {
 
 /**
  * Prefetch current user's counts on app initialization
- * Call this from AuthContext or App component
  */
 export const initializeCurrentUserCounts = async (userId: string): Promise<void> => {
-  // Don't re-initialize if already done
   if (prefetchedUsers.has(userId)) return;
-  
   await prefetchProfileCounts(userId);
+};
+
+/**
+ * Batch prefetch multiple users' counts at once - call on feed load
+ */
+export const batchPrefetchCounts = async (userIds: string[]): Promise<void> => {
+  const uniqueIds = [...new Set(userIds)].filter(id => !memoryCache.has(`profile-counts:${id}`));
+  
+  // Prefetch in parallel, max 5 at a time
+  const batchSize = 5;
+  for (let i = 0; i < uniqueIds.length; i += batchSize) {
+    const batch = uniqueIds.slice(i, i + batchSize);
+    await Promise.all(batch.map(id => prefetchProfileCounts(id)));
+  }
 };
 
 export default useProfileCounts;

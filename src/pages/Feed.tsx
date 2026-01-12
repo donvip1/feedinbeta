@@ -33,6 +33,7 @@ import { PullToRefresh } from '@/components/feed/PullToRefresh';
 import { SwipeableTabs } from '@/components/feed/SwipeableTabs';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 import { useFeedPreloader } from '@/hooks/useFeedPreloader';
+import { batchPrefetchCounts } from '@/hooks/useProfileCounts';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -420,7 +421,7 @@ const Feed = () => {
   const isLoading = activeTab === 'following' ? isLoadingFollowing : isLoadingForYou;
   const refetch = activeTab === 'following' ? refetchFollowing : refetchForYou;
 
-  // Update refs when posts change
+  // Update refs when posts change and prefetch profile counts for INSTANT display
   useEffect(() => {
     if (posts && posts.length > 0) {
       allLoadedPostsRef.current = posts;
@@ -428,6 +429,12 @@ const Feed = () => {
         p.media_type === 'video' || 
         ((p.post_type === 'refeed' || p.post_type === 'quote') && p.original_post?.media_type === 'video')
       );
+      
+      // INSTANT: Batch prefetch all post authors' profile counts
+      const userIds = posts.map((p: any) => p.user_id).filter(Boolean);
+      if (userIds.length > 0) {
+        batchPrefetchCounts(userIds);
+      }
     }
   }, [posts]);
 
