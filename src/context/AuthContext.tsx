@@ -6,6 +6,7 @@ import { SessionManager } from '@/lib/session-manager';
 import { CookieManager } from '@/lib/cookie-manager';
 import { appShellPreloader } from '@/lib/app-shell-preloader';
 import { backgroundSync } from '@/lib/background-sync';
+import { initializeCurrentUserCounts } from '@/hooks/useProfileCounts';
 
 interface AuthContextType {
   user: User | null;
@@ -82,6 +83,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           if (session?.user) {
             appShellPreloader.refreshInBackground();
             backgroundSync.initialize(session.user.id);
+            // INSTANT: Prefetch profile counts immediately on login
+            initializeCurrentUserCounts(session.user.id);
             // Defer profile sync to avoid deadlock
             setTimeout(() => {
               syncUserProfile(session.user);

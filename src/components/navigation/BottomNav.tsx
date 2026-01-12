@@ -14,6 +14,7 @@ import { memoryCache } from '@/lib/memory-cache';
 import { useWalletNotifications } from '@/hooks/useWalletNotifications';
 import { useNavigation } from '@/context/NavigationContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { prefetchProfileCounts } from '@/hooks/useProfileCounts';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -36,6 +37,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
 
   useEffect(() => {
     if (user) {
+      // INSTANT: Prefetch profile counts immediately
+      prefetchProfileCounts(user.id);
+      
       // Try to get avatar from memory cache first (INSTANT)
       const cachedProfile = memoryCache.get<any>(`profile:${user.id}`);
       if (cachedProfile?.avatar_url) {
