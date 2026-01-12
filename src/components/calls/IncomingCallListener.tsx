@@ -16,6 +16,7 @@ export const IncomingCallListener = () => {
   const { user } = useAuth();
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const processingCallIds = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!user) return;
@@ -29,7 +30,7 @@ export const IncomingCallListener = () => {
 
     // Subscribe to incoming calls where we are the receiver
     const channel = supabase
-      .channel(`incoming-calls:${user.id}`)
+      .channel(`incoming-calls:${user.id}:${Date.now()}`)
       .on(
         'postgres_changes',
         {
@@ -48,9 +49,17 @@ export const IncomingCallListener = () => {
             return;
           }
           
+          // Prevent duplicate processing
+          if (processingCallIds.current.has(call.id)) {
+            console.log('[IncomingCallListener] Already processing this call');
+            return;
+          }
+          processingCallIds.current.add(call.id);
+          
           // Don't show if we already have an incoming call
           if (incomingCall) {
             console.log('[IncomingCallListener] Already have an incoming call, ignoring');
+            processingCallIds.current.delete(call.id);
             return;
           }
 
@@ -97,6 +106,7 @@ export const IncomingCallListener = () => {
             }
           } catch (error) {
             console.error('[IncomingCallListener] Error loading caller profile:', error);
+            processingCallIds.current.delete(call.id);
           }
         }
       )
@@ -110,7 +120,7 @@ export const IncomingCallListener = () => {
         },
         (payload) => {
           const call = payload.new;
-          console.log('[IncomingCallListener] Call updated:', call.id, 'status:', call.status);
+          console.log('[IncomingCallListener] Receiver call updated:', call.id, 'status:', call.status);
           
           // Clear incoming call if it's ended, rejected, or answered
           if (call.status === 'ended' || call.status === 'rejected' || call.status === 'answered') {
@@ -118,6 +128,7 @@ export const IncomingCallListener = () => {
               if (prev?.callId === call.id) {
                 console.log('[IncomingCallListener] Clearing incoming call - status:', call.status);
                 callSounds.stopAllSounds();
+                processingCallIds.current.delete(call.id);
                 return null;
               }
               return prev;
@@ -134,9 +145,9 @@ export const IncomingCallListener = () => {
           filter: `caller_id=eq.${user.id}`,
         },
         (payload) => {
-          const call = payload.new;
-          console.log('[IncomingCallListener] Outgoing call updated:', call.id, 'status:', call.status);
           // This helps the caller know when the call is answered/rejected
+          // But don't clear incoming call state for caller updates
+          console.log('[IncomingCallListener] Outgoing call updated:', payload.new.id, 'status:', payload.new.status);
         }
       )
       .subscribe((status) => {
@@ -145,41 +156,47 @@ export const IncomingCallListener = () => {
 
     channelRef.current = channel;
 
-    // Check call status periodically (less frequently to avoid race conditions)
-    const checkCallTimeout = setInterval(() => {
-      if (incomingCall) {
-        // Check if call is still pending
-        supabase
-          .from('call_logs')
-          .select('status')
-          .eq('id', incomingCall.callId)
-          .single()
-          .then(({ data }) => {
-            // Only dismiss if call has been explicitly ended or rejected
-            if (data?.status === 'ended' || data?.status === 'rejected') {
-              console.log('[IncomingCallListener] Call status changed to:', data?.status);
-              setIncomingCall(null);
-              callSounds.stopAllSounds();
-            }
-          });
-      }
-    }, 10000); // Check every 10 seconds
-
     return () => {
       console.log('[IncomingCallListener] Cleaning up');
-      clearInterval(checkCallTimeout);
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      processingCallIds.current.clear();
     };
-  }, [user, incomingCall]);
+  }, [user]);
+
+  // Handle incoming call being dismissed by caller
+  useEffect(() => {
+    if (!incomingCall) return;
+
+    // Poll for call status changes (backup for realtime)
+    const checkInterval = setInterval(async () => {
+      try {
+        const { data } = await supabase
+          .from('call_logs')
+          .select('status')
+          .eq('id', incomingCall.callId)
+          .single();
+        
+        if (data?.status === 'ended' || data?.status === 'rejected') {
+          console.log('[IncomingCallListener] Call ended by caller:', data.status);
+          callSounds.stopAllSounds();
+          setIncomingCall(null);
+          processingCallIds.current.delete(incomingCall.callId);
+        }
+      } catch (error) {
+        console.error('[IncomingCallListener] Error checking call status:', error);
+      }
+    }, 3000);
+
+    return () => clearInterval(checkInterval);
+  }, [incomingCall]);
 
   // Handle visibility change - keep listening even when tab is hidden
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && incomingCall) {
-        // Re-focus on incoming call when tab becomes visible
         console.log('[IncomingCallListener] Tab visible, incoming call active');
       }
     };
@@ -190,13 +207,19 @@ export const IncomingCallListener = () => {
 
   const handleAccept = useCallback(() => {
     console.log('[IncomingCallListener] Call accepted');
+    if (incomingCall) {
+      processingCallIds.current.delete(incomingCall.callId);
+    }
     setIncomingCall(null);
-  }, []);
+  }, [incomingCall]);
 
   const handleReject = useCallback(() => {
     console.log('[IncomingCallListener] Call rejected');
+    if (incomingCall) {
+      processingCallIds.current.delete(incomingCall.callId);
+    }
     setIncomingCall(null);
-  }, []);
+  }, [incomingCall]);
 
   if (!incomingCall) return null;
 

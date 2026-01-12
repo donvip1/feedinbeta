@@ -89,12 +89,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const startTimeRef = useRef<number>(0);
+  const callEndSubscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   // Clean up on unmount
   useEffect(() => {
     return () => {
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
+      }
+      if (callEndSubscriptionRef.current) {
+        supabase.removeChannel(callEndSubscriptionRef.current);
       }
       callManagerRef.current?.disconnect();
     };
@@ -128,6 +132,38 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Subscribe to call status changes at the context level for early detection
+  const subscribeToCallStatus = useCallback((callId: string) => {
+    // Clean up existing subscription
+    if (callEndSubscriptionRef.current) {
+      supabase.removeChannel(callEndSubscriptionRef.current);
+    }
+
+    console.log('[CallContext] Subscribing to call status:', callId);
+
+    callEndSubscriptionRef.current = supabase
+      .channel(`call-context-${callId}-${Date.now()}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'call_logs',
+          filter: `id=eq.${callId}`,
+        },
+        (payload) => {
+          const newStatus = payload.new.status;
+          console.log('[CallContext] Call status changed:', newStatus);
+          
+          if (newStatus === 'ended' || newStatus === 'rejected') {
+            console.log('[CallContext] Call ended/rejected, cleaning up');
+            endCall();
+          }
+        }
+      )
+      .subscribe();
+  }, []);
+
   const startCall = useCallback(async (
     callId: string,
     callType: 'video' | 'voice',
@@ -135,6 +171,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isCaller: boolean
   ) => {
     console.log('[CallContext] Starting LiveKit call:', { callId, callType, otherUserId, isCaller });
+
+    // Subscribe to call status changes immediately
+    subscribeToCallStatus(callId);
 
     // Load other user's profile
     await loadOtherUserProfile(otherUserId);
@@ -181,6 +220,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (callType === 'video' && localVideoRef.current) {
               localVideoRef.current.srcObject = stream;
+              localVideoRef.current.play().catch(e => console.warn('[CallContext] Local video play error:', e));
             }
           },
           onRemoteStream: (stream) => {
@@ -189,8 +229,19 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (callType === 'video' && remoteVideoRef.current) {
               remoteVideoRef.current.srcObject = stream;
-            } else if (remoteAudioRef.current) {
+              remoteVideoRef.current.play().catch(e => console.warn('[CallContext] Remote video play error:', e));
+            }
+          },
+          onRemoteAudioTrack: (track) => {
+            console.log('[CallContext] Got remote audio track');
+            // Audio is handled by LiveKitCallManager directly with attached audio elements
+            // This callback is for reference/logging purposes
+            
+            // Also attach to our audio ref as backup
+            if (remoteAudioRef.current) {
+              const stream = new MediaStream([track]);
               remoteAudioRef.current.srcObject = stream;
+              remoteAudioRef.current.play().catch(e => console.warn('[CallContext] Audio play error:', e));
             }
           },
           onStatusChange: (status, message) => {
@@ -246,7 +297,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
         variant: 'destructive',
       });
     }
-  }, [toast, startDurationTimer]);
+  }, [toast, startDurationTimer, subscribeToCallStatus]);
 
   const endCall = useCallback(async () => {
     console.log('[CallContext] Ending call');
@@ -255,6 +306,12 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     callSounds.playDisconnected();
     stopDurationTimer();
     
+    // Clean up call status subscription
+    if (callEndSubscriptionRef.current) {
+      await supabase.removeChannel(callEndSubscriptionRef.current);
+      callEndSubscriptionRef.current = null;
+    }
+    
     // Exit PiP if active
     if (document.pictureInPictureElement) {
       await document.exitPictureInPicture().catch(() => {});
@@ -262,6 +319,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     if (callState.callId) {
       try {
+        // Update call status to ended - this will trigger the realtime update for the other user
         await supabase
           .from('call_logs')
           .update({
@@ -270,6 +328,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
             duration: callState.callDuration,
           })
           .eq('id', callState.callId);
+        console.log('[CallContext] Call log updated to ended');
       } catch (error) {
         console.error('[CallContext] Error updating call log:', error);
       }
@@ -411,6 +470,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localVideoRef.current = ref;
     if (ref && callState.localStream) {
       ref.srcObject = callState.localStream;
+      ref.play().catch(e => console.warn('[CallContext] Local video ref play error:', e));
     }
   }, [callState.localStream]);
 
@@ -418,6 +478,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     remoteVideoRef.current = ref;
     if (ref && callState.remoteStream) {
       ref.srcObject = callState.remoteStream;
+      ref.play().catch(e => console.warn('[CallContext] Remote video ref play error:', e));
     }
   }, [callState.remoteStream]);
 
@@ -425,6 +486,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     remoteAudioRef.current = ref;
     if (ref && callState.remoteStream) {
       ref.srcObject = callState.remoteStream;
+      ref.play().catch(e => console.warn('[CallContext] Audio ref play error:', e));
     }
   }, [callState.remoteStream]);
 
