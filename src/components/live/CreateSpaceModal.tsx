@@ -76,6 +76,8 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
           scheduled_start: isScheduled && scheduledStart ? new Date(scheduledStart).toISOString() : null,
           started_at: isScheduled ? null : new Date().toISOString(),
           share_link: shareLink,
+          // CRITICAL: Default to allowing everyone to talk (like Telegram/Zoom)
+          allow_mic_for_all: true,
         })
         .select()
         .single();

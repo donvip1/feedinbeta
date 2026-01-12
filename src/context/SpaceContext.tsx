@@ -109,11 +109,13 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     spaceInfoRef.current = spaceState.spaceInfo;
   }, [spaceState.spaceInfo]);
 
-  // Derived: can this user broadcast? (includes listeners with permission)
+  // Derived: can this user broadcast? 
+  // CRITICAL: All roles can broadcast now (like Telegram/Zoom)
+  // Listeners just start muted but can unmute anytime
   const getCanBroadcast = useCallback((overrideRole?: string) => {
     const role = overrideRole || roleRef.current;
-    // Listeners can broadcast if they have mic permission (handled separately)
-    return role === 'host' || role === 'co_host' || role === 'speaker' || role === 'listener_with_mic';
+    // Everyone can broadcast - listeners included (they just need to unmute)
+    return role === 'host' || role === 'co_host' || role === 'speaker' || role === 'listener';
   }, []);
 
   // Get local audio stream

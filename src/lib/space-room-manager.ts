@@ -168,44 +168,95 @@ class SpaceRoomManager {
 
   /**
    * Handle speaker changes from realtime updates
+   * CRITICAL: This is the main mechanism for discovering new broadcasters
    */
   private async handleSpeakerChange(payload: any) {
     const { eventType, new: newData, old: oldData } = payload;
 
+    console.log('[SpaceRoomManager] ========================================');
+    console.log('[SpaceRoomManager] 📡 SPEAKER CHANGE EVENT');
+    console.log('[SpaceRoomManager] Event type:', eventType);
+    console.log('[SpaceRoomManager] User ID:', newData?.user_id);
+    console.log('[SpaceRoomManager] OLD track_id:', oldData?.cloudflare_track_id?.slice(0, 30) || 'null');
+    console.log('[SpaceRoomManager] NEW track_id:', newData?.cloudflare_track_id?.slice(0, 30) || 'null');
+    console.log('[SpaceRoomManager] OLD session_id:', oldData?.cloudflare_session_id?.slice(0, 8) || 'null');
+    console.log('[SpaceRoomManager] NEW session_id:', newData?.cloudflare_session_id?.slice(0, 8) || 'null');
+    console.log('[SpaceRoomManager] Is me:', newData?.user_id === this.userId);
+    console.log('[SpaceRoomManager] Already subscribed:', this.subscribedSpeakers.has(newData?.user_id));
+    console.log('[SpaceRoomManager] Previously failed:', this.failedSubscriptions.has(newData?.user_id));
+    console.log('[SpaceRoomManager] Currently subscribed to:', Array.from(this.subscribedSpeakers));
+    console.log('[SpaceRoomManager] ========================================');
+
     if (eventType === 'INSERT' || eventType === 'UPDATE') {
       const speaker = newData as SpaceSpeaker;
       
-      console.log('[SpaceRoomManager] 📡 Speaker change detected:', {
-        event: eventType,
-        speakerId: speaker.id,
-        speakerUserId: speaker.user_id,
-        hasSessionId: !!speaker.cloudflare_session_id,
-        hasTrackId: !!speaker.cloudflare_track_id,
-        sessionId: speaker.cloudflare_session_id?.slice(0, 8),
-        trackId: speaker.cloudflare_track_id?.slice(0, 30),
-        isMe: speaker.user_id === this.userId,
-        alreadySubscribed: this.subscribedSpeakers.has(speaker.user_id),
-        previouslyFailed: this.failedSubscriptions.has(speaker.user_id),
-      });
+      // Skip if it's me
+      if (speaker.user_id === this.userId) {
+        console.log('[SpaceRoomManager] Skipping - this is my own update');
+        return;
+      }
       
-      // If a speaker has track info and it's not me
-      // Subscribe if: never subscribed OR previously failed OR track info changed (re-published)
-      const shouldSubscribe = 
-        speaker.cloudflare_session_id && 
-        speaker.cloudflare_track_id && 
-        speaker.user_id !== this.userId &&
-        (
-          !this.subscribedSpeakers.has(speaker.user_id) || 
-          this.failedSubscriptions.has(speaker.user_id) ||
-          (eventType === 'UPDATE' && oldData?.cloudflare_track_id !== speaker.cloudflare_track_id)
-        );
+      // Check if this speaker has track info (meaning they're broadcasting)
+      const hasTrackInfo = speaker.cloudflare_session_id && speaker.cloudflare_track_id;
+      
+      if (!hasTrackInfo) {
+        console.log('[SpaceRoomManager] Speaker has no track info yet, waiting for them to broadcast');
+        return;
+      }
+      
+      // CRITICAL: Check if track was JUST added (null -> value)
+      // This is the key moment when a user starts broadcasting
+      const trackJustAdded = eventType === 'UPDATE' && 
+        !oldData?.cloudflare_track_id && 
+        speaker.cloudflare_track_id;
+        
+      // Also check if track CHANGED (user republished with new track)
+      const trackChanged = eventType === 'UPDATE' && 
+        oldData?.cloudflare_track_id && 
+        speaker.cloudflare_track_id &&
+        oldData.cloudflare_track_id !== speaker.cloudflare_track_id;
+      
+      // Subscribe if: 
+      // 1. Never subscribed (new speaker with INSERT)
+      // 2. Track just added (user just started broadcasting)
+      // 3. Track changed (user republished)
+      // 4. Previously failed (retry)
+      const neverSubscribed = !this.subscribedSpeakers.has(speaker.user_id);
+      const previouslyFailed = this.failedSubscriptions.has(speaker.user_id);
+      
+      const shouldSubscribe = neverSubscribed || trackJustAdded || trackChanged || previouslyFailed;
+      
+      console.log('[SpaceRoomManager] Subscription decision:', {
+        neverSubscribed,
+        trackJustAdded,
+        trackChanged,
+        previouslyFailed,
+        shouldSubscribe,
+      });
         
       if (shouldSubscribe) {
-        console.log('[SpaceRoomManager] 🎧 New/updated speaker detected, subscribing:', speaker.user_id);
-        // Remove from failed set before retrying
+        console.log('[SpaceRoomManager] 🎧🎧🎧 SUBSCRIBING TO NEW SPEAKER:', speaker.user_id);
+        // Clear tracking to allow fresh subscription
         this.failedSubscriptions.delete(speaker.user_id);
-        this.subscribedSpeakers.delete(speaker.user_id); // Allow fresh subscription
-        await this.subscribeToSpeaker(speaker);
+        this.subscribedSpeakers.delete(speaker.user_id);
+        
+        // Subscribe with slight delay to ensure track is fully registered on SFU
+        setTimeout(async () => {
+          await this.subscribeToSpeaker(speaker);
+        }, 500);
+      } else {
+        console.log('[SpaceRoomManager] Already subscribed to this speaker, no action needed');
+      }
+    } else if (eventType === 'DELETE') {
+      // User left, remove from subscribed set
+      if (oldData?.user_id) {
+        console.log('[SpaceRoomManager] Speaker left, removing from subscribed set:', oldData.user_id);
+        this.subscribedSpeakers.delete(oldData.user_id);
+        this.failedSubscriptions.delete(oldData.user_id);
+        
+        // Remove their audio element
+        const audioEl = document.getElementById(`space-audio-backup-${oldData.user_id}`);
+        if (audioEl) audioEl.remove();
       }
     }
 
@@ -346,6 +397,7 @@ class SpaceRoomManager {
   /**
    * Start periodic refresh for speaker subscriptions
    * This is a fallback mechanism to ensure we don't miss any speakers
+   * CRITICAL: This runs every 5 seconds to catch any missed realtime events
    */
   private startPeriodicSpeakerRefresh(): void {
     // Clear any existing interval
@@ -353,14 +405,12 @@ class SpaceRoomManager {
       clearInterval(this.periodicRefreshInterval);
     }
     
-    console.log('[SpaceRoomManager] 🔄 Starting periodic speaker refresh (every 10 seconds)');
+    console.log('[SpaceRoomManager] 🔄 Starting periodic speaker refresh (every 5 seconds)');
     
     this.periodicRefreshInterval = window.setInterval(async () => {
       if (!this.spaceId || !this.sessionId) {
         return;
       }
-      
-      console.log('[SpaceRoomManager] 🔄 Periodic refresh - checking for new speakers...');
       
       // Check for any speakers with track info that we haven't subscribed to
       const { data: speakers, error } = await supabase
@@ -376,23 +426,32 @@ class SpaceRoomManager {
         return;
       }
       
+      // Log current state for debugging
+      console.log('[SpaceRoomManager] 🔄 Periodic refresh:', {
+        speakersInDB: speakers?.map(s => ({
+          userId: s.user_id.slice(0, 8),
+          hasTrack: !!s.cloudflare_track_id,
+        })),
+        currentlySubscribed: Array.from(this.subscribedSpeakers).map(id => id.slice(0, 8)),
+        failedSubscriptions: Array.from(this.failedSubscriptions).map(id => id.slice(0, 8)),
+      });
+      
       const unsubscribedSpeakers = (speakers || []).filter(
         s => s.user_id !== this.userId && 
              (!this.subscribedSpeakers.has(s.user_id) || this.failedSubscriptions.has(s.user_id))
       );
       
       if (unsubscribedSpeakers.length > 0) {
-        console.log(`[SpaceRoomManager] 🔄 Found ${unsubscribedSpeakers.length} unsubscribed speakers, subscribing...`);
+        console.log(`[SpaceRoomManager] 🔄🔄🔄 FOUND ${unsubscribedSpeakers.length} UNSUBSCRIBED SPEAKERS!`);
         
         for (const speaker of unsubscribedSpeakers) {
+          console.log('[SpaceRoomManager] 🔄 Subscribing to missed speaker:', speaker.user_id.slice(0, 8));
           this.failedSubscriptions.delete(speaker.user_id);
           this.subscribedSpeakers.delete(speaker.user_id);
           await this.subscribeToSpeaker(speaker as SpaceSpeaker);
         }
-      } else {
-        console.log('[SpaceRoomManager] 🔄 All speakers already subscribed');
       }
-    }, 10000); // Every 10 seconds
+    }, 5000); // Every 5 seconds for faster detection
   }
 
   /**

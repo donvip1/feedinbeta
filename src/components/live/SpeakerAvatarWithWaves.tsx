@@ -72,15 +72,15 @@ export const SpeakerAvatarWithWaves = ({
     lg: { inner: 'w-24 h-24', middle: 'w-28 h-28', outer: 'w-32 h-32' },
   };
 
-  // More sensitive speaking detection - threshold of 5 (was 0.1 which was wrong)
+  // More sensitive speaking detection - threshold of 2 for very responsive indicator
   // audioLevel is 0-100 from the analyzer
-  const isSpeaking = !speaker.is_muted && audioLevel > 5;
+  const isSpeaking = !speaker.is_muted && !speaker.host_muted && audioLevel > 2;
   const isSelf = speaker.user_id === currentUserId;
   const canShowHostControls = isHost && !isSelf && speaker.role !== 'host';
   
   // Normalize audio level for animations (0-1 range, with amplification for visual effect)
-  // audioLevel is 0-100, normalize to 0-1
-  const normalizedLevel = Math.min(audioLevel / 50, 1);
+  // audioLevel is 0-100, normalize to 0-1 with more sensitivity
+  const normalizedLevel = Math.min(audioLevel / 30, 1);
 
   return (
     <div className="flex flex-col items-center gap-2 group">
