@@ -575,9 +575,14 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
         </div>
       </div>
 
-      {/* Chat Section */}
+      {/* Chat Section - positioned above the fixed bottom controls */}
       {showChat && (
-        <div className="absolute left-0 right-0 bottom-40 px-4 z-10 pointer-events-none">
+        <div 
+          className="fixed left-0 right-0 px-4 z-10 pointer-events-none"
+          style={{ 
+            bottom: isKeyboardOpen ? keyboardHeight + 140 : 140,
+          }}
+        >
           <FlyingChat 
             messages={comments.slice(-10)}
             hostId={stream?.user_id}
@@ -585,10 +590,13 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
         </div>
       )}
 
-      {/* BOTTOM CONTROLS */}
+      {/* BOTTOM CONTROLS - Fixed to bottom */}
       <div 
-        className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4 z-20 safe-area-bottom"
-        style={{ paddingBottom: isKeyboardOpen ? keyboardHeight + 16 : undefined }}
+        className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/70 to-transparent p-4 z-20 safe-area-bottom"
+        style={{ 
+          paddingBottom: isKeyboardOpen ? keyboardHeight + 16 : 16,
+          transform: 'translateZ(0)', // Force GPU layer for stability
+        }}
       >
         {/* REACTION BAR */}
         <div className="flex items-center justify-center gap-2 mb-4 overflow-x-auto">
@@ -618,7 +626,7 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
           <Button
             size="icon"
             variant="ghost"
-            className="text-white hover:bg-white/20"
+            className="text-white hover:bg-white/20 shrink-0"
             onClick={() => setShowChat(!showChat)}
           >
             <MessageCircle className="w-5 h-5" />
@@ -633,7 +641,7 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
           <Button
             size="icon"
             variant="ghost"
-            className="text-white hover:bg-white/20"
+            className="text-white hover:bg-white/20 shrink-0"
             onClick={sendComment}
           >
             <Send className="w-5 h-5" />
@@ -642,7 +650,7 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
             size="icon"
             variant="ghost"
             className={cn(
-              "text-white hover:bg-white/20",
+              "text-white hover:bg-white/20 shrink-0",
               !isMuted && "bg-white/20"
             )}
             onClick={handleUnmute}
