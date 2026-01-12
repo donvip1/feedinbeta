@@ -19,6 +19,7 @@ import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { useProfileWithCache } from '@/hooks/useProfileWithCache';
+import { useProfileCounts } from '@/hooks/useProfileCounts';
 import { memoryCache } from '@/lib/memory-cache';
 import { usernameCache } from '@/lib/username-cache';
 import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
@@ -79,7 +80,6 @@ const Profile = () => {
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [followersModalTab, setFollowersModalTab] = useState<'followers' | 'following'>('followers');
   const [showFriendsModal, setShowFriendsModal] = useState(false);
-  const [friendsCount, setFriendsCount] = useState(0);
   const [isFollowingMe, setIsFollowingMe] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
@@ -103,6 +103,9 @@ const Profile = () => {
 
   // Use cached profile hook - this returns cached data INSTANTLY
   const { profile: cachedProfile, isLoading: cacheLoading, refetch: refetchCached } = useProfileWithCache(identifier);
+  
+  // INSTANT: Use profile counts hook for real-time, cached counts
+  const { counts, refetch: refetchCounts } = useProfileCounts(resolvedUserId);
 
   // Helper to check if string is UUID
   const isUUID = (str: string) => {
@@ -198,10 +201,11 @@ const Profile = () => {
     // Silent background refresh
     loadProfile(false);
     refetchCached();
+    refetchCounts();
     if (isOwnProfile) {
       loadPendingFriendRequests();
     }
-  }, [isOwnProfile, refetchCached]));
+  }, [isOwnProfile, refetchCached, refetchCounts]));
 
   const loadProfile = async (showLoading = true) => {
     if (!resolvedUserId) return;
@@ -247,7 +251,6 @@ const Profile = () => {
       }
 
       const friendsTotal = friendsCountResult.count || 0;
-      setFriendsCount(friendsTotal);
 
       const fullProfile = {
         ...(profileResult.data as any),
@@ -834,7 +837,7 @@ const Profile = () => {
               onClick={() => { setFollowersModalTab('followers'); setShowFollowersModal(true); }}
               className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
             >
-              <p className="text-2xl font-bold text-foreground">{profile.followers_count}</p>
+              <p className="text-2xl font-bold text-foreground">{counts.followersCount || profile.followers_count}</p>
               <p className="text-xs text-muted-foreground">Followers</p>
             </button>
 
@@ -842,7 +845,7 @@ const Profile = () => {
               onClick={() => { setFollowersModalTab('following'); setShowFollowersModal(true); }}
               className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
             >
-              <p className="text-2xl font-bold text-foreground">{profile.following_count}</p>
+              <p className="text-2xl font-bold text-foreground">{counts.followingCount || profile.following_count}</p>
               <p className="text-xs text-muted-foreground">Following</p>
             </button>
 
@@ -852,7 +855,7 @@ const Profile = () => {
                 onClick={() => setShowFriendsModal(true)}
                 className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
               >
-                <p className="text-2xl font-bold text-foreground">{friendsCount}</p>
+                <p className="text-2xl font-bold text-foreground">{counts.friendsCount}</p>
                 <p className="text-xs text-muted-foreground">Friends</p>
               </button>
             ) : (
@@ -863,7 +866,7 @@ const Profile = () => {
             )}
 
             <div className="flex flex-col items-center">
-              <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
+              <p className="text-2xl font-bold text-foreground">{counts.likesCount}</p>
               <p className="text-xs text-muted-foreground">Likes</p>
             </div>
           </div>
@@ -1218,7 +1221,7 @@ const Profile = () => {
         open={showFriendsModal}
         onClose={() => setShowFriendsModal(false)}
         userId={resolvedUserId || ''}
-        friendsCount={friendsCount}
+        friendsCount={counts.friendsCount}
       />
 
       {/* Profile Image Modals */}
