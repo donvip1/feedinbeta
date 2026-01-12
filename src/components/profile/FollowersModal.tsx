@@ -161,14 +161,14 @@ export const FollowersModal = ({ open, onClose, userId, defaultTab = 'followers'
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground truncate">
+            <p className="font-semibold text-foreground break-words whitespace-normal">
               {userData.display_name || 'Unknown'}
             </p>
-            <p className="text-sm text-muted-foreground truncate">
+            <p className="text-sm text-muted-foreground break-words whitespace-normal">
               @{userData.username || 'user'}
             </p>
             {userData.bio && (
-              <p className="text-xs text-muted-foreground truncate mt-1">
+              <p className="text-xs text-muted-foreground break-words whitespace-normal mt-1 line-clamp-2">
                 {userData.bio}
               </p>
             )}

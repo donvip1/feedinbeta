@@ -7,13 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
-import { MessageCircle, User, MoreVertical } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { MessageCircle, User } from 'lucide-react';
 
 interface Friend {
   id: string;
@@ -141,59 +135,61 @@ export const FriendsModal = ({ open, onClose, userId, friendsCount }: FriendsMod
   };
 
   const FriendItem = ({ friend }: { friend: Friend }) => {
-    const isOwnProfile = user?.id === friend.id;
+    const isOwnUser = user?.id === friend.id;
 
     return (
-      <div className="flex items-center justify-between p-3 hover:bg-accent/50 rounded-lg transition">
-        <div 
-          className="flex items-center gap-3 flex-1 cursor-pointer"
+      <div className="flex items-center gap-3 p-3 hover:bg-accent/50 rounded-lg transition bg-card border border-border">
+        <Avatar 
+          className="w-12 h-12 shrink-0 cursor-pointer"
           onClick={() => handleViewProfile(friend)}
         >
-          <Avatar className="w-12 h-12">
-            <AvatarImage src={friend.avatar_url || ''} />
-            <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
-              {friend.display_name?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-foreground truncate">
-              {friend.display_name || 'Unknown'}
+          <AvatarImage src={friend.avatar_url || ''} />
+          <AvatarFallback className="bg-gradient-to-br from-primary to-accent text-primary-foreground">
+            {friend.display_name?.[0] || 'U'}
+          </AvatarFallback>
+        </Avatar>
+        
+        <div 
+          className="flex-1 min-w-0 cursor-pointer"
+          onClick={() => handleViewProfile(friend)}
+        >
+          <p className="font-semibold text-foreground break-words whitespace-normal text-sm">
+            {friend.display_name || 'Unknown'}
+          </p>
+          <p className="text-xs text-muted-foreground break-words whitespace-normal">
+            @{friend.username || 'user'}
+          </p>
+          {friend.bio && (
+            <p className="text-xs text-muted-foreground break-words whitespace-normal mt-1 line-clamp-2">
+              {friend.bio}
             </p>
-            <p className="text-sm text-muted-foreground truncate">
-              @{friend.username || 'user'}
-            </p>
-            {friend.bio && (
-              <p className="text-xs text-muted-foreground truncate mt-1">
-                {friend.bio}
-              </p>
-            )}
-          </div>
+          )}
         </div>
         
-        {!isOwnProfile && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <MoreVertical className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background border-border">
-              <DropdownMenuItem 
-                onClick={() => handleChat(friend.id)}
-                className="cursor-pointer"
-              >
-                <MessageCircle className="w-4 h-4 mr-2" />
-                Chat
-              </DropdownMenuItem>
-              <DropdownMenuItem 
-                onClick={() => handleViewProfile(friend)}
-                className="cursor-pointer"
-              >
-                <User className="w-4 h-4 mr-2" />
-                View Profile
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        {!isOwnUser && (
+          <div className="flex gap-2 shrink-0">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleChat(friend.id);
+              }}
+              size="sm"
+              className="bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground"
+            >
+              <MessageCircle className="w-4 h-4 mr-1" />
+              Chat
+            </Button>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewProfile(friend);
+              }}
+              size="sm"
+              variant="outline"
+            >
+              <User className="w-4 h-4" />
+            </Button>
+          </div>
         )}
       </div>
     );
