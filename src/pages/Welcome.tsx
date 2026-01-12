@@ -1,13 +1,24 @@
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Users, Video, MessageCircle, Link2, Download, Smartphone } from 'lucide-react';
+import { Users, Video, MessageCircle, Link2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { AndroidAppBanner } from '@/components/native/AndroidAppBanner';
+import { useAuth } from '@/hooks/useAuth';
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const [sharedContent, setSharedContent] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Redirect authenticated users to feed immediately
+  useEffect(() => {
+    if (!loading && user) {
+      setIsRedirecting(true);
+      navigate('/feed', { replace: true });
+    }
+  }, [loading, user, navigate]);
 
   useEffect(() => {
     // Check if user was redirected from a shared link
@@ -24,6 +35,17 @@ export default function Welcome() {
       }
     }
   }, []);
+
+  // Show loading while auth state is being determined or redirecting
+  if (loading || isRedirecting || user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-pulse">
+          <img src={feedinLogo} alt="feedin" className="w-40 h-40" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-secondary/20">
