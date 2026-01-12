@@ -15,6 +15,9 @@ interface PackageCardProps {
   promotionLabel?: string;
   promotionActive?: boolean;
   discountPercentage?: number;
+  currencySymbol?: string;
+  exchangeRate?: number;
+  currencyCode?: string;
   onPurchase: () => void;
 }
 
@@ -35,11 +38,17 @@ export const PackageCard: React.FC<PackageCardProps> = ({
   promotionLabel,
   promotionActive,
   discountPercentage,
+  currencySymbol = '$',
+  exchangeRate = 1,
+  currencyCode = 'USD',
   onPurchase,
 }) => {
   const totalCredits = credits + bonusCredits;
   const bonusPercent = bonusCredits ? Math.round((bonusCredits / credits) * 100) : 0;
-  const pricePerCredit = (price / totalCredits).toFixed(3);
+  
+  // Convert price to local currency
+  const localPrice = price * exchangeRate;
+  const pricePerCredit = (localPrice / totalCredits).toFixed(exchangeRate > 100 ? 2 : 4);
   
   // Determine package tier for styling
   const isStarter = name.toLowerCase().includes('starter') || price <= 5;
@@ -149,18 +158,27 @@ export const PackageCard: React.FC<PackageCardProps> = ({
           <div>
             {discountPercentage && discountPercentage > 0 ? (
               <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-bold text-primary">${price}</span>
+                <span className="text-3xl font-bold text-primary">
+                  {currencySymbol}{localPrice.toLocaleString(undefined, { maximumFractionDigits: exchangeRate > 100 ? 0 : 2 })}
+                </span>
                 <span className="text-sm text-muted-foreground line-through">
-                  ${(price / (1 - discountPercentage / 100)).toFixed(0)}
+                  {currencySymbol}{((price / (1 - discountPercentage / 100)) * exchangeRate).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </span>
               </div>
             ) : (
-              <span className="text-3xl font-bold text-primary">${price}</span>
+              <span className="text-3xl font-bold text-primary">
+                {currencySymbol}{localPrice.toLocaleString(undefined, { maximumFractionDigits: exchangeRate > 100 ? 0 : 2 })}
+              </span>
             )}
-            <span className="text-xs text-muted-foreground block mt-0.5">USD</span>
+            <span className="text-xs text-muted-foreground block mt-0.5">
+              {currencyCode}
+              {currencyCode !== 'USD' && (
+                <span className="ml-1 opacity-70">(~${price.toFixed(2)} USD)</span>
+              )}
+            </span>
           </div>
           <div className="text-right">
-            <span className="text-sm font-semibold text-foreground">${pricePerCredit}</span>
+            <span className="text-sm font-semibold text-foreground">{currencySymbol}{pricePerCredit}</span>
             <span className="text-xs text-muted-foreground block">per credit</span>
           </div>
         </div>
