@@ -16,16 +16,8 @@ async function generateLiveKitToken(
   participantName: string,
   isHost: boolean
 ): Promise<string> {
-  const now = Math.floor(Date.now() / 1000);
-  const exp = now + 6 * 60 * 60; // 6 hours from now
-
-  // LiveKit JWT claims
-  const claims = {
-    iss: apiKey, // API Key as issuer
-    sub: participantIdentity, // Participant identity
-    iat: now,
-    exp: exp,
-    nbf: now,
+  // Build the grants object (this goes into the JWT payload)
+  const grants = {
     name: participantName,
     video: {
       room: roomName,
@@ -38,13 +30,18 @@ async function generateLiveKitToken(
     },
   };
 
-  // Sign the JWT with the API secret
+  // Sign the JWT matching LiveKit's expected format
   const encoder = new TextEncoder();
   const secretKey = encoder.encode(apiSecret);
   
-  const jwt = await new jose.SignJWT(claims)
-    .setProtectedHeader({ alg: "HS256", typ: "JWT" })
-    .setIssuedAt()
+  const now = Math.floor(Date.now() / 1000);
+  
+  const jwt = await new jose.SignJWT(grants)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(apiKey)
+    .setSubject(participantIdentity)
+    .setIssuedAt(now)
+    .setNotBefore(now)
     .setExpirationTime("6h")
     .sign(secretKey);
 
