@@ -79,6 +79,8 @@ import CreatorDashboard from "./pages/CreatorDashboard";
 import SpaceDetail from "./pages/SpaceDetail";
 import CallInvite from "./pages/CallInvite";
 import AdminDeletedPosts from "./pages/AdminDeletedPosts";
+import CurrencySettings from "./pages/CurrencySettings";
+import { CurrencyProvider } from "@/context/CurrencyContext";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -156,6 +158,7 @@ const App = () => {
             <NavigationProvider>
               <RefreshProvider>
                 <AuthProvider>
+                  <CurrencyProvider>
                   <CallProvider>
                     <SpaceProvider>
                       <RealtimeProvider>
@@ -248,6 +251,7 @@ const App = () => {
             <Route path="/settings/sessions" element={<SessionManagement />} />
             <Route path="/settings/investors" element={<Investors />} />
             <Route path="/settings/investment-docs" element={<InvestmentDocs />} />
+            <Route path="/settings/currency" element={<CurrencySettings />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/deleted-posts" element={<AdminDeletedPosts />} />
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
@@ -257,6 +261,7 @@ const App = () => {
                       </RealtimeProvider>
                     </SpaceProvider>
                   </CallProvider>
+                  </CurrencyProvider>
               </AuthProvider>
             </RefreshProvider>
           </NavigationProvider>

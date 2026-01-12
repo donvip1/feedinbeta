@@ -122,6 +122,13 @@ const Settings = () => {
       description: 'Choose your preferred language',
       route: '/settings/language',
       color: 'text-teal-500'
+    },
+    {
+      icon: Wallet,
+      title: 'Currency & Location',
+      description: 'Set your preferred currency',
+      route: '/settings/currency',
+      color: 'text-emerald-500'
     }
   ];
 

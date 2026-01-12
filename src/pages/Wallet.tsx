@@ -21,12 +21,14 @@ import { SubscriptionCard } from '@/components/wallet/SubscriptionCard';
 import { TransactionList } from '@/components/wallet/TransactionList';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
+import { useCurrency } from '@/context/CurrencyContext';
 
 const Wallet = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { currentCurrency, currencySymbol, exchangeRate } = useCurrency();
   const [activeTab, setActiveTab] = useState('overview');
   const [sendAmount, setSendAmount] = useState('');
   const [recipientUsername, setRecipientUsername] = useState('');
@@ -386,6 +388,9 @@ const Wallet = () => {
               totalEarned={credits?.total_earned || 0}
               totalSpent={credits?.total_spent || 0}
               tierName={tierInfo?.name}
+              currencySymbol={currencySymbol}
+              exchangeRate={exchangeRate}
+              currencyCode={currentCurrency}
               onSendClick={() => setIsSendModalOpen(true)}
               onBuyClick={() => setActiveTab('buy')}
             />
@@ -448,6 +453,9 @@ const Wallet = () => {
                     price={pkg.price}
                     isPopular={pkg.name.toLowerCase().includes('popular')}
                     isLoading={loadingPackage === pkg.id}
+                    currencySymbol={currencySymbol}
+                    exchangeRate={exchangeRate}
+                    currencyCode={currentCurrency}
                     onPurchase={() => handlePurchasePackage(pkg.id, pkg.stripe_price_id)}
                   />
                 ))}

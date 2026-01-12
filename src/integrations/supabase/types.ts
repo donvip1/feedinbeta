@@ -825,6 +825,42 @@ export type Database = {
         }
         Relationships: []
       }
+      currency_rates: {
+        Row: {
+          country_codes: string[] | null
+          created_at: string | null
+          currency_code: string
+          currency_name: string
+          currency_symbol: string
+          id: string
+          is_active: boolean | null
+          rate_to_usd: number
+          updated_at: string | null
+        }
+        Insert: {
+          country_codes?: string[] | null
+          created_at?: string | null
+          currency_code: string
+          currency_name: string
+          currency_symbol: string
+          id?: string
+          is_active?: boolean | null
+          rate_to_usd?: number
+          updated_at?: string | null
+        }
+        Update: {
+          country_codes?: string[] | null
+          created_at?: string | null
+          currency_code?: string
+          currency_name?: string
+          currency_symbol?: string
+          id?: string
+          is_active?: boolean | null
+          rate_to_usd?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       daily_earnings: {
         Row: {
           created_at: string | null
@@ -3456,6 +3492,7 @@ export type Database = {
           avatar_url: string | null
           banner_url: string | null
           bio: string | null
+          city: string | null
           country: string | null
           cover_url: string | null
           created_at: string
@@ -3465,6 +3502,7 @@ export type Database = {
           daily_ai_thesis_count: number | null
           daily_ai_video_count: number | null
           daily_enhancement_count: number | null
+          detected_country_code: string | null
           display_name: string | null
           facebook_url: string | null
           followers_count: number | null
@@ -3482,6 +3520,7 @@ export type Database = {
           location: string | null
           marital_status: string | null
           max_friends: number | null
+          preferred_currency: string | null
           preferred_language: string | null
           profile_completed: boolean | null
           purpose: string[] | null
@@ -3493,6 +3532,7 @@ export type Database = {
           status_updated_at: string | null
           status_visibility: string | null
           tiktok_url: string | null
+          timezone: string | null
           total_views: number | null
           twitter_url: string | null
           updated_at: string
@@ -3508,6 +3548,7 @@ export type Database = {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          city?: string | null
           country?: string | null
           cover_url?: string | null
           created_at?: string
@@ -3517,6 +3558,7 @@ export type Database = {
           daily_ai_thesis_count?: number | null
           daily_ai_video_count?: number | null
           daily_enhancement_count?: number | null
+          detected_country_code?: string | null
           display_name?: string | null
           facebook_url?: string | null
           followers_count?: number | null
@@ -3534,6 +3576,7 @@ export type Database = {
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
+          preferred_currency?: string | null
           preferred_language?: string | null
           profile_completed?: boolean | null
           purpose?: string[] | null
@@ -3545,6 +3588,7 @@ export type Database = {
           status_updated_at?: string | null
           status_visibility?: string | null
           tiktok_url?: string | null
+          timezone?: string | null
           total_views?: number | null
           twitter_url?: string | null
           updated_at?: string
@@ -3560,6 +3604,7 @@ export type Database = {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          city?: string | null
           country?: string | null
           cover_url?: string | null
           created_at?: string
@@ -3569,6 +3614,7 @@ export type Database = {
           daily_ai_thesis_count?: number | null
           daily_ai_video_count?: number | null
           daily_enhancement_count?: number | null
+          detected_country_code?: string | null
           display_name?: string | null
           facebook_url?: string | null
           followers_count?: number | null
@@ -3586,6 +3632,7 @@ export type Database = {
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
+          preferred_currency?: string | null
           preferred_language?: string | null
           profile_completed?: boolean | null
           purpose?: string[] | null
@@ -3597,6 +3644,7 @@ export type Database = {
           status_updated_at?: string | null
           status_visibility?: string | null
           tiktok_url?: string | null
+          timezone?: string | null
           total_views?: number | null
           twitter_url?: string | null
           updated_at?: string
