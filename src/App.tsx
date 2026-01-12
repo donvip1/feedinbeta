@@ -80,6 +80,7 @@ import SpaceDetail from "./pages/SpaceDetail";
 import CallInvite from "./pages/CallInvite";
 import AdminDeletedPosts from "./pages/AdminDeletedPosts";
 import CurrencySettings from "./pages/CurrencySettings";
+import P2PPaymentMethods from "./pages/P2PPaymentMethods";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 
 // Create QueryClient with aggressive refetch settings for mobile
@@ -229,6 +230,7 @@ const App = () => {
             <Route path="/wallet/subscription" element={<Subscription />} />
             <Route path="/wallet/p2p" element={<P2PMarketplace />} />
             <Route path="/wallet/p2p/:transactionId" element={<P2PTransaction />} />
+            <Route path="/p2p/payment-methods" element={<P2PPaymentMethods />} />
             <Route path="/wallet/admin" element={<AdminWallet />} />
             <Route path="/wallet/creator-payouts" element={<CreatorPayouts />} />
             

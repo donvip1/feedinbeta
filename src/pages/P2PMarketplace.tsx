@@ -3,31 +3,45 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Coins, Shield, History, TrendingUp } from 'lucide-react';
+import { ArrowLeft, Coins, Shield, History, TrendingUp, Globe, Filter } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { P2PListingCard } from '@/components/p2p/P2PListingCard';
 import { CreateListingModal } from '@/components/p2p/CreateListingModal';
+import { EligibilityBanner } from '@/components/p2p/EligibilityBanner';
 import { useCurrency } from '@/context/CurrencyContext';
+import { useP2PEligibility } from '@/hooks/useP2PEligibility';
+import { P2P_CONFIG } from '@/lib/p2p-config';
 
 const P2PMarketplace = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { formatCreditsValue } = useCurrency();
+  const { formatCreditsValue, userLocation } = useCurrency();
+  const { eligibility } = useP2PEligibility();
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [showRegionOnly, setShowRegionOnly] = useState(true);
+
+  const userCountry = eligibility.userCountry || (typeof userLocation === 'string' ? userLocation : userLocation?.countryCode) || 'NG';
 
   const { data: listings, isLoading: listingsLoading } = useQuery({
-    queryKey: ['p2p-listings'],
+    queryKey: ['p2p-listings', showRegionOnly, userCountry],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('p2p_listings')
         .select('*, profiles(display_name, username, avatar_url)')
         .eq('status', 'active')
         .order('created_at', { ascending: false });
+      
+      // Filter by region if enabled
+      if (showRegionOnly && userCountry) {
+        query = query.eq('country_code', userCountry);
+      }
+      
+      const { data, error } = await query;
       
       if (error) throw error;
       return data;
@@ -59,7 +73,7 @@ const P2PMarketplace = () => {
         .select('*')
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
       
       if (error) throw error;
       return data;
@@ -70,6 +84,16 @@ const P2PMarketplace = () => {
   const handleBuyCredits = async (listingId: string, sellerId: string, creditsAmount: number, priceUsd: number) => {
     if (!user) {
       toast.error('Please sign in to buy credits');
+      return;
+    }
+
+    if (!eligibility.canTrade) {
+      toast.error('Please complete your P2P setup first');
+      return;
+    }
+
+    if (creditsAmount < eligibility.minTradeAmount) {
+      toast.error(`Minimum trade amount is ${eligibility.minTradeAmount} credits`);
       return;
     }
 
@@ -125,6 +149,29 @@ const P2PMarketplace = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Eligibility Banner */}
+        <EligibilityBanner />
+
+        {/* P2P Rate Info */}
+        <Card className="bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">P2P Rate</span>
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-muted-foreground">
+                  Buy: <span className="font-medium text-foreground">{P2P_CONFIG.BUY_RATE} credits/$1</span>
+                </span>
+                <span className="text-muted-foreground">
+                  Sell: <span className="font-medium text-primary">{P2P_CONFIG.SELL_RATE} credits/$1</span>
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Balance Card */}
         {myCredits && (
           <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
@@ -140,12 +187,20 @@ const P2PMarketplace = () => {
                     ≈ {formatCreditsValue(myCredits.balance)}
                   </p>
                 </div>
-                {activeCount > 0 && (
-                  <Badge variant="secondary" className="gap-1">
-                    <History className="w-3 h-3" />
-                    {activeCount} Active
-                  </Badge>
-                )}
+                <div className="flex flex-col items-end gap-2">
+                  {activeCount > 0 && (
+                    <Badge variant="secondary" className="gap-1">
+                      <History className="w-3 h-3" />
+                      {activeCount} Active
+                    </Badge>
+                  )}
+                  {eligibility.userCountry && (
+                    <Badge variant="outline" className="gap-1">
+                      <Globe className="w-3 h-3" />
+                      {eligibility.userCountry}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -158,6 +213,23 @@ const P2PMarketplace = () => {
           </TabsList>
 
           <TabsContent value="listings" className="mt-4 space-y-4">
+            {/* Region Filter */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Filter</span>
+              </div>
+              <Button
+                variant={showRegionOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowRegionOnly(!showRegionOnly)}
+                className="gap-1"
+              >
+                <Globe className="h-3 w-3" />
+                {showRegionOnly ? `${userCountry} Only` : 'All Regions'}
+              </Button>
+            </div>
+
             {listingsLoading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
@@ -166,8 +238,17 @@ const P2PMarketplace = () => {
               <Card>
                 <CardContent className="py-8 text-center text-muted-foreground">
                   <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No active listings available</p>
+                  <p>No active listings in {showRegionOnly ? userCountry : 'any region'}</p>
                   <p className="text-sm">Be the first to sell your credits!</p>
+                  {showRegionOnly && (
+                    <Button 
+                      variant="link" 
+                      onClick={() => setShowRegionOnly(false)}
+                      className="mt-2"
+                    >
+                      View all regions
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             ) : (
@@ -179,6 +260,7 @@ const P2PMarketplace = () => {
                     onBuy={handleBuyCredits}
                     isProcessing={processingId === listing.id}
                   />
+                ))}
                 ))}
               </div>
             )}

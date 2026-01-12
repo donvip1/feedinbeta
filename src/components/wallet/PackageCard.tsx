@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Gift, Sparkles, Zap, Image, MessageSquare, TrendingUp, Star, Crown, Check } from 'lucide-react';
+import { Gift, Sparkles, Zap, Image, MessageSquare, TrendingUp, Star, Crown, Check, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface PackageCardProps {
@@ -53,24 +53,51 @@ export const PackageCard: React.FC<PackageCardProps> = ({
   // Determine package tier for styling
   const isStarter = name.toLowerCase().includes('starter') || price <= 5;
   const isPro = name.toLowerCase().includes('pro') || name.toLowerCase().includes('popular');
-  const isPremium = name.toLowerCase().includes('premium') || name.toLowerCase().includes('mega') || price >= 50;
+  const isMega = name.toLowerCase().includes('mega');
+  const isUltimate = name.toLowerCase().includes('ultimate');
+  const isReseller = name.toLowerCase().includes('reseller');
+  const isPremium = isUltimate || isReseller || price >= 50;
 
   const getPackageIcon = () => {
+    if (isReseller) return <Users className="w-5 h-5" />;
     if (isPremium) return <Crown className="w-5 h-5" />;
-    if (isPro || isPopular) return <Star className="w-5 h-5" />;
+    if (isPro || isPopular || isMega) return <Star className="w-5 h-5" />;
     return <Zap className="w-5 h-5" />;
   };
 
   const getGradientClass = () => {
+    if (isReseller) return 'from-purple-500/20 via-violet-500/10 to-indigo-500/20';
     if (isPremium) return 'from-amber-500/20 via-yellow-500/10 to-orange-500/20';
-    if (isPopular || isPro) return 'from-primary/20 via-primary/10 to-accent/20';
+    if (isPopular || isPro || isMega) return 'from-primary/20 via-primary/10 to-accent/20';
     return 'from-muted/50 to-muted/30';
   };
 
   const getBorderClass = () => {
+    if (isReseller) return 'border-purple-500/50 shadow-lg shadow-purple-500/20';
     if (isPremium) return 'border-amber-500/50 shadow-lg shadow-amber-500/20';
-    if (isPopular || isPro) return 'border-primary/50 shadow-lg shadow-primary/20';
+    if (isPopular || isPro || isMega) return 'border-primary/50 shadow-lg shadow-primary/20';
     return 'border-border hover:border-primary/30';
+  };
+
+  const getButtonClass = () => {
+    if (isReseller) return 'bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white shadow-lg shadow-purple-500/30';
+    if (isPremium) return 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/30';
+    if (isPopular || isPro || isMega) return 'bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg shadow-primary/30';
+    return 'bg-primary hover:bg-primary/90';
+  };
+
+  const getIconBgClass = () => {
+    if (isReseller) return 'bg-purple-500/20 text-purple-500';
+    if (isPremium) return 'bg-amber-500/20 text-amber-500';
+    if (isPopular || isPro || isMega) return 'bg-primary/20 text-primary';
+    return 'bg-muted text-muted-foreground';
+  };
+
+  const getBadgeLabel = () => {
+    if (isReseller) return 'For Resellers';
+    if (isUltimate) return 'Best Value';
+    if (isMega) return '18% Bonus';
+    return 'Popular';
   };
 
   return (
@@ -84,20 +111,22 @@ export const PackageCard: React.FC<PackageCardProps> = ({
       {/* Top Badges Container */}
       <div className="absolute -top-3 left-0 right-0 flex justify-between px-4 z-10">
         {/* Popular/Premium badge */}
-        {(isPopular || isPremium) && (
+        {(isPopular || isPremium || isMega || isReseller) && (
           <Badge className={cn(
             "px-3 py-1 font-semibold",
-            isPremium 
+            isReseller 
+              ? "bg-gradient-to-r from-purple-500 to-violet-500 text-white"
+              : isPremium 
               ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white" 
               : "bg-gradient-to-r from-primary to-accent text-primary-foreground"
           )}>
             <Sparkles className="w-3 h-3 mr-1.5" />
-            {isPremium ? 'Best Value' : 'Popular'}
+            {getBadgeLabel()}
           </Badge>
         )}
         
         {/* Spacer if no left badge */}
-        {!isPopular && !isPremium && <div />}
+        {!isPopular && !isPremium && !isMega && !isReseller && <div />}
 
         {/* Bonus badge */}
         {bonusPercent > 0 && (
@@ -118,17 +147,14 @@ export const PackageCard: React.FC<PackageCardProps> = ({
       <div className="space-y-4">
         {/* Package Header */}
         <div className="flex items-center gap-3">
-          <div className={cn(
-            "p-2.5 rounded-xl",
-            isPremium ? "bg-amber-500/20 text-amber-500" :
-            isPopular || isPro ? "bg-primary/20 text-primary" :
-            "bg-muted text-muted-foreground"
-          )}>
+          <div className={cn("p-2.5 rounded-xl", getIconBgClass())}>
             {getPackageIcon()}
           </div>
           <div>
             <h3 className="font-bold text-lg text-foreground">{name}</h3>
-            <p className="text-xs text-muted-foreground">One-time purchase</p>
+            <p className="text-xs text-muted-foreground">
+              {isReseller ? 'Bulk purchase for resale' : 'One-time purchase'}
+            </p>
           </div>
         </div>
 
@@ -194,20 +220,19 @@ export const PackageCard: React.FC<PackageCardProps> = ({
               </div>
             ))}
           </div>
+          {isReseller && (
+            <div className="flex items-center gap-1.5 text-xs text-purple-500 mt-2">
+              <Check className="w-3 h-3 flex-shrink-0" />
+              <span>Eligible for P2P reselling</span>
+            </div>
+          )}
         </div>
 
         {/* Buy Button */}
         <Button 
           onClick={onPurchase}
           disabled={isLoading}
-          className={cn(
-            "w-full h-12 text-base font-semibold transition-all duration-200",
-            isPremium 
-              ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/30" 
-              : isPopular || isPro
-              ? "bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg shadow-primary/30"
-              : "bg-primary hover:bg-primary/90"
-          )}
+          className={cn("w-full h-12 text-base font-semibold transition-all duration-200", getButtonClass())}
         >
           {isLoading ? (
             <span className="flex items-center gap-2">
@@ -217,7 +242,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
           ) : (
             <span className="flex items-center gap-2">
               Buy Now
-              {(isPopular || isPremium) && <Sparkles className="w-4 h-4" />}
+              {(isPopular || isPremium || isReseller) && <Sparkles className="w-4 h-4" />}
             </span>
           )}
         </Button>
