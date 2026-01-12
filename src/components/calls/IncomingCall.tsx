@@ -135,8 +135,26 @@ export const IncomingCall = ({
       
       console.log('[IncomingCall] Call status updated to answered');
       
-      // Wait a moment for realtime to propagate the change to caller
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Verify the update was successful by polling
+      let verified = false;
+      for (let i = 0; i < 5; i++) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        const { data } = await supabase
+          .from('call_logs')
+          .select('status')
+          .eq('id', callId)
+          .single();
+        
+        if (data?.status === 'answered') {
+          verified = true;
+          console.log('[IncomingCall] Call status verified as answered');
+          break;
+        }
+      }
+      
+      if (!verified) {
+        console.warn('[IncomingCall] Could not verify call status update, proceeding anyway');
+      }
 
       onAccept();
       

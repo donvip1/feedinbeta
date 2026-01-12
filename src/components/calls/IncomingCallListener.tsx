@@ -17,20 +17,73 @@ export const IncomingCallListener = () => {
   const [incomingCall, setIncomingCall] = useState<IncomingCallData | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const processingCallIds = useRef<Set<string>>(new Set());
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Check for pending calls on mount and periodically (fallback for realtime)
+  const checkPendingCalls = useCallback(async () => {
+    if (!user || incomingCall) return;
+
+    try {
+      const { data: pendingCalls, error } = await supabase
+        .from('call_logs')
+        .select('*')
+        .eq('receiver_id', user.id)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (error || !pendingCalls || pendingCalls.length === 0) return;
+
+      const call = pendingCalls[0];
+      
+      // Check if call was created within last 60 seconds (not stale)
+      const callAge = Date.now() - new Date(call.created_at).getTime();
+      if (callAge > 60000) return;
+      
+      // Prevent duplicate processing
+      if (processingCallIds.current.has(call.id)) return;
+      processingCallIds.current.add(call.id);
+
+      console.log('[IncomingCallListener] Found pending call via poll:', call.id);
+
+      // Fetch caller's profile
+      const { data: callerProfile } = await supabase
+        .from('profiles')
+        .select('display_name, avatar_url')
+        .eq('id', call.caller_id)
+        .single();
+
+      setIncomingCall({
+        callId: call.id,
+        callerId: call.caller_id,
+        callerName: callerProfile?.display_name || 'Unknown',
+        callerAvatar: callerProfile?.avatar_url || null,
+        callType: call.call_type as 'video' | 'voice',
+      });
+    } catch (error) {
+      console.error('[IncomingCallListener] Error checking pending calls:', error);
+    }
+  }, [user, incomingCall]);
 
   useEffect(() => {
     if (!user) return;
 
     console.log('[IncomingCallListener] Setting up listener for user:', user.id);
 
+    // Check for pending calls immediately on mount
+    checkPendingCalls();
+
+    // Set up poll-based fallback every 5 seconds
+    pollIntervalRef.current = setInterval(checkPendingCalls, 5000);
+
     // Clean up any existing channel
     if (channelRef.current) {
       supabase.removeChannel(channelRef.current);
     }
 
-    // Subscribe to incoming calls where we are the receiver
+    // Use stable channel name (no Date.now()) to reduce subscription churn
     const channel = supabase
-      .channel(`incoming-calls:${user.id}:${Date.now()}`)
+      .channel(`incoming-calls:${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -162,9 +215,13 @@ export const IncomingCallListener = () => {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
       processingCallIds.current.clear();
     };
-  }, [user]);
+  }, [user, checkPendingCalls]);
 
   // Handle incoming call being dismissed by caller
   useEffect(() => {
