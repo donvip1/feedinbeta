@@ -635,11 +635,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         .from('live_space_speakers')
         .insert({
           space_id: spaceId,
-        user_id: user.id,
+          user_id: user.id,
           role: role,
-          is_muted: !isOwner, // Host starts unmuted
+          is_muted: !isOwner, // Host starts unmuted, listeners start muted but CAN unmute
           host_muted: false,
-          mic_allowed: isOwner, // Only host has mic permission by default, listeners need to raise hand
+          // CRITICAL: Everyone has mic permission by default (like Telegram/Zoom)
+          // They just need to unmute to speak
+          mic_allowed: true,
           left_at: null,
           joined_at: new Date().toISOString(),
         });
@@ -704,23 +706,13 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   // Toggle mute with host control checks
+  // CRITICAL: Everyone can talk by default (like Telegram/Zoom)
   const toggleMute = async () => {
     if (!user) return;
     
-    // Check permissions based on role - listeners can speak if mic_allowed OR allow_mic_for_all
-    const listenerCanSpeak = myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted;
-    const canToggle = canSpeak || listenerCanSpeak;
-    
-    if (!canToggle) {
-      if (myRole === 'listener') {
-        toast.error('Raise your hand to request speaking permission');
-      }
-      return;
-    }
-
-    // Check if host has muted us - can't unmute
+    // Check if host has forcibly muted us - we can't unmute until they allow it
     if (myHostMuted && isMuted) {
-      toast.error('Host has muted you. Only the host can unmute you.');
+      toast.error('Host has muted you. Wait for host to allow you to unmute.');
       return;
     }
 
@@ -732,10 +724,14 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
       spaceContext.setMuted(newMuteState);
     }
     
-    // If listener is unmuting for first time, need to start broadcasting
-    if (!newMuteState && listenerCanSpeak && spaceContext) {
-      console.log('[LiveSpace] Listener unmuting - starting broadcast');
-      await spaceContext.startListenerBroadcast();
+    // If unmuting, need to start broadcasting (for any role including listeners)
+    if (!newMuteState && spaceContext) {
+      console.log('[LiveSpace] User unmuting - starting broadcast for role:', myRole);
+      const success = await spaceContext.startListenerBroadcast();
+      if (success) {
+        console.log('[LiveSpace] ✅ Broadcast started successfully');
+        toast.success('You are now speaking');
+      }
     }
 
     await supabase
