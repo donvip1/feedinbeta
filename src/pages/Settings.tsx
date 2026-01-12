@@ -218,6 +218,13 @@ const Settings = () => {
       description: 'MAU, DAU, revenue, and investor metrics',
       route: '/admin/analytics',
       color: 'text-blue-500'
+    },
+    {
+      icon: Trash2,
+      title: 'Deleted Posts Recovery',
+      description: 'Search and restore user deleted posts',
+      route: '/admin/deleted-posts',
+      color: 'text-red-500'
     }
   ];
 

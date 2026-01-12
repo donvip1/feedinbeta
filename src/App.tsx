@@ -78,6 +78,7 @@ import InvestmentDocs from "./pages/InvestmentDocs";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import SpaceDetail from "./pages/SpaceDetail";
 import CallInvite from "./pages/CallInvite";
+import AdminDeletedPosts from "./pages/AdminDeletedPosts";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -248,6 +249,7 @@ const App = () => {
             <Route path="/settings/investors" element={<Investors />} />
             <Route path="/settings/investment-docs" element={<InvestmentDocs />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
+            <Route path="/admin/deleted-posts" element={<AdminDeletedPosts />} />
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
             
               <Route path="*" element={<NotFound />} />

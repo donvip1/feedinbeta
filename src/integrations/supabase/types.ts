@@ -3243,6 +3243,8 @@ export type Database = {
           comments_count: number | null
           content: string | null
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           feed_id: string
           gifts_count: number | null
           has_blur_background: boolean | null
@@ -3280,6 +3282,8 @@ export type Database = {
           comments_count?: number | null
           content?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           feed_id: string
           gifts_count?: number | null
           has_blur_background?: boolean | null
@@ -3317,6 +3321,8 @@ export type Database = {
           comments_count?: number | null
           content?: string | null
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           feed_id?: string
           gifts_count?: number | null
           has_blur_background?: boolean | null
@@ -4744,6 +4750,20 @@ export type Database = {
       get_daily_earnings_stats:
         | { Args: never; Returns: Json }
         | { Args: { p_days?: number }; Returns: Json }
+      get_deleted_posts_by_username: {
+        Args: { target_username: string }
+        Returns: {
+          content: string
+          created_at: string
+          deleted_at: string
+          deleted_by: string
+          feed_id: string
+          id: string
+          media_type: string
+          media_url: string
+          user_id: string
+        }[]
+      }
       get_expired_attachments: {
         Args: never
         Returns: {
@@ -5102,6 +5122,7 @@ export type Database = {
         Returns: undefined
       }
       request_creator_payout: { Args: { p_amount: number }; Returns: Json }
+      restore_deleted_post: { Args: { post_id: string }; Returns: boolean }
       send_direct_gift: {
         Args: {
           p_credit_value: number
