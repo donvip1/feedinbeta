@@ -2795,9 +2795,13 @@ export type Database = {
       p2p_listings: {
         Row: {
           auto_reply: string | null
+          country_code: string | null
           created_at: string
           credits_amount: number
+          credits_per_dollar: number | null
+          currency_code: string | null
           id: string
+          is_international: boolean | null
           max_amount: number | null
           min_amount: number | null
           payment_method_id: string | null
@@ -2810,9 +2814,13 @@ export type Database = {
         }
         Insert: {
           auto_reply?: string | null
+          country_code?: string | null
           created_at?: string
           credits_amount: number
+          credits_per_dollar?: number | null
+          currency_code?: string | null
           id?: string
+          is_international?: boolean | null
           max_amount?: number | null
           min_amount?: number | null
           payment_method_id?: string | null
@@ -2825,9 +2833,13 @@ export type Database = {
         }
         Update: {
           auto_reply?: string | null
+          country_code?: string | null
           created_at?: string
           credits_amount?: number
+          credits_per_dollar?: number | null
+          currency_code?: string | null
           id?: string
+          is_international?: boolean | null
           max_amount?: number | null
           min_amount?: number | null
           payment_method_id?: string | null
@@ -2891,9 +2903,13 @@ export type Database = {
       p2p_payment_methods: {
         Row: {
           account_details: Json
+          country_code: string | null
           created_at: string | null
+          currency_code: string | null
           id: string
           is_active: boolean | null
+          is_default: boolean | null
+          is_verified: boolean | null
           method_name: string
           method_type: string
           updated_at: string | null
@@ -2901,9 +2917,13 @@ export type Database = {
         }
         Insert: {
           account_details: Json
+          country_code?: string | null
           created_at?: string | null
+          currency_code?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
+          is_verified?: boolean | null
           method_name: string
           method_type: string
           updated_at?: string | null
@@ -2911,9 +2931,13 @@ export type Database = {
         }
         Update: {
           account_details?: Json
+          country_code?: string | null
           created_at?: string | null
+          currency_code?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
+          is_verified?: boolean | null
           method_name?: string
           method_type?: string
           updated_at?: string | null
@@ -3058,6 +3082,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      p2p_user_eligibility: {
+        Row: {
+          created_at: string | null
+          first_p2p_trade_completed: boolean | null
+          has_purchased_pack: boolean | null
+          id: string
+          is_reseller: boolean | null
+          min_trade_amount: number | null
+          total_trades: number | null
+          total_volume_usd: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          first_p2p_trade_completed?: boolean | null
+          has_purchased_pack?: boolean | null
+          id?: string
+          is_reseller?: boolean | null
+          min_trade_amount?: number | null
+          total_trades?: number | null
+          total_volume_usd?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          first_p2p_trade_completed?: boolean | null
+          has_purchased_pack?: boolean | null
+          id?: string
+          is_reseller?: boolean | null
+          min_trade_amount?: number | null
+          total_trades?: number | null
+          total_volume_usd?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       payment_history: {
         Row: {

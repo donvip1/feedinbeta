@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/context/CurrencyContext';
@@ -9,44 +9,68 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Coins, Info } from 'lucide-react';
+import { Plus, Coins, Info, AlertCircle, Globe, Lock } from 'lucide-react';
+import { P2P_CONFIG, creditsToUsdForSelling, getCountryByCode } from '@/lib/p2p-config';
+import { useP2PEligibility } from '@/hooks/useP2PEligibility';
+import { useNavigate } from 'react-router-dom';
 
 interface CreateListingModalProps {
   userCredits: number;
 }
 
-const PAYMENT_METHODS = [
-  { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'mobile_money', label: 'Mobile Money' },
-  { value: 'crypto', label: 'Cryptocurrency' },
-  { value: 'paypal', label: 'PayPal' },
-  { value: 'other', label: 'Other' },
-];
-
 export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => {
   const { user } = useAuth();
-  const { formatPrice, convertFromUSD, currencySymbol } = useCurrency();
+  const { formatPrice, convertFromUSD, currencySymbol, userLocation } = useCurrency();
+  const { eligibility } = useP2PEligibility();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  
+  // Get user's country
+  const { data: profile } = useQuery({
+    queryKey: ['profile-country', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('country')
+        .eq('id', user?.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const userCountry = profile?.country || (typeof userLocation === 'string' ? userLocation : userLocation?.countryCode) || 'NG';
+  const countryInfo = getCountryByCode(userCountry);
   
   // Form state
   const [creditsAmount, setCreditsAmount] = useState('');
   const [priceUsd, setPriceUsd] = useState('');
-  const [minAmount, setMinAmount] = useState('');
+  const [minAmount, setMinAmount] = useState(eligibility.minTradeAmount.toString());
   const [maxAmount, setMaxAmount] = useState('');
   const [paymentWindow, setPaymentWindow] = useState('30');
   const [terms, setTerms] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('');
 
-  // Calculate rate
+  // Calculate rate using P2P sell rate (85 credits = $1)
   const credits = parseInt(creditsAmount) || 0;
   const price = parseFloat(priceUsd) || 0;
+  const suggestedPrice = creditsToUsdForSelling(credits);
   const rate = price > 0 ? Math.round(credits / price) : 0;
   const localPrice = convertFromUSD(price);
 
   const createListingMutation = useMutation({
     mutationFn: async () => {
+      // Validate eligibility
+      if (!eligibility.canTrade) {
+        throw new Error('Please complete your P2P setup first');
+      }
+
+      if (credits < eligibility.minTradeAmount) {
+        throw new Error(`Minimum trade amount is ${eligibility.minTradeAmount} credits`);
+      }
+
       if (credits <= 0 || price <= 0) {
         throw new Error('Invalid amounts');
       }
@@ -61,10 +85,14 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
           seller_id: user?.id,
           credits_amount: credits,
           price_usd: price,
-          min_amount: minAmount ? parseInt(minAmount) : null,
+          min_amount: minAmount ? parseInt(minAmount) : eligibility.minTradeAmount,
           max_amount: maxAmount ? parseInt(maxAmount) : null,
           payment_window_minutes: parseInt(paymentWindow) || 30,
           terms: terms || null,
+          country_code: userCountry,
+          currency_code: countryInfo?.currency || 'USD',
+          credits_per_dollar: P2P_CONFIG.SELL_RATE,
+          is_international: false,
         });
 
       if (error) throw error;
@@ -83,19 +111,75 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
   const resetForm = () => {
     setCreditsAmount('');
     setPriceUsd('');
-    setMinAmount('');
+    setMinAmount(eligibility.minTradeAmount.toString());
     setMaxAmount('');
     setPaymentWindow('30');
     setTerms('');
-    setPaymentMethod('');
   };
 
   const handleQuickAmount = (percentage: number) => {
     const amount = Math.floor(userCredits * percentage);
     setCreditsAmount(amount.toString());
-    // Auto-calculate price at market rate (100 credits = $1)
-    setPriceUsd((amount / 100).toFixed(2));
+    // Auto-calculate price at P2P sell rate (85 credits = $1)
+    const suggestedUsd = creditsToUsdForSelling(amount);
+    setPriceUsd(suggestedUsd.toFixed(2));
   };
+
+  const handleCreditsChange = (value: string) => {
+    setCreditsAmount(value);
+    const creditNum = parseInt(value) || 0;
+    if (creditNum > 0) {
+      const suggestedUsd = creditsToUsdForSelling(creditNum);
+      setPriceUsd(suggestedUsd.toFixed(2));
+    }
+  };
+
+  // Check if user can create listing
+  if (!eligibility.canTrade) {
+    return (
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Sell Credits
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-yellow-500" />
+              Complete Setup First
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              To sell credits on the P2P marketplace, you need to:
+            </p>
+            <ul className="space-y-2">
+              {eligibility.reasons.map((reason, i) => (
+                <li key={i} className="flex items-center gap-2 text-sm">
+                  <div className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                  {reason}
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2">
+              {eligibility.requiresPaymentSetup && (
+                <Button onClick={() => navigate('/p2p/payment-methods')} className="flex-1">
+                  Add Payment Method
+                </Button>
+              )}
+              {!eligibility.userCountry && (
+                <Button variant="outline" onClick={() => navigate('/settings/account')} className="flex-1">
+                  Set Country
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -114,6 +198,23 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Region Lock Badge */}
+          <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 border border-primary/20">
+            <Lock className="h-4 w-4 text-primary" />
+            <div className="flex-1">
+              <span className="text-sm font-medium flex items-center gap-2">
+                <Globe className="h-3 w-3" />
+                {countryInfo?.name || userCountry} Only
+              </span>
+              <p className="text-xs text-muted-foreground">
+                Only users in {countryInfo?.name || userCountry} can buy
+              </p>
+            </div>
+            <Badge variant="outline" className="text-xs">
+              {countryInfo?.currency || 'USD'}
+            </Badge>
+          </div>
+
           {/* Available Balance */}
           <div className="p-3 bg-muted rounded-lg">
             <p className="text-sm text-muted-foreground">Available Balance</p>
@@ -143,11 +244,16 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
             <Label>Credits to Sell</Label>
             <Input
               type="number"
-              placeholder="Enter amount"
+              placeholder={`Min: ${eligibility.minTradeAmount}`}
               value={creditsAmount}
-              onChange={(e) => setCreditsAmount(e.target.value)}
+              onChange={(e) => handleCreditsChange(e.target.value)}
               max={userCredits}
             />
+            {credits > 0 && credits < eligibility.minTradeAmount && (
+              <p className="text-xs text-destructive">
+                Minimum amount is {eligibility.minTradeAmount} credits
+              </p>
+            )}
             {credits > userCredits && (
               <p className="text-xs text-destructive">Exceeds available balance</p>
             )}
@@ -165,32 +271,38 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
             />
             {price > 0 && (
               <p className="text-sm text-muted-foreground">
-                ≈ {currencySymbol}{localPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} in local currency
+                ≈ {currencySymbol}{localPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })} in {countryInfo?.currency || 'local currency'}
               </p>
             )}
           </div>
 
           {/* Rate Preview */}
           {rate > 0 && (
-            <div className="p-3 bg-primary/10 rounded-lg">
+            <div className="p-3 bg-primary/10 rounded-lg space-y-1">
               <p className="text-sm font-medium">
                 Rate: {rate} credits per $1
               </p>
               <p className="text-xs text-muted-foreground">
-                Market rate is ~100 credits per $1
+                P2P sell rate is {P2P_CONFIG.SELL_RATE} credits per $1 (vs {P2P_CONFIG.BUY_RATE} in store)
               </p>
+              {rate < P2P_CONFIG.SELL_RATE - 5 && (
+                <p className="text-xs text-yellow-600">
+                  ⚠️ Your rate is below market. Consider pricing at ${suggestedPrice.toFixed(2)}
+                </p>
+              )}
             </div>
           )}
 
           {/* Min/Max Limits */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label>Min Amount (optional)</Label>
+              <Label>Min Amount</Label>
               <Input
                 type="number"
-                placeholder="100"
+                placeholder={eligibility.minTradeAmount.toString()}
                 value={minAmount}
                 onChange={(e) => setMinAmount(e.target.value)}
+                min={eligibility.minTradeAmount}
               />
             </div>
             <div className="space-y-2">
@@ -234,6 +346,16 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
             />
           </div>
 
+          {/* International Coming Soon */}
+          <div className="flex items-center gap-2 p-3 bg-yellow-500/10 rounded-lg">
+            <Globe className="w-4 h-4 text-yellow-600" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-600">PayPal International</p>
+              <p className="text-xs text-muted-foreground">Coming soon for cross-border trades</p>
+            </div>
+            <Badge variant="outline" className="text-xs">Soon</Badge>
+          </div>
+
           {/* Info Note */}
           <div className="flex items-start gap-2 p-3 bg-blue-500/10 rounded-lg text-sm">
             <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
@@ -249,7 +371,7 @@ export const CreateListingModal = ({ userCredits }: CreateListingModalProps) => 
             onClick={() => createListingMutation.mutate()}
             disabled={
               createListingMutation.isPending ||
-              credits <= 0 ||
+              credits < eligibility.minTradeAmount ||
               price <= 0 ||
               credits > userCredits
             }
