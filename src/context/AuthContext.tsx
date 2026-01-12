@@ -49,6 +49,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const { toast } = useToast();
 
   // Refresh session manually if needed
@@ -68,62 +69,85 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+    // Initialize auth state - get session FIRST before setting up listener
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
         if (!mounted) return;
-
+        
+        if (error) {
+          console.error('Error getting session:', error);
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false);
+        
+        // Initialize counts immediately if user is logged in
+        if (session?.user) {
+          initializeCurrentUserCounts(session.user.id);
+          appShellPreloader.refreshInBackground();
+          backgroundSync.initialize(session.user.id);
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+      } finally {
+        if (mounted) {
+          setInitialized(true);
+          setLoading(false);
+        }
+      }
+    };
+
+    // Start initialization
+    initializeAuth();
+
+    // Set up auth state listener for SUBSEQUENT changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        if (!mounted) return;
+
+        // Always update state immediately
+        setSession(newSession);
+        setUser(newSession?.user ?? null);
+        
+        // Only update loading if already initialized (prevents race condition)
+        if (initialized) {
+          setLoading(false);
+        }
 
         // Handle specific auth events
         if (event === 'SIGNED_IN') {
-          // Start aggressive preload for offline-first experience
-          if (session?.user) {
+          if (newSession?.user) {
             appShellPreloader.refreshInBackground();
-            backgroundSync.initialize(session.user.id);
-            // INSTANT: Prefetch profile counts immediately on login
-            initializeCurrentUserCounts(session.user.id);
-            // Defer profile sync to avoid deadlock
+            backgroundSync.initialize(newSession.user.id);
+            initializeCurrentUserCounts(newSession.user.id);
             setTimeout(() => {
-              syncUserProfile(session.user);
+              syncUserProfile(newSession.user);
             }, 0);
           }
         } else if (event === 'SIGNED_OUT') {
-          // Stop background sync and reset preloader
           backgroundSync.stop();
           appShellPreloader.reset();
-          // Clear all local data on sign out
           clearAllLocalData();
           setUser(null);
           setSession(null);
         } else if (event === 'TOKEN_REFRESHED') {
-          // Token refreshed successfully - session extended
+          // Token refreshed successfully
         } else if (event === 'USER_UPDATED') {
-          // User data was updated, sync profile if needed
-          if (session?.user) {
+          if (newSession?.user) {
             setTimeout(() => {
-              syncUserProfile(session.user);
+              syncUserProfile(newSession.user);
             }, 0);
           }
         }
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!mounted) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
     return () => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [initialized]);
 
   // Sync user profile data after auth events
   const syncUserProfile = async (user: User) => {
