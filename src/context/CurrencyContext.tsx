@@ -11,6 +11,7 @@ export interface CurrencyRate {
   rate_to_usd: number;
   country_codes: string[];
   is_active: boolean;
+  updated_at?: string;
 }
 
 interface CurrencyContextType {
@@ -21,6 +22,7 @@ interface CurrencyContextType {
   availableCurrencies: CurrencyRate[];
   userLocation: LocationData | null;
   loading: boolean;
+  lastRateUpdate: Date | null;
   setCurrency: (currencyCode: string) => Promise<void>;
   convertFromUSD: (usdAmount: number) => number;
   convertToUSD: (localAmount: number) => number;
@@ -31,6 +33,7 @@ interface CurrencyContextType {
 }
 
 const CREDITS_PER_USD = 100;
+const RATE_REFRESH_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
 const CurrencyContext = createContext<CurrencyContextType | null>(null);
 
@@ -48,6 +51,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [availableCurrencies, setAvailableCurrencies] = useState<CurrencyRate[]>([]);
   const [userLocation, setUserLocation] = useState<LocationData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastRateUpdate, setLastRateUpdate] = useState<Date | null>(null);
 
   // Get current currency data
   const currentCurrencyData = availableCurrencies.find(c => c.currency_code === currentCurrency);
@@ -55,9 +59,33 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const currencyName = currentCurrencyData?.currency_name || 'US Dollar';
   const exchangeRate = currentCurrencyData?.rate_to_usd || 1;
 
-  // Fetch currency rates from database
-  const fetchCurrencyRates = useCallback(async () => {
+  // Fetch live rates from edge function
+  const fetchLiveRates = useCallback(async () => {
     try {
+      console.log('Fetching live exchange rates...');
+      const { data, error } = await supabase.functions.invoke('update-exchange-rates');
+      
+      if (error) {
+        console.error('Failed to fetch live rates:', error);
+        return false;
+      }
+      
+      console.log('Live rates response:', data);
+      return data?.success || false;
+    } catch (error) {
+      console.error('Error calling exchange rate function:', error);
+      return false;
+    }
+  }, []);
+
+  // Fetch currency rates from database
+  const fetchCurrencyRates = useCallback(async (triggerLiveUpdate = false) => {
+    try {
+      // Optionally trigger live rate update first
+      if (triggerLiveUpdate) {
+        await fetchLiveRates();
+      }
+
       const { data, error } = await supabase
         .from('currency_rates')
         .select('*')
@@ -65,7 +93,17 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         .order('currency_name');
 
       if (error) throw error;
+      
       setAvailableCurrencies(data || []);
+      
+      // Track last update time
+      if (data && data.length > 0) {
+        const mostRecent = data.reduce((latest, curr) => {
+          const currDate = curr.updated_at ? new Date(curr.updated_at) : new Date(0);
+          return currDate > latest ? currDate : latest;
+        }, new Date(0));
+        setLastRateUpdate(mostRecent);
+      }
     } catch (error) {
       console.error('Failed to fetch currency rates:', error);
       // Set default USD if fetch fails
@@ -79,7 +117,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         is_active: true,
       }]);
     }
-  }, []);
+  }, [fetchLiveRates]);
 
   // Load user's preferred currency from profile
   const loadUserCurrency = useCallback(async () => {
@@ -203,14 +241,21 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return formatPrice(usdValue, showSymbol);
   }, [formatPrice]);
 
-  // Refresh rates
+  // Refresh rates with live data
   const refreshRates = useCallback(async () => {
-    await fetchCurrencyRates();
+    await fetchCurrencyRates(true);
   }, [fetchCurrencyRates]);
 
-  // Initialize on mount
+  // Initialize on mount - fetch rates and trigger live update
   useEffect(() => {
-    fetchCurrencyRates();
+    fetchCurrencyRates(true);
+    
+    // Set up periodic refresh
+    const interval = setInterval(() => {
+      fetchCurrencyRates(true);
+    }, RATE_REFRESH_INTERVAL);
+    
+    return () => clearInterval(interval);
   }, [fetchCurrencyRates]);
 
   // Load user currency when user changes
@@ -233,6 +278,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     availableCurrencies,
     userLocation,
     loading,
+    lastRateUpdate,
     setCurrency,
     convertFromUSD,
     convertToUSD,
