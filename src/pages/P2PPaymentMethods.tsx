@@ -55,7 +55,7 @@ const P2PPaymentMethods = () => {
           user_id: user?.id,
           method_type: 'bank_transfer',
           method_name: details.bank_name,
-          account_details: details as unknown as Record<string, unknown>,
+          account_details: details as unknown as { [key: string]: string },
           country_code: details.countryCode,
           currency_code: details.currencyCode || countryInfo?.currency || 'USD',
           is_default: (paymentMethods?.length ?? 0) === 0,
