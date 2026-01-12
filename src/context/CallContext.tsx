@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
-import { WebRTCP2PManager, CallStatus as P2PCallStatus } from '@/lib/webrtc-p2p-manager';
+import { LiveKitCallManager, CallConnectionStatus } from '@/lib/livekit-call-manager';
 import { supabase } from '@/integrations/supabase/client';
 import { callSounds } from '@/utils/callSounds';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +15,7 @@ interface CallState {
   isSpeakerOn: boolean;
   isScreenSharing: boolean;
   callDuration: number;
-  connectionStatus: P2PCallStatus;
+  connectionStatus: CallConnectionStatus;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
   otherUserId: string | null;
@@ -37,6 +37,9 @@ interface CallContextType {
   toggleVideo: () => void;
   toggleSpeaker: () => void;
   flipCamera: () => Promise<void>;
+  startScreenShare: () => Promise<void>;
+  stopScreenShare: () => Promise<void>;
+  createCallInvite: () => Promise<{ inviteCode: string; inviteLink: string } | null>;
   // Refs for video elements
   setLocalVideoRef: (ref: HTMLVideoElement | null) => void;
   setRemoteVideoRef: (ref: HTMLVideoElement | null) => void;
@@ -80,7 +83,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
   const [callState, setCallState] = useState<CallState>(defaultCallState);
   
-  const callManagerRef = useRef<WebRTCP2PManager | null>(null);
+  const callManagerRef = useRef<LiveKitCallManager | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null);
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -93,7 +96,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
-      callManagerRef.current?.cleanup();
+      callManagerRef.current?.disconnect();
     };
   }, []);
 
@@ -131,7 +134,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     otherUserId: string,
     isCaller: boolean
   ) => {
-    console.log('[CallContext] Starting P2P call:', { callId, callType, otherUserId, isCaller });
+    console.log('[CallContext] Starting LiveKit call:', { callId, callType, otherUserId, isCaller });
 
     // Load other user's profile
     await loadOtherUserProfile(otherUserId);
@@ -147,6 +150,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Get current user's display name
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .single();
+    
+    const displayName = profile?.display_name || 'User';
+
     setCallState(prev => ({
       ...prev,
       callId,
@@ -158,11 +170,10 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }));
 
     try {
-      // Create P2P call manager
-      callManagerRef.current = new WebRTCP2PManager(
+      // Create LiveKit call manager
+      callManagerRef.current = new LiveKitCallManager(
         callId,
         user.id,
-        otherUserId,
         {
           onLocalStream: (stream) => {
             console.log('[CallContext] Got local stream');
@@ -207,17 +218,25 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
               variant: 'destructive',
             });
           },
+          onParticipantJoined: (participantId, participantName) => {
+            console.log('[CallContext] Participant joined:', participantId, participantName);
+            toast({
+              title: 'Connected',
+              description: `${participantName} joined the call`,
+            });
+          },
+          onParticipantLeft: (participantId) => {
+            console.log('[CallContext] Participant left:', participantId);
+          },
+          onCallEnded: () => {
+            console.log('[CallContext] Call ended by other participant or system');
+            endCall();
+          },
         }
       );
 
       const isVideo = callType === 'video';
-      
-      // Initialize as caller or receiver
-      if (isCaller) {
-        await callManagerRef.current.initializeAsCaller(isVideo);
-      } else {
-        await callManagerRef.current.initializeAsReceiver(isVideo);
-      }
+      await callManagerRef.current.initialize(isVideo, displayName);
 
     } catch (error: any) {
       console.error('[CallContext] Error setting up call:', error);
@@ -256,7 +275,7 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
     
-    await callManagerRef.current?.cleanup();
+    await callManagerRef.current?.disconnect();
     callManagerRef.current = null;
     
     setCallState(defaultCallState);
@@ -272,16 +291,16 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setCallState(prev => ({ ...prev, isMinimized: false }));
   }, []);
 
-  const toggleMute = useCallback(() => {
+  const toggleMute = useCallback(async () => {
     if (callManagerRef.current) {
-      const isEnabled = callManagerRef.current.toggleMute();
+      const isEnabled = await callManagerRef.current.toggleMute();
       setCallState(prev => ({ ...prev, isMuted: !isEnabled }));
     }
   }, []);
 
-  const toggleVideo = useCallback(() => {
+  const toggleVideo = useCallback(async () => {
     if (callManagerRef.current) {
-      const isEnabled = callManagerRef.current.toggleVideo();
+      const isEnabled = await callManagerRef.current.toggleVideo();
       setCallState(prev => ({ ...prev, isVideoOff: !isEnabled }));
     }
   }, []);
@@ -298,10 +317,83 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (callManagerRef.current) {
       const success = await callManagerRef.current.flipCamera();
       if (success && localVideoRef.current) {
-        localVideoRef.current.srcObject = callManagerRef.current.getLocalStream();
+        const stream = callManagerRef.current.getLocalStream();
+        if (stream) {
+          localVideoRef.current.srcObject = stream;
+          setCallState(prev => ({ ...prev, localStream: stream }));
+        }
       }
     }
   }, []);
+
+  const startScreenShare = useCallback(async () => {
+    if (callManagerRef.current) {
+      const success = await callManagerRef.current.startScreenShare();
+      if (success) {
+        setCallState(prev => ({ ...prev, isScreenSharing: true }));
+        toast({
+          title: 'Screen Sharing',
+          description: 'You are now sharing your screen',
+        });
+      } else {
+        toast({
+          title: 'Screen Share Failed',
+          description: 'Could not start screen sharing',
+          variant: 'destructive',
+        });
+      }
+    }
+  }, [toast]);
+
+  const stopScreenShare = useCallback(async () => {
+    if (callManagerRef.current) {
+      const success = await callManagerRef.current.stopScreenShare();
+      if (success) {
+        setCallState(prev => ({ ...prev, isScreenSharing: false }));
+        toast({
+          title: 'Screen Sharing Stopped',
+          description: 'You stopped sharing your screen',
+        });
+      }
+    }
+  }, [toast]);
+
+  const createCallInvite = useCallback(async (): Promise<{ inviteCode: string; inviteLink: string } | null> => {
+    if (!callState.callId) {
+      toast({
+        title: 'No Active Call',
+        description: 'Start a call first to create an invite link',
+        variant: 'destructive',
+      });
+      return null;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-call-invite', {
+        body: {
+          callId: callState.callId,
+          callType: callState.callType,
+        },
+      });
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to create invite');
+      }
+
+      return {
+        inviteCode: data.inviteCode,
+        inviteLink: data.inviteLink,
+      };
+    } catch (error: any) {
+      console.error('[CallContext] Error creating invite:', error);
+      toast({
+        title: 'Failed to create invite',
+        description: error.message || 'Please try again',
+        variant: 'destructive',
+      });
+      return null;
+    }
+  }, [callState.callId, callState.callType, toast]);
 
   // Listen for PiP exit
   useEffect(() => {
@@ -346,6 +438,9 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toggleVideo,
     toggleSpeaker,
     flipCamera,
+    startScreenShare,
+    stopScreenShare,
+    createCallInvite,
     setLocalVideoRef,
     setRemoteVideoRef,
     setRemoteAudioRef,
