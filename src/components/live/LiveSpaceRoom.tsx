@@ -1083,6 +1083,21 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }));
   };
 
+  // Force resubscribe to all speakers - for troubleshooting audio issues
+  const forceResubscribe = async () => {
+    console.log('[LiveSpace] Force resubscribing to all speakers...');
+    toast.info('Refreshing audio connections...');
+    
+    try {
+      const { spaceRoomManager } = await import('@/lib/space-room-manager');
+      await spaceRoomManager.forceResubscribeAll();
+      toast.success('Audio connections refreshed');
+    } catch (error) {
+      console.error('[LiveSpace] Failed to resubscribe:', error);
+      toast.error('Failed to refresh audio');
+    }
+  };
+
   // Connection status badge
   const ConnectionStatusBadge = () => {
     switch (connectionStatus) {
@@ -1102,16 +1117,24 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         );
       case 'connected':
         return (
-          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 gap-1">
+          <Badge 
+            className="bg-green-500/20 text-green-400 border-green-500/30 gap-1 cursor-pointer hover:bg-green-500/30"
+            onClick={forceResubscribe}
+            title="Click to refresh audio if you can't hear others"
+          >
             <Wifi className="w-3 h-3" />
             Connected (SFU)
           </Badge>
         );
       case 'failed':
         return (
-          <Badge className="bg-red-500/20 text-red-400 border-red-500/30 gap-1">
+          <Badge 
+            className="bg-red-500/20 text-red-400 border-red-500/30 gap-1 cursor-pointer hover:bg-red-500/30"
+            onClick={forceResubscribe}
+            title="Click to retry connection"
+          >
             <WifiOff className="w-3 h-3" />
-            Failed
+            Failed - Tap to retry
           </Badge>
         );
       default:
@@ -1695,6 +1718,19 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 </Button>
               </motion.div>
 
+              {/* Refresh Audio - for troubleshooting */}
+              <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-12 w-12 rounded-xl transition-all"
+                  onClick={forceResubscribe}
+                  title="Refresh audio connections"
+                >
+                  <AudioLines className="w-5 h-5" />
+                </Button>
+              </motion.div>
+
               {/* Host-only controls */}
               {isHost && (
                 <>
@@ -1735,6 +1771,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={forceResubscribe}>
+                        <AudioLines className="w-4 h-4 mr-2" />
+                        Refresh Audio Connections
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={toggleMuteAllParticipants}>
                         {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
                         {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
