@@ -82,6 +82,7 @@ import AdminDeletedPosts from "./pages/AdminDeletedPosts";
 import CurrencySettings from "./pages/CurrencySettings";
 import P2PPaymentMethods from "./pages/P2PPaymentMethods";
 import { CurrencyProvider } from "@/context/CurrencyContext";
+import AdminPanel from "./pages/AdminPanel";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -256,6 +257,7 @@ const App = () => {
             <Route path="/settings/currency" element={<CurrencySettings />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/deleted-posts" element={<AdminDeletedPosts />} />
+            <Route path="/admin/panel" element={<AdminPanel />} />
             <Route path="/creator/dashboard" element={<CreatorDashboard />} />
             
               <Route path="*" element={<NotFound />} />

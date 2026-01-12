@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_action_logs: {
+        Row: {
+          action_type: string
+          admin_id: string
+          created_at: string
+          details: Json | null
+          id: string
+          target_id: string | null
+          target_type: string
+          target_username: string | null
+        }
+        Insert: {
+          action_type: string
+          admin_id: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id?: string | null
+          target_type: string
+          target_username?: string | null
+        }
+        Update: {
+          action_type?: string
+          admin_id?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          target_id?: string | null
+          target_type?: string
+          target_username?: string | null
+        }
+        Relationships: []
+      }
       ai_chat_messages: {
         Row: {
           content: string
@@ -4712,22 +4745,46 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          assigned_by: string | null
+          can_manage_content: boolean | null
+          can_manage_disputes: boolean | null
+          can_manage_p2p: boolean | null
+          can_manage_roles: boolean | null
+          can_manage_users: boolean | null
+          can_view_analytics: boolean | null
           created_at: string | null
           id: string
+          notes: string | null
           role: string
           updated_at: string | null
           user_id: string
         }
         Insert: {
+          assigned_by?: string | null
+          can_manage_content?: boolean | null
+          can_manage_disputes?: boolean | null
+          can_manage_p2p?: boolean | null
+          can_manage_roles?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_analytics?: boolean | null
           created_at?: string | null
           id?: string
+          notes?: string | null
           role?: string
           updated_at?: string | null
           user_id: string
         }
         Update: {
+          assigned_by?: string | null
+          can_manage_content?: boolean | null
+          can_manage_disputes?: boolean | null
+          can_manage_p2p?: boolean | null
+          can_manage_roles?: boolean | null
+          can_manage_users?: boolean | null
+          can_view_analytics?: boolean | null
           created_at?: string | null
           id?: string
+          notes?: string | null
           role?: string
           updated_at?: string | null
           user_id?: string

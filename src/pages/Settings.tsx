@@ -220,6 +220,13 @@ const Settings = () => {
 
   const adminOptions = [
     {
+      icon: Shield,
+      title: 'Admin Panel',
+      description: 'Manage P2P orders, disputes, and roles',
+      route: '/admin/panel',
+      color: 'text-primary'
+    },
+    {
       icon: ShieldCheck,
       title: 'Admin Wallet',
       description: 'Platform wallet and credit management',
