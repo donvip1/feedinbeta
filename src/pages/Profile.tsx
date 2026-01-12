@@ -846,13 +846,21 @@ const Profile = () => {
               <p className="text-xs text-muted-foreground">Following</p>
             </button>
 
-            <button
-              onClick={() => setShowFriendsModal(true)}
-              className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
-            >
-              <p className="text-2xl font-bold text-foreground">{friendsCount}</p>
-              <p className="text-xs text-muted-foreground">Friends</p>
-            </button>
+            {/* Friends - Show count and modal for own profile or if mutual friends, otherwise show "Not Friends" */}
+            {isOwnProfile || areMutualFriends ? (
+              <button
+                onClick={() => setShowFriendsModal(true)}
+                className="flex flex-col items-center cursor-pointer hover:opacity-80 transition"
+              >
+                <p className="text-2xl font-bold text-foreground">{friendsCount}</p>
+                <p className="text-xs text-muted-foreground">Friends</p>
+              </button>
+            ) : (
+              <div className="flex flex-col items-center">
+                <p className="text-2xl font-bold text-muted-foreground">—</p>
+                <p className="text-xs text-muted-foreground">Not Friends</p>
+              </div>
+            )}
 
             <div className="flex flex-col items-center">
               <p className="text-2xl font-bold text-foreground">{profile.total_views}</p>
@@ -1072,12 +1080,6 @@ const Profile = () => {
 
           {/* Details Section */}
           <div className="space-y-4">
-            {profile.about && (
-              <div className="bg-card/50 border border-border rounded-xl p-5 backdrop-blur-sm">
-                <h3 className="font-semibold text-foreground mb-3 text-base">About</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{profile.about}</p>
-              </div>
-            )}
 
             {profile.purpose && Array.isArray(profile.purpose) && profile.purpose.length > 0 && (
               <div className="bg-card/50 border border-border rounded-xl p-5 backdrop-blur-sm">
