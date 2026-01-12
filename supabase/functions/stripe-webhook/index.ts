@@ -124,7 +124,17 @@ serve(async (req) => {
             stripe_payment_intent_id: session.payment_intent as string,
           });
 
+          // Update P2P eligibility - user has purchased a pack
+          await supabaseAdmin
+            .from('p2p_user_eligibility')
+            .upsert({
+              user_id: userId,
+              has_purchased_pack: true,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: 'user_id' });
+
           console.log('Credits added for user:', userId, creditsAmount);
+          console.log('P2P eligibility updated: has_purchased_pack = true');
         }
 
         // Record payment with validated data
