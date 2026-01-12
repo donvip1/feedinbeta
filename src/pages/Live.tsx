@@ -10,8 +10,8 @@ import { CreateSpaceModal } from "@/components/live/CreateSpaceModal";
 import { LiveStreamCard } from "@/components/live/LiveStreamCard";
 import { LiveStreamPreviewCard } from "@/components/live/LiveStreamPreviewCard";
 import { SpaceCard } from "@/components/live/SpaceCard";
-import { SimpleViewer } from "@/components/live/SimpleViewer";
-import { SimpleBroadcaster } from "@/components/live/SimpleBroadcaster";
+import { LiveKitViewer } from "@/components/live/LiveKitViewer";
+import { LiveKitBroadcaster } from "@/components/live/LiveKitBroadcaster";
 import { LiveSpaceRoom } from "@/components/live/LiveSpaceRoom";
 import { GoLiveDropdown } from "@/components/live/GoLiveDropdown";
 import { SpaceContentManager } from "@/components/live/SpaceContentManager";
@@ -373,7 +373,7 @@ const Live = () => {
   // Render modals/overlays
   if (selectedStreamId) {
     return (
-      <SimpleViewer
+      <LiveKitViewer
         streamId={selectedStreamId}
         onClose={() => setSelectedStreamId(null)}
       />
@@ -382,7 +382,7 @@ const Live = () => {
 
   if (isBroadcasting && broadcastStreamId) {
     return (
-      <SimpleBroadcaster
+      <LiveKitBroadcaster
         streamId={broadcastStreamId}
         onClose={() => {
           setIsBroadcasting(false);
