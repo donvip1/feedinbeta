@@ -2658,27 +2658,126 @@ export type Database = {
         }
         Relationships: []
       }
+      p2p_chat_messages: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          media_url: string | null
+          message_type: string | null
+          sender_id: string
+          transaction_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          media_url?: string | null
+          message_type?: string | null
+          sender_id: string
+          transaction_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          media_url?: string | null
+          message_type?: string | null
+          sender_id?: string
+          transaction_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      p2p_disputes: {
+        Row: {
+          assigned_at: string | null
+          buyer_evidence_urls: string[] | null
+          created_at: string | null
+          description: string | null
+          id: string
+          initiated_by: string
+          moderator_id: string | null
+          reason: string
+          resolution: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          seller_evidence_urls: string[] | null
+          status: string | null
+          transaction_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          buyer_evidence_urls?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          initiated_by: string
+          moderator_id?: string | null
+          reason: string
+          resolution?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          seller_evidence_urls?: string[] | null
+          status?: string | null
+          transaction_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          buyer_evidence_urls?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          initiated_by?: string
+          moderator_id?: string | null
+          reason?: string
+          resolution?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          seller_evidence_urls?: string[] | null
+          status?: string | null
+          transaction_id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       p2p_escrow: {
         Row: {
           credits_amount: number
+          dispute_id: string | null
           id: string
           locked_at: string
+          locked_by: string | null
+          platform_fee: number | null
           released_at: string | null
           status: string
           transaction_id: string
         }
         Insert: {
           credits_amount: number
+          dispute_id?: string | null
           id?: string
           locked_at?: string
+          locked_by?: string | null
+          platform_fee?: number | null
           released_at?: string | null
           status?: string
           transaction_id: string
         }
         Update: {
           credits_amount?: number
+          dispute_id?: string | null
           id?: string
           locked_at?: string
+          locked_by?: string | null
+          platform_fee?: number | null
           released_at?: string | null
           status?: string
           transaction_id?: string
@@ -2695,30 +2794,48 @@ export type Database = {
       }
       p2p_listings: {
         Row: {
+          auto_reply: string | null
           created_at: string
           credits_amount: number
           id: string
+          max_amount: number | null
+          min_amount: number | null
+          payment_method_id: string | null
+          payment_window_minutes: number | null
           price_usd: number
           seller_id: string
           status: string
+          terms: string | null
           updated_at: string
         }
         Insert: {
+          auto_reply?: string | null
           created_at?: string
           credits_amount: number
           id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          payment_method_id?: string | null
+          payment_window_minutes?: number | null
           price_usd: number
           seller_id: string
           status?: string
+          terms?: string | null
           updated_at?: string
         }
         Update: {
+          auto_reply?: string | null
           created_at?: string
           credits_amount?: number
           id?: string
+          max_amount?: number | null
+          min_amount?: number | null
+          payment_method_id?: string | null
+          payment_window_minutes?: number | null
           price_usd?: number
           seller_id?: string
           status?: string
+          terms?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -2738,42 +2855,168 @@ export type Database = {
           },
         ]
       }
+      p2p_moderators: {
+        Row: {
+          avg_resolution_time_hours: number | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          rating: number | null
+          total_disputes_handled: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avg_resolution_time_hours?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rating?: number | null
+          total_disputes_handled?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avg_resolution_time_hours?: number | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          rating?: number | null
+          total_disputes_handled?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      p2p_payment_methods: {
+        Row: {
+          account_details: Json
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          method_name: string
+          method_type: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_details: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          method_name: string
+          method_type: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_details?: Json
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          method_name?: string
+          method_type?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      p2p_payment_proofs: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          file_type: string | null
+          file_url: string
+          id: string
+          proof_type: string | null
+          transaction_id: string
+          uploaded_by: string
+          verified: boolean | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          proof_type?: string | null
+          transaction_id: string
+          uploaded_by: string
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          proof_type?: string | null
+          transaction_id?: string
+          uploaded_by?: string
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
       p2p_transactions: {
         Row: {
+          buyer_confirmed_at: string | null
           buyer_id: string
+          chat_enabled: boolean | null
           created_at: string
           credits_amount: number
+          dispute_id: string | null
           escrow_locked: boolean | null
+          expires_at: string | null
           id: string
+          last_activity_at: string | null
           listing_id: string
           price_usd: number
           proof_url: string | null
+          seller_confirmed_at: string | null
           seller_id: string
           status: string
           updated_at: string
         }
         Insert: {
+          buyer_confirmed_at?: string | null
           buyer_id: string
+          chat_enabled?: boolean | null
           created_at?: string
           credits_amount: number
+          dispute_id?: string | null
           escrow_locked?: boolean | null
+          expires_at?: string | null
           id?: string
+          last_activity_at?: string | null
           listing_id: string
           price_usd: number
           proof_url?: string | null
+          seller_confirmed_at?: string | null
           seller_id: string
           status?: string
           updated_at?: string
         }
         Update: {
+          buyer_confirmed_at?: string | null
           buyer_id?: string
+          chat_enabled?: boolean | null
           created_at?: string
           credits_amount?: number
+          dispute_id?: string | null
           escrow_locked?: boolean | null
+          expires_at?: string | null
           id?: string
+          last_activity_at?: string | null
           listing_id?: string
           price_usd?: number
           proof_url?: string | null
+          seller_confirmed_at?: string | null
           seller_id?: string
           status?: string
           updated_at?: string
