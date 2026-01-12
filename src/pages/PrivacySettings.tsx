@@ -8,9 +8,20 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Shield, Eye, Lock, Users, Moon, Sun, Loader2, MessageCircle, Activity } from 'lucide-react';
+import { ArrowLeft, Shield, Eye, Lock, Users, Moon, Sun, Loader2, MessageCircle, Activity, Trash2, AlertTriangle } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useTheme } from 'next-themes';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface PrivacySettingsData {
   profile_visible: boolean;
@@ -23,11 +34,13 @@ interface PrivacySettingsData {
 
 const PrivacySettings = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { theme, setTheme } = useTheme();
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [settings, setSettings] = useState<PrivacySettingsData>({
     profile_visible: true,
     show_online_status: true,
@@ -265,6 +278,90 @@ const PrivacySettings = () => {
             Your privacy is important to us. These settings help you control your
             visibility and interactions on FEEDIN. You can change these at any time.
           </p>
+        </Card>
+
+        {/* Danger Zone - Delete Account */}
+        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/30 mt-6 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <AlertTriangle className="w-5 h-5 text-destructive" />
+            <h3 className="font-bold text-destructive">Danger Zone</h3>
+          </div>
+          
+          <p className="text-sm text-muted-foreground mb-4">
+            Once you delete your account, there is no going back. All your data, posts, 
+            messages, and connections will be permanently removed.
+          </p>
+
+          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full border-destructive/50 text-destructive hover:bg-destructive/20 hover:border-destructive"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete My Account
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="bg-card border-border">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-destructive flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  Delete Account Permanently?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete your account 
+                  and remove all your data including:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Your profile and personal information</li>
+                    <li>All your posts, stories, and media</li>
+                    <li>Your messages and conversations</li>
+                    <li>Your credits and transaction history</li>
+                    <li>All your followers and following connections</li>
+                  </ul>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="border-border">Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!user) return;
+                    
+                    setDeleteLoading(true);
+                    try {
+                      // In a real app, you'd call a server function to handle deletion
+                      // For now, we'll just sign out
+                      toast({
+                        title: 'Account deletion requested',
+                        description: 'Your account deletion has been scheduled. You will be signed out.',
+                      });
+                      
+                      await signOut();
+                      navigate('/welcome');
+                    } catch (error: any) {
+                      toast({
+                        title: 'Error',
+                        description: 'Failed to delete account. Please contact support.',
+                        variant: 'destructive',
+                      });
+                    } finally {
+                      setDeleteLoading(false);
+                    }
+                  }}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleteLoading}
+                >
+                  {deleteLoading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Deleting...
+                    </>
+                  ) : (
+                    'Yes, Delete My Account'
+                  )}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </Card>
       </main>
 

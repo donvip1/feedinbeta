@@ -3477,6 +3477,7 @@ export type Database = {
           marital_status: string | null
           max_friends: number | null
           preferred_language: string | null
+          profile_completed: boolean | null
           purpose: string[] | null
           purpose_updated_at: string | null
           referral_code: string | null
@@ -3528,6 +3529,7 @@ export type Database = {
           marital_status?: string | null
           max_friends?: number | null
           preferred_language?: string | null
+          profile_completed?: boolean | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
           referral_code?: string | null
@@ -3579,6 +3581,7 @@ export type Database = {
           marital_status?: string | null
           max_friends?: number | null
           preferred_language?: string | null
+          profile_completed?: boolean | null
           purpose?: string[] | null
           purpose_updated_at?: string | null
           referral_code?: string | null

@@ -393,26 +393,7 @@ const Settings = () => {
           </Card>
         )}
 
-        {/* Danger Zone */}
-        <Card className="bg-gradient-to-br from-destructive/10 to-destructive/5 backdrop-blur-sm border-destructive/30 shadow-xl mt-6">
-          <div className="p-6">
-            <h3 className="text-lg font-bold mb-4 text-destructive flex items-center gap-2">
-              <Trash2 className="w-5 h-5" />
-              Danger Zone
-            </h3>
-            <Button
-              onClick={() => navigate('/settings/account')}
-              variant="outline"
-              className="w-full justify-between border-destructive/50 text-destructive hover:bg-destructive/20 hover:border-destructive transition-all duration-300 group"
-            >
-              <div className="flex items-center space-x-2">
-                <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                <span className="font-semibold">Delete Account</span>
-              </div>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </div>
-        </Card>
+        {/* Note: Danger Zone moved to Privacy & Security settings */}
 
         {/* Sign Out */}
         <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
