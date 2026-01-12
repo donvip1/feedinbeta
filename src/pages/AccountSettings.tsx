@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,9 +22,87 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Camera, Loader2, Trash2 } from 'lucide-react';
+import { Camera, Loader2, Trash2, MapPin, Phone, Calendar, User, Briefcase, Globe } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { detectUserLocation, getCountryFlag, getCurrencyForCountry, type LocationData } from '@/lib/location-service';
+
+// Country list for selection
+const COUNTRIES = [
+  { code: 'US', name: 'United States' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'NG', name: 'Nigeria' },
+  { code: 'ZA', name: 'South Africa' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'EG', name: 'Egypt' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'BE', name: 'Belgium' },
+  { code: 'CH', name: 'Switzerland' },
+  { code: 'SE', name: 'Sweden' },
+  { code: 'NO', name: 'Norway' },
+  { code: 'DK', name: 'Denmark' },
+  { code: 'PL', name: 'Poland' },
+  { code: 'RU', name: 'Russia' },
+  { code: 'TR', name: 'Turkey' },
+  { code: 'UA', name: 'Ukraine' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'CN', name: 'China' },
+  { code: 'KR', name: 'South Korea' },
+  { code: 'IN', name: 'India' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'ID', name: 'Indonesia' },
+  { code: 'MY', name: 'Malaysia' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'TH', name: 'Thailand' },
+  { code: 'VN', name: 'Vietnam' },
+  { code: 'AE', name: 'United Arab Emirates' },
+  { code: 'SA', name: 'Saudi Arabia' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'NZ', name: 'New Zealand' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'AR', name: 'Argentina' },
+  { code: 'CL', name: 'Chile' },
+  { code: 'CO', name: 'Colombia' },
+  { code: 'PE', name: 'Peru' },
+  { code: 'TZ', name: 'Tanzania' },
+  { code: 'UG', name: 'Uganda' },
+  { code: 'RW', name: 'Rwanda' },
+  { code: 'ET', name: 'Ethiopia' },
+  { code: 'SN', name: 'Senegal' },
+  { code: 'CI', name: 'Ivory Coast' },
+  { code: 'CM', name: 'Cameroon' },
+].sort((a, b) => a.name.localeCompare(b.name));
+
+const GENDER_OPTIONS = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'non-binary', label: 'Non-binary' },
+  { value: 'prefer-not-to-say', label: 'Prefer not to say' },
+];
+
+interface ProfileData {
+  display_name: string;
+  username: string;
+  bio: string;
+  avatar_url: string;
+  country: string;
+  city: string;
+  phone_number: string;
+  date_of_birth: string;
+  gender: string;
+  occupation: string;
+  timezone: string;
+  detected_country_code: string;
+}
 
 const AccountSettings = () => {
   const navigate = useNavigate();
@@ -31,11 +110,20 @@ const AccountSettings = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [profile, setProfile] = useState({
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [profile, setProfile] = useState<ProfileData>({
     display_name: '',
     username: '',
     bio: '',
     avatar_url: '',
+    country: '',
+    city: '',
+    phone_number: '',
+    date_of_birth: '',
+    gender: '',
+    occupation: '',
+    timezone: '',
+    detected_country_code: '',
   });
   const [userEmail, setUserEmail] = useState('');
 
@@ -50,12 +138,25 @@ const AccountSettings = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('display_name, username, bio, avatar_url')
+        .select('display_name, username, bio, avatar_url, country, city, phone_number, date_of_birth, gender, occupation, timezone, detected_country_code')
         .eq('id', user?.id)
         .single();
 
       if (error) throw error;
-      setProfile(data);
+      setProfile({
+        display_name: data.display_name || '',
+        username: data.username || '',
+        bio: data.bio || '',
+        avatar_url: data.avatar_url || '',
+        country: data.country || '',
+        city: data.city || '',
+        phone_number: data.phone_number || '',
+        date_of_birth: data.date_of_birth || '',
+        gender: data.gender || '',
+        occupation: data.occupation || '',
+        timezone: data.timezone || '',
+        detected_country_code: data.detected_country_code || '',
+      });
       
       // Get user email from auth
       if (user?.email) {
@@ -70,15 +171,67 @@ const AccountSettings = () => {
     }
   };
 
+  const handleDetectLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      const location: LocationData = await detectUserLocation();
+      
+      setProfile(prev => ({
+        ...prev,
+        country: location.country,
+        city: location.city,
+        timezone: location.timezone,
+        detected_country_code: location.countryCode,
+      }));
+
+      toast({
+        title: 'Location detected',
+        description: `${location.city ? location.city + ', ' : ''}${location.country}`,
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Could not detect location',
+        description: 'Please select your country manually.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
+
+  const handleCountryChange = (countryCode: string) => {
+    const country = COUNTRIES.find(c => c.code === countryCode);
+    if (country) {
+      setProfile(prev => ({
+        ...prev,
+        country: country.name,
+        detected_country_code: countryCode,
+      }));
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
+      const currency = profile.detected_country_code 
+        ? getCurrencyForCountry(profile.detected_country_code)
+        : 'USD';
+
       const { error } = await supabase
         .from('profiles')
         .update({
           display_name: profile.display_name,
           username: profile.username,
           bio: profile.bio,
+          country: profile.country,
+          city: profile.city,
+          phone_number: profile.phone_number || null,
+          date_of_birth: profile.date_of_birth || null,
+          gender: profile.gender || null,
+          occupation: profile.occupation || null,
+          timezone: profile.timezone,
+          detected_country_code: profile.detected_country_code,
+          preferred_currency: currency,
         })
         .eq('id', user?.id);
 
@@ -174,6 +327,14 @@ const AccountSettings = () => {
     }
   };
 
+  const getSelectedCountryCode = () => {
+    if (profile.detected_country_code) {
+      return profile.detected_country_code;
+    }
+    const found = COUNTRIES.find(c => c.name === profile.country);
+    return found?.code || '';
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <PageHeader title="Account Settings" />
@@ -234,8 +395,13 @@ const AccountSettings = () => {
 
           <Separator className="my-6" />
 
-          {/* Profile Form */}
+          {/* Basic Info Section */}
           <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Basic Information
+            </h3>
+            
             <div>
               <Label htmlFor="email">Email Address</Label>
               <Input
@@ -285,22 +451,183 @@ const AccountSettings = () => {
                 className="bg-background min-h-[100px]"
               />
             </div>
-
-            <Button
-              onClick={handleSave}
-              disabled={loading}
-              className="w-full bg-gradient-primary"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Changes'
-              )}
-            </Button>
           </div>
+
+          <Separator className="my-6" />
+
+          {/* Personal Details Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Personal Details
+            </h3>
+
+            <div>
+              <Label htmlFor="phone_number">Phone Number</Label>
+              <div className="flex items-center gap-2">
+                <Phone className="w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="phone_number"
+                  type="tel"
+                  value={profile.phone_number || ''}
+                  onChange={(e) =>
+                    setProfile({ ...profile, phone_number: e.target.value })
+                  }
+                  placeholder="+1 234 567 8900"
+                  className="bg-background flex-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Required for P2P marketplace
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="date_of_birth">Date of Birth</Label>
+              <Input
+                id="date_of_birth"
+                type="date"
+                value={profile.date_of_birth || ''}
+                onChange={(e) =>
+                  setProfile({ ...profile, date_of_birth: e.target.value })
+                }
+                className="bg-background"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="gender">Gender</Label>
+              <Select
+                value={profile.gender || ''}
+                onValueChange={(value) => setProfile({ ...profile, gender: value })}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border z-50">
+                  {GENDER_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="occupation">Occupation</Label>
+              <div className="flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="occupation"
+                  value={profile.occupation || ''}
+                  onChange={(e) =>
+                    setProfile({ ...profile, occupation: e.target.value })
+                  }
+                  placeholder="Your profession"
+                  className="bg-background flex-1"
+                />
+              </div>
+            </div>
+          </div>
+
+          <Separator className="my-6" />
+
+          {/* Location Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <MapPin className="w-5 h-5" />
+                Location
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDetectLocation}
+                disabled={detectingLocation}
+              >
+                {detectingLocation ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Globe className="w-4 h-4 mr-2" />
+                )}
+                {detectingLocation ? 'Detecting...' : 'Auto-detect'}
+              </Button>
+            </div>
+
+            <div>
+              <Label htmlFor="country">Country</Label>
+              <Select
+                value={getSelectedCountryCode()}
+                onValueChange={handleCountryChange}
+              >
+                <SelectTrigger className="bg-background">
+                  <SelectValue placeholder="Select your country">
+                    {getSelectedCountryCode() && (
+                      <span className="flex items-center gap-2">
+                        <span>{getCountryFlag(getSelectedCountryCode())}</span>
+                        <span>{profile.country}</span>
+                      </span>
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border z-50 max-h-[300px]">
+                  {COUNTRIES.map((country) => (
+                    <SelectItem key={country.code} value={country.code}>
+                      <span className="flex items-center gap-2">
+                        <span>{getCountryFlag(country.code)}</span>
+                        <span>{country.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Required for P2P marketplace and currency settings
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="city">City</Label>
+              <Input
+                id="city"
+                value={profile.city || ''}
+                onChange={(e) =>
+                  setProfile({ ...profile, city: e.target.value })
+                }
+                placeholder="Your city"
+                className="bg-background"
+              />
+            </div>
+
+            {profile.timezone && (
+              <div>
+                <Label>Timezone</Label>
+                <Input
+                  value={profile.timezone}
+                  disabled
+                  className="bg-muted cursor-not-allowed"
+                />
+              </div>
+            )}
+          </div>
+
+          <Separator className="my-6" />
+
+          <Button
+            onClick={handleSave}
+            disabled={loading}
+            className="w-full bg-gradient-primary"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </Button>
         </Card>
 
         {/* Delete Account Section */}

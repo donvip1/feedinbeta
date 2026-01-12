@@ -3856,11 +3856,13 @@ export type Database = {
           daily_ai_thesis_count: number | null
           daily_ai_video_count: number | null
           daily_enhancement_count: number | null
+          date_of_birth: string | null
           detected_country_code: string | null
           display_name: string | null
           facebook_url: string | null
           followers_count: number | null
           following_count: number | null
+          gender: string | null
           id: string
           instagram_url: string | null
           interests: string[] | null
@@ -3874,6 +3876,9 @@ export type Database = {
           location: string | null
           marital_status: string | null
           max_friends: number | null
+          occupation: string | null
+          phone_number: string | null
+          phone_verified: boolean | null
           preferred_currency: string | null
           preferred_language: string | null
           profile_completed: boolean | null
@@ -3912,11 +3917,13 @@ export type Database = {
           daily_ai_thesis_count?: number | null
           daily_ai_video_count?: number | null
           daily_enhancement_count?: number | null
+          date_of_birth?: string | null
           detected_country_code?: string | null
           display_name?: string | null
           facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
+          gender?: string | null
           id: string
           instagram_url?: string | null
           interests?: string[] | null
@@ -3930,6 +3937,9 @@ export type Database = {
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
+          occupation?: string | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
           preferred_currency?: string | null
           preferred_language?: string | null
           profile_completed?: boolean | null
@@ -3968,11 +3978,13 @@ export type Database = {
           daily_ai_thesis_count?: number | null
           daily_ai_video_count?: number | null
           daily_enhancement_count?: number | null
+          date_of_birth?: string | null
           detected_country_code?: string | null
           display_name?: string | null
           facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
+          gender?: string | null
           id?: string
           instagram_url?: string | null
           interests?: string[] | null
@@ -3986,6 +3998,9 @@ export type Database = {
           location?: string | null
           marital_status?: string | null
           max_friends?: number | null
+          occupation?: string | null
+          phone_number?: string | null
+          phone_verified?: boolean | null
           preferred_currency?: string | null
           preferred_language?: string | null
           profile_completed?: boolean | null
@@ -5050,34 +5065,88 @@ export type Database = {
       }
       public_profiles: {
         Row: {
+          about: string | null
+          about_visibility: string | null
           avatar_url: string | null
           bio: string | null
+          city: string | null
+          country: string | null
+          cover_url: string | null
+          detected_country_code: string | null
           display_name: string | null
+          facebook_url: string | null
           followers_count: number | null
           following_count: number | null
           id: string | null
+          instagram_url: string | null
           is_premium: boolean | null
+          linkedin_url: string | null
+          marital_status: string | null
+          occupation: string | null
+          purpose: string[] | null
+          status: string | null
+          status_visibility: string | null
+          tiktok_url: string | null
+          twitter_url: string | null
           username: string | null
+          website_url: string | null
+          youtube_url: string | null
         }
         Insert: {
+          about?: string | null
+          about_visibility?: string | null
           avatar_url?: string | null
           bio?: string | null
+          city?: string | null
+          country?: string | null
+          cover_url?: string | null
+          detected_country_code?: string | null
           display_name?: string | null
+          facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
+          instagram_url?: string | null
           is_premium?: boolean | null
+          linkedin_url?: string | null
+          marital_status?: string | null
+          occupation?: string | null
+          purpose?: string[] | null
+          status?: string | null
+          status_visibility?: string | null
+          tiktok_url?: string | null
+          twitter_url?: string | null
           username?: string | null
+          website_url?: string | null
+          youtube_url?: string | null
         }
         Update: {
+          about?: string | null
+          about_visibility?: string | null
           avatar_url?: string | null
           bio?: string | null
+          city?: string | null
+          country?: string | null
+          cover_url?: string | null
+          detected_country_code?: string | null
           display_name?: string | null
+          facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
+          instagram_url?: string | null
           is_premium?: boolean | null
+          linkedin_url?: string | null
+          marital_status?: string | null
+          occupation?: string | null
+          purpose?: string[] | null
+          status?: string | null
+          status_visibility?: string | null
+          tiktok_url?: string | null
+          twitter_url?: string | null
           username?: string | null
+          website_url?: string | null
+          youtube_url?: string | null
         }
         Relationships: []
       }

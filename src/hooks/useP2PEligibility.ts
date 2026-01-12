@@ -15,10 +15,12 @@ interface P2PEligibility {
   totalVolumeUsd: number;
   requiresPaymentSetup: boolean;
   userCountry: string | null;
+  userPhoneNumber: string | null;
   reasons: string[];
   buyerCancellationCount: number;
   buyerBanUntil: string | null;
   isBuyerBanned: boolean;
+  profileIncomplete: boolean;
 }
 
 export const useP2PEligibility = () => {
@@ -40,10 +42,12 @@ export const useP2PEligibility = () => {
           totalVolumeUsd: 0,
           requiresPaymentSetup: true,
           userCountry: null,
+          userPhoneNumber: null,
           reasons: ['Please sign in to trade'],
           buyerCancellationCount: 0,
           buyerBanUntil: null,
           isBuyerBanned: false,
+          profileIncomplete: true,
         };
       }
 
@@ -61,10 +65,10 @@ export const useP2PEligibility = () => {
         .eq('user_id', user.id)
         .eq('is_active', true);
 
-      // Fetch user profile for country
+      // Fetch user profile for country and phone
       const { data: profile } = await supabase
         .from('profiles')
-        .select('country')
+        .select('country, phone_number')
         .eq('id', user.id)
         .single();
 
@@ -75,6 +79,7 @@ export const useP2PEligibility = () => {
       const totalTrades = eligibilityData?.total_trades ?? 0;
       const totalVolumeUsd = Number(eligibilityData?.total_volume_usd ?? 0);
       const userCountry = profile?.country ?? null;
+      const userPhoneNumber = profile?.phone_number ?? null;
       const buyerCancellationCount = (eligibilityData as any)?.buyer_cancellation_count ?? 0;
       const buyerBanUntil = (eligibilityData as any)?.buyer_ban_until ?? null;
 
@@ -98,11 +103,16 @@ export const useP2PEligibility = () => {
         reasons.push('Set your country in profile settings');
       }
 
+      if (!userPhoneNumber) {
+        reasons.push('Add your phone number in profile settings');
+      }
+
       if (isBuyerBanned) {
         reasons.push(`You are banned from buying until ${new Date(buyerBanUntil!).toLocaleDateString()}`);
       }
 
-      const canTrade = hasPaymentMethod && !!userCountry;
+      const profileIncomplete = !userCountry || !userPhoneNumber;
+      const canTrade = hasPaymentMethod && !!userCountry && !!userPhoneNumber;
       const canBuy = canTrade && !isBuyerBanned;
 
       return {
@@ -117,10 +127,12 @@ export const useP2PEligibility = () => {
         totalVolumeUsd,
         requiresPaymentSetup: !hasPaymentMethod,
         userCountry,
+        userPhoneNumber,
         reasons,
         buyerCancellationCount,
         buyerBanUntil,
         isBuyerBanned,
+        profileIncomplete,
       };
     },
     enabled: !!user?.id,
@@ -140,10 +152,12 @@ export const useP2PEligibility = () => {
       totalVolumeUsd: 0,
       requiresPaymentSetup: true,
       userCountry: null,
+      userPhoneNumber: null,
       reasons: ['Loading...'],
       buyerCancellationCount: 0,
       buyerBanUntil: null,
       isBuyerBanned: false,
+      profileIncomplete: true,
     },
     isLoading,
     refetch,

@@ -14,7 +14,8 @@ import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket, UserCheck, X } from 'lucide-react';
+import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket, UserCheck, X, MapPin, Briefcase } from 'lucide-react';
+import { getCountryFlag } from '@/lib/location-service';
 import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
 import { usePageRefresh } from '@/context/RefreshContext';
@@ -50,6 +51,11 @@ interface Profile {
   tiktok_url?: string | null;
   youtube_url?: string | null;
   website_url?: string | null;
+  country?: string | null;
+  city?: string | null;
+  detected_country_code?: string | null;
+  phone_number?: string | null;
+  occupation?: string | null;
 }
 
 const PURPOSE_OPTIONS: Record<string, string> = {
@@ -959,6 +965,27 @@ const Profile = () => {
           {/* Bio */}
           {profile.bio && (
             <p className="text-foreground mb-4 leading-relaxed">{profile.bio}</p>
+          )}
+
+          {/* Location & Occupation Info */}
+          {(profile.country || profile.city || profile.occupation) && (
+            <div className="flex flex-wrap gap-3 mb-4">
+              {(profile.country || profile.city) && (
+                <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                  <MapPin className="w-4 h-4" />
+                  <span>
+                    {profile.detected_country_code && getCountryFlag(profile.detected_country_code)}{' '}
+                    {profile.city && profile.country ? `${profile.city}, ${profile.country}` : (profile.city || profile.country)}
+                  </span>
+                </div>
+              )}
+              {profile.occupation && (
+                <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
+                  <Briefcase className="w-4 h-4" />
+                  <span>{profile.occupation}</span>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Friend Requests Section - Only for own profile */}
