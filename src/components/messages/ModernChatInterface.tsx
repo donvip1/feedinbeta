@@ -934,37 +934,37 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   return (
     <div className="flex flex-col h-[100dvh] w-full bg-gradient-to-b from-background to-background/95 overflow-hidden">
       {/* Header - Flex shrink 0 to stay at top */}
-      <header className="flex-shrink-0 flex items-center gap-3 p-3 border-b border-border/50 bg-background/95 backdrop-blur-lg z-50 min-h-[60px]">
+      <header className="flex-shrink-0 flex items-center gap-2 px-2 py-2 border-b border-border/50 bg-background/95 backdrop-blur-lg z-50 min-h-[52px]">
         <Button
           variant="ghost"
           size="icon"
           onClick={onBack}
-          className="md:hidden shrink-0 hover:bg-primary/10"
+          className="md:hidden shrink-0 h-8 w-8 hover:bg-primary/10"
         >
-          <ArrowLeft className="w-5 h-5" />
+          <ArrowLeft className="w-4 h-4" />
         </Button>
         
         <div 
-          className="flex items-center gap-3 flex-1 cursor-pointer"
+          className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer overflow-hidden"
           onClick={() => otherUser && navigate(`/profile/${otherUser.username || otherUser.id}`)}
         >
-          <div className="relative">
-            <Avatar className="w-10 h-10 ring-2 ring-primary/20">
+          <div className="relative shrink-0">
+            <Avatar className="w-9 h-9 ring-2 ring-primary/20">
               <AvatarImage src={otherUser?.avatar_url || ''} />
-              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40">
+              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
                 {otherUser?.display_name?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
             {isOnline && (
               <div className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background",
+                "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
                 currentSection === 'messages' ? 'bg-blue-500' : 'bg-emerald-500'
               )} />
             )}
           </div>
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold truncate">{otherUser?.display_name || 'Loading...'}</h2>
-            <p className="text-xs text-muted-foreground">
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <h2 className="font-semibold truncate text-sm">{otherUser?.display_name || 'Loading...'}</h2>
+            <p className="text-xs text-muted-foreground truncate">
               {isTyping ? (
                 <span className="text-primary flex items-center gap-1 animate-pulse">
                   {getActivityIcon(activityType)}
@@ -983,35 +983,36 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        {/* Action buttons - Always visible, never shrink */}
+        <div className="flex items-center gap-0.5 shrink-0">
           <Button
             variant="ghost"
             size="icon"
-            className="hover:bg-primary/10"
+            className="h-8 w-8 hover:bg-primary/10"
             onClick={() => setShowSearch(!showSearch)}
           >
-            <Search className="w-5 h-5" />
+            <Search className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="hover:bg-primary/10"
+            className="h-8 w-8 hover:bg-primary/10"
             onClick={() => initiateCall('voice')}
           >
-            <Phone className="w-5 h-5" />
+            <Phone className="w-4 h-4" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
-            className="hover:bg-primary/10"
+            className="h-8 w-8 hover:bg-primary/10"
             onClick={() => initiateCall('video')}
           >
-            <Video className="w-5 h-5" />
+            <Video className="w-4 h-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="hover:bg-primary/10">
-                <MoreVertical className="w-5 h-5" />
+              <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10">
+                <MoreVertical className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl">
