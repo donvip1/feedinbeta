@@ -153,6 +153,20 @@ const Settings = () => {
       description: 'Purchase credit packages',
       route: '/wallet/credits',
       color: 'text-amber-500'
+    },
+    {
+      icon: TrendingUp,
+      title: 'P2P Marketplace',
+      description: 'Buy and sell credits peer-to-peer',
+      route: '/wallet/p2p',
+      color: 'text-blue-500'
+    },
+    {
+      icon: Banknote,
+      title: 'P2P Payment Methods',
+      description: 'Manage your bank accounts for P2P trading',
+      route: '/p2p/payment-methods',
+      color: 'text-cyan-500'
     }
   ];
 

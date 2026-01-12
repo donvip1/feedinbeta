@@ -5,8 +5,9 @@ import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Coins, DollarSign, Clock, Shield, Star, TrendingUp } from 'lucide-react';
+import { Coins, Clock, Shield, TrendingUp, Globe, MapPin } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { P2P_CONFIG } from '@/lib/p2p-config';
 
 interface P2PListingCardProps {
   listing: {
@@ -19,24 +20,30 @@ interface P2PListingCardProps {
     payment_window_minutes?: number;
     terms?: string;
     created_at: string;
+    country_code?: string;
+    currency_code?: string;
+    is_international?: boolean;
     profiles?: {
       display_name: string | null;
       username: string | null;
       avatar_url: string | null;
     };
   };
+  userCountry?: string;
   onBuy: (listingId: string, sellerId: string, credits: number, price: number) => void;
   isProcessing?: boolean;
 }
 
-export const P2PListingCard = ({ listing, onBuy, isProcessing }: P2PListingCardProps) => {
+export const P2PListingCard = ({ listing, userCountry, onBuy, isProcessing }: P2PListingCardProps) => {
   const { user } = useAuth();
-  const { formatPrice, convertFromUSD, currencySymbol } = useCurrency();
+  const { convertFromUSD, currencySymbol } = useCurrency();
   const [showTerms, setShowTerms] = useState(false);
 
   const isOwnListing = user?.id === listing.seller_id;
   const creditsPerDollar = Math.round(listing.credits_amount / listing.price_usd);
   const localPrice = convertFromUSD(listing.price_usd);
+  const isSameCountry = !userCountry || listing.country_code === userCountry;
+  const countryName = P2P_CONFIG.SUPPORTED_COUNTRIES[listing.country_code || 'NG'] || listing.country_code;
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
@@ -60,11 +67,20 @@ export const P2PListingCard = ({ listing, onBuy, isProcessing }: P2PListingCardP
             </div>
           </div>
 
-          {/* Rate Badge */}
-          <Badge variant="secondary" className="gap-1">
-            <TrendingUp className="w-3 h-3" />
-            {creditsPerDollar}/$ 
-          </Badge>
+          {/* Country & Rate Badges */}
+          <div className="flex flex-col items-end gap-1">
+            <Badge 
+              variant={isSameCountry ? "default" : "outline"} 
+              className={`gap-1 ${isSameCountry ? 'bg-green-500/10 text-green-600 border-green-500/30' : ''}`}
+            >
+              <MapPin className="w-3 h-3" />
+              {countryName}
+            </Badge>
+            <Badge variant="secondary" className="gap-1">
+              <TrendingUp className="w-3 h-3" />
+              {creditsPerDollar}/$ 
+            </Badge>
+          </div>
         </div>
       </CardHeader>
 
@@ -138,13 +154,19 @@ export const P2PListingCard = ({ listing, onBuy, isProcessing }: P2PListingCardP
         </p>
       </CardContent>
 
-      <CardFooter>
+      <CardFooter className="flex-col gap-2">
+        {!isSameCountry && (
+          <p className="text-xs text-yellow-600 flex items-center gap-1 w-full">
+            <Globe className="w-3 h-3" />
+            Different region - PayPal payment required (Coming Soon)
+          </p>
+        )}
         <Button
           className="w-full"
           onClick={() => onBuy(listing.id, listing.seller_id, listing.credits_amount, listing.price_usd)}
-          disabled={isOwnListing || isProcessing}
+          disabled={isOwnListing || isProcessing || !isSameCountry}
         >
-          {isOwnListing ? 'Your Listing' : isProcessing ? 'Processing...' : 'Buy Credits'}
+          {isOwnListing ? 'Your Listing' : !isSameCountry ? 'Region Locked' : isProcessing ? 'Processing...' : 'Buy Credits'}
         </Button>
       </CardFooter>
     </Card>

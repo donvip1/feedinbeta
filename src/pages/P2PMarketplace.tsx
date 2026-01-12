@@ -257,10 +257,10 @@ const P2PMarketplace = () => {
                   <P2PListingCard
                     key={listing.id}
                     listing={listing}
+                    userCountry={userCountry}
                     onBuy={handleBuyCredits}
                     isProcessing={processingId === listing.id}
                   />
-                ))}
                 ))}
               </div>
             )}
