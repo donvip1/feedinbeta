@@ -7,7 +7,12 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Generate LiveKit compatible JWT token
+// Generate a unique JWT ID
+function generateJti(): string {
+  return crypto.randomUUID();
+}
+
+// Generate LiveKit compatible JWT token matching the official SDK format
 async function generateLiveKitToken(
   apiKey: string,
   apiSecret: string,
@@ -16,8 +21,13 @@ async function generateLiveKitToken(
   participantName: string,
   isHost: boolean
 ): Promise<string> {
-  // Build the grants object (this goes into the JWT payload)
-  const grants = {
+  const encoder = new TextEncoder();
+  const secretKey = encoder.encode(apiSecret);
+  
+  // Build the claims matching LiveKit's expected format exactly
+  // https://docs.livekit.io/realtime/concepts/authentication/
+  const claims = {
+    jti: generateJti(), // JWT ID is required by LiveKit
     name: participantName,
     video: {
       room: roomName,
@@ -28,21 +38,16 @@ async function generateLiveKitToken(
       roomAdmin: isHost,
       roomRecord: isHost,
     },
+    metadata: "", // Empty metadata
+    sha256: "", // Empty sha256
   };
-
-  // Sign the JWT matching LiveKit's expected format
-  const encoder = new TextEncoder();
-  const secretKey = encoder.encode(apiSecret);
   
-  const now = Math.floor(Date.now() / 1000);
-  
-  const jwt = await new jose.SignJWT(grants)
+  const jwt = await new jose.SignJWT(claims)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuer(apiKey)
     .setSubject(participantIdentity)
-    .setIssuedAt(now)
-    .setNotBefore(now)
     .setExpirationTime("6h")
+    .setNotBefore(Math.floor(Date.now() / 1000))
     .sign(secretKey);
 
   return jwt;
@@ -66,6 +71,14 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Ensure URL has wss:// prefix for WebSocket connection
+    let wsUrl = LIVEKIT_URL;
+    if (!wsUrl.startsWith('wss://') && !wsUrl.startsWith('ws://')) {
+      wsUrl = `wss://${wsUrl}`;
+    }
+    
+    console.log(`[LiveKit] URL: ${wsUrl}, API Key prefix: ${LIVEKIT_API_KEY.substring(0, 8)}...`);
 
     const { roomName, participantName, participantIdentity, isHost } = await req.json();
 
@@ -92,7 +105,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         token, 
-        url: LIVEKIT_URL,
+        url: wsUrl,
         roomName,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
