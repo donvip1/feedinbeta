@@ -48,7 +48,9 @@ class SpaceRoomManager {
   private onConnectionStateChange: ConnectionStateCallback | null = null;
   private realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
   private subscribedSpeakers: Set<string> = new Set();
+  private failedSubscriptions: Set<string> = new Set(); // Track failed subscriptions for retry
   private sfuClient: UnifiedSFUClient | null = null;
+  private periodicRefreshInterval: number | null = null;
 
   /**
    * Initialize the room manager for a specific space
@@ -117,6 +119,9 @@ class SpaceRoomManager {
     // This is CRITICAL for discovering new speakers who join/broadcast
     this.setupRealtimeSubscription();
 
+    // Start periodic refresh for speaker subscriptions (fallback for missed realtime events)
+    this.startPeriodicSpeakerRefresh();
+
     this.notifyStateChange();
     return result;
   }
@@ -170,7 +175,7 @@ class SpaceRoomManager {
     if (eventType === 'INSERT' || eventType === 'UPDATE') {
       const speaker = newData as SpaceSpeaker;
       
-      console.log('[SpaceRoomManager] Speaker change detected:', {
+      console.log('[SpaceRoomManager] 📡 Speaker change detected:', {
         event: eventType,
         speakerId: speaker.id,
         speakerUserId: speaker.user_id,
@@ -180,16 +185,26 @@ class SpaceRoomManager {
         trackId: speaker.cloudflare_track_id?.slice(0, 30),
         isMe: speaker.user_id === this.userId,
         alreadySubscribed: this.subscribedSpeakers.has(speaker.user_id),
+        previouslyFailed: this.failedSubscriptions.has(speaker.user_id),
       });
       
-      // If a speaker has track info, it's not me, and I haven't subscribed yet
-      if (
+      // If a speaker has track info and it's not me
+      // Subscribe if: never subscribed OR previously failed OR track info changed (re-published)
+      const shouldSubscribe = 
         speaker.cloudflare_session_id && 
         speaker.cloudflare_track_id && 
         speaker.user_id !== this.userId &&
-        !this.subscribedSpeakers.has(speaker.user_id)
-      ) {
-        console.log('[SpaceRoomManager] 🎧 New speaker detected, subscribing:', speaker.user_id);
+        (
+          !this.subscribedSpeakers.has(speaker.user_id) || 
+          this.failedSubscriptions.has(speaker.user_id) ||
+          (eventType === 'UPDATE' && oldData?.cloudflare_track_id !== speaker.cloudflare_track_id)
+        );
+        
+      if (shouldSubscribe) {
+        console.log('[SpaceRoomManager] 🎧 New/updated speaker detected, subscribing:', speaker.user_id);
+        // Remove from failed set before retrying
+        this.failedSubscriptions.delete(speaker.user_id);
+        this.subscribedSpeakers.delete(speaker.user_id); // Allow fresh subscription
         await this.subscribeToSpeaker(speaker);
       }
     }
@@ -198,24 +213,26 @@ class SpaceRoomManager {
   }
 
   /**
-   * Subscribe to a speaker's audio track
+   * Subscribe to a speaker's audio track with retry logic
    * This pulls the remote track from the speaker's Cloudflare SFU session to our local session
    */
-  private async subscribeToSpeaker(speaker: SpaceSpeaker) {
+  private async subscribeToSpeaker(speaker: SpaceSpeaker, retryCount = 0): Promise<boolean> {
+    const maxRetries = 3;
+    
     if (!this.sessionId || !this.sfuClient || !speaker.cloudflare_session_id || !speaker.cloudflare_track_id) {
       console.warn('[SpaceRoomManager] Cannot subscribe - missing session or track info', {
         mySession: this.sessionId?.slice(0, 8),
         speakerSession: speaker.cloudflare_session_id?.slice(0, 8),
         speakerTrack: speaker.cloudflare_track_id?.slice(0, 30),
       });
-      return;
+      return false;
     }
 
     // Mark as subscribing to prevent duplicate subscriptions
     this.subscribedSpeakers.add(speaker.user_id);
 
     console.log('[SpaceRoomManager] ========================================');
-    console.log('[SpaceRoomManager] 🎧 SUBSCRIBING TO SPEAKER');
+    console.log(`[SpaceRoomManager] 🎧 SUBSCRIBING TO SPEAKER (attempt ${retryCount + 1}/${maxRetries + 1})`);
     console.log('[SpaceRoomManager] Speaker user ID:', speaker.user_id);
     console.log('[SpaceRoomManager] Speaker session:', speaker.cloudflare_session_id.slice(0, 8));
     console.log('[SpaceRoomManager] Speaker track:', speaker.cloudflare_track_id);
@@ -231,13 +248,39 @@ class SpaceRoomManager {
 
       if (!result.success) {
         console.error('[SpaceRoomManager] ❌ Failed to subscribe to speaker:', result.error);
-        this.subscribedSpeakers.delete(speaker.user_id); // Allow retry
+        
+        // Retry with exponential backoff
+        if (retryCount < maxRetries) {
+          const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s
+          console.log(`[SpaceRoomManager] Retrying subscription in ${delay}ms...`);
+          this.subscribedSpeakers.delete(speaker.user_id); // Allow retry
+          await new Promise(r => setTimeout(r, delay));
+          return this.subscribeToSpeaker(speaker, retryCount + 1);
+        } else {
+          // Mark as failed for potential refresh retry later
+          this.failedSubscriptions.add(speaker.user_id);
+          this.subscribedSpeakers.delete(speaker.user_id);
+          return false;
+        }
       } else {
         console.log('[SpaceRoomManager] ✅ Successfully subscribed to speaker:', speaker.user_id);
+        this.failedSubscriptions.delete(speaker.user_id);
+        return true;
       }
     } catch (error) {
       console.error('[SpaceRoomManager] ❌ Error subscribing to speaker:', error);
-      this.subscribedSpeakers.delete(speaker.user_id); // Allow retry
+      
+      if (retryCount < maxRetries) {
+        const delay = Math.pow(2, retryCount) * 500;
+        console.log(`[SpaceRoomManager] Retrying subscription in ${delay}ms...`);
+        this.subscribedSpeakers.delete(speaker.user_id);
+        await new Promise(r => setTimeout(r, delay));
+        return this.subscribeToSpeaker(speaker, retryCount + 1);
+      } else {
+        this.failedSubscriptions.add(speaker.user_id);
+        this.subscribedSpeakers.delete(speaker.user_id);
+        return false;
+      }
     }
   }
 
@@ -258,19 +301,98 @@ class SpaceRoomManager {
       return;
     }
 
-    // Create audio element for playback (SFU client already does this, but we also track for analyzer)
+    // Create audio element for playback with extra reliability
     this.playRemoteAudio(track, peerId);
     
-    // Create analyzer for speaking indicator
-    this.createAnalyzer(new MediaStream([track]), peerId);
+    // Create analyzer for speaking indicator - CRITICAL for visual feedback
+    const stream = new MediaStream([track]);
+    this.createAnalyzer(stream, peerId);
+    
+    // Log audio level detection status
+    console.log('[SpaceRoomManager] ✅ Analyzer created for peer:', peerId, 'Total analyzers:', this.analyzers.size);
   }
 
   /**
    * Play remote audio through an audio element (backup/additional handling)
    */
   private playRemoteAudio(track: MediaStreamTrack, peerId: string): void {
-    // The SFU client already creates audio elements, this is for redundancy
-    console.log('[SpaceRoomManager] 🔊 Remote audio setup complete for peer:', peerId);
+    // Create an additional backup audio element for this track
+    // This ensures playback even if the primary handler fails
+    try {
+      const existingEl = document.getElementById(`space-audio-backup-${peerId}`);
+      if (existingEl) {
+        existingEl.remove();
+      }
+      
+      const audio = document.createElement('audio');
+      audio.id = `space-audio-backup-${peerId}`;
+      audio.autoplay = true;
+      (audio as any).playsInline = true; // For iOS support
+      audio.srcObject = new MediaStream([track]);
+      audio.style.display = 'none';
+      document.body.appendChild(audio);
+      
+      // Ensure playback starts
+      audio.play().then(() => {
+        console.log('[SpaceRoomManager] 🔊 Backup audio element playing for peer:', peerId);
+      }).catch(e => {
+        console.warn('[SpaceRoomManager] Backup audio play failed (may need user interaction):', e);
+      });
+    } catch (e) {
+      console.warn('[SpaceRoomManager] Could not create backup audio element:', e);
+    }
+  }
+  
+  /**
+   * Start periodic refresh for speaker subscriptions
+   * This is a fallback mechanism to ensure we don't miss any speakers
+   */
+  private startPeriodicSpeakerRefresh(): void {
+    // Clear any existing interval
+    if (this.periodicRefreshInterval) {
+      clearInterval(this.periodicRefreshInterval);
+    }
+    
+    console.log('[SpaceRoomManager] 🔄 Starting periodic speaker refresh (every 10 seconds)');
+    
+    this.periodicRefreshInterval = window.setInterval(async () => {
+      if (!this.spaceId || !this.sessionId) {
+        return;
+      }
+      
+      console.log('[SpaceRoomManager] 🔄 Periodic refresh - checking for new speakers...');
+      
+      // Check for any speakers with track info that we haven't subscribed to
+      const { data: speakers, error } = await supabase
+        .from('live_space_speakers')
+        .select('*')
+        .eq('space_id', this.spaceId)
+        .is('left_at', null)
+        .not('cloudflare_track_id', 'is', null)
+        .not('cloudflare_session_id', 'is', null);
+        
+      if (error) {
+        console.warn('[SpaceRoomManager] Error fetching speakers during refresh:', error);
+        return;
+      }
+      
+      const unsubscribedSpeakers = (speakers || []).filter(
+        s => s.user_id !== this.userId && 
+             (!this.subscribedSpeakers.has(s.user_id) || this.failedSubscriptions.has(s.user_id))
+      );
+      
+      if (unsubscribedSpeakers.length > 0) {
+        console.log(`[SpaceRoomManager] 🔄 Found ${unsubscribedSpeakers.length} unsubscribed speakers, subscribing...`);
+        
+        for (const speaker of unsubscribedSpeakers) {
+          this.failedSubscriptions.delete(speaker.user_id);
+          this.subscribedSpeakers.delete(speaker.user_id);
+          await this.subscribeToSpeaker(speaker as SpaceSpeaker);
+        }
+      } else {
+        console.log('[SpaceRoomManager] 🔄 All speakers already subscribed');
+      }
+    }, 10000); // Every 10 seconds
   }
 
   /**
@@ -532,6 +654,12 @@ class SpaceRoomManager {
       sessionId: this.sessionId?.slice(0, 8),
     });
 
+    // Stop periodic refresh
+    if (this.periodicRefreshInterval) {
+      clearInterval(this.periodicRefreshInterval);
+      this.periodicRefreshInterval = null;
+    }
+
     // Stop audio level monitoring
     if (this.audioLevelInterval) {
       clearInterval(this.audioLevelInterval);
@@ -543,10 +671,14 @@ class SpaceRoomManager {
 
     // Use centralized audio manager for cleanup
     audioPlaybackManager.cleanup();
+    
+    // Remove backup audio elements
+    document.querySelectorAll('[id^="space-audio-backup-"]').forEach(el => el.remove());
 
     // Clear analyzers
     this.analyzers.clear();
     this.subscribedSpeakers.clear();
+    this.failedSubscriptions.clear();
 
     // Close audio context
     if (this.audioContext) {
@@ -581,6 +713,20 @@ class SpaceRoomManager {
     this.onConnectionStateChange = null;
     
     console.log('[SpaceRoomManager] ✅ Cleanup complete');
+  }
+  
+  /**
+   * Force resubscribe to all speakers (for manual retry)
+   */
+  async forceResubscribeAll(): Promise<void> {
+    console.log('[SpaceRoomManager] 🔄 Force resubscribing to all speakers...');
+    
+    // Clear all subscription state
+    this.subscribedSpeakers.clear();
+    this.failedSubscriptions.clear();
+    
+    // Resubscribe
+    await this.subscribeToAllSpeakers();
   }
 
   /**
