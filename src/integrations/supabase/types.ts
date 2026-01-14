@@ -3871,6 +3871,7 @@ export type Database = {
           is_premium: boolean | null
           last_ai_reset: string | null
           last_ai_reset_date: string | null
+          last_display_name_change: string | null
           last_enhancement_reset: string | null
           last_free_enhancement: string | null
           last_username_change: string | null
@@ -3936,6 +3937,7 @@ export type Database = {
           is_premium?: boolean | null
           last_ai_reset?: string | null
           last_ai_reset_date?: string | null
+          last_display_name_change?: string | null
           last_enhancement_reset?: string | null
           last_free_enhancement?: string | null
           last_username_change?: string | null
@@ -4001,6 +4003,7 @@ export type Database = {
           is_premium?: boolean | null
           last_ai_reset?: string | null
           last_ai_reset_date?: string | null
+          last_display_name_change?: string | null
           last_enhancement_reset?: string | null
           last_free_enhancement?: string | null
           last_username_change?: string | null
