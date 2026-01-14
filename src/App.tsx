@@ -83,6 +83,7 @@ import CurrencySettings from "./pages/CurrencySettings";
 import P2PPaymentMethods from "./pages/P2PPaymentMethods";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import AdminPanel from "./pages/AdminPanel";
+import Referral from "./pages/Referral";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -185,6 +186,7 @@ const App = () => {
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/install" element={<Install />} />
+            <Route path="/ref/:username" element={<Referral />} />
             
             {/* Feed & Content */}
             <Route path="/feed" element={<Feed />} />
