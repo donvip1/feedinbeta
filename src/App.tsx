@@ -61,7 +61,7 @@ import Wallet from "./pages/Wallet";
 import LearnTech from "./pages/LearnTech";
 import Welcome from "./pages/Welcome";
 import NotFound from "./pages/NotFound";
-import ProfileEdit from "./pages/ProfileEdit";
+
 import Search from "./pages/Search";
 import HashtagSearch from "./pages/HashtagSearch";
 import StoryDetail from "./pages/StoryDetail";
@@ -197,7 +197,7 @@ const App = () => {
             
             {/* Profile - supports both username and UUID */}
             <Route path="/profile/:identifier" element={<Profile />} />
-            <Route path="/profile/:identifier/edit" element={<ProfileEdit />} />
+            
             
             {/* Social */}
             <Route path="/messages" element={<Messages />} />
