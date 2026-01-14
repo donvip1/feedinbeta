@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -79,7 +78,6 @@ const PostDetail = () => {
           <h2 className="text-2xl font-bold text-foreground">Post Not Found</h2>
           <p className="text-muted-foreground">This post may have been deleted or doesn't exist.</p>
           <Button onClick={() => navigate('/feed')}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Feed
           </Button>
         </div>
@@ -89,19 +87,7 @@ const PostDetail = () => {
 
   return (
     <div className="min-h-screen bg-black relative">
-      {/* Back button overlay */}
-      <div className="absolute top-4 left-4 z-50">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => navigate(-1)}
-          className="bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-      </div>
-
-      {/* Fullscreen immersive post */}
+      {/* Fullscreen immersive post - no back button needed, users can use device back gestures */}
       <div className="h-screen w-full">
         <ImmersivePostCard
           post={post}
