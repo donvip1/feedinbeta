@@ -5547,6 +5547,10 @@ export type Database = {
         Args: { post_id: string }
         Returns: undefined
       }
+      increment_referral_count: {
+        Args: { referrer_id: string }
+        Returns: undefined
+      }
       invalidate_all_sessions: { Args: never; Returns: undefined }
       invalidate_session: { Args: { p_session_id: string }; Returns: boolean }
       is_account_locked: { Args: { p_identifier: string }; Returns: boolean }

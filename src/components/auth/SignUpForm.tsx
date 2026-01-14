@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Loader2, Eye, EyeOff, Check, X, AtSign, User, Mail, Lock } from 'lucide-react';
+import { Loader2, Eye, EyeOff, Check, X, AtSign, User, Mail, Lock, Gift } from 'lucide-react';
 import { z } from 'zod';
+import { getOrCreateFingerprint } from '@/lib/device-fingerprint';
 
 // Strong password requirements
 const passwordSchema = z.string()
@@ -31,9 +32,10 @@ const signupSchema = z.object({
 
 interface SignUpFormProps {
   onEmailAlreadyExists?: (email: string) => void;
+  referrerUsername?: string | null;
 }
 
-export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
+export const SignUpForm = ({ onEmailAlreadyExists, referrerUsername }: SignUpFormProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
@@ -42,6 +44,7 @@ export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [fraudCheckLoading, setFraudCheckLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     displayName: '',
@@ -167,6 +170,8 @@ export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
     }
 
     setLoading(true);
+    setFraudCheckLoading(true);
+    
     try {
       const redirectUrl = `${window.location.origin}/`;
 
@@ -177,6 +182,49 @@ export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
         username: formData.username,
       });
 
+      // Get device fingerprint for fraud detection
+      const fingerprint = await getOrCreateFingerprint();
+      
+      // Check for fraud/duplicate accounts
+      const { data: fraudCheck, error: fraudError } = await supabase.functions.invoke('fraud-detection', {
+        body: {
+          action: 'check_signup',
+          email: validated.email,
+          fingerprint,
+        },
+      });
+
+      setFraudCheckLoading(false);
+
+      if (fraudError) {
+        console.warn('Fraud check failed:', fraudError);
+        // Continue with signup even if fraud check fails
+      } else if (fraudCheck && !fraudCheck.allowed) {
+        toast({
+          title: "Account creation blocked",
+          description: fraudCheck.reasons?.join('. ') || 'Unable to create account at this time.',
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Get referrer ID if there's a referrer username
+      let referrerId: string | null = null;
+      const storedReferrer = sessionStorage.getItem('referrer_username') || referrerUsername;
+      
+      if (storedReferrer) {
+        const { data: referrerData } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('username', storedReferrer.toLowerCase())
+          .maybeSingle();
+        
+        if (referrerData) {
+          referrerId = referrerData.id;
+        }
+      }
+
       const { data, error } = await supabase.auth.signUp({
         email: validated.email,
         password: validated.password,
@@ -185,19 +233,30 @@ export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
           data: {
             display_name: validated.displayName,
             username: validated.username,
+            referred_by: referrerId,
+            signup_fingerprint: fingerprint,
           },
         },
       });
 
       if (error) {
         if (error.message.includes('already registered')) {
-          // Call callback to switch to signin tab with email prefilled
           if (onEmailAlreadyExists) {
             onEmailAlreadyExists(formData.email);
           }
           throw new Error('An account with this email already exists. Please sign in instead.');
         }
         throw error;
+      }
+
+      // If signup successful, increment referrer's count
+      if (data.user && referrerId) {
+        try {
+          await supabase.rpc('increment_referral_count' as any, { referrer_id: referrerId });
+        } catch (e) {
+          console.warn('Failed to increment referral count:', e);
+        }
+        sessionStorage.removeItem('referrer_username');
       }
 
       if (data.user && !data.session) {
@@ -210,7 +269,7 @@ export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
 
       toast({
         title: "Account created!",
-        description: "Welcome to feedin",
+        description: referrerId ? "Welcome to feedin! Thanks for using a referral." : "Welcome to feedin",
       });
       navigate('/');
     } catch (error: any) {
@@ -229,6 +288,7 @@ export const SignUpForm = ({ onEmailAlreadyExists }: SignUpFormProps) => {
       }
     } finally {
       setLoading(false);
+      setFraudCheckLoading(false);
     }
   };
 

@@ -7,7 +7,7 @@ import { SignUpForm } from '@/components/auth/SignUpForm';
 import { ForgotPasswordForm } from '@/components/auth/ForgotPasswordForm';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { Card, CardContent } from '@/components/ui/card';
-import { LogIn, UserPlus } from 'lucide-react';
+import { LogIn, UserPlus, Gift } from 'lucide-react';
 import { AndroidAppBanner } from '@/components/native/AndroidAppBanner';
 
 const Auth = () => {
@@ -17,6 +17,9 @@ const Auth = () => {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [activeTab, setActiveTab] = useState('signin');
   const [prefillEmail, setPrefillEmail] = useState('');
+  
+  // Get referrer from sessionStorage (set by /ref/:username page)
+  const referrerUsername = sessionStorage.getItem('referrer_username');
 
   // Callback when signup shows "email already exists" error
   const handleEmailAlreadyExists = useCallback((email: string) => {
@@ -66,6 +69,17 @@ const Auth = () => {
       <AndroidAppBanner variant="banner" />
       <div className="flex-1 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+        {/* Referral Banner */}
+        {referrerUsername && (
+          <div className="mb-4 p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center gap-3 animate-fade-in">
+            <Gift className="w-5 h-5 text-primary" />
+            <div>
+              <p className="text-sm font-medium">Referred by @{referrerUsername}</p>
+              <p className="text-xs text-muted-foreground">Create an account to get started!</p>
+            </div>
+          </div>
+        )}
+        
         {/* Logo & Header */}
         <div className="flex flex-col items-center mb-6 animate-fade-in">
           <div className="relative mb-4">
@@ -106,7 +120,10 @@ const Auth = () => {
               </TabsContent>
 
               <TabsContent value="signup" className="mt-0 animate-fade-in">
-                <SignUpForm onEmailAlreadyExists={handleEmailAlreadyExists} />
+                <SignUpForm 
+                  onEmailAlreadyExists={handleEmailAlreadyExists} 
+                  referrerUsername={referrerUsername}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>

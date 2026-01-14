@@ -1,14 +1,16 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
+import { getBackDestination } from '@/lib/navigation-utils';
 
 interface PageHeaderProps {
   title: string;
   icon?: React.ReactNode;
   showBack?: boolean;
   onBack?: () => void;
+  backTo?: string; // Explicit back destination
   rightContent?: React.ReactNode;
   className?: string;
   sticky?: boolean;
@@ -19,17 +21,23 @@ export const PageHeader = ({
   icon,
   showBack = true,
   onBack,
+  backTo,
   rightContent,
   className = '',
   sticky = true
 }: PageHeaderProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleBack = () => {
     if (onBack) {
       onBack();
+    } else if (backTo) {
+      navigate(backTo);
     } else {
-      navigate(-1);
+      // Use smart navigation based on current path
+      const destination = getBackDestination(location.pathname);
+      navigate(destination);
     }
   };
 
