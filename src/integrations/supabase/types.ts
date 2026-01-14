@@ -3842,6 +3842,7 @@ export type Database = {
           about: string | null
           about_updated_at: string | null
           about_visibility: string | null
+          account_status: string | null
           age: number | null
           avatar_url: string | null
           banner_url: string | null
@@ -3866,6 +3867,7 @@ export type Database = {
           id: string
           instagram_url: string | null
           interests: string[] | null
+          is_duplicate_flagged: boolean | null
           is_premium: boolean | null
           last_ai_reset: string | null
           last_ai_reset_date: string | null
@@ -3887,6 +3889,8 @@ export type Database = {
           referral_code: string | null
           referral_count: number | null
           referred_by: string | null
+          registration_ip: unknown
+          signup_fingerprint: string | null
           status: string | null
           status_updated_at: string | null
           status_visibility: string | null
@@ -3903,6 +3907,7 @@ export type Database = {
           about?: string | null
           about_updated_at?: string | null
           about_visibility?: string | null
+          account_status?: string | null
           age?: number | null
           avatar_url?: string | null
           banner_url?: string | null
@@ -3927,6 +3932,7 @@ export type Database = {
           id: string
           instagram_url?: string | null
           interests?: string[] | null
+          is_duplicate_flagged?: boolean | null
           is_premium?: boolean | null
           last_ai_reset?: string | null
           last_ai_reset_date?: string | null
@@ -3948,6 +3954,8 @@ export type Database = {
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
+          registration_ip?: unknown
+          signup_fingerprint?: string | null
           status?: string | null
           status_updated_at?: string | null
           status_visibility?: string | null
@@ -3964,6 +3972,7 @@ export type Database = {
           about?: string | null
           about_updated_at?: string | null
           about_visibility?: string | null
+          account_status?: string | null
           age?: number | null
           avatar_url?: string | null
           banner_url?: string | null
@@ -3988,6 +3997,7 @@ export type Database = {
           id?: string
           instagram_url?: string | null
           interests?: string[] | null
+          is_duplicate_flagged?: boolean | null
           is_premium?: boolean | null
           last_ai_reset?: string | null
           last_ai_reset_date?: string | null
@@ -4009,6 +4019,8 @@ export type Database = {
           referral_code?: string | null
           referral_count?: number | null
           referred_by?: string | null
+          registration_ip?: unknown
+          signup_fingerprint?: string | null
           status?: string | null
           status_updated_at?: string | null
           status_visibility?: string | null
@@ -4701,6 +4713,57 @@ export type Database = {
           },
         ]
       }
+      user_identifiers: {
+        Row: {
+          created_at: string | null
+          first_seen_at: string | null
+          flag_reason: string | null
+          id: string
+          identifier_type: string
+          identifier_value: string
+          is_flagged: boolean | null
+          last_seen_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          first_seen_at?: string | null
+          flag_reason?: string | null
+          id?: string
+          identifier_type: string
+          identifier_value: string
+          is_flagged?: boolean | null
+          last_seen_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          first_seen_at?: string | null
+          flag_reason?: string | null
+          id?: string
+          identifier_type?: string
+          identifier_value?: string
+          is_flagged?: boolean | null
+          last_seen_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_identifiers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_identifiers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_interests: {
         Row: {
           created_at: string | null
@@ -5065,88 +5128,55 @@ export type Database = {
       }
       public_profiles: {
         Row: {
-          about: string | null
-          about_visibility: string | null
+          account_status: string | null
           avatar_url: string | null
           bio: string | null
           city: string | null
           country: string | null
           cover_url: string | null
+          created_at: string | null
           detected_country_code: string | null
           display_name: string | null
-          facebook_url: string | null
           followers_count: number | null
           following_count: number | null
           id: string | null
-          instagram_url: string | null
           is_premium: boolean | null
-          linkedin_url: string | null
-          marital_status: string | null
           occupation: string | null
-          purpose: string[] | null
-          status: string | null
-          status_visibility: string | null
-          tiktok_url: string | null
-          twitter_url: string | null
           username: string | null
-          website_url: string | null
-          youtube_url: string | null
         }
         Insert: {
-          about?: string | null
-          about_visibility?: string | null
+          account_status?: string | null
           avatar_url?: string | null
           bio?: string | null
           city?: string | null
           country?: string | null
           cover_url?: string | null
+          created_at?: string | null
           detected_country_code?: string | null
           display_name?: string | null
-          facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
-          instagram_url?: string | null
           is_premium?: boolean | null
-          linkedin_url?: string | null
-          marital_status?: string | null
           occupation?: string | null
-          purpose?: string[] | null
-          status?: string | null
-          status_visibility?: string | null
-          tiktok_url?: string | null
-          twitter_url?: string | null
           username?: string | null
-          website_url?: string | null
-          youtube_url?: string | null
         }
         Update: {
-          about?: string | null
-          about_visibility?: string | null
+          account_status?: string | null
           avatar_url?: string | null
           bio?: string | null
           city?: string | null
           country?: string | null
           cover_url?: string | null
+          created_at?: string | null
           detected_country_code?: string | null
           display_name?: string | null
-          facebook_url?: string | null
           followers_count?: number | null
           following_count?: number | null
           id?: string | null
-          instagram_url?: string | null
           is_premium?: boolean | null
-          linkedin_url?: string | null
-          marital_status?: string | null
           occupation?: string | null
-          purpose?: string[] | null
-          status?: string | null
-          status_visibility?: string | null
-          tiktok_url?: string | null
-          twitter_url?: string | null
           username?: string | null
-          website_url?: string | null
-          youtube_url?: string | null
         }
         Relationships: []
       }
