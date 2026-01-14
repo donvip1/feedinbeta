@@ -16,6 +16,7 @@ import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import FullscreenMediaViewer from './FullscreenMediaViewer';
 import { cn } from '@/lib/utils';
+import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
 
 // Format count for display (e.g., 1.2K, 3.5M)
 const formatCount = (count: number): string => {
@@ -427,8 +428,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   // Generate gradient background for text posts
   const getTextBackground = () => {
     if (isTextStyled && post.media_url) {
-      // media_url contains the style info for styled text posts
-      return post.media_url;
+      // media_url contains Tailwind classes - convert to CSS gradient
+      return tailwindGradientToCSS(post.media_url);
     }
     // Default gradient for text-only posts
     return 'linear-gradient(135deg, hsl(230, 85%, 25%) 0%, hsl(280, 70%, 35%) 100%)';

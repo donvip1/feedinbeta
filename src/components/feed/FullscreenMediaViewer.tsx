@@ -12,6 +12,7 @@ import InlineCommentsPanel from './InlineCommentsPanel';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
+import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
 
 interface Post {
   id: string;
@@ -590,12 +591,22 @@ export default function FullscreenMediaViewer({
             const isCurrentVideo = p.media_type === 'video' || 
               (p.post_type === 'refeed' && p.original_post?.media_type === 'video') ||
               (p.post_type === 'quote' && p.original_post?.media_type === 'video');
+            const isTextStyled = p.media_type === 'text_styled';
+            const isImage = p.media_type === 'image' && mediaUrl;
             const isCurrent = index === currentPostIndex;
             const postDisplayName = p.profiles?.display_name || p.profiles?.username || 'Anonymous';
             const postUsername = p.profiles?.username || 'anonymous';
             
             // Check if video is preloaded
             const isPreloaded = mediaUrl ? videoPreloadManager.isReady(mediaUrl) : false;
+
+            // Get background for text_styled posts
+            const getPostBackground = () => {
+              if (isTextStyled && p.media_url) {
+                return tailwindGradientToCSS(p.media_url);
+              }
+              return 'linear-gradient(135deg, #6b21a8 0%, #db2777 100%)';
+            };
 
             return (
               <div 
@@ -623,7 +634,7 @@ export default function FullscreenMediaViewer({
                     controlsList="nodownload nofullscreen noremoteplayback"
                     disablePictureInPicture
                   />
-                ) : (
+                ) : isImage ? (
                   <img
                     src={mediaUrl || ''}
                     alt="Post content"
@@ -631,6 +642,17 @@ export default function FullscreenMediaViewer({
                     onClick={handleImageTap}
                     onContextMenu={(e) => e.preventDefault()}
                   />
+                ) : (
+                  /* Text styled or text-only posts */
+                  <div 
+                    className="w-full h-full flex items-center justify-center px-8"
+                    style={{ background: getPostBackground() }}
+                    onClick={handleImageTap}
+                  >
+                    <p className="text-white text-xl md:text-2xl font-semibold text-center leading-relaxed drop-shadow-lg break-words whitespace-pre-wrap">
+                      {p.content || ''}
+                    </p>
+                  </div>
                 )}
 
                 {/* Overlays - only show for current post */}
