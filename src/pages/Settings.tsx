@@ -9,6 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
 import { useTheme } from 'next-themes';
+import { ReferralSection } from '@/components/settings/ReferralSection';
 import { 
   ArrowLeft, 
   User, 
@@ -35,7 +36,8 @@ import {
   Banknote,
   Moon,
   Sun,
-  BarChart3
+  BarChart3,
+  Gift
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -358,8 +360,19 @@ const Settings = () => {
           </div>
         </Card>
 
+        {/* Referral Section */}
+        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 backdrop-blur-sm border-primary/30 shadow-xl mt-6">
+          <div className="p-6">
+            <h3 className="text-lg font-bold mb-4 text-foreground flex items-center gap-2">
+              <Gift className="w-5 h-5 text-primary" />
+              Invite Friends
+            </h3>
+            <ReferralSection />
+          </div>
+        </Card>
+
         {/* Account Settings Card */}
-        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl">
+        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
           <div className="p-6">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
