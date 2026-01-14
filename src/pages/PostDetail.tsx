@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import PostCard from '@/components/feed/PostCard';
+import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useQuery } from '@tanstack/react-query';
 
@@ -66,25 +66,8 @@ const PostDetail = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background pb-16">
-        <div className="sticky top-0 z-50 bg-background border-b border-border">
-          <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
-            <Skeleton className="w-8 h-8 rounded-full" />
-            <Skeleton className="h-6 w-24" />
-          </div>
-        </div>
-        <div className="max-w-2xl mx-auto p-4">
-          <div className="bg-card rounded-lg p-4 border border-border">
-            <div className="flex items-center gap-3 mb-3">
-              <Skeleton className="w-10 h-10 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-32" />
-                <Skeleton className="h-3 w-24" />
-              </div>
-            </div>
-            <Skeleton className="h-96 w-full rounded-lg" />
-          </div>
-        </div>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -105,22 +88,22 @@ const PostDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-16">
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center gap-3 px-4 py-3 max-w-2xl mx-auto">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">Post</h1>
-        </div>
+    <div className="min-h-screen bg-black relative">
+      {/* Back button overlay */}
+      <div className="absolute top-4 left-4 z-50">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(-1)}
+          className="bg-black/50 hover:bg-black/70 text-white rounded-full backdrop-blur-sm"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
       </div>
 
-      <div className="max-w-2xl mx-auto">
-        <PostCard
+      {/* Fullscreen immersive post */}
+      <div className="h-screen w-full">
+        <ImmersivePostCard
           post={post}
           allPosts={[post]}
           onLikeUpdate={() => {}}
