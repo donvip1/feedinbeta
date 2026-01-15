@@ -9,8 +9,9 @@ import { ShareCallModal } from '@/components/calls/ShareCallModal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { callSounds } from '@/utils/callSounds';
 import { useCallContext } from '@/context/CallContext';
-import { Loader2, RefreshCw, UserPlus } from 'lucide-react';
+import { Loader2, RefreshCw, UserPlus, Minimize2, Maximize2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface CallData {
   id: string;
@@ -58,6 +59,8 @@ const Call = () => {
   const [connectionMessage, setConnectionMessage] = useState('Starting call...');
   const [showRetry, setShowRetry] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [isRemoteFullscreen, setIsRemoteFullscreen] = useState(false);
+  const [currentCallType, setCurrentCallType] = useState<'video' | 'voice'>('voice');
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -333,7 +336,7 @@ const Call = () => {
       if (error) throw error;
 
       callTypeRef.current = data.call_type as 'video' | 'voice';
-
+      setCurrentCallType(data.call_type as 'video' | 'voice');
       const [callerProfile, receiverProfile] = await Promise.all([
         supabase.from('profiles').select('display_name, avatar_url').eq('id', data.caller_id).single(),
         supabase.from('profiles').select('display_name, avatar_url').eq('id', data.receiver_id).single(),
@@ -585,6 +588,45 @@ const Call = () => {
     }
   };
 
+  // Upgrade from voice to video call
+  const handleUpgradeToVideo = useCallback(async () => {
+    if (currentCallType === 'video') return;
+    
+    try {
+      // Enable the camera
+      await contextToggleVideo();
+      
+      // Update local state
+      callTypeRef.current = 'video';
+      setCurrentCallType('video');
+      
+      // Update database
+      if (callId) {
+        await supabase
+          .from('call_logs')
+          .update({ call_type: 'video' })
+          .eq('id', callId);
+      }
+      
+      toast({
+        title: 'Video enabled',
+        description: 'Switched to video call',
+      });
+    } catch (error) {
+      console.error('Error upgrading to video:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to enable video',
+        variant: 'destructive',
+      });
+    }
+  }, [currentCallType, callId, contextToggleVideo, toast]);
+
+  // Toggle remote video fullscreen
+  const toggleRemoteFullscreen = () => {
+    setIsRemoteFullscreen(prev => !prev);
+  };
+
   if (!callData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
@@ -593,7 +635,7 @@ const Call = () => {
     );
   }
 
-  const isVideoCall = callTypeRef.current === 'video';
+  const isVideoCall = currentCallType === 'video';
   const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   return (
@@ -647,15 +689,57 @@ const Call = () => {
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center p-6">
         {isVideoCall ? (
           /* Video call layout */
-          <div className="w-full h-full flex flex-col items-center">
-            {/* Remote video (main view) */}
-            <div className="relative w-full max-w-2xl aspect-video bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl overflow-hidden shadow-2xl">
+          <div className="w-full h-full flex flex-col items-center relative">
+            {/* Remote video (main view) - Tap to toggle fullscreen */}
+            <motion.div 
+              className={`relative bg-gradient-to-br from-gray-900 to-gray-800 overflow-hidden shadow-2xl cursor-pointer transition-all duration-300 ${
+                isRemoteFullscreen 
+                  ? 'fixed inset-0 z-50 rounded-none' 
+                  : 'w-full max-w-2xl aspect-video rounded-3xl'
+              }`}
+              onClick={toggleRemoteFullscreen}
+              layout
+            >
               <video 
                 ref={remoteVideoRef} 
                 autoPlay 
                 playsInline 
                 className="w-full h-full object-cover"
               />
+              
+              {/* Fullscreen toggle button overlay */}
+              <div className="absolute top-4 right-4 opacity-0 hover:opacity-100 transition-opacity">
+                <button 
+                  className="p-2 bg-black/50 rounded-full text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleRemoteFullscreen();
+                  }}
+                >
+                  {isRemoteFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                </button>
+              </div>
+
+              {/* Tap hint - show briefly */}
+              {callState.isConnected && !isRemoteFullscreen && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/50 px-3 py-1.5 rounded-full text-xs text-white/70 pointer-events-none">
+                  Tap to fullscreen
+                </div>
+              )}
+              
+              {/* Close button when fullscreen */}
+              {isRemoteFullscreen && (
+                <button 
+                  className="absolute top-4 left-4 p-2 bg-black/50 rounded-full text-white z-10"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsRemoteFullscreen(false);
+                  }}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+
               {!callState.isConnected && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                   <Avatar className="w-24 h-24 border-4 border-primary shadow-xl">
@@ -671,40 +755,81 @@ const Call = () => {
                   </div>
                 </div>
               )}
-            </div>
+            </motion.div>
             
-            {/* Local video (picture-in-picture) */}
-            <div className="absolute top-8 right-8 w-28 h-40 bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10">
-              <video 
-                ref={localVideoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                className={`w-full h-full object-cover ${callState.isVideoOff ? 'hidden' : ''}`}
-              />
-              {callState.isVideoOff && (
-                <div className="w-full h-full flex items-center justify-center bg-gray-800">
-                  <span className="text-gray-400 text-xs">Camera off</span>
-                </div>
+            {/* Local video (picture-in-picture) - Draggable style */}
+            <AnimatePresence>
+              {!isRemoteFullscreen && (
+                <motion.div 
+                  className="absolute top-8 right-8 w-28 h-40 bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border-2 border-white/10"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                >
+                  <video 
+                    ref={localVideoRef} 
+                    autoPlay 
+                    playsInline 
+                    muted 
+                    className={`w-full h-full object-cover ${callState.isVideoOff ? 'hidden' : ''}`}
+                  />
+                  {callState.isVideoOff && (
+                    <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                      <span className="text-gray-400 text-xs">Camera off</span>
+                    </div>
+                  )}
+                  {callState.isScreenSharing && (
+                    <div className="absolute bottom-1 left-1 right-1 bg-primary/80 text-xs text-center py-0.5 rounded">
+                      Sharing
+                    </div>
+                  )}
+                </motion.div>
               )}
-              {callState.isScreenSharing && (
-                <div className="absolute bottom-1 left-1 right-1 bg-primary/80 text-xs text-center py-0.5 rounded">
-                  Sharing
-                </div>
-              )}
-            </div>
+            </AnimatePresence>
             
-            {/* Call info */}
-            <div className="mt-6 text-center">
-              <h2 className="text-2xl font-bold">{otherUserProfile?.display_name || 'Unknown User'}</h2>
-              <p className="text-lg text-gray-300 mt-2">
-                {callStatus === 'connected' ? (
-                  <span className="text-green-400">{formatDuration(callDuration)}</span>
-                ) : callStatus === 'ended' ? (
-                  <span className="text-gray-400">Call ended</span>
-                ) : null}
-              </p>
-            </div>
+            {/* Minimized local video when fullscreen */}
+            {isRemoteFullscreen && (
+              <motion.div 
+                className="fixed bottom-24 right-4 w-24 h-32 bg-gray-900 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20 z-50"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
+                <video 
+                  ref={localVideoRef} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  className={`w-full h-full object-cover ${callState.isVideoOff ? 'hidden' : ''}`}
+                />
+                {callState.isVideoOff && (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                    <span className="text-gray-400 text-xs">Off</span>
+                  </div>
+                )}
+              </motion.div>
+            )}
+            
+            {/* Call info - hide when fullscreen */}
+            {!isRemoteFullscreen && (
+              <div className="mt-6 text-center">
+                <h2 className="text-2xl font-bold">{otherUserProfile?.display_name || 'Unknown User'}</h2>
+                <p className="text-lg text-gray-300 mt-2">
+                  {callStatus === 'connected' ? (
+                    <span className="text-green-400">{formatDuration(callDuration)}</span>
+                  ) : callStatus === 'ended' ? (
+                    <span className="text-gray-400">Call ended</span>
+                  ) : null}
+                </p>
+              </div>
+            )}
+
+            {/* Fullscreen call info overlay */}
+            {isRemoteFullscreen && callState.isConnected && (
+              <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-black/50 px-4 py-2 rounded-full flex items-center gap-3">
+                <span className="text-white font-medium">{otherUserProfile?.display_name || 'Unknown'}</span>
+                <span className="text-green-400 font-mono">{formatDuration(callDuration)}</span>
+              </div>
+            )}
           </div>
         ) : (
           /* Voice call layout */
@@ -777,8 +902,8 @@ const Call = () => {
         )}
       </div>
 
-      {/* Call controls */}
-      <div className="relative z-10 p-6 pb-10 bg-gradient-to-t from-black/50 to-transparent">
+      {/* Call controls - Fixed at bottom when fullscreen */}
+      <div className={`relative z-10 p-6 pb-10 bg-gradient-to-t from-black/50 to-transparent ${isRemoteFullscreen ? 'fixed bottom-0 left-0 right-0 z-50' : ''}`}>
         <CallControls
           isMuted={callState.isMuted}
           isVideoOff={callState.isVideoOff}
@@ -791,6 +916,7 @@ const Call = () => {
           onEndCall={endCall}
           onFlipCamera={isVideoCall && isMobileDevice ? handleFlipCamera : undefined}
           onToggleScreenShare={!isMobileDevice ? handleToggleScreenShare : undefined}
+          onUpgradeToVideo={!isVideoCall ? handleUpgradeToVideo : undefined}
         />
       </div>
 
