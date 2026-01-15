@@ -16,6 +16,7 @@ interface CallControlsProps {
   onToggleScreenShare?: () => void;
   onMinimize?: () => void;
   onTogglePiP?: () => void;
+  onUpgradeToVideo?: () => void;
 }
 
 export const CallControls = ({
@@ -34,6 +35,7 @@ export const CallControls = ({
   onToggleScreenShare,
   onMinimize,
   onTogglePiP,
+  onUpgradeToVideo,
 }: CallControlsProps) => {
   return (
     <div className="flex items-center justify-center gap-3 px-4 flex-wrap">
@@ -54,24 +56,24 @@ export const CallControls = ({
         )}
       </button>
 
-      {/* Video Toggle (only for video calls) */}
-      {isVideoCall && (
-        <button
-          onClick={onToggleVideo}
-          className={`rounded-full w-14 h-14 flex items-center justify-center transition-all ${
-            isVideoOff 
+      {/* Video Toggle - Always show for video calls, or for voice calls to upgrade */}
+      <button
+        onClick={isVideoCall ? onToggleVideo : onUpgradeToVideo}
+        className={`rounded-full w-14 h-14 flex items-center justify-center transition-all ${
+          isVideoCall 
+            ? isVideoOff 
               ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' 
               : 'bg-white/10 text-white hover:bg-white/20'
-          }`}
-          title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
-        >
-          {isVideoOff ? (
-            <VideoOff className="w-5 h-5" />
-          ) : (
-            <Video className="w-5 h-5" />
-          )}
-        </button>
-      )}
+            : 'bg-primary/20 text-primary hover:bg-primary/30 ring-2 ring-primary/30'
+        }`}
+        title={isVideoCall ? (isVideoOff ? 'Turn on camera' : 'Turn off camera') : 'Switch to video call'}
+      >
+        {isVideoCall && isVideoOff ? (
+          <VideoOff className="w-5 h-5" />
+        ) : (
+          <Video className="w-5 h-5" />
+        )}
+      </button>
 
       {/* Flip Camera (only for video calls on mobile) */}
       {isVideoCall && onFlipCamera && (
