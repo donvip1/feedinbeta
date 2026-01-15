@@ -88,16 +88,8 @@ const AccountSettings = () => {
   }, [user]);
 
   const handleAutoDetectOnLoad = async () => {
-    // Only auto-detect if country is not set (first time)
-    const { data } = await supabase
-      .from('profiles')
-      .select('country')
-      .eq('id', user?.id)
-      .single();
-    
-    if (!data?.country) {
-      handleDetectLocation();
-    }
+    // Always auto-detect location on page load (silently)
+    handleDetectLocation(true);
   };
 
   const loadProfile = async () => {
@@ -142,7 +134,7 @@ const AccountSettings = () => {
     }
   };
 
-  const handleDetectLocation = async () => {
+  const handleDetectLocation = async (silent = false) => {
     setDetectingLocation(true);
     try {
       const location: LocationData = await detectUserLocation();
@@ -163,16 +155,20 @@ const AccountSettings = () => {
         phone_number: prev.phone_number || (matchedCountry ? getDialCodeForCountry(matchedCountry.code) + ' ' : ''),
       }));
 
-      toast({
-        title: 'Location detected',
-        description: `${location.city ? location.city + ', ' : ''}${location.country}`,
-      });
+      if (!silent) {
+        toast({
+          title: 'Location detected',
+          description: `${location.city ? location.city + ', ' : ''}${location.country}`,
+        });
+      }
     } catch (error: any) {
-      toast({
-        title: 'Could not detect location',
-        description: 'Please select your country manually.',
-        variant: 'destructive',
-      });
+      if (!silent) {
+        toast({
+          title: 'Could not detect location',
+          description: 'Please select your country manually.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setDetectingLocation(false);
     }
@@ -618,7 +614,7 @@ const AccountSettings = () => {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={handleDetectLocation}
+                onClick={() => handleDetectLocation(false)}
                 disabled={detectingLocation}
               >
                 {detectingLocation ? (

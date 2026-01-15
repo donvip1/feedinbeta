@@ -117,6 +117,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
+  const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
@@ -460,8 +461,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               ref={videoRef}
               src={currentMediaUrl}
               className={cn(
-                "w-full h-full object-cover transition-opacity duration-300",
-                isMediaLoaded ? "opacity-100" : "opacity-0"
+                "w-full h-full transition-opacity duration-300",
+                isMediaLoaded ? "opacity-100" : "opacity-0",
+                isLandscapeVideo ? "object-contain bg-black" : "object-cover"
               )}
               style={{ touchAction: 'manipulation' }}
               muted={isMuted}
@@ -474,6 +476,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 togglePlayPause();
               }}
               onCanPlay={() => setIsMediaLoaded(true)}
+              onLoadedMetadata={(e) => {
+                const video = e.target as HTMLVideoElement;
+                const aspectRatio = video.videoWidth / video.videoHeight;
+                setIsLandscapeVideo(aspectRatio > 1.2); // Landscape if wider than 1.2:1
+              }}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onContextMenu={(e) => e.preventDefault()}

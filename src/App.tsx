@@ -186,6 +186,7 @@ const App = () => {
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/install" element={<Install />} />
+            <Route path="/referral/:username" element={<Referral />} />
             <Route path="/ref/:username" element={<Referral />} />
             
             {/* Feed & Content */}

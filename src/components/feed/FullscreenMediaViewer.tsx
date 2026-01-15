@@ -89,6 +89,7 @@ export default function FullscreenMediaViewer({
   const [refeedsCount, setRefeedsCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [landscapeVideos, setLandscapeVideos] = useState<Set<string>>(new Set());
   
   // Modal states - render inside fullscreen to stay open
   const [showComments, setShowComments] = useState(false);
@@ -624,12 +625,19 @@ export default function FullscreenMediaViewer({
                       else videoRefs.current.delete(p.id);
                     }}
                     src={mediaUrl || ''}
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full ${landscapeVideos.has(p.id) ? 'object-contain bg-black' : 'object-cover'}`}
                     playsInline
                     muted={isMuted}
                     loop
                     preload={isPreloaded ? 'auto' : 'metadata'}
                     onClick={() => isCurrent && togglePlayPause()}
+                    onLoadedMetadata={(e) => {
+                      const video = e.target as HTMLVideoElement;
+                      const aspectRatio = video.videoWidth / video.videoHeight;
+                      if (aspectRatio > 1.2) {
+                        setLandscapeVideos(prev => new Set(prev).add(p.id));
+                      }
+                    }}
                     onContextMenu={(e) => e.preventDefault()}
                     controlsList="nodownload nofullscreen noremoteplayback"
                     disablePictureInPicture
