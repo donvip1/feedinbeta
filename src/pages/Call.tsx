@@ -233,15 +233,17 @@ const Call = () => {
       if (callState.isConnected && duration > 0 && user?.id) {
         const durationMinutes = Math.max(1, Math.ceil(duration / 60));
         const action = callTypeRef.current === 'video' ? 'video_call' : 'voice_call';
+        const otherUserName = otherUserProfile?.display_name || 'Unknown';
         
         try {
           await supabase.functions.invoke('credit-deduction', {
             body: {
               action,
-              userId: user.id,
+              callId: callId,
               metadata: {
                 minutes: durationMinutes,
                 duration: duration,
+                otherUserName: otherUserName,
               },
             },
           });

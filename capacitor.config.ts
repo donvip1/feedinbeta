@@ -24,15 +24,27 @@ const config: CapacitorConfig = {
       resize: 'body',
       resizeOnFullScreen: true,
     },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#9333EA',
+      sound: 'beep.wav',
+    },
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
   },
   android: {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: true,
+    // Background audio configuration
+    backgroundColor: '#000000',
   },
   ios: {
     contentInset: 'automatic',
     scrollEnabled: true,
+    // Background audio configuration
+    backgroundColor: '#000000',
   },
 };
 

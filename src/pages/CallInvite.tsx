@@ -15,11 +15,11 @@ interface InviteData {
   created_by: string;
   expires_at: string;
   used_at: string | null;
+  call_type: 'video' | 'voice';
   creator_profile?: {
     display_name: string | null;
     avatar_url: string | null;
   };
-  call_type?: 'video' | 'voice';
 }
 
 const CallInvite = () => {
@@ -53,6 +53,7 @@ const CallInvite = () => {
         .maybeSingle();
 
       if (inviteError || !invite) {
+        console.error('[CallInvite] Invite not found:', inviteError);
         setError('Invite not found or has expired');
         setLoading(false);
         return;
@@ -65,13 +66,6 @@ const CallInvite = () => {
         return;
       }
 
-      // Check if already used
-      if (invite.used_at) {
-        setError('This invite has already been used');
-        setLoading(false);
-        return;
-      }
-
       // Load creator's profile
       const { data: creatorProfile } = await supabase
         .from('profiles')
@@ -79,17 +73,41 @@ const CallInvite = () => {
         .eq('id', invite.created_by)
         .single();
 
-      // Load call info to get call type
-      const { data: callLog } = await supabase
-        .from('call_logs')
-        .select('call_type')
-        .eq('id', invite.call_id)
-        .maybeSingle();
+      // Check if the call is still active (not ended)
+      if (invite.call_id) {
+        const { data: callLog } = await supabase
+          .from('call_logs')
+          .select('status, call_type')
+          .eq('id', invite.call_id)
+          .maybeSingle();
+
+        // Only reject if call has explicitly ended or was rejected
+        if (callLog?.status === 'ended' || callLog?.status === 'rejected') {
+          setError('This call has ended');
+          setLoading(false);
+          return;
+        }
+      }
+
+      // Get call_type from invite first (new system), fallback to call_logs (old system)
+      let callType: 'video' | 'voice' = (invite.call_type as 'video' | 'voice') || 'video';
+      
+      // If invite doesn't have call_type, check call_logs
+      if (!invite.call_type && invite.call_id) {
+        const { data: callLog } = await supabase
+          .from('call_logs')
+          .select('call_type')
+          .eq('id', invite.call_id)
+          .maybeSingle();
+        if (callLog?.call_type) {
+          callType = callLog.call_type as 'video' | 'voice';
+        }
+      }
 
       setInviteData({
         ...invite,
         creator_profile: creatorProfile || undefined,
-        call_type: (callLog?.call_type as 'video' | 'voice') || 'voice',
+        call_type: callType,
       });
       setLoading(false);
 
@@ -98,7 +116,7 @@ const CallInvite = () => {
       callSounds.playRinging();
 
     } catch (err: any) {
-      console.error('Error loading invite:', err);
+      console.error('[CallInvite] Error loading invite:', err);
       setError('Failed to load invite');
       setLoading(false);
     }
@@ -117,43 +135,40 @@ const CallInvite = () => {
     callSounds.stopAllSounds();
 
     try {
-      // Mark invite as used
-      const { error: updateError } = await supabase
+      // Mark invite as used (don't fail if already used - allow rejoin)
+      await supabase
         .from('call_invites')
         .update({
           used_at: new Date().toISOString(),
           used_by: user.id,
         })
-        .eq('id', inviteData.id)
-        .eq('used_at', null); // Only update if not already used
+        .eq('id', inviteData.id);
 
-      if (updateError) {
-        console.error('Error updating invite:', updateError);
-      }
-
-      // Create call log entry for this user if needed
+      // Check call status and update if needed
       const { data: existingCall } = await supabase
         .from('call_logs')
-        .select('*')
+        .select('status')
         .eq('id', inviteData.call_id)
         .single();
 
       if (existingCall) {
-        // Update call status to answered
-        await supabase
-          .from('call_logs')
-          .update({
-            status: 'answered',
-            started_at: new Date().toISOString(),
-          })
-          .eq('id', inviteData.call_id);
+        // If call is pending or in progress, update to answered
+        if (existingCall.status === 'pending' || existingCall.status === 'answered') {
+          await supabase
+            .from('call_logs')
+            .update({
+              status: 'answered',
+              started_at: existingCall.status === 'pending' ? new Date().toISOString() : undefined,
+            })
+            .eq('id', inviteData.call_id);
+        }
       }
 
       // Navigate to call page
       navigate(`/call?callId=${inviteData.call_id}&type=${inviteData.call_type}`);
 
     } catch (err: any) {
-      console.error('Error joining call:', err);
+      console.error('[CallInvite] Error joining call:', err);
       toast({
         title: 'Failed to join call',
         description: err.message || 'Please try again',

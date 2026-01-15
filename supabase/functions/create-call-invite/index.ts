@@ -77,7 +77,7 @@ serve(async (req) => {
     // Calculate expiration
     const expiresAt = new Date(Date.now() + expiresInMinutes * 60 * 1000).toISOString();
 
-    // Insert invite
+    // Insert invite with call_type
     const { data: invite, error: insertError } = await supabase
       .from('call_invites')
       .insert({
@@ -85,6 +85,7 @@ serve(async (req) => {
         invite_code: inviteCode,
         created_by: user.id,
         expires_at: expiresAt,
+        call_type: callType || 'video',
       })
       .select()
       .single();
