@@ -1,5 +1,6 @@
 import { Room, RoomEvent, Track, LocalParticipant, RemoteParticipant, ConnectionState, LocalTrack, RemoteTrack, RemoteTrackPublication } from 'livekit-client';
 import { supabase } from '@/integrations/supabase/client';
+import { backgroundAudioManager } from './background-audio-manager';
 
 export type CallConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'failed' | 'ringing' | 'ended' | 'waiting_for_peer';
 
@@ -28,6 +29,7 @@ export class LiveKitCallManager {
   private callEndSubscription: ReturnType<typeof supabase.channel> | null = null;
   private hasRemoteParticipant: boolean = false;
   private audioElements: HTMLAudioElement[] = [];
+  private backgroundAudioInitialized: boolean = false;
 
   constructor(callId: string, userId: string, callbacks: CallManagerCallbacks) {
     this.callId = callId;
@@ -46,6 +48,10 @@ export class LiveKitCallManager {
     this.updateStatus('connecting', 'Getting call token...');
 
     try {
+      // Initialize background audio manager for persistent audio playback
+      await backgroundAudioManager.initialize();
+      this.backgroundAudioInitialized = true;
+      
       // Unlock audio context on mobile by creating a silent audio context
       await this.unlockAudioContext();
       
@@ -174,10 +180,16 @@ export class LiveKitCallManager {
       const audioElement = document.createElement('audio');
       audioElement.autoplay = true;
       (audioElement as any).playsInline = true;
+      audioElement.setAttribute('playsinline', 'true');
       
       // Attach the track to the audio element
       track.attach(audioElement);
       this.audioElements.push(audioElement);
+      
+      // Register with background audio manager for persistent playback
+      if (this.backgroundAudioInitialized) {
+        backgroundAudioManager.registerAudioElement(`remote-audio-${participant.identity}`, audioElement);
+      }
       
       // Try to play with error handling for autoplay policy
       audioElement.play().catch(async (error) => {

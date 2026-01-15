@@ -47,7 +47,7 @@ serve(async (req) => {
       );
     }
 
-    const { action, targetUserId, metadata } = await req.json();
+    const { action, targetUserId, metadata, callId } = await req.json();
 
     // Validate action type
     const costPerUnit = COSTS[action];
@@ -72,8 +72,10 @@ serve(async (req) => {
       case "voice_call":
       case "video_call":
         const minutes = Math.max(1, Math.min(120, Number(metadata?.minutes) || 1));
+        const duration = Number(metadata?.duration) || minutes * 60;
         totalCost = costPerUnit * minutes;
-        description = `${action === "video_call" ? "Video" : "Voice"} call - ${minutes} min`;
+        const otherUserName = metadata?.otherUserName || 'Unknown';
+        description = `${action === "video_call" ? "Video" : "Voice"} call with ${otherUserName} - ${minutes} min`;
         break;
     }
 
@@ -108,7 +110,7 @@ serve(async (req) => {
         amount: -totalCost,
         description,
         type: "spent",
-        related_id: targetUserId || null,
+        related_id: callId || targetUserId || null,
       });
 
     if (txError) {
@@ -116,10 +118,24 @@ serve(async (req) => {
       throw txError;
     }
 
+    // Update call_logs with credits_deducted if this is a call
+    if (callId && (action === "voice_call" || action === "video_call")) {
+      const { error: callUpdateError } = await supabase
+        .from("call_logs")
+        .update({ credits_deducted: totalCost })
+        .eq("id", callId);
+
+      if (callUpdateError) {
+        console.error("[Credit] Call log update error:", callUpdateError);
+      } else {
+        console.log(`[Credit] Updated call ${callId} with credits_deducted: ${totalCost}`);
+      }
+    }
+
     console.log(`[Credit] Deducted ${totalCost} from user ${user.id} for ${action}`);
 
     return new Response(
-      JSON.stringify({ success: true, totalCost, description }),
+      JSON.stringify({ success: true, totalCost, description, callId }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
 

@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed } from 'lucide-react';
+import { ArrowLeft, Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Coins } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
@@ -17,6 +17,7 @@ interface CallLog {
   call_type: 'video' | 'voice';
   status: string;
   duration: number;
+  credits_deducted: number;
   created_at: string;
   caller: {
     display_name: string | null;
@@ -71,10 +72,18 @@ const CallHistory = () => {
   };
 
   const formatDuration = (seconds: number) => {
-    if (seconds === 0) return 'Not connected';
+    if (!seconds || seconds === 0) return 'Not connected';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
+    if (mins > 0) {
+      return `${mins}m ${secs}s`;
+    }
+    return `${secs}s`;
+  };
+
+  const formatCredits = (credits: number) => {
+    if (!credits || credits === 0) return null;
+    return `${credits} credits`;
   };
 
   const formatDate = (dateString: string) => {
@@ -176,17 +185,26 @@ const CallHistory = () => {
                     </AvatarFallback>
                   </Avatar>
                   
-                  <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0">
                     <div className="flex items-center space-x-2">
                       {getCallIcon(log)}
                       <p className="font-semibold truncate">
                         {otherUser.display_name || 'Unknown'}
                       </p>
                     </div>
-                    <div className="flex items-center space-x-2 text-sm text-gray-400">
+                    <div className="flex items-center flex-wrap gap-x-2 gap-y-0.5 text-sm text-gray-400">
                       <span>{formatDate(log.created_at)}</span>
                       <span>•</span>
                       <span>{formatDuration(log.duration)}</span>
+                      {log.credits_deducted > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="flex items-center text-amber-400">
+                            <Coins className="w-3 h-3 mr-0.5" />
+                            {formatCredits(log.credits_deducted)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 

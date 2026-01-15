@@ -161,6 +161,7 @@ export type Database = {
       call_invites: {
         Row: {
           call_id: string | null
+          call_type: string | null
           created_at: string | null
           created_by: string
           expires_at: string
@@ -171,6 +172,7 @@ export type Database = {
         }
         Insert: {
           call_id?: string | null
+          call_type?: string | null
           created_at?: string | null
           created_by: string
           expires_at?: string
@@ -181,6 +183,7 @@ export type Database = {
         }
         Update: {
           call_id?: string | null
+          call_type?: string | null
           created_at?: string | null
           created_by?: string
           expires_at?: string
@@ -204,6 +207,7 @@ export type Database = {
           call_type: string
           caller_id: string
           created_at: string | null
+          credits_deducted: number | null
           duration: number | null
           ended_at: string | null
           id: string
@@ -216,6 +220,7 @@ export type Database = {
           call_type: string
           caller_id: string
           created_at?: string | null
+          credits_deducted?: number | null
           duration?: number | null
           ended_at?: string | null
           id?: string
@@ -228,6 +233,7 @@ export type Database = {
           call_type?: string
           caller_id?: string
           created_at?: string | null
+          credits_deducted?: number | null
           duration?: number | null
           ended_at?: string | null
           id?: string
