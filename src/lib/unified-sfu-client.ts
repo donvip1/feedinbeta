@@ -157,6 +157,11 @@ export class UnifiedSFUClient {
         audioPlaybackManager.playTrack(peerId, event.track);
       }
       
+      // For video tracks (screen share), create video element
+      if (event.track.kind === 'video') {
+        this.playVideoTrack(event.track, peerId);
+      }
+      
       if (this.onTrackCallback) {
         this.onTrackCallback(event.track, peerId);
       }
@@ -283,10 +288,13 @@ export class UnifiedSFUClient {
       const existingReceivers = pc.getTransceivers().filter(
         t => t.direction === 'recvonly' || t.direction === 'inactive'
       );
+      
+      // Determine track type from first track (default to audio)
+      const trackType = remoteTracks[0]?.trackName?.startsWith('screen-') ? 'video' : 'audio';
       const needed = remoteTracks.length - existingReceivers.length;
       
       for (let i = 0; i < needed; i++) {
-        pc.addTransceiver('audio', { direction: 'recvonly' });
+        pc.addTransceiver(trackType, { direction: 'recvonly' });
       }
 
       // Always create offer for pull requests
@@ -461,6 +469,32 @@ export class UnifiedSFUClient {
       return data?.success || false;
     } catch {
       return false;
+    }
+  }
+
+  /**
+   * Play video track in a video element (for screen sharing)
+   */
+  private playVideoTrack(track: MediaStreamTrack, peerId: string): void {
+    try {
+      const existingEl = document.getElementById(`sfu-video-${peerId}`);
+      if (existingEl) {
+        existingEl.remove();
+      }
+
+      const video = document.createElement('video');
+      video.id = `sfu-video-${peerId}`;
+      video.autoplay = true;
+      video.playsInline = true;
+      video.muted = true; // Video tracks are muted by default
+      video.srcObject = new MediaStream([track]);
+      video.className = 'fixed inset-0 z-50 w-full h-full object-contain bg-black/90';
+      video.style.display = 'none'; // Hidden by default, shown via callback
+      document.body.appendChild(video);
+
+      console.log(`[UnifiedSFU:${this.clientId}] 🎥 Video element created for peer:`, peerId);
+    } catch (e) {
+      console.warn(`[UnifiedSFU:${this.clientId}] Could not create video element:`, e);
     }
   }
 

@@ -790,7 +790,7 @@ const Call = () => {
           onToggleSpeaker={handleToggleSpeaker}
           onEndCall={endCall}
           onFlipCamera={isVideoCall && isMobileDevice ? handleFlipCamera : undefined}
-          onToggleScreenShare={isVideoCall && !isMobileDevice ? handleToggleScreenShare : undefined}
+          onToggleScreenShare={!isMobileDevice ? handleToggleScreenShare : undefined}
         />
       </div>
 

@@ -38,16 +38,20 @@ class SpaceRoomManager {
   private userId: string | null = null;
   private sessionId: string | null = null;
   private localTrackName: string | null = null;
+  private screenTrackName: string | null = null;
   private isHost: boolean = false;
   private localStream: MediaStream | null = null;
+  private screenStream: MediaStream | null = null;
   private audioContext: AudioContext | null = null;
   private analyzers: Map<string, AnalyserNode> = new Map();
   private audioLevelInterval: number | null = null;
   private onStateChange: StateChangeCallback | null = null;
   private onAudioLevels: AudioLevelCallback | null = null;
   private onConnectionStateChange: ConnectionStateCallback | null = null;
+  private onScreenShareChange: ((isSharing: boolean, stream: MediaStream | null) => void) | null = null;
   private realtimeChannel: ReturnType<typeof supabase.channel> | null = null;
   private subscribedSpeakers: Set<string> = new Set();
+  private subscribedScreenShares: Set<string> = new Set();
   private failedSubscriptions: Set<string> = new Set(); // Track failed subscriptions for retry
   private sfuClient: UnifiedSFUClient | null = null;
   private periodicRefreshInterval: number | null = null;
@@ -725,18 +729,23 @@ class SpaceRoomManager {
       this.audioLevelInterval = null;
     }
 
+    // Stop screen sharing
+    await this.stopScreenShare();
+
     // Stop broadcasting
     await this.stopBroadcasting();
 
     // Use centralized audio manager for cleanup
     audioPlaybackManager.cleanup();
     
-    // Remove backup audio elements
+    // Remove backup audio elements and video elements
     document.querySelectorAll('[id^="space-audio-backup-"]').forEach(el => el.remove());
+    document.querySelectorAll('[id^="sfu-video-"]').forEach(el => el.remove());
 
     // Clear analyzers
     this.analyzers.clear();
     this.subscribedSpeakers.clear();
+    this.subscribedScreenShares.clear();
     this.failedSubscriptions.clear();
 
     // Close audio context
@@ -766,10 +775,12 @@ class SpaceRoomManager {
     this.userId = null;
     this.sessionId = null;
     this.localTrackName = null;
+    this.screenTrackName = null;
     this.isHost = false;
     this.onStateChange = null;
     this.onAudioLevels = null;
     this.onConnectionStateChange = null;
+    this.onScreenShareChange = null;
     
     console.log('[SpaceRoomManager] ✅ Cleanup complete');
   }
@@ -800,6 +811,200 @@ class SpaceRoomManager {
    */
   isBroadcasting(): boolean {
     return this.localTrackName !== null;
+  }
+
+  /**
+   * Check if currently screen sharing
+   */
+  isScreenSharing(): boolean {
+    return this.screenTrackName !== null;
+  }
+
+  /**
+   * Set screen share change callback
+   */
+  setOnScreenShareChange(callback: ((isSharing: boolean, stream: MediaStream | null) => void) | null): void {
+    this.onScreenShareChange = callback;
+  }
+
+  /**
+   * Start screen sharing and broadcast to all participants
+   */
+  async startScreenShare(): Promise<{ success: boolean; stream?: MediaStream; error?: string }> {
+    if (!this.sessionId || !this.userId || !this.spaceId || !this.sfuClient) {
+      return { success: false, error: 'Not initialized' };
+    }
+
+    if (this.screenTrackName) {
+      return { success: false, error: 'Already sharing screen' };
+    }
+
+    try {
+      console.log('[SpaceRoomManager] 🖥️ Starting screen share...');
+      
+      // Get screen stream
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          displaySurface: 'monitor',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30 },
+        },
+        audio: true,
+      });
+
+      this.screenStream = stream;
+      this.screenTrackName = `screen-${this.userId}-${Date.now()}`;
+
+      // Handle user stopping via browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        this.stopScreenShare();
+      };
+
+      // Publish video track to SFU
+      const result = await this.sfuClient.publishTrack(
+        stream,
+        this.screenTrackName,
+        'video'
+      );
+
+      if (!result.success) {
+        this.screenStream?.getTracks().forEach(t => t.stop());
+        this.screenStream = null;
+        this.screenTrackName = null;
+        return { success: false, error: result.error };
+      }
+
+      console.log('[SpaceRoomManager] ✅ Screen share published to SFU');
+
+      // Update speaker record with screen share track info
+      await supabase
+        .from('live_space_speakers')
+        .update({
+          // We can use a JSON field or add new columns for screen share
+          // For now, broadcast via realtime channel
+        })
+        .eq('space_id', this.spaceId)
+        .eq('user_id', this.userId);
+
+      // Broadcast screen share status to all participants
+      const channel = supabase.channel(`space-screen-${this.spaceId}`);
+      await channel.send({
+        type: 'broadcast',
+        event: 'screen-share-started',
+        payload: {
+          userId: this.userId,
+          sessionId: this.sessionId,
+          trackName: this.screenTrackName,
+        },
+      });
+      supabase.removeChannel(channel);
+
+      // Notify callback
+      if (this.onScreenShareChange) {
+        this.onScreenShareChange(true, stream);
+      }
+
+      this.notifyStateChange();
+      return { success: true, stream };
+    } catch (error: any) {
+      console.error('[SpaceRoomManager] Screen share error:', error);
+      return { 
+        success: false, 
+        error: error.name === 'NotAllowedError' ? 'Permission denied' : error.message 
+      };
+    }
+  }
+
+  /**
+   * Stop screen sharing
+   */
+  async stopScreenShare(): Promise<void> {
+    if (!this.screenTrackName || !this.sfuClient) return;
+
+    console.log('[SpaceRoomManager] 🖥️ Stopping screen share...');
+
+    try {
+      await this.sfuClient.closeTrack(this.screenTrackName);
+    } catch (e) {
+      console.warn('[SpaceRoomManager] Error closing screen track:', e);
+    }
+
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(track => track.stop());
+      this.screenStream = null;
+    }
+
+    // Broadcast screen share ended
+    if (this.spaceId) {
+      const channel = supabase.channel(`space-screen-${this.spaceId}`);
+      await channel.send({
+        type: 'broadcast',
+        event: 'screen-share-ended',
+        payload: { userId: this.userId },
+      });
+      supabase.removeChannel(channel);
+    }
+
+    this.screenTrackName = null;
+
+    // Notify callback
+    if (this.onScreenShareChange) {
+      this.onScreenShareChange(false, null);
+    }
+
+    this.notifyStateChange();
+  }
+
+  /**
+   * Subscribe to a remote screen share
+   */
+  async subscribeToScreenShare(
+    userId: string, 
+    sessionId: string, 
+    trackName: string
+  ): Promise<{ success: boolean; stream?: MediaStream }> {
+    if (!this.sfuClient || !this.sessionId) {
+      return { success: false };
+    }
+
+    if (userId === this.userId) {
+      // Don't subscribe to our own screen share
+      return { success: false };
+    }
+
+    if (this.subscribedScreenShares.has(userId)) {
+      return { success: false };
+    }
+
+    console.log('[SpaceRoomManager] 🖥️ Subscribing to screen share from:', userId);
+    this.subscribedScreenShares.add(userId);
+
+    try {
+      const result = await this.sfuClient.pullTracks([{
+        location: 'remote',
+        trackName,
+        sessionId,
+      }]);
+
+      if (!result.success) {
+        this.subscribedScreenShares.delete(userId);
+        return { success: false };
+      }
+
+      console.log('[SpaceRoomManager] ✅ Subscribed to screen share');
+      return { success: true };
+    } catch (error) {
+      this.subscribedScreenShares.delete(userId);
+      return { success: false };
+    }
+  }
+
+  /**
+   * Get current screen stream
+   */
+  getScreenStream(): MediaStream | null {
+    return this.screenStream;
   }
 }
 
