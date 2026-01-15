@@ -48,8 +48,11 @@ export const ReferralSection = () => {
     ttl: 5 * 60 * 1000, // 5 minutes
   });
 
+  // Use published URL for referral links (update to custom domain when available)
+  const PUBLISHED_URL = 'https://feedinbeta.lovable.app';
+  
   const referralLink = profile?.username 
-    ? `${window.location.origin}/ref/${profile.username}`
+    ? `${PUBLISHED_URL}/referral/${profile.username}`
     : '';
 
   const handleCopy = async () => {
@@ -172,7 +175,7 @@ export const ReferralSection = () => {
 
         <p className="text-xs text-muted-foreground text-center">
           <ExternalLink className="w-3 h-3 inline mr-1" />
-          feedin.com/ref/{profile.username}
+          feedin.com/referral/{profile.username}
         </p>
       </div>
     </Card>

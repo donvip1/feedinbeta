@@ -3,7 +3,7 @@ import { BottomNav } from "@/components/navigation/BottomNav";
 import { Bookmark } from "lucide-react";
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import PostCard from '@/components/feed/PostCard';
+import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/shared/PageHeader';
 
@@ -32,11 +32,20 @@ const SavedPosts = () => {
             content,
             media_url,
             media_type,
+            media_urls,
+            media_types,
             created_at,
             likes_count,
             comments_count,
             views_count,
+            refeeds_count,
             location,
+            post_type,
+            original_post_id,
+            music_title,
+            music_artist,
+            music_url,
+            is_original_audio,
             profiles (
               username,
               display_name,
@@ -60,22 +69,21 @@ const SavedPosts = () => {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted pb-20">
+      <div className="min-h-screen bg-black pb-0">
         <PageHeader 
           title="Saved Posts" 
           icon={<Bookmark className="w-5 h-5" />}
         />
         
-        <div className="container mx-auto px-4 py-6 max-w-2xl">
-
+        <div className="w-full max-w-[430px] mx-auto">
           {loading ? (
-            <div className="space-y-4">
+            <div className="space-y-4 p-4">
               {[1, 2, 3].map(i => (
                 <Skeleton key={i} className="h-96 w-full rounded-xl" />
               ))}
             </div>
           ) : savedPosts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-96 text-center">
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-140px)] text-center px-4">
               <Bookmark className="w-16 h-16 text-muted-foreground mb-4" />
               <p className="text-muted-foreground text-lg">No saved posts yet</p>
               <p className="text-sm text-muted-foreground mt-2">
@@ -83,13 +91,15 @@ const SavedPosts = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {savedPosts.map(post => (
-                <PostCard 
-                  key={post.id} 
-                  post={post}
-                  onLikeUpdate={loadSavedPosts}
-                />
+            <div className="h-[calc(100dvh-60px)] overflow-y-auto snap-y snap-mandatory scrollbar-hide">
+              {savedPosts.map((post) => (
+                <div key={post.id} className="h-[calc(100dvh-60px)] snap-start snap-always">
+                  <ImmersivePostCard 
+                    post={post}
+                    onLikeUpdate={loadSavedPosts}
+                    allPosts={savedPosts}
+                  />
+                </div>
               ))}
             </div>
           )}

@@ -140,7 +140,7 @@ export function getBackDestination(currentPath: string): string {
   }
   
   // Referral page -> welcome
-  if (currentPath.startsWith('/ref/')) {
+  if (currentPath.startsWith('/referral/') || currentPath.startsWith('/ref/')) {
     return '/welcome';
   }
   
