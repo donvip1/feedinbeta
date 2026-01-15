@@ -32,6 +32,9 @@ import Call from "./pages/Call";
 import CallHistory from "./pages/CallHistory";
 import Live from "./pages/Live";
 import AICopilot from "./pages/AICopilot";
+import AIHub from "./pages/AIHub";
+import CaptionGenerator from "./pages/CaptionGenerator";
+import ContentIdeas from "./pages/ContentIdeas";
 import ThesisWriter from "./pages/ThesisWriter";
 import VideoCreation from "./pages/VideoCreation";
 import EducationalQA from "./pages/EducationalQA";
@@ -215,6 +218,7 @@ const App = () => {
             <Route path="/story/:storyId" element={<StoryDetail />} />
             
             {/* AI Features */}
+            <Route path="/ai" element={<AIHub />} />
             <Route path="/ai/copilot" element={<AICopilot />} />
             <Route path="/ai/thesis" element={<ThesisWriter />} />
             <Route path="/ai/video" element={<VideoCreation />} />
@@ -223,6 +227,8 @@ const App = () => {
             <Route path="/ai/image-gen" element={<ImageGeneration />} />
             <Route path="/ai/enhance" element={<ImageEnhancement />} />
             <Route path="/ai/learn" element={<LearnTech />} />
+            <Route path="/ai/captions" element={<CaptionGenerator />} />
+            <Route path="/ai/ideas" element={<ContentIdeas />} />
             
             {/* Groups */}
             <Route path="/groups" element={<Groups />} />

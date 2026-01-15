@@ -5,10 +5,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CallControls } from '@/components/calls/CallControls';
 import { ConnectionStatus } from '@/components/calls/ConnectionStatus';
+import { ShareCallModal } from '@/components/calls/ShareCallModal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { callSounds } from '@/utils/callSounds';
 import { useCallContext } from '@/context/CallContext';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface CallData {
@@ -56,6 +57,7 @@ const Call = () => {
   const [otherUserProfile, setOtherUserProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
   const [connectionMessage, setConnectionMessage] = useState('Starting call...');
   const [showRetry, setShowRetry] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
   
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -610,9 +612,18 @@ const Call = () => {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       </div>
 
-      {/* Network Quality Indicator - shown when connected */}
+      {/* Network Quality Indicator and Invite Button - shown when connected */}
       {callState.isConnected && (
-        <div className="absolute top-4 right-4 z-20">
+        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+            onClick={() => setShowShareModal(true)}
+          >
+            <UserPlus className="w-4 h-4 mr-1" />
+            Invite
+          </Button>
           <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 rounded-full border border-green-500/30">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span className="text-xs text-green-400 font-medium">Connected</span>
@@ -782,6 +793,14 @@ const Call = () => {
           onToggleScreenShare={isVideoCall && !isMobileDevice ? handleToggleScreenShare : undefined}
         />
       </div>
+
+      {/* Share Call Modal */}
+      <ShareCallModal
+        open={showShareModal}
+        onOpenChange={setShowShareModal}
+        callId={callId || ''}
+        callType={callTypeRef.current}
+      />
     </div>
   );
 };
