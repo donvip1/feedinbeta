@@ -55,13 +55,17 @@ export const FriendsModal = ({ open, onClose, userId, friendsCount }: FriendsMod
       ) || [];
 
       if (friendIds.length > 0) {
+        // Fetch directly from profiles table for fresh data, not cached public_profiles view
         const { data: friendProfiles, error: profilesError } = await supabase
-          .from('public_profiles')
+          .from('profiles')
           .select('id, display_name, username, avatar_url, bio')
           .in('id', friendIds);
 
         if (profilesError) throw profilesError;
-        setFriends(friendProfiles || []);
+        
+        // Filter out any profiles with missing required data
+        const validFriends = (friendProfiles || []).filter(p => p.id);
+        setFriends(validFriends);
       } else {
         setFriends([]);
       }

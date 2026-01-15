@@ -90,6 +90,46 @@ class UsernameCache {
   size(): number {
     return this.cache.size;
   }
+
+  /**
+   * Remove a username from cache (for when it changes)
+   */
+  async remove(username: string): Promise<void> {
+    this.cache.delete(username.toLowerCase());
+    
+    // Update IndexedDB
+    try {
+      const stored = await indexedDBCache.get<Record<string, string>>(USERNAME_CACHE_KEY) || {};
+      delete stored[username.toLowerCase()];
+      await indexedDBCache.set(USERNAME_CACHE_KEY, stored, CACHE_TTL);
+    } catch (error) {
+      console.error('[UsernameCache] Remove error:', error);
+    }
+  }
+
+  /**
+   * Invalidate entire cache (for when bulk changes happen)
+   */
+  async invalidateAll(): Promise<void> {
+    this.cache.clear();
+    this.loaded = false;
+    
+    try {
+      await indexedDBCache.delete(USERNAME_CACHE_KEY);
+    } catch (error) {
+      console.error('[UsernameCache] Invalidate all error:', error);
+    }
+  }
+
+  /**
+   * Update a mapping (removes old if exists, adds new)
+   */
+  async update(oldUsername: string | null, newUsername: string, userId: string): Promise<void> {
+    if (oldUsername && oldUsername !== newUsername) {
+      this.cache.delete(oldUsername.toLowerCase());
+    }
+    await this.set(newUsername, userId);
+  }
 }
 
 export const usernameCache = new UsernameCache();
