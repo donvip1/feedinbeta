@@ -6,8 +6,9 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdminRole } from '@/hooks/useAdminRole';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Gift, Loader2, Search } from 'lucide-react';
+import { Gift, Loader2, Search, Infinity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface SendDirectGiftModalProps {
@@ -39,6 +40,8 @@ const allGifts: GiftType[] = [
 export const SendDirectGiftModal = ({ isOpen, onClose }: SendDirectGiftModalProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { permissions } = useAdminRole();
+  const hasUnlimitedCredits = permissions.isDeveloper;
   const queryClient = useQueryClient();
   const [recipient, setRecipient] = useState('');
   const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
@@ -79,7 +82,7 @@ export const SendDirectGiftModal = ({ isOpen, onClose }: SendDirectGiftModalProp
       return;
     }
 
-    if ((credits || 0) < selectedGift.cost) {
+    if (!hasUnlimitedCredits && (credits || 0) < selectedGift.cost) {
       toast({
         title: 'Insufficient credits',
         description: `You need ${selectedGift.cost} credits to send this gift`,
@@ -174,7 +177,13 @@ export const SendDirectGiftModal = ({ isOpen, onClose }: SendDirectGiftModalProp
 
           {/* Available Credits */}
           <div className="text-sm text-muted-foreground">
-            Available: <span className="font-semibold text-foreground">{credits || 0}</span> credits
+            Available: {hasUnlimitedCredits ? (
+              <span className="font-semibold text-primary flex items-center gap-1 inline-flex">
+                <Infinity className="w-3 h-3" /> Unlimited
+              </span>
+            ) : (
+              <span className="font-semibold text-foreground">{credits || 0}</span>
+            )} credits
           </div>
 
           {/* Gift Selection */}
@@ -185,13 +194,13 @@ export const SendDirectGiftModal = ({ isOpen, onClose }: SendDirectGiftModalProp
                 <button
                   key={gift.id}
                   onClick={() => setSelectedGift(gift)}
-                  disabled={(credits || 0) < gift.cost}
+                  disabled={!hasUnlimitedCredits && (credits || 0) < gift.cost}
                   className={cn(
                     'flex flex-col items-center p-2 rounded-lg border transition-all',
                     selectedGift?.id === gift.id
                       ? 'border-primary bg-primary/10 ring-2 ring-primary'
                       : 'border-border hover:border-primary/50',
-                    (credits || 0) < gift.cost && 'opacity-40 cursor-not-allowed'
+                    !hasUnlimitedCredits && (credits || 0) < gift.cost && 'opacity-40 cursor-not-allowed'
                   )}
                 >
                   <span className="text-2xl">{gift.emoji}</span>

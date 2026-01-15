@@ -9,8 +9,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminRole } from "@/hooks/useAdminRole";
 import { toast } from "sonner";
-import { Gift, Coins, Send, Sparkles, Crown, Zap, Heart, Star, Gem, Flame, Rocket } from "lucide-react";
+import { Gift, Coins, Send, Sparkles, Crown, Zap, Heart, Star, Gem, Flame, Rocket, Infinity } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,8 @@ export const LiveGiftModal = ({
   isSpace = false,
 }: LiveGiftModalProps) => {
   const { user } = useAuth();
+  const { permissions } = useAdminRole();
+  const hasUnlimitedCredits = permissions.isDeveloper;
   const [selectedRecipient, setSelectedRecipient] = useState<string | null>(null);
   const [customAmount, setCustomAmount] = useState("");
   const [sending, setSending] = useState(false);
@@ -83,7 +86,7 @@ export const LiveGiftModal = ({
       return;
     }
 
-    if (userCredits < creditValue) {
+    if (!hasUnlimitedCredits && userCredits < creditValue) {
       toast.error("Insufficient credits");
       return;
     }
@@ -176,7 +179,13 @@ export const LiveGiftModal = ({
             <div>
               <span className="text-lg font-bold">Send Gift</span>
               <p className="text-xs text-muted-foreground font-normal">
-                Your balance: <span className="text-primary font-semibold">{userCredits} credits</span>
+                Your balance: {hasUnlimitedCredits ? (
+                  <span className="text-primary font-semibold flex items-center gap-1 inline-flex">
+                    <Infinity className="w-3 h-3" /> Unlimited
+                  </span>
+                ) : (
+                  <span className="text-primary font-semibold">{userCredits} credits</span>
+                )}
               </p>
             </div>
           </DialogTitle>
@@ -262,21 +271,22 @@ export const LiveGiftModal = ({
                 const Icon = gift.icon;
                 const canAfford = userCredits >= gift.value;
                 
-                return (
-                  <motion.button
-                    key={gift.type}
-                    whileHover={{ scale: canAfford ? 1.05 : 1 }}
-                    whileTap={{ scale: canAfford ? 0.95 : 1 }}
-                    className={cn(
-                      "relative flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all",
-                      canAfford 
-                        ? "hover:border-primary cursor-pointer" 
-                        : "opacity-50 cursor-not-allowed",
-                      sending && "pointer-events-none"
-                    )}
-                    onClick={() => canAfford && handleSendGift(gift.type, gift.value)}
-                    disabled={!canAfford || sending || (isHost && !selectedRecipient)}
-                  >
+                  const effectiveCanAfford = hasUnlimitedCredits || canAfford;
+                  return (
+                    <motion.button
+                      key={gift.type}
+                      whileHover={{ scale: effectiveCanAfford ? 1.05 : 1 }}
+                      whileTap={{ scale: effectiveCanAfford ? 0.95 : 1 }}
+                      className={cn(
+                        "relative flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all",
+                        effectiveCanAfford 
+                          ? "hover:border-primary cursor-pointer" 
+                          : "opacity-50 cursor-not-allowed",
+                        sending && "pointer-events-none"
+                      )}
+                      onClick={() => effectiveCanAfford && handleSendGift(gift.type, gift.value)}
+                      disabled={!effectiveCanAfford || sending || (isHost && !selectedRecipient)}
+                    >
                     <div className={cn(
                       "absolute inset-0 rounded-2xl bg-gradient-to-br opacity-10",
                       gift.color
@@ -284,12 +294,12 @@ export const LiveGiftModal = ({
                     
                     <span className="text-2xl relative z-10">{gift.emoji}</span>
                     <span className="text-[10px] font-medium relative z-10">{gift.label}</span>
-                    <Badge 
-                      variant="secondary" 
-                      className={cn(
-                        "text-[10px] h-5 relative z-10",
-                        canAfford ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                      )}
+                      <Badge 
+                        variant="secondary" 
+                        className={cn(
+                          "text-[10px] h-5 relative z-10",
+                          effectiveCanAfford ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                        )}
                     >
                       {gift.value}
                     </Badge>
@@ -372,7 +382,7 @@ export const LiveGiftModal = ({
                     "flex-1 min-w-[60px]",
                     customAmount === amount.toString() && "border-primary bg-primary/10"
                   )}
-                  disabled={userCredits < amount}
+                  disabled={!hasUnlimitedCredits && userCredits < amount}
                 >
                   {amount}
                 </Button>

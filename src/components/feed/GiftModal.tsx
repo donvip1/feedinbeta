@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Gift, Heart, Trophy, Crown, Sparkles, TrendingUp } from 'lucide-react';
+import { Gift, Heart, Trophy, Crown, Sparkles, TrendingUp, Infinity } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import AnimatedGiftEmoji from '@/components/shared/AnimatedGiftEmoji';
-
+import { useAdminRole } from '@/hooks/useAdminRole';
 interface GiftModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -58,6 +58,8 @@ const allGifts: GiftType[] = [
 export default function GiftModal({ isOpen, onClose, postId, recipientId, recipientName }: GiftModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { permissions } = useAdminRole();
+  const hasUnlimitedCredits = permissions.isDeveloper;
   const [sending, setSending] = useState(false);
   const [selectedGift, setSelectedGift] = useState<GiftType | null>(null);
   const [credits, setCredits] = useState(0);
@@ -65,7 +67,6 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
   const [floatingEmojis, setFloatingEmojis] = useState<{ id: number; giftId: string; x: number }[]>([]);
   const [comboCount, setComboCount] = useState(0);
   const [lastGiftTime, setLastGiftTime] = useState(0);
-
   useEffect(() => {
     if (isOpen && user) {
       loadCredits();
@@ -109,7 +110,7 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
       return;
     }
 
-    if (credits < gift.cost) {
+    if (!hasUnlimitedCredits && credits < gift.cost) {
       toast({
         title: 'Insufficient credits',
         description: `You need ${gift.cost} credits. You have ${credits}.`,
@@ -211,9 +212,19 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
             
             {/* Credits Display */}
             <div className="mt-3 flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-full">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <span className="font-bold">{credits}</span>
-              <span className="text-xs text-muted-foreground">credits available</span>
+              {hasUnlimitedCredits ? (
+                <>
+                  <Infinity className="w-4 h-4 text-primary" />
+                  <span className="font-bold text-primary">Unlimited</span>
+                  <span className="text-xs text-muted-foreground">developer access</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="font-bold">{credits}</span>
+                  <span className="text-xs text-muted-foreground">credits available</span>
+                </>
+              )}
             </div>
 
             {/* Combo Indicator */}
@@ -249,10 +260,10 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
                       variant="outline"
                       className={`gift-card flex flex-col items-center gap-2 h-auto py-4 rounded-xl border-2 transition-all relative overflow-hidden
                         ${selectedGift?.id === gift.id ? 'border-primary scale-105' : 'border-border hover:border-primary/50'}
-                        ${credits < gift.cost ? 'opacity-50' : ''}
+                        ${!hasUnlimitedCredits && credits < gift.cost ? 'opacity-50' : ''}
                       `}
                       onClick={() => handleSendGift(gift)}
-                      disabled={sending || credits < gift.cost}
+                      disabled={sending || (!hasUnlimitedCredits && credits < gift.cost)}
                     >
                       <div className={`absolute inset-0 bg-gradient-to-br ${gift.color} opacity-10`} />
                       
