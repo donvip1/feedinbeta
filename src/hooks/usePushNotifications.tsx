@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { pushNotificationManager } from '@/lib/push-notification-manager';
+import { notificationSounds } from '@/lib/notification-sounds';
 
 interface NotificationPreferences {
   push_enabled: boolean;
@@ -102,6 +103,9 @@ export function usePushNotifications() {
 
           // Check if document is hidden (user not actively on app)
           if (document.visibilityState === 'hidden') {
+            // Play notification sound
+            await notificationSounds.playForNotification(notification.type);
+            
             await pushNotificationManager.showLocalNotification(
               notification.title,
               {

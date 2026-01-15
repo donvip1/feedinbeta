@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Bell } from 'lucide-react';
 import { NotificationsPanel } from './NotificationsPanel';
+import { notificationSounds } from '@/lib/notification-sounds';
 
 interface NotificationBellProps {
   onPanelOpen?: () => void;
@@ -48,9 +49,15 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
           table: 'notifications',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
+        (payload: any) => {
           // New notification arrived - increment count
           setUnreadCount(prev => prev + 1);
+          
+          // Play appropriate sound based on notification type
+          const notificationType = payload.new?.type;
+          if (notificationType) {
+            notificationSounds.playForNotification(notificationType);
+          }
         }
       )
       .on(
