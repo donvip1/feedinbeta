@@ -84,13 +84,13 @@ export const CallControls = ({
         </button>
       )}
 
-      {/* Screen Share (only for video calls on desktop) */}
-      {isVideoCall && onToggleScreenShare && (
+      {/* Screen Share (available for both voice and video calls on desktop) */}
+      {onToggleScreenShare && (
         <button
           onClick={onToggleScreenShare}
           className={`rounded-full w-14 h-14 flex items-center justify-center transition-all ${
             isScreenSharing
-              ? 'bg-primary/20 text-primary hover:bg-primary/30'
+              ? 'bg-green-500/30 text-green-400 hover:bg-green-500/40 ring-2 ring-green-500/50'
               : 'bg-white/10 text-white hover:bg-white/20'
           }`}
           title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
