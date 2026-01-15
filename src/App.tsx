@@ -87,6 +87,7 @@ import P2PPaymentMethods from "./pages/P2PPaymentMethods";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import AdminPanel from "./pages/AdminPanel";
 import Referral from "./pages/Referral";
+import NotificationHistory from "./pages/NotificationHistory";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -250,6 +251,9 @@ const App = () => {
             <Route path="/promotions" element={<Promotions />} />
             <Route path="/promote/:postId" element={<Promote />} />
             <Route path="/moderation" element={<Moderation />} />
+            
+            {/* Notifications */}
+            <Route path="/notifications/history" element={<NotificationHistory />} />
             
             {/* Settings */}
             <Route path="/settings" element={<Settings />} />

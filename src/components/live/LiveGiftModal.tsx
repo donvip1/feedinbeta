@@ -144,8 +144,21 @@ export const LiveGiftModal = ({
         platform_fee: creditValue - recipientAmount,
       });
 
+      // Create notification for the recipient
+      await supabase.from('notifications').insert({
+        user_id: recipientId,
+        from_user_id: user.id,
+        type: 'live_gift',
+        title: 'You received a gift!',
+        message: `Someone sent you a ${giftType} gift (${creditValue} credits) in the ${isSpace ? 'space' : 'stream'}`,
+        related_id: streamId,
+        related_type: isSpace ? 'space' : 'live_stream'
+      });
+
       toast.success(`${giftType} sent!`);
-      setUserCredits(prev => prev - creditValue);
+      if (!hasUnlimitedCredits) {
+        setUserCredits(prev => prev - creditValue);
+      }
 
       setTimeout(() => {
         setSentGift(null);
