@@ -55,7 +55,7 @@ const PDFCompress = () => {
         addDefaultPage: false,
       });
 
-      const blob = new Blob([compressedBytes.buffer], { type: 'application/pdf' });
+      const blob = new Blob([compressedBytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
 
       setResult({

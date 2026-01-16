@@ -69,7 +69,7 @@ const PDFMerge = () => {
       }
 
       const mergedPdfBytes = await mergedPdf.save();
-      const blob = new Blob([mergedPdfBytes.buffer], { type: 'application/pdf' });
+      const blob = new Blob([mergedPdfBytes as BlobPart], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setResultUrl(url);
 
