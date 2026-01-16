@@ -88,6 +88,12 @@ import { CurrencyProvider } from "@/context/CurrencyContext";
 import AdminPanel from "./pages/AdminPanel";
 import Referral from "./pages/Referral";
 import NotificationHistory from "./pages/NotificationHistory";
+import AIToolsHub from "./pages/AIToolsHub";
+import AIAgent from "./pages/AIAgent";
+import BackgroundRemover from "./pages/tools/BackgroundRemover";
+import ImageUpscaler from "./pages/tools/ImageUpscaler";
+import EssayWriter from "./pages/tools/EssayWriter";
+import QRCodeGenerator from "./pages/tools/QRCodeGenerator";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -220,6 +226,8 @@ const App = () => {
             
             {/* AI Features */}
             <Route path="/ai" element={<AIHub />} />
+            <Route path="/ai/tools" element={<AIToolsHub />} />
+            <Route path="/ai/agent" element={<AIAgent />} />
             <Route path="/ai/copilot" element={<AICopilot />} />
             <Route path="/ai/thesis" element={<ThesisWriter />} />
             <Route path="/ai/video" element={<VideoCreation />} />
@@ -230,6 +238,11 @@ const App = () => {
             <Route path="/ai/learn" element={<LearnTech />} />
             <Route path="/ai/captions" element={<CaptionGenerator />} />
             <Route path="/ai/ideas" element={<ContentIdeas />} />
+            {/* AI Tools */}
+            <Route path="/ai/tools/bg-remover" element={<BackgroundRemover />} />
+            <Route path="/ai/tools/upscaler" element={<ImageUpscaler />} />
+            <Route path="/ai/tools/essay-writer" element={<EssayWriter />} />
+            <Route path="/ai/tools/qr-code" element={<QRCodeGenerator />} />
             
             {/* Groups */}
             <Route path="/groups" element={<Groups />} />
