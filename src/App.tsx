@@ -261,6 +261,22 @@ const App = () => {
             <Route path="/ai/tools/img-compress" element={<ImageCompressor />} />
             <Route path="/ai/tools/image-to-text" element={<ImageToText />} />
             <Route path="/ai/tools/video-trim" element={<VideoTrimmer />} />
+            <Route path="/ai/tools/pdf-to-word" element={<PDFToWord />} />
+            <Route path="/ai/tools/word-to-pdf" element={<WordToPDF />} />
+            <Route path="/ai/tools/summarizer" element={<Summarizer />} />
+            <Route path="/ai/tools/colorizer" element={<ImageColorizer />} />
+            <Route path="/ai/tools/video-compress" element={<VideoCompressor />} />
+            <Route path="/ai/tools/audio-extract" element={<AudioExtractor />} />
+            <Route path="/ai/tools/exam-prep" element={<ExamPrep />} />
+            <Route path="/ai/tools/research" element={<ResearchAssistant />} />
+            <Route path="/ai/tools/math-solver" element={<MathSolver />} />
+            <Route path="/ai/tools/text-to-speech" element={<TextToSpeech />} />
+            <Route path="/ai/tools/speech-to-text" element={<SpeechToText />} />
+            <Route path="/ai/tools/meme-gen" element={<MemeGenerator />} />
+            <Route path="/ai/tools/logo-maker" element={<LogoMaker />} />
+            <Route path="/ai/tools/health-info" element={<HealthInfo />} />
+            <Route path="/ai/tools/symptom-checker" element={<SymptomChecker />} />
+            <Route path="/ai/tools/nutrition" element={<NutritionCalculator />} />
             
             {/* Groups */}
             <Route path="/groups" element={<Groups />} />
