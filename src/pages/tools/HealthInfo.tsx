@@ -1,32 +1,28 @@
 import { useState } from 'react';
-import { ArrowLeft, Heart, Search, Loader2, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Heart, Search, Loader2, AlertTriangle, BookOpen, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 
 const HealthInfo = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [info, setInfo] = useState<{
-    overview: string;
-    causes: string[];
-    symptoms: string[];
-    prevention: string[];
-    whenToSeek: string;
-  } | null>(null);
+  const [result, setResult] = useState('');
 
   const popularTopics = [
-    'Headaches',
-    'Sleep disorders',
-    'Stress management',
-    'Healthy eating',
-    'Exercise benefits',
-    'Mental health'
+    '🤕 Headaches',
+    '😴 Sleep disorders',
+    '🧘 Stress management',
+    '🥗 Healthy eating',
+    '🏃 Exercise benefits',
+    '🧠 Mental health'
   ];
 
   const handleSearch = async () => {
@@ -36,41 +32,112 @@ const HealthInfo = () => {
     }
 
     setIsSearching(true);
+    setResult('');
+    
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
           messages: [
             {
+              role: 'system',
+              content: `You are a health education assistant. Provide accurate, general health information for educational purposes.
+
+## Response Format:
+
+### 📚 Health Topic: [Topic Name]
+
+#### Overview
+[2-3 sentence overview of the topic]
+
+---
+
+### 🔍 Common Causes
+
+| Cause | Description |
+|-------|-------------|
+| Cause 1 | Brief explanation |
+| Cause 2 | Brief explanation |
+| Cause 3 | Brief explanation |
+
+---
+
+### ⚡ Common Symptoms
+
+- **Symptom 1**: Description
+- **Symptom 2**: Description
+- **Symptom 3**: Description
+
+---
+
+### ✅ Prevention & Management
+
+1. **Tip 1**: Detailed explanation
+2. **Tip 2**: Detailed explanation
+3. **Tip 3**: Detailed explanation
+4. **Tip 4**: Detailed explanation
+
+---
+
+### 🏥 When to See a Doctor
+
+> ⚠️ Seek medical attention if you experience:
+> - Warning sign 1
+> - Warning sign 2
+> - Warning sign 3
+
+---
+
+### ⚠️ Disclaimer
+
+This information is for educational purposes only. Always consult a healthcare professional for medical advice.
+
+IMPORTANT: Never diagnose or prescribe treatment. Always emphasize consulting healthcare professionals.`,
+            },
+            {
               role: 'user',
-              content: `Provide general health information about: "${query}"
-              
-              Format as JSON:
-              {
-                "overview": "A brief overview of the topic (2-3 sentences)",
-                "causes": ["Common cause 1", "Common cause 2", ...],
-                "symptoms": ["Symptom 1", "Symptom 2", ...],
-                "prevention": ["Prevention tip 1", "Prevention tip 2", ...],
-                "whenToSeek": "When to seek medical attention"
-              }
-              
-              IMPORTANT: This is for educational purposes only. Always recommend consulting a healthcare professional.`
-            }
+              content: `Provide general health information about: "${query}"`,
+            },
           ],
-          systemPrompt: 'You are a health education assistant. Provide accurate, general health information for educational purposes. Always emphasize the importance of consulting healthcare professionals. Never diagnose or prescribe treatment.'
-        }
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Search failed');
 
-      const content = data?.choices?.[0]?.message?.content || data?.content;
-      if (content) {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          setInfo(parsed);
-          toast.success('Information found!');
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  fullResponse += content;
+                  setResult(fullResponse);
+                }
+              } catch {}
+            }
+          }
         }
       }
+
+      toast.success('Information found!');
     } catch (error) {
       console.error('Search error:', error);
       toast.error('Failed to find information. Please try again.');
@@ -86,133 +153,108 @@ const HealthInfo = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold">Health Information</h1>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Heart className="h-5 w-5 text-primary" />
+              Health Information
+            </h1>
             <p className="text-sm text-muted-foreground">Educational health resources</p>
           </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 max-w-2xl mx-auto space-y-4">
         {/* Disclaimer */}
-        <Card className="p-4 bg-amber-500/10 border-amber-500/30">
-          <div className="flex gap-3">
-            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
-            <p className="text-sm text-amber-700 dark:text-amber-400">
-              This tool provides general health information for educational purposes only. 
-              It is not a substitute for professional medical advice. Always consult a healthcare provider.
-            </p>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Heart className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Search Health Topics</h3>
-            </div>
-
-            <div className="flex gap-2">
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="e.g., headaches, nutrition, sleep..."
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              />
-              <Button onClick={handleSearch} disabled={isSearching}>
-                {isSearching ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">Popular topics:</p>
-              <div className="flex flex-wrap gap-2">
-                {popularTopics.map((topic) => (
-                  <button
-                    key={topic}
-                    className="px-3 py-1 text-xs bg-muted rounded-full hover:bg-muted/80"
-                    onClick={() => {
-                      setQuery(topic);
-                      setInfo(null);
-                    }}
-                  >
-                    {topic}
-                  </button>
-                ))}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Card className="bg-amber-500/10 border-amber-500/30">
+            <CardContent className="p-4">
+              <div className="flex gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0" />
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  This tool provides general health information for educational purposes only. 
+                  It is not a substitute for professional medical advice. Always consult a healthcare provider.
+                </p>
               </div>
-            </div>
-          </div>
-        </Card>
+            </CardContent>
+          </Card>
+        </motion.div>
 
-        {info && (
-          <>
-            <Card className="p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold">Overview</h3>
-                <p className="text-sm text-muted-foreground">{info.overview}</p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Search Health Topics</h3>
               </div>
-            </Card>
 
-            {info.causes.length > 0 && (
-              <Card className="p-4">
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Common Causes</h3>
-                  <ul className="space-y-1">
-                    {info.causes.map((cause, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <span className="text-primary">•</span>
-                        <span>{cause}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Card>
-            )}
+              <div className="flex gap-2">
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g., headaches, nutrition, sleep..."
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  className="text-base"
+                />
+                <Button onClick={handleSearch} disabled={isSearching}>
+                  {isSearching ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
 
-            {info.symptoms.length > 0 && (
-              <Card className="p-4">
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Common Symptoms</h3>
-                  <ul className="space-y-1">
-                    {info.symptoms.map((symptom, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <span className="text-primary">•</span>
-                        <span>{symptom}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Card>
-            )}
-
-            {info.prevention.length > 0 && (
-              <Card className="p-4">
-                <div className="space-y-3">
-                  <h3 className="font-semibold">Prevention & Management</h3>
-                  <ul className="space-y-1">
-                    {info.prevention.map((tip, index) => (
-                      <li key={index} className="flex items-start gap-2 text-sm">
-                        <span className="text-green-500">✓</span>
-                        <span>{tip}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Card>
-            )}
-
-            <Card className="p-4 bg-red-500/10 border-red-500/30">
               <div className="space-y-2">
-                <h3 className="font-semibold text-red-600 dark:text-red-400">When to See a Doctor</h3>
-                <p className="text-sm">{info.whenToSeek}</p>
+                <p className="text-xs text-muted-foreground">Popular topics:</p>
+                <div className="flex flex-wrap gap-2">
+                  {popularTopics.map((topic) => (
+                    <Button
+                      key={topic}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => {
+                        setQuery(topic.slice(2).trim());
+                        setResult('');
+                      }}
+                    >
+                      {topic}
+                    </Button>
+                  ))}
+                </div>
               </div>
-            </Card>
-          </>
-        )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <AnimatePresence mode="wait">
+          {result && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+            >
+              <Card className="border-primary/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <h3 className="font-semibold">Health Information</h3>
+                  </div>
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <EnhancedMarkdownRenderer content={result} />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <BottomNav />

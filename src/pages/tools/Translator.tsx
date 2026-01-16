@@ -5,40 +5,42 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Languages, Loader2, Copy, Download, ArrowLeftRight } from 'lucide-react';
+import { ArrowLeft, Languages, Loader2, Copy, Download, ArrowLeftRight, Volume2, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 
 const LANGUAGES = [
-  { code: 'en', name: 'English' },
-  { code: 'es', name: 'Spanish' },
-  { code: 'fr', name: 'French' },
-  { code: 'de', name: 'German' },
-  { code: 'it', name: 'Italian' },
-  { code: 'pt', name: 'Portuguese' },
-  { code: 'ru', name: 'Russian' },
-  { code: 'zh', name: 'Chinese' },
-  { code: 'ja', name: 'Japanese' },
-  { code: 'ko', name: 'Korean' },
-  { code: 'ar', name: 'Arabic' },
-  { code: 'hi', name: 'Hindi' },
-  { code: 'tr', name: 'Turkish' },
-  { code: 'nl', name: 'Dutch' },
-  { code: 'pl', name: 'Polish' },
-  { code: 'sv', name: 'Swedish' },
-  { code: 'da', name: 'Danish' },
-  { code: 'no', name: 'Norwegian' },
-  { code: 'fi', name: 'Finnish' },
-  { code: 'el', name: 'Greek' },
-  { code: 'he', name: 'Hebrew' },
-  { code: 'th', name: 'Thai' },
-  { code: 'vi', name: 'Vietnamese' },
-  { code: 'id', name: 'Indonesian' },
-  { code: 'ms', name: 'Malay' },
-  { code: 'tl', name: 'Filipino' },
-  { code: 'sw', name: 'Swahili' },
-  { code: 'yo', name: 'Yoruba' },
-  { code: 'ig', name: 'Igbo' },
-  { code: 'ha', name: 'Hausa' },
+  { code: 'en', name: 'English', flag: '🇬🇧' },
+  { code: 'es', name: 'Spanish', flag: '🇪🇸' },
+  { code: 'fr', name: 'French', flag: '🇫🇷' },
+  { code: 'de', name: 'German', flag: '🇩🇪' },
+  { code: 'it', name: 'Italian', flag: '🇮🇹' },
+  { code: 'pt', name: 'Portuguese', flag: '🇵🇹' },
+  { code: 'ru', name: 'Russian', flag: '🇷🇺' },
+  { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
+  { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
+  { code: 'ko', name: 'Korean', flag: '🇰🇷' },
+  { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
+  { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
+  { code: 'tr', name: 'Turkish', flag: '🇹🇷' },
+  { code: 'nl', name: 'Dutch', flag: '🇳🇱' },
+  { code: 'pl', name: 'Polish', flag: '🇵🇱' },
+  { code: 'sv', name: 'Swedish', flag: '🇸🇪' },
+  { code: 'da', name: 'Danish', flag: '🇩🇰' },
+  { code: 'no', name: 'Norwegian', flag: '🇳🇴' },
+  { code: 'fi', name: 'Finnish', flag: '🇫🇮' },
+  { code: 'el', name: 'Greek', flag: '🇬🇷' },
+  { code: 'he', name: 'Hebrew', flag: '🇮🇱' },
+  { code: 'th', name: 'Thai', flag: '🇹🇭' },
+  { code: 'vi', name: 'Vietnamese', flag: '🇻🇳' },
+  { code: 'id', name: 'Indonesian', flag: '🇮🇩' },
+  { code: 'ms', name: 'Malay', flag: '🇲🇾' },
+  { code: 'tl', name: 'Filipino', flag: '🇵🇭' },
+  { code: 'sw', name: 'Swahili', flag: '🇰🇪' },
+  { code: 'yo', name: 'Yoruba', flag: '🇳🇬' },
+  { code: 'ig', name: 'Igbo', flag: '🇳🇬' },
+  { code: 'ha', name: 'Hausa', flag: '🇳🇬' },
 ];
 
 const Translator = () => {
@@ -67,6 +69,7 @@ const Translator = () => {
     try {
       const sourceLanguage = sourceLang === 'auto' ? 'the detected language' : LANGUAGES.find(l => l.code === sourceLang)?.name;
       const targetLanguage = LANGUAGES.find(l => l.code === targetLang)?.name;
+      const targetFlag = LANGUAGES.find(l => l.code === targetLang)?.flag;
 
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
         method: 'POST',
@@ -78,15 +81,23 @@ const Translator = () => {
           messages: [
             {
               role: 'system',
-              content: `You are a professional translator. Translate the text from ${sourceLanguage} to ${targetLanguage}. 
-              
-              If auto-detecting the language, first identify it.
-              
-              Format your response as:
-              ${sourceLang === 'auto' ? 'DETECTED LANGUAGE: [language name]\n' : ''}TRANSLATION:
-              [translated text]
-              
-              Preserve the original meaning, tone, and formatting. Do not add explanations.`,
+              content: `You are a professional translator. Translate the text from ${sourceLanguage} to ${targetLanguage}.
+
+## Response Format:
+
+${sourceLang === 'auto' ? '### 🔍 Detected Language\n**[Language Name]**\n\n---\n\n' : ''}### ${targetFlag} Translation
+
+[Your accurate translation here - preserve meaning, tone, and formatting]
+
+---
+
+### 📝 Translation Notes (if relevant)
+
+- Any cultural context or nuances
+- Alternative translations for specific phrases
+- Formality level maintained
+
+Provide natural, fluent translations. Preserve the original meaning, tone, and formatting.`,
             },
             {
               role: 'user',
@@ -119,18 +130,7 @@ const Translator = () => {
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   fullResponse += content;
-                  
-                  // Parse detected language
-                  const langMatch = fullResponse.match(/DETECTED LANGUAGE:\s*(\w+)/i);
-                  if (langMatch) {
-                    setDetectedLang(langMatch[1]);
-                  }
-                  
-                  // Parse translation
-                  const translationMatch = fullResponse.match(/TRANSLATION:\s*([\s\S]*)/i);
-                  if (translationMatch) {
-                    setResult(translationMatch[1].trim());
-                  }
+                  setResult(fullResponse);
                 }
               } catch {}
             }
@@ -139,8 +139,8 @@ const Translator = () => {
       }
 
       toast({
-        title: 'Translation complete!',
-        description: detectedLang ? `Detected: ${detectedLang}` : undefined,
+        title: '✅ Translation complete!',
+        description: `Translated to ${targetLanguage}`,
       });
     } catch (error: any) {
       console.error('Translation error:', error);
@@ -160,7 +160,7 @@ const Translator = () => {
       setSourceLang(targetLang);
       setTargetLang(temp);
       if (result) {
-        setInputText(result);
+        setInputText(result.split('\n')[0] || '');
         setResult('');
       }
     }
@@ -180,6 +180,12 @@ const Translator = () => {
     a.click();
   };
 
+  const speakText = (text: string, lang: string) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang;
+    speechSynthesis.speak(utterance);
+  };
+
   return (
     <>
       <div className="min-h-screen bg-background pb-24">
@@ -188,75 +194,101 @@ const Translator = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
-              <h1 className="text-lg font-semibold">Translator</h1>
-              <p className="text-xs text-muted-foreground">Translate between 30+ languages</p>
+            <div className="flex-1">
+              <h1 className="text-lg font-semibold flex items-center gap-2">
+                <Languages className="w-5 h-5 text-primary" />
+                AI Translator
+              </h1>
+              <p className="text-xs text-muted-foreground">Translate between 30+ languages with AI</p>
             </div>
           </div>
         </div>
 
         <div className="p-4 max-w-2xl mx-auto space-y-4">
-          <Card>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-center gap-2">
-                <Select value={sourceLang} onValueChange={setSourceLang}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="From" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">Auto-detect</SelectItem>
-                    {LANGUAGES.map(lang => (
-                      <SelectItem key={lang.code} value={lang.code}>
-                        {lang.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleSwapLanguages}
-                  disabled={sourceLang === 'auto'}
-                >
-                  <ArrowLeftRight className="w-4 h-4" />
-                </Button>
+          {/* Language Selection */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Select value={sourceLang} onValueChange={setSourceLang}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="From" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">🔍 Auto-detect</SelectItem>
+                      {LANGUAGES.map(lang => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.flag} {lang.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleSwapLanguages}
+                    disabled={sourceLang === 'auto'}
+                    className="shrink-0"
+                  >
+                    <ArrowLeftRight className="w-4 h-4" />
+                  </Button>
 
-                <Select value={targetLang} onValueChange={setTargetLang}>
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="To" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGES.map(lang => (
-                      <SelectItem key={lang.code} value={lang.code}>
-                        {lang.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                  <Select value={targetLang} onValueChange={setTargetLang}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="To" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGUAGES.map(lang => (
+                        <SelectItem key={lang.code} value={lang.code}>
+                          {lang.flag} {lang.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-              <Textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Enter text to translate..."
-                className="min-h-[150px] resize-none"
-              />
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">
-                  {inputText.length} characters
-                </span>
-                {detectedLang && (
+                <div className="relative">
+                  <Textarea
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder="Enter text to translate..."
+                    className="min-h-[150px] resize-none text-base pr-10"
+                  />
+                  {inputText && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-2 h-8 w-8"
+                      onClick={() => speakText(inputText, sourceLang === 'auto' ? 'en' : sourceLang)}
+                    >
+                      <Volume2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                <div className="flex justify-between items-center">
                   <span className="text-xs text-muted-foreground">
-                    Detected: {detectedLang}
+                    {inputText.length} characters
                   </span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setInputText('')}
+                    disabled={!inputText}
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
           <Button
-            className="w-full"
+            className="w-full h-12 text-base font-medium"
             size="lg"
             onClick={handleTranslate}
             disabled={!inputText.trim() || isProcessing}
@@ -274,26 +306,44 @@ const Translator = () => {
             )}
           </Button>
 
-          {result && (
-            <Card className="border-green-500/50 bg-green-500/10">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                    ✓ Translation ({LANGUAGES.find(l => l.code === targetLang)?.name})
-                  </p>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={handleCopy}>
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={handleDownload}>
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-sm whitespace-pre-wrap">{result}</p>
-              </CardContent>
-            </Card>
-          )}
+          {/* Result */}
+          <AnimatePresence mode="wait">
+            {result && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-blue-500/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-primary" />
+                        <p className="text-sm font-semibold">
+                          {LANGUAGES.find(l => l.code === targetLang)?.flag} Translation Result
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={() => speakText(result, targetLang)} className="h-8 w-8 p-0">
+                          <Volume2 className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={handleCopy} className="h-8 w-8 p-0">
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={handleDownload} className="h-8 w-8 p-0">
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <EnhancedMarkdownRenderer content={result} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
       <BottomNav />

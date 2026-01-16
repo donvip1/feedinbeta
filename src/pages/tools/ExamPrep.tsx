@@ -1,14 +1,16 @@
 import { useState } from 'react';
-import { ArrowLeft, GraduationCap, Loader2, BookOpen, CheckCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, GraduationCap, Loader2, BookOpen, CheckCircle, XCircle, Trophy, Target, Brain } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 
 interface Question {
   question: string;
@@ -27,6 +29,8 @@ const ExamPrep = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<number[]>([]);
   const [showResults, setShowResults] = useState(false);
+
+  const popularSubjects = ['Mathematics', 'Physics', 'Biology', 'History', 'Computer Science', 'Literature'];
 
   const handleGenerate = async () => {
     if (!topic.trim()) {
@@ -68,7 +72,6 @@ const ExamPrep = () => {
 
       const content_response = data?.choices?.[0]?.message?.content || data?.content;
       if (content_response) {
-        // Parse JSON from response
         const jsonMatch = content_response.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
@@ -103,6 +106,7 @@ const ExamPrep = () => {
   };
 
   const score = answers.filter((a, i) => a === questions[i]?.correctAnswer).length;
+  const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -111,148 +115,199 @@ const ExamPrep = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold">Exam Prep</h1>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <Brain className="h-5 w-5 text-primary" />
+              Exam Prep
+            </h1>
             <p className="text-sm text-muted-foreground">AI-powered practice questions</p>
           </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-4 max-w-2xl mx-auto space-y-4">
         {questions.length === 0 ? (
-          <Card className="p-4">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold">Generate Practice Questions</h3>
-              </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold">Generate Practice Questions</h3>
+                </div>
 
-              <Input
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="Enter topic (e.g., World War II, Python programming)"
-              />
+                <Input
+                  value={topic}
+                  onChange={(e) => setTopic(e.target.value)}
+                  placeholder="Enter topic (e.g., World War II, Python programming)"
+                  className="text-base"
+                />
 
-              <Textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                placeholder="Optional: Paste study material for more relevant questions..."
-                className="min-h-[100px]"
-              />
+                {/* Quick topic selection */}
+                <div className="flex flex-wrap gap-2">
+                  {popularSubjects.map((subject) => (
+                    <Button
+                      key={subject}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => setTopic(subject)}
+                    >
+                      {subject}
+                    </Button>
+                  ))}
+                </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <Select value={difficulty} onValueChange={setDifficulty}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Difficulty" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="easy">Easy</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="hard">Hard</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Optional: Paste study material for more relevant questions..."
+                  className="min-h-[100px]"
+                />
 
-                <Select value={questionCount} onValueChange={setQuestionCount}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Questions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="3">3 Questions</SelectItem>
-                    <SelectItem value="5">5 Questions</SelectItem>
-                    <SelectItem value="10">10 Questions</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Select value={difficulty} onValueChange={setDifficulty}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Difficulty" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="easy">🟢 Easy</SelectItem>
+                      <SelectItem value="medium">🟡 Medium</SelectItem>
+                      <SelectItem value="hard">🔴 Hard</SelectItem>
+                    </SelectContent>
+                  </Select>
 
-              <Button 
-                onClick={handleGenerate} 
-                disabled={isGenerating || !topic.trim()}
-                className="w-full"
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generating Questions...
-                  </>
-                ) : (
-                  <>
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Generate Questions
-                  </>
-                )}
-              </Button>
-            </div>
-          </Card>
+                  <Select value={questionCount} onValueChange={setQuestionCount}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Questions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="3">3 Questions</SelectItem>
+                      <SelectItem value="5">5 Questions</SelectItem>
+                      <SelectItem value="10">10 Questions</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Button 
+                  onClick={handleGenerate} 
+                  disabled={isGenerating || !topic.trim()}
+                  className="w-full h-12"
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Generating Questions...
+                    </>
+                  ) : (
+                    <>
+                      <Target className="h-4 w-4 mr-2" />
+                      Generate Questions
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
         ) : (
           <>
-            {showResults && (
-              <Card className="p-4 bg-primary/10">
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold">{score}/{questions.length}</h3>
-                  <p className="text-sm text-muted-foreground">
-                    {score === questions.length ? 'Perfect!' : score >= questions.length / 2 ? 'Good job!' : 'Keep practicing!'}
-                  </p>
-                </div>
-              </Card>
-            )}
+            <AnimatePresence>
+              {showResults && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                >
+                  <Card className={`${percentage >= 70 ? 'bg-green-500/10 border-green-500/30' : percentage >= 50 ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                    <CardContent className="p-6 text-center">
+                      <Trophy className={`w-12 h-12 mx-auto mb-3 ${percentage >= 70 ? 'text-green-500' : percentage >= 50 ? 'text-yellow-500' : 'text-red-500'}`} />
+                      <h3 className="text-3xl font-bold">{score}/{questions.length}</h3>
+                      <p className="text-lg font-medium">{percentage}%</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        {percentage === 100 ? '🎉 Perfect score!' : percentage >= 70 ? '👏 Great job!' : percentage >= 50 ? '📚 Keep practicing!' : '💪 Don\'t give up!'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {questions.map((q, qIndex) => (
-              <Card key={qIndex} className="p-4">
-                <div className="space-y-3">
-                  <p className="font-medium">
-                    {qIndex + 1}. {q.question}
-                  </p>
-                  <div className="space-y-2">
-                    {q.options.map((option, oIndex) => {
-                      const isSelected = answers[qIndex] === oIndex;
-                      const isCorrect = q.correctAnswer === oIndex;
-                      let className = 'p-3 rounded-lg border cursor-pointer transition-colors ';
-                      
-                      if (showResults) {
-                        if (isCorrect) {
-                          className += 'bg-green-500/20 border-green-500';
-                        } else if (isSelected && !isCorrect) {
-                          className += 'bg-red-500/20 border-red-500';
-                        } else {
-                          className += 'bg-muted/50 border-border';
-                        }
-                      } else {
-                        className += isSelected 
-                          ? 'bg-primary/20 border-primary' 
-                          : 'bg-muted/50 border-border hover:border-primary/50';
-                      }
-
-                      return (
-                        <div
-                          key={oIndex}
-                          className={className}
-                          onClick={() => handleAnswer(qIndex, oIndex)}
-                        >
-                          <div className="flex items-center gap-2">
-                            {showResults && isCorrect && (
-                              <CheckCircle className="h-4 w-4 text-green-500" />
-                            )}
-                            {showResults && isSelected && !isCorrect && (
-                              <XCircle className="h-4 w-4 text-red-500" />
-                            )}
-                            <span className="text-sm">{option}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {showResults && (
-                    <p className="text-sm text-muted-foreground mt-2 p-2 bg-muted/50 rounded">
-                      {q.explanation}
+              <motion.div
+                key={qIndex}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: qIndex * 0.1 }}
+              >
+                <Card className={showResults ? (answers[qIndex] === q.correctAnswer ? 'border-green-500/30' : 'border-red-500/30') : ''}>
+                  <CardContent className="p-4 space-y-3">
+                    <p className="font-medium flex items-start gap-2">
+                      <span className="bg-primary/10 text-primary rounded-full w-6 h-6 flex items-center justify-center text-sm shrink-0">
+                        {qIndex + 1}
+                      </span>
+                      <span>{q.question}</span>
                     </p>
-                  )}
-                </div>
-              </Card>
+                    <div className="space-y-2 ml-8">
+                      {q.options.map((option, oIndex) => {
+                        const isSelected = answers[qIndex] === oIndex;
+                        const isCorrect = q.correctAnswer === oIndex;
+                        let className = 'p-3 rounded-lg border cursor-pointer transition-all ';
+                        
+                        if (showResults) {
+                          if (isCorrect) {
+                            className += 'bg-green-500/20 border-green-500';
+                          } else if (isSelected && !isCorrect) {
+                            className += 'bg-red-500/20 border-red-500';
+                          } else {
+                            className += 'bg-muted/50 border-border opacity-50';
+                          }
+                        } else {
+                          className += isSelected 
+                            ? 'bg-primary/20 border-primary' 
+                            : 'bg-muted/50 border-border hover:border-primary/50 hover:bg-primary/5';
+                        }
+
+                        return (
+                          <div
+                            key={oIndex}
+                            className={className}
+                            onClick={() => handleAnswer(qIndex, oIndex)}
+                          >
+                            <div className="flex items-center gap-2">
+                              {showResults && isCorrect && (
+                                <CheckCircle className="h-4 w-4 text-green-500 shrink-0" />
+                              )}
+                              {showResults && isSelected && !isCorrect && (
+                                <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                              )}
+                              <span className="text-sm">{option}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {showResults && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="ml-8 p-3 bg-primary/5 rounded-lg border border-primary/20"
+                      >
+                        <p className="text-sm font-medium text-primary mb-1">💡 Explanation</p>
+                        <p className="text-sm text-muted-foreground">{q.explanation}</p>
+                      </motion.div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
 
             <div className="flex gap-2">
               {!showResults ? (
-                <Button onClick={handleSubmit} className="flex-1">
+                <Button onClick={handleSubmit} className="flex-1 h-12">
+                  <CheckCircle className="h-4 w-4 mr-2" />
                   Submit Answers
                 </Button>
               ) : (
@@ -260,7 +315,8 @@ const ExamPrep = () => {
                   setQuestions([]);
                   setAnswers([]);
                   setShowResults(false);
-                }} className="flex-1">
+                }} className="flex-1 h-12">
+                  <Target className="h-4 w-4 mr-2" />
                   Try New Questions
                 </Button>
               )}
