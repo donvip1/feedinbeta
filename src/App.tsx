@@ -103,6 +103,22 @@ import Paraphraser from "./pages/tools/Paraphraser";
 import ImageCompressor from "./pages/tools/ImageCompressor";
 import ImageToText from "./pages/tools/ImageToText";
 import VideoTrimmer from "./pages/tools/VideoTrimmer";
+import PDFToWord from "./pages/tools/PDFToWord";
+import WordToPDF from "./pages/tools/WordToPDF";
+import Summarizer from "./pages/tools/Summarizer";
+import ImageColorizer from "./pages/tools/ImageColorizer";
+import VideoCompressor from "./pages/tools/VideoCompressor";
+import AudioExtractor from "./pages/tools/AudioExtractor";
+import ExamPrep from "./pages/tools/ExamPrep";
+import ResearchAssistant from "./pages/tools/ResearchAssistant";
+import MathSolver from "./pages/tools/MathSolver";
+import TextToSpeech from "./pages/tools/TextToSpeech";
+import SpeechToText from "./pages/tools/SpeechToText";
+import MemeGenerator from "./pages/tools/MemeGenerator";
+import LogoMaker from "./pages/tools/LogoMaker";
+import HealthInfo from "./pages/tools/HealthInfo";
+import SymptomChecker from "./pages/tools/SymptomChecker";
+import NutritionCalculator from "./pages/tools/NutritionCalculator";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
