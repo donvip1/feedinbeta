@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { ImageShareModal } from '@/components/shared/ImageShareModal';
+import { MarkdownRenderer } from '@/components/ai/MarkdownRenderer';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -288,8 +289,8 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
             <CheckCircle className="w-4 h-4 text-green-500" />
             <span className="font-medium">Result Ready</span>
           </div>
-          <div className="bg-muted p-4 rounded-lg whitespace-pre-wrap text-sm">
-            {text}
+          <div className="bg-muted p-4 rounded-lg">
+            <MarkdownRenderer content={text} className="text-sm" />
           </div>
         </CardContent>
       </Card>

@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/navigation/BottomNav";
+import { MarkdownRenderer } from "@/components/ai/MarkdownRenderer";
 
 export default function ProjectWriting() {
   const navigate = useNavigate();
@@ -193,9 +194,7 @@ Use professional language and industry best practices.`;
         {result && (
           <div className="bg-card rounded-lg p-4 border">
             <h3 className="font-semibold mb-3">Project Document:</h3>
-            <div className="prose prose-sm max-w-none whitespace-pre-wrap">
-              {result}
-            </div>
+            <MarkdownRenderer content={result} />
           </div>
         )}
       </div>

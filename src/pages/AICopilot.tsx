@@ -10,6 +10,7 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { MarkdownRenderer } from '@/components/ai/MarkdownRenderer';
 import { 
   ArrowLeft, Send, Loader2, Trash2, Bot, MessageSquare, Image, Wand2, 
   FileText, PenTool, Video, Settings, ChevronDown, ChevronRight, Sparkles,
@@ -522,7 +523,11 @@ const AICopilot = () => {
                             : 'bg-muted'
                         }`}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        {message.role === 'user' ? (
+                          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        ) : (
+                          <MarkdownRenderer content={message.content} className="text-sm" />
+                        )}
                       </div>
                     </div>
                   ))}
