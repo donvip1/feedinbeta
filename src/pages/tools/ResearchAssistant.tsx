@@ -1,25 +1,31 @@
 import { useState } from 'react';
-import { ArrowLeft, Search, Loader2, BookOpen, Copy, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, BookOpen, Copy, ExternalLink, Sparkles, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 
 const ResearchAssistant = () => {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [context, setContext] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [results, setResults] = useState<{
-    summary: string;
-    keyPoints: string[];
-    sources: string[];
-    furtherReading: string[];
-  } | null>(null);
+  const [result, setResult] = useState('');
+
+  const popularTopics = [
+    'Climate Change',
+    'Artificial Intelligence',
+    'Renewable Energy',
+    'Mental Health',
+    'Blockchain Technology',
+    'Gene Therapy'
+  ];
 
   const handleSearch = async () => {
     if (!query.trim()) {
@@ -28,45 +34,108 @@ const ResearchAssistant = () => {
     }
 
     setIsSearching(true);
+    setResult('');
+    
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
           messages: [
             {
+              role: 'system',
+              content: `You are an expert research assistant with academic rigor. Provide comprehensive, well-researched information.
+
+## Response Format (CRITICAL - Follow exactly):
+
+### 📚 Research Summary: [Topic]
+
+[2-3 paragraph comprehensive overview with key insights]
+
+---
+
+### 🔑 Key Findings
+
+1. **Finding 1**: Detailed explanation
+2. **Finding 2**: Detailed explanation
+3. **Finding 3**: Detailed explanation
+4. **Finding 4**: Detailed explanation
+5. **Finding 5**: Detailed explanation
+
+---
+
+### 📊 Current State of Research
+
+| Aspect | Status | Key Developments |
+|--------|--------|------------------|
+| Area 1 | Status | Recent developments |
+| Area 2 | Status | Recent developments |
+
+---
+
+### 📖 Recommended Sources
+
+1. **Academic Source 1** - Description of relevance
+2. **Academic Source 2** - Description of relevance
+3. **Research Paper/Book** - Description of relevance
+
+---
+
+### 🔮 Further Research Directions
+
+- **Direction 1**: Why it's important
+- **Direction 2**: Why it's important
+- **Direction 3**: Why it's important
+
+---
+
+### ⚠️ Research Considerations
+
+Important caveats, limitations, or areas of ongoing debate.`,
+            },
+            {
               role: 'user',
-              content: `Research topic: "${query}"
-              ${context ? `Additional context: ${context}` : ''}
-              
-              Please provide:
-              1. A comprehensive summary of this topic (2-3 paragraphs)
-              2. Key points and findings (5-7 bullet points)
-              3. Suggested academic/reliable sources to explore
-              4. Further reading recommendations
-              
-              Format your response as JSON:
-              {
-                "summary": "...",
-                "keyPoints": ["point1", "point2", ...],
-                "sources": ["source1", "source2", ...],
-                "furtherReading": ["topic1", "topic2", ...]
-              }`
-            }
+              content: `Research topic: "${query}"${context ? `\n\nAdditional context: ${context}` : ''}`,
+            },
           ],
-          systemPrompt: 'You are an expert research assistant. Provide accurate, well-researched information with academic rigor. Always cite reliable sources and suggest further reading.'
-        }
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Research failed');
 
-      const content = data?.choices?.[0]?.message?.content || data?.content;
-      if (content) {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          setResults(parsed);
-          toast.success('Research complete!');
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullResponse = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  fullResponse += content;
+                  setResult(fullResponse);
+                }
+              } catch {}
+            }
+          }
         }
       }
+
+      toast.success('Research complete!');
     } catch (error) {
       console.error('Research error:', error);
       toast.error('Research failed. Please try again.');
@@ -75,8 +144,8 @@ const ResearchAssistant = () => {
     }
   };
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(result);
     toast.success('Copied to clipboard!');
   };
 
@@ -87,119 +156,110 @@ const ResearchAssistant = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold">Research Assistant</h1>
-            <p className="text-sm text-muted-foreground">AI-powered research helper</p>
+          <div className="flex-1">
+            <h1 className="text-xl font-bold flex items-center gap-2">
+              <GraduationCap className="h-5 w-5 text-primary" />
+              Research Assistant
+            </h1>
+            <p className="text-sm text-muted-foreground">AI-powered academic research helper</p>
           </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        <Card className="p-4">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2">
-              <Search className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Enter Research Topic</h3>
-            </div>
-
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="e.g., Climate change effects on biodiversity"
-            />
-
-            <Textarea
-              value={context}
-              onChange={(e) => setContext(e.target.value)}
-              placeholder="Optional: Add specific questions or context..."
-              className="min-h-[80px]"
-            />
-
-            <Button 
-              onClick={handleSearch} 
-              disabled={isSearching || !query.trim()}
-              className="w-full"
-            >
-              {isSearching ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Researching...
-                </>
-              ) : (
-                <>
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Start Research
-                </>
-              )}
-            </Button>
-          </div>
-        </Card>
-
-        {results && (
-          <>
-            <Card className="p-4">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Summary</h3>
-                  <Button variant="ghost" size="sm" onClick={() => handleCopy(results.summary)}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {results.summary}
-                </p>
+      <div className="p-4 max-w-2xl mx-auto space-y-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Card>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Search className="h-5 w-5 text-primary" />
+                <h3 className="font-semibold">Enter Research Topic</h3>
               </div>
-            </Card>
 
-            <Card className="p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold">Key Points</h3>
-                <ul className="space-y-2">
-                  {results.keyPoints.map((point, index) => (
-                    <li key={index} className="flex items-start gap-2 text-sm">
-                      <span className="text-primary">•</span>
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Card>
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="e.g., Climate change effects on biodiversity"
+                className="text-base"
+              />
 
-            <Card className="p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold">Suggested Sources</h3>
-                <ul className="space-y-2">
-                  {results.sources.map((source, index) => (
-                    <li key={index} className="flex items-center gap-2 text-sm text-primary">
-                      <ExternalLink className="h-3 w-3" />
-                      <span>{source}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Card>
+              <Textarea
+                value={context}
+                onChange={(e) => setContext(e.target.value)}
+                placeholder="Optional: Add specific questions or context..."
+                className="min-h-[80px]"
+              />
 
-            <Card className="p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold">Further Reading</h3>
+              {/* Popular topics */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Popular topics:</p>
                 <div className="flex flex-wrap gap-2">
-                  {results.furtherReading.map((topic, index) => (
-                    <span 
-                      key={index} 
-                      className="px-3 py-1 bg-primary/10 rounded-full text-sm cursor-pointer hover:bg-primary/20"
-                      onClick={() => {
-                        setQuery(topic);
-                        setResults(null);
-                      }}
+                  {popularTopics.map((topic) => (
+                    <Button
+                      key={topic}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => setQuery(topic)}
                     >
                       {topic}
-                    </span>
+                    </Button>
                   ))}
                 </div>
               </div>
-            </Card>
-          </>
-        )}
+
+              <Button 
+                onClick={handleSearch} 
+                disabled={isSearching || !query.trim()}
+                className="w-full h-12"
+              >
+                {isSearching ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Researching...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Start Research
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <AnimatePresence mode="wait">
+          {result && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="border-primary/20">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                      <h3 className="font-semibold">Research Results</h3>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={handleCopy}>
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <EnhancedMarkdownRenderer content={result} />
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <BottomNav />

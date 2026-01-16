@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, SpellCheck, Loader2, Copy, Download, RefreshCw } from 'lucide-react';
+import { ArrowLeft, SpellCheck, Loader2, Copy, Download, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 
 const GrammarFixer = () => {
   const navigate = useNavigate();
@@ -17,6 +18,12 @@ const GrammarFixer = () => {
   const [result, setResult] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [corrections, setCorrections] = useState<string[]>([]);
+
+  const exampleTexts = [
+    "Their going to the store tommorrow to buy grocerys.",
+    "The company have been growing steadily, but they doesnt have enough employees.",
+    "Me and him went to the park yesterday, it was very beautifull weather."
+  ];
 
   const handleFix = async () => {
     if (!inputText.trim()) {
@@ -43,16 +50,33 @@ const GrammarFixer = () => {
           messages: [
             {
               role: 'system',
-              content: `You are a professional grammar and spelling checker. Fix all grammar, spelling, and punctuation errors in the text. 
-              
-              Format your response as follows:
-              CORRECTED TEXT:
-              [The corrected text here]
-              
-              CORRECTIONS MADE:
-              - [List each correction made, one per line]
-              
-              Be thorough but preserve the original meaning and tone.`,
+              content: `You are a professional grammar and spelling checker. Fix all grammar, spelling, and punctuation errors in the text.
+
+## Response Format (CRITICAL - Follow exactly):
+
+### ✅ Corrected Text
+
+[The fully corrected text with all fixes applied]
+
+---
+
+### 📝 Corrections Made
+
+| Original | Corrected | Type |
+|----------|-----------|------|
+| error1 | fix1 | Grammar/Spelling/Punctuation |
+| error2 | fix2 | Grammar/Spelling/Punctuation |
+
+---
+
+### 💡 Writing Tips
+
+Based on the errors found, here are tips to improve:
+
+1. **Tip 1**: Brief explanation
+2. **Tip 2**: Brief explanation
+
+Be thorough but preserve the original meaning and tone. Use markdown formatting for clear presentation.`,
             },
             {
               role: 'user',
@@ -85,22 +109,7 @@ const GrammarFixer = () => {
                 const content = parsed.choices?.[0]?.delta?.content;
                 if (content) {
                   fullResponse += content;
-                  
-                  // Parse the response to extract corrected text
-                  const correctedMatch = fullResponse.match(/CORRECTED TEXT:\s*([\s\S]*?)(?=CORRECTIONS MADE:|$)/i);
-                  if (correctedMatch) {
-                    setResult(correctedMatch[1].trim());
-                  }
-                  
-                  // Parse corrections
-                  const correctionsMatch = fullResponse.match(/CORRECTIONS MADE:\s*([\s\S]*)/i);
-                  if (correctionsMatch) {
-                    const correctionsList = correctionsMatch[1]
-                      .split('\n')
-                      .filter(line => line.trim().startsWith('-'))
-                      .map(line => line.trim().slice(1).trim());
-                    setCorrections(correctionsList);
-                  }
+                  setResult(fullResponse);
                 }
               } catch {}
             }
@@ -109,8 +118,8 @@ const GrammarFixer = () => {
       }
 
       toast({
-        title: 'Grammar fixed!',
-        description: `Made ${corrections.length || 'several'} corrections`,
+        title: '✅ Grammar fixed!',
+        description: 'Your text has been corrected',
       });
     } catch (error: any) {
       console.error('Grammar fix error:', error);
@@ -146,40 +155,70 @@ const GrammarFixer = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
-              <h1 className="text-lg font-semibold">Grammar Fixer</h1>
-              <p className="text-xs text-muted-foreground">Fix grammar and spelling errors</p>
+            <div className="flex-1">
+              <h1 className="text-lg font-semibold flex items-center gap-2">
+                <SpellCheck className="w-5 h-5 text-primary" />
+                Grammar Fixer
+              </h1>
+              <p className="text-xs text-muted-foreground">AI-powered grammar and spelling correction</p>
             </div>
           </div>
         </div>
 
         <div className="p-4 max-w-2xl mx-auto space-y-4">
-          <Card>
-            <CardContent className="p-4">
-              <Textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Paste your text here to fix grammar and spelling errors..."
-                className="min-h-[200px] resize-none"
-              />
-              <div className="flex justify-between items-center mt-2">
-                <span className="text-xs text-muted-foreground">
-                  {inputText.length} characters
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setInputText('')}
-                  disabled={!inputText}
-                >
-                  Clear
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Input Card */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <Card className="border-primary/20">
+              <CardContent className="p-4 space-y-4">
+                <Textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Paste your text here to fix grammar and spelling errors..."
+                  className="min-h-[200px] resize-none text-base"
+                />
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">
+                    {inputText.length} characters • {inputText.split(/\s+/).filter(Boolean).length} words
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setInputText('')}
+                    disabled={!inputText}
+                  >
+                    Clear
+                  </Button>
+                </div>
+
+                {/* Example texts */}
+                {!inputText && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground">Try an example:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {exampleTexts.map((text, i) => (
+                        <Button
+                          key={i}
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-auto py-1.5 px-2"
+                          onClick={() => setInputText(text)}
+                        >
+                          Example {i + 1}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </motion.div>
 
           <Button
-            className="w-full"
+            className="w-full h-12 text-base font-medium"
             size="lg"
             onClick={handleFix}
             disabled={!inputText.trim() || isProcessing}
@@ -187,54 +226,55 @@ const GrammarFixer = () => {
             {isProcessing ? (
               <>
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Fixing grammar...
+                Analyzing & Fixing...
               </>
             ) : (
               <>
                 <SpellCheck className="w-5 h-5 mr-2" />
-                Fix Grammar
+                Fix Grammar & Spelling
               </>
             )}
           </Button>
 
-          {result && (
-            <>
-              <Card className="border-green-500/50 bg-green-500/10">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                      ✓ Corrected Text
-                    </p>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={handleCopy}>
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={handleDownload}>
-                        <Download className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                  <p className="text-sm whitespace-pre-wrap">{result}</p>
-                </CardContent>
-              </Card>
-
-              {corrections.length > 0 && (
-                <Card>
+          {/* Results */}
+          <AnimatePresence mode="wait">
+            {result && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-4"
+              >
+                <Card className="border-green-500/30 bg-gradient-to-br from-green-500/5 to-emerald-500/5">
                   <CardContent className="p-4">
-                    <p className="text-sm font-medium mb-3">Corrections Made ({corrections.length})</p>
-                    <ul className="space-y-1">
-                      {corrections.map((correction, index) => (
-                        <li key={index} className="text-sm text-muted-foreground flex items-start gap-2">
-                          <RefreshCw className="w-3 h-3 mt-1 flex-shrink-0" />
-                          {correction}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                          Corrected Result
+                        </p>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={handleCopy} className="h-8 w-8 p-0">
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={handleDownload} className="h-8 w-8 p-0">
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={handleFix} className="h-8 w-8 p-0">
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <EnhancedMarkdownRenderer content={result} />
+                    </div>
                   </CardContent>
                 </Card>
-              )}
-            </>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
       <BottomNav />
