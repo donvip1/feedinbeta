@@ -23,7 +23,21 @@ import {
   Hash,
   Mic,
   UserCircle,
-  Lightbulb
+  Lightbulb,
+  Bot,
+  Wrench,
+  ImagePlus,
+  Eraser,
+  FileType,
+  Merge,
+  Scissors,
+  Minimize2,
+  Languages,
+  PenTool,
+  ScanText,
+  QrCode,
+  Type,
+  ChevronRight
 } from 'lucide-react';
 import feedinIcon from '@/assets/feedin-icon.png';
 
@@ -100,6 +114,16 @@ const AIHub = () => {
       path: '/ai/copilot',
       category: 'chat',
       creditCost: 5,
+    },
+    {
+      id: 'ai-agent',
+      name: 'AI Agent',
+      description: 'Advanced AI with memory for thesis, health, coding & more',
+      icon: <Bot className="w-6 h-6" />,
+      path: '/ai/agent',
+      category: 'chat',
+      isNew: true,
+      creditCost: 10,
     },
     {
       id: 'image-gen',
@@ -183,6 +207,98 @@ const AIHub = () => {
       path: '/ai/learn',
       category: 'learning',
       creditCost: 5,
+    },
+  ];
+
+  // New AI Tools (Phase 2)
+  const newAiTools = [
+    {
+      id: 'ai-tools-hub',
+      name: 'AI Tools Hub',
+      description: 'Access 50+ AI tools for images, PDFs, writing & more',
+      icon: <Wrench className="w-6 h-6" />,
+      path: '/ai/tools',
+      isNew: true,
+    },
+    {
+      id: 'bg-remover',
+      name: 'Background Remover',
+      description: 'Remove backgrounds from images with AI',
+      icon: <Eraser className="w-6 h-6" />,
+      path: '/ai/tools/bg-remover',
+      isNew: true,
+    },
+    {
+      id: 'image-upscaler',
+      name: 'Image Upscaler',
+      description: 'Enhance image resolution like Remini',
+      icon: <ImagePlus className="w-6 h-6" />,
+      path: '/ai/tools/upscaler',
+      isNew: true,
+    },
+    {
+      id: 'essay-writer',
+      name: 'Essay Writer',
+      description: 'Generate academic essays with AI',
+      icon: <PenTool className="w-6 h-6" />,
+      path: '/ai/tools/essay-writer',
+      isNew: true,
+    },
+    {
+      id: 'grammar-fixer',
+      name: 'Grammar Fixer',
+      description: 'Fix grammar and spelling errors',
+      icon: <Type className="w-6 h-6" />,
+      path: '/ai/tools/grammar',
+      isNew: true,
+    },
+    {
+      id: 'translator',
+      name: 'Translator',
+      description: 'Translate text between 20+ languages',
+      icon: <Languages className="w-6 h-6" />,
+      path: '/ai/tools/translator',
+      isNew: true,
+    },
+    {
+      id: 'pdf-merge',
+      name: 'PDF Merge',
+      description: 'Combine multiple PDFs into one',
+      icon: <Merge className="w-6 h-6" />,
+      path: '/ai/tools/pdf-merge',
+      isNew: true,
+    },
+    {
+      id: 'pdf-split',
+      name: 'PDF Split',
+      description: 'Split PDFs into separate files',
+      icon: <Scissors className="w-6 h-6" />,
+      path: '/ai/tools/pdf-split',
+      isNew: true,
+    },
+    {
+      id: 'pdf-compress',
+      name: 'PDF Compress',
+      description: 'Reduce PDF file size',
+      icon: <Minimize2 className="w-6 h-6" />,
+      path: '/ai/tools/pdf-compress',
+      isNew: true,
+    },
+    {
+      id: 'image-to-text',
+      name: 'Image to Text (OCR)',
+      description: 'Extract text from images',
+      icon: <ScanText className="w-6 h-6" />,
+      path: '/ai/tools/image-to-text',
+      isNew: true,
+    },
+    {
+      id: 'qr-generator',
+      name: 'QR Code Generator',
+      description: 'Create QR codes for URLs, text & more',
+      icon: <QrCode className="w-6 h-6" />,
+      path: '/ai/tools/qr-gen',
+      isNew: true,
     },
   ];
 
@@ -361,6 +477,95 @@ const AIHub = () => {
             </div>
           );
         })}
+
+        {/* NEW: AI Tools Section */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-primary" />
+              AI Tools
+              <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-500">
+                50+ Tools
+              </Badge>
+            </h2>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/ai/tools')}
+              className="text-primary"
+            >
+              View All
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+          
+          {/* Featured New Tools */}
+          <div className="grid grid-cols-2 gap-3">
+            {newAiTools.slice(0, 6).map((tool) => (
+              <Card 
+                key={tool.id}
+                className="cursor-pointer hover:border-primary/50 transition-all hover:shadow-lg border-green-500/30 bg-green-500/5"
+                onClick={() => navigate(tool.path)}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-start gap-2">
+                    <div className="p-2 bg-green-500/10 rounded-lg text-green-500">
+                      {tool.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <h3 className="font-medium text-sm truncate">{tool.name}</h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-1">
+                        {tool.description}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* More Tools List */}
+          <div className="space-y-2">
+            {newAiTools.slice(6).map((tool) => (
+              <Card 
+                key={tool.id}
+                className="cursor-pointer hover:border-primary/50 transition-all"
+                onClick={() => navigate(tool.path)}
+              >
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                      {tool.icon}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-sm">{tool.name}</h3>
+                        <Badge variant="secondary" className="text-xs bg-green-500/20 text-green-500">
+                          New
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {tool.description}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* View All Tools Button */}
+          <Button 
+            className="w-full bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+            onClick={() => navigate('/ai/tools')}
+          >
+            <Wrench className="w-4 h-4 mr-2" />
+            Explore All 50+ AI Tools
+          </Button>
+        </div>
 
         {/* Credits CTA */}
         <Card className="bg-muted/50">
