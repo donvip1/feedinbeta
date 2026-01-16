@@ -1,21 +1,23 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, RefreshCw, Loader2, Copy, Download, Sparkles } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Loader2, Copy, Download, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 
 const MODES = [
-  { id: 'standard', name: 'Standard', description: 'Clear and natural rewrite' },
-  { id: 'fluent', name: 'Fluent', description: 'Improve flow and readability' },
-  { id: 'formal', name: 'Formal', description: 'Professional and academic tone' },
-  { id: 'simple', name: 'Simple', description: 'Easy to understand' },
-  { id: 'creative', name: 'Creative', description: 'Unique and engaging' },
-  { id: 'expand', name: 'Expand', description: 'Add more detail' },
-  { id: 'shorten', name: 'Shorten', description: 'Make it concise' },
+  { id: 'standard', name: 'Standard', description: 'Clear and natural rewrite', emoji: '✍️' },
+  { id: 'fluent', name: 'Fluent', description: 'Improve flow and readability', emoji: '💫' },
+  { id: 'formal', name: 'Formal', description: 'Professional and academic tone', emoji: '📚' },
+  { id: 'simple', name: 'Simple', description: 'Easy to understand', emoji: '🎯' },
+  { id: 'creative', name: 'Creative', description: 'Unique and engaging', emoji: '🎨' },
+  { id: 'expand', name: 'Expand', description: 'Add more detail', emoji: '📝' },
+  { id: 'shorten', name: 'Shorten', description: 'Make it concise', emoji: '⚡' },
 ];
 
 const Paraphraser = () => {
@@ -49,30 +51,24 @@ const Paraphraser = () => {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `You are a professional paraphrasing assistant. Rewrite the given text in a ${modeInfo?.name.toLowerCase()} style.
-              
-              Mode: ${modeInfo?.name} - ${modeInfo?.description}
-              
-              Guidelines:
-              - Preserve the original meaning
-              - Change sentence structure and word choice
-              - Make it sound natural
-              ${mode === 'formal' ? '- Use formal vocabulary and avoid contractions' : ''}
-              ${mode === 'simple' ? '- Use simple words and short sentences' : ''}
-              ${mode === 'creative' ? '- Add engaging language and varied sentence structures' : ''}
-              ${mode === 'expand' ? '- Add more detail and explanation' : ''}
-              ${mode === 'shorten' ? '- Be concise while keeping key information' : ''}
-              
-              Respond with ONLY the paraphrased text, no explanations.`,
-            },
-            {
-              role: 'user',
-              content: inputText,
-            },
-          ],
+          messages: [{ role: 'user', content: inputText }],
+          systemPrompt: `You are a professional paraphrasing assistant. Rewrite the given text in a ${modeInfo?.name.toLowerCase()} style.
+
+## Mode: ${modeInfo?.name} ${modeInfo?.emoji}
+${modeInfo?.description}
+
+## Guidelines
+- Preserve the original meaning completely
+- Change sentence structure and word choice significantly  
+- Make it sound natural and fluent
+${mode === 'formal' ? '- Use formal vocabulary and avoid contractions\n- Employ sophisticated sentence structures' : ''}
+${mode === 'simple' ? '- Use simple words and short sentences\n- Avoid jargon and complex terms' : ''}
+${mode === 'creative' ? '- Add engaging language and varied sentence structures\n- Make it more interesting to read' : ''}
+${mode === 'expand' ? '- Add more detail and explanation\n- Elaborate on key points' : ''}
+${mode === 'shorten' ? '- Be concise while keeping key information\n- Remove unnecessary words' : ''}
+
+## Output Format
+Provide ONLY the paraphrased text. Make the rewrite high-quality and professional.`,
         }),
       });
 
@@ -80,6 +76,7 @@ const Paraphraser = () => {
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
+      let content = '';
 
       if (reader) {
         while (true) {
@@ -95,9 +92,10 @@ const Paraphraser = () => {
               if (jsonStr === '[DONE]') continue;
               try {
                 const parsed = JSON.parse(jsonStr);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) {
-                  setResult(prev => prev + content);
+                const delta = parsed.choices?.[0]?.delta?.content;
+                if (delta) {
+                  content += delta;
+                  setResult(content);
                 }
               } catch {}
             }
@@ -105,9 +103,7 @@ const Paraphraser = () => {
         }
       }
 
-      toast({
-        title: 'Paraphrasing complete!',
-      });
+      toast({ title: 'Paraphrasing complete!' });
     } catch (error: any) {
       console.error('Paraphrase error:', error);
       toast({
@@ -132,24 +128,51 @@ const Paraphraser = () => {
     a.href = url;
     a.download = 'paraphrased_text.txt';
     a.click();
+    URL.revokeObjectURL(url);
   };
+
+  const inputWordCount = inputText.split(/\s+/).filter(Boolean).length;
+  const resultWordCount = result.split(/\s+/).filter(Boolean).length;
 
   return (
     <>
       <div className="min-h-screen bg-background pb-24">
+        {/* Header */}
         <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-          <div className="flex items-center gap-3 p-4">
+          <div className="flex items-center justify-between p-4">
             <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
-              <h1 className="text-lg font-semibold">Paraphraser</h1>
-              <p className="text-xs text-muted-foreground">Rewrite text in different styles</p>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
+                <RefreshCw className="w-5 h-5" />
+              </div>
+              <span className="text-lg font-semibold">Paraphraser</span>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              1
             </div>
           </div>
         </div>
 
         <div className="p-4 max-w-2xl mx-auto space-y-4">
+          {/* Info Card */}
+          <Card className="bg-gradient-to-r from-primary/5 to-purple-500/5 border-none">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <Sparkles className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium">AI Paraphraser</p>
+                  <p className="text-sm text-muted-foreground">
+                    Rewrite text in different styles while preserving the original meaning.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Input Section */}
           <Card>
             <CardContent className="p-4 space-y-4">
               <div>
@@ -161,9 +184,12 @@ const Paraphraser = () => {
                   <SelectContent>
                     {MODES.map(m => (
                       <SelectItem key={m.id} value={m.id}>
-                        <div className="flex flex-col">
-                          <span>{m.name}</span>
-                          <span className="text-xs text-muted-foreground">{m.description}</span>
+                        <div className="flex items-center gap-2">
+                          <span>{m.emoji}</span>
+                          <div className="flex flex-col">
+                            <span>{m.name}</span>
+                            <span className="text-xs text-muted-foreground">{m.description}</span>
+                          </div>
                         </div>
                       </SelectItem>
                     ))}
@@ -179,7 +205,7 @@ const Paraphraser = () => {
               />
               <div className="flex justify-between items-center">
                 <span className="text-xs text-muted-foreground">
-                  {inputText.split(/\s+/).filter(Boolean).length} words
+                  {inputWordCount} words
                 </span>
                 <Button
                   variant="ghost"
@@ -212,32 +238,46 @@ const Paraphraser = () => {
             )}
           </Button>
 
-          {result && (
-            <Card className="border-green-500/50 bg-green-500/10">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-green-600 dark:text-green-400" />
-                    <p className="text-sm font-medium text-green-600 dark:text-green-400">
-                      {MODES.find(m => m.id === mode)?.name} Paraphrase
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={handleCopy}>
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={handleDownload}>
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                <p className="text-sm whitespace-pre-wrap">{result}</p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {result.split(/\s+/).filter(Boolean).length} words
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          {/* Result Section */}
+          <AnimatePresence>
+            {result && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+              >
+                <Card className="border-green-500/30 bg-gradient-to-br from-green-500/5 to-emerald-500/5">
+                  <CardContent className="p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-green-500/10 rounded-lg">
+                          <CheckCircle2 className="w-4 h-4 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium">{MODES.find(m => m.id === mode)?.name} Paraphrase</p>
+                          <span className="text-xs text-muted-foreground">
+                            {resultWordCount} words
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" onClick={handleCopy}>
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={handleDownload}>
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-background/50 rounded-lg p-4 border border-border/50">
+                      <EnhancedMarkdownRenderer content={result} className="text-sm" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
       <BottomNav />

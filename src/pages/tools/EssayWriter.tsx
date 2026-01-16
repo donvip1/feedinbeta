@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 import { 
   ArrowLeft, Pen, Loader2, Copy, Download, 
   CheckCircle, Zap, FileText, GraduationCap
@@ -65,18 +66,40 @@ const EssayWriter = () => {
       const systemPrompt = `You are an expert academic essay writer. Generate a well-structured, 
 original essay that demonstrates critical thinking and proper academic writing conventions.
 
-Essay Type: ${essayTypes.find(t => t.value === essayType)?.label}
-Target Word Count: approximately ${wordCount} words
+## Essay Configuration
+- **Type:** ${essayTypes.find(t => t.value === essayType)?.label}
+- **Target Length:** approximately ${wordCount} words
 
-Guidelines:
-- Include a clear thesis statement in the introduction
-- Use topic sentences for each paragraph
-- Provide evidence and examples to support arguments
+## Output Format
+
+Structure your essay with proper markdown formatting:
+
+### Title
+**[Create an engaging title for the essay]**
+
+### Introduction
+- Hook to capture reader attention
+- Background context
+- Clear **thesis statement** (bolded)
+
+### Body Paragraphs
+For each main point:
+- **Topic sentence** (bolded)
+- Supporting evidence and examples
+- Analysis and explanation
+- Transition to next point
+
+### Conclusion
+- Restate thesis in new words
+- Summarize main points
+- Closing thought or call to action
+
+## Writing Guidelines
 - Use proper transitions between paragraphs
-- Write a strong conclusion that reinforces the main points
-- Use academic language appropriate for the essay type
-- Ensure the essay is original and plagiarism-free
-- Format with clear paragraph breaks`;
+- Support arguments with specific examples
+- Maintain academic tone appropriate for ${essayTypes.find(t => t.value === essayType)?.label}
+- Ensure logical flow of ideas
+- Write original, plagiarism-free content`;
 
       const userPrompt = `Write an essay on the following topic:
 
@@ -336,9 +359,7 @@ with approximately ${wordCount} words.`;
                   </span>
                 </div>
                 <ScrollArea className="h-[400px] rounded-lg border p-4 bg-muted/30">
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed">
-                    {generatedEssay}
-                  </div>
+                  <EnhancedMarkdownRenderer content={generatedEssay} className="text-sm" />
                 </ScrollArea>
               </CardContent>
             </Card>
