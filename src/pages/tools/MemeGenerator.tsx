@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef, ChangeEvent } from 'react';
 import { ArrowLeft, Image, Download, Type, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ const MemeGenerator = () => {
     setGeneratedMeme(null);
   };
 
-  const handleCustomImage = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomImage = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
