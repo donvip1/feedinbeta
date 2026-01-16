@@ -94,6 +94,15 @@ import BackgroundRemover from "./pages/tools/BackgroundRemover";
 import ImageUpscaler from "./pages/tools/ImageUpscaler";
 import EssayWriter from "./pages/tools/EssayWriter";
 import QRCodeGenerator from "./pages/tools/QRCodeGenerator";
+import PDFMerge from "./pages/tools/PDFMerge";
+import PDFSplit from "./pages/tools/PDFSplit";
+import PDFCompress from "./pages/tools/PDFCompress";
+import GrammarFixer from "./pages/tools/GrammarFixer";
+import Translator from "./pages/tools/Translator";
+import Paraphraser from "./pages/tools/Paraphraser";
+import ImageCompressor from "./pages/tools/ImageCompressor";
+import ImageToText from "./pages/tools/ImageToText";
+import VideoTrimmer from "./pages/tools/VideoTrimmer";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -242,7 +251,16 @@ const App = () => {
             <Route path="/ai/tools/bg-remover" element={<BackgroundRemover />} />
             <Route path="/ai/tools/upscaler" element={<ImageUpscaler />} />
             <Route path="/ai/tools/essay-writer" element={<EssayWriter />} />
-            <Route path="/ai/tools/qr-code" element={<QRCodeGenerator />} />
+            <Route path="/ai/tools/qr-gen" element={<QRCodeGenerator />} />
+            <Route path="/ai/tools/pdf-merge" element={<PDFMerge />} />
+            <Route path="/ai/tools/pdf-split" element={<PDFSplit />} />
+            <Route path="/ai/tools/pdf-compress" element={<PDFCompress />} />
+            <Route path="/ai/tools/grammar" element={<GrammarFixer />} />
+            <Route path="/ai/tools/translator" element={<Translator />} />
+            <Route path="/ai/tools/paraphrase" element={<Paraphraser />} />
+            <Route path="/ai/tools/img-compress" element={<ImageCompressor />} />
+            <Route path="/ai/tools/image-to-text" element={<ImageToText />} />
+            <Route path="/ai/tools/video-trim" element={<VideoTrimmer />} />
             
             {/* Groups */}
             <Route path="/groups" element={<Groups />} />
