@@ -84,7 +84,7 @@ const PDFSplit = () => {
 
         if (newPdf.getPageCount() > 0) {
           const pdfBytes = await newPdf.save();
-          const blob = new Blob([pdfBytes.buffer], { type: 'application/pdf' });
+          const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
           const url = URL.createObjectURL(blob);
           results.push({
             name: `split_${range.replace('-', '_to_')}.pdf`,
