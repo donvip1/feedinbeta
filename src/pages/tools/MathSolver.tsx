@@ -1,29 +1,28 @@
 import { useState } from 'react';
-import { ArrowLeft, Calculator, Loader2, Copy, Sparkles } from 'lucide-react';
+import { ArrowLeft, Calculator, Loader2, Copy, Sparkles, Zap, Download, CheckCircle2, Lightbulb } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
 
 const MathSolver = () => {
   const navigate = useNavigate();
   const [problem, setProblem] = useState('');
   const [isSolving, setIsSolving] = useState(false);
-  const [solution, setSolution] = useState<{
-    answer: string;
-    steps: string[];
-    explanation: string;
-  } | null>(null);
+  const [solution, setSolution] = useState('');
 
   const exampleProblems = [
     'Solve: 2x + 5 = 15',
-    'Find the derivative of f(x) = x³ + 2x² - 5x',
+    'Find the derivative of f(x) = x³ + 2x²',
     'Calculate the area of a circle with radius 7',
     'Simplify: (3x² + 2x) / x',
-    'Solve the system: x + y = 10, x - y = 4'
+    'Solve the system: x + y = 10, x - y = 4',
+    'Integrate: ∫ 2x dx',
   ];
 
   const handleSolve = async () => {
@@ -33,39 +32,89 @@ const MathSolver = () => {
     }
 
     setIsSolving(true);
+    setSolution('');
+
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
-          messages: [
-            {
-              role: 'user',
-              content: `Solve this math problem step by step: ${problem}
-              
-              Provide the solution in this JSON format:
-              {
-                "answer": "The final answer",
-                "steps": ["Step 1: ...", "Step 2: ...", ...],
-                "explanation": "A brief explanation of the concept used"
-              }
-              
-              Only return the JSON, no other text.`
-            }
-          ],
-          systemPrompt: 'You are an expert math tutor. Solve problems step by step, showing all work clearly. Explain concepts in simple terms. Always verify your calculations.'
-        }
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: problem }],
+          systemPrompt: `You are an expert math tutor. Solve math problems step by step with clear explanations.
+
+## Response Format
+
+Always structure your response as follows:
+
+### 📊 Problem Analysis
+Brief analysis of what type of problem this is and the approach needed.
+
+### ✅ Solution
+
+**Answer:** [Final answer in a box or highlighted]
+
+### 📝 Step-by-Step Process
+
+**Step 1:** [First step with explanation]
+$$[Mathematical expression if needed]$$
+
+**Step 2:** [Second step with explanation]
+$$[Mathematical expression if needed]$$
+
+[Continue with remaining steps...]
+
+### 💡 Key Concepts
+- Concept 1 used in this problem
+- Concept 2 used in this problem
+
+### 🔍 Verification
+[Quick check that the answer is correct]
+
+---
+
+**Tips:**
+- Use LaTeX for mathematical expressions: $inline$ or $$block$$
+- Be clear and educational
+- Explain WHY each step is taken
+- Use proper mathematical notation`
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to solve');
 
-      const content = data?.choices?.[0]?.message?.content || data?.content;
-      if (content) {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          setSolution(parsed);
-          toast.success('Problem solved!');
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let content = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const delta = parsed.choices?.[0]?.delta?.content;
+                if (delta) {
+                  content += delta;
+                  setSolution(content);
+                }
+              } catch {}
+            }
+          }
         }
       }
+
+      toast.success('Problem solved!');
     } catch (error) {
       console.error('Solving error:', error);
       toast.error('Failed to solve. Please try again.');
@@ -75,30 +124,60 @@ const MathSolver = () => {
   };
 
   const handleCopy = () => {
-    if (solution) {
-      const text = `Problem: ${problem}\n\nAnswer: ${solution.answer}\n\nSteps:\n${solution.steps.join('\n')}\n\nExplanation: ${solution.explanation}`;
-      navigator.clipboard.writeText(text);
-      toast.success('Solution copied!');
-    }
+    navigator.clipboard.writeText(solution);
+    toast.success('Solution copied!');
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([solution], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'math-solution.txt';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border p-4">
-        <div className="flex items-center gap-3">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
+        <div className="flex items-center justify-between p-4">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
-            <h1 className="text-xl font-bold">Math Solver</h1>
-            <p className="text-sm text-muted-foreground">Step-by-step solutions</p>
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
+              <Calculator className="w-5 h-5" />
+            </div>
+            <span className="text-lg font-semibold">Math Solver</span>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            1
           </div>
         </div>
       </div>
 
-      <div className="p-4 space-y-4">
-        <Card className="p-4">
-          <div className="space-y-4">
+      <div className="p-4 space-y-4 max-w-2xl mx-auto">
+        {/* Info Card */}
+        <Card className="bg-gradient-to-r from-blue-500/5 to-purple-500/5 border-none">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <Lightbulb className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">AI Math Tutor</p>
+                <p className="text-sm text-muted-foreground">
+                  Get step-by-step solutions with explanations for any math problem.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Input Section */}
+        <Card>
+          <CardContent className="p-4 space-y-4">
             <div className="flex items-center gap-2">
               <Calculator className="h-5 w-5 text-primary" />
               <h3 className="font-semibold">Enter Math Problem</h3>
@@ -107,7 +186,7 @@ const MathSolver = () => {
             <Textarea
               value={problem}
               onChange={(e) => setProblem(e.target.value)}
-              placeholder="Type your math problem here..."
+              placeholder="Type your math problem here... (e.g., Solve for x: 2x + 5 = 15)"
               className="min-h-[100px] font-mono"
             />
 
@@ -115,13 +194,15 @@ const MathSolver = () => {
               <p className="text-xs text-muted-foreground">Try an example:</p>
               <div className="flex flex-wrap gap-2">
                 {exampleProblems.map((example, index) => (
-                  <button
+                  <motion.button
                     key={index}
-                    className="px-2 py-1 text-xs bg-muted rounded hover:bg-muted/80 transition-colors"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="px-3 py-1.5 text-xs bg-muted rounded-full hover:bg-muted/80 transition-colors border border-border/50"
                     onClick={() => setProblem(example)}
                   >
                     {example}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
             </div>
@@ -130,60 +211,70 @@ const MathSolver = () => {
               onClick={handleSolve} 
               disabled={isSolving || !problem.trim()}
               className="w-full"
+              size="lg"
             >
               {isSolving ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="h-5 w-5 mr-2 animate-spin" />
                   Solving...
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-4 w-4 mr-2" />
+                  <Sparkles className="h-5 w-5 mr-2" />
                   Solve Problem
                 </>
               )}
             </Button>
-          </div>
+          </CardContent>
         </Card>
 
-        {solution && (
-          <>
-            <Card className="p-4 bg-primary/10">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold">Answer</h3>
-                  <Button variant="ghost" size="sm" onClick={handleCopy}>
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-2xl font-bold font-mono">{solution.answer}</p>
-              </div>
-            </Card>
-
-            <Card className="p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold">Step-by-Step Solution</h3>
-                <div className="space-y-2">
-                  {solution.steps.map((step, index) => (
-                    <div key={index} className="flex gap-3 items-start">
-                      <span className="flex-shrink-0 w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center text-xs font-medium">
-                        {index + 1}
-                      </span>
-                      <p className="text-sm font-mono">{step}</p>
+        {/* Solution Section */}
+        <AnimatePresence>
+          {solution && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-4"
+            >
+              <Card className="border-green-500/30 bg-gradient-to-br from-green-500/5 to-emerald-500/5">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 bg-green-500/10 rounded-lg">
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      </div>
+                      <h3 className="font-semibold">Solution</h3>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
+                    <div className="flex gap-1">
+                      <Button variant="ghost" size="icon" onClick={handleCopy}>
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={handleDownload}>
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-background/50 rounded-lg p-4 border border-border/50">
+                    <EnhancedMarkdownRenderer content={solution} className="text-sm" />
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card className="p-4">
-              <div className="space-y-2">
-                <h3 className="font-semibold">Explanation</h3>
-                <p className="text-sm text-muted-foreground">{solution.explanation}</p>
-              </div>
-            </Card>
-          </>
-        )}
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => {
+                  setSolution('');
+                  setProblem('');
+                }}
+              >
+                Solve Another Problem
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <BottomNav />

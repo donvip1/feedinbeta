@@ -4,13 +4,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { MarkdownRenderer } from '@/components/ai/MarkdownRenderer';
+import { ChatMessage } from '@/components/ai/ChatMessage';
+import { ChatInput } from '@/components/ai/ChatInput';
+import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+import { TypingIndicator } from '@/components/ai/TypingIndicator';
+import { Input } from '@/components/ui/input';
 import { 
   ArrowLeft, Send, Loader2, Trash2, Bot, MessageSquare, Image, Wand2, 
   FileText, PenTool, Video, Settings, ChevronDown, ChevronRight, Sparkles,
@@ -526,7 +529,7 @@ const AICopilot = () => {
                         {message.role === 'user' ? (
                           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         ) : (
-                          <MarkdownRenderer content={message.content} className="text-sm" />
+                          <EnhancedMarkdownRenderer content={message.content} className="text-sm" />
                         )}
                       </div>
                     </div>
@@ -534,7 +537,7 @@ const AICopilot = () => {
                   {isLoading && (
                     <div className="flex justify-start">
                       <div className="bg-muted rounded-lg p-3">
-                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <TypingIndicator />
                       </div>
                     </div>
                   )}
