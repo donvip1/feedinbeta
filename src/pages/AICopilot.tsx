@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
 import { ArrowLeft, Send, Loader2, Trash2 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 import feedinIcon from '@/assets/feedin-icon.png';
@@ -181,13 +180,6 @@ const AICopilot = () => {
     }
   };
 
-  const handleQuickAction = () => {
-    toast({
-      title: 'Post System Removed',
-      description: 'Quick actions are no longer available',
-    });
-  };
-
   return (
     <>
       <div className="flex flex-col h-screen bg-background pb-20">
@@ -279,7 +271,6 @@ const AICopilot = () => {
         </div>
       </div>
 
-      <FloatingActionButton onClick={handleQuickAction} />
       <BottomNav />
     </>
   );
