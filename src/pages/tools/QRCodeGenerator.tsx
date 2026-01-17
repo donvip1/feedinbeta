@@ -11,8 +11,11 @@ import { Label } from '@/components/ui/label';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { 
   ArrowLeft, QrCode, Download, Share2, Link, 
-  Mail, Phone, MessageSquare, Wifi, Sparkles, Check, Loader2
+  Mail, Phone, MessageSquare, Wifi, Sparkles, Check, Loader2, Zap
 } from 'lucide-react';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const QR_TYPES = [
   { value: 'url', label: 'URL', icon: Link, color: 'from-blue-500 to-cyan-500' },
@@ -26,6 +29,10 @@ const QRCodeGenerator = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'qr_code_generator',
+    creditCost: CREDIT_COST,
+  });
   
   const [qrType, setQrType] = useState<string>('url');
   const [inputValue, setInputValue] = useState('');
@@ -94,12 +101,16 @@ const QRCodeGenerator = () => {
     }
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     const data = getQRData();
     if (!data || data.length < 3) {
       toast({ title: 'Please enter valid data', variant: 'destructive' });
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
+
     generateQRCode(data);
   };
 
@@ -160,6 +171,10 @@ const QRCodeGenerator = () => {
               QR Code Generator
             </h1>
             <p className="text-xs text-muted-foreground">Create scannable QR codes</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            <span>{CREDIT_COST}</span>
           </div>
         </div>
       </div>

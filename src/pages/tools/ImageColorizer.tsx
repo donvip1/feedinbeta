@@ -1,14 +1,21 @@
 import { useState, ChangeEvent } from 'react';
-import { ArrowLeft, Palette, Download, Upload, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Palette, Download, Upload, Loader2, Sparkles, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 10;
 
 const ImageColorizer = () => {
   const navigate = useNavigate();
+  const { balance, isLoading: creditsLoading, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'image_colorizer',
+    creditCost: CREDIT_COST,
+  });
   const [image, setImage] = useState<string | null>(null);
   const [colorizedImage, setColorizedImage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -34,6 +41,9 @@ const ImageColorizer = () => {
       toast.error('Please select an image first');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsProcessing(true);
     try {
@@ -106,9 +116,13 @@ const ImageColorizer = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Image Colorizer</h1>
             <p className="text-sm text-muted-foreground">Add color to black & white photos</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            <span>{CREDIT_COST}</span>
           </div>
         </div>
       </div>

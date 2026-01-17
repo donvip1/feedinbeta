@@ -1,5 +1,5 @@
 import { useState, ChangeEvent } from 'react';
-import { ArrowLeft, FileText, Download, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileText, Download, Upload, Loader2, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -7,9 +7,16 @@ import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { jsPDF } from 'jspdf';
 import mammoth from 'mammoth';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const WordToPDF = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'word_to_pdf',
+    creditCost: CREDIT_COST,
+  });
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -35,6 +42,9 @@ const WordToPDF = () => {
       toast.error('Please select a Word document first');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsProcessing(true);
     try {
@@ -92,9 +102,13 @@ const WordToPDF = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Word to PDF</h1>
             <p className="text-sm text-muted-foreground">Convert Word documents to PDF format</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            <span>{CREDIT_COST}</span>
           </div>
         </div>
       </div>

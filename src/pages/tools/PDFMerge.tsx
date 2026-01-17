@@ -4,14 +4,21 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Upload, Merge, Loader2, Download, X, GripVertical } from 'lucide-react';
+import { ArrowLeft, Upload, Merge, Loader2, Download, X, GripVertical, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PDFDocument } from 'pdf-lib';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const PDFMerge = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'pdf_merge',
+    creditCost: CREDIT_COST,
+  });
   const [files, setFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
@@ -55,6 +62,9 @@ const PDFMerge = () => {
       });
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsProcessing(true);
 
@@ -105,9 +115,13 @@ const PDFMerge = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-lg font-semibold">Merge PDFs</h1>
               <p className="text-xs text-muted-foreground">Combine multiple PDFs into one</p>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              <span>{CREDIT_COST}</span>
             </div>
           </div>
         </div>
