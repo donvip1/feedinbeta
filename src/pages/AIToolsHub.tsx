@@ -407,7 +407,7 @@ const AIToolsHub = () => {
       icon: <Brain className="w-5 h-5" />,
       path: '/ai/tools/math-solver',
       category: 'education',
-      creditCost: 5,
+      creditCost: 3,
     },
     {
       id: 'exam-prep',
@@ -416,7 +416,7 @@ const AIToolsHub = () => {
       icon: <GraduationCap className="w-5 h-5" />,
       path: '/ai/tools/exam-prep',
       category: 'education',
-      creditCost: 8,
+      creditCost: 3,
     },
     {
       id: 'research',

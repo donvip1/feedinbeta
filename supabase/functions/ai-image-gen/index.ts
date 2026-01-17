@@ -68,24 +68,31 @@ serve(async (req) => {
 
     // Build the message content based on whether we're editing or generating
     let messageContent;
+    let selectedModel = "google/gemini-2.5-flash-image";
+    
     if (mode === "edit" && inputImageUrl) {
-      // For image editing, send both the image and the prompt
+      // For image editing, use the preview model which is better at edits
+      selectedModel = "google/gemini-3-pro-image-preview";
+      
+      // For image editing, send both the image and the prompt with stronger instructions
       messageContent = [
-        {
-          type: "text",
-          text: prompt
-        },
         {
           type: "image_url",
           image_url: {
             url: inputImageUrl
           }
+        },
+        {
+          type: "text",
+          text: `IMPORTANT: Edit THIS EXACT image I have provided. ${prompt}. You MUST return the edited version of MY image, not a different image. Keep the main subject exactly as shown.`
         }
       ];
     } else {
       // For pure generation, just send the prompt
       messageContent = prompt;
     }
+
+    console.log("Using model:", selectedModel);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -94,7 +101,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image",
+        model: selectedModel,
         messages: [
           {
             role: "user",

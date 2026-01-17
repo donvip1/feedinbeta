@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, GraduationCap, Loader2, BookOpen, CheckCircle, XCircle, Trophy, Target, Brain } from 'lucide-react';
+import { ArrowLeft, GraduationCap, Loader2, BookOpen, CheckCircle, XCircle, Trophy, Target, Brain, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -44,14 +44,20 @@ const ExamPrep = () => {
     setShowResults(false);
 
     try {
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
+      const session = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
           messages: [
             {
               role: 'user',
               content: `Generate ${questionCount} ${difficulty} difficulty multiple choice questions about "${topic}". ${content ? `Use this content as reference: ${content}` : ''}
               
-              Return the response as a JSON array with this exact format:
+              Return the response as a JSON array ONLY with this exact format, no other text:
               [
                 {
                   "question": "Question text here?",
@@ -59,25 +65,52 @@ const ExamPrep = () => {
                   "correctAnswer": 0,
                   "explanation": "Brief explanation of why this answer is correct"
                 }
-              ]
-              
-              Only return the JSON array, no other text.`
+              ]`
             }
           ],
-          systemPrompt: 'You are an expert educational content creator. Generate accurate, well-structured exam questions. Always return valid JSON.'
-        }
+          systemPrompt: 'You are an expert educational content creator. Generate accurate, well-structured exam questions. ONLY return valid JSON array, no markdown or other text.'
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to generate questions');
 
-      const content_response = data?.choices?.[0]?.message?.content || data?.content;
-      if (content_response) {
-        const jsonMatch = content_response.match(/\[[\s\S]*\]/);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const delta = parsed.choices?.[0]?.delta?.content;
+                if (delta) {
+                  fullContent += delta;
+                }
+              } catch {}
+            }
+          }
+        }
+      }
+
+      if (fullContent) {
+        const jsonMatch = fullContent.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
           setQuestions(parsed);
           setAnswers(new Array(parsed.length).fill(-1));
           toast.success('Questions generated successfully!');
+        } else {
+          throw new Error('Invalid response format');
         }
       }
     } catch (error) {
@@ -121,6 +154,10 @@ const ExamPrep = () => {
               Exam Prep
             </h1>
             <p className="text-sm text-muted-foreground">AI-powered practice questions</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            3
           </div>
         </div>
       </div>
