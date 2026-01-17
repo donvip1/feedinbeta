@@ -5,10 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, SpellCheck, Loader2, Copy, Download, RefreshCw, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ArrowLeft, SpellCheck, Loader2, Copy, Download, RefreshCw, CheckCircle2, AlertCircle, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+
+const CREDIT_COST = 5;
 
 const GrammarFixer = () => {
   const navigate = useNavigate();
@@ -18,6 +22,11 @@ const GrammarFixer = () => {
   const [result, setResult] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [corrections, setCorrections] = useState<string[]>([]);
+  
+  const { balance, isLoading: isLoadingCredits, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'Grammar Fixer',
+    creditCost: CREDIT_COST,
+  });
 
   const exampleTexts = [
     "Their going to the store tommorrow to buy grocerys.",
@@ -34,6 +43,10 @@ const GrammarFixer = () => {
       });
       return;
     }
+
+    // Check and deduct credits first
+    const hasCredits = await checkAndDeductCredits();
+    if (!hasCredits) return;
 
     setIsProcessing(true);
     setResult('');
@@ -161,6 +174,16 @@ Be thorough but preserve the original meaning and tone. Use markdown formatting 
                 Grammar Fixer
               </h1>
               <p className="text-xs text-muted-foreground">AI-powered grammar and spelling correction</p>
+            </div>
+            <div className="flex items-center gap-1 text-sm">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              {isLoadingCredits ? (
+                <Skeleton className="w-8 h-4" />
+              ) : (
+                <span className={hasEnoughCredits ? 'text-muted-foreground' : 'text-destructive font-medium'}>
+                  {balance}
+                </span>
+              )}
             </div>
           </div>
         </div>
