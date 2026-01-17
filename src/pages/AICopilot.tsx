@@ -118,9 +118,9 @@ const toolCategories: ToolCategory[] = [
     tools: [
       { name: 'Learn Tech', description: 'Interactive tech courses', icon: <FlaskConical className="w-5 h-5" />, route: '/ai/learn', credits: 0, isPopular: true },
       { name: 'Educational Q&A', description: 'Get answers with sources', icon: <FileQuestion className="w-5 h-5" />, route: '/ai/education', credits: 5 },
-      { name: 'Exam Prep', description: 'Practice questions & quizzes', icon: <BookOpen className="w-5 h-5" />, route: '/ai/tools/exam-prep', credits: 8 },
+      { name: 'Exam Prep', description: 'Practice questions & quizzes', icon: <BookOpen className="w-5 h-5" />, route: '/ai/tools/exam-prep', credits: 3 },
       { name: 'Research Assistant', description: 'Find academic papers', icon: <Globe className="w-5 h-5" />, route: '/ai/tools/research', credits: 8 },
-      { name: 'Math Solver', description: 'Solve math problems', icon: <Calculator className="w-5 h-5" />, route: '/ai/tools/math-solver', credits: 5 },
+      { name: 'Math Solver', description: 'Solve math problems', icon: <Calculator className="w-5 h-5" />, route: '/ai/tools/math-solver', credits: 3 },
     ]
   },
   {

@@ -47,47 +47,53 @@ const BackgroundRemover = () => {
 
     try {
       // Convert file to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(selectedFile);
+      const base64Image = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(selectedFile);
+      });
       
-      reader.onload = async () => {
-        const base64Image = reader.result as string;
-        setProgress(30);
+      setProgress(30);
 
-        // Call AI to remove background
-        const { data, error } = await supabase.functions.invoke('ai-image-gen', {
-          body: {
-            prompt: 'Remove the background from this image completely. Make the background transparent or white. Keep the main subject intact with clean edges.',
-            inputImageUrl: base64Image,
-            mode: 'edit',
-          },
+      // Call AI to remove background with improved prompt
+      const { data, error } = await supabase.functions.invoke('ai-image-gen', {
+        body: {
+          prompt: 'CRITICAL INSTRUCTION: You must edit the EXACT image I provided. Remove ONLY the background from this specific image while keeping the main subject EXACTLY as it appears. The subject must remain identical - same pose, same details, same colors. Replace the background with pure white (#FFFFFF). Do NOT generate a new or different image. Preserve every detail of the original subject.',
+          imageUrl: base64Image,
+          mode: 'edit',
+        },
+      });
+
+      setProgress(80);
+
+      if (error) {
+        throw new Error(error.message || 'Failed to process image');
+      }
+
+      if (data?.imageUrl) {
+        setResultUrl(data.imageUrl);
+        setProgress(100);
+
+        // Log usage
+        await supabase.from('ai_tool_usage').insert({
+          user_id: user.id,
+          tool_id: 'bg-remover',
+          tool_category: 'image',
+          credits_used: 10,
+          status: 'completed',
         });
 
-        setProgress(80);
-
-        if (error) throw error;
-
-        if (data?.imageUrl) {
-          setResultUrl(data.imageUrl);
-          setProgress(100);
-
-          // Log usage
-          await supabase.from('ai_tool_usage').insert({
-            user_id: user.id,
-            tool_id: 'bg-remover',
-            tool_category: 'image',
-            credits_used: 10,
-            status: 'completed',
-          });
-
-          toast({ title: 'Background removed successfully!' });
-        }
-      };
+        toast({ title: 'Background removed successfully!' });
+      } else {
+        throw new Error('No image returned from AI');
+      }
     } catch (error: any) {
       console.error('Error:', error);
+      setProgress(0);
       toast({ 
         title: 'Processing failed', 
-        description: error.message, 
+        description: 'AI could not process this image. Try a different image with a clear subject.',
         variant: 'destructive' 
       });
     } finally {

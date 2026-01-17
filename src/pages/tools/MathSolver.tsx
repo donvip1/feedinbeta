@@ -154,7 +154,7 @@ $$[Mathematical expression if needed]$$
           </div>
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <Zap className="w-4 h-4 text-yellow-500" />
-            1
+            3
           </div>
         </div>
       </div>

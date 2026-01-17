@@ -73,14 +73,20 @@ const NutritionCalculator = () => {
     try {
       const foodList = foods.map(f => `${f.quantity} of ${f.name}`).join(', ');
       
-      const { data, error } = await supabase.functions.invoke('ai-chat', {
-        body: {
+      const session = await supabase.auth.getSession();
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
           messages: [
             {
               role: 'user',
               content: `Calculate the approximate nutrition for these foods: ${foodList}
               
-              Provide the response in JSON format:
+              Provide the response in JSON format ONLY, no other text:
               {
                 "totalCalories": 0,
                 "protein": 0,
@@ -96,19 +102,48 @@ const NutritionCalculator = () => {
               Use approximate values based on common food databases. All values in grams except calories.`
             }
           ],
-          systemPrompt: 'You are a nutrition calculator expert. Provide accurate nutritional information based on USDA food database values. Be precise with macronutrient calculations. Always include helpful suggestions for balanced nutrition.'
-        }
+          systemPrompt: 'You are a nutrition calculator expert. Provide accurate nutritional information based on USDA food database values. Be precise with macronutrient calculations. Always include helpful suggestions for balanced nutrition. ONLY return valid JSON, no markdown or other text.'
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) throw new Error('Failed to calculate nutrition');
 
-      const content = data?.choices?.[0]?.message?.content || data?.content;
-      if (content) {
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = '';
+
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const jsonStr = line.slice(6).trim();
+              if (jsonStr === '[DONE]') continue;
+              try {
+                const parsed = JSON.parse(jsonStr);
+                const delta = parsed.choices?.[0]?.delta?.content;
+                if (delta) {
+                  fullContent += delta;
+                }
+              } catch {}
+            }
+          }
+        }
+      }
+
+      if (fullContent) {
+        const jsonMatch = fullContent.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
           setNutrition(parsed);
           toast.success('Nutrition calculated!');
+        } else {
+          throw new Error('Invalid response format');
         }
       }
     } catch (error) {
