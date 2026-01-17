@@ -37,7 +37,7 @@ const AIToolsHub = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
-  const [credits, setCredits] = useState(0);
+  const [credits, setCredits] = useState<number | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [dailyUsage, setDailyUsage] = useState({ used: 0, limit: 50 });
   const [activeCategory, setActiveCategory] = useState<string>('all');
@@ -48,7 +48,36 @@ const AIToolsHub = () => {
       navigate('/auth');
       return;
     }
+    
+    // Show cached credits immediately
+    const cached = localStorage.getItem('user_credits_cache');
+    if (cached) setCredits(Number(cached));
+    
     loadUserData();
+
+    // Real-time subscription for credits
+    const channel = supabase
+      .channel('tools-credits-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_credits',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload: any) => {
+          if (payload.new?.balance !== undefined) {
+            setCredits(payload.new.balance);
+            localStorage.setItem('user_credits_cache', String(payload.new.balance));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, loading, navigate]);
 
   const loadUserData = async () => {
@@ -60,7 +89,10 @@ const AIToolsHub = () => {
       .eq('user_id', user.id)
       .single();
     
-    if (creditsData) setCredits(creditsData.balance);
+    if (creditsData) {
+      setCredits(creditsData.balance);
+      localStorage.setItem('user_credits_cache', String(creditsData.balance));
+    }
 
     const { data: profile } = await supabase
       .from('profiles')
@@ -99,7 +131,20 @@ const AIToolsHub = () => {
       icon: <MessageSquare className="w-5 h-5" />,
       path: '/ai/copilot',
       category: 'chat',
-      creditCost: 3,
+      creditCost: 0,
+    },
+    
+    // Writing Tools (Adding Humanize AI)
+    {
+      id: 'humanize-ai',
+      name: 'Humanize AI',
+      description: 'Make AI text sound human & bypass detectors',
+      icon: <Pen className="w-5 h-5" />,
+      path: '/ai/tools/humanize',
+      category: 'writing',
+      creditCost: 10,
+      isNew: true,
+      isPopular: true,
     },
     
     // Image Tools
@@ -491,7 +536,7 @@ const AIToolsHub = () => {
           </div>
           <Button variant="ghost" size="sm" onClick={() => navigate('/wallet/credits')}>
             <Zap className="w-4 h-4 mr-1 text-yellow-500" />
-            {credits}
+            {credits === null ? '...' : credits}
           </Button>
         </div>
 

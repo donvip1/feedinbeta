@@ -12,6 +12,7 @@ const COSTS: Record<string, number> = {
   profile_view: 2,
   voice_call: 20,  // per minute
   video_call: 30,  // per minute
+  ai_tool: 0,      // Variable cost passed in metadata
 };
 
 serve(async (req) => {
@@ -76,6 +77,12 @@ serve(async (req) => {
         totalCost = costPerUnit * minutes;
         const otherUserName = metadata?.otherUserName || 'Unknown';
         description = `${action === "video_call" ? "Video" : "Voice"} call with ${otherUserName} - ${minutes} min`;
+        break;
+      case "ai_tool":
+        // Variable cost passed from frontend
+        totalCost = Number(metadata?.credits) || 5;
+        const toolName = metadata?.tool || 'AI Tool';
+        description = `Used ${toolName.replace(/_/g, ' ')}`;
         break;
     }
 
