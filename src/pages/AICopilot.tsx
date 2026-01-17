@@ -47,65 +47,68 @@ interface ToolCategory {
   tools: ToolItem[];
 }
 
+import { UserCheck } from 'lucide-react';
+
 const toolCategories: ToolCategory[] = [
   {
     name: 'Chat & AI Assistant',
     icon: <Bot className="w-5 h-5" />,
     tools: [
-      { name: 'AI Agent', description: 'Advanced AI with memory & context', icon: <Brain className="w-5 h-5" />, route: '/ai/agent', credits: 2, isPopular: true },
-      { name: 'Quick Chat', description: 'Fast answers to any question', icon: <MessageSquare className="w-5 h-5" />, route: '/ai/copilot', credits: 1 },
-      { name: 'Content Ideas', description: 'Generate viral content ideas', icon: <Lightbulb className="w-5 h-5" />, route: '/ai/ideas', credits: 2 },
-      { name: 'Caption Generator', description: 'Create engaging captions', icon: <Edit3 className="w-5 h-5" />, route: '/ai/captions', credits: 1 },
+      { name: 'AI Agent', description: 'Advanced AI with memory & context', icon: <Brain className="w-5 h-5" />, route: '/ai/agent', credits: 5, isPopular: true },
+      { name: 'Quick Chat', description: 'Fast answers to any question', icon: <MessageSquare className="w-5 h-5" />, route: '/ai/copilot', credits: 0 },
+      { name: 'Content Ideas', description: 'Generate viral content ideas', icon: <Lightbulb className="w-5 h-5" />, route: '/ai/ideas', credits: 5 },
+      { name: 'Caption Generator', description: 'Create engaging captions', icon: <Edit3 className="w-5 h-5" />, route: '/ai/captions', credits: 5 },
     ]
   },
   {
     name: 'Image Tools',
     icon: <Image className="w-5 h-5" />,
     tools: [
-      { name: 'Image Generator', description: 'Create images from text', icon: <Wand2 className="w-5 h-5" />, route: '/ai/image-gen', credits: 5, isPopular: true },
-      { name: 'Image Enhancer', description: 'Upscale & improve quality', icon: <ZoomIn className="w-5 h-5" />, route: '/ai/enhance', credits: 3, isNew: true },
-      { name: 'Background Remover', description: 'Remove image backgrounds', icon: <Eraser className="w-5 h-5" />, route: '/ai/tools/bg-remover', credits: 2, isNew: true },
-      { name: 'Image Upscaler', description: 'Increase resolution 4x', icon: <ZoomIn className="w-5 h-5" />, route: '/ai/tools/upscaler', credits: 3, isNew: true },
-      { name: 'Image Compressor', description: 'Reduce file size', icon: <Archive className="w-5 h-5" />, route: '/ai/tools/img-compress', credits: 0 },
-      { name: 'Image to Text (OCR)', description: 'Extract text from images', icon: <ScanText className="w-5 h-5" />, route: '/ai/tools/image-to-text', credits: 1, isNew: true },
-      { name: 'Image Colorizer', description: 'Colorize B&W photos', icon: <Palette className="w-5 h-5" />, route: '/ai/tools/colorizer', credits: 3 },
+      { name: 'Image Generator', description: 'Create images from text', icon: <Wand2 className="w-5 h-5" />, route: '/ai/image-gen', credits: 20, isPopular: true },
+      { name: 'Image Enhancer', description: 'Upscale & improve quality', icon: <ZoomIn className="w-5 h-5" />, route: '/ai/enhance', credits: 15, isNew: true },
+      { name: 'Background Remover', description: 'Remove image backgrounds', icon: <Eraser className="w-5 h-5" />, route: '/ai/tools/bg-remover', credits: 10, isNew: true },
+      { name: 'Image Upscaler', description: 'Increase resolution 4x', icon: <ZoomIn className="w-5 h-5" />, route: '/ai/tools/upscaler', credits: 15, isNew: true },
+      { name: 'Image Compressor', description: 'Reduce file size', icon: <Archive className="w-5 h-5" />, route: '/ai/tools/img-compress', credits: 5 },
+      { name: 'Image to Text (OCR)', description: 'Extract text from images', icon: <ScanText className="w-5 h-5" />, route: '/ai/tools/image-to-text', credits: 5, isNew: true },
+      { name: 'Image Colorizer', description: 'Colorize B&W photos', icon: <Palette className="w-5 h-5" />, route: '/ai/tools/colorizer', credits: 10 },
     ]
   },
   {
     name: 'PDF & Document Tools',
     icon: <FileText className="w-5 h-5" />,
     tools: [
-      { name: 'PDF Merge', description: 'Combine multiple PDFs', icon: <Layers className="w-5 h-5" />, route: '/ai/tools/pdf-merge', credits: 0, isNew: true },
-      { name: 'PDF Split', description: 'Split PDF into pages', icon: <Scissors className="w-5 h-5" />, route: '/ai/tools/pdf-split', credits: 0 },
-      { name: 'PDF Compress', description: 'Reduce PDF file size', icon: <Archive className="w-5 h-5" />, route: '/ai/tools/pdf-compress', credits: 0, isNew: true },
-      { name: 'PDF to Word', description: 'Convert PDF to DOCX', icon: <FileType className="w-5 h-5" />, route: '/ai/tools/pdf-to-word', credits: 1 },
-      { name: 'Word to PDF', description: 'Convert DOCX to PDF', icon: <FileText className="w-5 h-5" />, route: '/ai/tools/word-to-pdf', credits: 0 },
-      { name: 'Images to PDF', description: 'Convert images to PDF', icon: <Layers className="w-5 h-5" />, route: '/ai/tools/jpg-to-pdf', credits: 0 },
-      { name: 'Summarizer', description: 'Summarize long texts', icon: <Type className="w-5 h-5" />, route: '/ai/tools/summarizer', credits: 1 },
+      { name: 'PDF Merge', description: 'Combine multiple PDFs', icon: <Layers className="w-5 h-5" />, route: '/ai/tools/pdf-merge', credits: 5, isNew: true },
+      { name: 'PDF Split', description: 'Split PDF into pages', icon: <Scissors className="w-5 h-5" />, route: '/ai/tools/pdf-split', credits: 5 },
+      { name: 'PDF Compress', description: 'Reduce PDF file size', icon: <Archive className="w-5 h-5" />, route: '/ai/tools/pdf-compress', credits: 5, isNew: true },
+      { name: 'PDF to Word', description: 'Convert PDF to DOCX', icon: <FileType className="w-5 h-5" />, route: '/ai/tools/pdf-to-word', credits: 10 },
+      { name: 'Word to PDF', description: 'Convert DOCX to PDF', icon: <FileText className="w-5 h-5" />, route: '/ai/tools/word-to-pdf', credits: 5 },
+      { name: 'Images to PDF', description: 'Convert images to PDF', icon: <Layers className="w-5 h-5" />, route: '/ai/tools/jpg-to-pdf', credits: 5 },
+      { name: 'Summarizer', description: 'Summarize long texts', icon: <Type className="w-5 h-5" />, route: '/ai/tools/summarizer', credits: 8 },
     ]
   },
   {
     name: 'Writing & Text Tools',
     icon: <PenTool className="w-5 h-5" />,
     tools: [
-      { name: 'Essay Writer', description: 'Generate academic essays', icon: <BookOpen className="w-5 h-5" />, route: '/ai/tools/essay-writer', credits: 5, isPopular: true, isNew: true },
-      { name: 'Thesis Writer', description: 'Write thesis & dissertations', icon: <GraduationCap className="w-5 h-5" />, route: '/ai/thesis', credits: 10, isNew: true },
-      { name: 'Project Writer', description: 'Complete project reports', icon: <FileText className="w-5 h-5" />, route: '/ai/project', credits: 8 },
-      { name: 'Grammar Fixer', description: 'Fix grammar & spelling', icon: <CheckCircle className="w-5 h-5" />, route: '/ai/tools/grammar', credits: 1, isNew: true },
-      { name: 'Paraphraser', description: 'Rewrite text uniquely', icon: <Edit3 className="w-5 h-5" />, route: '/ai/tools/paraphrase', credits: 1, isNew: true },
-      { name: 'Translator', description: 'Translate to 100+ languages', icon: <Languages className="w-5 h-5" />, route: '/ai/tools/translator', credits: 1, isNew: true },
+      { name: 'Humanize AI', description: 'Make AI text sound human & pass detectors', icon: <UserCheck className="w-5 h-5" />, route: '/ai/tools/humanize', credits: 10, isNew: true, isPopular: true },
+      { name: 'Essay Writer', description: 'Generate academic essays', icon: <BookOpen className="w-5 h-5" />, route: '/ai/tools/essay-writer', credits: 15, isPopular: true },
+      { name: 'Thesis Writer', description: 'Write thesis & dissertations', icon: <GraduationCap className="w-5 h-5" />, route: '/ai/thesis', credits: 20, isNew: true },
+      { name: 'Project Writer', description: 'Complete project reports', icon: <FileText className="w-5 h-5" />, route: '/ai/project', credits: 15 },
+      { name: 'Grammar Fixer', description: 'Fix grammar & spelling', icon: <CheckCircle className="w-5 h-5" />, route: '/ai/tools/grammar', credits: 5, isNew: true },
+      { name: 'Paraphraser', description: 'Rewrite text uniquely', icon: <Edit3 className="w-5 h-5" />, route: '/ai/tools/paraphrase', credits: 8, isNew: true },
+      { name: 'Translator', description: 'Translate to 100+ languages', icon: <Languages className="w-5 h-5" />, route: '/ai/tools/translator', credits: 5, isNew: true },
     ]
   },
   {
     name: 'Video & Audio Tools',
     icon: <Video className="w-5 h-5" />,
     tools: [
-      { name: 'Video Creator', description: 'AI video generation', icon: <Clapperboard className="w-5 h-5" />, route: '/ai/video', credits: 15, isPopular: true },
-      { name: 'Video Trimmer', description: 'Cut & trim videos', icon: <Scissors className="w-5 h-5" />, route: '/ai/tools/video-trim', credits: 0, isNew: true },
-      { name: 'Video Compressor', description: 'Reduce video size', icon: <Archive className="w-5 h-5" />, route: '/ai/tools/video-compress', credits: 0 },
-      { name: 'Audio Extractor', description: 'Extract audio from video', icon: <Volume2 className="w-5 h-5" />, route: '/ai/tools/audio-extract', credits: 0 },
-      { name: 'Text to Speech', description: 'Convert text to audio', icon: <Headphones className="w-5 h-5" />, route: '/ai/tools/text-to-speech', credits: 2 },
-      { name: 'Speech to Text', description: 'Transcribe audio to text', icon: <Mic className="w-5 h-5" />, route: '/ai/tools/speech-to-text', credits: 2 },
+      { name: 'Video Creator', description: 'AI video generation', icon: <Clapperboard className="w-5 h-5" />, route: '/ai/video', credits: 25, isPopular: true },
+      { name: 'Video Trimmer', description: 'Cut & trim videos', icon: <Scissors className="w-5 h-5" />, route: '/ai/tools/video-trim', credits: 5, isNew: true },
+      { name: 'Video Compressor', description: 'Reduce video size', icon: <Archive className="w-5 h-5" />, route: '/ai/tools/video-compress', credits: 5 },
+      { name: 'Audio Extractor', description: 'Extract audio from video', icon: <Volume2 className="w-5 h-5" />, route: '/ai/tools/audio-extract', credits: 5 },
+      { name: 'Text to Speech', description: 'Convert text to audio', icon: <Headphones className="w-5 h-5" />, route: '/ai/tools/text-to-speech', credits: 8 },
+      { name: 'Speech to Text', description: 'Transcribe audio to text', icon: <Mic className="w-5 h-5" />, route: '/ai/tools/speech-to-text', credits: 8 },
       { name: 'Music Discovery', description: 'Find trending music', icon: <Music className="w-5 h-5" />, route: '/music', credits: 0 },
     ]
   },
@@ -114,19 +117,19 @@ const toolCategories: ToolCategory[] = [
     icon: <GraduationCap className="w-5 h-5" />,
     tools: [
       { name: 'Learn Tech', description: 'Interactive tech courses', icon: <FlaskConical className="w-5 h-5" />, route: '/ai/learn', credits: 0, isPopular: true },
-      { name: 'Educational Q&A', description: 'Get answers with sources', icon: <FileQuestion className="w-5 h-5" />, route: '/ai/education', credits: 2 },
-      { name: 'Exam Prep', description: 'Practice questions & quizzes', icon: <BookOpen className="w-5 h-5" />, route: '/ai/tools/exam-prep', credits: 3 },
-      { name: 'Research Assistant', description: 'Find academic papers', icon: <Globe className="w-5 h-5" />, route: '/ai/tools/research', credits: 2 },
-      { name: 'Math Solver', description: 'Solve math problems', icon: <Calculator className="w-5 h-5" />, route: '/ai/tools/math-solver', credits: 1 },
+      { name: 'Educational Q&A', description: 'Get answers with sources', icon: <FileQuestion className="w-5 h-5" />, route: '/ai/education', credits: 5 },
+      { name: 'Exam Prep', description: 'Practice questions & quizzes', icon: <BookOpen className="w-5 h-5" />, route: '/ai/tools/exam-prep', credits: 8 },
+      { name: 'Research Assistant', description: 'Find academic papers', icon: <Globe className="w-5 h-5" />, route: '/ai/tools/research', credits: 8 },
+      { name: 'Math Solver', description: 'Solve math problems', icon: <Calculator className="w-5 h-5" />, route: '/ai/tools/math-solver', credits: 5 },
     ]
   },
   {
     name: 'Utility Tools',
     icon: <Settings className="w-5 h-5" />,
     tools: [
-      { name: 'QR Code Generator', description: 'Create QR codes instantly', icon: <QrCode className="w-5 h-5" />, route: '/ai/tools/qr-gen', credits: 0, isNew: true },
-      { name: 'Meme Generator', description: 'Create funny memes', icon: <ImagePlus className="w-5 h-5" />, route: '/ai/tools/meme-gen', credits: 0 },
-      { name: 'Logo Maker', description: 'Design simple logos', icon: <Brush className="w-5 h-5" />, route: '/ai/tools/logo-maker', credits: 5 },
+      { name: 'QR Code Generator', description: 'Create QR codes instantly', icon: <QrCode className="w-5 h-5" />, route: '/ai/tools/qr-gen', credits: 5, isNew: true },
+      { name: 'Meme Generator', description: 'Create funny memes', icon: <ImagePlus className="w-5 h-5" />, route: '/ai/tools/meme-gen', credits: 5 },
+      { name: 'Logo Maker', description: 'Design simple logos', icon: <Brush className="w-5 h-5" />, route: '/ai/tools/logo-maker', credits: 10 },
     ]
   },
   {
@@ -134,17 +137,17 @@ const toolCategories: ToolCategory[] = [
     icon: <Heart className="w-5 h-5" />,
     tools: [
       { name: 'Health Info', description: 'General health information', icon: <Heart className="w-5 h-5" />, route: '/ai/tools/health-info', credits: 0 },
-      { name: 'Symptom Checker', description: 'Check symptoms (not medical advice)', icon: <FlaskConical className="w-5 h-5" />, route: '/ai/tools/symptom-checker', credits: 1 },
-      { name: 'Nutrition Calculator', description: 'Calculate meal nutrition', icon: <Calculator className="w-5 h-5" />, route: '/ai/tools/nutrition', credits: 0 },
+      { name: 'Symptom Checker', description: 'Check symptoms (not medical advice)', icon: <FlaskConical className="w-5 h-5" />, route: '/ai/tools/symptom-checker', credits: 5 },
+      { name: 'Nutrition Calculator', description: 'Calculate meal nutrition', icon: <Calculator className="w-5 h-5" />, route: '/ai/tools/nutrition', credits: 5 },
     ]
   },
 ];
 
 const quickAccessTools: ToolItem[] = [
-  { name: 'AI Agent', description: 'Chat with memory', icon: <Brain className="w-6 h-6" />, route: '/ai/agent', credits: 2 },
-  { name: 'Image Gen', description: 'Create images', icon: <Wand2 className="w-6 h-6" />, route: '/ai/image-gen', credits: 5 },
-  { name: 'Essay Writer', description: 'Academic essays', icon: <BookOpen className="w-6 h-6" />, route: '/ai/tools/essay-writer', credits: 5 },
-  { name: 'Learn Tech', description: 'Free courses', icon: <GraduationCap className="w-6 h-6" />, route: '/ai/learn', credits: 0 },
+  { name: 'AI Agent', description: 'Chat with memory', icon: <Brain className="w-6 h-6" />, route: '/ai/agent', credits: 5 },
+  { name: 'Humanize AI', description: 'Pass AI detectors', icon: <UserCheck className="w-6 h-6" />, route: '/ai/tools/humanize', credits: 10 },
+  { name: 'Image Gen', description: 'Create images', icon: <Wand2 className="w-6 h-6" />, route: '/ai/image-gen', credits: 20 },
+  { name: 'Essay Writer', description: 'Academic essays', icon: <BookOpen className="w-6 h-6" />, route: '/ai/tools/essay-writer', credits: 15 },
 ];
 
 const AICopilot = () => {
@@ -156,7 +159,7 @@ const AICopilot = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(['Chat & AI Assistant', 'Image Tools']);
-  const [userCredits, setUserCredits] = useState<number>(0);
+  const [userCredits, setUserCredits] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -167,6 +170,30 @@ const AICopilot = () => {
     }
     loadChatHistory();
     loadUserCredits();
+
+    // Real-time subscription for credits
+    const channel = supabase
+      .channel('user-credits-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_credits',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload: any) => {
+          if (payload.new?.balance !== undefined) {
+            setUserCredits(payload.new.balance);
+            localStorage.setItem('user_credits_cache', String(payload.new.balance));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [user, loading, navigate]);
 
   usePageRefresh('ai', useCallback(() => {
@@ -181,9 +208,15 @@ const AICopilot = () => {
   }, [messages, showChat]);
 
   const loadUserCredits = async () => {
+    // Show cached value immediately
+    const cached = localStorage.getItem('user_credits_cache');
+    if (cached) setUserCredits(Number(cached));
+    
     try {
       const { data } = await supabase.rpc('get_user_credits');
-      setUserCredits(data || 0);
+      const credits = data || 0;
+      setUserCredits(credits);
+      localStorage.setItem('user_credits_cache', String(credits));
     } catch (error) {
       console.error('Error loading credits:', error);
     }
@@ -346,7 +379,9 @@ const AICopilot = () => {
             </div>
             <div className="flex items-center gap-1">
               <Coins className="w-4 h-4 text-yellow-500" />
-              <span className="text-sm font-medium">{userCredits}</span>
+              <span className="text-sm font-medium">
+                {userCredits === null ? '...' : userCredits}
+              </span>
             </div>
           </div>
         </div>
