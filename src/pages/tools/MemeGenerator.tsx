@@ -1,6 +1,6 @@
 import { useState, useRef, ChangeEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Image, Download, Type, Loader2, Share2, Sparkles, Upload } from 'lucide-react';
+import { ArrowLeft, Image, Download, Type, Loader2, Share2, Sparkles, Upload, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const memeTemplates = [
   { id: 'drake', name: 'Drake', url: 'https://i.imgflip.com/30b1gx.jpg', category: 'Reactions' },
@@ -22,6 +25,10 @@ const memeTemplates = [
 
 const MemeGenerator = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'meme_generator',
+    creditCost: CREDIT_COST,
+  });
   const [selectedTemplate, setSelectedTemplate] = useState<typeof memeTemplates[0] | null>(null);
   const [topText, setTopText] = useState('');
   const [bottomText, setBottomText] = useState('');
@@ -55,6 +62,9 @@ const MemeGenerator = () => {
       toast.error('Please select a template or upload an image');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsGenerating(true);
     try {
@@ -143,18 +153,21 @@ const MemeGenerator = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border">
         <div className="flex items-center gap-3 p-4">
           <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold flex items-center gap-2">
               <Image className="h-5 w-5 text-primary" />
               Meme Generator
             </h1>
             <p className="text-sm text-muted-foreground">Create hilarious memes</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            <span>{CREDIT_COST}</span>
           </div>
         </div>
       </div>

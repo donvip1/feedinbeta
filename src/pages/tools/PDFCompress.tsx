@@ -3,13 +3,20 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Upload, Minimize2, Loader2, Download, FileText } from 'lucide-react';
+import { ArrowLeft, Upload, Minimize2, Loader2, Download, FileText, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PDFDocument } from 'pdf-lib';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const PDFCompress = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'pdf_compress',
+    creditCost: CREDIT_COST,
+  });
   const [file, setFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [result, setResult] = useState<{ url: string; originalSize: number; newSize: number } | null>(null);
@@ -33,6 +40,9 @@ const PDFCompress = () => {
 
   const handleCompress = async () => {
     if (!file) return;
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsProcessing(true);
 
@@ -103,9 +113,13 @@ const PDFCompress = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-lg font-semibold">Compress PDF</h1>
               <p className="text-xs text-muted-foreground">Reduce PDF file size</p>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              <span>{CREDIT_COST}</span>
             </div>
           </div>
         </div>

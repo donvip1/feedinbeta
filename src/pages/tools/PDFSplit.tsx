@@ -6,14 +6,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Upload, Scissors, Loader2, Download, FileText } from 'lucide-react';
+import { ArrowLeft, Upload, Scissors, Loader2, Download, FileText, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { PDFDocument } from 'pdf-lib';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const PDFSplit = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'pdf_split',
+    creditCost: CREDIT_COST,
+  });
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [splitPages, setSplitPages] = useState('');
@@ -52,6 +59,9 @@ const PDFSplit = () => {
 
   const handleSplit = async () => {
     if (!file) return;
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsProcessing(true);
 
@@ -132,9 +142,13 @@ const PDFSplit = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-lg font-semibold">Split PDF</h1>
               <p className="text-xs text-muted-foreground">Extract pages from a PDF</p>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              <span>{CREDIT_COST}</span>
             </div>
           </div>
         </div>

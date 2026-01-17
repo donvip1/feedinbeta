@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Palette, Download, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, Palette, Download, Loader2, Sparkles, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -9,9 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 10;
 
 const LogoMaker = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'logo_maker',
+    creditCost: CREDIT_COST,
+  });
   const [brandName, setBrandName] = useState('');
   const [description, setDescription] = useState('');
   const [style, setStyle] = useState('modern');
@@ -43,6 +50,9 @@ const LogoMaker = () => {
       toast.error('Please enter your brand name');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsGenerating(true);
     try {
@@ -94,9 +104,13 @@ const LogoMaker = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Logo Maker</h1>
             <p className="text-sm text-muted-foreground">AI-powered logo design</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            <span>{CREDIT_COST}</span>
           </div>
         </div>
       </div>

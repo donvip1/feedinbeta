@@ -4,12 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Upload, Minimize2, Loader2, Download, ImageIcon } from 'lucide-react';
+import { ArrowLeft, Upload, Minimize2, Loader2, Download, ImageIcon, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const ImageCompressor = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'image_compressor',
+    creditCost: CREDIT_COST,
+  });
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [quality, setQuality] = useState([80]);
@@ -39,6 +46,9 @@ const ImageCompressor = () => {
 
   const handleCompress = async () => {
     if (!file || !preview) return;
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsProcessing(true);
 
@@ -111,9 +121,13 @@ const ImageCompressor = () => {
             <Button variant="ghost" size="icon" onClick={() => navigate('/ai/tools')}>
               <ArrowLeft className="w-5 h-5" />
             </Button>
-            <div>
+            <div className="flex-1">
               <h1 className="text-lg font-semibold">Image Compressor</h1>
               <p className="text-xs text-muted-foreground">Reduce image file size</p>
+            </div>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Zap className="w-4 h-4 text-yellow-500" />
+              <span>{CREDIT_COST}</span>
             </div>
           </div>
         </div>
