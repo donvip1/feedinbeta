@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { ImageShareModal } from '@/components/shared/ImageShareModal';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   ArrowLeft, Upload, Maximize, Loader2, Download, Share2, 
   CheckCircle, Zap, ZoomIn
@@ -27,6 +29,12 @@ const ImageUpscaler = () => {
   const [progress, setProgress] = useState(0);
   const [upscaleLevel, setUpscaleLevel] = useState<'2x' | '4x'>('2x');
   const [showShareModal, setShowShareModal] = useState(false);
+  
+  const creditCost = upscaleLevel === '2x' ? 15 : 25;
+  const { balance, isLoading: isLoadingCredits, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'Image Upscaler',
+    creditCost,
+  });
 
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -43,6 +51,10 @@ const ImageUpscaler = () => {
 
   const handleUpscale = async () => {
     if (!user || !selectedFile) return;
+
+    // Check and deduct credits first
+    const hasCredits = await checkAndDeductCredits();
+    if (!hasCredits) return;
 
     setIsProcessing(true);
     setProgress(10);
@@ -133,9 +145,15 @@ const ImageUpscaler = () => {
             </div>
             <span className="text-lg font-semibold">Image Upscaler</span>
           </div>
-          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1 text-sm">
             <Zap className="w-4 h-4 text-yellow-500" />
-            ~15
+            {isLoadingCredits ? (
+              <Skeleton className="w-8 h-4" />
+            ) : (
+              <span className={hasEnoughCredits ? 'text-muted-foreground' : 'text-destructive font-medium'}>
+                {balance}
+              </span>
+            )}
           </div>
         </div>
       </div>

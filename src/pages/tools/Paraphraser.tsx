@@ -6,9 +6,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, RefreshCw, Loader2, Copy, Download, Sparkles, Zap, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
 import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+
+const CREDIT_COST = 8;
 
 const MODES = [
   { id: 'standard', name: 'Standard', description: 'Clear and natural rewrite', emoji: '✍️' },
@@ -27,6 +31,11 @@ const Paraphraser = () => {
   const [result, setResult] = useState('');
   const [mode, setMode] = useState('standard');
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  const { balance, isLoading: isLoadingCredits, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'Paraphraser',
+    creditCost: CREDIT_COST,
+  });
 
   const handleParaphrase = async () => {
     if (!inputText.trim()) {
@@ -37,6 +46,10 @@ const Paraphraser = () => {
       });
       return;
     }
+
+    // Check and deduct credits first
+    const hasCredits = await checkAndDeductCredits();
+    if (!hasCredits) return;
 
     setIsProcessing(true);
     setResult('');
@@ -149,9 +162,15 @@ Provide ONLY the paraphrased text. Make the rewrite high-quality and professiona
               </div>
               <span className="text-lg font-semibold">Paraphraser</span>
             </div>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1 text-sm">
               <Zap className="w-4 h-4 text-yellow-500" />
-              1
+              {isLoadingCredits ? (
+                <Skeleton className="w-8 h-4" />
+              ) : (
+                <span className={hasEnoughCredits ? 'text-muted-foreground' : 'text-destructive font-medium'}>
+                  {balance}
+                </span>
+              )}
             </div>
           </div>
         </div>
