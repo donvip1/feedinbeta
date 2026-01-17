@@ -119,6 +119,7 @@ import LogoMaker from "./pages/tools/LogoMaker";
 import HealthInfo from "./pages/tools/HealthInfo";
 import SymptomChecker from "./pages/tools/SymptomChecker";
 import NutritionCalculator from "./pages/tools/NutritionCalculator";
+import ImagesToPDF from "./pages/tools/ImagesToPDF";
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -293,6 +294,7 @@ const App = () => {
             <Route path="/ai/tools/health-info" element={<HealthInfo />} />
             <Route path="/ai/tools/symptom-checker" element={<SymptomChecker />} />
             <Route path="/ai/tools/nutrition" element={<NutritionCalculator />} />
+            <Route path="/ai/tools/jpg-to-pdf" element={<ImagesToPDF />} />
             
             {/* Groups */}
             <Route path="/groups" element={<Groups />} />

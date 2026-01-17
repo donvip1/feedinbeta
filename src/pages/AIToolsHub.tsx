@@ -26,7 +26,7 @@ interface AITool {
   description: string;
   icon: React.ReactNode;
   path: string;
-  category: 'pdf' | 'image' | 'video' | 'writing' | 'utility' | 'chat';
+  category: 'pdf' | 'image' | 'video' | 'writing' | 'utility' | 'chat' | 'audio' | 'education' | 'health';
   creditCost: number;
   isNew?: boolean;
   isPremium?: boolean;
@@ -144,23 +144,32 @@ const AIToolsHub = () => {
       creditCost: 15,
     },
     {
-      id: 'colorize',
+      id: 'colorizer',
       name: 'Photo Colorizer',
       description: 'Add color to black & white photos',
       icon: <Palette className="w-5 h-5" />,
-      path: '/ai/tools/colorize',
+      path: '/ai/tools/colorizer',
       category: 'image',
       creditCost: 10,
       isNew: true,
     },
     {
-      id: 'ocr',
+      id: 'image-to-text',
       name: 'Image to Text (OCR)',
       description: 'Extract text from images',
       icon: <Type className="w-5 h-5" />,
-      path: '/ai/tools/ocr',
+      path: '/ai/tools/image-to-text',
       category: 'image',
       creditCost: 5,
+    },
+    {
+      id: 'img-compress',
+      name: 'Image Compressor',
+      description: 'Reduce image file size',
+      icon: <FileImage className="w-5 h-5" />,
+      path: '/ai/tools/img-compress',
+      category: 'image',
+      creditCost: 3,
     },
     
     // PDF Tools
@@ -193,6 +202,24 @@ const AIToolsHub = () => {
       creditCost: 5,
     },
     {
+      id: 'pdf-split',
+      name: 'Split PDF',
+      description: 'Split PDF into separate pages',
+      icon: <Scissors className="w-5 h-5" />,
+      path: '/ai/tools/pdf-split',
+      category: 'pdf',
+      creditCost: 5,
+    },
+    {
+      id: 'pdf-compress',
+      name: 'Compress PDF',
+      description: 'Reduce PDF file size',
+      icon: <Download className="w-5 h-5" />,
+      path: '/ai/tools/pdf-compress',
+      category: 'pdf',
+      creditCost: 5,
+    },
+    {
       id: 'jpg-to-pdf',
       name: 'Images to PDF',
       description: 'Convert images to PDF document',
@@ -200,6 +227,15 @@ const AIToolsHub = () => {
       path: '/ai/tools/jpg-to-pdf',
       category: 'pdf',
       creditCost: 5,
+    },
+    {
+      id: 'summarizer',
+      name: 'Document Summarizer',
+      description: 'Summarize long documents with AI',
+      icon: <BookOpen className="w-5 h-5" />,
+      path: '/ai/tools/summarizer',
+      category: 'pdf',
+      creditCost: 8,
     },
     
     // Writing Tools
@@ -237,7 +273,7 @@ const AIToolsHub = () => {
       name: 'AI Translator',
       description: 'Translate text to any language',
       icon: <Languages className="w-5 h-5" />,
-      path: '/ai/tools/translate',
+      path: '/ai/tools/translator',
       category: 'writing',
       creditCost: 5,
     },
@@ -288,25 +324,121 @@ const AIToolsHub = () => {
       category: 'video',
       creditCost: 5,
     },
+    
+    // Audio Tools
     {
-      id: 'video-to-audio',
+      id: 'audio-extract',
       name: 'Video to MP3',
       description: 'Extract audio from videos',
       icon: <Music className="w-5 h-5" />,
-      path: '/ai/tools/video-to-audio',
-      category: 'video',
+      path: '/ai/tools/audio-extract',
+      category: 'audio',
       creditCost: 3,
+    },
+    {
+      id: 'text-to-speech',
+      name: 'Text to Speech',
+      description: 'Convert text to natural speech',
+      icon: <Music className="w-5 h-5" />,
+      path: '/ai/tools/text-to-speech',
+      category: 'audio',
+      creditCost: 5,
+    },
+    {
+      id: 'speech-to-text',
+      name: 'Speech to Text',
+      description: 'Transcribe audio to text',
+      icon: <Type className="w-5 h-5" />,
+      path: '/ai/tools/speech-to-text',
+      category: 'audio',
+      creditCost: 5,
+    },
+    
+    // Education & Research Tools
+    {
+      id: 'math-solver',
+      name: 'Math Solver',
+      description: 'Solve math problems step by step',
+      icon: <Brain className="w-5 h-5" />,
+      path: '/ai/tools/math-solver',
+      category: 'education',
+      creditCost: 5,
+    },
+    {
+      id: 'exam-prep',
+      name: 'Exam Prep',
+      description: 'Practice questions and study guides',
+      icon: <GraduationCap className="w-5 h-5" />,
+      path: '/ai/tools/exam-prep',
+      category: 'education',
+      creditCost: 8,
+    },
+    {
+      id: 'research',
+      name: 'Research Assistant',
+      description: 'Help with research and citations',
+      icon: <BookOpen className="w-5 h-5" />,
+      path: '/ai/tools/research',
+      category: 'education',
+      creditCost: 10,
     },
     
     // Utility Tools
     {
-      id: 'qr-code',
+      id: 'qr-gen',
       name: 'QR Code Generator',
       description: 'Create QR codes instantly',
       icon: <QrCode className="w-5 h-5" />,
-      path: '/ai/tools/qr-code',
+      path: '/ai/tools/qr-gen',
       category: 'utility',
       creditCost: 2,
+    },
+    {
+      id: 'meme-gen',
+      name: 'Meme Generator',
+      description: 'Create funny memes easily',
+      icon: <Sparkles className="w-5 h-5" />,
+      path: '/ai/tools/meme-gen',
+      category: 'utility',
+      creditCost: 3,
+    },
+    {
+      id: 'logo-maker',
+      name: 'Logo Maker',
+      description: 'Design simple logos with AI',
+      icon: <Wand2 className="w-5 h-5" />,
+      path: '/ai/tools/logo-maker',
+      category: 'utility',
+      creditCost: 10,
+    },
+    
+    // Health Tools
+    {
+      id: 'health-info',
+      name: 'Health Info',
+      description: 'Get health information and tips',
+      icon: <Brain className="w-5 h-5" />,
+      path: '/ai/tools/health-info',
+      category: 'health',
+      creditCost: 5,
+    },
+    {
+      id: 'symptom-checker',
+      name: 'Symptom Checker',
+      description: 'Check symptoms and get guidance',
+      icon: <FileCheck className="w-5 h-5" />,
+      path: '/ai/tools/symptom-checker',
+      category: 'health',
+      creditCost: 5,
+    },
+    {
+      id: 'nutrition',
+      name: 'Nutrition Calculator',
+      description: 'Calculate nutrition information',
+      icon: <Lightbulb className="w-5 h-5" />,
+      path: '/ai/tools/nutrition',
+      category: 'health',
+      creditCost: 3,
     },
   ];
 
@@ -317,6 +449,9 @@ const AIToolsHub = () => {
     { id: 'pdf', name: 'PDF', icon: <FileText className="w-4 h-4" /> },
     { id: 'writing', name: 'Writing', icon: <Pen className="w-4 h-4" /> },
     { id: 'video', name: 'Video', icon: <Video className="w-4 h-4" /> },
+    { id: 'audio', name: 'Audio', icon: <Music className="w-4 h-4" /> },
+    { id: 'education', name: 'Education', icon: <GraduationCap className="w-4 h-4" /> },
+    { id: 'health', name: 'Health', icon: <Brain className="w-4 h-4" /> },
     { id: 'utility', name: 'Utility', icon: <Wrench className="w-4 h-4" /> },
   ];
 
