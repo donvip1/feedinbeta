@@ -137,7 +137,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     { id: 'wallet', label: 'Wallet', icon: Wallet, path: '/wallet' },
     { id: 'learn', label: 'Learn Tech', icon: BookOpen, path: '/ai/learn' },
     { id: 'ai', label: 'FeedAI', icon: Zap, path: '/ai/copilot' },
-    { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || ''}`, isProfile: true },
+    { id: 'profile', label: 'Profile', icon: User, path: `/profile/${localStorage.getItem('currentUserId') || user?.id || ''}`, isProfile: true },
   ];
 
   const isActive = (path: string) => location.pathname === path;
