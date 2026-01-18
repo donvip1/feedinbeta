@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,10 +19,16 @@ import {
   CheckCircle, Zap, FileText, GraduationCap
 } from 'lucide-react';
 
+const CREDIT_COST = 15;
+
 const EssayWriter = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'essay_writer',
+    creditCost: CREDIT_COST,
+  });
   
   const [topic, setTopic] = useState('');
   const [essayType, setEssayType] = useState<string>('argumentative');
@@ -55,6 +62,9 @@ const EssayWriter = () => {
       toast({ title: 'Please enter a topic', variant: 'destructive' });
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsGenerating(true);
     setProgress(10);

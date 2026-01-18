@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Apple, Plus, X, Loader2, PieChart, Sparkles, Lightbulb } from 'lucide-react';
+import { ArrowLeft, Apple, Plus, X, Loader2, PieChart, Sparkles, Lightbulb, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,9 @@ import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 interface FoodItem {
   name: string;
@@ -37,6 +40,10 @@ const QUICK_FOODS = [
 
 const NutritionCalculator = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'nutrition_calculator',
+    creditCost: CREDIT_COST,
+  });
   const [foods, setFoods] = useState<FoodItem[]>([]);
   const [currentFood, setCurrentFood] = useState('');
   const [currentQuantity, setCurrentQuantity] = useState('');
@@ -68,6 +75,9 @@ const NutritionCalculator = () => {
       toast.error('Please add at least one food item');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsCalculating(true);
     try {
@@ -176,6 +186,10 @@ const NutritionCalculator = () => {
               Nutrition Calculator
             </h1>
             <p className="text-sm text-muted-foreground">Track your food intake</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            {CREDIT_COST}
           </div>
         </div>
       </div>

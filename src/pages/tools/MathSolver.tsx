@@ -9,9 +9,16 @@ import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 3;
 
 const MathSolver = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'math_solver',
+    creditCost: CREDIT_COST,
+  });
   const [problem, setProblem] = useState('');
   const [isSolving, setIsSolving] = useState(false);
   const [solution, setSolution] = useState('');
@@ -30,6 +37,9 @@ const MathSolver = () => {
       toast.error('Please enter a math problem');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsSolving(true);
     setSolution('');

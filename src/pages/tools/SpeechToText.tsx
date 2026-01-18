@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Mic, MicOff, Copy, Download, Trash2, Sparkles, Languages } from 'lucide-react';
+import { ArrowLeft, Mic, MicOff, Copy, Download, Trash2, Sparkles, Languages, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,6 +8,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 8;
 
 const LANGUAGES = [
   { code: 'en-US', name: 'English (US)', flag: '🇺🇸' },
@@ -26,6 +29,10 @@ const LANGUAGES = [
 
 const SpeechToText = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'speech_to_text',
+    creditCost: CREDIT_COST,
+  });
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -144,6 +151,10 @@ const SpeechToText = () => {
               Speech to Text
             </h1>
             <p className="text-sm text-muted-foreground">Convert speech to text in real-time</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            {CREDIT_COST}
           </div>
         </div>
       </div>

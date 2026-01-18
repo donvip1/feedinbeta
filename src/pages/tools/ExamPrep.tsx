@@ -11,6 +11,9 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 3;
 
 interface Question {
   question: string;
@@ -21,6 +24,10 @@ interface Question {
 
 const ExamPrep = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'exam_prep',
+    creditCost: CREDIT_COST,
+  });
   const [topic, setTopic] = useState('');
   const [content, setContent] = useState('');
   const [difficulty, setDifficulty] = useState('medium');
@@ -37,6 +44,9 @@ const ExamPrep = () => {
       toast.error('Please enter a topic');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsGenerating(true);
     setQuestions([]);

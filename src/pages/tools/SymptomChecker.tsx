@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Stethoscope, Plus, X, Loader2, AlertTriangle, Heart, ShieldCheck, Activity } from 'lucide-react';
+import { ArrowLeft, Stethoscope, Plus, X, Loader2, AlertTriangle, Heart, ShieldCheck, Activity, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,9 +9,16 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const SymptomChecker = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'symptom_checker',
+    creditCost: CREDIT_COST,
+  });
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [currentSymptom, setCurrentSymptom] = useState('');
   const [duration, setDuration] = useState('');
@@ -36,6 +43,9 @@ const SymptomChecker = () => {
       toast.error('Please add at least one symptom');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsAnalyzing(true);
     setResult('');
@@ -162,6 +172,10 @@ CRITICAL: Always emphasize this is educational only, NOT a diagnosis. Recommend 
               Symptom Checker
             </h1>
             <p className="text-sm text-muted-foreground">Educational symptom analysis</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            {CREDIT_COST}
           </div>
         </div>
       </div>
