@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Volume2, Download, Play, Pause, Settings, Sparkles, Wand2 } from 'lucide-react';
+import { ArrowLeft, Volume2, Download, Play, Pause, Settings, Sparkles, Wand2, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,9 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 8;
 
 const TextToSpeech = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'text_to_speech',
+    creditCost: CREDIT_COST,
+  });
   const [text, setText] = useState('');
   const [voice, setVoice] = useState('');
   const [rate, setRate] = useState([1]);
@@ -118,6 +125,10 @@ const TextToSpeech = () => {
               Text to Speech
             </h1>
             <p className="text-sm text-muted-foreground">Convert text to natural audio</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            {CREDIT_COST}
           </div>
         </div>
       </div>

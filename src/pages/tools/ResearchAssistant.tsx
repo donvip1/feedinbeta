@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Search, Loader2, BookOpen, Copy, ExternalLink, Sparkles, GraduationCap } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, BookOpen, Copy, ExternalLink, Sparkles, GraduationCap, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,9 +10,16 @@ import { BottomNav } from '@/components/navigation/BottomNav';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { EnhancedMarkdownRenderer } from '@/components/ai/EnhancedMarkdownRenderer';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 8;
 
 const ResearchAssistant = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'research_assistant',
+    creditCost: CREDIT_COST,
+  });
   const [query, setQuery] = useState('');
   const [context, setContext] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -32,6 +39,9 @@ const ResearchAssistant = () => {
       toast.error('Please enter a research topic');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsSearching(true);
     setResult('');
@@ -162,6 +172,10 @@ Important caveats, limitations, or areas of ongoing debate.`,
               Research Assistant
             </h1>
             <p className="text-sm text-muted-foreground">AI-powered academic research helper</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            {CREDIT_COST}
           </div>
         </div>
       </div>

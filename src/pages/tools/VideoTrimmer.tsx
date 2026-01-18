@@ -4,12 +4,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Upload, Scissors, Loader2, Download, Play, Pause, Video } from 'lucide-react';
+import { ArrowLeft, Upload, Scissors, Loader2, Download, Play, Pause, Video, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const VideoTrimmer = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'video_trimmer',
+    creditCost: CREDIT_COST,
+  });
   const videoRef = useRef<HTMLVideoElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -90,6 +97,9 @@ const VideoTrimmer = () => {
   const handleTrim = async () => {
     if (!file || !videoUrl) return;
 
+    const success = await checkAndDeductCredits();
+    if (!success) return;
+
     setIsProcessing(true);
 
     try {
@@ -148,6 +158,10 @@ const VideoTrimmer = () => {
               <h1 className="text-lg font-semibold">Video Trimmer</h1>
               <p className="text-xs text-muted-foreground">Cut and trim your videos</p>
             </div>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            {CREDIT_COST}
           </div>
         </div>
 

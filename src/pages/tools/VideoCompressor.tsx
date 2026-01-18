@@ -1,14 +1,21 @@
 import { useState, ChangeEvent } from 'react';
-import { ArrowLeft, Video, Download, Upload, Loader2, Settings } from 'lucide-react';
+import { ArrowLeft, Video, Download, Upload, Loader2, Settings, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+
+const CREDIT_COST = 5;
 
 const VideoCompressor = () => {
   const navigate = useNavigate();
+  const { balance, hasEnoughCredits, checkAndDeductCredits } = useAIToolCredits({
+    toolName: 'video_compressor',
+    creditCost: CREDIT_COST,
+  });
   const [video, setVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [compressedUrl, setCompressedUrl] = useState<string | null>(null);
@@ -45,6 +52,9 @@ const VideoCompressor = () => {
       toast.error('Please select a video first');
       return;
     }
+
+    const success = await checkAndDeductCredits();
+    if (!success) return;
 
     setIsProcessing(true);
     try {
@@ -87,9 +97,13 @@ const VideoCompressor = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-xl font-bold">Video Compressor</h1>
             <p className="text-sm text-muted-foreground">Reduce video file size</p>
+          </div>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Zap className="w-4 h-4 text-yellow-500" />
+            {CREDIT_COST}
           </div>
         </div>
       </div>
