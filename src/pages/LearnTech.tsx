@@ -199,7 +199,6 @@ export default function LearnTech() {
                       <CategoryCard 
                         key={category.id} 
                         category={category}
-                        onClick={() => navigate(`/ai/learn/category/${category.slug}`)}
                       />
                     ))
                   ) : (
@@ -303,7 +302,7 @@ export default function LearnTech() {
                   ) : careerPaths && careerPaths.length > 0 ? (
                     careerPaths.map((path) => (
                       <div key={path.id} className="w-64 shrink-0">
-                        <CareerPathCard path={path} />
+                        <CareerPathCard careerPath={path} />
                       </div>
                     ))
                   ) : (
@@ -621,7 +620,7 @@ export default function LearnTech() {
                   ))
                 ) : careerPaths && careerPaths.length > 0 ? (
                   careerPaths.map((path) => (
-                    <CareerPathCard key={path.id} path={path} variant="detailed" />
+                    <CareerPathCard key={path.id} careerPath={path} variant="featured" />
                   ))
                 ) : (
                   // Fallback career paths

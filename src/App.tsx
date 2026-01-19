@@ -68,6 +68,8 @@ const P2PMarketplace = lazy(() => import("./pages/P2PMarketplace"));
 const P2PTransaction = lazy(() => import("./pages/P2PTransaction"));
 const Trending = lazy(() => import("./pages/Trending"));
 const LearnTech = lazy(() => import("./pages/LearnTech"));
+const CourseDetail = lazy(() => import("./pages/CourseDetail"));
+const CoursePlayer = lazy(() => import("./pages/CoursePlayer"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Search = lazy(() => import("./pages/Search"));
 const HashtagSearch = lazy(() => import("./pages/HashtagSearch"));
@@ -280,6 +282,8 @@ const App = () => {
             <Route path="/ai/image-gen" element={<ImageGeneration />} />
             <Route path="/ai/enhance" element={<ImageEnhancement />} />
             <Route path="/ai/learn" element={<LearnTech />} />
+            <Route path="/ai/learn/course/:slug" element={<CourseDetail />} />
+            <Route path="/ai/learn/course/:slug/learn" element={<CoursePlayer />} />
             <Route path="/ai/captions" element={<CaptionGenerator />} />
             <Route path="/ai/ideas" element={<ContentIdeas />} />
             {/* AI Tools */}
