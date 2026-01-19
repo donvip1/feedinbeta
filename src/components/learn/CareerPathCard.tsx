@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { TrendingUp, DollarSign, BookOpen, Briefcase, ArrowRight } from 'lucide-react';
+import { TrendingUp, DollarSign, BookOpen, ArrowRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
@@ -25,8 +25,27 @@ interface CareerPathCardProps {
   variant?: 'default' | 'compact' | 'featured';
 }
 
+// High-quality images for career paths
+const careerImages: Record<string, string> = {
+  'web-developer': 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=600&h=400&fit=crop',
+  'data-scientist': 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=400&fit=crop',
+  'ux-designer': 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=600&h=400&fit=crop',
+  'cloud-engineer': 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=400&fit=crop',
+  'product-manager': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=600&h=400&fit=crop',
+  'cybersecurity': 'https://images.unsplash.com/photo-1555949963-ff9fe0c870eb?w=600&h=400&fit=crop',
+  'mobile-developer': 'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?w=600&h=400&fit=crop',
+  'machine-learning': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600&h=400&fit=crop',
+  'digital-marketing': 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=600&h=400&fit=crop',
+  'devops': 'https://images.unsplash.com/photo-1518432031352-d6fc5c10da5a?w=600&h=400&fit=crop',
+  'blockchain': 'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?w=600&h=400&fit=crop',
+  'game-developer': 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=600&h=400&fit=crop',
+};
+
+const defaultCareerImage = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=600&h=400&fit=crop';
+
 export const CareerPathCard = ({ careerPath, variant = 'default' }: CareerPathCardProps) => {
   const navigate = useNavigate();
+  const imageUrl = careerImages[careerPath.slug] || defaultCareerImage;
 
   const formatSalary = (min?: number, max?: number, currency?: string) => {
     if (!min && !max) return 'Varies';
@@ -46,18 +65,22 @@ export const CareerPathCard = ({ careerPath, variant = 'default' }: CareerPathCa
       <motion.div
         whileHover={{ y: -2 }}
         onClick={() => navigate(`/ai/learn/careers/${careerPath.slug}`)}
-        className="flex items-center gap-3 p-3 bg-card/50 rounded-lg border border-border/50 cursor-pointer hover:border-primary/30 transition-all"
+        className="relative flex items-center gap-3 p-2 rounded-lg overflow-hidden cursor-pointer group"
       >
-        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Briefcase className="w-5 h-5 text-primary" />
+        <div className="w-14 h-14 rounded-lg overflow-hidden shrink-0">
+          <img 
+            src={imageUrl}
+            alt={careerPath.title}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="font-medium text-sm">{careerPath.title}</h4>
+            <h4 className="font-medium text-sm text-foreground">{careerPath.title}</h4>
             {careerPath.is_trending && (
               <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">
                 <TrendingUp className="w-3 h-3 mr-1" />
-                Trending
+                Hot
               </Badge>
             )}
           </div>
@@ -73,62 +96,59 @@ export const CareerPathCard = ({ careerPath, variant = 'default' }: CareerPathCa
       <motion.div
         whileHover={{ scale: 1.02 }}
         onClick={() => navigate(`/ai/learn/careers/${careerPath.slug}`)}
-        className="relative p-6 bg-gradient-to-br from-primary/20 to-accent/20 rounded-xl border border-primary/30 cursor-pointer overflow-hidden group"
+        className="relative rounded-xl overflow-hidden aspect-[4/3] cursor-pointer group"
       >
-        <div className="absolute top-0 right-0 w-40 h-40 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="relative z-10">
-          <div className="flex items-start justify-between mb-4">
-            <div className="w-14 h-14 rounded-xl bg-background/50 flex items-center justify-center">
-              <Briefcase className="w-7 h-7 text-primary" />
-            </div>
-            <div className="flex gap-2">
-              {careerPath.is_trending && (
-                <Badge className="bg-orange-500 text-white">
-                  <TrendingUp className="w-3 h-3 mr-1" />
-                  Trending
-                </Badge>
-              )}
-              {careerPath.is_featured && (
-                <Badge className="bg-primary text-primary-foreground">Featured</Badge>
-              )}
-            </div>
-          </div>
-          
-          <h3 className="text-xl font-bold mb-2">{careerPath.title}</h3>
+        <img 
+          src={imageUrl}
+          alt={careerPath.title}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+        
+        {/* Badges */}
+        <div className="absolute top-3 left-3 flex gap-2">
+          {careerPath.is_trending && (
+            <Badge className="bg-orange-500 text-white border-0">
+              <TrendingUp className="w-3 h-3 mr-1" />
+              Trending
+            </Badge>
+          )}
+          {careerPath.is_featured && (
+            <Badge className="bg-primary text-primary-foreground border-0">Featured</Badge>
+          )}
+        </div>
+        
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <h3 className="text-lg font-bold text-white mb-1">{careerPath.title}</h3>
           {careerPath.description && (
-            <p className="text-sm text-muted-foreground line-clamp-2 mb-4">{careerPath.description}</p>
+            <p className="text-sm text-white/80 line-clamp-2 mb-3">{careerPath.description}</p>
           )}
           
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-green-500" />
+          <div className="flex items-center gap-4 mb-3">
+            <div className="flex items-center gap-1.5 text-white/90">
+              <DollarSign className="w-4 h-4 text-green-400" />
               <span className="text-sm font-medium">
                 {formatSalary(careerPath.salary_range_min, careerPath.salary_range_max, careerPath.salary_currency)}
               </span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-white/90">
               <BookOpen className="w-4 h-4 text-primary" />
               <span className="text-sm">{careerPath.total_courses || 0} courses</span>
             </div>
           </div>
           
           {careerPath.skills_required && careerPath.skills_required.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-4">
-              {careerPath.skills_required.slice(0, 4).map((skill, i) => (
-                <Badge key={i} variant="outline" className="text-xs">
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {careerPath.skills_required.slice(0, 3).map((skill, i) => (
+                <Badge key={i} variant="outline" className="text-xs bg-white/10 text-white border-white/30">
                   {skill}
                 </Badge>
               ))}
-              {careerPath.skills_required.length > 4 && (
-                <Badge variant="outline" className="text-xs">
-                  +{careerPath.skills_required.length - 4} more
-                </Badge>
-              )}
             </div>
           )}
           
-          <Button className="w-full gap-2 group-hover:gap-3 transition-all">
-            Explore Career Path
+          <Button className="w-full gap-2 group-hover:gap-3 transition-all" size="sm">
+            Explore Career
             <ArrowRight className="w-4 h-4" />
           </Button>
         </div>
@@ -136,62 +156,60 @@ export const CareerPathCard = ({ careerPath, variant = 'default' }: CareerPathCa
     );
   }
 
+  // Default variant - image-based card
   return (
     <motion.div
       whileHover={{ y: -4 }}
       onClick={() => navigate(`/ai/learn/careers/${careerPath.slug}`)}
-      className="bg-card rounded-xl border border-border/50 p-5 cursor-pointer hover:border-primary/30 transition-all group"
+      className="relative rounded-xl overflow-hidden aspect-[3/4] cursor-pointer group"
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-          <Briefcase className="w-6 h-6 text-primary" />
-        </div>
-        <div className="flex gap-1.5">
-          {careerPath.is_trending && (
-            <Badge variant="secondary" className="text-xs bg-orange-500/20 text-orange-400">
-              <TrendingUp className="w-3 h-3 mr-1" />
-              Trending
-            </Badge>
-          )}
-        </div>
-      </div>
+      <img 
+        src={imageUrl}
+        alt={careerPath.title}
+        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
       
-      <h3 className="font-semibold text-lg mb-1 group-hover:text-primary transition-colors">
-        {careerPath.title}
-      </h3>
-      
-      {careerPath.category && (
-        <p className="text-sm text-muted-foreground mb-3">{careerPath.category}</p>
+      {/* Trending badge */}
+      {careerPath.is_trending && (
+        <Badge className="absolute top-3 right-3 bg-orange-500 text-white border-0">
+          <TrendingUp className="w-3 h-3 mr-1" />
+          Hot
+        </Badge>
       )}
       
-      <div className="flex items-center gap-4 text-sm mb-4">
-        <div className="flex items-center gap-1 text-green-500">
-          <DollarSign className="w-4 h-4" />
-          <span className="font-medium">
-            {formatSalary(careerPath.salary_range_min, careerPath.salary_range_max, careerPath.salary_currency)}
+      <div className="absolute bottom-0 left-0 right-0 p-4">
+        <h3 className="font-semibold text-lg text-white mb-1">{careerPath.title}</h3>
+        
+        {careerPath.category && (
+          <p className="text-sm text-white/70 mb-2">{careerPath.category}</p>
+        )}
+        
+        <div className="flex items-center gap-3 text-sm mb-2">
+          <div className="flex items-center gap-1 text-green-400">
+            <DollarSign className="w-4 h-4" />
+            <span className="font-medium text-white">
+              {formatSalary(careerPath.salary_range_min, careerPath.salary_range_max, careerPath.salary_currency)}
+            </span>
+          </div>
+        </div>
+        
+        {careerPath.skills_required && careerPath.skills_required.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            {careerPath.skills_required.slice(0, 2).map((skill, i) => (
+              <Badge key={i} variant="outline" className="text-xs bg-white/10 text-white/90 border-white/20">
+                {skill}
+              </Badge>
+            ))}
+          </div>
+        )}
+        
+        <div className="flex items-center justify-between pt-2 border-t border-white/20">
+          <span className="text-sm text-white/80">
+            {careerPath.total_courses || 0} courses
           </span>
+          <ArrowRight className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" />
         </div>
-      </div>
-      
-      {careerPath.job_outlook && (
-        <p className="text-xs text-muted-foreground mb-3">{careerPath.job_outlook}</p>
-      )}
-      
-      {careerPath.skills_required && careerPath.skills_required.length > 0 && (
-        <div className="flex flex-wrap gap-1 mb-4">
-          {careerPath.skills_required.slice(0, 3).map((skill, i) => (
-            <Badge key={i} variant="outline" className="text-xs">
-              {skill}
-            </Badge>
-          ))}
-        </div>
-      )}
-      
-      <div className="flex items-center justify-between pt-3 border-t border-border/50">
-        <span className="text-sm text-muted-foreground">
-          {careerPath.total_courses || 0} courses
-        </span>
-        <ArrowRight className="w-4 h-4 text-primary group-hover:translate-x-1 transition-transform" />
       </div>
     </motion.div>
   );
