@@ -444,7 +444,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     <>
       <div 
         ref={postRef}
-        className="relative w-full max-w-[430px] mx-auto h-[calc(100dvh-8rem)] bg-black overflow-hidden rounded-none sm:rounded-2xl"
+        className="relative w-full max-w-[430px] mx-auto h-[100dvh] bg-black overflow-hidden rounded-none sm:rounded-2xl"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -552,7 +552,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* Multiple Media Indicator */}
         {hasMultipleMedia && (
-          <div className="absolute top-4 right-16 flex gap-1.5 z-10">
+          <div className="absolute top-16 right-16 flex gap-1.5 z-10">
             {mediaUrls.map((_, idx) => (
               <div 
                 key={idx} 
@@ -566,7 +566,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         )}
 
         {/* Top Left - User Info Overlay */}
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-3">
+        <div className="absolute top-16 left-4 z-10 flex items-center gap-3">
           <Avatar 
             className="w-11 h-11 ring-2 ring-white/30 cursor-pointer"
             onClick={handleProfileClick}
@@ -585,7 +585,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         </div>
 
         {/* Top Right - Menu & Promoted Badge */}
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        <div className="absolute top-16 right-4 z-10 flex items-center gap-2">
           {isPromoted && (
             <Badge className="bg-primary/80 backdrop-blur-sm text-white text-xs">
               <Sparkles className="w-3 h-3 mr-1" />
@@ -627,7 +627,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               setShowFullscreenViewer(true);
               onInteractionStart?.();
             }}
-            className="absolute top-20 right-4 z-10 p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/50 transition-colors"
+            className="absolute top-28 right-4 z-10 p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/50 transition-colors"
           >
             <Maximize className="w-5 h-5 text-white" />
           </button>
@@ -635,7 +635,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* Right Side - Action Buttons (Vertical Stack) */}
         <div className={cn(
-          "absolute right-3 bottom-32 flex flex-col items-center gap-3 z-10",
+          "absolute right-3 bottom-24 flex flex-col items-center gap-3 z-10",
           showControls ? "visible" : "invisible"
         )}>
           {/* Like */}
@@ -703,7 +703,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         </div>
 
         {/* Bottom Left - Caption & Music */}
-        <div className="absolute left-4 right-20 bottom-8 z-10">
+        <div className="absolute left-4 right-20 bottom-20 z-10">
           {/* Refeed indicator */}
           {isRefeed && (
             <div className="flex items-center gap-1.5 mb-2">
