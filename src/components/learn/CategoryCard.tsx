@@ -1,10 +1,5 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Code, Palette, TrendingUp, Heart, Brain, Globe, 
-  Camera, Music, Briefcase, GraduationCap, Laptop, 
-  Shield, Database, Smartphone, Cloud, Cpu
-} from 'lucide-react';
 
 interface CategoryCardProps {
   category: {
@@ -19,41 +14,31 @@ interface CategoryCardProps {
   variant?: 'default' | 'compact' | 'large';
 }
 
-const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
-  'code': Code,
-  'palette': Palette,
-  'trending-up': TrendingUp,
-  'heart': Heart,
-  'brain': Brain,
-  'globe': Globe,
-  'camera': Camera,
-  'music': Music,
-  'briefcase': Briefcase,
-  'graduation-cap': GraduationCap,
-  'laptop': Laptop,
-  'shield': Shield,
-  'database': Database,
-  'smartphone': Smartphone,
-  'cloud': Cloud,
-  'cpu': Cpu,
+// High-quality Unsplash images for categories
+const categoryImages: Record<string, string> = {
+  'technology': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=300&fit=crop',
+  'business': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&h=300&fit=crop',
+  'design': 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=300&fit=crop',
+  'health': 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=300&fit=crop',
+  'science': 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=400&h=300&fit=crop',
+  'language': 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=300&fit=crop',
+  'marketing': 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=400&h=300&fit=crop',
+  'personal-development': 'https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=400&h=300&fit=crop',
+  'programming': 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400&h=300&fit=crop',
+  'data-science': 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400&h=300&fit=crop',
+  'ai-ml': 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=300&fit=crop',
+  'finance': 'https://images.unsplash.com/photo-1579621970588-a35d0e7ab9b6?w=400&h=300&fit=crop',
+  'photography': 'https://images.unsplash.com/photo-1542038784456-1ea8e935640e?w=400&h=300&fit=crop',
+  'music': 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=400&h=300&fit=crop',
+  'education': 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400&h=300&fit=crop',
+  'lifestyle': 'https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=400&h=300&fit=crop',
 };
 
-const categoryColors: Record<string, string> = {
-  'technology': 'from-blue-500/20 to-cyan-500/20 border-blue-500/30',
-  'business': 'from-green-500/20 to-emerald-500/20 border-green-500/30',
-  'design': 'from-purple-500/20 to-pink-500/20 border-purple-500/30',
-  'health': 'from-red-500/20 to-orange-500/20 border-red-500/30',
-  'science': 'from-indigo-500/20 to-violet-500/20 border-indigo-500/30',
-  'language': 'from-yellow-500/20 to-amber-500/20 border-yellow-500/30',
-  'marketing': 'from-pink-500/20 to-rose-500/20 border-pink-500/30',
-  'personal-development': 'from-teal-500/20 to-cyan-500/20 border-teal-500/30',
-  'default': 'from-primary/20 to-accent/20 border-primary/30',
-};
+const defaultImage = 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=400&h=300&fit=crop';
 
 export const CategoryCard = ({ category, variant = 'default' }: CategoryCardProps) => {
   const navigate = useNavigate();
-  const IconComponent = iconMap[category.icon || 'graduation-cap'] || GraduationCap;
-  const colorClass = categoryColors[category.slug] || categoryColors['default'];
+  const imageUrl = categoryImages[category.slug] || defaultImage;
 
   if (variant === 'compact') {
     return (
@@ -61,13 +46,17 @@ export const CategoryCard = ({ category, variant = 'default' }: CategoryCardProp
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
         onClick={() => navigate(`/ai/learn/category/${category.slug}`)}
-        className={`flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r ${colorClass} border cursor-pointer transition-all`}
+        className="relative flex items-center gap-3 p-2 rounded-lg overflow-hidden cursor-pointer group"
       >
-        <div className="w-10 h-10 rounded-lg bg-background/50 flex items-center justify-center">
-          <IconComponent className="w-5 h-5 text-primary" />
+        <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0">
+          <img 
+            src={imageUrl} 
+            alt={category.name}
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+          />
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm">{category.name}</h4>
+          <h4 className="font-medium text-sm text-foreground">{category.name}</h4>
           <p className="text-xs text-muted-foreground">{category.course_count || 0} courses</p>
         </div>
       </motion.div>
@@ -79,35 +68,43 @@ export const CategoryCard = ({ category, variant = 'default' }: CategoryCardProp
       <motion.div
         whileHover={{ y: -4 }}
         onClick={() => navigate(`/ai/learn/category/${category.slug}`)}
-        className={`relative p-6 rounded-xl bg-gradient-to-br ${colorClass} border cursor-pointer group overflow-hidden`}
+        className="relative rounded-xl overflow-hidden aspect-[16/9] cursor-pointer group"
       >
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="relative z-10">
-          <div className="w-14 h-14 rounded-xl bg-background/50 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-            <IconComponent className="w-7 h-7 text-primary" />
-          </div>
-          <h3 className="text-lg font-bold mb-2">{category.name}</h3>
+        <img 
+          src={imageUrl}
+          alt={category.name}
+          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+        <div className="absolute bottom-0 left-0 right-0 p-6">
+          <h3 className="text-xl font-bold text-white mb-1">{category.name}</h3>
           {category.description && (
-            <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{category.description}</p>
+            <p className="text-sm text-white/80 line-clamp-2 mb-2">{category.description}</p>
           )}
-          <p className="text-sm font-medium text-primary">{category.course_count || 0} courses</p>
+          <p className="text-sm font-medium text-white/90">{category.course_count || 0} courses</p>
         </div>
       </motion.div>
     );
   }
 
+  // Default variant - image-based card
   return (
     <motion.div
       whileHover={{ y: -2, scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => navigate(`/ai/learn/category/${category.slug}`)}
-      className={`p-4 rounded-xl bg-gradient-to-br ${colorClass} border cursor-pointer group transition-all`}
+      className="relative w-32 shrink-0 rounded-xl overflow-hidden aspect-[3/4] cursor-pointer group"
     >
-      <div className="w-12 h-12 rounded-lg bg-background/50 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
-        <IconComponent className="w-6 h-6 text-primary" />
+      <img 
+        src={imageUrl}
+        alt={category.name}
+        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+      />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+      <div className="absolute bottom-0 left-0 right-0 p-3">
+        <h4 className="font-semibold text-white text-sm line-clamp-2">{category.name}</h4>
+        <p className="text-xs text-white/80 mt-0.5">{category.course_count || 0} courses</p>
       </div>
-      <h4 className="font-semibold mb-1">{category.name}</h4>
-      <p className="text-sm text-muted-foreground">{category.course_count || 0} courses</p>
     </motion.div>
   );
 };

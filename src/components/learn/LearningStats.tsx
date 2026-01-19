@@ -19,42 +19,42 @@ export const LearningStats = ({ stats, variant = 'default' }: LearningStatsProps
       label: 'In Progress', 
       value: stats.coursesInProgress || 0, 
       icon: BookOpen, 
-      color: 'text-blue-500',
+      iconColor: 'text-blue-500',
       bgColor: 'bg-blue-500/10'
     },
     { 
       label: 'Completed', 
       value: stats.coursesCompleted || 0, 
       icon: Trophy, 
-      color: 'text-green-500',
+      iconColor: 'text-green-500',
       bgColor: 'bg-green-500/10'
     },
     { 
       label: 'Certificates', 
       value: stats.certificatesEarned || 0, 
       icon: Award, 
-      color: 'text-yellow-500',
+      iconColor: 'text-yellow-500',
       bgColor: 'bg-yellow-500/10'
     },
     { 
       label: 'Hours Learned', 
       value: stats.totalHoursLearned?.toFixed(1) || '0', 
       icon: Clock, 
-      color: 'text-purple-500',
+      iconColor: 'text-purple-500',
       bgColor: 'bg-purple-500/10'
     },
     { 
       label: 'Day Streak', 
       value: stats.currentStreak || 0, 
       icon: Flame, 
-      color: 'text-orange-500',
+      iconColor: 'text-orange-500',
       bgColor: 'bg-orange-500/10'
     },
     { 
       label: 'Best Streak', 
       value: stats.longestStreak || 0, 
       icon: Target, 
-      color: 'text-red-500',
+      iconColor: 'text-red-500',
       bgColor: 'bg-red-500/10'
     },
   ];
@@ -70,8 +70,8 @@ export const LearningStats = ({ stats, variant = 'default' }: LearningStatsProps
             transition={{ delay: index * 0.1 }}
             className="flex items-center gap-2 px-3 py-2 bg-card rounded-lg border border-border/50 flex-shrink-0"
           >
-            <stat.icon className={`w-4 h-4 ${stat.color}`} />
-            <span className="font-semibold">{stat.value}</span>
+            <stat.icon className={`w-4 h-4 ${stat.iconColor}`} />
+            <span className="font-semibold text-foreground">{stat.value}</span>
             <span className="text-xs text-muted-foreground">{stat.label}</span>
           </motion.div>
         ))}
@@ -91,11 +91,11 @@ export const LearningStats = ({ stats, variant = 'default' }: LearningStatsProps
             className={`p-4 rounded-xl ${stat.bgColor} border border-border/30`}
           >
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-lg bg-background/50 flex items-center justify-center`}>
-                <stat.icon className={`w-6 h-6 ${stat.color}`} />
+              <div className="w-12 h-12 rounded-lg bg-background/50 flex items-center justify-center">
+                <stat.icon className={`w-6 h-6 ${stat.iconColor}`} />
               </div>
               <div>
-                <div className="text-2xl font-bold">{stat.value}</div>
+                <div className="text-2xl font-bold text-foreground">{stat.value}</div>
                 <div className="text-sm text-muted-foreground">{stat.label}</div>
               </div>
             </div>
@@ -116,9 +116,9 @@ export const LearningStats = ({ stats, variant = 'default' }: LearningStatsProps
           className="text-center p-3 bg-card/50 rounded-lg border border-border/30"
         >
           <div className={`w-10 h-10 mx-auto rounded-lg ${stat.bgColor} flex items-center justify-center mb-2`}>
-            <stat.icon className={`w-5 h-5 ${stat.color}`} />
+            <stat.icon className={`w-5 h-5 ${stat.iconColor}`} />
           </div>
-          <div className="text-xl font-bold">{stat.value}</div>
+          <div className="text-xl font-bold text-foreground">{stat.value}</div>
           <div className="text-xs text-muted-foreground">{stat.label}</div>
         </motion.div>
       ))}
