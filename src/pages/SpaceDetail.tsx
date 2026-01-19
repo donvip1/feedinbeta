@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Mic, Lock, Loader2, Users, Play, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
+import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 
 const SpaceDetail = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -99,7 +100,7 @@ const SpaceDetail = () => {
     // Note: Auto-join is now handled by a separate useEffect
   };
 
-  const handleJoin = async () => {
+  const handleJoin = () => {
     if (!user) {
       toast.error('Please sign in to join this space');
       // Store redirect in sessionStorage as backup
@@ -110,7 +111,6 @@ const SpaceDetail = () => {
     
     // CRITICAL: Enable audio playback BEFORE showing room
     // User clicking "Join Space" is a valid user interaction
-    const { audioPlaybackManager } = await import('@/lib/audio-playback-manager');
     audioPlaybackManager.enableAudioPlayback();
     console.log('[SpaceDetail] 🔊 Audio playback enabled on join');
     

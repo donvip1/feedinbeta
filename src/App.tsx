@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -20,8 +20,11 @@ import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
 import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
 import { BrowserInstallBanner } from "@/components/pwa/BrowserInstallBanner";
 import { ProfileCompletionModal } from "@/components/auth/ProfileCompletionModal";
-import { UPDATE_AVAILABLE_EVENT, autoUpdater } from "@/lib/auto-updater";
 import { appDataSync } from "@/lib/app-data-sync";
+import { CurrencyProvider } from "@/context/CurrencyContext";
+import { LoadingScreen } from "@/components/shared/LoadingScreen";
+
+// Core pages - static imports
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Feed from "./pages/Feed";
@@ -29,98 +32,103 @@ import Messages from "./pages/Messages";
 import Friends from "./pages/Friends";
 import Profile from "./pages/Profile";
 import Call from "./pages/Call";
-import CallHistory from "./pages/CallHistory";
 import Live from "./pages/Live";
-import AICopilot from "./pages/AICopilot";
-import AIHub from "./pages/AIHub";
-import CaptionGenerator from "./pages/CaptionGenerator";
-import ContentIdeas from "./pages/ContentIdeas";
-import ThesisWriter from "./pages/ThesisWriter";
-import VideoCreation from "./pages/VideoCreation";
-import EducationalQA from "./pages/EducationalQA";
-import ProjectWriting from "./pages/ProjectWriting";
-import ImageGeneration from "./pages/ImageGeneration";
-import ImageEnhancement from "./pages/ImageEnhancement";
-import Groups from "./pages/Groups";
-import GroupDetail from "./pages/GroupDetail";
-import Subscription from "./pages/Subscription";
-import Credits from "./pages/Credits";
-import SavedPosts from "./pages/SavedPosts";
-import Promote from "./pages/Promote";
-import PostDetail from "./pages/PostDetail";
-import Moderation from "./pages/Moderation";
-import Settings from "./pages/Settings";
-import AccountSettings from "./pages/AccountSettings";
-import PrivacySettings from "./pages/PrivacySettings";
-import NotificationSettings from "./pages/NotificationSettings";
-import CacheSettingsPage from "./pages/CacheSettingsPage";
-import BlockedUsers from "./pages/BlockedUsers";
-import LanguageSettings from "./pages/LanguageSettings";
-import HelpSupport from "./pages/HelpSupport";
-import P2PMarketplace from "./pages/P2PMarketplace";
-import P2PTransaction from "./pages/P2PTransaction";
-import Trending from "./pages/Trending";
 import Wallet from "./pages/Wallet";
-import LearnTech from "./pages/LearnTech";
-import Welcome from "./pages/Welcome";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
-import Search from "./pages/Search";
-import HashtagSearch from "./pages/HashtagSearch";
-import StoryDetail from "./pages/StoryDetail";
-import LiveStreamDetail from "./pages/LiveStreamDetail";
-import AdminWallet from "./pages/AdminWallet";
-import SessionManagement from "./pages/SessionManagement";
-import CreatorPayouts from "./pages/CreatorPayouts";
-import Promotions from "./pages/Promotions";
-import Install from "./pages/Install";
-import MusicDiscovery from "./pages/MusicDiscovery";
-import AdminAnalytics from "./pages/AdminAnalytics";
-import Investors from "./pages/Investors";
-import InvestmentDocs from "./pages/InvestmentDocs";
-import CreatorDashboard from "./pages/CreatorDashboard";
-import SpaceDetail from "./pages/SpaceDetail";
-import CallInvite from "./pages/CallInvite";
-import AdminDeletedPosts from "./pages/AdminDeletedPosts";
-import CurrencySettings from "./pages/CurrencySettings";
-import P2PPaymentMethods from "./pages/P2PPaymentMethods";
-import { CurrencyProvider } from "@/context/CurrencyContext";
-import AdminPanel from "./pages/AdminPanel";
-import Referral from "./pages/Referral";
-import NotificationHistory from "./pages/NotificationHistory";
-import AIToolsHub from "./pages/AIToolsHub";
-import AIAgent from "./pages/AIAgent";
-import BackgroundRemover from "./pages/tools/BackgroundRemover";
-import ImageUpscaler from "./pages/tools/ImageUpscaler";
-import EssayWriter from "./pages/tools/EssayWriter";
-import QRCodeGenerator from "./pages/tools/QRCodeGenerator";
-import PDFMerge from "./pages/tools/PDFMerge";
-import PDFSplit from "./pages/tools/PDFSplit";
-import PDFCompress from "./pages/tools/PDFCompress";
-import GrammarFixer from "./pages/tools/GrammarFixer";
-import Translator from "./pages/tools/Translator";
-import Paraphraser from "./pages/tools/Paraphraser";
-import ImageCompressor from "./pages/tools/ImageCompressor";
-import ImageToText from "./pages/tools/ImageToText";
-import VideoTrimmer from "./pages/tools/VideoTrimmer";
-import PDFToWord from "./pages/tools/PDFToWord";
-import WordToPDF from "./pages/tools/WordToPDF";
-import Summarizer from "./pages/tools/Summarizer";
-import ImageColorizer from "./pages/tools/ImageColorizer";
-import VideoCompressor from "./pages/tools/VideoCompressor";
-import AudioExtractor from "./pages/tools/AudioExtractor";
-import ExamPrep from "./pages/tools/ExamPrep";
-import ResearchAssistant from "./pages/tools/ResearchAssistant";
-import MathSolver from "./pages/tools/MathSolver";
-import TextToSpeech from "./pages/tools/TextToSpeech";
-import SpeechToText from "./pages/tools/SpeechToText";
-import MemeGenerator from "./pages/tools/MemeGenerator";
-import LogoMaker from "./pages/tools/LogoMaker";
-import HealthInfo from "./pages/tools/HealthInfo";
-import SymptomChecker from "./pages/tools/SymptomChecker";
-import NutritionCalculator from "./pages/tools/NutritionCalculator";
-import ImagesToPDF from "./pages/tools/ImagesToPDF";
-import HumanizeAI from "./pages/tools/HumanizeAI";
+// Lazy load less frequently used pages to reduce initial bundle size
+const CallHistory = lazy(() => import("./pages/CallHistory"));
+const AICopilot = lazy(() => import("./pages/AICopilot"));
+const AIHub = lazy(() => import("./pages/AIHub"));
+const CaptionGenerator = lazy(() => import("./pages/CaptionGenerator"));
+const ContentIdeas = lazy(() => import("./pages/ContentIdeas"));
+const ThesisWriter = lazy(() => import("./pages/ThesisWriter"));
+const VideoCreation = lazy(() => import("./pages/VideoCreation"));
+const EducationalQA = lazy(() => import("./pages/EducationalQA"));
+const ProjectWriting = lazy(() => import("./pages/ProjectWriting"));
+const ImageGeneration = lazy(() => import("./pages/ImageGeneration"));
+const ImageEnhancement = lazy(() => import("./pages/ImageEnhancement"));
+const Groups = lazy(() => import("./pages/Groups"));
+const GroupDetail = lazy(() => import("./pages/GroupDetail"));
+const Subscription = lazy(() => import("./pages/Subscription"));
+const Credits = lazy(() => import("./pages/Credits"));
+const SavedPosts = lazy(() => import("./pages/SavedPosts"));
+const Promote = lazy(() => import("./pages/Promote"));
+const PostDetail = lazy(() => import("./pages/PostDetail"));
+const Moderation = lazy(() => import("./pages/Moderation"));
+const AccountSettings = lazy(() => import("./pages/AccountSettings"));
+const PrivacySettings = lazy(() => import("./pages/PrivacySettings"));
+const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
+const CacheSettingsPage = lazy(() => import("./pages/CacheSettingsPage"));
+const BlockedUsers = lazy(() => import("./pages/BlockedUsers"));
+const LanguageSettings = lazy(() => import("./pages/LanguageSettings"));
+const HelpSupport = lazy(() => import("./pages/HelpSupport"));
+const P2PMarketplace = lazy(() => import("./pages/P2PMarketplace"));
+const P2PTransaction = lazy(() => import("./pages/P2PTransaction"));
+const Trending = lazy(() => import("./pages/Trending"));
+const LearnTech = lazy(() => import("./pages/LearnTech"));
+const Welcome = lazy(() => import("./pages/Welcome"));
+const Search = lazy(() => import("./pages/Search"));
+const HashtagSearch = lazy(() => import("./pages/HashtagSearch"));
+const StoryDetail = lazy(() => import("./pages/StoryDetail"));
+const LiveStreamDetail = lazy(() => import("./pages/LiveStreamDetail"));
+const AdminWallet = lazy(() => import("./pages/AdminWallet"));
+const SessionManagement = lazy(() => import("./pages/SessionManagement"));
+const CreatorPayouts = lazy(() => import("./pages/CreatorPayouts"));
+const Promotions = lazy(() => import("./pages/Promotions"));
+const Install = lazy(() => import("./pages/Install"));
+const MusicDiscovery = lazy(() => import("./pages/MusicDiscovery"));
+const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
+const Investors = lazy(() => import("./pages/Investors"));
+const InvestmentDocs = lazy(() => import("./pages/InvestmentDocs"));
+const CreatorDashboard = lazy(() => import("./pages/CreatorDashboard"));
+const SpaceDetail = lazy(() => import("./pages/SpaceDetail"));
+const CallInvite = lazy(() => import("./pages/CallInvite"));
+const AdminDeletedPosts = lazy(() => import("./pages/AdminDeletedPosts"));
+const CurrencySettings = lazy(() => import("./pages/CurrencySettings"));
+const P2PPaymentMethods = lazy(() => import("./pages/P2PPaymentMethods"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
+const Referral = lazy(() => import("./pages/Referral"));
+const NotificationHistory = lazy(() => import("./pages/NotificationHistory"));
+const AIToolsHub = lazy(() => import("./pages/AIToolsHub"));
+const AIAgent = lazy(() => import("./pages/AIAgent"));
+
+// Lazy load ALL AI tools - reduces memory during build
+const BackgroundRemover = lazy(() => import("./pages/tools/BackgroundRemover"));
+const ImageUpscaler = lazy(() => import("./pages/tools/ImageUpscaler"));
+const EssayWriter = lazy(() => import("./pages/tools/EssayWriter"));
+const QRCodeGenerator = lazy(() => import("./pages/tools/QRCodeGenerator"));
+const PDFMerge = lazy(() => import("./pages/tools/PDFMerge"));
+const PDFSplit = lazy(() => import("./pages/tools/PDFSplit"));
+const PDFCompress = lazy(() => import("./pages/tools/PDFCompress"));
+const GrammarFixer = lazy(() => import("./pages/tools/GrammarFixer"));
+const Translator = lazy(() => import("./pages/tools/Translator"));
+const Paraphraser = lazy(() => import("./pages/tools/Paraphraser"));
+const ImageCompressor = lazy(() => import("./pages/tools/ImageCompressor"));
+const ImageToText = lazy(() => import("./pages/tools/ImageToText"));
+const VideoTrimmer = lazy(() => import("./pages/tools/VideoTrimmer"));
+const PDFToWord = lazy(() => import("./pages/tools/PDFToWord"));
+const WordToPDF = lazy(() => import("./pages/tools/WordToPDF"));
+const Summarizer = lazy(() => import("./pages/tools/Summarizer"));
+const ImageColorizer = lazy(() => import("./pages/tools/ImageColorizer"));
+const VideoCompressor = lazy(() => import("./pages/tools/VideoCompressor"));
+const AudioExtractor = lazy(() => import("./pages/tools/AudioExtractor"));
+const ExamPrep = lazy(() => import("./pages/tools/ExamPrep"));
+const ResearchAssistant = lazy(() => import("./pages/tools/ResearchAssistant"));
+const MathSolver = lazy(() => import("./pages/tools/MathSolver"));
+const TextToSpeech = lazy(() => import("./pages/tools/TextToSpeech"));
+const SpeechToText = lazy(() => import("./pages/tools/SpeechToText"));
+const MemeGenerator = lazy(() => import("./pages/tools/MemeGenerator"));
+const LogoMaker = lazy(() => import("./pages/tools/LogoMaker"));
+const HealthInfo = lazy(() => import("./pages/tools/HealthInfo"));
+const SymptomChecker = lazy(() => import("./pages/tools/SymptomChecker"));
+const NutritionCalculator = lazy(() => import("./pages/tools/NutritionCalculator"));
+const ImagesToPDF = lazy(() => import("./pages/tools/ImagesToPDF"));
+const HumanizeAI = lazy(() => import("./pages/tools/HumanizeAI"));
+
+// Custom event for update available - defined locally to avoid mixed import
+const UPDATE_AVAILABLE_EVENT = 'feedin-update-available';
 
 // Create QueryClient with aggressive refetch settings for mobile
 const queryClient = new QueryClient({
@@ -142,19 +150,23 @@ const queryClient = new QueryClient({
 // Initialize app data sync with the query client
 appDataSync.initialize(queryClient);
 
+// Lazy fallback component for code splitting
+const LazyFallback = () => <LoadingScreen />;
+
 const App = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
-  // Initialize offline manager + auto-updater
+  // Initialize offline manager + auto-updater (dynamic import only)
   useEffect(() => {
     // Initialize offline manager
     import('@/lib/offline-manager').then(({ offlineManager: manager }) => {
-      // Manager auto-initializes as singleton
       console.log('Offline manager ready');
     });
 
-    // Initialize auto-updater for background updates
-    import('@/lib/auto-updater').then(({ getAutoUpdater }) => {
+    // Initialize auto-updater for background updates (dynamic import only)
+    let autoUpdaterRef: any = null;
+    import('@/lib/auto-updater').then(({ getAutoUpdater, autoUpdater }) => {
+      autoUpdaterRef = autoUpdater;
       getAutoUpdater();
       console.log('Auto-updater ready');
     });
@@ -167,7 +179,6 @@ const App = () => {
     
     // Request notification permission on app load
     if ('Notification' in window && Notification.permission === 'default') {
-      // Request after a slight delay to not overwhelm on first load
       setTimeout(() => {
         Notification.requestPermission().then(permission => {
           console.log('Notification permission:', permission);
@@ -182,12 +193,17 @@ const App = () => {
 
   const handleUpdate = () => {
     setShowUpdateModal(false);
-    autoUpdater.applyUpdate();
+    // Dynamic import for update action
+    import('@/lib/auto-updater').then(({ autoUpdater }) => {
+      autoUpdater.applyUpdate();
+    });
   };
 
   const handleUpdateLater = () => {
     setShowUpdateModal(false);
-    autoUpdater.dismissUpdate();
+    import('@/lib/auto-updater').then(({ autoUpdater }) => {
+      autoUpdater.dismissUpdate();
+    });
   };
 
   return (
@@ -217,6 +233,7 @@ const App = () => {
                     onUpdate={handleUpdate} 
                     onLater={handleUpdateLater} 
                   />
+                <Suspense fallback={<LazyFallback />}>
                 <Routes>
             {/* Main */}
             <Route path="/" element={<Index />} />
@@ -342,6 +359,7 @@ const App = () => {
             
               <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
                       </RealtimeProvider>
                     </SpaceProvider>
                   </CallProvider>
