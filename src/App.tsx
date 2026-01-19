@@ -301,6 +301,20 @@ const App = () => {
             <Route path="/ai/learn/my-learning" element={<MyLearning />} />
             <Route path="/ai/learn/course/:slug" element={<CourseDetail />} />
             <Route path="/ai/learn/course/:slug/learn" element={<CoursePlayer />} />
+            <Route path="/ai/learn/course/:slug/discussions" element={<CourseDiscussion />} />
+            <Route path="/ai/learn/certificates" element={<MyCertificates />} />
+            <Route path="/ai/learn/careers" element={<CareerPaths />} />
+            <Route path="/ai/learn/careers/:slug" element={<CareerPathDetail />} />
+            <Route path="/ai/learn/aptitude" element={<AptitudeTests />} />
+            <Route path="/ai/learn/aptitude/:slug" element={<AptitudeTestPlayer />} />
+            <Route path="/ai/learn/resume" element={<ResumeBuilder />} />
+            <Route path="/ai/learn/teach" element={<BecomeInstructor />} />
+            <Route path="/ai/learn/instructor/dashboard" element={<InstructorDashboard />} />
+            <Route path="/ai/learn/instructor/courses" element={<ManageCourses />} />
+            <Route path="/ai/learn/instructor/create" element={<CreateCourse />} />
+            <Route path="/ai/learn/videos" element={<VideoDiscovery />} />
+            <Route path="/ai/learn/paths" element={<LearningPaths />} />
+            <Route path="/ai/learn/paths/:slug" element={<LearningPathDetail />} />
             <Route path="/ai/captions" element={<CaptionGenerator />} />
             <Route path="/ai/ideas" element={<ContentIdeas />} />
             {/* AI Tools */}
