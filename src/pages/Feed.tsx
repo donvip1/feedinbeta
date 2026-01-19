@@ -76,8 +76,8 @@ const Feed = () => {
       ]);
       return (streamsCount || 0) + (spacesCount || 0);
     },
-    refetchInterval: 3000, // Refresh every 3 seconds for near-instant updates
-    staleTime: 0, // Always consider stale for fresh data
+    refetchInterval: 30000, // Refresh every 30 seconds for stability
+    staleTime: Infinity, // Never auto-refetch to prevent scroll resets
   });
 
   // Fetch live content for the Live tab - optimized for real-time

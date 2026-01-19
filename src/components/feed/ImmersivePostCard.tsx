@@ -568,11 +568,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         {/* Top Left - User Info Overlay */}
         <div className="absolute top-16 left-4 z-10 flex items-center gap-3">
           <Avatar 
-            className="w-11 h-11 ring-2 ring-white/30 cursor-pointer"
+            className="w-6 h-6 ring-1 ring-white/30 cursor-pointer"
             onClick={handleProfileClick}
           >
             <AvatarImage src={post.profiles?.avatar_url || ''} />
-            <AvatarFallback className="bg-primary text-white">{displayName[0]?.toUpperCase()}</AvatarFallback>
+            <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
           </Avatar>
           <div className="flex flex-col" onClick={handleProfileClick}>
             <span className="text-white font-semibold text-sm drop-shadow-lg cursor-pointer">
@@ -715,10 +715,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Caption - shown for all post types */}
           {caption && (
             <div className="mb-2">
-              <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
-                <span className="font-semibold mr-1">@{username}</span>
-                {!isTextStyled && renderCaptionWithHashtags(truncatedCaption)}
-              </p>
+            <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
+              {!isTextStyled && renderCaptionWithHashtags(truncatedCaption)}
+            </p>
               {!isTextStyled && caption.length > 100 && (
                 <button 
                   onClick={(e) => {
