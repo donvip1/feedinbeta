@@ -70,6 +70,7 @@ const Trending = lazy(() => import("./pages/Trending"));
 const LearnTech = lazy(() => import("./pages/LearnTech"));
 const CourseDetail = lazy(() => import("./pages/CourseDetail"));
 const CoursePlayer = lazy(() => import("./pages/CoursePlayer"));
+const MyLearning = lazy(() => import("./pages/MyLearning"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Search = lazy(() => import("./pages/Search"));
 const HashtagSearch = lazy(() => import("./pages/HashtagSearch"));
@@ -282,6 +283,7 @@ const App = () => {
             <Route path="/ai/image-gen" element={<ImageGeneration />} />
             <Route path="/ai/enhance" element={<ImageEnhancement />} />
             <Route path="/ai/learn" element={<LearnTech />} />
+            <Route path="/ai/learn/my-learning" element={<MyLearning />} />
             <Route path="/ai/learn/course/:slug" element={<CourseDetail />} />
             <Route path="/ai/learn/course/:slug/learn" element={<CoursePlayer />} />
             <Route path="/ai/captions" element={<CaptionGenerator />} />
