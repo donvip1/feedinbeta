@@ -10,6 +10,7 @@ interface CourseCardProps {
     slug: string;
     title: string;
     short_description?: string;
+    description?: string;
     thumbnail_url?: string;
     level?: string;
     course_type?: string;
@@ -28,8 +29,14 @@ interface CourseCardProps {
         avatar_url?: string;
       };
     };
+    instructors?: {
+      profiles?: {
+        display_name?: string;
+        avatar_url?: string;
+      };
+    };
   };
-  variant?: 'default' | 'compact' | 'featured';
+  variant?: 'default' | 'compact' | 'featured' | 'horizontal' | 'detailed';
 }
 
 export const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => {
@@ -49,6 +56,9 @@ export const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => 
     if (hours < 1) return `${Math.round(hours * 60)} mins`;
     return `${hours.toFixed(1)} hrs`;
   };
+
+  const instructorName = course.instructor?.profiles?.display_name || 
+    course.instructors?.profiles?.display_name || 'Instructor';
 
   if (variant === 'compact') {
     return (
@@ -79,6 +89,131 @@ export const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => 
         </div>
         <div className="text-right flex-shrink-0">
           <span className="text-sm font-semibold text-primary">{course.credit_cost} credits</span>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (variant === 'horizontal') {
+    return (
+      <motion.div
+        whileHover={{ y: -2 }}
+        onClick={() => navigate(`/ai/learn/course/${course.slug}`)}
+        className="flex gap-4 p-4 bg-card rounded-xl border border-border/50 cursor-pointer hover:border-primary/30 transition-all group"
+      >
+        <div className="w-48 h-28 rounded-lg overflow-hidden flex-shrink-0 bg-muted relative">
+          {course.thumbnail_url ? (
+            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
+              <BookOpen className="w-10 h-10 text-primary/50" />
+            </div>
+          )}
+          <div className="absolute top-2 left-2 flex gap-1">
+            {course.is_bestseller && (
+              <Badge className="bg-yellow-500 text-black text-xs">Bestseller</Badge>
+            )}
+            {course.course_type === 'diploma' && (
+              <Badge className="bg-purple-500/90 text-white text-xs flex items-center gap-1">
+                <Award className="w-3 h-3" /> Diploma
+              </Badge>
+            )}
+          </div>
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <h3 className="font-semibold text-base line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+            {course.title}
+          </h3>
+          <p className="text-xs text-muted-foreground mb-2">{instructorName}</p>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+            <span className="flex items-center gap-1">
+              <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+              {course.average_rating?.toFixed(1) || '0.0'} ({course.total_reviews || 0})
+            </span>
+            <span>•</span>
+            <span>{formatDuration(course.duration_hours)}</span>
+            <span>•</span>
+            <Badge variant="outline" className={`text-xs ${getLevelColor(course.level)}`}>
+              {course.level || 'All levels'}
+            </Badge>
+          </div>
+          <div className="mt-auto flex items-center justify-between">
+            <span className="text-lg font-bold text-primary">{course.credit_cost} credits</span>
+            <span className="text-xs text-muted-foreground">{course.total_enrolled?.toLocaleString() || 0} students</span>
+          </div>
+        </div>
+      </motion.div>
+    );
+  }
+
+  if (variant === 'detailed') {
+    return (
+      <motion.div
+        whileHover={{ y: -2 }}
+        onClick={() => navigate(`/ai/learn/course/${course.slug}`)}
+        className="flex gap-5 p-5 bg-card rounded-xl border border-border/50 cursor-pointer hover:border-primary/30 transition-all group"
+      >
+        <div className="w-64 h-36 rounded-lg overflow-hidden flex-shrink-0 bg-muted relative">
+          {course.thumbnail_url ? (
+            <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-accent/20">
+              <BookOpen className="w-12 h-12 text-primary/50" />
+            </div>
+          )}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+            <Play className="w-10 h-10 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+          <div className="absolute top-2 left-2 flex gap-1">
+            {course.is_bestseller && (
+              <Badge className="bg-yellow-500 text-black text-xs">Bestseller</Badge>
+            )}
+            {course.is_new && (
+              <Badge className="bg-green-500 text-white text-xs">New</Badge>
+            )}
+          </div>
+          {course.course_type === 'diploma' && (
+            <div className="absolute top-2 right-2">
+              <Badge className="bg-purple-500/90 text-white text-xs flex items-center gap-1">
+                <Award className="w-3 h-3" /> Diploma
+              </Badge>
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0 flex flex-col">
+          <h3 className="font-bold text-lg line-clamp-2 mb-1 group-hover:text-primary transition-colors">
+            {course.title}
+          </h3>
+          {(course.short_description || course.description) && (
+            <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+              {course.short_description || course.description}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground mb-2">{instructorName}</p>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+            <span className="flex items-center gap-1">
+              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+              <span className="font-medium">{course.average_rating?.toFixed(1) || '0.0'}</span>
+              ({course.total_reviews?.toLocaleString() || 0} reviews)
+            </span>
+            <span className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5" />
+              {course.total_enrolled?.toLocaleString() || 0} students
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5" />
+              {formatDuration(course.duration_hours)}
+            </span>
+            <Badge variant="outline" className={`text-xs ${getLevelColor(course.level)}`}>
+              {course.level || 'All levels'}
+            </Badge>
+          </div>
+          <div className="mt-auto flex items-center justify-between pt-3">
+            <span className="text-xl font-bold text-primary">{course.credit_cost} credits</span>
+            <Button size="sm">Enroll Now</Button>
+          </div>
         </div>
       </motion.div>
     );
@@ -181,11 +316,9 @@ export const CourseCard = ({ course, variant = 'default' }: CourseCardProps) => 
           {course.title}
         </h3>
         
-        {course.instructor?.profiles && (
-          <p className="text-xs text-muted-foreground mb-2">
-            {course.instructor.profiles.display_name || 'Instructor'}
-          </p>
-        )}
+        <p className="text-xs text-muted-foreground mb-2">
+          {instructorName}
+        </p>
         
         <div className="flex items-center gap-2 mb-3">
           <div className="flex items-center gap-1">
