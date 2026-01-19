@@ -171,17 +171,17 @@ const queryClient = new QueryClient({
 // Initialize app data sync with the query client
 appDataSync.initialize(queryClient);
 
-// Initialize native app manager for SDK-like experience
-nativeAppManager.initialize({ queryClient });
-
 // Lazy fallback component for code splitting
 const LazyFallback = () => <LoadingScreen />;
 
 const App = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
-  // Initialize offline manager + auto-updater (dynamic import only)
+  // Initialize offline manager, auto-updater, and native app manager
   useEffect(() => {
+    // Initialize native app manager for SDK-like experience (must be inside React lifecycle)
+    nativeAppManager.initialize({ queryClient });
+
     // Initialize offline manager
     import('@/lib/offline-manager').then(({ offlineManager: manager }) => {
       console.log('Offline manager ready');
