@@ -135,12 +135,24 @@ const AptitudeTestPlayer = () => {
       console.error('Failed to save results:', error);
     }
 
+    // Build graded answers
+    const gradedAnswers: Record<string, { selected: string; correct: string; isCorrect: boolean; explanation?: string }> = {};
+    questions.forEach((q) => {
+      gradedAnswers[q.id] = {
+        selected: answers[q.id] || '',
+        correct: q.correct_option_id,
+        isCorrect: answers[q.id] === q.correct_option_id,
+        explanation: q.explanation,
+      };
+    });
+
     setResults({
-      score: scorePercent,
+      scorePercent,
       passed,
       correctAnswers: correct,
       totalQuestions: questions.length,
       timeTaken: ((test.duration_minutes || 20) * 60) - (timeLeft || 0),
+      gradedAnswers,
     });
     setTestCompleted(true);
   };
@@ -171,23 +183,22 @@ const AptitudeTestPlayer = () => {
     );
   }
 
-  if (testCompleted && results) {
+  if (testCompleted && results && questions) {
     return (
-      <QuizResults
-        score={results.score}
-        passed={results.passed}
-        correctAnswers={results.correctAnswers}
-        totalQuestions={results.totalQuestions}
-        timeTaken={results.timeTaken}
-        passingScore={test.passing_score || 70}
-        onRetry={() => {
-          setTestCompleted(false);
-          setTestStarted(false);
-          setAnswers({});
-          setResults(null);
-        }}
-        onClose={() => navigate('/ai/learn/aptitude')}
-      />
+      <div className="min-h-screen bg-background p-4 pb-24">
+        <QuizResults
+          results={results}
+          passPercentage={test.passing_score || 70}
+          questions={questions}
+          onRetry={() => {
+            setTestCompleted(false);
+            setTestStarted(false);
+            setAnswers({});
+            setResults(null);
+          }}
+          onClose={() => navigate('/ai/learn/aptitude')}
+        />
+      </div>
     );
   }
 

@@ -75,7 +75,7 @@ const LearningPathDetail = () => {
               
               <div className="flex justify-center gap-6 text-sm mb-4">
                 <div className="text-center">
-                  <div className="font-bold">{path.courses.length}</div>
+                  <div className="font-bold">{path.pathCourses.length}</div>
                   <div className="text-xs text-muted-foreground">Courses</div>
                 </div>
                 <div className="text-center">
@@ -94,7 +94,7 @@ const LearningPathDetail = () => {
                 <div className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
                     <span>Your Progress</span>
-                    <span>{path.completedCourses}/{path.courses.length} courses</span>
+                    <span>{path.completedCourses}/{path.pathCourses.length} courses</span>
                   </div>
                   <Progress value={path.progress} className="h-3" />
                 </div>
@@ -142,7 +142,7 @@ const LearningPathDetail = () => {
             <CardTitle className="text-lg">Path Courses</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {path.courses.map((course, index) => (
+            {path.pathCourses.map((course, index) => (
               <motion.div
                 key={course.id}
                 initial={{ opacity: 0, x: -20 }}
@@ -191,7 +191,7 @@ const LearningPathDetail = () => {
           </CardHeader>
           <CardContent>
             <ul className="space-y-2">
-              {path.requirements.map((req, index) => (
+              {path.pathRequirements.map((req, index) => (
                 <li key={index} className="flex items-center gap-2 text-sm">
                   <ChevronRight className="w-4 h-4 text-primary" />
                   {req}
@@ -212,11 +212,11 @@ const LearningPathDetail = () => {
                 <p className="text-sm opacity-90">
                   {path.progress > 0 
                     ? `Pick up where you left off` 
-                    : `${path.courses.length} courses • ${path.estimatedWeeks} weeks`}
+                    : `${path.pathCourses.length} courses • ${path.estimatedWeeks} weeks`}
                 </p>
               </div>
               <Button variant="secondary" onClick={() => {
-                const nextCourse = path.courses.find(c => !c.completed);
+                const nextCourse = path.pathCourses.find(c => !c.completed);
                 if (nextCourse) {
                   navigate(`/ai/learn/course/${nextCourse.id}`);
                 }
