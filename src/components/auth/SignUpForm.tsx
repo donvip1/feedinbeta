@@ -299,7 +299,8 @@ export const SignUpForm = ({ onEmailAlreadyExists, referrerUsername }: SignUpFor
     }
   };
 
-  const canSubmit = emailValid && displayNameValid && usernameValid && passwordValid && passwordsMatch && usernameAvailable !== false;
+  // Allow submit if username is available (true) or still checking (null) - but not if explicitly unavailable (false)
+  const canSubmit = emailValid && displayNameValid && usernameValid && passwordValid && passwordsMatch && usernameAvailable !== false && !checkingUsername;
 
   const ValidationIcon = ({ valid, show }: { valid: boolean; show: boolean }) => {
     if (!show) return null;

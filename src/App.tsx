@@ -23,6 +23,7 @@ import { ProfileCompletionModal } from "@/components/auth/ProfileCompletionModal
 import { appDataSync } from "@/lib/app-data-sync";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { LoadingScreen } from "@/components/shared/LoadingScreen";
+import { nativeAppManager } from "@/lib/native-app-manager";
 
 // Core pages - static imports
 import Index from "./pages/Index";
@@ -169,6 +170,9 @@ const queryClient = new QueryClient({
 
 // Initialize app data sync with the query client
 appDataSync.initialize(queryClient);
+
+// Initialize native app manager for SDK-like experience
+nativeAppManager.initialize({ queryClient });
 
 // Lazy fallback component for code splitting
 const LazyFallback = () => <LoadingScreen />;
