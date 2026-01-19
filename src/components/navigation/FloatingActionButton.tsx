@@ -38,9 +38,9 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
       onPointerUp={() => setIsPressed(false)}
       onPointerLeave={() => setIsPressed(false)}
       className={cn(
-        'fixed bottom-[72px] md:bottom-20 z-[80]',
-        // Right side, aligned with feed card max-width (max-w-lg = 32rem = 512px)
-        'right-4 md:right-auto md:left-1/2 md:ml-[calc(min(256px,50vw-2rem)-28px)]',
+      'fixed bottom-[72px] md:bottom-20 z-[80]',
+      // Positioned left of action buttons to avoid overlap
+      'right-20 md:right-auto md:left-1/2 md:ml-[calc(min(256px,50vw-2rem)-28px)]',
         'flex items-center justify-center',
         'transition-all duration-200 ease-out',
         'touch-manipulation',
@@ -54,14 +54,14 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
       <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
       
       {/* Icon */}
-      <img 
-        src={editIcon} 
-        alt="Create post" 
-        className={cn(
-          'w-12 h-12 md:w-14 md:h-14 object-contain relative z-10',
-          'transition-transform duration-150'
-        )} 
-      />
+        <img 
+          src={editIcon} 
+          alt="Create post" 
+          className={cn(
+            'w-9 h-9 md:w-10 md:h-10 object-contain relative z-10',
+            'transition-transform duration-150'
+          )} 
+        />
     </button>
   );
 };
