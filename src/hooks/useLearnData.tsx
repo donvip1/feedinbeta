@@ -484,3 +484,61 @@ export const usePlatformStats = () => {
     staleTime: 1000 * 60 * 30, // 30 minutes
   });
 };
+
+// User's learning credits and earnings
+export const useLearnCredits = () => {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['learn-credits', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+
+      // Get user credit balance
+      const { data: credits } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+
+      // Get total spent on courses
+      const { data: courseSpending } = await supabase
+        .from('course_enrollments')
+        .select('credits_paid')
+        .eq('user_id', user.id);
+
+      const totalSpent = courseSpending?.reduce((sum, e) => sum + (e.credits_paid || 0), 0) || 0;
+
+      // Check if user is instructor
+      const { data: instructor } = await supabase
+        .from('instructors')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Get instructor earnings from creator_monetization if instructor
+      let instructorEarnings = 0;
+      let availableForPayout = 0;
+      
+      if (instructor) {
+        const { data: monetization } = await supabase
+          .from('creator_monetization')
+          .select('total_earnings, total_withdrawn')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        
+        instructorEarnings = monetization?.total_earnings || 0;
+        availableForPayout = (monetization?.total_earnings || 0) - (monetization?.total_withdrawn || 0);
+      }
+
+      return {
+        balance: credits?.balance || 0,
+        totalSpentOnCourses: totalSpent,
+        isInstructor: !!instructor,
+        instructorEarnings,
+        availableForPayout,
+      };
+    },
+    enabled: !!user?.id,
+  });
+};
