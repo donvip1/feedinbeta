@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { useNavigation } from '@/context/NavigationContext';
 import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -612,7 +613,6 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     
     // CRITICAL: Enable audio playback BEFORE connecting
     // This ensures the user's click to join counts as user interaction
-    const { audioPlaybackManager } = await import('@/lib/audio-playback-manager');
     audioPlaybackManager.enableAudioPlayback();
     console.log('[LiveSpace] 🔊 Audio playback enabled for listener');
     
