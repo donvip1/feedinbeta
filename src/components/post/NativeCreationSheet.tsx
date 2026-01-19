@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { Camera, Image, Type, Radio, X } from 'lucide-react';
+import { Camera, Image, Type, Radio, X, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NativeCreationSheetProps {
@@ -9,6 +9,7 @@ interface NativeCreationSheetProps {
   onGallerySelect: () => void;
   onStorySelect: () => void;
   onTextSelect: () => void;
+  onLiveSelect?: () => void;
 }
 
 const options = [
@@ -44,6 +45,14 @@ const options = [
     gradient: 'from-orange-500 to-amber-400',
     action: 'onTextSelect',
   },
+  {
+    id: 'live',
+    label: 'Go Live',
+    description: 'Start a live stream or audio space',
+    icon: Mic,
+    gradient: 'from-red-500 to-rose-400',
+    action: 'onLiveSelect',
+  },
 ];
 
 export default function NativeCreationSheet({
@@ -53,6 +62,7 @@ export default function NativeCreationSheet({
   onGallerySelect,
   onStorySelect,
   onTextSelect,
+  onLiveSelect,
 }: NativeCreationSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const startYRef = useRef(0);
@@ -72,14 +82,15 @@ export default function NativeCreationSheet({
 
   const handleOptionClick = useCallback((action: string) => {
     triggerHaptic();
-    const actions: Record<string, () => void> = {
+    const actions: Record<string, (() => void) | undefined> = {
       onCameraSelect,
       onGallerySelect,
       onStorySelect,
       onTextSelect,
+      onLiveSelect,
     };
     actions[action]?.();
-  }, [onCameraSelect, onGallerySelect, onStorySelect, onTextSelect, triggerHaptic]);
+  }, [onCameraSelect, onGallerySelect, onStorySelect, onTextSelect, onLiveSelect, triggerHaptic]);
 
   // Handle drag to dismiss
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -119,6 +130,9 @@ export default function NativeCreationSheet({
   }, [open]);
 
   if (!open) return null;
+
+  // Filter out live option if handler not provided
+  const displayOptions = onLiveSelect ? options : options.filter(o => o.id !== 'live');
 
   return (
     <div className="fixed inset-0 z-[100]">
@@ -162,7 +176,7 @@ export default function NativeCreationSheet({
 
         {/* Options */}
         <div className="px-4 pb-8 space-y-2">
-          {options.map((option, index) => {
+          {displayOptions.map((option, index) => {
             const Icon = option.icon;
             return (
               <button

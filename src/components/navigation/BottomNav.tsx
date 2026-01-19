@@ -11,10 +11,10 @@ import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { RefreshContext, RefreshContextType, RefreshPage } from '@/context/RefreshContext';
 import { navigationPrefetcher } from '@/lib/navigation-prefetcher';
 import { memoryCache } from '@/lib/memory-cache';
-import { useWalletNotifications } from '@/hooks/useWalletNotifications';
 import { useNavigation } from '@/context/NavigationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { prefetchProfileCounts } from '@/hooks/useProfileCounts';
+import { useDistributedNotifications } from '@/hooks/useDistributedNotifications';
 
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
@@ -29,8 +29,10 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
   const { isSubPage, hideBottomNav } = useNavigation();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const { unreadGiftCount, markWalletViewed } = useWalletNotifications();
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  
+  // Use distributed notifications for categorized badge counts
+  const { counts: notificationCounts, markCategoryAsRead } = useDistributedNotifications();
 
   // Should hide: manual hidden prop, context hideBottomNav, or on sub-pages
   const shouldHide = hidden || hideBottomNav || isSubPage;
@@ -66,7 +68,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
           (payload: any) => {
             // Instantly increment if message is from another user
             if (payload.new?.sender_id !== user.id) {
-              setUnreadCount(prev => prev + 1);
+              setUnreadMessageCount(prev => prev + 1);
             }
           }
         )
@@ -80,7 +82,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
           (payload: any) => {
             // Decrement when message is marked as read
             if (payload.new?.is_read && !payload.old?.is_read && payload.new?.sender_id !== user.id) {
-              setUnreadCount(prev => Math.max(0, prev - 1));
+              setUnreadMessageCount(prev => Math.max(0, prev - 1));
             }
           }
         )
@@ -102,7 +104,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
       .eq('user_id', user.id);
     
     if (!conversations || conversations.length === 0) {
-      setUnreadCount(0);
+      setUnreadMessageCount(0);
       return;
     }
 
@@ -116,7 +118,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
       .neq('sender_id', user.id)
       .eq('is_read', false);
     
-    setUnreadCount(count || 0);
+    setUnreadMessageCount(count || 0);
   };
 
   const loadAvatar = async () => {
@@ -145,6 +147,21 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
   // Get refresh context (may be null if not wrapped)
   const refreshContext = useContext(RefreshContext);
 
+  // Calculate combined counts for each nav item
+  const getNavBadgeCount = (itemId: string): number => {
+    switch (itemId) {
+      case 'feed':
+        return notificationCounts.feed;
+      case 'chats':
+        // Combine unread messages + message-related notifications (friend requests etc)
+        return unreadMessageCount + notificationCounts.messages;
+      case 'wallet':
+        return notificationCounts.wallet;
+      default:
+        return 0;
+    }
+  };
+
   const handleNavClick = useCallback((path: string, itemId: string) => {
     // Trigger haptic feedback
     haptic('light');
@@ -155,9 +172,13 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     
     const isCurrentPage = isActive(path);
     
-    // Mark wallet as viewed when clicking on wallet
-    if (itemId === 'wallet') {
-      markWalletViewed();
+    // Mark category as viewed when clicking on nav item
+    if (itemId === 'feed') {
+      markCategoryAsRead('feed');
+    } else if (itemId === 'wallet') {
+      markCategoryAsRead('wallet');
+    } else if (itemId === 'chats') {
+      markCategoryAsRead('messages');
     }
     
     if (isCurrentPage) {
@@ -176,7 +197,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
     if (refreshContext) {
       refreshContext.triggerRefresh(itemId as RefreshPage);
     }
-  }, [haptic, navigate, isActive, refreshContext, markWalletViewed]);
+  }, [haptic, navigate, isActive, refreshContext, markCategoryAsRead]);
 
   return (
     <AnimatePresence>
@@ -202,6 +223,8 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
               const Icon = item.icon;
               const active = isActive(item.path);
               const isPressed = pressedId === item.id;
+              const badgeCount = getNavBadgeCount(item.id);
+              
               return (
                 <Tooltip key={item.id}>
                   <TooltipTrigger asChild>
@@ -231,11 +254,8 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                             strokeWidth={2.5}
                             className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
                           />
-                          {item.id === 'chats' && unreadCount > 0 && (
-                            <UnreadBadge count={unreadCount} size="sm" />
-                          )}
-                          {item.id === 'wallet' && unreadGiftCount > 0 && (
-                            <UnreadBadge count={unreadGiftCount} size="sm" />
+                          {badgeCount > 0 && (
+                            <UnreadBadge count={badgeCount} size="sm" />
                           )}
                         </div>
                       )}
