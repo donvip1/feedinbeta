@@ -210,7 +210,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
         >
           <TooltipProvider>
             <nav 
-              className="fixed bottom-0 left-0 right-0 z-[70] bg-background/95 backdrop-blur-lg border-t border-border/50 native-bottom-nav"
+              className="fixed bottom-0 left-0 right-0 z-[70] bg-transparent native-bottom-nav"
               style={{
                 paddingBottom: 'env(safe-area-inset-bottom)',
                 transform: 'translateZ(0)',
@@ -233,7 +233,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       variant="ghost"
                       size="icon"
                       className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${
-                        active ? 'text-primary' : 'text-foreground/80 hover:text-foreground'
+                        active ? 'text-white' : 'text-white/80 hover:text-white'
                       }`}
                       style={{
                         transform: isPressed ? 'scale(0.9)' : 'scale(1)',
@@ -241,7 +241,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       }}
                     >
                       {item.isProfile && avatarUrl ? (
-                        <div className={`rounded-full transition-all duration-150 ${active ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}`}>
+                        <div className={`rounded-full transition-all duration-150 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' : ''}`}>
                           <Avatar className="w-7 h-7">
                             <AvatarImage src={avatarUrl} />
                             <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
