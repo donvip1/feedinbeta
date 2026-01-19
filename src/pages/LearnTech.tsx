@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft, Search, BookOpen, GraduationCap, Award, Users, 
   TrendingUp, Sparkles, Play, Filter, ChevronRight, Briefcase,
-  Brain, Clock, Star, Trophy, Target, Flame, ArrowRight
+  Brain, Clock, Star, Trophy, Target, Flame, ArrowRight, Wallet, Coins
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +35,8 @@ import {
   useFeaturedInstructors,
   usePlatformStats,
   useUserEnrollments,
-  useLearningStats
+  useLearningStats,
+  useLearnCredits
 } from '@/hooks/useLearnData';
 
 // Hero banner images for carousel
@@ -79,6 +80,7 @@ export default function LearnTech() {
   const { data: platformStats } = usePlatformStats();
   const { data: userEnrollments, isLoading: loadingEnrollments } = useUserEnrollments();
   const { data: learningStats } = useLearningStats();
+  const { data: learnCredits } = useLearnCredits();
 
   useEffect(() => {
     setSearchParams({ tab: activeTab });
@@ -88,25 +90,26 @@ export default function LearnTech() {
     navigate(`/ai/learn/search?q=${encodeURIComponent(query)}`);
   };
 
+  // Real platform stats - no fake numbers
   const stats = [
     { 
       icon: BookOpen, 
-      value: platformStats?.totalCourses ? `${Math.floor(platformStats.totalCourses / 100) * 100 + (platformStats.totalCourses > 100 ? 0 : platformStats.totalCourses)}+` : '10,000+', 
+      value: platformStats?.totalCourses || 0, 
       label: 'Courses' 
     },
     { 
       icon: Users, 
-      value: platformStats?.totalEnrollments ? `${(platformStats.totalEnrollments / 1000).toFixed(0)}K+` : '500K+', 
+      value: platformStats?.totalEnrollments || 0, 
       label: 'Learners' 
     },
     { 
       icon: Award, 
-      value: platformStats?.totalCertificates ? `${(platformStats.totalCertificates / 1000).toFixed(0)}K+` : '100K+', 
+      value: platformStats?.totalCertificates || 0, 
       label: 'Certificates' 
     },
     { 
       icon: GraduationCap, 
-      value: platformStats?.totalInstructors ? `${platformStats.totalInstructors}+` : '1,000+', 
+      value: platformStats?.totalInstructors || 0, 
       label: 'Instructors' 
     },
   ];
@@ -471,6 +474,63 @@ export default function LearnTech() {
               <>
                 {/* Learning Stats */}
                 <LearningStats stats={learningStats} />
+
+                {/* Wallet & Earnings Section */}
+                <section>
+                  <h2 className="text-lg font-semibold mb-4 flex items-center gap-2 text-foreground">
+                    <Wallet className="w-5 h-5 text-primary" />
+                    My Balance & Earnings
+                  </h2>
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Credit Balance Card */}
+                    <Card 
+                      className="relative overflow-hidden cursor-pointer hover:shadow-lg transition-all group"
+                      onClick={() => navigate('/wallet/credits')}
+                    >
+                      <img 
+                        src="https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=200&fit=crop"
+                        alt="Credit Balance"
+                        className="w-full h-28 object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <p className="text-xs text-white/80 flex items-center gap-1">
+                          <Coins className="w-3 h-3" />
+                          Credit Balance
+                        </p>
+                        <p className="text-2xl font-bold text-white">{learnCredits?.balance || 0}</p>
+                        <p className="text-[10px] text-white/70">Spent on courses: {learnCredits?.totalSpentOnCourses || 0}</p>
+                      </div>
+                    </Card>
+
+                    {/* Instructor Earnings Card */}
+                    <Card 
+                      className="relative overflow-hidden cursor-pointer hover:shadow-lg transition-all group"
+                      onClick={() => navigate(learnCredits?.isInstructor ? '/ai/learn/instructor/dashboard' : '/ai/learn/teach')}
+                    >
+                      <img 
+                        src="https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&h=200&fit=crop"
+                        alt="Learning Earnings"
+                        className="w-full h-28 object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <p className="text-xs text-white/80 flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" />
+                          {learnCredits?.isInstructor ? 'Teaching Earnings' : 'Start Teaching'}
+                        </p>
+                        <p className="text-2xl font-bold text-white">
+                          {learnCredits?.isInstructor ? learnCredits?.instructorEarnings || 0 : '—'}
+                        </p>
+                        <p className="text-[10px] text-white/70">
+                          {learnCredits?.isInstructor 
+                            ? `Available: ${learnCredits?.availableForPayout || 0}` 
+                            : 'Earn by sharing knowledge'}
+                        </p>
+                      </div>
+                    </Card>
+                  </div>
+                </section>
 
                 {/* Continue Learning */}
                 <section>
