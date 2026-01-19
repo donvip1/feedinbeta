@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { 
   Search, Play, Clock, Eye, Filter, ChevronRight,
   Bookmark, BookmarkCheck, TrendingUp
@@ -15,8 +15,17 @@ import { toast } from 'sonner';
 
 const VideoDiscovery = () => {
   const navigate = useNavigate();
+  const { category: urlCategory } = useParams<{ category?: string }>();
   const [searchQuery, setSearchQuery] = useState('');
   const [savedVideos, setSavedVideos] = useState<Set<string>>(new Set());
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  // Handle category from URL parameter
+  useEffect(() => {
+    if (urlCategory) {
+      setSelectedCategory(urlCategory);
+    }
+  }, [urlCategory]);
 
   const categories = [
     { id: 'programming', name: 'Programming', icon: '💻' },
@@ -140,14 +149,31 @@ const VideoDiscovery = () => {
 
         {/* Categories */}
         <div>
-          <h2 className="font-semibold mb-3">Browse by Category</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-semibold">Browse by Category</h2>
+            {selectedCategory && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => {
+                  setSelectedCategory(null);
+                  navigate('/ai/learn/videos');
+                }}
+              >
+                Clear filter
+              </Button>
+            )}
+          </div>
           <div className="grid grid-cols-3 gap-2">
             {categories.map((cat) => (
               <Button
                 key={cat.id}
-                variant="outline"
+                variant={selectedCategory === cat.id ? "default" : "outline"}
                 className="h-auto py-3 flex-col gap-1"
-                onClick={() => navigate(`/ai/learn/videos/${cat.id}`)}
+                onClick={() => {
+                  setSelectedCategory(cat.id);
+                  navigate(`/ai/learn/videos/${cat.id}`);
+                }}
               >
                 <span className="text-xl">{cat.icon}</span>
                 <span className="text-xs">{cat.name}</span>
@@ -169,7 +195,9 @@ const VideoDiscovery = () => {
 
           <TabsContent value="trending" className="mt-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {trendingVideos.map((video, index) => (
+              {trendingVideos
+                .filter(v => !selectedCategory || v.category === selectedCategory)
+                .map((video, index) => (
                 <motion.div
                   key={video.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -179,6 +207,11 @@ const VideoDiscovery = () => {
                   <VideoCard video={video} />
                 </motion.div>
               ))}
+              {selectedCategory && trendingVideos.filter(v => v.category === selectedCategory).length === 0 && (
+                <div className="col-span-2 text-center py-8 text-muted-foreground">
+                  No videos in this category yet
+                </div>
+              )}
             </div>
           </TabsContent>
 

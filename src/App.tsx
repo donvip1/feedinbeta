@@ -86,6 +86,8 @@ const VideoDiscovery = lazy(() => import("./pages/VideoDiscovery"));
 const LearningPaths = lazy(() => import("./pages/LearningPaths"));
 const LearningPathDetail = lazy(() => import("./pages/LearningPathDetail"));
 const CourseDiscussion = lazy(() => import("./pages/CourseDiscussion"));
+const CategoryCourses = lazy(() => import("./pages/CategoryCourses"));
+const EditCourse = lazy(() => import("./pages/EditCourse"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Search = lazy(() => import("./pages/Search"));
 const HashtagSearch = lazy(() => import("./pages/HashtagSearch"));
@@ -313,6 +315,9 @@ const App = () => {
             <Route path="/ai/learn/instructor/courses" element={<ManageCourses />} />
             <Route path="/ai/learn/instructor/create" element={<CreateCourse />} />
             <Route path="/ai/learn/videos" element={<VideoDiscovery />} />
+            <Route path="/ai/learn/videos/:category" element={<VideoDiscovery />} />
+            <Route path="/ai/learn/category/:slug" element={<CategoryCourses />} />
+            <Route path="/ai/learn/instructor/course/:id/edit" element={<EditCourse />} />
             <Route path="/ai/learn/paths" element={<LearningPaths />} />
             <Route path="/ai/learn/paths/:slug" element={<LearningPathDetail />} />
             <Route path="/ai/captions" element={<CaptionGenerator />} />
