@@ -241,16 +241,32 @@ export default function LearnTech() {
                   </CarouselContent>
                 </Carousel>
               ) : (
-                <div className="flex gap-3 overflow-x-auto pb-2">
-                  {['Technology', 'Business', 'Design', 'Marketing', 'Health', 'Language'].map((name, i) => (
-                    <Card key={i} className="w-28 shrink-0 cursor-pointer hover:border-primary/50 transition-colors">
-                      <CardContent className="p-4 text-center">
-                        <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-primary/10 flex items-center justify-center">
-                          <BookOpen className="w-5 h-5 text-primary" />
-                        </div>
-                        <span className="text-xs font-medium text-foreground">{name}</span>
-                      </CardContent>
-                    </Card>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                  {[
+                    { name: 'Technology', slug: 'technology', image: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=500&fit=crop' },
+                    { name: 'Business', slug: 'business', image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&h=500&fit=crop' },
+                    { name: 'Design', slug: 'design', image: 'https://images.unsplash.com/photo-1561070791-2526d30994b5?w=400&h=500&fit=crop' },
+                    { name: 'Marketing', slug: 'marketing', image: 'https://images.unsplash.com/photo-1533750349088-cd871a92f312?w=400&h=500&fit=crop' },
+                    { name: 'Health', slug: 'health', image: 'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=500&fit=crop' },
+                    { name: 'Language', slug: 'language', image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=500&fit=crop' },
+                  ].map((cat, i) => (
+                    <motion.div 
+                      key={i} 
+                      className="relative w-32 shrink-0 rounded-xl overflow-hidden aspect-[3/4] cursor-pointer group"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => navigate(`/ai/learn/category/${cat.slug}`)}
+                    >
+                      <img 
+                        src={cat.image} 
+                        alt={cat.name} 
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" 
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-3">
+                        <h4 className="font-semibold text-white text-sm">{cat.name}</h4>
+                      </div>
+                    </motion.div>
                   ))}
                 </div>
               )}
@@ -477,8 +493,15 @@ export default function LearnTech() {
                           onClick={() => navigate(`/ai/learn/course/${enrollment.course?.slug}/learn`)}
                         >
                           <div className="flex gap-4">
-                            <div className="w-20 h-14 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center shrink-0">
-                              <Play className="w-6 h-6 text-primary" />
+                            <div className="w-24 h-16 rounded-lg overflow-hidden shrink-0 relative group">
+                              <img 
+                                src={enrollment.course?.thumbnail_url || `https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=200&h=150&fit=crop`}
+                                alt={enrollment.course?.title}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                <Play className="w-6 h-6 text-white" />
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-medium truncate text-foreground">{enrollment.course?.title}</h3>
@@ -531,8 +554,15 @@ export default function LearnTech() {
                           onClick={() => navigate(`/ai/learn/course/${enrollment.course?.slug}`)}
                         >
                           <div className="flex gap-4 items-center">
-                            <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
-                              <Award className="w-6 h-6 text-green-500" />
+                            <div className="w-16 h-16 rounded-lg overflow-hidden shrink-0 relative">
+                              <img 
+                                src={enrollment.course?.thumbnail_url || `https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=200&h=200&fit=crop`}
+                                alt={enrollment.course?.title}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center">
+                                <Award className="w-6 h-6 text-green-500" />
+                              </div>
                             </div>
                             <div className="flex-1 min-w-0">
                               <h3 className="font-medium truncate text-foreground">{enrollment.course?.title}</h3>
@@ -557,36 +587,64 @@ export default function LearnTech() {
                   <h2 className="text-lg font-semibold mb-4 text-foreground">Quick Actions</h2>
                   <div className="grid grid-cols-2 gap-4">
                     <Card 
-                      className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                      className="relative overflow-hidden cursor-pointer transition-all hover:shadow-lg group h-32"
                       onClick={() => navigate('/ai/learn/certificates')}
                     >
-                      <Award className="w-8 h-8 text-yellow-500 mb-2" />
-                      <h3 className="font-medium text-foreground">My Certificates</h3>
-                      <p className="text-xs text-muted-foreground">View earned credentials</p>
+                      <img 
+                        src="https://images.unsplash.com/photo-1589330694653-ded6df03f754?w=400&h=200&fit=crop"
+                        alt="My Certificates"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="font-semibold text-white">My Certificates</h3>
+                        <p className="text-xs text-white/80">View earned credentials</p>
+                      </div>
                     </Card>
                     <Card 
-                      className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                      className="relative overflow-hidden cursor-pointer transition-all hover:shadow-lg group h-32"
                       onClick={() => navigate('/ai/learn/aptitude')}
                     >
-                      <Brain className="w-8 h-8 text-purple-500 mb-2" />
-                      <h3 className="font-medium text-foreground">Aptitude Tests</h3>
-                      <p className="text-xs text-muted-foreground">Assess your skills</p>
+                      <img 
+                        src="https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400&h=200&fit=crop"
+                        alt="Aptitude Tests"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="font-semibold text-white">Aptitude Tests</h3>
+                        <p className="text-xs text-white/80">Assess your skills</p>
+                      </div>
                     </Card>
                     <Card 
-                      className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                      className="relative overflow-hidden cursor-pointer transition-all hover:shadow-lg group h-32"
                       onClick={() => navigate('/ai/learn/resume')}
                     >
-                      <Briefcase className="w-8 h-8 text-primary mb-2" />
-                      <h3 className="font-medium text-foreground">Resume Builder</h3>
-                      <p className="text-xs text-muted-foreground">Build your profile</p>
+                      <img 
+                        src="https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=400&h=200&fit=crop"
+                        alt="Resume Builder"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="font-semibold text-white">Resume Builder</h3>
+                        <p className="text-xs text-white/80">Build your profile</p>
+                      </div>
                     </Card>
                     <Card 
-                      className="p-4 cursor-pointer hover:border-primary/50 transition-colors"
+                      className="relative overflow-hidden cursor-pointer transition-all hover:shadow-lg group h-32"
                       onClick={() => navigate('/ai/learn/saved')}
                     >
-                      <Star className="w-8 h-8 text-orange-500 mb-2" />
-                      <h3 className="font-medium text-foreground">Saved Courses</h3>
-                      <p className="text-xs text-muted-foreground">Your wishlist</p>
+                      <img 
+                        src="https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&h=200&fit=crop"
+                        alt="Saved Courses"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <h3 className="font-semibold text-white">Saved Courses</h3>
+                        <p className="text-xs text-white/80">Your wishlist</p>
+                      </div>
                     </Card>
                   </div>
                 </section>
