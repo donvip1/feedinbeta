@@ -4,7 +4,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
-import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Search, TrendingUp, Radio } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,7 +62,7 @@ const Feed = () => {
   const hasInitializedRef = useRef(false);
   const [displayPosts, setDisplayPosts] = useState<any[]>([]);
   const allLoadedPostsRef = useRef<any[]>([]);
-  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  
   const allVideoPostsRef = useRef<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -527,20 +526,6 @@ const Feed = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [isLoadingMore]);
-  // Pause all videos when notification panel opens
-  const handleNotificationPanelOpen = () => {
-    setIsNotificationOpen(true);
-    // Pause all videos by dispatching a custom event
-    document.querySelectorAll('video').forEach((video) => {
-      if (!video.paused) {
-        video.pause();
-      }
-    });
-  };
-
-  const handleNotificationPanelClose = () => {
-    setIsNotificationOpen(false);
-  };
 
   useEffect(() => {
     if (authLoading) return;
@@ -629,7 +614,7 @@ const Feed = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16 native-feed-container">
+    <div className="min-h-screen bg-black native-feed-container relative">
       {/* Offline Banner */}
       <OfflineBanner 
         isOffline={isOffline} 
@@ -637,23 +622,23 @@ const Feed = () => {
         onRetry={() => !isOffline && refetch()}
       />
       
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
-        <div className="flex items-center justify-between px-3 py-2 max-w-2xl mx-auto">
-          <NotificationBell 
-            onPanelOpen={handleNotificationPanelOpen}
-            onPanelClose={handleNotificationPanelClose}
-          />
+      {/* TikTok-style Overlay Navigation - Transparent over content */}
+      <div className="fixed top-0 left-0 right-0 z-40 pt-safe-area pointer-events-none">
+        <div className="flex items-center justify-between px-4 py-3 pointer-events-auto">
+          {/* Left spacer for balance */}
+          <div className="w-16" />
           
-          <div className="flex items-center gap-3 relative">
+          {/* Centered Tabs with transparent styling */}
+          <div className="flex items-center gap-4 relative">
             <button
               onClick={() => {
                 haptic('selection');
                 setActiveTab('following');
               }}
-              className={`text-sm font-semibold transition-all ${
+              className={`text-sm font-semibold transition-all drop-shadow-lg ${
                 activeTab === 'following'
-                  ? 'text-foreground'
-                  : 'text-muted-foreground'
+                  ? 'text-white'
+                  : 'text-white/60'
               }`}
             >
               Following
@@ -663,10 +648,10 @@ const Feed = () => {
                 haptic('selection');
                 setActiveTab('forYou');
               }}
-              className={`text-sm font-semibold transition-all ${
+              className={`text-sm font-semibold transition-all drop-shadow-lg ${
                 activeTab === 'forYou'
-                  ? 'text-foreground'
-                  : 'text-muted-foreground'
+                  ? 'text-white'
+                  : 'text-white/60'
               }`}
             >
               For You
@@ -676,15 +661,15 @@ const Feed = () => {
                 haptic('selection');
                 setActiveTab('live');
               }}
-              className={`transition-all p-1 rounded-full flex items-center gap-1.5 ${
+              className={`transition-all p-1 rounded-full flex items-center gap-1.5 drop-shadow-lg ${
                 activeTab === 'live'
-                  ? 'bg-red-500/20'
+                  ? 'bg-red-500/30'
                   : ''
               }`}
               title="Live"
             >
               {(liveCount || 0) > 0 && (
-                <span className="text-xs font-bold text-red-500">{liveCount}</span>
+                <span className="text-xs font-bold text-red-400">{liveCount}</span>
               )}
               <span className="relative flex h-3 w-3">
                 {(liveCount || 0) > 0 ? (
@@ -693,13 +678,13 @@ const Feed = () => {
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
                   </>
                 ) : (
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-muted-foreground/50"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white/40"></span>
                 )}
               </span>
             </button>
             {/* Sliding tab indicator */}
             <div 
-              className="absolute -bottom-2 h-0.5 bg-primary transition-all duration-200 ease-out"
+              className="absolute -bottom-1 h-0.5 bg-white transition-all duration-200 ease-out"
               style={{ 
                 width: activeTab === 'live' ? '12px' : '50px',
                 left: activeTab === 'following' ? '0' : activeTab === 'forYou' ? '70px' : '140px'
@@ -707,28 +692,23 @@ const Feed = () => {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Right icons - Trending & Search */}
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate('/feed/trending')}
+              className="text-white/80 hover:text-white hover:bg-white/10"
             >
-              <TrendingUp className="w-5 h-5" />
+              <TrendingUp className="w-5 h-5 drop-shadow-lg" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => navigate('/feed/search')}
+              className="text-white/80 hover:text-white hover:bg-white/10"
             >
-              <Search className="w-5 h-5" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/live')}
-              className="relative"
-            >
-              <Radio className="w-5 h-5 text-red-500" fill="currentColor" />
+              <Search className="w-5 h-5 drop-shadow-lg" />
             </Button>
           </div>
         </div>
@@ -741,7 +721,7 @@ const Feed = () => {
       >
         <div
           ref={containerRef}
-          className="w-full max-w-[430px] mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100dvh-8rem)] scroll-smooth native-scroll-container relative"
+          className="w-full mx-auto snap-y snap-mandatory overflow-y-scroll h-[100dvh] scroll-smooth native-scroll-container relative"
           data-scrollable="true"
         >
           {/* Pull to Refresh Indicator */}
@@ -800,7 +780,7 @@ const Feed = () => {
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
             {/* Show inline live content at the top if available (only on following/forYou tabs) */}
             {inlineLiveContent && inlineLiveContent.length > 0 && (
-              <div className="snap-start snap-always h-[calc(100dvh-8rem)] flex items-center justify-center">
+              <div className="snap-start snap-always h-[100dvh] flex items-center justify-center pt-16">
                 <InlineLiveCard
                   item={{
                     ...inlineLiveContent[0],
@@ -845,7 +825,7 @@ const Feed = () => {
                     />
                   </div>
                   {showInlineLive && (
-                    <div key={`live-${index}`} className="snap-start snap-always h-[calc(100dvh-8rem)] flex items-center justify-center">
+                    <div key={`live-${index}`} className="snap-start snap-always h-[100dvh] flex items-center justify-center pt-16">
                       <InlineLiveCard
                         item={{
                           ...inlineLiveContent[index === 4 ? 1 : 2],
@@ -909,6 +889,10 @@ const Feed = () => {
         onGallerySelect={() => setPostStep('gallery')}
         onStorySelect={() => setPostStep('story')}
         onTextSelect={() => setPostStep('text')}
+        onLiveSelect={() => {
+          setPostStep(null);
+          navigate('/live');
+        }}
       />
 
       {/* Native Camera */}

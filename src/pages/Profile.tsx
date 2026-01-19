@@ -14,7 +14,8 @@ import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket, UserCheck, X, MapPin, Briefcase } from 'lucide-react';
+import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket, UserCheck, X, MapPin, Briefcase, Bell } from 'lucide-react';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { getCountryFlag } from '@/lib/location-service';
 import { PostsGrid } from '@/components/profile/PostsGrid';
 import { ViewHistory } from '@/components/profile/ViewHistory';
@@ -868,6 +869,14 @@ const Profile = () => {
               <p className="text-2xl font-bold text-foreground">{displayCounts.likesCount}</p>
               <p className="text-xs text-muted-foreground">Likes</p>
             </div>
+
+            {/* Notification Bell - Only on own profile */}
+            {isOwnProfile && (
+              <div className="flex flex-col items-center">
+                <NotificationBell />
+                <p className="text-xs text-muted-foreground mt-1">Alerts</p>
+              </div>
+            )}
           </div>
 
 
