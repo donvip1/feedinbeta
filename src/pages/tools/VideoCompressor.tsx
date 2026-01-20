@@ -1,12 +1,14 @@
-import { useState, ChangeEvent } from 'react';
+import { useState } from 'react';
 import { ArrowLeft, Video, Download, Upload, Loader2, Settings, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useAIToolCredits } from '@/hooks/useAIToolCredits';
+import { compressVideo } from '@/lib/video-compressor';
 
 const CREDIT_COST = 5;
 
@@ -19,7 +21,9 @@ const VideoCompressor = () => {
   const [video, setVideo] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [compressedUrl, setCompressedUrl] = useState<string | null>(null);
+  const [compressedBlob, setCompressedBlob] = useState<Blob | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [quality, setQuality] = useState('medium');
   const [originalSize, setOriginalSize] = useState(0);
   const [compressedSize, setCompressedSize] = useState(0);
@@ -32,7 +36,9 @@ const VideoCompressor = () => {
         setVideoUrl(URL.createObjectURL(file));
         setOriginalSize(file.size);
         setCompressedUrl(null);
+        setCompressedBlob(null);
         setCompressedSize(0);
+        setProgress(0);
       } else {
         toast.error('Please select a video file');
       }
@@ -57,36 +63,40 @@ const VideoCompressor = () => {
     if (!success) return;
 
     setIsProcessing(true);
+    setProgress(0);
+
     try {
-      // Note: True video compression requires FFmpeg or a backend service
-      // This is a demo that simulates compression with a canvas-based approach for small videos
+      const result = await compressVideo(video, {
+        quality: quality as 'low' | 'medium' | 'high',
+        onProgress: (p) => setProgress(p),
+      });
+
+      const blobUrl = URL.createObjectURL(result.blob);
+      setCompressedUrl(blobUrl);
+      setCompressedBlob(result.blob);
+      setCompressedSize(result.compressedSize);
       
-      toast.info('Video compression requires a backend service for full functionality');
-      
-      // Simulate compression by creating a blob URL
-      // In production, this would be sent to a backend with FFmpeg
-      setTimeout(() => {
-        const simulatedCompressedSize = Math.floor(originalSize * (quality === 'low' ? 0.3 : quality === 'medium' ? 0.5 : 0.7));
-        setCompressedSize(simulatedCompressedSize);
-        setCompressedUrl(videoUrl);
-        toast.success('Video processed! For full compression, use our premium backend.');
-        setIsProcessing(false);
-      }, 2000);
-      
+      const savedPercent = Math.round((1 - result.compressedSize / originalSize) * 100);
+      toast.success(`Video compressed! Saved ${savedPercent}% (${formatSize(originalSize - result.compressedSize)})`);
     } catch (error) {
       console.error('Compression error:', error);
       toast.error('Compression failed. Please try again.');
+    } finally {
       setIsProcessing(false);
     }
   };
 
   const handleDownload = () => {
-    if (compressedUrl && video) {
+    if (compressedBlob && video) {
       const a = document.createElement('a');
-      a.href = compressedUrl;
-      a.download = `compressed_${video.name}`;
+      a.href = URL.createObjectURL(compressedBlob);
+      // Change extension to .webm since we're using WebM codec
+      const originalName = video.name.replace(/\.[^/.]+$/, '');
+      a.download = `compressed_${originalName}.webm`;
+      document.body.appendChild(a);
       a.click();
-      toast.success('Video downloaded!');
+      document.body.removeChild(a);
+      toast.success('Compressed video downloaded!');
     }
   };
 
@@ -152,12 +162,21 @@ const VideoCompressor = () => {
                   <SelectValue placeholder="Select quality" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Low (Smallest file)</SelectItem>
-                  <SelectItem value="medium">Medium (Balanced)</SelectItem>
-                  <SelectItem value="high">High (Best quality)</SelectItem>
+                  <SelectItem value="low">Low (480p - Smallest file)</SelectItem>
+                  <SelectItem value="medium">Medium (720p - Balanced)</SelectItem>
+                  <SelectItem value="high">High (1080p - Best quality)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {isProcessing && (
+              <div className="space-y-2">
+                <Progress value={progress} className="h-2" />
+                <p className="text-sm text-muted-foreground">
+                  Compressing... {progress}%
+                </p>
+              </div>
+            )}
 
             <Button 
               onClick={handleCompress} 
@@ -176,10 +195,13 @@ const VideoCompressor = () => {
           </div>
         </Card>
 
-        {compressedUrl && (
+        {compressedUrl && !isProcessing && (
           <Card className="p-6">
             <div className="space-y-4">
               <h3 className="font-semibold">Compression Complete!</h3>
+              
+              <video src={compressedUrl} className="w-full max-h-48 rounded" controls />
+              
               <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Original:</span>
