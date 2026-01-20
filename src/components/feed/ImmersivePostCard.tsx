@@ -565,8 +565,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Top Left - User Info Overlay - Moved down to avoid touching content */}
-        <div className="absolute top-20 left-4 z-10 flex items-center gap-3">
+        {/* Top Left - User Info Overlay - Positioned closer to header */}
+        <div className="absolute top-14 left-4 z-10 flex items-center gap-3">
           <Avatar 
             className="w-6 h-6 ring-1 ring-white/30 cursor-pointer"
             onClick={handleProfileClick}
@@ -584,8 +584,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         </div>
 
-        {/* Top Right - Menu & Promoted Badge - Also moved down */}
-        <div className="absolute top-20 right-4 z-10 flex items-center gap-2">
+        {/* Top Right - Menu & Promoted Badge - Positioned closer to header */}
+        <div className="absolute top-14 right-4 z-10 flex items-center gap-2">
           {isPromoted && (
             <Badge className="bg-primary/80 backdrop-blur-sm text-white text-xs">
               <Sparkles className="w-3 h-3 mr-1" />
@@ -594,8 +594,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/50 transition-colors">
-                <MoreVertical className="w-5 h-5 text-white" />
+              <button className="p-2 transition-colors">
+                <MoreVertical className="w-5 h-5 text-white drop-shadow-lg" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -616,16 +616,16 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </DropdownMenu>
         </div>
 
-        {/* Mute/Unmute Button - Positioned below menu, replaces fullscreen */}
+        {/* Mute/Unmute Button - Positioned below menu, no shadow */}
         {hasVideo && (
           <button 
             onClick={toggleMute}
-            className="absolute top-28 right-4 z-10 p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/50 transition-colors"
+            className="absolute top-24 right-4 z-10 p-2 transition-colors"
           >
             {isMuted ? (
-              <VolumeX className="w-5 h-5 text-white" />
+              <VolumeX className="w-5 h-5 text-white drop-shadow-lg" />
             ) : (
-              <Volume2 className="w-5 h-5 text-white" />
+              <Volume2 className="w-5 h-5 text-white drop-shadow-lg" />
             )}
           </button>
         )}
@@ -697,14 +697,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Promote CTA - Just under caption as clickable text */}
+          {/* Promote CTA - White color for visibility on all backgrounds */}
           {user && !isPromoted && (
             <button 
               onClick={(e) => {
                 e.stopPropagation();
                 navigate(`/promote/${post.id}`);
               }}
-              className="flex items-center gap-1.5 text-primary hover:text-primary/80 text-xs font-bold transition-all animate-pulse mb-2"
+              className="flex items-center gap-1.5 text-white hover:text-white/80 text-xs font-bold transition-all animate-pulse mb-2 drop-shadow-lg"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               <span>Promote this post</span>

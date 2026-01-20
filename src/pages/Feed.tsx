@@ -13,6 +13,7 @@ import NativeCreationSheet from '@/components/post/NativeCreationSheet';
 import NativeCameraView from '@/components/post/NativeCameraView';
 import NativeGalleryPicker from '@/components/post/NativeGalleryPicker';
 import TextPostCreator from '@/components/post/TextPostCreator';
+import PlainTextPostCreator from '@/components/post/PlainTextPostCreator';
 import PostDetails from '@/components/post/PostDetails';
 import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
@@ -50,7 +51,7 @@ const Feed = () => {
     setActiveTab(tabs[index]);
   }, []);
   const { containerRef: scrollContainerRef } = useScrollPosition('feed');
-  const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | null>(null);
+  const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | 'plaintext' | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file: File }[]>([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -903,6 +904,7 @@ const Feed = () => {
         onGallerySelect={() => setPostStep('gallery')}
         onStorySelect={() => setPostStep('story')}
         onTextSelect={() => setPostStep('text')}
+        onPlainTextSelect={() => setPostStep('plaintext')}
         onLiveSelect={() => {
           setPostStep(null);
           navigate('/live');
@@ -947,6 +949,12 @@ const Feed = () => {
       )}
       {postStep === 'text' && (
         <TextPostCreator
+          onClose={() => setPostStep(null)}
+          onSubmit={handlePostSubmit}
+        />
+      )}
+      {postStep === 'plaintext' && (
+        <PlainTextPostCreator
           onClose={() => setPostStep(null)}
           onSubmit={handlePostSubmit}
         />

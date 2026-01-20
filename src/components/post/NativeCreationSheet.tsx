@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { Camera, Image, Type, Radio, X, Mic } from 'lucide-react';
+import { Camera, Image, Type, Radio, X, Mic, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NativeCreationSheetProps {
@@ -9,6 +9,7 @@ interface NativeCreationSheetProps {
   onGallerySelect: () => void;
   onStorySelect: () => void;
   onTextSelect: () => void;
+  onPlainTextSelect?: () => void;
   onLiveSelect?: () => void;
 }
 
@@ -40,10 +41,18 @@ const options = [
   {
     id: 'text',
     label: 'Text Card',
-    description: 'Create a styled text card',
+    description: 'Styled text with backgrounds',
     icon: Type,
     gradient: 'from-orange-500 to-amber-400',
     action: 'onTextSelect',
+  },
+  {
+    id: 'plaintext',
+    label: 'Plain Text',
+    description: 'Share your thoughts',
+    icon: MessageSquare,
+    gradient: 'from-slate-600 to-slate-400',
+    action: 'onPlainTextSelect',
   },
   {
     id: 'live',
@@ -62,6 +71,7 @@ export default function NativeCreationSheet({
   onGallerySelect,
   onStorySelect,
   onTextSelect,
+  onPlainTextSelect,
   onLiveSelect,
 }: NativeCreationSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -87,10 +97,11 @@ export default function NativeCreationSheet({
       onGallerySelect,
       onStorySelect,
       onTextSelect,
+      onPlainTextSelect,
       onLiveSelect,
     };
     actions[action]?.();
-  }, [onCameraSelect, onGallerySelect, onStorySelect, onTextSelect, onLiveSelect, triggerHaptic]);
+  }, [onCameraSelect, onGallerySelect, onStorySelect, onTextSelect, onPlainTextSelect, onLiveSelect, triggerHaptic]);
 
   // Handle drag to dismiss
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -131,8 +142,12 @@ export default function NativeCreationSheet({
 
   if (!open) return null;
 
-  // Filter out live option if handler not provided
-  const displayOptions = onLiveSelect ? options : options.filter(o => o.id !== 'live');
+  // Filter out optional options if handlers not provided
+  const displayOptions = options.filter(o => {
+    if (o.id === 'live' && !onLiveSelect) return false;
+    if (o.id === 'plaintext' && !onPlainTextSelect) return false;
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-[100]">
