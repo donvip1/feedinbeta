@@ -630,35 +630,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </button>
         )}
 
-        {/* Conditional Social Button Layout */}
-        {layoutType === 'photo-text' ? (
-          /* Horizontal layout for Photos & Text - Bottom of post */
-          <div className={cn(
-            "absolute left-4 right-4 bottom-24 flex items-center justify-around z-10 bg-black/20 backdrop-blur-sm rounded-full py-2",
-            showControls ? "visible" : "invisible"
-          )}>
-            <button onClick={handleLike} className="flex items-center gap-1.5 group">
-              <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
-              <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
-            </button>
-            <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-              <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-              <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
-            </button>
-            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-              <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-              <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
-            </button>
-            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-              <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-              <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
-            </button>
-            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
-              <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-            </button>
-          </div>
-        ) : (
-          /* Vertical layout for Videos - Right side */
+        {/* Social buttons for Videos - Vertical layout on right side */}
+        {layoutType === 'video' && (
           <div className={cn(
             "absolute right-3 bottom-24 flex flex-col items-center gap-3 z-10",
             showControls ? "visible" : "invisible"
@@ -731,11 +704,39 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 e.stopPropagation();
                 navigate(`/promote/${post.id}`);
               }}
-              className="flex items-center gap-1.5 text-blue-400 hover:text-blue-300 text-xs font-bold transition-all animate-pulse"
+              className="flex items-center gap-1.5 text-primary hover:text-primary/80 text-xs font-bold transition-all animate-pulse mb-2"
             >
               <TrendingUp className="w-3.5 h-3.5" />
               <span>Promote this post</span>
             </button>
+          )}
+
+          {/* Social buttons for Photos & Text - Horizontal layout under promote */}
+          {layoutType === 'photo-text' && (
+            <div className={cn(
+              "flex items-center gap-4 mt-2",
+              showControls ? "visible" : "invisible"
+            )}>
+              <button onClick={handleLike} className="flex items-center gap-1.5 group">
+                <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
+                <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
+              </button>
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
+                <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
+              </button>
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
+              </button>
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
+              </button>
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
+                <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+              </button>
+            </div>
           )}
 
           {/* Music indicator */}
