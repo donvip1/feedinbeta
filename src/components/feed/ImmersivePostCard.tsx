@@ -444,7 +444,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     <>
       <div 
         ref={postRef}
-        className="relative w-full max-w-[430px] mx-auto h-[100dvh] bg-black overflow-hidden rounded-none sm:rounded-2xl"
+        className="relative w-full max-w-[430px] mx-auto h-[calc(100dvh-68px)] bg-black overflow-hidden rounded-none sm:rounded-2xl"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -496,7 +496,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 src={currentMediaUrl}
                 alt="Post media"
                 className={cn(
-                  "w-full h-full object-cover transition-opacity duration-300",
+                  "w-full h-full object-contain transition-opacity duration-300",
                   isMediaLoaded ? "opacity-100" : "opacity-0"
                 )}
                 onLoad={() => setIsMediaLoaded(true)}
@@ -633,7 +633,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         {/* Social buttons for Videos - Vertical layout on right side */}
         {layoutType === 'video' && (
           <div className={cn(
-            "absolute right-3 bottom-24 flex flex-col items-center gap-3 z-10",
+            "absolute right-3 bottom-4 flex flex-col items-center gap-3 z-10",
             showControls ? "visible" : "invisible"
           )}>
             {/* Like */}
@@ -668,7 +668,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         )}
 
         {/* Bottom Left - Caption & Music */}
-        <div className="absolute left-4 right-20 bottom-20 z-10">
+        <div className="absolute left-4 right-16 bottom-4 z-10">
           {/* Refeed indicator */}
           {isRefeed && (
             <div className="flex items-center gap-1.5 mb-2">

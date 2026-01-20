@@ -734,7 +734,7 @@ const Feed = () => {
       >
         <div
           ref={containerRef}
-          className="w-full mx-auto snap-y snap-mandatory overflow-y-scroll h-[100dvh] scroll-smooth native-scroll-container relative"
+          className="w-full mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100dvh-68px)] scroll-smooth native-scroll-container relative"
           data-scrollable="true"
         >
           {/* Pull to Refresh Indicator */}
@@ -793,7 +793,7 @@ const Feed = () => {
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
             {/* Show inline live content at the top if available (only on following/forYou tabs) */}
             {inlineLiveContent && inlineLiveContent.length > 0 && (
-              <div className="snap-start snap-always h-[100dvh] flex items-center justify-center pt-16">
+              <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
                 <InlineLiveCard
                   item={{
                     ...inlineLiveContent[0],
@@ -839,7 +839,7 @@ const Feed = () => {
                     />
                   </div>
                   {showInlineLive && (
-                    <div key={`live-${index}`} className="snap-start snap-always h-[100dvh] flex items-center justify-center pt-16">
+                    <div key={`live-${index}`} className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
                       <InlineLiveCard
                         item={{
                           ...inlineLiveContent[index === 4 ? 1 : 2],
