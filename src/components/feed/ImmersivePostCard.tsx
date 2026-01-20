@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Maximize } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,6 @@ import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
-import FullscreenMediaViewer from './FullscreenMediaViewer';
 import { cn } from '@/lib/utils';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
 
@@ -78,6 +77,7 @@ interface ImmersivePostCardProps {
   allPosts?: any[];
   allVideoPosts?: any[];
   onMarkAsViewed?: (postId: string) => void;
+  layoutType?: 'video' | 'photo-text'; // Determines social button placement
 }
 
 const ImmersivePostCard = memo(function ImmersivePostCard({ 
@@ -92,7 +92,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   onView,
   allPosts,
   allVideoPosts,
-  onMarkAsViewed
+  onMarkAsViewed,
+  layoutType = 'video' // Default to video layout
 }: ImmersivePostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -116,7 +117,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showFullscreenViewer, setShowFullscreenViewer] = useState(false);
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -550,9 +550,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Multiple Media Indicator */}
+        {/* Multiple Media Indicator - Adjusted position */}
         {hasMultipleMedia && (
-          <div className="absolute top-16 right-16 flex gap-1.5 z-10">
+          <div className="absolute top-20 right-20 flex gap-1.5 z-10">
             {mediaUrls.map((_, idx) => (
               <div 
                 key={idx} 
@@ -565,8 +565,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Top Left - User Info Overlay */}
-        <div className="absolute top-16 left-4 z-10 flex items-center gap-3">
+        {/* Top Left - User Info Overlay - Moved down to avoid touching content */}
+        <div className="absolute top-20 left-4 z-10 flex items-center gap-3">
           <Avatar 
             className="w-6 h-6 ring-1 ring-white/30 cursor-pointer"
             onClick={handleProfileClick}
@@ -584,8 +584,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         </div>
 
-        {/* Top Right - Menu & Promoted Badge */}
-        <div className="absolute top-16 right-4 z-10 flex items-center gap-2">
+        {/* Top Right - Menu & Promoted Badge - Also moved down */}
+        <div className="absolute top-20 right-4 z-10 flex items-center gap-2">
           {isPromoted && (
             <Badge className="bg-primary/80 backdrop-blur-sm text-white text-xs">
               <Sparkles className="w-3 h-3 mr-1" />
@@ -616,91 +616,83 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </DropdownMenu>
         </div>
 
-        {/* Fullscreen Button - Below three-dot menu */}
-        {(allPosts && allPosts.length > 0) && (
+        {/* Mute/Unmute Button - Positioned below menu, replaces fullscreen */}
+        {hasVideo && (
           <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              if (videoRef.current) {
-                videoRef.current.pause();
-              }
-              setShowFullscreenViewer(true);
-              onInteractionStart?.();
-            }}
+            onClick={toggleMute}
             className="absolute top-28 right-4 z-10 p-2 bg-black/30 backdrop-blur-sm rounded-full hover:bg-black/50 transition-colors"
           >
-            <Maximize className="w-5 h-5 text-white" />
+            {isMuted ? (
+              <VolumeX className="w-5 h-5 text-white" />
+            ) : (
+              <Volume2 className="w-5 h-5 text-white" />
+            )}
           </button>
         )}
 
-        {/* Right Side - Action Buttons (Vertical Stack) */}
-        <div className={cn(
-          "absolute right-3 bottom-24 flex flex-col items-center gap-3 z-10",
-          showControls ? "visible" : "invisible"
-        )}>
-          {/* Like */}
-          <button 
-            onClick={handleLike}
-            className="flex flex-col items-center gap-0.5 group"
-          >
-            <Heart 
-              className={cn(
-                "w-6 h-6 drop-shadow-lg transition-transform group-active:scale-90", 
-                liked ? "text-red-500 fill-red-500" : "text-white"
-              )} 
-            />
-            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
-          </button>
-
-          {/* Comments */}
-          <button 
-            onClick={() => handleCommentsOpenChange(true)}
-            className="flex flex-col items-center gap-0.5 group"
-          >
-            <MessageCircle className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
-            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-          </button>
-
-          {/* Refeed */}
-          <button 
-            onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }}
-            className="flex flex-col items-center gap-0.5 group"
-          >
-            <Repeat className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
-            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-          </button>
-
-          {/* Gift */}
-          <button 
-            onClick={() => { setGiftOpen(true); onInteractionStart?.(); }}
-            className="flex flex-col items-center gap-0.5 group"
-          >
-            <Gift className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
-            <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-          </button>
-
-          {/* Share */}
-          <button 
-            onClick={() => { setShareOpen(true); onInteractionStart?.(); }}
-            className="flex flex-col items-center gap-0.5 group"
-          >
-            <Share2 className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
-          </button>
-
-          {/* Mute/Unmute for videos */}
-          {hasVideo && (
-            <button 
-              onClick={toggleMute}
-              className="flex flex-col items-center gap-0.5"
-            >
-              {isMuted ? (
-                <VolumeX className="w-6 h-6 text-white drop-shadow-lg" />
-              ) : (
-                <Volume2 className="w-6 h-6 text-white drop-shadow-lg" />
-              )}
+        {/* Conditional Social Button Layout */}
+        {layoutType === 'photo-text' ? (
+          /* Horizontal layout for Photos & Text - Bottom of post */
+          <div className={cn(
+            "absolute left-4 right-4 bottom-24 flex items-center justify-around z-10 bg-black/20 backdrop-blur-sm rounded-full py-2",
+            showControls ? "visible" : "invisible"
+          )}>
+            <button onClick={handleLike} className="flex items-center gap-1.5 group">
+              <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
+              <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
             </button>
-          )}
-        </div>
+            <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
+              <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+              <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
+            </button>
+            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+              <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+              <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
+            </button>
+            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+              <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+              <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
+            </button>
+            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
+              <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+            </button>
+          </div>
+        ) : (
+          /* Vertical layout for Videos - Right side */
+          <div className={cn(
+            "absolute right-3 bottom-24 flex flex-col items-center gap-3 z-10",
+            showControls ? "visible" : "invisible"
+          )}>
+            {/* Like */}
+            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
+              <Heart className={cn("w-6 h-6 drop-shadow-lg transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
+            </button>
+
+            {/* Comments */}
+            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
+              <MessageCircle className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+            </button>
+
+            {/* Refeed */}
+            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+              <Repeat className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+            </button>
+
+            {/* Gift */}
+            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+              <Gift className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+            </button>
+
+            {/* Share */}
+            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+              <Share2 className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            </button>
+          </div>
+        )}
 
         {/* Bottom Left - Caption & Music */}
         <div className="absolute left-4 right-20 bottom-20 z-10">
@@ -820,25 +812,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Fullscreen Media Viewer */}
-      {allPosts && allPosts.length > 0 && (
-        <FullscreenMediaViewer
-          post={isRefeed && displayPost ? displayPost as any : post}
-          allPosts={allPosts}
-          allVideoPosts={allVideoPosts}
-          isOpen={showFullscreenViewer}
-          onClose={() => {
-            setShowFullscreenViewer(false);
-            onInteractionEnd?.();
-          }}
-          onMarkAsViewed={onMarkAsViewed}
-          parentLikesCount={likesCount}
-          parentCommentsCount={commentsCount}
-          parentRefeedsCount={refeedsCount}
-          actualPostId={post.id}
-          initialMuted={isMuted}
-        />
-      )}
     </>
   );
 });

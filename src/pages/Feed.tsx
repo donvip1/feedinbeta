@@ -4,7 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { FloatingActionButton } from '@/components/navigation/FloatingActionButton';
-import { Search, TrendingUp, Radio } from 'lucide-react';
+import { Search, Radio, Bell } from 'lucide-react';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -39,10 +40,10 @@ const Feed = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { haptic } = useNativeFeatures();
-  const [activeTab, setActiveTab] = useState<'following' | 'forYou' | 'live'>('forYou');
+  const [activeTab, setActiveTab] = useState<'videos' | 'photosText' | 'live'>('videos');
   
-  // Tab configuration for swipe gestures
-  const tabs: ('following' | 'forYou' | 'live')[] = ['following', 'forYou', 'live'];
+  // Tab configuration for swipe gestures - Videos, Photos & Text, Live indicator
+  const tabs: ('videos' | 'photosText' | 'live')[] = ['videos', 'photosText', 'live'];
   const activeTabIndex = tabs.indexOf(activeTab);
   
   const handleTabChange = useCallback((index: number) => {
@@ -379,18 +380,25 @@ const Feed = () => {
   }, []);
 
   // Separate queries for each tab - enables instant tab switching
-  const { data: forYouPosts, isLoading: isLoadingForYou, refetch: refetchForYou } = useQuery({
-    queryKey: ['feed-posts-forYou', user?.id],
+  // Videos tab - fetches all posts then filters to video only
+  const { data: videoPosts, isLoading: isLoadingVideos, refetch: refetchVideos } = useQuery({
+    queryKey: ['feed-posts-videos', user?.id],
     queryFn: async () => {
       if (!user) return [];
-      // Show cache immediately if available
       const cached = await feedCache.get('forYou');
       if (cached && cached.length > 0) {
-        // Trigger background refresh after returning cache
         setTimeout(() => fetchTabPosts('forYou', user.id), 100);
-        return cached;
+        // Filter for video posts only
+        return cached.filter((p: any) => 
+          p.media_type === 'video' || 
+          (p.original_post?.media_type === 'video')
+        );
       }
-      return await fetchTabPosts('forYou', user.id);
+      const allPosts = await fetchTabPosts('forYou', user.id);
+      return allPosts.filter((p: any) => 
+        p.media_type === 'video' || 
+        (p.original_post?.media_type === 'video')
+      );
     },
     enabled: !!user,
     staleTime: 60000,
@@ -398,16 +406,25 @@ const Feed = () => {
     refetchOnWindowFocus: false,
   });
 
-  const { data: followingPosts, isLoading: isLoadingFollowing, refetch: refetchFollowing } = useQuery({
-    queryKey: ['feed-posts-following', user?.id],
+  // Photos & Text tab - fetches all posts then filters to non-video
+  const { data: photosTextPosts, isLoading: isLoadingPhotosText, refetch: refetchPhotosText } = useQuery({
+    queryKey: ['feed-posts-photos-text', user?.id],
     queryFn: async () => {
       if (!user) return [];
       const cached = await feedCache.get('following');
       if (cached && cached.length > 0) {
         setTimeout(() => fetchTabPosts('following', user.id), 100);
-        return cached;
+        // Filter for non-video posts (images, text, styled text)
+        return cached.filter((p: any) => 
+          p.media_type !== 'video' && 
+          (!p.original_post || p.original_post.media_type !== 'video')
+        );
       }
-      return await fetchTabPosts('following', user.id);
+      const allPosts = await fetchTabPosts('following', user.id);
+      return allPosts.filter((p: any) => 
+        p.media_type !== 'video' && 
+        (!p.original_post || p.original_post.media_type !== 'video')
+      );
     },
     enabled: !!user,
     staleTime: 60000,
@@ -416,9 +433,9 @@ const Feed = () => {
   });
 
   // Derive current posts based on active tab
-  const posts = activeTab === 'following' ? followingPosts : forYouPosts;
-  const isLoading = activeTab === 'following' ? isLoadingFollowing : isLoadingForYou;
-  const refetch = activeTab === 'following' ? refetchFollowing : refetchForYou;
+  const posts = activeTab === 'videos' ? videoPosts : photosTextPosts;
+  const isLoading = activeTab === 'videos' ? isLoadingVideos : isLoadingPhotosText;
+  const refetch = activeTab === 'videos' ? refetchVideos : refetchPhotosText;
 
   // Update refs when posts change and prefetch profile counts for INSTANT display
   useEffect(() => {
@@ -625,48 +642,51 @@ const Feed = () => {
       {/* TikTok-style Overlay Navigation - Transparent over content */}
       <div className="fixed top-0 left-0 right-0 z-40 pt-safe-area pointer-events-none">
         <div className="flex items-center justify-between px-4 py-3 pointer-events-auto">
-          {/* Left spacer for balance */}
-          <div className="w-16" />
+          {/* Left - Notification Bell */}
+          <div className="w-16 flex justify-start">
+            <NotificationBell />
+          </div>
           
           {/* Centered Tabs with transparent styling */}
           <div className="flex items-center gap-4 relative">
             <button
               onClick={() => {
                 haptic('selection');
-                setActiveTab('following');
+                setActiveTab('videos');
               }}
               className={`text-sm font-semibold transition-all drop-shadow-lg ${
-                activeTab === 'following'
+                activeTab === 'videos'
                   ? 'text-white'
                   : 'text-white/60'
               }`}
             >
-              Following
+              Videos
             </button>
             <button
               onClick={() => {
                 haptic('selection');
-                setActiveTab('forYou');
+                setActiveTab('photosText');
               }}
               className={`text-sm font-semibold transition-all drop-shadow-lg ${
-                activeTab === 'forYou'
+                activeTab === 'photosText'
                   ? 'text-white'
                   : 'text-white/60'
               }`}
             >
-              For You
+              Photos & Text
             </button>
-            <button
-              onClick={() => {
-                haptic('selection');
-                setActiveTab('live');
-              }}
+            {/* Live Indicator - Not a button, just visual indicator */}
+            <div 
               className={`transition-all p-1 rounded-full flex items-center gap-1.5 drop-shadow-lg ${
-                activeTab === 'live'
-                  ? 'bg-red-500/30'
-                  : ''
+                (liveCount || 0) > 0 ? 'cursor-pointer' : ''
               }`}
-              title="Live"
+              title={`${liveCount || 0} live now`}
+              onClick={() => {
+                if ((liveCount || 0) > 0) {
+                  haptic('selection');
+                  setActiveTab('live');
+                }
+              }}
             >
               {(liveCount || 0) > 0 && (
                 <span className="text-xs font-bold text-red-400">{liveCount}</span>
@@ -681,27 +701,20 @@ const Feed = () => {
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-white/40"></span>
                 )}
               </span>
-            </button>
-            {/* Sliding tab indicator */}
+            </div>
+            {/* Sliding tab indicator - only for Videos and Photos & Text */}
             <div 
               className="absolute -bottom-1 h-0.5 bg-white transition-all duration-200 ease-out"
               style={{ 
-                width: activeTab === 'live' ? '12px' : '50px',
-                left: activeTab === 'following' ? '0' : activeTab === 'forYou' ? '70px' : '140px'
+                width: activeTab === 'live' ? '0px' : activeTab === 'videos' ? '50px' : '90px',
+                left: activeTab === 'videos' ? '0' : activeTab === 'photosText' ? '60px' : '0',
+                opacity: activeTab === 'live' ? 0 : 1
               }}
             />
           </div>
 
-          {/* Right icons - Trending & Search */}
+          {/* Right icon - Search only (Trending moved inside Search) */}
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/feed/trending')}
-              className="text-white/80 hover:text-white hover:bg-white/10"
-            >
-              <TrendingUp className="w-5 h-5 drop-shadow-lg" />
-            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -822,6 +835,7 @@ const Feed = () => {
                       allPosts={displayPosts}
                       allVideoPosts={allVideoPostsRef.current}
                       onMarkAsViewed={markAsViewed}
+                      layoutType={activeTab === 'videos' ? 'video' : 'photo-text'}
                     />
                   </div>
                   {showInlineLive && (

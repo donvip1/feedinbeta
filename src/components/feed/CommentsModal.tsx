@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Send, Heart, MoreVertical, X as XIcon } from "lucide-react";
+import { Send, Heart, MoreVertical, X as XIcon, Pencil, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatTextWithHashtagsAndMentions } from "@/lib/text-formatting-utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface CommentsModalProps {
   isOpen: boolean;
@@ -61,6 +63,11 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentions, setShowMentions] = useState(false);
   const [users, setUsers] = useState<any[]>([]);
+  
+  // Edit/Delete state
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const mentionStartPos = useRef<number>(0);
@@ -351,11 +358,57 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
     );
   }
 
+  // Handle edit comment
+  const handleEditComment = async (commentId: string) => {
+    if (!editContent.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from("post_comments")
+        .update({ content: editContent.trim() })
+        .eq("id", commentId)
+        .eq("user_id", user?.id);
+
+      if (error) throw error;
+
+      // Update local state
+      mergeUpdatedComment({ id: commentId, content: editContent.trim() } as CommentRow);
+      setEditingCommentId(null);
+      setEditContent("");
+      toast({ title: "Comment updated!" });
+    } catch (error) {
+      console.error("Error updating comment:", error);
+      toast({ title: "Failed to update comment", variant: "destructive" });
+    }
+  };
+
+  // Handle delete comment
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      const { error } = await supabase
+        .from("post_comments")
+        .delete()
+        .eq("id", commentId)
+        .eq("user_id", user?.id);
+
+      if (error) throw error;
+
+      // Update local state
+      removeCommentById(commentId);
+      setDeleteConfirmId(null);
+      toast({ title: "Comment deleted!" });
+    } catch (error) {
+      console.error("Error deleting comment:", error);
+      toast({ title: "Failed to delete comment", variant: "destructive" });
+    }
+  };
+
   // ----- Render -----
 
   const topLevelCount = comments.length;
 
   return (
+    <>
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
         {/* Post preview */}
@@ -470,13 +523,28 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                         </button>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
+                    {/* Edit/Delete menu for own comments */}
+                    {user?.id === c.user_id ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => { setEditingCommentId(c.id); setEditContent(c.content); }}>
+                            <Pencil className="w-4 h-4 mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setDeleteConfirmId(c.id)} className="text-destructive">
+                            <Trash2 className="w-4 h-4 mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
 
                   {/* Replies */}
@@ -619,5 +687,24 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
         </div>
       </SheetContent>
     </Sheet>
+
+    {/* Delete Confirmation Dialog */}
+    <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete Comment</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this comment? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={() => deleteConfirmId && handleDeleteComment(deleteConfirmId)} className="bg-destructive text-destructive-foreground">
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
   );
 }

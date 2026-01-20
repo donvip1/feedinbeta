@@ -347,11 +347,11 @@ const Search = () => {
                 </div>
               )}
 
-              {/* Quick Search Filters */}
+              {/* Quick Search Filters - Now includes Trending */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
-                  <FileText className="w-5 h-5 text-muted-foreground" />
-                  <h2 className="font-semibold">Explore</h2>
+                  <TrendingUp className="w-5 h-5 text-muted-foreground" />
+                  <h2 className="font-semibold">Explore Categories</h2>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button
@@ -365,10 +365,26 @@ const Search = () => {
                   <Button
                     variant="outline"
                     className="justify-start gap-2"
-                    onClick={() => handleQuickSearch('#tech')}
+                    onClick={() => handleQuickSearch('#sports')}
                   >
                     <Hash className="w-4 h-4" />
-                    #tech
+                    Sports
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start gap-2"
+                    onClick={() => handleQuickSearch('#news')}
+                  >
+                    <Hash className="w-4 h-4" />
+                    News
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start gap-2"
+                    onClick={() => handleQuickSearch('#entertainment')}
+                  >
+                    <Hash className="w-4 h-4" />
+                    Entertainment
                   </Button>
                   <Button
                     variant="outline"
@@ -376,15 +392,15 @@ const Search = () => {
                     onClick={() => handleQuickSearch('#music')}
                   >
                     <Hash className="w-4 h-4" />
-                    #music
+                    Music
                   </Button>
                   <Button
                     variant="outline"
                     className="justify-start gap-2"
-                    onClick={() => handleQuickSearch('#art')}
+                    onClick={() => handleQuickSearch('#tech')}
                   >
                     <Hash className="w-4 h-4" />
-                    #art
+                    Tech
                   </Button>
                 </div>
               </div>
