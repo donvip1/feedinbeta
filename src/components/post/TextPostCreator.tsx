@@ -15,7 +15,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
-type Stage = 'style' | 'compose' | 'details';
+type Stage = 'type' | 'style' | 'compose' | 'details';
+type PostStyle = 'card' | 'plain';
 type BackgroundStyle = 'solid' | 'gradient';
 type Privacy = 'everyone' | 'friends' | 'followers' | 'only_me';
 
@@ -49,7 +50,8 @@ interface TextPostCreatorProps {
 export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [stage, setStage] = useState<Stage>('style');
+  const [stage, setStage] = useState<Stage>('type');
+  const [postStyle, setPostStyle] = useState<PostStyle>('card');
   const [background, setBackground] = useState<BackgroundStyle>('gradient');
   const [selectedGradient, setSelectedGradient] = useState(gradientOptions[0]);
   const [selectedSolidColor, setSelectedSolidColor] = useState(solidColorOptions[0]);
@@ -95,7 +97,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
 
     try {
       // Store background style in media_url for text posts with backgrounds
-      const backgroundStyle = getBackgroundClass();
+      const backgroundStyle = postStyle === 'card' ? getBackgroundClass() : null;
       
       const { error } = await supabase.from('posts').insert({
         user_id: user.id,
@@ -105,8 +107,8 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
         privacy: privacy,
         location: location || null,
         status: 'active',
-        media_url: backgroundStyle, // Store background class here
-        media_type: 'text_styled', // Always mark as styled text post
+        media_url: backgroundStyle, // Store background class here (null for plain text)
+        media_type: postStyle === 'card' ? 'text_styled' : 'text_plain',
       });
 
       if (error) throw error;
@@ -147,8 +149,48 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
         </button>
       </div>
 
-      {/* STAGE 1: Style Selector */}
-      {stage === 'style' && (
+      {/* STAGE 0: Post Type Selector */}
+      {stage === 'type' && (
+        <div className="w-full space-y-4">
+          <div className="text-sm font-medium text-muted-foreground">Choose post style</div>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setPostStyle('card')}
+              className={`flex-1 rounded-xl p-4 text-sm font-semibold transition border-2 ${
+                postStyle === 'card' ? 'border-primary bg-primary/10' : 'border-border bg-muted'
+              }`}
+            >
+              <div className={`w-full h-20 rounded-lg mb-3 ${gradientOptions[0]}`} />
+              <Palette className="w-5 h-5 mx-auto mb-1" />
+              <span className="block">Text Card</span>
+              <span className="text-xs text-muted-foreground">With background colors</span>
+            </button>
+            <button
+              onClick={() => setPostStyle('plain')}
+              className={`flex-1 rounded-xl p-4 text-sm font-semibold transition border-2 ${
+                postStyle === 'plain' ? 'border-primary bg-primary/10' : 'border-border bg-muted'
+              }`}
+            >
+              <div className="w-full h-20 rounded-lg mb-3 bg-background border border-border flex items-center justify-center">
+                <Type className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <Type className="w-5 h-5 mx-auto mb-1" />
+              <span className="block">Plain Text</span>
+              <span className="text-xs text-muted-foreground">Simple text post</span>
+            </button>
+          </div>
+
+          <button
+            onClick={() => setStage(postStyle === 'card' ? 'style' : 'compose')}
+            className="mt-6 w-full py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm"
+          >
+            Next
+          </button>
+        </div>
+      )}
+
+      {/* STAGE 1: Style Selector (only for card style) */}
+      {stage === 'style' && postStyle === 'card' && (
         <div className="w-full space-y-4">
           <div className="text-sm font-medium text-muted-foreground">Choose background style</div>
           <div className="flex gap-2">
@@ -213,12 +255,20 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
             <Music2 className={`w-5 h-5 ${music ? 'text-primary' : 'text-muted-foreground'}`} />
           </button>
 
-          <button
-            onClick={() => setStage('compose')}
-            className="mt-6 w-full py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm"
-          >
-            Next
-          </button>
+          <div className="flex gap-2 mt-6">
+            <button
+              onClick={() => setStage('type')}
+              className="flex-1 py-3 rounded-full bg-muted text-foreground font-semibold text-sm"
+            >
+              Back
+            </button>
+            <button
+              onClick={() => setStage('compose')}
+              className="flex-1 py-3 rounded-full bg-primary text-primary-foreground font-semibold text-sm"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 
@@ -226,7 +276,9 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
       {stage === 'compose' && (
         <div className="w-full flex flex-col items-center">
           <div
-            className={`w-full min-h-[60vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${getBackgroundClass()}`}
+            className={`w-full min-h-[60vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${
+              postStyle === 'card' ? getBackgroundClass() : 'bg-background border border-border'
+            }`}
           >
             <textarea
               value={text}
@@ -241,7 +293,9 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
               }}
               placeholder="What's on your mind?"
               maxLength={500}
-              className={`w-full bg-transparent text-xl font-semibold resize-none outline-none text-center placeholder:opacity-70 ${getTextColorClass()}`}
+              className={`w-full bg-transparent text-xl font-semibold resize-none outline-none text-center placeholder:opacity-70 ${
+                postStyle === 'card' ? getTextColorClass() : 'text-foreground'
+              }`}
               rows={8}
             />
           </div>
@@ -250,7 +304,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
             {text.length}/500 characters
           </div>
 
-          {music && (
+          {music && postStyle === 'card' && (
             <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
               <Music2 className="w-4 h-4" />
               <span>{music}</span>
@@ -259,7 +313,7 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
 
           <div className="w-full flex justify-between">
             <button
-              onClick={() => setStage('style')}
+              onClick={() => setStage(postStyle === 'card' ? 'style' : 'type')}
               className="px-6 py-2 rounded-full bg-muted text-foreground font-semibold"
             >
               Back
@@ -289,9 +343,13 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
         <div className="w-full space-y-4">
           {/* Preview */}
           <div
-            className={`w-full min-h-[30vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${getBackgroundClass()}`}
+            className={`w-full min-h-[30vh] rounded-lg flex items-center justify-center text-center p-6 mb-4 ${
+              postStyle === 'card' ? getBackgroundClass() : 'bg-background border border-border'
+            }`}
           >
-            <p className={`text-lg font-semibold break-words ${getTextColorClass()}`}>
+            <p className={`text-lg font-semibold break-words text-center ${
+              postStyle === 'card' ? getTextColorClass() : 'text-foreground'
+            }`}>
               {text}
             </p>
           </div>
