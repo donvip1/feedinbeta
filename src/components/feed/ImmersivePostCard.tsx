@@ -532,14 +532,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Plain text posts - No card, just simple dark background with text */}
           {(isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled)) && (
             <div 
-              className="w-full h-full flex flex-col px-4 pr-16 pt-28 pb-6 overflow-hidden bg-background"
+              className="w-full h-full flex flex-col items-center justify-center px-4 pr-16 py-6 overflow-hidden bg-background"
               style={{ touchAction: 'manipulation' }}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
               }}
             >
-              <p className="text-foreground text-lg md:text-xl leading-relaxed max-w-full break-words whitespace-pre-wrap">
+              <p className="text-foreground text-lg md:text-xl leading-relaxed max-w-full break-words whitespace-pre-wrap text-center">
                 {renderCaptionWithHashtags(caption)}
               </p>
             </div>
