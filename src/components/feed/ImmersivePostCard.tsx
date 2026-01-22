@@ -609,19 +609,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               Sponsored
             </Badge>
           )}
-          {/* Promote CTA - Positioned on right side */}
-          {user && !isPromoted && !isPlainText && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/promote/${post.id}`);
-              }}
-              className="flex items-center gap-1.5 text-white hover:text-white/80 text-xs font-bold transition-all animate-pulse drop-shadow-lg"
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Promote</span>
-            </button>
-          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="p-2 transition-colors">
@@ -696,7 +683,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         {/* Social buttons for Videos - Vertical layout on right side */}
         {layoutType === 'video' && (
           <div className={cn(
-            "absolute right-3 bottom-4 flex flex-col items-center gap-3 z-10",
+            "absolute right-3 bottom-14 flex flex-col items-center gap-3 z-10",
             showControls ? "visible" : "invisible"
           )}>
             {/* Like */}
@@ -728,6 +715,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <Share2 className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
             </button>
           </div>
+        )}
+
+        {/* Promote CTA - Bottom right for videos */}
+        {layoutType === 'video' && user && !isPromoted && (
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/promote/${post.id}`);
+            }}
+            className="absolute right-3 bottom-4 z-10 flex items-center gap-1.5 text-white hover:text-white/80 text-xs font-bold transition-all animate-pulse drop-shadow-lg"
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>Promote</span>
+          </button>
         )}
 
         {/* Bottom Left - Music & Social Buttons - Hide for plain text since it's already shown */}
