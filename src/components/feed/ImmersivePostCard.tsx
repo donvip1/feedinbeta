@@ -609,6 +609,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               Sponsored
             </Badge>
           )}
+          {/* Promote CTA - Positioned on right side */}
+          {user && !isPromoted && !isPlainText && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/promote/${post.id}`);
+              }}
+              className="flex items-center gap-1.5 text-white hover:text-white/80 text-xs font-bold transition-all animate-pulse drop-shadow-lg"
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Promote</span>
+            </button>
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="p-2 transition-colors">
@@ -632,6 +645,39 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Top Section - Refeed indicator & Caption (below user info) */}
+        {!isPlainText && (isRefeed || (caption && !isTextStyled)) && (
+          <div className="absolute top-24 left-4 right-16 z-10">
+            {/* Refeed indicator */}
+            {isRefeed && (
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Repeat className="w-3.5 h-3.5 text-white/70" />
+                <span className="text-xs text-white/70">Refeed from @{post.original_post?.profiles?.username}</span>
+              </div>
+            )}
+
+            {/* Caption - shown for all post types except text styled and plain text */}
+            {caption && !isTextStyled && (
+              <div>
+                <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
+                  {renderCaptionWithHashtags(truncatedCaption)}
+                </p>
+                {caption.length > 100 && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFullCaption(!showFullCaption);
+                    }}
+                    className="text-primary text-xs mt-1 font-medium"
+                  >
+                    {showFullCaption ? 'Show less' : 'Show more...'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Mute/Unmute Button - Positioned below menu, no shadow */}
         {hasVideo && (
@@ -684,91 +730,48 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Bottom Left - Caption & Music - Hide for plain text since it's already shown */}
+        {/* Bottom Left - Music & Social Buttons - Hide for plain text since it's already shown */}
         {!isPlainText && (
           <div className="absolute left-4 right-16 bottom-4 z-10">
-            {/* Refeed indicator */}
-            {isRefeed && (
-              <div className="flex items-center gap-1.5 mb-2">
-                <Repeat className="w-3.5 h-3.5 text-white/70" />
-                <span className="text-xs text-white/70">Refeed from @{post.original_post?.profiles?.username}</span>
+            {/* Social buttons for Photos & Text - Horizontal layout */}
+            {layoutType === 'photo-text' && (
+              <div className={cn(
+                "flex items-center gap-4 mb-2",
+                showControls ? "visible" : "invisible"
+              )}>
+                <button onClick={handleLike} className="flex items-center gap-1.5 group">
+                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
+                  <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
+                </button>
+                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
+                  <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
+                </button>
+                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                  <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
+                </button>
+                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                  <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
+                </button>
+                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
+                  <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                </button>
               </div>
             )}
 
-            {/* Caption - shown for all post types except text styled and plain text */}
-            {caption && !isTextStyled && (
-              <div className="mb-2">
-              <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
-                {renderCaptionWithHashtags(truncatedCaption)}
-              </p>
-                {caption.length > 100 && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowFullCaption(!showFullCaption);
-                    }}
-                    className="text-primary text-xs mt-1 font-medium"
-                  >
-                    {showFullCaption ? 'Show less' : 'Show more...'}
-                  </button>
-                )}
+            {/* Music indicator */}
+            {hasMusic && (
+              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
+                <Music className="w-4 h-4 text-white animate-pulse" />
+                <div className="overflow-hidden">
+                  <p className="text-white text-xs font-medium truncate max-w-[180px]">
+                    {post.music_title || 'Original Audio'} {post.music_artist && `· ${post.music_artist}`}
+                  </p>
+                </div>
               </div>
             )}
-
-          {/* Promote CTA - White color for visibility on all backgrounds */}
-          {user && !isPromoted && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/promote/${post.id}`);
-              }}
-              className="flex items-center gap-1.5 text-white hover:text-white/80 text-xs font-bold transition-all animate-pulse mb-2 drop-shadow-lg"
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Promote this post</span>
-            </button>
-          )}
-
-          {/* Social buttons for Photos & Text - Horizontal layout under promote */}
-          {layoutType === 'photo-text' && (
-            <div className={cn(
-              "flex items-center gap-4 mt-2",
-              showControls ? "visible" : "invisible"
-            )}>
-              <button onClick={handleLike} className="flex items-center gap-1.5 group">
-                <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
-                <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
-              </button>
-              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-                <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
-              </button>
-              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-                <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
-              </button>
-              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-                <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
-              </button>
-              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
-                <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-              </button>
-            </div>
-          )}
-
-          {/* Music indicator */}
-          {hasMusic && (
-            <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit mb-2">
-              <Music className="w-4 h-4 text-white animate-pulse" />
-              <div className="overflow-hidden">
-                <p className="text-white text-xs font-medium truncate max-w-[180px]">
-                  {post.music_title || 'Original Audio'} {post.music_artist && `· ${post.music_artist}`}
-                </p>
-              </div>
-            </div>
-          )}
-
           </div>
         )}
 
