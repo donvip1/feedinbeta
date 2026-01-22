@@ -635,7 +635,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* Top Section - Refeed indicator & Caption (below user info) */}
         {!isPlainText && (isRefeed || (caption && !isTextStyled)) && (
-          <div className="absolute top-24 left-4 right-16 z-10">
+          <div className="absolute top-24 left-4 right-16 z-10 pl-9">
             {/* Refeed indicator */}
             {isRefeed && (
               <div className="flex items-center gap-1.5 mb-1.5">
