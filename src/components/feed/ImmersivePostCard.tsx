@@ -888,7 +888,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) - hidden in immersive mode, or shown when immersive UI is visible --- */}
           {(!isImmersiveMode || showImmersiveUI) && (
             <div className={cn(
-              "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
+              "absolute right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
+              isImmersiveMode ? "bottom-28" : "bottom-24",
               (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
             )}>
               {/* Like */}
