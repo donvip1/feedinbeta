@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus, Globe, Star } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus, Globe, Star, ArrowLeft } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -130,7 +130,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI except author name
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI
+  const [showImmersiveUI, setShowImmersiveUI] = useState(false); // Toggle UI visibility while in immersive mode
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -351,17 +352,30 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     return () => { supabase.removeChannel(channel); };
   }, [post.id]);
 
-  // Toggle immersive mode (fullscreen with minimal UI)
-  const toggleImmersiveMode = () => {
-    const newMode = !isImmersiveMode;
-    setIsImmersiveMode(newMode);
-    onImmersiveModeChange?.(newMode);
+  // Enter immersive mode (fullscreen with minimal UI)
+  const enterImmersiveMode = () => {
+    setIsImmersiveMode(true);
+    setShowImmersiveUI(false); // Start with UI hidden
+    onImmersiveModeChange?.(true);
     
     // In immersive mode, start playing if not already
-    if (newMode && videoRef.current && !isPlaying) {
+    if (videoRef.current && !isPlaying) {
       videoRef.current.play();
       setIsPlaying(true);
     }
+  };
+
+  // Exit immersive mode (return to normal view)
+  const exitImmersiveMode = () => {
+    setIsImmersiveMode(false);
+    setShowImmersiveUI(false);
+    onImmersiveModeChange?.(false);
+    // Video continues playing from current position - no need to reset
+  };
+
+  // Toggle UI visibility in immersive mode
+  const toggleImmersiveUI = () => {
+    setShowImmersiveUI(prev => !prev);
   };
 
   const togglePlayPause = () => {
@@ -390,11 +404,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     e.preventDefault();
     
     if (isImmersiveMode) {
-      // In immersive mode, tap exits immersive mode
-      toggleImmersiveMode();
+      // In immersive mode, tap toggles UI visibility (not exit)
+      toggleImmersiveUI();
     } else {
-      // In normal mode, tap toggles play/pause
-      togglePlayPause();
+      // In normal mode, tap just toggles controls visibility (no play/pause)
+      setShowControls(prev => !prev);
     }
   };
 
@@ -686,29 +700,52 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </>
           )}
 
-          {/* Immersive Mode: Author Name Overlay (only visible in immersive mode) */}
+          {/* Immersive Mode: Only Avatar Overlay (always visible in immersive mode) */}
           {isImmersiveMode && (
-            <div className="absolute top-12 left-4 z-30 pointer-events-none">
-              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5">
-                <Avatar className="w-6 h-6 border border-white/20">
-                  <AvatarImage src={post.profiles?.avatar_url || ''} />
-                  <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <span className="text-white text-sm font-medium drop-shadow-lg">{displayName}</span>
-              </div>
+            <div className="absolute top-12 left-4 z-30">
+              <Avatar 
+                className="w-8 h-8 border-2 border-white/30 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleProfileClick();
+                }}
+              >
+                <AvatarImage src={post.profiles?.avatar_url || ''} />
+                <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
             </div>
           )}
 
-          {/* Play/Pause Center Overlay - only in normal mode */}
-          {hasVideo && !isImmersiveMode && (
+          {/* Immersive Mode: Back Button to exit fullscreen */}
+          {isImmersiveMode && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                exitImmersiveMode();
+              }}
+              className="absolute top-12 right-4 z-30 p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50"
+            >
+              <ArrowLeft className="w-5 h-5 text-white" />
+            </button>
+          )}
+
+          {/* Play/Pause Center Overlay - in normal mode: clicking enters fullscreen. In immersive mode with UI shown: toggle play/pause */}
+          {hasVideo && (
             <div className={cn(
               "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
-              showControls ? "opacity-100" : "opacity-0"
+              // In normal mode: show when controls visible. In immersive mode: show when UI visible
+              (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0"
             )}>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  toggleImmersiveMode();
+                  if (isImmersiveMode) {
+                    // In immersive mode, toggle play/pause
+                    togglePlayPause();
+                  } else {
+                    // In normal mode, enter fullscreen immersive mode
+                    enterImmersiveMode();
+                  }
                 }}
                 className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
               >
@@ -736,11 +773,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Mute/Unmute Button - Top right of media, standalone - hidden in immersive mode */}
-          {hasVideo && !isImmersiveMode && (
+          {/* Mute/Unmute Button - Top right of media, standalone - hidden in immersive mode, or shown when immersive UI is visible */}
+          {hasVideo && (!isImmersiveMode || showImmersiveUI) && (
             <button 
               onClick={toggleMute}
-              className="absolute top-4 right-3 z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50"
+              className={cn(
+                "absolute z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50",
+                isImmersiveMode ? "top-12 right-14" : "top-4 right-3" // Adjust position in immersive mode to not overlap with back button
+              )}
             >
               {isMuted ? (
                 <VolumeX className="w-5 h-5 text-white" />
@@ -750,8 +790,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </button>
           )}
 
-          {/* Promoted Badge - hidden in immersive mode */}
-          {isPromoted && !isImmersiveMode && (
+          {/* Promoted Badge - hidden in immersive mode, or shown when immersive UI is visible */}
+          {isPromoted && (!isImmersiveMode || showImmersiveUI) && (
             <div className="absolute top-4 left-4 z-10">
               <Badge className="bg-pink-500/90 backdrop-blur-sm text-white text-xs font-semibold">
                 <Sparkles className="w-3 h-3 mr-1" />
@@ -760,11 +800,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) - hidden in immersive mode --- */}
-          {!isImmersiveMode && (
+          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) - hidden in immersive mode, or shown when immersive UI is visible --- */}
+          {(!isImmersiveMode || showImmersiveUI) && (
             <div className={cn(
-              "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto",
-              showControls ? "visible" : "invisible"
+              "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
+              (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
             )}>
               {/* Like */}
               <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
@@ -833,9 +873,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Bottom Left - Music indicator - hidden in immersive mode */}
-          {hasMusic && !isImmersiveMode && (
-            <div className="absolute left-4 bottom-4 z-10 flex items-center gap-3">
+          {/* Bottom Left - Music indicator - hidden in immersive mode, or shown when immersive UI is visible */}
+          {hasMusic && (!isImmersiveMode || showImmersiveUI) && (
+            <div className={cn(
+              "absolute left-4 bottom-4 z-10 flex items-center gap-3 transition-opacity duration-200",
+              (isImmersiveMode ? showImmersiveUI : true) ? "opacity-100" : "opacity-0"
+            )}>
               <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
                 <div className="w-4 h-4 rounded-full bg-white/20" />
                 <div className="absolute inset-0 rounded-full border border-white/10" />
