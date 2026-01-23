@@ -142,6 +142,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [videoDuration, setVideoDuration] = useState(0); // Video duration in seconds
   const [isSeeking, setIsSeeking] = useState(false); // Is user dragging timeline
   const [isFollowing, setIsFollowing] = useState(false); // Follow state
+  const [showMoreActions, setShowMoreActions] = useState(false); // Toggle for expanded social buttons when caption is long
   const [isFollowLoading, setIsFollowLoading] = useState(false); // Loading state for follow action
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -928,73 +929,100 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- RIGHT SIDEBAR: Social Buttons (always visible, overlays on top of comments) --- */}
-          {(!isImmersiveMode || showImmersiveUI) && (
-            <div className={cn(
-              "absolute right-3 z-50 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
-              isImmersiveMode ? "bottom-16" : "bottom-14",
-              (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
-            )}>
-              {/* Like */}
-              <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-                <div className={cn(
-                  "p-1.5 rounded-full transition-all active:scale-90",
-                  liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
-                )}>
-                  <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
-              </button>
+          {/* --- RIGHT SIDEBAR: Social Buttons (with collapsible "more" for long captions) --- */}
+          {(!isImmersiveMode || showImmersiveUI) && (() => {
+            const hasLongCaption = caption && countWords(caption) > 15;
+            return (
+              <div className={cn(
+                "absolute right-3 z-50 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
+                isImmersiveMode ? "bottom-16" : "bottom-14",
+                (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
+              )}>
+                {/* Like - always visible */}
+                <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
+                  <div className={cn(
+                    "p-1.5 rounded-full transition-all active:scale-90",
+                    liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+                  )}>
+                    <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+                  </div>
+                  <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
+                </button>
 
-              {/* Comments - opens draggable panel in immersive mode, modal otherwise */}
-              <button 
-                onClick={(e) => {
-                  if (isImmersiveMode) {
-                    openImmersiveComments(e);
-                  } else {
-                    handleCommentsOpenChange(true);
-                  }
-                }} 
-                className="flex flex-col items-center gap-0.5 group"
-              >
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <MessageCircle className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-              </button>
+                {/* Comments - always visible */}
+                <button 
+                  onClick={(e) => {
+                    if (isImmersiveMode) {
+                      openImmersiveComments(e);
+                    } else {
+                      handleCommentsOpenChange(true);
+                    }
+                  }} 
+                  className="flex flex-col items-center gap-0.5 group"
+                >
+                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <MessageCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+                </button>
 
-              {/* Views */}
-              <div className="flex flex-col items-center gap-0.5">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
-                  <Eye className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
+                {/* Collapsible buttons - show when no long caption OR when expanded */}
+                {(!hasLongCaption || showMoreActions) && (
+                  <>
+                    {/* Views */}
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
+                        <Eye className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
+                    </div>
+
+                    {/* Refeed */}
+                    <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                        <Repeat className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+                    </button>
+
+                    {/* Gift */}
+                    <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                        <Gift className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+                    </button>
+
+                    {/* Share */}
+                    <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                        <Share2 className="w-5 h-5 text-white" />
+                      </div>
+                    </button>
+                  </>
+                )}
+
+                {/* More/Close toggle button - only show when caption is long */}
+                {hasLongCaption && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowMoreActions(!showMoreActions);
+                    }} 
+                    className="flex flex-col items-center gap-0.5 group"
+                  >
+                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                      {showMoreActions ? (
+                        <X className="w-5 h-5 text-white" />
+                      ) : (
+                        <MoreHorizontal className="w-5 h-5 text-white" />
+                      )}
+                    </div>
+                  </button>
+                )}
               </div>
-
-              {/* Refeed */}
-              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Repeat className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-              </button>
-
-              {/* Gift */}
-              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Gift className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-              </button>
-
-              {/* Share */}
-              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Share2 className="w-5 h-5 text-white" />
-                </div>
-              </button>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Immersive Mode: Caption overlay - shown when UI is visible */}
           {isImmersiveMode && showImmersiveUI && caption && !isTextStyled && !isPlainText && (
