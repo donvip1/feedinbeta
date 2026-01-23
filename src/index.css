@@ -619,6 +619,81 @@ All colors MUST be HSL.
   animation: confetti-fall 3s linear forwards;
 }
 
+/* Toast/Notification Styling - Modern swipe-to-dismiss */
+[data-sonner-toaster] {
+  --width: 356px;
+}
+
+[data-sonner-toast] {
+  touch-action: pan-y;
+  cursor: grab;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+[data-sonner-toast]:active {
+  cursor: grabbing;
+}
+
+[data-sonner-toast][data-swiping="true"] {
+  transition: none;
+}
+
+/* Hide close button completely */
+[data-sonner-toast] [data-close-button] {
+  display: none !important;
+}
+
+/* Toast enter animation */
+[data-sonner-toast][data-mounted="true"] {
+  animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-100%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Toast exit animation */
+[data-sonner-toast][data-removed="true"] {
+  animation: toast-slide-out 0.2s ease-out forwards;
+}
+
+@keyframes toast-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-50%) scale(0.95);
+  }
+}
+
+/* Swipe indicator - subtle grab hint */
+[data-sonner-toast]::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 32px;
+  height: 4px;
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+[data-sonner-toast]:hover::before {
+  opacity: 1;
+}
+
 @layer base {
   * {
     @apply border-border;
