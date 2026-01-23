@@ -854,6 +854,7 @@ const Feed = () => {
                       globalMuted={globalMuted}
                       onGlobalMuteToggle={toggleGlobalMute}
                       onImmersiveModeChange={setIsImmersiveMode}
+                      isGlobalImmersive={isImmersiveMode}
                     />
                   </div>
                   {showInlineLive && (
@@ -898,6 +899,8 @@ const Feed = () => {
                     onMarkAsViewed={() => {}}
                     globalMuted={globalMuted}
                     onGlobalMuteToggle={toggleGlobalMute}
+                    onImmersiveModeChange={setIsImmersiveMode}
+                    isGlobalImmersive={isImmersiveMode}
                   />
                 </div>
               );
