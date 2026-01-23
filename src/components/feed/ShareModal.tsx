@@ -1,5 +1,5 @@
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { Share2, Link2, Download, Send, Users, ImageIcon, Bookmark } from 'lucide-react';
+import { Share2, Link2, Download, Send, Users, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
@@ -18,11 +18,9 @@ interface ShareModalProps {
     media_type?: string;
     content?: string;
   };
-  onSaveToggle?: () => void;
-  isSaved?: boolean;
 }
 
-export default function ShareModal({ isOpen, onClose, postId, postData, onSaveToggle, isSaved }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, postId, postData }: ShareModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showFriends, setShowFriends] = useState(false);
@@ -322,21 +320,6 @@ export default function ShareModal({ isOpen, onClose, postId, postData, onSaveTo
             <Link2 className="w-5 h-5" />
             <span className="font-medium">Copy Link</span>
           </Button>
-
-          {/* Save/Bookmark option */}
-          {onSaveToggle && (
-            <Button
-              onClick={() => {
-                onSaveToggle();
-                onClose();
-              }}
-              className="w-full flex items-center justify-start gap-3 h-12 rounded-lg bg-card hover:bg-accent"
-              variant="ghost"
-            >
-              <Bookmark className={isSaved ? "w-5 h-5 fill-primary text-primary" : "w-5 h-5"} />
-              <span className="font-medium">{isSaved ? 'Remove from Saved' : 'Save Post'}</span>
-            </Button>
-          )}
 
           {postData?.media_url && (
             <Button

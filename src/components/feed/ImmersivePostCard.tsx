@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus, Globe, Star } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus, Globe, Star, ArrowLeft } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,7 @@ import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
-import FullscreenFeedViewer from './FullscreenFeedViewer';
+import InlineCommentsPanel from './InlineCommentsPanel';
 import { cn } from '@/lib/utils';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
 
@@ -131,16 +131,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [showFullscreenViewer, setShowFullscreenViewer] = useState(false); // Opens fullscreen feed viewer
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI
   const [showImmersiveUI, setShowImmersiveUI] = useState(false); // Toggle UI visibility while in immersive mode
+  const [showInlineComments, setShowInlineComments] = useState(true); // Show inline comments in immersive mode
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
-  const [hasPlayedPreview, setHasPlayedPreview] = useState(false); // Track if 2-sec preview has played
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Auto-show controls after 1 second of inactivity
   const resetControlsTimer = () => {
@@ -294,7 +293,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     return () => observer.disconnect();
   }, [user, post.id, post.user_id, hasViewed, onView]);
 
-  // Auto-play video when visible - 2 second preview then pause
+  // Auto-play video when visible
   useEffect(() => {
     if (!hasVideo && !isTextStyled) return;
     if (!videoRef.current && !isTextStyled) return;
@@ -306,7 +305,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         if (entry.isIntersecting) {
           if (videoRef.current) {
             videoRef.current.muted = isMuted;
-            videoRef.current.currentTime = 0; // Start from beginning
             videoRef.current.play().catch(() => {
               if (videoRef.current) {
                 videoRef.current.muted = true;
@@ -320,26 +318,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               }
             });
             setIsPlaying(true);
-            
-            // Pause after 2 seconds preview (only if not already paused by user)
-            if (!hasPlayedPreview) {
-              previewTimeoutRef.current = setTimeout(() => {
-                if (videoRef.current && !showFullscreenViewer) {
-                  videoRef.current.pause();
-                  setIsPlaying(false);
-                  setHasPlayedPreview(true);
-                }
-              }, 2000);
-            }
           }
         } else {
           if (videoRef.current) {
             videoRef.current.pause();
             setIsPlaying(false);
-          }
-          // Clear preview timeout when leaving view
-          if (previewTimeoutRef.current) {
-            clearTimeout(previewTimeoutRef.current);
           }
         }
       },
@@ -347,13 +330,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     );
     
     if (postRef.current) observer.observe(postRef.current);
-    return () => {
-      observer.disconnect();
-      if (previewTimeoutRef.current) {
-        clearTimeout(previewTimeoutRef.current);
-      }
-    };
-  }, [hasVideo, isTextStyled, isMuted, hasPlayedPreview, showFullscreenViewer]);
+    return () => observer.disconnect();
+  }, [hasVideo, isTextStyled, isMuted]);
 
   // Real-time subscription for count updates
   useEffect(() => {
@@ -376,33 +354,39 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     return () => { supabase.removeChannel(channel); };
   }, [post.id]);
 
-  // Open fullscreen feed viewer
-  const openFullscreenViewer = () => {
-    // Clear preview timeout
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current);
-    }
-    setShowFullscreenViewer(true);
+  // Enter immersive mode (fullscreen with minimal UI)
+  const enterImmersiveMode = () => {
+    setIsImmersiveMode(true);
+    setShowImmersiveUI(false); // Start with UI hidden
     onImmersiveModeChange?.(true);
-  };
-
-  // Close fullscreen viewer and resume from position
-  const closeFullscreenViewer = (postId: string, currentTime: number) => {
-    setShowFullscreenViewer(false);
-    onImmersiveModeChange?.(false);
     
-    // Resume video from where it was in fullscreen
-    if (videoRef.current && postId === post.id) {
-      videoRef.current.currentTime = currentTime;
+    // In immersive mode, start playing if not already
+    if (videoRef.current && !isPlaying) {
+      videoRef.current.play();
+      setIsPlaying(true);
     }
   };
 
-  // Toggle UI visibility
+  // Exit immersive mode (return to normal view)
+  const exitImmersiveMode = () => {
+    setIsImmersiveMode(false);
+    setShowImmersiveUI(false);
+    onImmersiveModeChange?.(false);
+    // Video continues playing from current position - no need to reset
+  };
+
+  // Toggle UI visibility in immersive mode
   const toggleImmersiveUI = () => {
     setShowImmersiveUI(prev => !prev);
   };
 
   const togglePlayPause = () => {
+    // Toggle controls visibility on any tap
+    setShowControls(prev => !prev);
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -416,15 +400,18 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     }
   };
 
-  // Handle tap on video/media area - opens fullscreen viewer
+  // Handle tap on video/media area
   const handleMediaTap = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    // Clear preview timeout and open fullscreen
-    if (previewTimeoutRef.current) {
-      clearTimeout(previewTimeoutRef.current);
+    
+    if (isImmersiveMode) {
+      // In immersive mode, tap toggles UI visibility (not exit)
+      toggleImmersiveUI();
+    } else {
+      // In normal mode, tap just toggles controls visibility (no play/pause)
+      setShowControls(prev => !prev);
     }
-    openFullscreenViewer();
   };
 
   const toggleMute = (e: React.MouseEvent) => {
@@ -528,12 +515,16 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     <>
       <div 
         ref={postRef}
-        className="relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col h-[calc(100dvh-68px)]"
+        className={cn(
+          "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
+          isImmersiveMode ? "h-[100dvh] fixed inset-0 max-w-none z-50" : "h-[calc(100dvh-68px)]"
+        )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* --- TOP SECTION: User Info & Caption (NOT overlayed) --- */}
-        <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
+        {/* --- TOP SECTION: User Info & Caption (NOT overlayed) - Hidden in immersive mode --- */}
+        {!isImmersiveMode && (
+          <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
             <div className="flex items-start justify-between">
               <div className="flex gap-3">
                 <div className="relative">
@@ -615,10 +606,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 )}
               </div>
             )}
-        </div>
+          </div>
+        )}
 
-        {/* --- MEDIA SECTION --- */}
-        <div className="relative overflow-hidden flex-1">
+        {/* --- MEDIA SECTION (takes full screen in immersive mode) --- */}
+        <div className={cn(
+          "relative overflow-hidden",
+          isImmersiveMode ? "flex-1 h-full w-full" : "flex-1"
+        )}>
           {/* Loading skeleton */}
           {!isMediaLoaded && (currentMediaUrl || isTextStyled) && (
             <Skeleton className="absolute inset-0 w-full h-full bg-muted/30" />
@@ -632,9 +627,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               className={cn(
                 "w-full h-full transition-opacity duration-300",
                 isMediaLoaded ? "opacity-100" : "opacity-0",
-                isLandscapeVideo ? "object-contain bg-black" : "object-cover"
+                // In immersive mode, always cover full screen
+                isImmersiveMode ? "object-cover" : (isLandscapeVideo ? "object-contain bg-black" : "object-cover")
               )}
-              style={{ touchAction: 'manipulation' }}
+              style={{ touchAction: 'manipulation', minHeight: isImmersiveMode ? '100%' : undefined, minWidth: isImmersiveMode ? '100%' : undefined }}
               muted={isMuted}
               playsInline
               loop
@@ -661,9 +657,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 src={currentMediaUrl}
                 alt="Post media"
                 className={cn(
-                  "w-full h-full transition-opacity duration-300 object-contain",
-                  isMediaLoaded ? "opacity-100" : "opacity-0"
+                  "w-full h-full transition-opacity duration-300",
+                  isMediaLoaded ? "opacity-100" : "opacity-0",
+                  isImmersiveMode ? "object-cover" : "object-contain"
                 )}
+                style={{ minHeight: isImmersiveMode ? '100%' : undefined, minWidth: isImmersiveMode ? '100%' : undefined }}
                 onClick={handleMediaTap}
                 onLoad={() => setIsMediaLoaded(true)}
                 onContextMenu={(e) => e.preventDefault()}
@@ -702,26 +700,62 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Gradient overlays for buttons readability */}
-          {(hasVideo || hasImage) && (
+          {/* Gradient overlays for buttons readability - shown when NOT in immersive mode */}
+          {(hasVideo || hasImage) && !isImmersiveMode && (
             <>
               <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
               <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
             </>
           )}
 
-          {/* Play/Pause Center Overlay - clickable button */}
-          {hasVideo && (
-            <div className={cn(
-              "absolute inset-0 flex items-center justify-center transition-opacity duration-300",
-              (!isPlaying || showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
-            )}>
-              <button
+          {/* Immersive Mode: Only Avatar Overlay (always visible in immersive mode) */}
+          {isImmersiveMode && (
+            <div className="absolute top-12 left-4 z-30">
+              <Avatar 
+                className="w-8 h-8 border-2 border-white/30 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
-                  togglePlayPause();
+                  handleProfileClick();
                 }}
-                className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10 transition-transform active:scale-95"
+              >
+                <AvatarImage src={post.profiles?.avatar_url || ''} />
+                <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+            </div>
+          )}
+
+          {/* Immersive Mode: Back Button to exit fullscreen */}
+          {isImmersiveMode && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                exitImmersiveMode();
+              }}
+              className="absolute top-12 right-4 z-30 p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50"
+            >
+              <ArrowLeft className="w-5 h-5 text-white" />
+            </button>
+          )}
+
+          {/* Play/Pause Center Overlay - in normal mode: clicking enters fullscreen. In immersive mode with UI shown: toggle play/pause */}
+          {hasVideo && (
+            <div className={cn(
+              "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
+              // In normal mode: show when controls visible. In immersive mode: show when UI visible
+              (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0"
+            )}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isImmersiveMode) {
+                    // In immersive mode, toggle play/pause
+                    togglePlayPause();
+                  } else {
+                    // In normal mode, enter fullscreen immersive mode
+                    enterImmersiveMode();
+                  }
+                }}
+                className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
               >
                 {isPlaying ? (
                   <Pause className="w-8 h-8 text-white" fill="white" />
@@ -747,11 +781,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Mute/Unmute Button */}
-          {hasVideo && (
+          {/* Mute/Unmute Button - Top right of media, standalone - hidden in immersive mode, or shown when immersive UI is visible */}
+          {hasVideo && (!isImmersiveMode || showImmersiveUI) && (
             <button 
               onClick={toggleMute}
-              className="absolute z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50 top-4 right-3"
+              className={cn(
+                "absolute z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50",
+                isImmersiveMode ? "top-12 right-14" : "top-4 right-3" // Adjust position in immersive mode to not overlap with back button
+              )}
             >
               {isMuted ? (
                 <VolumeX className="w-5 h-5 text-white" />
@@ -761,8 +798,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </button>
           )}
 
-          {/* Promoted Badge */}
-          {isPromoted && (
+          {/* Promoted Badge - hidden in immersive mode, or shown when immersive UI is visible */}
+          {isPromoted && (!isImmersiveMode || showImmersiveUI) && (
             <div className="absolute top-4 left-4 z-10">
               <Badge className="bg-pink-500/90 backdrop-blur-sm text-white text-xs font-semibold">
                 <Sparkles className="w-3 h-3 mr-1" />
@@ -771,71 +808,85 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- RIGHT SIDEBAR: Social Buttons --- */}
-          <div className={cn(
-            "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
-            showControls ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}>
-            {/* Like */}
-            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-              <div className={cn(
-                "p-1.5 rounded-full transition-all active:scale-90",
-                liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
-              )}>
-                <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
-            </button>
-
-            {/* Comments */}
-            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <MessageCircle className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-            </button>
-
-            {/* Refeed */}
-            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Repeat className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-            </button>
-
-            {/* Gift */}
-            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Gift className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-            </button>
-
-            {/* Share */}
-            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Share2 className="w-5 h-5 text-white" />
-              </div>
-            </button>
-
-
-            {/* Promote Button */}
-            {user && !isPromoted && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/promote/${post.id}`);
-                }}
-                className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
-              >
-                <TrendingUp className="w-5 h-5 text-white" />
+          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) - hidden in immersive mode, or shown when immersive UI is visible --- */}
+          {(!isImmersiveMode || showImmersiveUI) && (
+            <div className={cn(
+              "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
+              (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
+            )}>
+              {/* Like */}
+              <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
+                <div className={cn(
+                  "p-1.5 rounded-full transition-all active:scale-90",
+                  liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+                )}>
+                  <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
               </button>
-            )}
-          </div>
 
-          {/* Bottom Left - Music indicator */}
-          {hasMusic && (
-            <div className="absolute left-4 bottom-4 z-10 flex items-center gap-3">
+              {/* Comments */}
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <MessageCircle className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+              </button>
+
+              {/* Refeed */}
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Repeat className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+              </button>
+
+              {/* Gift */}
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Gift className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+              </button>
+
+              {/* Share */}
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Share2 className="w-5 h-5 text-white" />
+                </div>
+              </button>
+
+              {/* Bookmark */}
+              <button onClick={handleSave} className="flex flex-col items-center gap-0.5 group">
+                <div className={cn(
+                  "p-1.5 rounded-full transition-all active:scale-90",
+                  saved ? "bg-primary/90" : "bg-black/40 backdrop-blur-sm"
+                )}>
+                  <Bookmark className={cn("w-5 h-5", saved ? "text-white fill-white" : "text-white")} />
+                </div>
+              </button>
+
+              {/* Promote Button - Bottom right */}
+              {user && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
+                >
+                  <TrendingUp className="w-5 h-5 text-white" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Bottom Left - Music indicator - hidden in immersive mode, or shown when immersive UI is visible */}
+          {hasMusic && (!isImmersiveMode || showImmersiveUI) && (
+            <div className={cn(
+              "absolute left-4 bottom-4 z-10 flex items-center gap-3 transition-opacity duration-200",
+              (isImmersiveMode ? showImmersiveUI : true) ? "opacity-100" : "opacity-0"
+            )}>
               <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
                 <div className="w-4 h-4 rounded-full bg-white/20" />
                 <div className="absolute inset-0 rounded-full border border-white/10" />
@@ -847,6 +898,30 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </p>
               </div>
             </div>
+          )}
+
+          {/* Immersive Mode: Inline Comments Panel - Always visible at bottom */}
+          {isImmersiveMode && (
+            <InlineCommentsPanel
+              isOpen={showInlineComments}
+              onClose={() => setShowInlineComments(false)}
+              postId={post.id}
+              onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+            />
+          )}
+
+          {/* Toggle Comments Button - Show when comments are hidden in immersive mode */}
+          {isImmersiveMode && !showInlineComments && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowInlineComments(true);
+              }}
+              className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full text-white text-sm font-medium transition-all active:scale-95"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>View Comments ({commentsCount})</span>
+            </button>
           )}
         </div>
 
@@ -910,9 +985,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           onInteractionEnd?.();
         }}
         postId={post.id}
-        postData={{ content: caption, media_url: currentMediaUrl, media_type: currentMediaType }}
-        onSaveToggle={handleSave}
-        isSaved={saved}
+        postData={{ content: caption }}
       />
 
       <GiftModal
