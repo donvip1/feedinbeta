@@ -582,15 +582,6 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
                     </div>
                   </button>
 
-                  {/* Bookmark */}
-                  <button onClick={() => handleSave(post.id)} className="flex flex-col items-center gap-0.5">
-                    <div className={cn(
-                      "p-1.5 rounded-full transition-all active:scale-90",
-                      isSaved ? "bg-primary/90" : "bg-black/40 backdrop-blur-sm"
-                    )}>
-                      <Bookmark className={cn("w-5 h-5", isSaved ? "text-white fill-white" : "text-white")} />
-                    </div>
-                  </button>
 
                   {/* Promote */}
                   {user && (
@@ -640,7 +631,13 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
         isOpen={shareOpen}
         onClose={() => setShareOpen(false)}
         postId={currentPost.id}
-        postData={{ content: currentPost.content || '' }}
+        postData={{ 
+          content: currentPost.content || '', 
+          media_url: getMediaUrl(currentPost) || undefined,
+          media_type: getMediaType(currentPost) || undefined
+        }}
+        onSaveToggle={() => handleSave(currentPost.id)}
+        isSaved={savedPosts.has(currentPost.id)}
       />
 
       <GiftModal

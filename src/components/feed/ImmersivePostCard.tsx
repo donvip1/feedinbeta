@@ -716,14 +716,18 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </>
           )}
 
-          {/* Play/Pause Center Overlay - visual indicator only, tapping media opens fullscreen */}
-          {hasVideo && !isPlaying && (
+          {/* Play/Pause Center Overlay - always visible when paused, tapping media opens fullscreen */}
+          {hasVideo && (
             <div className={cn(
               "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
-              showControls ? "opacity-100" : "opacity-0"
+              (!isPlaying || showControls) ? "opacity-100" : "opacity-0"
             )}>
               <div className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10">
-                <Play className="w-8 h-8 text-white ml-1" fill="white" />
+                {isPlaying ? (
+                  <Pause className="w-8 h-8 text-white" fill="white" />
+                ) : (
+                  <Play className="w-8 h-8 text-white ml-1" fill="white" />
+                )}
               </div>
             </div>
           )}
@@ -814,15 +818,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               </div>
             </button>
 
-            {/* Bookmark */}
-            <button onClick={handleSave} className="flex flex-col items-center gap-0.5 group">
-              <div className={cn(
-                "p-1.5 rounded-full transition-all active:scale-90",
-                saved ? "bg-primary/90" : "bg-black/40 backdrop-blur-sm"
-              )}>
-                <Bookmark className={cn("w-5 h-5", saved ? "text-white fill-white" : "text-white")} />
-              </div>
-            </button>
 
             {/* Promote Button */}
             {user && !isPromoted && (
@@ -915,7 +910,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           onInteractionEnd?.();
         }}
         postId={post.id}
-        postData={{ content: caption }}
+        postData={{ content: caption, media_url: currentMediaUrl, media_type: currentMediaType }}
+        onSaveToggle={handleSave}
+        isSaved={saved}
       />
 
       <GiftModal
