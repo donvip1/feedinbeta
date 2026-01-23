@@ -85,6 +85,7 @@ interface ImmersivePostCardProps {
   layoutType?: 'video' | 'photo-text'; // Determines social button placement
   globalMuted?: boolean; // Global mute state from parent
   onGlobalMuteToggle?: () => void; // Callback to toggle global mute
+  onImmersiveModeChange?: (isImmersive: boolean) => void; // Callback when entering/exiting fullscreen immersive mode
 }
 
 const ImmersivePostCard = memo(function ImmersivePostCard({ 
@@ -102,7 +103,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   onMarkAsViewed,
   layoutType = 'video', // Default to video layout
   globalMuted,
-  onGlobalMuteToggle
+  onGlobalMuteToggle,
+  onImmersiveModeChange
 }: ImmersivePostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -128,6 +130,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI except author name
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -348,6 +351,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     return () => { supabase.removeChannel(channel); };
   }, [post.id]);
 
+  // Toggle immersive mode (fullscreen with minimal UI)
+  const toggleImmersiveMode = () => {
+    const newMode = !isImmersiveMode;
+    setIsImmersiveMode(newMode);
+    onImmersiveModeChange?.(newMode);
+    
+    // In immersive mode, start playing if not already
+    if (newMode && videoRef.current && !isPlaying) {
+      videoRef.current.play();
+      setIsPlaying(true);
+    }
+  };
+
   const togglePlayPause = () => {
     // Toggle controls visibility on any tap
     setShowControls(prev => !prev);
@@ -365,6 +381,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       }
       setShowPlayIcon(true);
       setTimeout(() => setShowPlayIcon(false), 500);
+    }
+  };
+
+  // Handle tap on video/media area
+  const handleMediaTap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    if (isImmersiveMode) {
+      // In immersive mode, tap exits immersive mode
+      toggleImmersiveMode();
+    } else {
+      // In normal mode, tap toggles play/pause
+      togglePlayPause();
     }
   };
 
@@ -469,94 +499,99 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     <>
       <div 
         ref={postRef}
-        className="relative w-full max-w-[430px] mx-auto h-[calc(100dvh-68px)] bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col"
+        className={cn(
+          "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
+          isImmersiveMode ? "h-[100dvh]" : "h-[calc(100dvh-68px)]"
+        )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* --- TOP SECTION: User Info & Caption (NOT overlayed) --- */}
-        <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
-          <div className="flex items-start justify-between">
-            <div className="flex gap-3">
-              <div className="relative">
-                <Avatar 
-                  className="w-10 h-10 cursor-pointer border border-white/20"
-                  onClick={handleProfileClick}
-                >
-                  <AvatarImage src={post.profiles?.avatar_url || ''} />
-                  <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
-                </Avatar>
-                {/* Online indicator */}
-                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full" />
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-base text-white cursor-pointer" onClick={handleProfileClick}>
-                    {displayName}
-                  </span>
-                  {/* Follow button inline */}
-                  {user && user.id !== post.user_id && (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toast({ title: 'Following', description: `You are now following @${username}` });
-                      }}
-                      className="text-blue-400 font-bold text-sm hover:text-blue-300 transition"
-                    >
-                      • Follow
-                    </button>
-                  )}
-                </div>
-                <div className="flex items-center gap-1 text-xs text-gray-400">
-                  <Globe className="w-2.5 h-2.5" />
-                  <span>Public</span>
-                </div>
-              </div>
-            </div>
-            {/* Menu button */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="p-2 rounded-full transition-all active:scale-95 hover:bg-white/10">
-                  <MoreVertical className="w-6 h-6 text-white" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-md border-border/50">
-                <DropdownMenuItem onClick={handleSave} className="gap-2">
-                  <Bookmark className="w-4 h-4" />
-                  {saved ? 'Unsave Post' : 'Save Post'}
-                </DropdownMenuItem>
-                {canDeletePost && (
-                  <DropdownMenuItem 
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-destructive focus:text-destructive gap-2"
+        {/* --- TOP SECTION: User Info & Caption (NOT overlayed) - Hidden in immersive mode --- */}
+        {!isImmersiveMode && (
+          <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
+            <div className="flex items-start justify-between">
+              <div className="flex gap-3">
+                <div className="relative">
+                  <Avatar 
+                    className="w-10 h-10 cursor-pointer border border-white/20"
+                    onClick={handleProfileClick}
                   >
-                    <Trash2 className="w-4 h-4" />
-                    Delete Post
+                    <AvatarImage src={post.profiles?.avatar_url || ''} />
+                    <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
+                  </Avatar>
+                  {/* Online indicator */}
+                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full" />
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base text-white cursor-pointer" onClick={handleProfileClick}>
+                      {displayName}
+                    </span>
+                    {/* Follow button inline */}
+                    {user && user.id !== post.user_id && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toast({ title: 'Following', description: `You are now following @${username}` });
+                        }}
+                        className="text-blue-400 font-bold text-sm hover:text-blue-300 transition"
+                      >
+                        • Follow
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                    <Globe className="w-2.5 h-2.5" />
+                    <span>Public</span>
+                  </div>
+                </div>
+              </div>
+              {/* Menu button */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="p-2 rounded-full transition-all active:scale-95 hover:bg-white/10">
+                    <MoreVertical className="w-6 h-6 text-white" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-md border-border/50">
+                  <DropdownMenuItem onClick={handleSave} className="gap-2">
+                    <Bookmark className="w-4 h-4" />
+                    {saved ? 'Unsave Post' : 'Save Post'}
                   </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {/* Caption - Below user info */}
-          {caption && !isTextStyled && (
-            <div className="mt-2">
-              <p className="text-white text-sm leading-snug">
-                {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
-              </p>
-              {shouldTruncateCaption && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowFullCaption(!showFullCaption);
-                  }}
-                  className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition"
-                >
-                  {showFullCaption ? 'Show less' : 'View more'}
-                </button>
-              )}
+                  {canDeletePost && (
+                    <DropdownMenuItem 
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="text-destructive focus:text-destructive gap-2"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete Post
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-          )}
-        </div>
+
+            {/* Caption - Below user info */}
+            {caption && !isTextStyled && (
+              <div className="mt-2">
+                <p className="text-white text-sm leading-snug">
+                  {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+                </p>
+                {shouldTruncateCaption && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFullCaption(!showFullCaption);
+                    }}
+                    className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition"
+                  >
+                    {showFullCaption ? 'Show less' : 'View more'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* --- MEDIA SECTION (takes remaining space) --- */}
         <div className="flex-1 relative overflow-hidden">
@@ -580,11 +615,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               playsInline
               loop
               preload="auto"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                togglePlayPause();
-              }}
+              onClick={handleMediaTap}
               onCanPlay={() => setIsMediaLoaded(true)}
               onLoadedMetadata={(e) => {
                 const video = e.target as HTMLVideoElement;
@@ -609,11 +640,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   "w-full h-full object-contain transition-opacity duration-300",
                   isMediaLoaded ? "opacity-100" : "opacity-0"
                 )}
+                onClick={handleMediaTap}
                 onLoad={() => setIsMediaLoaded(true)}
                 onContextMenu={(e) => e.preventDefault()}
                 draggable={false}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
             </>
           )}
 
@@ -625,11 +657,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 background: getTextBackground(),
                 touchAction: 'manipulation'
               }}
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                togglePlayPause();
-              }}
+              onClick={handleMediaTap}
             >
               <p className="text-white text-xl md:text-2xl font-semibold text-center leading-relaxed max-w-full drop-shadow-lg break-words whitespace-pre-wrap">
                 {renderCaptionWithHashtags(caption)}
@@ -642,6 +670,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             <div 
               className="w-full h-full flex flex-col items-center justify-center px-4 pr-16 py-6 overflow-hidden bg-background"
               style={{ touchAction: 'manipulation' }}
+              onClick={handleMediaTap}
             >
               <p className="text-foreground text-lg md:text-xl leading-relaxed max-w-full break-words whitespace-pre-wrap text-center">
                 {renderCaptionWithHashtags(caption)}
@@ -649,16 +678,29 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Gradient overlays for buttons readability */}
-          {(hasVideo || hasImage) && (
+          {/* Gradient overlays for buttons readability - shown when NOT in immersive mode */}
+          {(hasVideo || hasImage) && !isImmersiveMode && (
             <>
               <div className="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
               <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
             </>
           )}
 
-          {/* Play/Pause Center Overlay */}
-          {hasVideo && (
+          {/* Immersive Mode: Author Name Overlay (only visible in immersive mode) */}
+          {isImmersiveMode && (
+            <div className="absolute top-12 left-4 z-30 pointer-events-none">
+              <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5">
+                <Avatar className="w-6 h-6 border border-white/20">
+                  <AvatarImage src={post.profiles?.avatar_url || ''} />
+                  <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="text-white text-sm font-medium drop-shadow-lg">{displayName}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Play/Pause Center Overlay - only in normal mode */}
+          {hasVideo && !isImmersiveMode && (
             <div className={cn(
               "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
               showControls ? "opacity-100" : "opacity-0"
@@ -666,7 +708,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  togglePlayPause();
+                  toggleImmersiveMode();
                 }}
                 className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
               >
@@ -694,8 +736,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Mute/Unmute Button - Top right of media, standalone */}
-          {hasVideo && (
+          {/* Mute/Unmute Button - Top right of media, standalone - hidden in immersive mode */}
+          {hasVideo && !isImmersiveMode && (
             <button 
               onClick={toggleMute}
               className="absolute top-4 right-3 z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50"
@@ -708,8 +750,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </button>
           )}
 
-          {/* Promoted Badge */}
-          {isPromoted && (
+          {/* Promoted Badge - hidden in immersive mode */}
+          {isPromoted && !isImmersiveMode && (
             <div className="absolute top-4 left-4 z-10">
               <Badge className="bg-pink-500/90 backdrop-blur-sm text-white text-xs font-semibold">
                 <Sparkles className="w-3 h-3 mr-1" />
@@ -718,79 +760,81 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) --- */}
-          <div className={cn(
-            "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto",
-            showControls ? "visible" : "invisible"
-          )}>
-            {/* Like */}
-            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-              <div className={cn(
-                "p-1.5 rounded-full transition-all active:scale-90",
-                liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
-              )}>
-                <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
-            </button>
-
-            {/* Comments */}
-            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <MessageCircle className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-            </button>
-
-            {/* Refeed */}
-            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Repeat className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-            </button>
-
-            {/* Gift */}
-            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Gift className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-            </button>
-
-            {/* Share */}
-            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Share2 className="w-5 h-5 text-white" />
-              </div>
-            </button>
-
-            {/* Bookmark */}
-            <button onClick={handleSave} className="flex flex-col items-center gap-0.5 group">
-              <div className={cn(
-                "p-1.5 rounded-full transition-all active:scale-90",
-                saved ? "bg-primary/90" : "bg-black/40 backdrop-blur-sm"
-              )}>
-                <Bookmark className={cn("w-5 h-5", saved ? "text-white fill-white" : "text-white")} />
-              </div>
-            </button>
-
-            {/* Promote Button - Bottom right */}
-            {user && !isPromoted && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/promote/${post.id}`);
-                }}
-                className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
-              >
-                <TrendingUp className="w-5 h-5 text-white" />
+          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) - hidden in immersive mode --- */}
+          {!isImmersiveMode && (
+            <div className={cn(
+              "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto",
+              showControls ? "visible" : "invisible"
+            )}>
+              {/* Like */}
+              <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
+                <div className={cn(
+                  "p-1.5 rounded-full transition-all active:scale-90",
+                  liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+                )}>
+                  <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
               </button>
-            )}
-          </div>
 
-          {/* Bottom Left - Music indicator */}
-          {hasMusic && (
+              {/* Comments */}
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <MessageCircle className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+              </button>
+
+              {/* Refeed */}
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Repeat className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+              </button>
+
+              {/* Gift */}
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Gift className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+              </button>
+
+              {/* Share */}
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Share2 className="w-5 h-5 text-white" />
+                </div>
+              </button>
+
+              {/* Bookmark */}
+              <button onClick={handleSave} className="flex flex-col items-center gap-0.5 group">
+                <div className={cn(
+                  "p-1.5 rounded-full transition-all active:scale-90",
+                  saved ? "bg-primary/90" : "bg-black/40 backdrop-blur-sm"
+                )}>
+                  <Bookmark className={cn("w-5 h-5", saved ? "text-white fill-white" : "text-white")} />
+                </div>
+              </button>
+
+              {/* Promote Button - Bottom right */}
+              {user && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
+                >
+                  <TrendingUp className="w-5 h-5 text-white" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Bottom Left - Music indicator - hidden in immersive mode */}
+          {hasMusic && !isImmersiveMode && (
             <div className="absolute left-4 bottom-4 z-10 flex items-center gap-3">
               <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
                 <div className="w-4 h-4 rounded-full bg-white/20" />
