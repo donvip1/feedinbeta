@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -920,6 +920,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
               </button>
 
+              {/* Views */}
+              <div className="flex flex-col items-center gap-0.5">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
+                  <Eye className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
+              </div>
+
               {/* Refeed */}
               <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
                 <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
@@ -1067,25 +1075,29 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             )}
 
             {/* Social buttons - Horizontal layout */}
-            <div className="flex items-center gap-4 mt-2">
-              <button onClick={handleLike} className="flex items-center gap-1.5 group">
-                <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
+            <div className="flex items-center gap-3 mt-2">
+              <button onClick={handleLike} className="flex items-center gap-1 group">
+                <Heart className={cn("w-4 h-4 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
                 <span className="text-muted-foreground text-xs font-semibold">{formatCount(likesCount)}</span>
               </button>
-              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1 group">
+                <MessageCircle className="w-4 h-4 text-muted-foreground transition-transform group-active:scale-90" />
                 <span className="text-muted-foreground text-xs font-semibold">{formatCount(commentsCount)}</span>
               </button>
-              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                <Repeat className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+              <div className="flex items-center gap-1">
+                <Eye className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground text-xs font-semibold">{formatCount(post.views_count || 0)}</span>
+              </div>
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1 group">
+                <Repeat className="w-4 h-4 text-muted-foreground transition-transform group-active:scale-90" />
                 <span className="text-muted-foreground text-xs font-semibold">{formatCount(refeedsCount)}</span>
               </button>
-              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                <Gift className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1 group">
+                <Gift className="w-4 h-4 text-muted-foreground transition-transform group-active:scale-90" />
                 <span className="text-muted-foreground text-xs font-semibold">{formatCount(giftsCount)}</span>
               </button>
               <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
-                <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                <Share2 className="w-4 h-4 text-muted-foreground transition-transform group-active:scale-90" />
               </button>
             </div>
           </div>
