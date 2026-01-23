@@ -879,7 +879,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- CAPTION OVERLAY (positioned at bottom, below social buttons) --- */}
+          {/* --- CAPTION OVERLAY with Promote Button (positioned at bottom left) --- */}
           {!isImmersiveMode && caption && !isTextStyled && !isPlainText && (
             <div className="absolute left-4 right-16 bottom-14 z-10 transition-opacity duration-200 pr-2">
               <p className="text-white text-sm leading-snug break-words" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>
@@ -896,6 +896,35 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   {showFullCaption ? 'less' : 'more'}
                 </button>
               )}
+              {/* Promote Button - always at bottom of caption area */}
+              {user && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+                >
+                  <TrendingUp className="w-4 h-4 text-white" />
+                  <span className="text-white text-xs font-semibold">Promote</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Promote Button for posts without caption */}
+          {!isImmersiveMode && (!caption || isTextStyled || isPlainText) && user && !isPromoted && (
+            <div className="absolute left-4 bottom-14 z-10">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/promote/${post.id}`);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+              >
+                <TrendingUp className="w-4 h-4 text-white" />
+                <span className="text-white text-xs font-semibold">Promote</span>
+              </button>
             </div>
           )}
 
@@ -967,19 +996,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                       <Share2 className="w-5 h-5 text-white" />
                     </div>
                   </button>
-
-                  {/* Promote Button */}
-                  {user && !isPromoted && (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/promote/${post.id}`);
-                      }}
-                      className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
-                    >
-                      <TrendingUp className="w-5 h-5 text-white" />
-                    </button>
-                  )}
                 </>
               )}
 
@@ -1022,6 +1038,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   className="text-white/70 text-xs mt-1 font-medium hover:text-white transition"
                 >
                   {showFullCaption ? 'less' : 'more'}
+                </button>
+              )}
+              {/* Promote Button - always at bottom of caption area in immersive mode */}
+              {user && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+                >
+                  <TrendingUp className="w-4 h-4 text-white" />
+                  <span className="text-white text-xs font-semibold">Promote</span>
                 </button>
               )}
             </div>
