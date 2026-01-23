@@ -747,7 +747,8 @@ const Feed = () => {
           ref={containerRef}
           className={cn(
             "w-full mx-auto snap-y snap-mandatory overflow-y-scroll scroll-smooth native-scroll-container relative",
-            isImmersiveMode ? "h-[100dvh]" : "h-[calc(100dvh-68px)]"
+            // In immersive mode, container takes full viewport for seamless fullscreen scrolling
+            isImmersiveMode ? "h-[100dvh] fixed inset-0 z-50 bg-black" : "h-[calc(100dvh-68px)]"
           )}
           data-scrollable="true"
         >
