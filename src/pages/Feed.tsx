@@ -509,7 +509,7 @@ const Feed = () => {
     }
   }, [posts]);
 
-  // Infinite scroll handler with skeleton loading
+  // Infinite scroll handler - NO cycling, posts only appear once until database allows reset
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -535,13 +535,9 @@ const Feed = () => {
               return [...prev, ...postsToAdd.slice(0, 10)];
             }
             
-            // If all posts are shown, start from beginning with unique keys
-            const startIndex = prev.length % allLoadedPostsRef.current.length;
-            const cyclePosts = allLoadedPostsRef.current.slice(startIndex, startIndex + 10).map((p, i) => ({
-              ...p,
-              _cycleKey: `${p.id}-cycle-${Date.now()}-${i}`
-            }));
-            return [...prev, ...cyclePosts];
+            // No more new posts - don't cycle, just stop loading
+            // The database will reset view history when 90%+ posts are viewed
+            return prev;
           });
           setIsLoadingMore(false);
         }, 300);
@@ -554,6 +550,19 @@ const Feed = () => {
       if (debounceTimer) clearTimeout(debounceTimer);
     };
   }, [isLoadingMore]);
+
+  // Refetch feed when user returns to the app/page (triggers database reset check)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // User returned to the app - refetch to get fresh posts (database will auto-reset if needed)
+        refetch();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user, refetch]);
 
   useEffect(() => {
     if (authLoading) return;
