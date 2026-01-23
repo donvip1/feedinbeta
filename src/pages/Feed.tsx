@@ -23,6 +23,7 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { FeedSkeleton } from '@/components/native/NativeLoadingSpinner';
 import { LiveFeedCard } from '@/components/feed/LiveFeedCard';
 import { InlineLiveCard } from '@/components/feed/InlineLiveCard';
+import { FullscreenLiveViewer } from '@/components/feed/FullscreenLiveViewer';
 import { feedCache } from '@/lib/feed-cache';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
@@ -59,6 +60,7 @@ const Feed = () => {
   const [isInteracting, setIsInteracting] = useState(false);
   const [showNav, setShowNav] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode
+  const [showLiveViewer, setShowLiveViewer] = useState(false); // Fullscreen live content viewer
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
   const { viewedPostIds, markAsViewed } = useViewedPosts();
@@ -685,27 +687,30 @@ const Feed = () => {
               >
                 Photo+
               </button>
-              {/* Live Indicator - Not a button, just visual indicator */}
+              {/* Live Indicator - Opens fullscreen live viewer when active */}
               <div 
-                className={`transition-all p-1 rounded-full flex items-center gap-1.5 drop-shadow-lg ${
-                  (liveCount || 0) > 0 ? 'cursor-pointer' : ''
-                }`}
+                className={cn(
+                  "transition-all p-1.5 rounded-full flex items-center gap-1.5 drop-shadow-lg",
+                  (liveCount || 0) > 0 
+                    ? "cursor-pointer bg-destructive/20 hover:bg-destructive/30" 
+                    : ""
+                )}
                 title={`${liveCount || 0} live now`}
                 onClick={() => {
-                  if ((liveCount || 0) > 0) {
+                  if ((liveCount || 0) > 0 && liveContent && liveContent.length > 0) {
                     haptic('selection');
-                    setActiveTab('live');
+                    setShowLiveViewer(true);
                   }
                 }}
               >
                 {(liveCount || 0) > 0 && (
-                  <span className="text-xs font-bold text-red-400">{liveCount}</span>
+                  <span className="text-xs font-bold text-destructive">{liveCount}</span>
                 )}
                 <span className="relative flex h-3 w-3">
                   {(liveCount || 0) > 0 ? (
                     <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
                     </>
                   ) : (
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-white/40"></span>
@@ -785,7 +790,7 @@ const Feed = () => {
                 <div className="relative w-24 h-24 mb-6">
                   <Radio className="w-24 h-24 text-muted-foreground/30" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-8 h-8 bg-red-500/20 rounded-full animate-ping" />
+                    <div className="w-8 h-8 bg-destructive/20 rounded-full animate-ping" />
                   </div>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">No Live Content</h3>
@@ -793,7 +798,7 @@ const Feed = () => {
                   Be the first to go live and share your moment with the world!
                 </p>
                 <Button 
-                  className="bg-red-600 hover:bg-red-700"
+                  className="bg-destructive hover:bg-destructive/90"
                   onClick={() => navigate('/live')}
                 >
                   <Radio className="w-4 h-4 mr-2" />
@@ -990,6 +995,22 @@ const Feed = () => {
             setSelectedMedia([]);
             setCurrentMediaIndex(0);
           }}
+        />
+      )}
+
+      {/* Fullscreen Live Content Viewer */}
+      {showLiveViewer && liveContent && liveContent.length > 0 && (
+        <FullscreenLiveViewer
+          liveContent={liveContent.map(item => ({
+            ...item,
+            host: {
+              id: (item.host as any)?.id,
+              display_name: item.host?.display_name || 'Unknown Host',
+              username: item.host?.username || 'unknown',
+              avatar_url: item.host?.avatar_url || '',
+            }
+          }))}
+          onClose={() => setShowLiveViewer(false)}
         />
       )}
     </div>
