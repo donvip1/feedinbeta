@@ -88,6 +88,7 @@ interface ImmersivePostCardProps {
   globalMuted?: boolean; // Global mute state from parent
   onGlobalMuteToggle?: () => void; // Callback to toggle global mute
   onImmersiveModeChange?: (isImmersive: boolean) => void; // Callback when entering/exiting fullscreen immersive mode
+  isGlobalImmersive?: boolean; // Global immersive mode state from parent - persists across scrolling
 }
 
 const ImmersivePostCard = memo(function ImmersivePostCard({ 
@@ -106,7 +107,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   layoutType = 'video', // Default to video layout
   globalMuted,
   onGlobalMuteToggle,
-  onImmersiveModeChange
+  onImmersiveModeChange,
+  isGlobalImmersive = false // Global immersive mode from parent
 }: ImmersivePostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -132,7 +134,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
   const [showControls, setShowControls] = useState(true);
-  const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI
+  // Use global immersive state if provided, allows all cards to stay in immersive mode when scrolling
+  const isImmersiveMode = isGlobalImmersive;
   const [showImmersiveUI, setShowImmersiveUI] = useState(false); // Toggle UI visibility while in immersive mode
   const [showDraggableComments, setShowDraggableComments] = useState(false); // Draggable comments panel
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
@@ -361,9 +364,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
   // Enter immersive mode (fullscreen with minimal UI)
   const enterImmersiveMode = () => {
-    setIsImmersiveMode(true);
     setShowImmersiveUI(false); // Start with UI hidden
-    onImmersiveModeChange?.(true);
+    onImmersiveModeChange?.(true); // Notify parent to set global immersive mode
     
     // In immersive mode, start playing if not already
     if (videoRef.current && !isPlaying) {
@@ -374,9 +376,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
   // Exit immersive mode (return to normal view)
   const exitImmersiveMode = () => {
-    setIsImmersiveMode(false);
     setShowImmersiveUI(false);
-    onImmersiveModeChange?.(false);
+    onImmersiveModeChange?.(false); // Notify parent to exit global immersive mode
     // Video continues playing from current position - no need to reset
   };
 
