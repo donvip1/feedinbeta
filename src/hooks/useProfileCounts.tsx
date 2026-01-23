@@ -5,6 +5,7 @@ import { memoryCache } from '@/lib/memory-cache';
 interface ProfileCounts {
   postsCount: number;
   likesCount: number;
+  viewsCount: number;
   friendsCount: number;
   followersCount: number;
   followingCount: number;
@@ -20,6 +21,7 @@ const CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 const DEFAULT_COUNTS: ProfileCounts = {
   postsCount: 0,
   likesCount: 0,
+  viewsCount: 0,
   friendsCount: 0,
   followersCount: 0,
   followingCount: 0,
@@ -41,7 +43,7 @@ export const getCachedCounts = (userId: string): ProfileCounts | null => {
  */
 const fetchAllCounts = async (userId: string): Promise<ProfileCounts> => {
   // Run ALL count queries in parallel for maximum speed
-  const [postsResult, likesResult, friendsResult, followersResult, followingResult] = await Promise.all([
+  const [postsResult, likesResult, viewsResult, friendsResult, followersResult, followingResult] = await Promise.all([
     // Posts count
     supabase
       .from('posts')
@@ -51,6 +53,13 @@ const fetchAllCounts = async (userId: string): Promise<ProfileCounts> => {
     
     // Likes received on user's posts
     supabase.rpc('get_user_total_likes', { user_uuid: userId }),
+    
+    // Total views on user's posts
+    supabase
+      .from('posts')
+      .select('views_count')
+      .eq('user_id', userId)
+      .neq('status', 'deleted'),
     
     // Friends count (accepted friend requests)
     supabase
@@ -72,9 +81,13 @@ const fetchAllCounts = async (userId: string): Promise<ProfileCounts> => {
       .eq('follower_id', userId),
   ]);
 
+  // Sum up all views from posts
+  const totalViews = (viewsResult.data || []).reduce((sum: number, post: any) => sum + (post.views_count || 0), 0);
+
   return {
     postsCount: postsResult.count || 0,
     likesCount: likesResult.data || 0,
+    viewsCount: totalViews,
     friendsCount: friendsResult.count || 0,
     followersCount: followersResult.count || 0,
     followingCount: followingResult.count || 0,
