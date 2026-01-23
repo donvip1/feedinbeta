@@ -903,7 +903,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     e.stopPropagation();
                     navigate(`/promote/${post.id}`);
                   }}
-                  className="flex items-center gap-1.5 mt-4 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+                  className="flex items-center gap-1.5 mt-6 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
                 >
                   <TrendingUp className="w-4 h-4 text-white" />
                   <span className="text-white text-xs font-semibold">Promote</span>
@@ -1047,7 +1047,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     e.stopPropagation();
                     navigate(`/promote/${post.id}`);
                   }}
-                  className="flex items-center gap-1.5 mt-4 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+                  className="flex items-center gap-1.5 mt-6 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
                 >
                   <TrendingUp className="w-4 h-4 text-white" />
                   <span className="text-white text-xs font-semibold">Promote</span>
