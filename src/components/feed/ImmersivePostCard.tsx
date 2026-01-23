@@ -694,11 +694,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Mute/Unmute Button - Top right of media */}
+          {/* Mute/Unmute Button - Top right of media, standalone */}
           {hasVideo && (
             <button 
               onClick={toggleMute}
-              className="absolute top-4 right-4 z-10 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50"
+              className="absolute top-4 right-3 z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50"
             >
               {isMuted ? (
                 <VolumeX className="w-5 h-5 text-white" />
@@ -720,60 +720,73 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) --- */}
           <div className={cn(
-            "absolute bottom-16 right-2 z-10 flex flex-col items-center gap-4 pointer-events-auto",
+            "absolute bottom-4 right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto",
             showControls ? "visible" : "invisible"
           )}>
             {/* Like */}
             <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
               <div className={cn(
-                "p-2 rounded-full transition-all active:scale-90",
+                "p-1.5 rounded-full transition-all active:scale-90",
                 liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
               )}>
-                <Heart className={cn("w-6 h-6 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+                <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
             </button>
 
             {/* Comments */}
             <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <MessageCircle className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <MessageCircle className="w-5 h-5 text-white" />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
             </button>
 
             {/* Refeed */}
             <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Repeat className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Repeat className="w-5 h-5 text-white" />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
             </button>
 
             {/* Gift */}
             <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Gift className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Gift className="w-5 h-5 text-white" />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
             </button>
 
             {/* Share */}
             <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Share2 className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Share2 className="w-5 h-5 text-white" />
               </div>
             </button>
 
             {/* Bookmark */}
             <button onClick={handleSave} className="flex flex-col items-center gap-0.5 group">
               <div className={cn(
-                "p-2 rounded-full transition-all active:scale-90",
+                "p-1.5 rounded-full transition-all active:scale-90",
                 saved ? "bg-primary/90" : "bg-black/40 backdrop-blur-sm"
               )}>
-                <Bookmark className={cn("w-6 h-6", saved ? "text-white fill-white" : "text-white")} />
+                <Bookmark className={cn("w-5 h-5", saved ? "text-white fill-white" : "text-white")} />
               </div>
             </button>
+
+            {/* Promote Button - Bottom right */}
+            {user && !isPromoted && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/promote/${post.id}`);
+                }}
+                className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
+              >
+                <TrendingUp className="w-5 h-5 text-white" />
+              </button>
+            )}
           </div>
 
           {/* Bottom Left - Music indicator */}
@@ -793,21 +806,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
         </div>
 
-        {/* --- BOTTOM SECTION: Promote Button (fixed at bottom, above nav) --- */}
-        {user && !isPromoted && (
-          <div className="flex-shrink-0 bg-black/95 px-4 py-2 z-20">
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/promote/${post.id}`);
-              }}
-              className="w-full flex items-center justify-center gap-1.5 text-primary hover:text-primary/80 text-xs font-bold transition-all animate-pulse"
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Promote this post</span>
-            </button>
-          </div>
-        )}
+        {/* Bottom spacer removed - Promote button now in social buttons stack */}
 
         {/* Social buttons for Plain Text - positioned at bottom */}
         {isPlainText && (
