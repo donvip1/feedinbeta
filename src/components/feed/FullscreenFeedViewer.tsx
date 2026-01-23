@@ -468,28 +468,31 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
                 <ArrowLeft className="w-5 h-5 text-white" />
               </button>
 
+              {/* Play/Pause button - Always visible when paused or when showUI is true */}
+              {isVideo && (
+                <div className={cn(
+                  "absolute inset-0 flex items-center justify-center transition-opacity duration-200",
+                  (!isVideoPlaying || showUI) ? "opacity-100" : "opacity-0 pointer-events-none"
+                )}>
+                  <button
+                    onClick={togglePlayPause}
+                    className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10 transition-transform active:scale-95"
+                  >
+                    {isVideoPlaying ? (
+                      <Pause className="w-8 h-8 text-white" fill="white" />
+                    ) : (
+                      <Play className="w-8 h-8 text-white ml-1" fill="white" />
+                    )}
+                  </button>
+                </div>
+              )}
+
               {/* UI Elements - Toggle visibility on tap */}
               <div className={cn(
                 "absolute inset-0 pointer-events-none transition-opacity duration-200",
                 showUI ? "opacity-100" : "opacity-0"
               )}>
-                {/* Play/Pause center button */}
-                {isVideo && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
-                    <button
-                      onClick={togglePlayPause}
-                      className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10 transition-transform active:scale-95"
-                    >
-                      {isVideoPlaying ? (
-                        <Pause className="w-8 h-8 text-white" fill="white" />
-                      ) : (
-                        <Play className="w-8 h-8 text-white ml-1" fill="white" />
-                      )}
-                    </button>
-                  </div>
-                )}
-
-                {/* Mute button */}
+                {/* Mute button (inside showUI container) */}
                 {isVideo && (
                   <button
                     onClick={toggleMute}

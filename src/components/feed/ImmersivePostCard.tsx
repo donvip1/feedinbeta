@@ -403,12 +403,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   };
 
   const togglePlayPause = () => {
-    // Toggle controls visibility on any tap
-    setShowControls(prev => !prev);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -716,19 +710,25 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </>
           )}
 
-          {/* Play/Pause Center Overlay - always visible when paused, tapping media opens fullscreen */}
+          {/* Play/Pause Center Overlay - clickable button */}
           {hasVideo && (
             <div className={cn(
-              "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
-              (!isPlaying || showControls) ? "opacity-100" : "opacity-0"
+              "absolute inset-0 flex items-center justify-center transition-opacity duration-300",
+              (!isPlaying || showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
             )}>
-              <div className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlayPause();
+                }}
+                className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10 transition-transform active:scale-95"
+              >
                 {isPlaying ? (
                   <Pause className="w-8 h-8 text-white" fill="white" />
                 ) : (
                   <Play className="w-8 h-8 text-white ml-1" fill="white" />
                 )}
-              </div>
+              </button>
             </div>
           )}
 
