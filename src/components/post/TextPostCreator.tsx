@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Music2,
@@ -50,6 +51,7 @@ interface TextPostCreatorProps {
 export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [stage, setStage] = useState<Stage>('type');
   const [postStyle, setPostStyle] = useState<PostStyle>('card');
   const [background, setBackground] = useState<BackgroundStyle>('gradient');
@@ -99,19 +101,33 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
       // Store background style in media_url for text posts with backgrounds
       const backgroundStyle = postStyle === 'card' ? getBackgroundClass() : null;
       
-      const { error } = await supabase.from('posts').insert({
+      // Build full content: caption + text + hashtags
+      const captionPart = caption.trim() ? `${caption.trim()}\n\n` : '';
+      const hashtagString = parsedHashtags.length > 0 
+        ? `\n\n${parsedHashtags.map(tag => `#${tag}`).join(' ')}`
+        : '';
+      const fullContent = captionPart + text + hashtagString;
+      
+      const { data: newPost, error } = await supabase.from('posts').insert({
         user_id: user.id,
         feed_id: crypto.randomUUID(),
-        content: text,
+        content: fullContent,
         post_type: 'public',
         privacy: privacy,
         location: location || null,
         status: 'active',
-        media_url: backgroundStyle, // Store background class here (null for plain text)
+        media_url: backgroundStyle,
         media_type: postStyle === 'card' ? 'text_styled' : 'text_plain',
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Process hashtags for trending/search
+      if (parsedHashtags.length > 0 && newPost?.id) {
+        supabase.functions.invoke('process-hashtags', {
+          body: { postId: newPost.id, content: fullContent }
+        }).catch(err => console.error('Error processing hashtags:', err));
+      }
 
       toast({
         title: 'Posted!',
@@ -119,6 +135,11 @@ export default function TextPostCreator({ onClose, onSubmit }: TextPostCreatorPr
       });
 
       onSubmit();
+      
+      // Navigate to the new post
+      if (newPost?.id) {
+        navigate(`/feed/post/${newPost.id}`);
+      }
     } catch (error) {
       console.error('Error posting:', error);
       toast({

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { X, Hash, MapPin, Globe, Users, UserCheck, Lock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +15,7 @@ interface PlainTextPostCreatorProps {
 export default function PlainTextPostCreator({ onClose, onSubmit }: PlainTextPostCreatorProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [text, setText] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [location, setLocation] = useState('');
@@ -54,19 +56,32 @@ export default function PlainTextPostCreator({ onClose, onSubmit }: PlainTextPos
     setIsPosting(true);
 
     try {
-      const { error } = await supabase.from('posts').insert({
+      // Build full content with hashtags appended
+      const hashtagString = parsedHashtags.length > 0 
+        ? `\n\n${parsedHashtags.map(tag => `#${tag}`).join(' ')}`
+        : '';
+      const fullContent = text + hashtagString;
+
+      const { data: newPost, error } = await supabase.from('posts').insert({
         user_id: user.id,
         feed_id: crypto.randomUUID(),
-        content: text,
+        content: fullContent,
         post_type: 'public',
         privacy: privacy,
         location: location || null,
         status: 'active',
         media_url: null,
-        media_type: 'text_plain', // Plain text post type
-      });
+        media_type: 'text_plain',
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Process hashtags for trending/search
+      if (parsedHashtags.length > 0 && newPost?.id) {
+        supabase.functions.invoke('process-hashtags', {
+          body: { postId: newPost.id, content: fullContent }
+        }).catch(err => console.error('Error processing hashtags:', err));
+      }
 
       toast({
         title: 'Posted!',
@@ -74,6 +89,11 @@ export default function PlainTextPostCreator({ onClose, onSubmit }: PlainTextPos
       });
 
       onSubmit();
+      
+      // Navigate to the new post
+      if (newPost?.id) {
+        navigate(`/feed/post/${newPost.id}`);
+      }
     } catch (error) {
       console.error('Error posting:', error);
       toast({
