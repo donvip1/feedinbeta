@@ -15,6 +15,7 @@ interface DraggableCommentsPanelProps {
   postId: string;
   commentsCount: number;
   onCommentAdded?: () => void;
+  onHide?: () => void; // Callback to completely hide the panel
 }
 
 type Profile = {
@@ -37,17 +38,19 @@ type CommentRow = {
 
 type CommentNode = CommentRow & { replies: CommentNode[] };
 
-type PanelState = 'collapsed' | 'partial' | 'expanded';
+type PanelState = 'hidden' | 'collapsed' | 'partial' | 'expanded';
 
 export default function DraggableCommentsPanel({ 
   postId,
   commentsCount,
-  onCommentAdded 
+  onCommentAdded,
+  onHide
 }: DraggableCommentsPanelProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Start in collapsed state (just the handle bar), users can expand from there
   const [panelState, setPanelState] = useState<PanelState>('collapsed');
   const [comment, setComment] = useState("");
   const [comments, setComments] = useState<CommentNode[]>([]);
@@ -66,12 +69,14 @@ export default function DraggableCommentsPanel({
   const optimisticallyAddedIds = useRef<Set<string>>(new Set());
 
   // Panel heights (percentage of viewport)
-  const COLLAPSED_HEIGHT = 15; // Just shows "View Comments" bar
+  const HIDDEN_HEIGHT = 0;     // Completely hidden
+  const COLLAPSED_HEIGHT = 12; // Just shows "View Comments" bar
   const PARTIAL_HEIGHT = 45;   // Shows some comments
   const EXPANDED_HEIGHT = 85;  // Nearly fullscreen
 
   const getHeightForState = (state: PanelState) => {
     switch (state) {
+      case 'hidden': return HIDDEN_HEIGHT;
       case 'collapsed': return COLLAPSED_HEIGHT;
       case 'partial': return PARTIAL_HEIGHT;
       case 'expanded': return EXPANDED_HEIGHT;
@@ -80,7 +85,7 @@ export default function DraggableCommentsPanel({
 
   // Fetch comments when panel opens
   useEffect(() => {
-    if (panelState !== 'collapsed') {
+    if (panelState !== 'collapsed' && panelState !== 'hidden') {
       fetchComments();
       fetchUsers();
     }
@@ -88,7 +93,7 @@ export default function DraggableCommentsPanel({
 
   // Real-time subscription
   useEffect(() => {
-    if (panelState === 'collapsed') return;
+    if (panelState === 'collapsed' || panelState === 'hidden') return;
 
     const channel = supabase
       .channel(`draggable-comments:${postId}`)
@@ -388,9 +393,13 @@ export default function DraggableCommentsPanel({
     const deltaY = dragStartY - clientY;
     const finalHeight = currentHeight + (deltaY / window.innerHeight) * 100;
     
-    // Determine which state to snap to
+    // Determine which state to snap to - including hidden when dragged all the way down
     let newState: PanelState;
-    if (finalHeight < (COLLAPSED_HEIGHT + PARTIAL_HEIGHT) / 2) {
+    if (finalHeight < COLLAPSED_HEIGHT / 2) {
+      // Dragged below collapsed threshold - hide completely
+      newState = 'hidden';
+      onHide?.();
+    } else if (finalHeight < (COLLAPSED_HEIGHT + PARTIAL_HEIGHT) / 2) {
       newState = 'collapsed';
     } else if (finalHeight < (PARTIAL_HEIGHT + EXPANDED_HEIGHT) / 2) {
       newState = 'partial';
@@ -404,7 +413,7 @@ export default function DraggableCommentsPanel({
     if (panelRef.current) {
       panelRef.current.style.height = '';
     }
-  }, [isDragging, dragStartY, currentHeight]);
+  }, [isDragging, dragStartY, currentHeight, onHide]);
 
   // Touch handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -441,7 +450,7 @@ export default function DraggableCommentsPanel({
 
   // Toggle panel state
   const togglePanel = () => {
-    if (panelState === 'collapsed') {
+    if (panelState === 'hidden' || panelState === 'collapsed') {
       setPanelState('partial');
     } else if (panelState === 'partial') {
       setPanelState('expanded');
@@ -451,7 +460,7 @@ export default function DraggableCommentsPanel({
   };
 
   const expandPanel = () => {
-    if (panelState === 'collapsed') {
+    if (panelState === 'hidden' || panelState === 'collapsed') {
       setPanelState('partial');
     } else if (panelState === 'partial') {
       setPanelState('expanded');
@@ -463,8 +472,19 @@ export default function DraggableCommentsPanel({
       setPanelState('partial');
     } else if (panelState === 'partial') {
       setPanelState('collapsed');
+    } else if (panelState === 'collapsed') {
+      setPanelState('hidden');
+      onHide?.();
     }
   };
+
+  const hidePanel = () => {
+    setPanelState('hidden');
+    onHide?.();
+  };
+
+  // If completely hidden, don't render
+  if (panelState === 'hidden') return null;
 
   return (
     <div 
