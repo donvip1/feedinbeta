@@ -14,6 +14,58 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_impressions: {
+        Row: {
+          ad_id: string | null
+          clicked: boolean | null
+          created_at: string | null
+          id: string
+          impression_date: string | null
+          impressions_count: number | null
+          user_id: string | null
+        }
+        Insert: {
+          ad_id?: string | null
+          clicked?: boolean | null
+          created_at?: string | null
+          id?: string
+          impression_date?: string | null
+          impressions_count?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          ad_id?: string | null
+          clicked?: boolean | null
+          created_at?: string | null
+          id?: string
+          impression_date?: string | null
+          impressions_count?: number | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_impressions_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "feed_ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_impressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ad_impressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_action_logs: {
         Row: {
           action_type: string
@@ -2119,6 +2171,111 @@ export type Database = {
           total?: number | null
         }
         Relationships: []
+      }
+      feed_ads: {
+        Row: {
+          advertiser_id: string | null
+          approval_status: string | null
+          click_url: string | null
+          clicks: number | null
+          cost_per_impression: number | null
+          created_at: string | null
+          ctr: number | null
+          daily_budget_credits: number | null
+          description: string | null
+          expires_at: string | null
+          id: string
+          impressions: number | null
+          is_active: boolean | null
+          media_type: string | null
+          media_url: string
+          spent_credits: number | null
+          started_at: string | null
+          target_age_max: number | null
+          target_age_min: number | null
+          target_cities: string[] | null
+          target_countries: string[] | null
+          target_genders: string[] | null
+          target_interests: string[] | null
+          target_occupations: string[] | null
+          title: string
+          total_budget_credits: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          advertiser_id?: string | null
+          approval_status?: string | null
+          click_url?: string | null
+          clicks?: number | null
+          cost_per_impression?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          daily_budget_credits?: number | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          impressions?: number | null
+          is_active?: boolean | null
+          media_type?: string | null
+          media_url: string
+          spent_credits?: number | null
+          started_at?: string | null
+          target_age_max?: number | null
+          target_age_min?: number | null
+          target_cities?: string[] | null
+          target_countries?: string[] | null
+          target_genders?: string[] | null
+          target_interests?: string[] | null
+          target_occupations?: string[] | null
+          title: string
+          total_budget_credits?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          advertiser_id?: string | null
+          approval_status?: string | null
+          click_url?: string | null
+          clicks?: number | null
+          cost_per_impression?: number | null
+          created_at?: string | null
+          ctr?: number | null
+          daily_budget_credits?: number | null
+          description?: string | null
+          expires_at?: string | null
+          id?: string
+          impressions?: number | null
+          is_active?: boolean | null
+          media_type?: string | null
+          media_url?: string
+          spent_credits?: number | null
+          started_at?: string | null
+          target_age_max?: number | null
+          target_age_min?: number | null
+          target_cities?: string[] | null
+          target_countries?: string[] | null
+          target_genders?: string[] | null
+          target_interests?: string[] | null
+          target_occupations?: string[] | null
+          title?: string
+          total_budget_credits?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_ads_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_ads_advertiser_id_fkey"
+            columns: ["advertiser_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       follows: {
         Row: {
@@ -6403,27 +6560,36 @@ export type Database = {
       user_interests: {
         Row: {
           created_at: string | null
+          decay_factor: number | null
           id: string
           interest_type: string
           interest_value: string
+          last_interaction: string | null
+          source: string | null
           updated_at: string | null
           user_id: string
           weight: number | null
         }
         Insert: {
           created_at?: string | null
+          decay_factor?: number | null
           id?: string
           interest_type: string
           interest_value: string
+          last_interaction?: string | null
+          source?: string | null
           updated_at?: string | null
           user_id: string
           weight?: number | null
         }
         Update: {
           created_at?: string | null
+          decay_factor?: number | null
           id?: string
           interest_type?: string
           interest_value?: string
+          last_interaction?: string | null
+          source?: string | null
           updated_at?: string | null
           user_id?: string
           weight?: number | null
@@ -6929,6 +7095,7 @@ export type Database = {
         Args: { p_amount: number; p_reason?: string }
         Returns: Json
       }
+      apply_interest_decay: { Args: never; Returns: number }
       are_mutual_friends: {
         Args: { user1_id: string; user2_id: string }
         Returns: boolean
@@ -7012,6 +7179,28 @@ export type Database = {
           file_path: string
           id: string
           message_id: string
+        }[]
+      }
+      get_explore_feed: {
+        Args: { p_limit?: number; p_offset?: number; p_user_id: string }
+        Returns: {
+          comments_count: number
+          content: string
+          created_at: string
+          discovery_score: number
+          is_promoted: boolean
+          likes_count: number
+          location: string
+          media_type: string
+          media_types: string[]
+          media_url: string
+          media_urls: string[]
+          original_post_id: string
+          post_id: string
+          post_type: string
+          refeeds_count: number
+          user_id: string
+          views_count: number
         }[]
       }
       get_following_feed: {
@@ -7193,6 +7382,18 @@ export type Database = {
           post_id: string
         }[]
       }
+      get_targeted_ads: {
+        Args: { p_limit?: number; p_user_id: string }
+        Returns: {
+          ad_id: string
+          click_url: string
+          description: string
+          media_type: string
+          media_url: string
+          relevance_score: number
+          title: string
+        }[]
+      }
       get_today_viewed_posts: {
         Args: never
         Returns: {
@@ -7368,6 +7569,15 @@ export type Database = {
         Returns: undefined
       }
       request_creator_payout: { Args: { p_amount: number }; Returns: Json }
+      reset_viewed_posts_cycle: {
+        Args: { p_user_id: string }
+        Returns: {
+          coverage_percent: number
+          total_posts: number
+          viewed_posts: number
+          was_reset: boolean
+        }[]
+      }
       restore_deleted_post: { Args: { post_id: string }; Returns: boolean }
       send_direct_gift: {
         Args: {
@@ -7413,6 +7623,15 @@ export type Database = {
         Returns: Json
       }
       update_my_phone_number: { Args: { new_phone: string }; Returns: boolean }
+      update_user_interests_from_engagement: {
+        Args: {
+          p_engagement_type: string
+          p_post_id: string
+          p_user_id: string
+          p_watch_duration?: number
+        }
+        Returns: undefined
+      }
       upsert_user_session: {
         Args: {
           p_device_fingerprint: string
