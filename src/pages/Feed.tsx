@@ -57,6 +57,7 @@ const Feed = () => {
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isInteracting, setIsInteracting] = useState(false);
   const [showNav, setShowNav] = useState(true);
+  const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
   const { viewedPostIds, markAsViewed } = useViewedPosts();
@@ -845,6 +846,7 @@ const Feed = () => {
                       layoutType={activeTab === 'videos' ? 'video' : 'photo-text'}
                       globalMuted={globalMuted}
                       onGlobalMuteToggle={toggleGlobalMute}
+                      onImmersiveModeChange={setIsImmersiveMode}
                     />
                   </div>
                   {showInlineLive && (
@@ -898,12 +900,12 @@ const Feed = () => {
         </div>
       </SwipeableTabs>
 
-      <BottomNav hidden={isCommentsOpen || !showNav || postStep !== null} />
+      <BottomNav hidden={isCommentsOpen || !showNav || postStep !== null || isImmersiveMode} />
       
       {/* Quick Action Button - positioned below feed cards */}
       <FloatingActionButton 
         onClick={handleCreatePost}
-        hidden={isCommentsOpen || !showNav || postStep !== null}
+        hidden={isCommentsOpen || !showNav || postStep !== null || isImmersiveMode}
       />
 
       {/* Native Creation Sheet */}
