@@ -67,6 +67,12 @@ const Feed = () => {
   
   const allVideoPostsRef = useRef<any[]>([]);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Global mute state - persists across all feed videos
+  const [globalMuted, setGlobalMuted] = useState(true); // Default muted for autoplay policy
+  const toggleGlobalMute = useCallback(() => {
+    setGlobalMuted(prev => !prev);
+  }, []);
 
   // Fetch live content count for indicator (always enabled) - real-time with fast refetch
   const { data: liveCount, refetch: refetchLiveCount } = useQuery({
@@ -837,6 +843,8 @@ const Feed = () => {
                       allVideoPosts={allVideoPostsRef.current}
                       onMarkAsViewed={markAsViewed}
                       layoutType={activeTab === 'videos' ? 'video' : 'photo-text'}
+                      globalMuted={globalMuted}
+                      onGlobalMuteToggle={toggleGlobalMute}
                     />
                   </div>
                   {showInlineLive && (
@@ -879,6 +887,8 @@ const Feed = () => {
                     onView={() => {}}
                     allPosts={cachedPosts as any[]}
                     onMarkAsViewed={() => {}}
+                    globalMuted={globalMuted}
+                    onGlobalMuteToggle={toggleGlobalMute}
                   />
                 </div>
               );
