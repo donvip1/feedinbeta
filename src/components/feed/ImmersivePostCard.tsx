@@ -638,18 +638,82 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </DropdownMenu>
         </div>
 
-        {/* Top Section - Refeed indicator & Caption (below user info) */}
-        {!isPlainText && (isRefeed || (caption && !isTextStyled)) && (
-          <div className="absolute top-24 left-4 right-16 z-10 pl-9">
+        {/* Mute/Unmute Button */}
+        {hasVideo && (
+          <button 
+            onClick={toggleMute}
+            className="absolute top-24 right-4 z-10 p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-95"
+          >
+            {isMuted ? (
+              <VolumeX className="w-5 h-5 text-white" />
+            ) : (
+              <Volume2 className="w-5 h-5 text-white" />
+            )}
+          </button>
+        )}
+
+        {/* Social buttons for Videos - Vertical layout on right side */}
+        {layoutType === 'video' && (
+          <div className={cn(
+            "absolute right-3 bottom-20 flex flex-col items-center gap-1.5 z-10",
+            showControls ? "visible" : "invisible"
+          )}>
+            {/* Like */}
+            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
+              <div className={cn(
+                "p-2 rounded-full transition-all active:scale-90",
+                liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+              )}>
+                <Heart className={cn("w-6 h-6 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+              </div>
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
+            </button>
+
+            {/* Comments */}
+            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
+              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <MessageCircle className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+            </button>
+
+            {/* Refeed */}
+            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Repeat className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+            </button>
+
+            {/* Gift */}
+            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Gift className="w-6 h-6 text-white" />
+              </div>
+              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+            </button>
+
+            {/* Share */}
+            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Share2 className="w-6 h-6 text-white" />
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Bottom Section - Refeed indicator, Caption & Promote aligned */}
+        {!isPlainText && (
+          <div className="absolute left-4 right-20 bottom-4 z-10">
             {/* Refeed indicator */}
             {isRefeed && (
-              <div className="flex items-center gap-1.5 mb-1.5">
+              <div className="flex items-center gap-1.5 mb-1">
                 <Repeat className="w-3.5 h-3.5 text-white/70" />
                 <span className="text-xs text-white/70">Refeed from @{post.original_post?.profiles?.username}</span>
               </div>
             )}
 
-            {/* Caption - shown for all post types except text styled and plain text */}
+            {/* Caption */}
             {caption && !isTextStyled && (
               <div>
                 <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
@@ -671,71 +735,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Mute/Unmute Button */}
-        {hasVideo && (
-          <button 
-            onClick={toggleMute}
-            className="absolute top-28 right-4 z-10 p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-95"
-          >
-            {isMuted ? (
-              <VolumeX className="w-5 h-5 text-white" />
-            ) : (
-              <Volume2 className="w-5 h-5 text-white" />
-            )}
-          </button>
-        )}
-
-        {/* Social buttons for Videos - Vertical layout on right side */}
-        {layoutType === 'video' && (
-          <div className={cn(
-            "absolute right-3 bottom-16 flex flex-col items-center gap-4 z-10",
-            showControls ? "visible" : "invisible"
-          )}>
-            {/* Like */}
-            <button onClick={handleLike} className="flex flex-col items-center gap-1 group">
-              <div className={cn(
-                "p-2.5 rounded-full transition-all active:scale-90",
-                liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
-              )}>
-                <Heart className={cn("w-7 h-7 transition-transform", liked ? "text-white fill-white" : "text-white")} />
-              </div>
-              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
-            </button>
-
-            {/* Comments */}
-            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-1 group">
-              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <MessageCircle className="w-7 h-7 text-white" />
-              </div>
-              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-            </button>
-
-            {/* Refeed */}
-            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-1 group">
-              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Repeat className="w-7 h-7 text-white" />
-              </div>
-              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-            </button>
-
-            {/* Gift */}
-            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-1 group">
-              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Gift className="w-7 h-7 text-white" />
-              </div>
-              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-            </button>
-
-            {/* Share */}
-            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-1 group">
-              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Share2 className="w-7 h-7 text-white" />
-              </div>
-            </button>
-          </div>
-        )}
-
-        {/* Promote CTA - Bottom right for videos */}
+        {/* Promote CTA - Bottom right */}
         {layoutType === 'video' && user && !isPromoted && (
           <button 
             onClick={(e) => {
@@ -744,7 +744,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             }}
             className="absolute right-3 bottom-4 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-white text-xs font-bold transition-all active:scale-95 shadow-lg"
           >
-            <TrendingUp className="w-4 h-4" />
+            <TrendingUp className="w-3.5 h-3.5" />
             <span>Promote</span>
           </button>
         )}
