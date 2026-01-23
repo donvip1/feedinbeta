@@ -870,6 +870,11 @@ const Profile = () => {
               <p className="text-xs text-muted-foreground">Likes</p>
             </div>
 
+            <div className="flex flex-col items-center">
+              <p className="text-2xl font-bold text-foreground">{displayCounts.viewsCount || 0}</p>
+              <p className="text-xs text-muted-foreground">Views</p>
+            </div>
+
           </div>
 
 
