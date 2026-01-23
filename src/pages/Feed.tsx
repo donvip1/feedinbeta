@@ -63,7 +63,7 @@ const Feed = () => {
   const [showLiveViewer, setShowLiveViewer] = useState(false); // Fullscreen live content viewer
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
-  const { viewedPostIds, markAsViewed } = useViewedPosts();
+  const { viewedPostIds, markAsViewed, flushPendingViews } = useViewedPosts();
   const initialViewedRef = useRef<string[]>([]);
   const hasInitializedRef = useRef(false);
   const [displayPosts, setDisplayPosts] = useState<any[]>([]);
@@ -503,11 +503,15 @@ const Feed = () => {
   }, [refetch]));
 
   // Initialize display posts and handle infinite scroll
+  // Filter out already-viewed posts client-side as a safety net
   useEffect(() => {
     if (posts) {
-      setDisplayPosts(posts);
+      // Client-side filter to exclude posts that are already in viewedPostIds
+      // This is a backup in case the cache served stale data
+      const filteredPosts = posts.filter((p: any) => !viewedPostIds.includes(p.id));
+      setDisplayPosts(filteredPosts.length > 0 ? filteredPosts : posts);
     }
-  }, [posts]);
+  }, [posts, viewedPostIds]);
 
   // Infinite scroll handler - NO cycling, posts only appear once until database allows reset
   useEffect(() => {
@@ -553,9 +557,11 @@ const Feed = () => {
 
   // Refetch feed when user returns to the app/page (triggers database reset check)
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && user) {
-        // User returned to the app - refetch to get fresh posts (database will auto-reset if needed)
+        // User returned to the app - clear cache and refetch fresh posts
+        // This ensures viewed posts are properly excluded
+        await feedCache.clear();
         refetch();
       }
     };
