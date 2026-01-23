@@ -584,48 +584,53 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* Top Left - User Info Overlay - Positioned closer to header */}
         <div className="absolute top-14 left-4 z-10 flex items-center gap-3">
-          <Avatar 
-            className={cn("w-6 h-6 cursor-pointer", isPlainText ? "ring-1 ring-border" : "ring-1 ring-white/30")}
-            onClick={handleProfileClick}
-          >
-            <AvatarImage src={post.profiles?.avatar_url || ''} />
-            <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar 
+              className={cn("w-10 h-10 cursor-pointer ring-2", isPlainText ? "ring-border" : "ring-white/80")}
+              onClick={handleProfileClick}
+            >
+              <AvatarImage src={post.profiles?.avatar_url || ''} />
+              <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
+            </Avatar>
+          </div>
           <div className="flex flex-col" onClick={handleProfileClick}>
-            <span className={cn("font-semibold text-sm cursor-pointer", isPlainText ? "text-foreground" : "text-white drop-shadow-lg")}>
+            <span className={cn("font-bold text-sm cursor-pointer", isPlainText ? "text-foreground" : "text-white drop-shadow-lg")}>
               {displayName}
             </span>
-            <span className={cn("text-xs", isPlainText ? "text-muted-foreground" : "text-white/70 drop-shadow-md")}>
+            <span className={cn("text-xs", isPlainText ? "text-muted-foreground" : "text-white/80 drop-shadow-md")}>
               @{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: false })}
             </span>
           </div>
         </div>
 
-        {/* Top Right - Menu & Promoted Badge - Positioned closer to header */}
+        {/* Top Right - Menu & Promoted Badge */}
         <div className="absolute top-14 right-4 z-10 flex items-center gap-2">
           {isPromoted && (
-            <Badge className="bg-primary/80 backdrop-blur-sm text-white text-xs">
+            <Badge className="bg-pink-500/90 backdrop-blur-sm text-white text-xs font-semibold">
               <Sparkles className="w-3 h-3 mr-1" />
               Sponsored
             </Badge>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="p-2 transition-colors">
-                <MoreVertical className={cn("w-5 h-5", isPlainText ? "text-foreground" : "text-white drop-shadow-lg")} />
+              <button className={cn(
+                "p-2 rounded-full transition-all active:scale-95",
+                isPlainText ? "bg-muted/80" : "bg-black/40 backdrop-blur-sm"
+              )}>
+                <MoreVertical className={cn("w-5 h-5", isPlainText ? "text-foreground" : "text-white")} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleSave}>
-                <Bookmark className="w-4 h-4 mr-2" />
+            <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-md border-border/50">
+              <DropdownMenuItem onClick={handleSave} className="gap-2">
+                <Bookmark className="w-4 h-4" />
                 {saved ? 'Unsave Post' : 'Save Post'}
               </DropdownMenuItem>
               {canDeletePost && (
                 <DropdownMenuItem 
                   onClick={() => setShowDeleteDialog(true)}
-                  className="text-destructive focus:text-destructive"
+                  className="text-destructive focus:text-destructive gap-2"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="w-4 h-4" />
                   Delete Post
                 </DropdownMenuItem>
               )}
@@ -666,16 +671,16 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Mute/Unmute Button - Positioned below menu, no shadow */}
+        {/* Mute/Unmute Button */}
         {hasVideo && (
           <button 
             onClick={toggleMute}
-            className="absolute top-24 right-4 z-10 p-2 transition-colors"
+            className="absolute top-28 right-4 z-10 p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-95"
           >
             {isMuted ? (
-              <VolumeX className="w-5 h-5 text-white drop-shadow-lg" />
+              <VolumeX className="w-5 h-5 text-white" />
             ) : (
-              <Volume2 className="w-5 h-5 text-white drop-shadow-lg" />
+              <Volume2 className="w-5 h-5 text-white" />
             )}
           </button>
         )}
@@ -683,36 +688,49 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         {/* Social buttons for Videos - Vertical layout on right side */}
         {layoutType === 'video' && (
           <div className={cn(
-            "absolute right-3 bottom-14 flex flex-col items-center gap-3 z-10",
+            "absolute right-3 bottom-16 flex flex-col items-center gap-4 z-10",
             showControls ? "visible" : "invisible"
           )}>
             {/* Like */}
-            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-              <Heart className={cn("w-6 h-6 drop-shadow-lg transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
+            <button onClick={handleLike} className="flex flex-col items-center gap-1 group">
+              <div className={cn(
+                "p-2.5 rounded-full transition-all active:scale-90",
+                liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+              )}>
+                <Heart className={cn("w-7 h-7 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+              </div>
+              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
             </button>
 
             {/* Comments */}
-            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
-              <MessageCircle className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-1 group">
+              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <MessageCircle className="w-7 h-7 text-white" />
+              </div>
+              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
             </button>
 
             {/* Refeed */}
-            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <Repeat className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-1 group">
+              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Repeat className="w-7 h-7 text-white" />
+              </div>
+              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
             </button>
 
             {/* Gift */}
-            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <Gift className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-1 group">
+              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Gift className="w-7 h-7 text-white" />
+              </div>
+              <span className="text-white text-xs font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
             </button>
 
             {/* Share */}
-            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <Share2 className="w-6 h-6 text-white drop-shadow-lg transition-transform group-active:scale-90" />
+            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-1 group">
+              <div className="p-2.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Share2 className="w-7 h-7 text-white" />
+              </div>
             </button>
           </div>
         )}
@@ -724,50 +742,67 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               e.stopPropagation();
               navigate(`/promote/${post.id}`);
             }}
-            className="absolute right-3 bottom-4 z-10 flex items-center gap-1.5 text-white hover:text-white/80 text-xs font-bold transition-all animate-pulse drop-shadow-lg"
+            className="absolute right-3 bottom-4 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-white text-xs font-bold transition-all active:scale-95 shadow-lg"
           >
             <TrendingUp className="w-4 h-4" />
             <span>Promote</span>
           </button>
         )}
 
-        {/* Bottom Left - Music & Social Buttons - Hide for plain text since it's already shown */}
+        {/* Bottom Left - Music & Social Buttons - Hide for plain text */}
         {!isPlainText && (
-          <div className="absolute left-4 right-16 bottom-4 z-10">
+          <div className="absolute left-4 right-20 bottom-4 z-10">
             {/* Social buttons for Photos & Text - Horizontal layout */}
             {layoutType === 'photo-text' && (
               <div className={cn(
-                "flex items-center gap-4 mb-2",
+                "flex items-center gap-3 mb-3",
                 showControls ? "visible" : "invisible"
               )}>
                 <button onClick={handleLike} className="flex items-center gap-1.5 group">
-                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
+                  <div className={cn(
+                    "p-2 rounded-full transition-all active:scale-90",
+                    liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+                  )}>
+                    <Heart className={cn("w-5 h-5", liked ? "text-white fill-white" : "text-white")} />
+                  </div>
                   <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
                 </button>
                 <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                  <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <MessageCircle className="w-5 h-5 text-white" />
+                  </div>
                   <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
                 </button>
                 <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <Repeat className="w-5 h-5 text-white" />
+                  </div>
                   <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
                 </button>
                 <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <Gift className="w-5 h-5 text-white" />
+                  </div>
                   <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
                 </button>
                 <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
-                  <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <Share2 className="w-5 h-5 text-white" />
+                  </div>
                 </button>
               </div>
             )}
 
-            {/* Music indicator */}
+            {/* Music indicator - Spinning vinyl style */}
             {hasMusic && (
-              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-sm rounded-full px-3 py-1.5 w-fit">
-                <Music className="w-4 h-4 text-white animate-pulse" />
-                <div className="overflow-hidden">
-                  <p className="text-white text-xs font-medium truncate max-w-[180px]">
+              <div className="flex items-center gap-3">
+                <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
+                  <div className="w-4 h-4 rounded-full bg-white/20" />
+                  <div className="absolute inset-0 rounded-full border border-white/10" />
+                </div>
+                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 overflow-hidden max-w-[200px]">
+                  <Music className="w-4 h-4 text-white flex-shrink-0" />
+                  <p className="text-white text-xs font-medium truncate">
                     {post.music_title || 'Original Audio'} {post.music_artist && `· ${post.music_artist}`}
                   </p>
                 </div>
