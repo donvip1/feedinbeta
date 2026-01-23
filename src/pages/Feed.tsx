@@ -680,7 +680,7 @@ const Feed = () => {
                   : 'text-white/60'
               }`}
             >
-              Photos & Text
+              Photo+
             </button>
             {/* Live Indicator - Not a button, just visual indicator */}
             <div 
@@ -709,11 +709,11 @@ const Feed = () => {
                 )}
               </span>
             </div>
-            {/* Sliding tab indicator - only for Videos and Photos & Text */}
+            {/* Sliding tab indicator - only for Videos and Photo+ */}
             <div 
               className="absolute -bottom-1 h-0.5 bg-white transition-all duration-200 ease-out"
               style={{ 
-                width: activeTab === 'live' ? '0px' : activeTab === 'videos' ? '50px' : '90px',
+                width: activeTab === 'live' ? '0px' : activeTab === 'videos' ? '50px' : '55px',
                 left: activeTab === 'videos' ? '0' : activeTab === 'photosText' ? '60px' : '0',
                 opacity: activeTab === 'live' ? 0 : 1
               }}
