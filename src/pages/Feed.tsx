@@ -555,20 +555,18 @@ const Feed = () => {
     };
   }, [isLoadingMore]);
 
-  // Refetch feed when user returns to the app/page (triggers database reset check)
+  // Flush pending views when user leaves the app (but don't auto-refresh on return)
   useEffect(() => {
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && user) {
-        // User returned to the app - clear cache and refetch fresh posts
-        // This ensures viewed posts are properly excluded
-        await feedCache.clear();
-        refetch();
+      if (document.visibilityState === 'hidden') {
+        // User left the app - flush pending views to database
+        await flushPendingViews();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user, refetch]);
+  }, [flushPendingViews]);
 
   useEffect(() => {
     if (authLoading) return;
