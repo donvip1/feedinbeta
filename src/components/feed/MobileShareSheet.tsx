@@ -459,10 +459,7 @@ export default function MobileShareSheet({
                   <Download className="w-5 h-5 text-primary-foreground" />
                 )}
               </div>
-              <div className="flex-1 text-left">
-                <span className="font-medium">Download</span>
-                <p className="text-xs text-muted-foreground">With feedin watermark</p>
-              </div>
+              <span className="font-medium">Download</span>
             </button>
           )}
         </div>
