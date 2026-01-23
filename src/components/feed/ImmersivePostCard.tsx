@@ -907,16 +907,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </div>
               </button>
 
-              {/* Bookmark */}
-              <button onClick={handleSave} className="flex flex-col items-center gap-0.5 group">
-                <div className={cn(
-                  "p-1.5 rounded-full transition-all active:scale-90",
-                  saved ? "bg-primary/90" : "bg-black/40 backdrop-blur-sm"
-                )}>
-                  <Bookmark className={cn("w-5 h-5", saved ? "text-white fill-white" : "text-white")} />
-                </div>
-              </button>
-
               {/* Promote Button - Bottom right */}
               {user && !isPromoted && (
                 <button 
@@ -1058,6 +1048,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         }}
         postId={post.id}
         postData={{ content: caption }}
+        onSavePost={handleSave}
+        isSaved={saved}
       />
 
       <GiftModal
