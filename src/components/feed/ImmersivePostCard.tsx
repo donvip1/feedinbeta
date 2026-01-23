@@ -78,6 +78,8 @@ interface ImmersivePostCardProps {
   allVideoPosts?: any[];
   onMarkAsViewed?: (postId: string) => void;
   layoutType?: 'video' | 'photo-text'; // Determines social button placement
+  globalMuted?: boolean; // Global mute state from parent
+  onGlobalMuteToggle?: () => void; // Callback to toggle global mute
 }
 
 const ImmersivePostCard = memo(function ImmersivePostCard({ 
@@ -93,7 +95,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   allPosts,
   allVideoPosts,
   onMarkAsViewed,
-  layoutType = 'video' // Default to video layout
+  layoutType = 'video', // Default to video layout
+  globalMuted,
+  onGlobalMuteToggle
 }: ImmersivePostCardProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -110,7 +114,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [shareOpen, setShareOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [refeedOpen, setRefeedOpen] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
+  // Use global mute state if provided, otherwise use local state
+  const [localMuted, setLocalMuted] = useState(false);
+  const isMuted = globalMuted !== undefined ? globalMuted : localMuted;
   const [isPlaying, setIsPlaying] = useState(false);
   const [showPlayIcon, setShowPlayIcon] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -291,7 +297,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             videoRef.current.play().catch(() => {
               if (videoRef.current) {
                 videoRef.current.muted = true;
-                setIsMuted(true);
+                // Force mute on autoplay failure - use global or local
+                if (onGlobalMuteToggle && !globalMuted) {
+                  onGlobalMuteToggle();
+                } else if (!onGlobalMuteToggle) {
+                  setLocalMuted(true);
+                }
                 videoRef.current.play().catch(() => {});
               }
             });
@@ -356,7 +367,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     e.stopPropagation();
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
+      // Use global toggle if available, otherwise use local
+      if (onGlobalMuteToggle) {
+        onGlobalMuteToggle();
+      } else {
+        setLocalMuted(!localMuted);
+      }
     }
   };
 
@@ -655,7 +671,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         {/* Social buttons for Videos - Vertical layout on right side */}
         {layoutType === 'video' && (
           <div className={cn(
-            "absolute right-3 bottom-20 flex flex-col items-center gap-1.5 z-10",
+            "absolute right-3 bottom-4 flex flex-col items-center gap-2 z-10",
             showControls ? "visible" : "invisible"
           )}>
             {/* Like */}
@@ -699,6 +715,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <Share2 className="w-6 h-6 text-white" />
               </div>
             </button>
+
+            {/* Promote - right below Share */}
+            {user && !isPromoted && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/promote/${post.id}`);
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-white text-xs font-bold transition-all active:scale-95 shadow-lg"
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>Promote</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -735,19 +765,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Promote CTA - Bottom right */}
-        {layoutType === 'video' && user && !isPromoted && (
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/promote/${post.id}`);
-            }}
-            className="absolute right-3 bottom-4 z-10 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-white text-xs font-bold transition-all active:scale-95 shadow-lg"
-          >
-            <TrendingUp className="w-3.5 h-3.5" />
-            <span>Promote</span>
-          </button>
-        )}
+        {/* Promote CTA removed from here - now in social button stack */}
 
         {/* Bottom Left - Music & Social Buttons - Hide for plain text */}
         {!isPlainText && (
