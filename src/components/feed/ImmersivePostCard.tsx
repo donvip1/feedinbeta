@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye, MoreHorizontal, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -143,6 +143,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [isSeeking, setIsSeeking] = useState(false); // Is user dragging timeline
   const [isFollowing, setIsFollowing] = useState(false); // Follow state
   const [isFollowLoading, setIsFollowLoading] = useState(false); // Loading state for follow action
+  const [showMoreActions, setShowMoreActions] = useState(false); // Toggle more actions menu for long captions
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
@@ -889,7 +890,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {(!isImmersiveMode || showImmersiveUI) && (
             <div className={cn(
               "absolute right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
-              isImmersiveMode ? "bottom-28" : "bottom-24",
+              isImmersiveMode ? "bottom-16" : "bottom-14",
               (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
             )}>
               {/* Like */}
@@ -920,47 +921,71 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
               </button>
 
-              {/* Views */}
-              <div className="flex flex-col items-center gap-0.5">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
-                  <Eye className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
-              </div>
+              {/* Show extra buttons only when caption is short OR more menu is open */}
+              {(!shouldTruncateCaption || showMoreActions) && (
+                <>
+                  {/* Views */}
+                  <div className="flex flex-col items-center gap-0.5">
+                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
+                      <Eye className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
+                  </div>
 
-              {/* Refeed */}
-              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Repeat className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-              </button>
+                  {/* Refeed */}
+                  <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                      <Repeat className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+                  </button>
 
-              {/* Gift */}
-              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Gift className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-              </button>
+                  {/* Gift */}
+                  <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                      <Gift className="w-5 h-5 text-white" />
+                    </div>
+                    <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+                  </button>
 
-              {/* Share */}
-              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Share2 className="w-5 h-5 text-white" />
-                </div>
-              </button>
+                  {/* Share */}
+                  <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                      <Share2 className="w-5 h-5 text-white" />
+                    </div>
+                  </button>
 
-              {/* Promote Button - Bottom right */}
-              {user && !isPromoted && (
+                  {/* Promote Button */}
+                  {user && !isPromoted && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/promote/${post.id}`);
+                      }}
+                      className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
+                    >
+                      <TrendingUp className="w-5 h-5 text-white" />
+                    </button>
+                  )}
+                </>
+              )}
+
+              {/* More button - only show when caption is long and extra buttons are hidden */}
+              {shouldTruncateCaption && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
-                  }}
-                  className="mt-1 p-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-90 hover:opacity-90"
+                    setShowMoreActions(!showMoreActions);
+                  }} 
+                  className="flex flex-col items-center gap-0.5 group"
                 >
-                  <TrendingUp className="w-5 h-5 text-white" />
+                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    {showMoreActions ? (
+                      <X className="w-5 h-5 text-white" />
+                    ) : (
+                      <MoreHorizontal className="w-5 h-5 text-white" />
+                    )}
+                  </div>
                 </button>
               )}
             </div>
