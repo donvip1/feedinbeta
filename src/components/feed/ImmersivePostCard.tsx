@@ -679,7 +679,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             {/* Caption - Below user info */}
             {caption && !isTextStyled && (
               <div className="mt-2">
-                <p className="text-white text-sm leading-snug break-words">
+                <p className="text-white text-sm leading-snug break-words drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                   {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
                 </p>
                 {shouldTruncateCaption && (
@@ -688,7 +688,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                       e.stopPropagation();
                       setShowFullCaption(!showFullCaption);
                     }}
-                    className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition"
+                    className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
                   >
                     {showFullCaption ? 'less' : 'more'}
                   </button>
@@ -1005,9 +1005,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {isImmersiveMode && showImmersiveUI && caption && !isTextStyled && !isPlainText && (
             <div className="absolute left-4 right-16 bottom-20 z-20 transition-opacity duration-200">
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-white font-bold text-sm">{displayName}</span>
+                <span className="text-white font-bold text-sm drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">{displayName}</span>
               </div>
-              <p className="text-white text-sm leading-snug pr-2">
+              <p className="text-white text-sm leading-snug pr-2 drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 2px 6px rgba(0,0,0,0.7)' }}>
                 {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
               </p>
               {shouldTruncateCaption && (
@@ -1016,7 +1016,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     e.stopPropagation();
                     setShowFullCaption(!showFullCaption);
                   }}
-                  className="text-white/70 text-xs mt-1 font-medium hover:text-white transition"
+                  className="text-white/70 text-xs mt-1 font-medium hover:text-white transition drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]"
                 >
                   {showFullCaption ? 'less' : 'more'}
                 </button>
