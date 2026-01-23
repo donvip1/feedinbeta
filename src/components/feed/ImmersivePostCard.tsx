@@ -14,6 +14,7 @@ import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
+import InlineCommentsPanel from './InlineCommentsPanel';
 import { cn } from '@/lib/utils';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
 
@@ -132,6 +133,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [showControls, setShowControls] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI
   const [showImmersiveUI, setShowImmersiveUI] = useState(false); // Toggle UI visibility while in immersive mode
+  const [showInlineComments, setShowInlineComments] = useState(true); // Show inline comments in immersive mode
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -515,7 +517,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         ref={postRef}
         className={cn(
           "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
-          isImmersiveMode ? "h-[100dvh]" : "h-[calc(100dvh-68px)]"
+          isImmersiveMode ? "h-[100dvh] fixed inset-0 max-w-none z-50" : "h-[calc(100dvh-68px)]"
         )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -607,8 +609,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* --- MEDIA SECTION (takes remaining space) --- */}
-        <div className="flex-1 relative overflow-hidden">
+        {/* --- MEDIA SECTION (takes full screen in immersive mode) --- */}
+        <div className={cn(
+          "relative overflow-hidden",
+          isImmersiveMode ? "flex-1 h-full w-full" : "flex-1"
+        )}>
           {/* Loading skeleton */}
           {!isMediaLoaded && (currentMediaUrl || isTextStyled) && (
             <Skeleton className="absolute inset-0 w-full h-full bg-muted/30" />
@@ -622,9 +627,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               className={cn(
                 "w-full h-full transition-opacity duration-300",
                 isMediaLoaded ? "opacity-100" : "opacity-0",
-                isLandscapeVideo ? "object-contain bg-black" : "object-cover"
+                // In immersive mode, always cover full screen
+                isImmersiveMode ? "object-cover" : (isLandscapeVideo ? "object-contain bg-black" : "object-cover")
               )}
-              style={{ touchAction: 'manipulation' }}
+              style={{ touchAction: 'manipulation', minHeight: isImmersiveMode ? '100%' : undefined, minWidth: isImmersiveMode ? '100%' : undefined }}
               muted={isMuted}
               playsInline
               loop
@@ -651,9 +657,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 src={currentMediaUrl}
                 alt="Post media"
                 className={cn(
-                  "w-full h-full object-contain transition-opacity duration-300",
-                  isMediaLoaded ? "opacity-100" : "opacity-0"
+                  "w-full h-full transition-opacity duration-300",
+                  isMediaLoaded ? "opacity-100" : "opacity-0",
+                  isImmersiveMode ? "object-cover" : "object-contain"
                 )}
+                style={{ minHeight: isImmersiveMode ? '100%' : undefined, minWidth: isImmersiveMode ? '100%' : undefined }}
                 onClick={handleMediaTap}
                 onLoad={() => setIsMediaLoaded(true)}
                 onContextMenu={(e) => e.preventDefault()}
@@ -890,6 +898,30 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </p>
               </div>
             </div>
+          )}
+
+          {/* Immersive Mode: Inline Comments Panel - Always visible at bottom */}
+          {isImmersiveMode && (
+            <InlineCommentsPanel
+              isOpen={showInlineComments}
+              onClose={() => setShowInlineComments(false)}
+              postId={post.id}
+              onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+            />
+          )}
+
+          {/* Toggle Comments Button - Show when comments are hidden in immersive mode */}
+          {isImmersiveMode && !showInlineComments && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowInlineComments(true);
+              }}
+              className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full text-white text-sm font-medium transition-all active:scale-95"
+            >
+              <MessageCircle className="w-4 h-4" />
+              <span>View Comments ({commentsCount})</span>
+            </button>
           )}
         </div>
 

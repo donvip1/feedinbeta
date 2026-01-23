@@ -35,6 +35,7 @@ import { SwipeableTabs } from '@/components/feed/SwipeableTabs';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 import { useFeedPreloader } from '@/hooks/useFeedPreloader';
 import { batchPrefetchCounts } from '@/hooks/useProfileCounts';
+import { cn } from '@/lib/utils';
 
 const Feed = () => {
   const navigate = useNavigate();
@@ -647,93 +648,95 @@ const Feed = () => {
         onRetry={() => !isOffline && refetch()}
       />
       
-      {/* TikTok-style Overlay Navigation - Transparent over content */}
-      <div className="fixed top-0 left-0 right-0 z-40 pt-safe-area pointer-events-none">
-        <div className="flex items-center justify-between px-4 py-3 pointer-events-auto">
-          {/* Left - Notification Bell */}
-          <div className="w-16 flex justify-start">
-            <NotificationBell />
-          </div>
-          
-          {/* Centered Tabs with transparent styling */}
-          <div className="flex items-center gap-4 relative">
-            <button
-              onClick={() => {
-                haptic('selection');
-                setActiveTab('videos');
-              }}
-              className={`text-sm font-semibold transition-all drop-shadow-lg ${
-                activeTab === 'videos'
-                  ? 'text-white'
-                  : 'text-white/60'
-              }`}
-            >
-              Videos
-            </button>
-            <button
-              onClick={() => {
-                haptic('selection');
-                setActiveTab('photosText');
-              }}
-              className={`text-sm font-semibold transition-all drop-shadow-lg ${
-                activeTab === 'photosText'
-                  ? 'text-white'
-                  : 'text-white/60'
-              }`}
-            >
-              Photo+
-            </button>
-            {/* Live Indicator - Not a button, just visual indicator */}
-            <div 
-              className={`transition-all p-1 rounded-full flex items-center gap-1.5 drop-shadow-lg ${
-                (liveCount || 0) > 0 ? 'cursor-pointer' : ''
-              }`}
-              title={`${liveCount || 0} live now`}
-              onClick={() => {
-                if ((liveCount || 0) > 0) {
-                  haptic('selection');
-                  setActiveTab('live');
-                }
-              }}
-            >
-              {(liveCount || 0) > 0 && (
-                <span className="text-xs font-bold text-red-400">{liveCount}</span>
-              )}
-              <span className="relative flex h-3 w-3">
-                {(liveCount || 0) > 0 ? (
-                  <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                  </>
-                ) : (
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white/40"></span>
-                )}
-              </span>
+      {/* TikTok-style Overlay Navigation - Hidden in immersive mode */}
+      {!isImmersiveMode && (
+        <div className="fixed top-0 left-0 right-0 z-40 pt-safe-area pointer-events-none">
+          <div className="flex items-center justify-between px-4 py-3 pointer-events-auto">
+            {/* Left - Notification Bell */}
+            <div className="w-16 flex justify-start">
+              <NotificationBell />
             </div>
-            {/* Sliding tab indicator - only for Videos and Photo+ */}
-            <div 
-              className="absolute -bottom-1 h-0.5 bg-white transition-all duration-200 ease-out"
-              style={{ 
-                width: activeTab === 'live' ? '0px' : activeTab === 'videos' ? '50px' : '55px',
-                left: activeTab === 'videos' ? '0' : activeTab === 'photosText' ? '60px' : '0',
-                opacity: activeTab === 'live' ? 0 : 1
-              }}
-            />
-          </div>
+            
+            {/* Centered Tabs with transparent styling */}
+            <div className="flex items-center gap-4 relative">
+              <button
+                onClick={() => {
+                  haptic('selection');
+                  setActiveTab('videos');
+                }}
+                className={`text-sm font-semibold transition-all drop-shadow-lg ${
+                  activeTab === 'videos'
+                    ? 'text-white'
+                    : 'text-white/60'
+                }`}
+              >
+                Videos
+              </button>
+              <button
+                onClick={() => {
+                  haptic('selection');
+                  setActiveTab('photosText');
+                }}
+                className={`text-sm font-semibold transition-all drop-shadow-lg ${
+                  activeTab === 'photosText'
+                    ? 'text-white'
+                    : 'text-white/60'
+                }`}
+              >
+                Photo+
+              </button>
+              {/* Live Indicator - Not a button, just visual indicator */}
+              <div 
+                className={`transition-all p-1 rounded-full flex items-center gap-1.5 drop-shadow-lg ${
+                  (liveCount || 0) > 0 ? 'cursor-pointer' : ''
+                }`}
+                title={`${liveCount || 0} live now`}
+                onClick={() => {
+                  if ((liveCount || 0) > 0) {
+                    haptic('selection');
+                    setActiveTab('live');
+                  }
+                }}
+              >
+                {(liveCount || 0) > 0 && (
+                  <span className="text-xs font-bold text-red-400">{liveCount}</span>
+                )}
+                <span className="relative flex h-3 w-3">
+                  {(liveCount || 0) > 0 ? (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </>
+                  ) : (
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white/40"></span>
+                  )}
+                </span>
+              </div>
+              {/* Sliding tab indicator - only for Videos and Photo+ */}
+              <div 
+                className="absolute -bottom-1 h-0.5 bg-white transition-all duration-200 ease-out"
+                style={{ 
+                  width: activeTab === 'live' ? '0px' : activeTab === 'videos' ? '50px' : '55px',
+                  left: activeTab === 'videos' ? '0' : activeTab === 'photosText' ? '60px' : '0',
+                  opacity: activeTab === 'live' ? 0 : 1
+                }}
+              />
+            </div>
 
-          {/* Right icon - Search only (Trending moved inside Search) */}
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/feed/search')}
-              className="text-white/80 hover:text-white hover:bg-white/10"
-            >
-              <Search className="w-5 h-5 drop-shadow-lg" />
-            </Button>
+            {/* Right icon - Search only (Trending moved inside Search) */}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/feed/search')}
+                className="text-white/80 hover:text-white hover:bg-white/10"
+              >
+                <Search className="w-5 h-5 drop-shadow-lg" />
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <SwipeableTabs
         activeIndex={activeTabIndex}
@@ -742,7 +745,10 @@ const Feed = () => {
       >
         <div
           ref={containerRef}
-          className="w-full mx-auto snap-y snap-mandatory overflow-y-scroll h-[calc(100dvh-68px)] scroll-smooth native-scroll-container relative"
+          className={cn(
+            "w-full mx-auto snap-y snap-mandatory overflow-y-scroll scroll-smooth native-scroll-container relative",
+            isImmersiveMode ? "h-[100dvh]" : "h-[calc(100dvh-68px)]"
+          )}
           data-scrollable="true"
         >
           {/* Pull to Refresh Indicator */}
