@@ -617,7 +617,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 )}
               </div>
             )}
-          </div>
         </div>
 
         {/* --- MEDIA SECTION --- */}
