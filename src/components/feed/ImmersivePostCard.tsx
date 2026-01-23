@@ -141,6 +141,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [videoProgress, setVideoProgress] = useState(0); // Video progress 0-100
   const [videoDuration, setVideoDuration] = useState(0); // Video duration in seconds
   const [isSeeking, setIsSeeking] = useState(false); // Is user dragging timeline
+  const [isFollowing, setIsFollowing] = useState(false); // Follow state
+  const [isFollowLoading, setIsFollowLoading] = useState(false); // Loading state for follow action
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
@@ -251,26 +253,68 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     handleSwipe();
   };
 
-  // Check if post is liked and saved
+  // Check if post is liked, saved, and if we're following the poster
   useEffect(() => {
     const checkStatus = async () => {
       if (!user) return;
 
       try {
-        const [likeCheck, saveCheck] = await Promise.all([
-          supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).single(),
-          supabase.from('saved_posts').select('id').eq('post_id', post.id).eq('user_id', user.id).single()
+        const [likeCheck, saveCheck, followCheck] = await Promise.all([
+          supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
+          supabase.from('saved_posts').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
+          supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', post.user_id).maybeSingle()
         ]);
 
         setLiked(!!likeCheck.data);
         setSaved(!!saveCheck.data);
+        setIsFollowing(!!followCheck.data);
       } catch (error) {
-        // Expected when not liked/saved
+        // Expected when not liked/saved/following
       }
     };
 
     checkStatus();
-  }, [user, post.id]);
+  }, [user, post.id, post.user_id]);
+
+  // Handle follow/unfollow
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast({ title: 'Sign in required', description: 'Please sign in to follow users', variant: 'destructive' });
+      return;
+    }
+    if (isFollowLoading) return;
+
+    setIsFollowLoading(true);
+    try {
+      if (isFollowing) {
+        // Unfollow
+        await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', post.user_id);
+        setIsFollowing(false);
+        toast({ title: 'Unfollowed', description: `You unfollowed @${username}` });
+      } else {
+        // Follow
+        await supabase
+          .from('follows')
+          .insert({ follower_id: user.id, following_id: post.user_id });
+        setIsFollowing(true);
+        toast({ title: 'Following', description: `You are now following @${username}` });
+      }
+    } catch (error: any) {
+      // Handle unique constraint violation (already following)
+      if (error?.code === '23505') {
+        setIsFollowing(true);
+      } else {
+        toast({ title: 'Error', description: 'Failed to update follow status', variant: 'destructive' });
+      }
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
 
   // Track visibility and record view
   useEffect(() => {
@@ -587,19 +631,23 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     {/* Follow button inline */}
                     {user && user.id !== post.user_id && (
                       <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          toast({ title: 'Following', description: `You are now following @${username}` });
-                        }}
-                        className="text-blue-400 font-bold text-sm hover:text-blue-300 transition"
+                        onClick={handleFollow}
+                        disabled={isFollowLoading}
+                        className={cn(
+                          "font-bold text-sm transition",
+                          isFollowing ? "text-gray-400 hover:text-gray-300" : "text-blue-400 hover:text-blue-300",
+                          isFollowLoading && "opacity-50"
+                        )}
                       >
-                        • Follow
+                        • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 text-xs text-gray-400">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
                     <Globe className="w-2.5 h-2.5" />
                     <span>Public</span>
+                    <span className="text-gray-500">•</span>
+                    <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                   </div>
                 </div>
               </div>
