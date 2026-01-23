@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -608,6 +608,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <AvatarImage src={post.profiles?.avatar_url || ''} />
               <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
+            {/* Follow button on avatar */}
+            {user && user.id !== post.user_id && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  // TODO: Implement follow logic
+                  toast({ title: 'Following', description: `You are now following @${username}` });
+                }}
+                className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-0.5 text-white shadow-md hover:bg-pink-600 transition-colors"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
+            )}
           </div>
           <div className="flex flex-col" onClick={handleProfileClick}>
             <span className={cn("font-bold text-sm cursor-pointer", isPlainText ? "text-foreground" : "text-white drop-shadow-lg")}>
@@ -668,51 +681,51 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </button>
         )}
 
-        {/* Social buttons for Videos - Vertical layout on right side */}
+        {/* Social buttons for Videos - Vertical layout on right side - aligned with mute button */}
         {layoutType === 'video' && (
           <div className={cn(
-            "absolute right-3 bottom-4 flex flex-col items-center gap-2 z-10",
+            "absolute right-4 bottom-6 flex flex-col items-center gap-3 z-10",
             showControls ? "visible" : "invisible"
           )}>
             {/* Like */}
             <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
               <div className={cn(
-                "p-2 rounded-full transition-all active:scale-90",
+                "p-1.5 rounded-full transition-all active:scale-90",
                 liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
               )}>
-                <Heart className={cn("w-6 h-6 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+                <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
             </button>
 
             {/* Comments */}
             <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <MessageCircle className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <MessageCircle className="w-5 h-5 text-white" />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
             </button>
 
             {/* Refeed */}
             <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Repeat className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Repeat className="w-5 h-5 text-white" />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
             </button>
 
             {/* Gift */}
             <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Gift className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Gift className="w-5 h-5 text-white" />
               </div>
               <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
             </button>
 
             {/* Share */}
             <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Share2 className="w-6 h-6 text-white" />
+              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                <Share2 className="w-5 h-5 text-white" />
               </div>
             </button>
 
@@ -723,9 +736,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   e.stopPropagation();
                   navigate(`/promote/${post.id}`);
                 }}
-                className="flex items-center gap-1 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-white text-xs font-bold transition-all active:scale-95 shadow-lg"
+                className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-white text-[10px] font-bold transition-all active:scale-95 shadow-lg mt-1"
               >
-                <TrendingUp className="w-3.5 h-3.5" />
+                <TrendingUp className="w-3 h-3" />
                 <span>Promote</span>
               </button>
             )}
