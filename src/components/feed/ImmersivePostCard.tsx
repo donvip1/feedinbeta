@@ -589,12 +589,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     return 'linear-gradient(135deg, hsl(230, 85%, 25%) 0%, hsl(280, 70%, 35%) 100%)';
   };
 
-  // Parse caption for display - expandable if more than 5 words
+  // Parse caption for display - different limits based on media type
+  // Video posts: max 25 words, Photo+ posts: max 125 words
   const caption = post.content || '';
   const wordCount = countWords(caption);
-  const shouldTruncateCaption = wordCount > 5;
+  const isVideoPost = hasVideo;
+  const maxWords = isVideoPost ? 25 : 125;
+  const shouldTruncateCaption = wordCount > maxWords;
   const words = caption.trim().split(/\s+/);
-  const truncatedCaption = shouldTruncateCaption ? words.slice(0, 5).join(' ') + '...' : caption;
+  const truncatedCaption = shouldTruncateCaption ? words.slice(0, maxWords).join(' ') + '...' : caption;
 
   return (
     <>
@@ -675,26 +678,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </button>
               )}
             </div>
-
-            {/* Caption - Below user info */}
-            {caption && !isTextStyled && (
-              <div className="mt-2">
-                <p className="text-white text-sm leading-snug break-words drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                  {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
-                </p>
-                {shouldTruncateCaption && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowFullCaption(!showFullCaption);
-                    }}
-                    className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
-                  >
-                    {showFullCaption ? 'less' : 'more'}
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -896,10 +879,30 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media) - hidden in immersive mode, or shown when immersive UI is visible --- */}
+          {/* --- CAPTION OVERLAY (positioned at bottom, below social buttons) --- */}
+          {!isImmersiveMode && caption && !isTextStyled && !isPlainText && (
+            <div className="absolute left-4 right-16 bottom-14 z-10 transition-opacity duration-200 pr-2">
+              <p className="text-white text-sm leading-snug break-words drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" style={{ textShadow: '0 1px 3px rgba(0,0,0,0.9), 0 2px 6px rgba(0,0,0,0.7)' }}>
+                {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+              </p>
+              {shouldTruncateCaption && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFullCaption(!showFullCaption);
+                  }}
+                  className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+                >
+                  {showFullCaption ? 'less' : 'more'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media, on top of caption) - hidden in immersive mode, or shown when immersive UI is visible --- */}
           {(!isImmersiveMode || showImmersiveUI) && (
             <div className={cn(
-              "absolute right-3 z-10 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
+              "absolute right-3 z-20 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
               isImmersiveMode ? "bottom-16" : "bottom-14",
               (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
             )}>
