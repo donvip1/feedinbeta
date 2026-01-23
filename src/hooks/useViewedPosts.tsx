@@ -10,6 +10,7 @@ interface ViewedPostsState {
   loading: boolean;
   hasViewedAllPosts: boolean;
   canCountView: (postId: string) => boolean;
+  flushPendingViews: () => Promise<void>;
 }
 
 export function useViewedPosts(): ViewedPostsState {
@@ -19,6 +20,7 @@ export function useViewedPosts(): ViewedPostsState {
   const [hasViewedAllPosts, setHasViewedAllPosts] = useState(false);
   const pendingViews = useRef<Set<string>>(new Set());
   const flushTimeout = useRef<NodeJS.Timeout | null>(null);
+  const isFlushing = useRef(false);
 
   // Load today's viewed posts from database on mount
   useEffect(() => {
@@ -52,22 +54,47 @@ export function useViewedPosts(): ViewedPostsState {
     loadViewedPosts();
   }, [user]);
 
-  // Batch flush pending views to database
+  // Batch flush pending views to database - IMMEDIATE version
   const flushPendingViews = useCallback(async () => {
-    if (!user || pendingViews.current.size === 0) return;
+    if (!user || pendingViews.current.size === 0 || isFlushing.current) return;
 
+    isFlushing.current = true;
     const viewsToFlush = Array.from(pendingViews.current);
     pendingViews.current.clear();
 
     // Record views in batch (fire and forget)
-    for (const postId of viewsToFlush) {
-      try {
-        await supabase.rpc('record_post_view', { p_post_id: postId });
-      } catch (err) {
-        console.error('Error recording post view:', err);
+    try {
+      for (const postId of viewsToFlush) {
+        try {
+          await supabase.rpc('record_post_view', { p_post_id: postId });
+        } catch (err) {
+          console.error('Error recording post view:', err);
+        }
       }
+    } finally {
+      isFlushing.current = false;
     }
   }, [user]);
+
+  // Flush immediately when page becomes hidden (user leaves/switches app)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Immediately flush pending views when user leaves
+        if (flushTimeout.current) {
+          clearTimeout(flushTimeout.current);
+          flushTimeout.current = null;
+        }
+        flushPendingViews();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [flushPendingViews]);
 
   // Flush on unmount or when user changes
   useEffect(() => {
@@ -91,11 +118,11 @@ export function useViewedPosts(): ViewedPostsState {
     // Add to pending batch
     pendingViews.current.add(postId);
 
-    // Debounce the flush
+    // Reduced debounce from 2000ms to 500ms for faster persistence
     if (flushTimeout.current) {
       clearTimeout(flushTimeout.current);
     }
-    flushTimeout.current = setTimeout(flushPendingViews, 2000);
+    flushTimeout.current = setTimeout(flushPendingViews, 500);
   }, [user, flushPendingViews]);
 
   const isViewed = useCallback((postId: string) => {
@@ -132,5 +159,6 @@ export function useViewedPosts(): ViewedPostsState {
     loading,
     hasViewedAllPosts,
     canCountView,
+    flushPendingViews,
   };
 }
