@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus, Globe, Star, ArrowLeft } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,8 +14,9 @@ import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
-import InlineCommentsPanel from './InlineCommentsPanel';
+import DraggableCommentsPanel from './DraggableCommentsPanel';
 import { cn } from '@/lib/utils';
+import { AnimatePresence, motion } from 'framer-motion';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
 
 // Format count for display (e.g., 1.2K, 3.5M)
@@ -133,13 +134,17 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [showControls, setShowControls] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI
   const [showImmersiveUI, setShowImmersiveUI] = useState(false); // Toggle UI visibility while in immersive mode
-  const [showInlineComments, setShowInlineComments] = useState(true); // Show inline comments in immersive mode
+  const [showDraggableComments, setShowDraggableComments] = useState(false); // Draggable comments panel
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0); // Video progress 0-100
+  const [videoDuration, setVideoDuration] = useState(0); // Video duration in seconds
+  const [isSeeking, setIsSeeking] = useState(false); // Is user dragging timeline
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Auto-show controls after 1 second of inactivity
   const resetControlsTimer = () => {
@@ -409,10 +414,45 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       // In immersive mode, tap toggles UI visibility (not exit)
       toggleImmersiveUI();
     } else {
-      // In normal mode, tap just toggles controls visibility (no play/pause)
-      setShowControls(prev => !prev);
+      // In normal mode, tapping anywhere enters fullscreen immersive mode
+      enterImmersiveMode();
     }
   };
+
+  // Video progress update handler
+  const handleTimeUpdate = useCallback(() => {
+    if (videoRef.current && !isSeeking) {
+      const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
+      setVideoProgress(progress);
+    }
+  }, [isSeeking]);
+
+  // Handle video seek via timeline
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    if (!videoRef.current || !timelineRef.current) return;
+    
+    const rect = timelineRef.current.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const position = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    
+    videoRef.current.currentTime = position * videoRef.current.duration;
+    setVideoProgress(position * 100);
+  }, []);
+
+  const handleSeekStart = useCallback((e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    setIsSeeking(true);
+    handleSeek(e);
+  }, [handleSeek]);
+
+  const handleSeekEnd = useCallback(() => {
+    setIsSeeking(false);
+  }, []);
+
+  // Open comments in immersive mode
+  const openImmersiveComments = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDraggableComments(true);
+  }, []);
 
   const toggleMute = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -641,7 +681,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 const video = e.target as HTMLVideoElement;
                 const aspectRatio = video.videoWidth / video.videoHeight;
                 setIsLandscapeVideo(aspectRatio > 1.2);
+                setVideoDuration(video.duration);
               }}
+              onTimeUpdate={handleTimeUpdate}
               onPlay={() => setIsPlaying(true)}
               onPause={() => setIsPlaying(false)}
               onContextMenu={(e) => e.preventDefault()}
@@ -825,8 +867,17 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
               </button>
 
-              {/* Comments */}
-              <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
+              {/* Comments - opens draggable panel in immersive mode, modal otherwise */}
+              <button 
+                onClick={(e) => {
+                  if (isImmersiveMode) {
+                    openImmersiveComments(e);
+                  } else {
+                    handleCommentsOpenChange(true);
+                  }
+                }} 
+                className="flex flex-col items-center gap-0.5 group"
+              >
                 <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
                   <MessageCircle className="w-5 h-5 text-white" />
                 </div>
@@ -900,29 +951,50 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Immersive Mode: Inline Comments Panel - Always visible at bottom */}
-          {isImmersiveMode && (
-            <InlineCommentsPanel
-              isOpen={showInlineComments}
-              onClose={() => setShowInlineComments(false)}
-              postId={post.id}
-              onCommentAdded={() => setCommentsCount(prev => prev + 1)}
-            />
+          {/* Immersive Mode: Video Timeline - Facebook Reels style */}
+          {isImmersiveMode && hasVideo && showImmersiveUI && (
+            <div className="absolute bottom-0 left-0 right-0 z-40 px-2 pb-safe">
+              <div 
+                ref={timelineRef}
+                className="relative h-8 flex items-center cursor-pointer touch-none"
+                onMouseDown={handleSeekStart}
+                onMouseMove={(e) => isSeeking && handleSeek(e)}
+                onMouseUp={handleSeekEnd}
+                onMouseLeave={handleSeekEnd}
+                onTouchStart={handleSeekStart}
+                onTouchMove={(e) => isSeeking && handleSeek(e)}
+                onTouchEnd={handleSeekEnd}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Timeline background */}
+                <div className="absolute left-0 right-0 h-1 bg-white/30 rounded-full" />
+                {/* Progress bar */}
+                <motion.div 
+                  className="absolute left-0 h-1 bg-white rounded-full"
+                  style={{ width: `${videoProgress}%` }}
+                />
+                {/* Seek handle */}
+                <motion.div 
+                  className="absolute w-3 h-3 bg-white rounded-full shadow-lg -translate-x-1/2"
+                  style={{ left: `${videoProgress}%` }}
+                  animate={{ scale: isSeeking ? 1.5 : 1 }}
+                />
+              </div>
+            </div>
           )}
 
-          {/* Toggle Comments Button - Show when comments are hidden in immersive mode */}
-          {isImmersiveMode && !showInlineComments && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowInlineComments(true);
-              }}
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full text-white text-sm font-medium transition-all active:scale-95"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>View Comments ({commentsCount})</span>
-            </button>
-          )}
+          {/* Immersive Mode: Draggable Comments Panel */}
+          <AnimatePresence>
+            {isImmersiveMode && showDraggableComments && (
+              <DraggableCommentsPanel
+                isOpen={showDraggableComments}
+                onClose={() => setShowDraggableComments(false)}
+                postId={post.id}
+                onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+                commentsCount={commentsCount}
+              />
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Bottom spacer removed - Promote button now in social buttons stack */}
