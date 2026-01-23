@@ -107,6 +107,141 @@ export const addWatermarkToImage = async (
 };
 
 /**
+ * Add watermark to media (image or video thumbnail) with poster info - TikTok style
+ * @param mediaUrl - URL of the media
+ * @param displayName - Poster's display name
+ * @param username - Poster's username
+ * @param mediaType - Type of media ('image' or 'video')
+ * @returns Promise<Blob> - Watermarked media as a blob
+ */
+export const addWatermarkToMedia = async (
+  mediaUrl: string,
+  displayName: string,
+  username: string,
+  mediaType: 'image' | 'video' = 'image'
+): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const watermarkImg = new Image();
+    watermarkImg.crossOrigin = "anonymous";
+    
+    const processMedia = async (sourceElement: HTMLImageElement | HTMLVideoElement, width: number, height: number) => {
+      // Wait for watermark to load
+      await new Promise<void>((res, rej) => {
+        watermarkImg.onload = () => res();
+        watermarkImg.onerror = () => res(); // Continue even if watermark fails
+        watermarkImg.src = feedinWatermark;
+      });
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // Draw the media
+      ctx.drawImage(sourceElement, 0, 0, width, height);
+
+      // Add semi-transparent overlay at bottom for text readability
+      const overlayHeight = height * 0.12;
+      const gradient = ctx.createLinearGradient(0, height - overlayHeight * 1.5, 0, height);
+      gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, height - overlayHeight * 1.5, width, overlayHeight * 1.5);
+
+      // Calculate sizes based on image dimensions
+      const logoSize = Math.min(48, Math.max(28, width * 0.06));
+      const padding = Math.max(12, width * 0.02);
+      const fontSize = Math.min(16, Math.max(10, width * 0.025));
+      const smallFontSize = Math.min(12, Math.max(8, width * 0.02));
+
+      // Draw feedin logo at bottom left
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+      
+      if (watermarkImg.complete && watermarkImg.naturalWidth > 0) {
+        ctx.globalAlpha = 0.9;
+        ctx.drawImage(watermarkImg, padding, height - logoSize - padding, logoSize, logoSize);
+        ctx.globalAlpha = 1;
+      }
+
+      // Draw poster info next to logo
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = 3;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+      
+      const textX = padding + logoSize + 8;
+      const textY = height - padding - logoSize / 2;
+      
+      // Display name
+      ctx.fillText(displayName, textX, textY - 2);
+      
+      // Username
+      ctx.font = `${smallFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      ctx.fillText(`@${username}`, textX, textY + fontSize - 2);
+
+      // Reset shadow
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+
+      // Convert canvas to blob
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error('Failed to create blob from canvas'));
+        }
+      }, 'image/jpeg', 0.92);
+    };
+
+    if (mediaType === 'video') {
+      // For video, capture a frame
+      const video = document.createElement('video');
+      video.crossOrigin = "anonymous";
+      video.preload = 'metadata';
+      video.muted = true;
+      
+      video.onloadedmetadata = () => {
+        video.currentTime = Math.min(1, video.duration / 4);
+      };
+
+      video.onseeked = () => {
+        processMedia(video, video.videoWidth, video.videoHeight);
+      };
+
+      video.onerror = () => {
+        reject(new Error('Failed to load video'));
+      };
+
+      video.src = mediaUrl;
+    } else {
+      // For image
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      
+      img.onload = () => {
+        processMedia(img, img.width, img.height);
+      };
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+
+      img.src = mediaUrl;
+    }
+  });
+};
+
+/**
  * Add watermark to a video by overlaying it during upload
  * Note: This creates a thumbnail with watermark. For video watermarking during playback,
  * you would typically use a video processing service or FFmpeg
