@@ -14,7 +14,7 @@ import CommentsModal from './CommentsModal';
 import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
-import InlineCommentsPanel from './InlineCommentsPanel';
+import DraggableCommentsPanel from './DraggableCommentsPanel';
 import { cn } from '@/lib/utils';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
 
@@ -133,7 +133,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [showControls, setShowControls] = useState(true);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false); // Fullscreen immersive mode - hides all UI
   const [showImmersiveUI, setShowImmersiveUI] = useState(false); // Toggle UI visibility while in immersive mode
-  const [showInlineComments, setShowInlineComments] = useState(true); // Show inline comments in immersive mode
   const [isLandscapeVideo, setIsLandscapeVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -825,13 +824,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
               </button>
 
-              {/* Comments */}
-              <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <MessageCircle className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-              </button>
+              {/* Comments - In immersive mode, this button is hidden since we have the draggable panel */}
+              {!isImmersiveMode && (
+                <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
+                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <MessageCircle className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
+                </button>
+              )}
 
               {/* Refeed */}
               <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
@@ -900,28 +901,13 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Immersive Mode: Inline Comments Panel - Always visible at bottom */}
+          {/* Immersive Mode: Draggable Comments Panel - Always visible at bottom */}
           {isImmersiveMode && (
-            <InlineCommentsPanel
-              isOpen={showInlineComments}
-              onClose={() => setShowInlineComments(false)}
+            <DraggableCommentsPanel
               postId={post.id}
+              commentsCount={commentsCount}
               onCommentAdded={() => setCommentsCount(prev => prev + 1)}
             />
-          )}
-
-          {/* Toggle Comments Button - Show when comments are hidden in immersive mode */}
-          {isImmersiveMode && !showInlineComments && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowInlineComments(true);
-              }}
-              className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2 px-4 py-2 bg-black/50 backdrop-blur-sm rounded-full text-white text-sm font-medium transition-all active:scale-95"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>View Comments ({commentsCount})</span>
-            </button>
           )}
         </div>
 
