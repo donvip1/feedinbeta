@@ -629,10 +629,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               </DropdownMenu>
             </div>
 
-            {/* Caption - Below user info */}
+            {/* Caption - Below user info, wraps with margin to avoid 3-dots menu */}
             {caption && !isTextStyled && (
-              <div className="mt-2">
-                <p className="text-white text-sm leading-snug">
+              <div className="mt-2 pr-12">
+                <p className="text-white text-sm leading-snug break-words">
                   {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
                 </p>
                 {shouldTruncateCaption && (
@@ -643,7 +643,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     }}
                     className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition"
                   >
-                    {showFullCaption ? 'Show less' : 'View more'}
+                    {showFullCaption ? 'less' : 'more'}
                   </button>
                 )}
               </div>
@@ -924,10 +924,34 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
+          {/* Immersive Mode: Caption overlay - shown when UI is visible */}
+          {isImmersiveMode && showImmersiveUI && caption && !isTextStyled && !isPlainText && (
+            <div className="absolute left-4 right-16 bottom-20 z-20 transition-opacity duration-200">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-white font-bold text-sm">{displayName}</span>
+              </div>
+              <p className="text-white text-sm leading-snug pr-2">
+                {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+              </p>
+              {shouldTruncateCaption && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFullCaption(!showFullCaption);
+                  }}
+                  className="text-white/70 text-xs mt-1 font-medium hover:text-white transition"
+                >
+                  {showFullCaption ? 'less' : 'more'}
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Bottom Left - Music indicator - hidden in immersive mode, or shown when immersive UI is visible */}
           {hasMusic && (!isImmersiveMode || showImmersiveUI) && (
             <div className={cn(
-              "absolute left-4 bottom-4 z-10 flex items-center gap-3 transition-opacity duration-200",
+              "absolute left-4 z-10 flex items-center gap-3 transition-opacity duration-200",
+              isImmersiveMode ? "bottom-24" : "bottom-4",
               (isImmersiveMode ? showImmersiveUI : true) ? "opacity-100" : "opacity-0"
             )}>
               <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
