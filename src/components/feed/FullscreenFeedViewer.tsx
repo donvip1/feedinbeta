@@ -74,6 +74,12 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
   const [showUI, setShowUI] = useState(false);
   const [showComments, setShowComments] = useState(false);
   
+  // Video timeline state
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(true);
+  
   // Per-post states
   const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
   const [savedPosts, setSavedPosts] = useState<Set<string>>(new Set());
@@ -89,6 +95,7 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const videoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
   const isScrolling = useRef(false);
+  const progressRef = useRef<HTMLDivElement>(null);
 
   const currentPost = allPosts[currentIndex];
 
@@ -243,6 +250,78 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
     }
   };
 
+  // Format time for display (e.g., 1:23)
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Handle seeking via timeline
+  const handleSeek = (e: React.MouseEvent | React.TouchEvent) => {
+    const progressBar = progressRef.current;
+    if (!progressBar) return;
+    
+    const rect = progressBar.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    const newTime = percent * duration;
+    
+    const currentVideo = videoRefs.current.get(currentPost?.id);
+    if (currentVideo) {
+      currentVideo.currentTime = newTime;
+      setCurrentTime(newTime);
+    }
+  };
+
+  // Handle timeline drag start
+  const handleSeekStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    setIsSeeking(true);
+    handleSeek(e);
+  };
+
+  // Handle timeline drag move
+  const handleSeekMove = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isSeeking) {
+      handleSeek(e);
+    }
+  };
+
+  // Handle timeline drag end
+  const handleSeekEnd = () => {
+    setIsSeeking(false);
+  };
+
+  // Update time from video
+  const handleTimeUpdate = (postId: string, video: HTMLVideoElement) => {
+    if (postId === currentPost?.id && !isSeeking) {
+      setCurrentTime(video.currentTime);
+    }
+  };
+
+  // Update duration from video
+  const handleLoadedMetadata = (postId: string, video: HTMLVideoElement) => {
+    if (postId === currentPost?.id) {
+      setDuration(video.duration);
+    }
+  };
+
+  // Toggle play/pause
+  const togglePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const video = videoRefs.current.get(currentPost?.id);
+    if (video) {
+      if (video.paused) {
+        video.play();
+        setIsVideoPlaying(true);
+      } else {
+        video.pause();
+        setIsVideoPlaying(false);
+      }
+    }
+  };
+
   // Get visible posts (current ± 2 for preloading)
   const getVisiblePosts = useCallback(() => {
     const visible: { post: Post; index: number }[] = [];
@@ -326,6 +405,10 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
                   preload="auto"
                   onClick={handleMediaTap}
                   autoPlay={isCurrentPost}
+                  onTimeUpdate={(e) => handleTimeUpdate(post.id, e.target as HTMLVideoElement)}
+                  onLoadedMetadata={(e) => handleLoadedMetadata(post.id, e.target as HTMLVideoElement)}
+                  onPlay={() => isCurrentPost && setIsVideoPlaying(true)}
+                  onPause={() => isCurrentPost && setIsVideoPlaying(false)}
                 />
               )}
 
@@ -394,17 +477,14 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
                 {isVideo && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-auto">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const video = videoRefs.current.get(post.id);
-                        if (video) {
-                          if (video.paused) video.play();
-                          else video.pause();
-                        }
-                      }}
-                      className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10"
+                      onClick={togglePlayPause}
+                      className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10 transition-transform active:scale-95"
                     >
-                      <Play className="w-8 h-8 text-white ml-1" fill="white" />
+                      {isVideoPlaying ? (
+                        <Pause className="w-8 h-8 text-white" fill="white" />
+                      ) : (
+                        <Play className="w-8 h-8 text-white ml-1" fill="white" />
+                      )}
                     </button>
                   </div>
                 )}
@@ -417,6 +497,46 @@ const FullscreenFeedViewer = memo(function FullscreenFeedViewer({
                   >
                     {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
                   </button>
+                )}
+
+                {/* Video Timeline / Seek Bar */}
+                {isVideo && isCurrentPost && duration > 0 && (
+                  <div className="absolute bottom-20 left-4 right-4 z-30 pointer-events-auto">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white text-xs font-medium min-w-[36px]">{formatTime(currentTime)}</span>
+                      
+                      {/* Progress bar */}
+                      <div
+                        ref={progressRef}
+                        className="flex-1 h-8 flex items-center cursor-pointer group"
+                        onMouseDown={handleSeekStart}
+                        onMouseMove={handleSeekMove}
+                        onMouseUp={handleSeekEnd}
+                        onMouseLeave={handleSeekEnd}
+                        onTouchStart={handleSeekStart}
+                        onTouchMove={handleSeekMove}
+                        onTouchEnd={handleSeekEnd}
+                      >
+                        <div className="relative w-full h-1 bg-white/30 rounded-full group-hover:h-1.5 transition-all">
+                          {/* Buffered progress could go here */}
+                          
+                          {/* Played progress */}
+                          <div 
+                            className="absolute left-0 top-0 h-full bg-white rounded-full transition-all"
+                            style={{ width: `${(currentTime / duration) * 100}%` }}
+                          />
+                          
+                          {/* Seek thumb */}
+                          <div 
+                            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ left: `calc(${(currentTime / duration) * 100}% - 6px)` }}
+                          />
+                        </div>
+                      </div>
+                      
+                      <span className="text-white text-xs font-medium min-w-[36px] text-right">{formatTime(duration)}</span>
+                    </div>
+                  </div>
                 )}
 
                 {/* Social buttons - Right side */}

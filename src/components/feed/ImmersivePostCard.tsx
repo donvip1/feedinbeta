@@ -422,11 +422,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     }
   };
 
-  // Handle tap on video/media area - just toggles controls visibility
+  // Handle tap on video/media area - opens fullscreen viewer
   const handleMediaTap = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    setShowControls(prev => !prev);
+    // Clear preview timeout and open fullscreen
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+    }
+    openFullscreenViewer();
   };
 
   const toggleMute = (e: React.MouseEvent) => {
@@ -712,25 +716,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </>
           )}
 
-          {/* Play/Pause Center Overlay - clicking opens fullscreen viewer */}
-          {hasVideo && (
+          {/* Play/Pause Center Overlay - visual indicator only, tapping media opens fullscreen */}
+          {hasVideo && !isPlaying && (
             <div className={cn(
               "absolute inset-0 flex items-center justify-center pointer-events-none transition-opacity duration-300",
               showControls ? "opacity-100" : "opacity-0"
             )}>
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openFullscreenViewer();
-                }}
-                className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
-              >
-                {isPlaying ? (
-                  <Pause className="w-8 h-8 text-white" fill="white" />
-                ) : (
-                  <Play className="w-8 h-8 text-white ml-1" fill="white" />
-                )}
-              </button>
+              <div className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center border border-white/10">
+                <Play className="w-8 h-8 text-white ml-1" fill="white" />
+              </div>
             </div>
           )}
 
