@@ -143,7 +143,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [isSeeking, setIsSeeking] = useState(false); // Is user dragging timeline
   const [isFollowing, setIsFollowing] = useState(false); // Follow state
   const [isFollowLoading, setIsFollowLoading] = useState(false); // Loading state for follow action
-  const [showMoreActions, setShowMoreActions] = useState(false); // Toggle more actions menu for long captions
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef<number>(0);
@@ -928,10 +928,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- RIGHT SIDEBAR: Social Buttons (overlayed on media, on top of caption) - hidden in immersive mode, or shown when immersive UI is visible --- */}
+          {/* --- RIGHT SIDEBAR: Social Buttons (always visible, overlays on top of comments) --- */}
           {(!isImmersiveMode || showImmersiveUI) && (
             <div className={cn(
-              "absolute right-3 z-20 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
+              "absolute right-3 z-50 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
               isImmersiveMode ? "bottom-16" : "bottom-14",
               (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
             )}>
@@ -963,60 +963,36 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
               </button>
 
-              {/* Show extra buttons only when caption is short OR more menu is open */}
-              {(!shouldTruncateCaption || showMoreActions) && (
-                <>
-                  {/* Views */}
-                  <div className="flex flex-col items-center gap-0.5">
-                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
-                      <Eye className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
-                  </div>
+              {/* Views */}
+              <div className="flex flex-col items-center gap-0.5">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
+                  <Eye className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
+              </div>
 
-                  {/* Refeed */}
-                  <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                      <Repeat className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-                  </button>
+              {/* Refeed */}
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Repeat className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+              </button>
 
-                  {/* Gift */}
-                  <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                      <Gift className="w-5 h-5 text-white" />
-                    </div>
-                    <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-                  </button>
+              {/* Gift */}
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Gift className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+              </button>
 
-                  {/* Share */}
-                  <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                      <Share2 className="w-5 h-5 text-white" />
-                    </div>
-                  </button>
-                </>
-              )}
-
-              {/* More button - only show when caption is long and extra buttons are hidden */}
-              {shouldTruncateCaption && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMoreActions(!showMoreActions);
-                  }} 
-                  className="flex flex-col items-center gap-0.5 group"
-                >
-                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                    {showMoreActions ? (
-                      <X className="w-5 h-5 text-white" />
-                    ) : (
-                      <MoreHorizontal className="w-5 h-5 text-white" />
-                    )}
-                  </div>
-                </button>
-              )}
+              {/* Share */}
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <Share2 className="w-5 h-5 text-white" />
+                </div>
+              </button>
             </div>
           )}
 
