@@ -643,6 +643,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                         • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
                       </button>
                     )}
+                    {/* Mute/Unmute button - inline with follow */}
+                    {hasVideo && (
+                      <button 
+                        onClick={toggleMute}
+                        className="p-1.5 bg-white/10 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-white/20 ml-auto"
+                      >
+                        {isMuted ? (
+                          <VolumeX className="w-4 h-4 text-white" />
+                        ) : (
+                          <Volume2 className="w-4 h-4 text-white" />
+                        )}
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-400">
                     <Globe className="w-2.5 h-2.5" />
@@ -859,14 +872,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Mute/Unmute Button - Top right of media, standalone - hidden in immersive mode, or shown when immersive UI is visible */}
-          {hasVideo && (!isImmersiveMode || showImmersiveUI) && (
+          {/* Mute/Unmute Button - Only show in immersive mode (normal mode has it in the header) */}
+          {hasVideo && isImmersiveMode && showImmersiveUI && (
             <button 
               onClick={toggleMute}
-              className={cn(
-                "absolute z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50",
-                isImmersiveMode ? "top-12 right-14" : "top-4 right-3" // Adjust position in immersive mode to not overlap with back button
-              )}
+              className="absolute z-20 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50 top-12 right-14"
             >
               {isMuted ? (
                 <VolumeX className="w-5 h-5 text-white" />
