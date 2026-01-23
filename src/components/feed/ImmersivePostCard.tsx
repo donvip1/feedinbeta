@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus, Globe, Star, ArrowLeft } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -7,11 +7,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import CommentsModal from './CommentsModal';
-import ShareModal from './ShareModal';
+import MobileShareSheet from './MobileShareSheet';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import DraggableCommentsPanel from './DraggableCommentsPanel';
@@ -568,7 +567,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         {!isImmersiveMode && (
           <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
             <div className="flex items-start justify-between">
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-1">
                 <div className="relative">
                   <Avatar 
                     className="w-10 h-10 cursor-pointer border border-white/20"
@@ -580,7 +579,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   {/* Online indicator */}
                   <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full" />
                 </div>
-                <div className="flex flex-col">
+                <div className="flex flex-col flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-base text-white cursor-pointer" onClick={handleProfileClick}>
                       {displayName}
@@ -604,34 +603,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   </div>
                 </div>
               </div>
-              {/* Menu button */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="p-2 rounded-full transition-all active:scale-95 hover:bg-white/10">
-                    <MoreVertical className="w-6 h-6 text-white" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-md border-border/50">
-                  <DropdownMenuItem onClick={handleSave} className="gap-2">
-                    <Bookmark className="w-4 h-4" />
-                    {saved ? 'Unsave Post' : 'Save Post'}
-                  </DropdownMenuItem>
-                  {canDeletePost && (
-                    <DropdownMenuItem 
-                      onClick={() => setShowDeleteDialog(true)}
-                      className="text-destructive focus:text-destructive gap-2"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Delete Post
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Delete button - only show for post owner/admin */}
+              {canDeletePost && (
+                <button 
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="p-2 rounded-full transition-all active:scale-95 hover:bg-white/10"
+                >
+                  <Trash2 className="w-5 h-5 text-destructive" />
+                </button>
+              )}
             </div>
 
-            {/* Caption - Below user info, wraps with margin to avoid 3-dots menu */}
+            {/* Caption - Below user info */}
             {caption && !isTextStyled && (
-              <div className="mt-2 pr-12">
+              <div className="mt-2">
                 <p className="text-white text-sm leading-snug break-words">
                   {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
                 </p>
@@ -1066,14 +1051,22 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         onCommentAdded={() => setCommentsCount(prev => prev + 1)}
       />
 
-      <ShareModal
+      <MobileShareSheet
         isOpen={shareOpen}
         onClose={() => {
           setShareOpen(false);
           onInteractionEnd?.();
         }}
         postId={post.id}
-        postData={{ content: caption }}
+        postData={{ 
+          content: caption,
+          media_url: currentMediaUrl,
+          media_type: currentMediaType
+        }}
+        posterInfo={{
+          displayName: displayName,
+          username: username
+        }}
         onSavePost={handleSave}
         isSaved={saved}
       />
