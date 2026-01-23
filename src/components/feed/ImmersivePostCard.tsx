@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Bookmark, Music, MoreVertical, Sparkles, Plus, Globe, Star } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -22,6 +22,11 @@ const formatCount = (count: number): string => {
   if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
   if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
   return count.toString();
+};
+
+// Helper to count words
+const countWords = (text: string): number => {
+  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
 };
 
 interface ImmersivePostCardProps {
@@ -453,9 +458,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     return 'linear-gradient(135deg, hsl(230, 85%, 25%) 0%, hsl(280, 70%, 35%) 100%)';
   };
 
-  // Parse caption for display
+  // Parse caption for display - expandable if more than 5 words
   const caption = post.content || '';
-  const truncatedCaption = caption.length > 150 ? caption.substring(0, 150) + '...' : caption;
+  const wordCount = countWords(caption);
+  const shouldTruncateCaption = wordCount > 5;
+  const words = caption.trim().split(/\s+/);
+  const truncatedCaption = shouldTruncateCaption ? words.slice(0, 5).join(' ') + '...' : caption;
 
   return (
     <>
@@ -562,30 +570,39 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
         </div>
 
-        {/* Gradient overlays for text readability */}
+        {/* Gradient overlays for text readability - stronger top gradient */}
         {(hasVideo || hasImage) && (
           <>
-            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
-            <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-black/90 via-black/50 to-transparent pointer-events-none z-20" />
+            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none z-20" />
           </>
         )}
 
-        {/* Play/Pause Overlay Icon */}
-        {showPlayIcon && hasVideo && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className="bg-black/40 backdrop-blur-sm rounded-full p-5">
+        {/* Play/Pause Center Overlay Icon */}
+        {hasVideo && (
+          <div className={cn(
+            "absolute inset-0 z-20 flex items-center justify-center pointer-events-none transition-opacity duration-300",
+            showControls ? "opacity-100" : "opacity-0"
+          )}>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                togglePlayPause();
+              }}
+              className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
+            >
               {isPlaying ? (
-                <Pause className="w-12 h-12 text-white" fill="white" />
+                <Pause className="w-8 h-8 text-white" fill="white" />
               ) : (
-                <Play className="w-12 h-12 text-white" fill="white" />
+                <Play className="w-8 h-8 text-white ml-1" fill="white" />
               )}
-            </div>
+            </button>
           </div>
         )}
 
         {/* Multiple Media Indicator - Adjusted position */}
         {hasMultipleMedia && (
-          <div className="absolute top-20 right-20 flex gap-1.5 z-10">
+          <div className="absolute top-20 right-20 flex gap-1.5 z-30">
             {mediaUrls.map((_, idx) => (
               <div 
                 key={idx} 
@@ -598,80 +615,109 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* Top Left - User Info Overlay - Positioned closer to header */}
-        <div className="absolute top-14 left-4 z-10 flex items-center gap-3">
-          <div className="relative">
-            <Avatar 
-              className={cn("w-10 h-10 cursor-pointer ring-2", isPlainText ? "ring-border" : "ring-white/80")}
-              onClick={handleProfileClick}
-            >
-              <AvatarImage src={post.profiles?.avatar_url || ''} />
-              <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
-            </Avatar>
-            {/* Follow button on avatar */}
-            {user && user.id !== post.user_id && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // TODO: Implement follow logic
-                  toast({ title: 'Following', description: `You are now following @${username}` });
-                }}
-                className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-pink-500 rounded-full p-0.5 text-white shadow-md hover:bg-pink-600 transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            )}
+        {/* --- TOP SECTION: User Info, Display Name, Caption --- */}
+        <div className="absolute top-24 left-0 right-0 px-4 z-30 pointer-events-none">
+          <div className="flex items-start justify-between pointer-events-auto">
+            <div className="flex gap-3">
+              <div className="relative">
+                <Avatar 
+                  className={cn("w-10 h-10 cursor-pointer border", isPlainText ? "border-border" : "border-white/20")}
+                  onClick={handleProfileClick}
+                >
+                  <AvatarImage src={post.profiles?.avatar_url || ''} />
+                  <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
+                </Avatar>
+                {/* Online indicator */}
+                <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full" />
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span className={cn("font-bold text-base cursor-pointer", isPlainText ? "text-foreground" : "text-white drop-shadow-sm")} onClick={handleProfileClick}>
+                    {displayName}
+                  </span>
+                  {/* Follow button inline */}
+                  {user && user.id !== post.user_id && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toast({ title: 'Following', description: `You are now following @${username}` });
+                      }}
+                      className="text-blue-400 font-bold text-sm hover:text-blue-300 transition"
+                    >
+                      • Follow
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-xs text-gray-300">
+                  <Globe className="w-2.5 h-2.5" />
+                  <span>Public</span>
+                </div>
+              </div>
+            </div>
+            {/* Menu button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className={cn(
+                  "p-2 rounded-full transition-all active:scale-95 hover:bg-white/10",
+                  isPlainText ? "bg-muted/80" : ""
+                )}>
+                  <MoreVertical className={cn("w-6 h-6", isPlainText ? "text-foreground" : "text-white")} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-md border-border/50">
+                <DropdownMenuItem onClick={handleSave} className="gap-2">
+                  <Bookmark className="w-4 h-4" />
+                  {saved ? 'Unsave Post' : 'Save Post'}
+                </DropdownMenuItem>
+                {canDeletePost && (
+                  <DropdownMenuItem 
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-destructive focus:text-destructive gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete Post
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <div className="flex flex-col" onClick={handleProfileClick}>
-            <span className={cn("font-bold text-sm cursor-pointer", isPlainText ? "text-foreground" : "text-white drop-shadow-lg")}>
-              {displayName}
-            </span>
-            <span className={cn("text-xs", isPlainText ? "text-muted-foreground" : "text-white/80 drop-shadow-md")}>
-              @{username} · {formatDistanceToNow(new Date(post.created_at), { addSuffix: false })}
-            </span>
-          </div>
+
+          {/* Caption Area - Immediately below user info */}
+          {caption && !isTextStyled && (
+            <div className="mt-3 pointer-events-auto">
+              <p className={cn("text-sm leading-snug drop-shadow-md", isPlainText ? "text-foreground" : "text-white")}>
+                {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+              </p>
+              {shouldTruncateCaption && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFullCaption(!showFullCaption);
+                  }}
+                  className="text-blue-400 text-xs mt-1 font-medium hover:text-blue-300 transition"
+                >
+                  {showFullCaption ? 'Show less' : 'View more'}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Top Right - Menu & Promoted Badge */}
-        <div className="absolute top-14 right-4 z-10 flex items-center gap-2">
-          {isPromoted && (
+        {/* Promoted Badge - Top right corner */}
+        {isPromoted && (
+          <div className="absolute top-14 right-4 z-30">
             <Badge className="bg-pink-500/90 backdrop-blur-sm text-white text-xs font-semibold">
               <Sparkles className="w-3 h-3 mr-1" />
               Sponsored
             </Badge>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className={cn(
-                "p-2 rounded-full transition-all active:scale-95",
-                isPlainText ? "bg-muted/80" : "bg-black/40 backdrop-blur-sm"
-              )}>
-                <MoreVertical className={cn("w-5 h-5", isPlainText ? "text-foreground" : "text-white")} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background/95 backdrop-blur-md border-border/50">
-              <DropdownMenuItem onClick={handleSave} className="gap-2">
-                <Bookmark className="w-4 h-4" />
-                {saved ? 'Unsave Post' : 'Save Post'}
-              </DropdownMenuItem>
-              {canDeletePost && (
-                <DropdownMenuItem 
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="text-destructive focus:text-destructive gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Delete Post
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+          </div>
+        )}
 
-        {/* Mute/Unmute Button */}
+        {/* Mute/Unmute Button - positioned below top section */}
         {hasVideo && (
           <button 
             onClick={toggleMute}
-            className="absolute top-24 right-4 z-10 p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-95"
+            className="absolute top-48 right-4 z-30 p-2 bg-black/30 backdrop-blur-sm rounded-full transition-all active:scale-95 hover:bg-black/50"
           >
             {isMuted ? (
               <VolumeX className="w-5 h-5 text-white" />
@@ -681,164 +727,152 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </button>
         )}
 
-        {/* Social buttons for Videos - Vertical layout on right side - aligned with mute button */}
+        {/* --- RIGHT SIDEBAR: Social Buttons --- */}
         {layoutType === 'video' && (
           <div className={cn(
-            "absolute right-4 bottom-6 flex flex-col items-center gap-3 z-10",
+            "absolute bottom-20 right-2 z-40 flex flex-col items-center gap-5 pointer-events-auto pb-4",
             showControls ? "visible" : "invisible"
           )}>
             {/* Like */}
-            <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-              <div className={cn(
-                "p-1.5 rounded-full transition-all active:scale-90",
-                liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
-              )}>
-                <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={handleLike}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <Heart 
+                  className={cn("w-7 h-7 transition-colors duration-200 drop-shadow-md", liked ? "text-blue-500 fill-blue-500" : "text-white")} 
+                  strokeWidth={liked ? 0 : 2}
+                />
               </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
-            </button>
+              <span className="text-white text-xs font-bold drop-shadow-md">{formatCount(likesCount)}</span>
+            </div>
 
-            {/* Comments */}
-            <button onClick={() => handleCommentsOpenChange(true)} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <MessageCircle className="w-5 h-5 text-white" />
+            {/* Comment */}
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => handleCommentsOpenChange(true)}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <MessageCircle className="w-7 h-7 text-white drop-shadow-md" strokeWidth={2} />
               </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-            </button>
-
-            {/* Refeed */}
-            <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Repeat className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-            </button>
-
-            {/* Gift */}
-            <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Gift className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-            </button>
+              <span className="text-white text-xs font-bold drop-shadow-md">{formatCount(commentsCount)}</span>
+            </div>
 
             {/* Share */}
-            <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-              <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                <Share2 className="w-5 h-5 text-white" />
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => { setShareOpen(true); onInteractionStart?.(); }}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <Share2 className="w-7 h-7 text-white drop-shadow-md" strokeWidth={2} />
               </div>
-            </button>
+              <span className="text-white text-xs font-bold drop-shadow-md">Share</span>
+            </div>
 
-            {/* Promote - right below Share */}
-            {user && !isPromoted && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/promote/${post.id}`);
-                }}
-                className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full text-white text-[10px] font-bold transition-all active:scale-95 shadow-lg mt-1"
-              >
-                <TrendingUp className="w-3 h-3" />
-                <span>Promote</span>
-              </button>
-            )}
+            {/* Gift */}
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => { setGiftOpen(true); onInteractionStart?.(); }}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <Gift className="w-7 h-7 text-yellow-400 drop-shadow-md" strokeWidth={2} />
+              </div>
+              <span className="text-white text-xs font-bold drop-shadow-md">Gift</span>
+            </div>
+
+            {/* Bookmark */}
+            <div className="p-2 cursor-pointer transition-transform active:scale-90 hover:scale-110" onClick={handleSave}>
+              <Bookmark className={cn("w-7 h-7 drop-shadow-md", saved ? "text-white fill-white" : "text-white")} strokeWidth={2} />
+            </div>
           </div>
         )}
 
-        {/* Bottom Section - Refeed indicator, Caption & Promote aligned */}
+        {/* --- BOTTOM SECTION: Music, Hashtags, Promote --- */}
         {!isPlainText && (
-          <div className="absolute left-4 right-20 bottom-4 z-10">
-            {/* Refeed indicator */}
-            {isRefeed && (
-              <div className="flex items-center gap-1.5 mb-1">
-                <Repeat className="w-3.5 h-3.5 text-white/70" />
-                <span className="text-xs text-white/70">Refeed from @{post.original_post?.profiles?.username}</span>
-              </div>
-            )}
+          <div className="absolute bottom-0 left-0 right-16 p-4 pb-20 z-30 flex flex-col justify-end pointer-events-none">
+            <div className="pointer-events-auto flex flex-col gap-2">
+              {/* Refeed indicator */}
+              {isRefeed && (
+                <div className="flex items-center gap-1.5">
+                  <Repeat className="w-3.5 h-3.5 text-white/70" />
+                  <span className="text-xs text-white/70">Refeed from @{post.original_post?.profiles?.username}</span>
+                </div>
+              )}
 
-            {/* Caption */}
-            {caption && !isTextStyled && (
-              <div>
-                <p className="text-white text-sm leading-relaxed drop-shadow-lg line-clamp-2">
-                  {renderCaptionWithHashtags(truncatedCaption)}
-                </p>
-                {caption.length > 100 && (
+              {/* Hashtags from caption */}
+              {caption && !isTextStyled && (
+                <div className="flex flex-wrap gap-1">
+                  {caption.match(/#\w+/g)?.slice(0, 5).map((tag, idx) => (
+                    <span 
+                      key={idx} 
+                      className="text-blue-400 font-semibold text-sm drop-shadow-md cursor-pointer hover:underline"
+                      onClick={() => navigate(`/feed/hashtag/${encodeURIComponent(tag.slice(1))}`)}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Music Tag */}
+              {hasMusic && (
+                <div className="flex items-center gap-2 bg-black/40 w-fit px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10 cursor-pointer">
+                  <Music className="w-3.5 h-3.5 text-white" />
+                  <div className="text-xs font-medium text-white max-w-[200px] truncate">
+                    {post.music_title || 'Original Audio'} {post.music_artist && `· ${post.music_artist}`}
+                  </div>
+                </div>
+              )}
+
+              {/* Boost/Promote Button */}
+              {user && !isPromoted && (
+                <div className="mt-2">
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowFullCaption(!showFullCaption);
+                      navigate(`/promote/${post.id}`);
                     }}
-                    className="text-primary text-xs mt-1 font-medium"
+                    className="bg-blue-600/90 hover:bg-blue-600 text-white text-xs font-bold py-1.5 px-4 rounded-md backdrop-blur-md transition flex items-center gap-1 shadow-lg"
                   >
-                    {showFullCaption ? 'Show less' : 'Show more...'}
+                    <Star className="w-3 h-3 fill-white" />
+                    Boost Reel
                   </button>
-                )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Promote CTA removed from here - now in social button stack */}
-
-        {/* Bottom Left - Music & Social Buttons - Hide for plain text */}
-        {!isPlainText && (
-          <div className="absolute left-4 right-20 bottom-4 z-10">
-            {/* Social buttons for Photos & Text - Horizontal layout */}
-            {layoutType === 'photo-text' && (
-              <div className={cn(
-                "flex items-center gap-3 mb-3",
-                showControls ? "visible" : "invisible"
-              )}>
-                <button onClick={handleLike} className="flex items-center gap-1.5 group">
-                  <div className={cn(
-                    "p-2 rounded-full transition-all active:scale-90",
-                    liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
-                  )}>
-                    <Heart className={cn("w-5 h-5", liked ? "text-white fill-white" : "text-white")} />
-                  </div>
-                  <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
-                </button>
-                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                    <MessageCircle className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
-                </button>
-                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                    <Repeat className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
-                </button>
-                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                    <Gift className="w-5 h-5 text-white" />
-                  </div>
-                  <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
-                </button>
-                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
-                  <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                    <Share2 className="w-5 h-5 text-white" />
-                  </div>
-                </button>
+        {/* Photo-text layout - Social buttons at bottom */}
+        {layoutType === 'photo-text' && !isPlainText && (
+          <div className="absolute bottom-20 right-2 z-40 flex flex-col items-center gap-5 pointer-events-auto pb-4">
+            {/* Like */}
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={handleLike}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <Heart 
+                  className={cn("w-7 h-7 transition-colors duration-200 drop-shadow-md", liked ? "text-blue-500 fill-blue-500" : "text-white")} 
+                  strokeWidth={liked ? 0 : 2}
+                />
               </div>
-            )}
+              <span className="text-white text-xs font-bold drop-shadow-md">{formatCount(likesCount)}</span>
+            </div>
 
-            {/* Music indicator - Spinning vinyl style */}
-            {hasMusic && (
-              <div className="flex items-center gap-3">
-                <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
-                  <div className="w-4 h-4 rounded-full bg-white/20" />
-                  <div className="absolute inset-0 rounded-full border border-white/10" />
-                </div>
-                <div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-3 py-1.5 overflow-hidden max-w-[200px]">
-                  <Music className="w-4 h-4 text-white flex-shrink-0" />
-                  <p className="text-white text-xs font-medium truncate">
-                    {post.music_title || 'Original Audio'} {post.music_artist && `· ${post.music_artist}`}
-                  </p>
-                </div>
+            {/* Comment */}
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => handleCommentsOpenChange(true)}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <MessageCircle className="w-7 h-7 text-white drop-shadow-md" strokeWidth={2} />
               </div>
-            )}
+              <span className="text-white text-xs font-bold drop-shadow-md">{formatCount(commentsCount)}</span>
+            </div>
+
+            {/* Share */}
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => { setShareOpen(true); onInteractionStart?.(); }}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <Share2 className="w-7 h-7 text-white drop-shadow-md" strokeWidth={2} />
+              </div>
+              <span className="text-white text-xs font-bold drop-shadow-md">Share</span>
+            </div>
+
+            {/* Gift */}
+            <div className="flex flex-col items-center gap-1 cursor-pointer group" onClick={() => { setGiftOpen(true); onInteractionStart?.(); }}>
+              <div className="p-2 transition-transform active:scale-90 group-hover:scale-110">
+                <Gift className="w-7 h-7 text-yellow-400 drop-shadow-md" strokeWidth={2} />
+              </div>
+              <span className="text-white text-xs font-bold drop-shadow-md">Gift</span>
+            </div>
+
+            {/* Bookmark */}
+            <div className="p-2 cursor-pointer transition-transform active:scale-90 hover:scale-110" onClick={handleSave}>
+              <Bookmark className={cn("w-7 h-7 drop-shadow-md", saved ? "text-white fill-white" : "text-white")} strokeWidth={2} />
+            </div>
           </div>
         )}
 
