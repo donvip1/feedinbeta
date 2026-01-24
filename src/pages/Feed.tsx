@@ -63,7 +63,7 @@ const Feed = () => {
   const [showLiveViewer, setShowLiveViewer] = useState(false); // Fullscreen live content viewer
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastScrollY = useRef(0);
-  const { viewedPostIds, markAsViewed, flushPendingViews } = useViewedPosts();
+  const { viewedPostIds, markAsViewed } = useViewedPosts();
   const initialViewedRef = useRef<string[]>([]);
   const hasInitializedRef = useRef(false);
   const [displayPosts, setDisplayPosts] = useState<any[]>([]);
@@ -503,15 +503,11 @@ const Feed = () => {
   }, [refetch]));
 
   // Initialize display posts and handle infinite scroll
-  // Filter out already-viewed posts client-side as a safety net
   useEffect(() => {
     if (posts) {
-      // Client-side filter to exclude posts that are already in viewedPostIds
-      // This is a backup in case the cache served stale data
-      const filteredPosts = posts.filter((p: any) => !viewedPostIds.includes(p.id));
-      setDisplayPosts(filteredPosts.length > 0 ? filteredPosts : posts);
+      setDisplayPosts(posts);
     }
-  }, [posts, viewedPostIds]);
+  }, [posts]);
 
   // Infinite scroll handler - NO cycling, posts only appear once until database allows reset
   useEffect(() => {
@@ -555,18 +551,18 @@ const Feed = () => {
     };
   }, [isLoadingMore]);
 
-  // Flush pending views when user leaves the app (but don't auto-refresh on return)
+  // Refetch feed when user returns to the app/page (triggers database reset check)
   useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'hidden') {
-        // User left the app - flush pending views to database
-        await flushPendingViews();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        // User returned to the app - refetch to get fresh posts (database will auto-reset if needed)
+        refetch();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [flushPendingViews]);
+  }, [user, refetch]);
 
   useEffect(() => {
     if (authLoading) return;
