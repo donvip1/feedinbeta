@@ -127,17 +127,27 @@ export const MediaMessageBubble = ({
               alt="Shared" 
               className="max-w-[280px] max-h-[320px] object-cover rounded-xl transition-transform duration-200 group-hover/media:scale-[1.02]"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover/media:opacity-100 transition-opacity" />
-            {/* Fullscreen icon button */}
-            <button 
-              className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm hover:bg-black/70 transition-colors"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowViewer(true);
-              }}
-            >
-              <Maximize2 className="w-4 h-4 text-white" />
-            </button>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent pointer-events-none" />
+            
+            {/* Transparent file size overlay - visible for both sender and receiver */}
+            <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between">
+              <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-0.5">
+                <ImageIcon className="w-3 h-3 text-white/90" />
+                {sizeText && (
+                  <span className="text-[10px] font-medium text-white/90">{sizeText}</span>
+                )}
+              </div>
+              {/* Fullscreen icon button */}
+              <button 
+                className="w-7 h-7 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowViewer(true);
+                }}
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-white" />
+              </button>
+            </div>
           </div>
           
           {/* WhatsApp-style fullscreen viewer with actions */}
@@ -191,16 +201,26 @@ export const MediaMessageBubble = ({
                 <Film className="w-6 h-6 text-white" />
               </div>
             </div>
-            {/* Fullscreen icon button */}
-            <button 
-              className="absolute bottom-2 right-2 w-8 h-8 rounded-full bg-black/50 flex items-center justify-center backdrop-blur-sm hover:bg-black/70 transition-colors z-10"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowViewer(true);
-              }}
-            >
-              <Maximize2 className="w-4 h-4 text-white" />
-            </button>
+            
+            {/* Transparent file size overlay - visible for both sender and receiver */}
+            <div className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-between z-10">
+              <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm rounded-full px-2 py-0.5">
+                <Film className="w-3 h-3 text-white/90" />
+                {sizeText && (
+                  <span className="text-[10px] font-medium text-white/90">{sizeText}</span>
+                )}
+              </div>
+              {/* Fullscreen icon button */}
+              <button 
+                className="w-7 h-7 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm hover:bg-black/60 transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowViewer(true);
+                }}
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-white" />
+              </button>
+            </div>
           </div>
 
           <ChatMediaViewer
