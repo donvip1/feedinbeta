@@ -950,11 +950,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               )}>
                 {/* Like - always visible */}
                 <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-                  <div className={cn(
-                    "p-1.5 rounded-full transition-all active:scale-90",
-                    liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
-                  )}>
-                    <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+                  <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                    <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
                 </button>
@@ -970,7 +967,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   }} 
                   className="flex flex-col items-center gap-0.5 group"
                 >
-                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
                     <MessageCircle className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
@@ -978,7 +975,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                 {/* Gift - always visible */}
                 <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
                     <Gift className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
@@ -989,7 +986,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   <>
                     {/* Views */}
                     <div className="flex flex-col items-center gap-0.5">
-                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
+                      <div className="p-1.5" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
                         <Eye className="w-5 h-5 text-white" />
                       </div>
                       <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
@@ -997,7 +994,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                     {/* Refeed */}
                     <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                      <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
                         <Repeat className="w-5 h-5 text-white" />
                       </div>
                       <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
@@ -1005,7 +1002,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                     {/* Share */}
                     <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                      <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
                         <Share2 className="w-5 h-5 text-white" />
                       </div>
                     </button>
@@ -1021,7 +1018,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     }} 
                     className="flex flex-col items-center gap-0.5 group"
                   >
-                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
                       {showMoreActions ? (
                         <X className="w-5 h-5 text-white" />
                       ) : (
