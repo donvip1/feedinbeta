@@ -38,8 +38,8 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
       onPointerUp={() => setIsPressed(false)}
       onPointerLeave={() => setIsPressed(false)}
       className={cn(
-      'fixed bottom-1 md:bottom-2 z-[80]',
-      // Positioned directly over the profile avatar in nav bar
+      'fixed bottom-10 md:bottom-12 z-[80]',
+      // Positioned above the nav bar, aligned with profile avatar
       'right-4 md:right-auto md:left-1/2 md:ml-[calc(min(256px,50vw-2rem)-28px)]',
         'flex items-center justify-center',
         'transition-all duration-200 ease-out',
