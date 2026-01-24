@@ -6,9 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield } from 'lucide-react';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
@@ -24,6 +23,8 @@ import { usePageRefresh } from '@/context/RefreshContext';
 import { realtimeManager } from '@/lib/unified-realtime';
 import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
 import { QueryErrorFallback } from '@/components/shared/QueryErrorFallback';
+import { MessagingTabs } from '@/components/messages/MessagingTabs';
+import { cn } from '@/lib/utils';
 
 interface Conversation {
   id: string;
@@ -77,8 +78,9 @@ export default function Messages() {
   const [groups, setGroups] = useState<Group[]>(cachedGroups);
   const [myGroups, setMyGroups] = useState<Group[]>(cachedMyGroups);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [activeTab, setActiveTab] = useState('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'stories' | 'live'>('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
+  const [secretMode, setSecretMode] = useState(false);
   const handledLocationStateRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
 
@@ -465,26 +467,71 @@ export default function Messages() {
   const showSkeleton = loading && conversations.length === 0;
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className={cn(
+      "flex h-screen transition-colors duration-300",
+      secretMode ? "bg-slate-950" : "bg-background"
+    )}>
+      {/* Secret Mode Pattern Overlay */}
+      {secretMode && (
+        <div 
+          className="fixed inset-0 opacity-5 pointer-events-none z-0" 
+          style={{ 
+            backgroundImage: 'radial-gradient(hsl(var(--destructive)) 1px, transparent 1px)', 
+            backgroundSize: '20px 20px' 
+          }} 
+        />
+      )}
+      
       {/* Sidebar */}
-      <div className={`${selectedConversationId ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 border-r border-border`}>
-        <div className="p-4 border-b border-border">
+      <div className={cn(
+        "flex-col w-full md:w-80 border-r z-10 transition-colors duration-300",
+        selectedConversationId ? 'hidden md:flex' : 'flex',
+        secretMode ? "bg-slate-900 border-slate-800" : "bg-background border-border"
+      )}>
+        {/* User Header */}
+        <div className={cn(
+          "p-4 border-b transition-colors duration-300",
+          secretMode ? "border-slate-800" : "border-border"
+        )}>
           <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate('/feed')}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-            <h1 className="text-xl font-bold">Chats & Groups</h1>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/feed')}
+                className={secretMode ? "hover:bg-slate-800" : ""}
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+            </div>
+            <h1 className={cn(
+              "text-xl font-bold",
+              secretMode && "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400"
+            )}>
+              {secretMode ? "Secret Mode" : "Messages"}
+            </h1>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSecretMode(!secretMode)}
+                className={cn(
+                  "transition-colors",
+                  secretMode 
+                    ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
+                    : "hover:bg-muted"
+                )}
+                title={secretMode ? "Exit Secret Mode" : "Enter Secret Mode"}
+              >
+                <Shield className="w-5 h-5" />
+              </Button>
               {activeTab === 'chats' && totalUnreadCount > 0 && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={markAllMessagesAsRead}
                   title="Mark all as read"
+                  className={secretMode ? "hover:bg-slate-800" : ""}
                 >
                   <CheckCheck className="w-5 h-5" />
                 </Button>
@@ -493,39 +540,40 @@ export default function Messages() {
                 variant="ghost"
                 size="icon"
                 onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
+                className={secretMode ? "hover:bg-slate-800" : ""}
               >
                 <Plus className="w-5 h-5" />
               </Button>
             </div>
           </div>
+          
+          {/* Search */}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder={`Search ${activeTab}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className={cn(
+                "pl-9",
+                secretMode && "bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+              )}
             />
           </div>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-3">
-              <TabsTrigger value="chats" className="relative">
-                Chats
-                {totalUnreadCount > 0 && (
-                  <span className="ml-1 bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 rounded-full">
-                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="groups">Groups</TabsTrigger>
-              <TabsTrigger value="stories">Stories</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          
+          {/* Modern Tab Navigation */}
+          <MessagingTabs
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            unreadCount={totalUnreadCount}
+            secretMode={secretMode}
+          />
         </div>
 
         <ScrollArea className="flex-1">
-          <Tabs value={activeTab} className="w-full">
-            <TabsContent value="chats" className="m-0">
+          {/* Chats Content */}
+          {activeTab === 'chats' && (
+            <div className="m-0">
               {loadError && conversations.length === 0 ? (
                 <div className="p-4">
                   <QueryErrorFallback 
@@ -581,9 +629,12 @@ export default function Messages() {
                           .then(() => {});
                       }
                     }}
-                    className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors ${
-                      selectedConversationId === conv.id ? 'bg-accent' : ''
-                    }`}
+                    className={cn(
+                      "w-full p-4 flex items-start gap-3 transition-colors",
+                      selectedConversationId === conv.id 
+                        ? (secretMode ? "bg-slate-800" : "bg-accent")
+                        : (secretMode ? "hover:bg-slate-800/50" : "hover:bg-accent")
+                    )}
                   >
                     <div className="relative">
                       <Avatar>
@@ -643,17 +694,26 @@ export default function Messages() {
                   </button>
                 ))
               )}
-            </TabsContent>
+            </div>
+          )}
 
-            <TabsContent value="groups" className="m-0">
+          {/* Groups Content - Only show in chats tab for groups section */}
+          {activeTab === 'chats' && (filteredMyGroups.length > 0 || filteredGroups.length > 0) && (
+            <>
               {filteredMyGroups.length > 0 && (
                 <div className="p-4">
-                  <h3 className="text-sm font-semibold mb-2 text-muted-foreground">My Groups</h3>
+                  <h3 className={cn(
+                    "text-sm font-semibold mb-2",
+                    secretMode ? "text-slate-400" : "text-muted-foreground"
+                  )}>My Groups</h3>
                   {filteredMyGroups.map((group) => (
                     <button
                       key={group.id}
                       onClick={() => navigate(`/groups/${group.id}`)}
-                      className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg mb-2"
+                      className={cn(
+                        "w-full p-3 flex items-start gap-3 transition-colors rounded-lg mb-2",
+                        secretMode ? "hover:bg-slate-800" : "hover:bg-accent"
+                      )}
                     >
                       <Avatar>
                         <AvatarImage src={group.avatar_url} />
@@ -679,7 +739,10 @@ export default function Messages() {
               )}
               
               <div className="p-4">
-                <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Discover</h3>
+                <h3 className={cn(
+                  "text-sm font-semibold mb-2",
+                  secretMode ? "text-slate-400" : "text-muted-foreground"
+                )}>Discover Groups</h3>
                 {filteredGroups.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     No groups found
@@ -689,7 +752,10 @@ export default function Messages() {
                     <button
                       key={group.id}
                       onClick={() => navigate(`/groups/${group.id}`)}
-                      className="w-full p-3 flex items-start gap-3 hover:bg-accent transition-colors rounded-lg mb-2"
+                      className={cn(
+                        "w-full p-3 flex items-start gap-3 transition-colors rounded-lg mb-2",
+                        secretMode ? "hover:bg-slate-800" : "hover:bg-accent"
+                      )}
                     >
                       <Avatar>
                         <AvatarImage src={group.avatar_url} />
@@ -717,12 +783,40 @@ export default function Messages() {
                   ))
                 )}
               </div>
-            </TabsContent>
+            </>
+          )}
 
-            <TabsContent value="stories" className="m-0">
-              <StoriesBar />
-            </TabsContent>
-          </Tabs>
+          {/* Stories Content */}
+          {activeTab === 'stories' && (
+            <StoriesBar />
+          )}
+
+          {/* Live Content */}
+          {activeTab === 'live' && (
+            <div className="p-4 text-center">
+              <div className="py-12">
+                <div className={cn(
+                  "w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center",
+                  secretMode ? "bg-red-500/20" : "bg-primary/10"
+                )}>
+                  <Users className={cn(
+                    "w-8 h-8",
+                    secretMode ? "text-red-400" : "text-primary"
+                  )} />
+                </div>
+                <h3 className="font-bold text-lg mb-2">Live Streams</h3>
+                <p className="text-muted-foreground text-sm">
+                  No active streams right now.
+                </p>
+                <Button 
+                  className="mt-4 bg-gradient-to-r from-red-500 to-orange-500 text-white"
+                  onClick={() => navigate('/live')}
+                >
+                  Go Live
+                </Button>
+              </div>
+            </div>
+          )}
         </ScrollArea>
       </div>
 

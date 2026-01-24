@@ -12,7 +12,7 @@ export const CHAT_SOUNDS = {
 
 type SoundType = keyof typeof CHAT_SOUNDS;
 
-class ChatSoundManager {
+export class ChatSoundManager {
   private audioContext: AudioContext | null = null;
   private soundEnabled: boolean = true;
   private lastPlayedAt: Map<SoundType, number> = new Map();
