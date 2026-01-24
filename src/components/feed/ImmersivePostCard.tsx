@@ -671,10 +671,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                       </button>
                     )}
                   </div>
-                  {/* Username beneath display name */}
-                  <span className="text-xs text-muted-foreground cursor-pointer hover:underline" onClick={handleProfileClick}>
-                    @{post.profiles?.username || 'user'}
-                  </span>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                     <Globe className="w-2.5 h-2.5" />
                     <span>Public</span>
@@ -797,11 +793,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </>
           )}
 
-          {/* Immersive Mode: Only Avatar Overlay (always visible in immersive mode) */}
+          {/* Immersive Mode: Avatar with Display Name and Username (always visible in immersive mode) */}
           {isImmersiveMode && (
-            <div className="absolute top-12 left-4 z-30">
+            <div className="absolute top-12 left-4 z-30 flex items-center gap-2">
               <Avatar 
-                className="w-8 h-8 border-2 border-white/30 cursor-pointer"
+                className="w-10 h-10 border-2 border-white/30 cursor-pointer"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleProfileClick();
@@ -810,6 +806,48 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <AvatarImage src={post.profiles?.avatar_url || ''} />
                 <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
               </Avatar>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-2">
+                  <span 
+                    className="font-bold text-sm text-white cursor-pointer" 
+                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProfileClick();
+                    }}
+                  >
+                    {displayName}
+                  </span>
+                  {/* Follow button inline */}
+                  {user && user.id !== post.user_id && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFollow(e);
+                      }}
+                      disabled={isFollowLoading}
+                      className={cn(
+                        "font-bold text-xs transition",
+                        isFollowing ? "text-white/60 hover:text-white/80" : "text-primary hover:text-primary/80",
+                        isFollowLoading && "opacity-50"
+                      )}
+                      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                    >
+                      • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                    </button>
+                  )}
+                </div>
+                <span 
+                  className="text-xs text-white/70 cursor-pointer hover:text-white/90 transition"
+                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleProfileClick();
+                  }}
+                >
+                  @{post.profiles?.username || 'user'}
+                </span>
+              </div>
             </div>
           )}
 
