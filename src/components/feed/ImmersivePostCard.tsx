@@ -607,6 +607,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     ? (caption.length > 90 ? caption.slice(0, 90).trim() + '...' : caption)
     : (wordCount > 125 ? caption.trim().split(/\s+/).slice(0, 125).join(' ') + '...' : caption);
 
+  // Check if we need a footer section (caption, music, or promote button exists)
+  const hasFooterContent = !isImmersiveMode && !isTextStyled && !isPlainText && (caption || hasMusic || (user && !isPromoted));
+
   return (
     <>
       <div 
@@ -619,7 +622,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* --- TOP SECTION: User Info & Caption (NOT overlayed) - Hidden in immersive mode --- */}
+        {/* --- TOP SECTION: User Info (NOT overlayed) - Hidden in immersive mode --- */}
         {!isImmersiveMode && (
           <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
             <div className="flex items-start justify-between">
@@ -689,10 +692,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
 
-        {/* --- MEDIA SECTION (takes full screen in immersive mode) --- */}
+        {/* --- MEDIA SECTION (takes available space, footer sits below) --- */}
         <div className={cn(
           "relative overflow-hidden",
-          isImmersiveMode ? "flex-1 h-full w-full" : "flex-1"
+          isImmersiveMode ? "flex-1 h-full w-full" : "flex-1 min-h-0"
         )}>
           {/* Loading skeleton */}
           {!isMediaLoaded && (currentMediaUrl || isTextStyled) && (
@@ -887,54 +890,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* --- CAPTION OVERLAY with Promote Button (positioned at bottom left) --- */}
-          {!isImmersiveMode && caption && !isTextStyled && !isPlainText && (
-            <div className="absolute left-4 right-16 bottom-4 z-10 transition-opacity duration-200 pr-2">
-              <p className="text-white text-sm leading-snug break-words" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>
-                {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
-              </p>
-              {shouldTruncateCaption && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowFullCaption(!showFullCaption);
-                  }}
-                  className="text-primary text-xs mt-1 font-medium hover:opacity-80 transition"
-                >
-                  {showFullCaption ? 'less' : 'more'}
-                </button>
-              )}
-              {/* Promote Button - always at bottom of caption area */}
-              {user && !isPromoted && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
-                  }}
-                  className="flex items-center gap-1.5 mt-4 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
-                >
-                  <TrendingUp className="w-4 h-4 text-white" />
-                  <span className="text-white text-xs font-semibold">Promote</span>
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Promote Button for posts without caption */}
-          {!isImmersiveMode && (!caption || isTextStyled || isPlainText) && user && !isPromoted && (
-            <div className="absolute left-4 bottom-4 z-10">
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/promote/${post.id}`);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
-              >
-                <TrendingUp className="w-4 h-4 text-white" />
-                <span className="text-white text-xs font-semibold">Promote</span>
-              </button>
-            </div>
-          )}
+          {/* Caption, Music, and Promote moved to footer section below media */}
 
           {/* --- RIGHT SIDEBAR: Social Buttons (with collapsible "more" for long captions) --- */}
           {(!isImmersiveMode || showImmersiveUI) && (() => {
@@ -1071,13 +1027,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Bottom Left - Music indicator - hidden in immersive mode, or shown when immersive UI is visible */}
-          {hasMusic && (!isImmersiveMode || showImmersiveUI) && (
-            <div className={cn(
-              "absolute left-4 z-10 flex items-center gap-3 transition-opacity duration-200",
-              isImmersiveMode ? "bottom-24" : "bottom-4",
-              (isImmersiveMode ? showImmersiveUI : true) ? "opacity-100" : "opacity-0"
-            )}>
+          {/* Music indicator for immersive mode only */}
+          {hasMusic && isImmersiveMode && showImmersiveUI && (
+            <div className="absolute left-4 bottom-24 z-10 flex items-center gap-3 transition-opacity duration-200">
               <div className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
                 <div className="w-4 h-4 rounded-full bg-white/20" />
                 <div className="absolute inset-0 rounded-full border border-white/10" />
@@ -1137,8 +1089,60 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </AnimatePresence>
         </div>
 
-        {/* Bottom spacer removed - Promote button now in social buttons stack */}
+        {/* --- FOOTER SECTION: Caption, Music, Promote (Below Media) - Hidden in immersive mode --- */}
+        {!isImmersiveMode && !isTextStyled && !isPlainText && (
+          <div className="flex-shrink-0 bg-black px-4 py-3 z-20">
+            {/* Caption */}
+            {caption && (
+              <div className="mb-2">
+                <p className="text-white text-sm leading-snug break-words">
+                  {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+                </p>
+                {shouldTruncateCaption && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFullCaption(!showFullCaption);
+                    }}
+                    className="text-primary text-xs mt-1 font-medium hover:opacity-80 transition"
+                  >
+                    {showFullCaption ? 'less' : 'more'}
+                  </button>
+                )}
+              </div>
+            )}
 
+            {/* Music Info */}
+            {hasMusic && (
+              <div className="flex items-center gap-3 mb-3">
+                <div className="relative w-8 h-8 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
+                  <div className="w-3 h-3 rounded-full bg-white/20" />
+                  <div className="absolute inset-0 rounded-full border border-white/10" />
+                </div>
+                <div className="flex items-center gap-2 overflow-hidden flex-1">
+                  <Music className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <p className="text-gray-300 text-xs font-medium truncate">
+                    {post.music_title || 'Original Audio'} {post.music_artist && `· ${post.music_artist}`}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Promote Button */}
+            {user && !isPromoted && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/promote/${post.id}`);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+              >
+                <TrendingUp className="w-4 h-4 text-white" />
+                <span className="text-white text-xs font-semibold">Promote</span>
+              </button>
+            )}
+          </div>
+        )}
         {/* Social buttons for Plain Text - positioned at bottom */}
         {isPlainText && (
           <div className="absolute left-4 right-4 bottom-16 z-10">
