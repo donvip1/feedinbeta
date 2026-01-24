@@ -10,9 +10,10 @@ import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import {
   X, Search, UserPlus, UserCheck, MessageCircle, Clock, MoreVertical,
-  Shield, Crown
+  Shield, Crown, ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { GroupRoleManagement } from './GroupRoleManagement';
 
 interface GroupMembersSheetProps {
   open: boolean;
@@ -20,13 +21,17 @@ interface GroupMembersSheetProps {
   groupId: string;
   members: Member[];
   isAdmin: boolean;
+  currentUserRole?: string;
+  onMembersChanged?: () => void;
 }
 
 interface Member {
+  id?: string;
   user_id: string;
   role: string;
   display_name: string | null;
   avatar_url: string | null;
+  username?: string;
 }
 
 interface FriendStatus {
@@ -39,6 +44,8 @@ export const GroupMembersSheet = ({
   groupId,
   members,
   isAdmin,
+  currentUserRole = 'member',
+  onMembersChanged,
 }: GroupMembersSheetProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -46,6 +53,8 @@ export const GroupMembersSheet = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [friendStatuses, setFriendStatuses] = useState<FriendStatus>({});
   const [loadingFriend, setLoadingFriend] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<Member | null>(null);
+  const [showRoleManagement, setShowRoleManagement] = useState(false);
 
   useEffect(() => {
     if (open && user?.id) {
@@ -149,7 +158,8 @@ export const GroupMembersSheet = ({
 
   const getRoleIcon = (role: string) => {
     if (role === 'owner') return <Crown className="w-3.5 h-3.5 text-yellow-400" />;
-    if (role === 'admin') return <Shield className="w-3.5 h-3.5 text-primary" />;
+    if (role === 'admin') return <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />;
+    if (role === 'moderator') return <Shield className="w-3.5 h-3.5 text-green-400" />;
     return null;
   };
 
@@ -158,6 +168,13 @@ export const GroupMembersSheet = ({
     if (role === 'admin') return 'Admin';
     if (role === 'moderator') return 'Mod';
     return null;
+  };
+
+  const handleMemberClick = (member: Member) => {
+    if (['owner', 'admin'].includes(currentUserRole) && member.user_id !== user?.id) {
+      setSelectedMember(member);
+      setShowRoleManagement(true);
+    }
   };
 
   return (
@@ -206,11 +223,20 @@ export const GroupMembersSheet = ({
                 return (
                   <div
                     key={member.user_id}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-800/50 transition-colors"
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl transition-colors",
+                      ['owner', 'admin'].includes(currentUserRole) && member.user_id !== user?.id
+                        ? "hover:bg-slate-800/50 cursor-pointer"
+                        : "hover:bg-slate-800/50"
+                    )}
+                    onClick={() => handleMemberClick(member)}
                   >
                     <Avatar
                       className="h-11 w-11 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => navigate(`/profile/${member.user_id}`)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/profile/${member.user_id}`);
+                      }}
                     >
                       <AvatarImage src={member.avatar_url || ''} />
                       <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
@@ -222,7 +248,10 @@ export const GroupMembersSheet = ({
                       <div className="flex items-center gap-2">
                         <span
                           className="font-medium text-white truncate cursor-pointer hover:underline"
-                          onClick={() => navigate(`/profile/${member.user_id}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/profile/${member.user_id}`);
+                          }}
                         >
                           {member.display_name || 'User'}
                           {isCurrentUser && ' (You)'}
@@ -231,19 +260,22 @@ export const GroupMembersSheet = ({
                         {roleBadge && (
                           <span className={cn(
                             "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
-                            member.role === 'owner' ? "bg-yellow-500/20 text-yellow-400" : "bg-primary/20 text-primary"
+                            member.role === 'owner' ? "bg-yellow-500/20 text-yellow-400" : 
+                            member.role === 'admin' ? "bg-blue-500/20 text-blue-400" :
+                            "bg-green-500/20 text-green-400"
                           )}>
                             {roleBadge}
                           </span>
                         )}
                       </div>
                       <p className="text-xs text-slate-500">
-                        {isCurrentUser ? 'You' : friendStatus === 'friends' ? 'Friend' : 'Tap to view profile'}
+                        {isCurrentUser ? 'You' : friendStatus === 'friends' ? 'Friend' : 
+                          ['owner', 'admin'].includes(currentUserRole) ? 'Tap to manage' : 'Tap to view profile'}
                       </p>
                     </div>
 
                     {!isCurrentUser && (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {/* Friend Action */}
                         {friendStatus === 'friends' ? (
                           <Button
@@ -290,6 +322,19 @@ export const GroupMembersSheet = ({
                             <MessageCircle className="w-4 h-4" />
                           </Button>
                         )}
+
+                        {/* More options for admins */}
+                        {['owner', 'admin'].includes(currentUserRole) && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 text-slate-400 hover:text-white"
+                            onClick={() => handleMemberClick(member)}
+                            title="Manage member"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -307,11 +352,35 @@ export const GroupMembersSheet = ({
           {/* Privacy Footer */}
           <div className="p-4 border-t border-slate-800 bg-slate-900/50">
             <p className="text-xs text-slate-500 text-center">
-              Send a friend request to chat privately with members. 
-              They must accept before you can message them.
+              {['owner', 'admin'].includes(currentUserRole) 
+                ? 'Tap on a member to manage their role'
+                : 'Send a friend request to chat privately with members'
+              }
             </p>
           </div>
         </div>
+
+        {/* Role Management Sheet */}
+        <GroupRoleManagement
+          open={showRoleManagement}
+          onOpenChange={setShowRoleManagement}
+          member={selectedMember ? {
+            id: selectedMember.id || '',
+            user_id: selectedMember.user_id,
+            role: selectedMember.role,
+            profile: {
+              username: selectedMember.username || selectedMember.display_name || 'User',
+              avatar_url: selectedMember.avatar_url,
+              full_name: selectedMember.display_name,
+            }
+          } : null}
+          groupId={groupId}
+          currentUserRole={currentUserRole}
+          onRoleChanged={() => {
+            onMembersChanged?.();
+            setShowRoleManagement(false);
+          }}
+        />
       </SheetContent>
     </Sheet>
   );

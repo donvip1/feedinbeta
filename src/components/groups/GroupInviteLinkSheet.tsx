@@ -178,6 +178,8 @@ export const GroupInviteLinkSheet = ({
   };
 
   const activeLinks = links.filter(l => !isExpired(l.expires_at));
+  const defaultLink = activeLinks.find(l => l.link_type === 'default');
+  const customLinks = activeLinks.filter(l => l.link_type !== 'default');
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -240,22 +242,72 @@ export const GroupInviteLinkSheet = ({
             </div>
           )}
 
-          {/* Active Links */}
+          {/* Default Group Link */}
+          {defaultLink && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <Link className="w-4 h-4" />
+                Default Group Link
+              </h3>
+              <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-4 border border-primary/20">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Share this link to invite people</p>
+                    <code className="text-sm text-primary bg-slate-900/50 px-2 py-1 rounded">
+                      {defaultLink.invite_code}
+                    </code>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10"
+                    onClick={() => copyLink(defaultLink.invite_code, defaultLink.id)}
+                  >
+                    {copiedId === defaultLink.id ? (
+                      <Check className="w-5 h-5 text-green-500" />
+                    ) : (
+                      <Copy className="w-5 h-5 text-primary" />
+                    )}
+                  </Button>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3 h-3" />
+                    {defaultLink.use_count} joined
+                  </span>
+                  <span className="text-green-400">• Never expires</span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-3 border-primary/30 text-primary hover:bg-primary/10"
+                  onClick={() => shareLink(defaultLink.invite_code)}
+                >
+                  Share Link
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Custom Links (for events, temporary access, etc.) */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium text-slate-300 flex items-center gap-2">
-              <Users className="w-4 h-4" />
-              Active Links ({activeLinks.length})
+              <Clock className="w-4 h-4" />
+              Custom Links ({customLinks.length})
             </h3>
             
             {loading ? (
               <div className="text-center py-8 text-slate-500">Loading...</div>
-            ) : activeLinks.length === 0 ? (
-              <div className="text-center py-8 text-slate-500">
-                No active invite links
+            ) : customLinks.length === 0 ? (
+              <div className="text-center py-6 text-slate-500 text-sm">
+                {isAdmin 
+                  ? 'Create custom links for events or temporary access'
+                  : 'No custom invite links available'
+                }
               </div>
             ) : (
               <div className="space-y-2">
-                {activeLinks.map(link => (
+                {customLinks.map(link => (
                   <div
                     key={link.id}
                     className="bg-slate-800 rounded-xl p-3 space-y-2"
@@ -297,7 +349,7 @@ export const GroupInviteLinkSheet = ({
                           {link.use_count} uses
                         </span>
                         {link.expires_at && (
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 text-yellow-400">
                             <Clock className="w-3 h-3" />
                             Expires {format(new Date(link.expires_at), 'MMM d, h:mm a')}
                           </span>

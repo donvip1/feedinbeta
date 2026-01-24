@@ -7656,12 +7656,20 @@ export type Database = {
       }
       calculate_trending_posts: { Args: never; Returns: undefined }
       calculate_trending_scores: { Args: never; Returns: undefined }
+      can_appoint_roles: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: boolean
+      }
       can_change_username: { Args: { user_id: string }; Returns: boolean }
       can_delete_for_everyone: {
         Args: { message_id: string; user_id: string }
         Returns: boolean
       }
       can_manage_credits: { Args: never; Returns: boolean }
+      can_manage_group: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: boolean
+      }
       can_message_stranger: {
         Args: { target_user_id: string }
         Returns: boolean
@@ -7871,6 +7879,10 @@ export type Database = {
       }
       get_gift_analytics_summary: { Args: never; Returns: Json }
       get_gift_statistics: { Args: never; Returns: Json }
+      get_group_role: {
+        Args: { p_group_id: string; p_user_id: string }
+        Returns: string
+      }
       get_group_unread_count: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: number
