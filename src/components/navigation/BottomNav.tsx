@@ -218,7 +218,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
               }}
             >
         <div className="max-w-screen-xl mx-auto px-2">
-          <div className="flex items-center justify-between py-2">
+          <div className="flex items-center justify-between py-1">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -232,7 +232,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       onClick={() => handleNavClick(item.path, item.id)}
                       variant="ghost"
                       size="icon"
-                      className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${
+                      className={`h-10 w-10 hover:bg-transparent transition-all duration-150 touch-feedback ${
                         active ? 'text-white' : 'text-white/80 hover:text-white'
                       }`}
                       style={{
