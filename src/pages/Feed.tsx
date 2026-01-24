@@ -298,56 +298,62 @@ const Feed = () => {
     }));
   };
 
-  // Helper function to fetch posts for a specific tab
+  // Helper function to fetch posts for a specific tab using the new rotation system
   const fetchTabPosts = useCallback(async (tab: 'following' | 'forYou', userId: string) => {
-    let feedData: { post_id: string; is_promoted: boolean; boost_level: string; relevance_score?: number }[] = [];
-    let useFallback = false;
-    
     try {
-      if (tab === 'following') {
-        const { data, error } = await supabase.rpc('get_following_feed', {
-          p_user_id: userId,
-          p_limit: 100,
-          p_offset: 0
-        });
-        
-        if (error) {
-          console.error('Following feed error:', error);
-          useFallback = true;
-        } else {
-          feedData = data || [];
-        }
-      } else {
-        const { data, error } = await supabase.rpc('get_personalized_for_you_feed', {
-          p_user_id: userId,
-          p_limit: 100,
-          p_offset: 0
-        });
-        
-        if (error) {
-          console.error('For You feed error:', error);
-          useFallback = true;
-        } else {
-          feedData = data || [];
-        }
+      // Use the new get_feed_with_rotation function that:
+      // 1. Excludes posts already viewed today
+      // 2. Prioritizes new posts (last 24h) over old posts
+      // 3. Applies session-based rotation for different starting positions
+      const feedType = tab === 'following' ? 'following' : 'forYou';
+      
+      const { data, error } = await supabase.rpc('get_feed_with_rotation', {
+        p_user_id: userId,
+        p_limit: 100,
+        p_offset: 0,
+        p_feed_type: feedType,
+        p_media_filter: 'all'
+      });
+      
+      if (error) {
+        console.error('Feed rotation error:', error);
+        // Fall back to old method
+        return await fetchFallbackPosts(userId);
       }
+      
+      if (!data || data.length === 0) {
+        // Check if cycle needs reset (user has seen most posts)
+        const { data: cycleData } = await supabase.rpc('reset_viewed_posts_cycle', { p_user_id: userId });
+        const wasReset = Array.isArray(cycleData) && cycleData[0]?.was_reset;
+        
+        if (wasReset) {
+          // Cycle was reset, try fetching again with randomized order
+          const { data: randomData } = await supabase.rpc('get_randomized_feed_cycle', {
+            p_user_id: userId,
+            p_limit: 100,
+            p_media_filter: 'all'
+          });
+          
+          if (randomData && randomData.length > 0) {
+            return await enrichPostsWithProfiles(randomData);
+          }
+        }
+        
+        return await fetchFallbackPosts(userId);
+      }
+      
+      // Enrich with profile data
+      return await enrichPostsWithProfiles(data);
     } catch (err) {
       console.error('Feed RPC error:', err);
-      useFallback = true;
-    }
-
-    if (useFallback || feedData.length === 0) {
       return await fetchFallbackPosts(userId);
     }
+  }, []);
 
-    const promotedMap = new Map(feedData.map(p => [p.post_id, { 
-      is_promoted: p.is_promoted, 
-      boost_level: p.boost_level,
-      relevance_score: (p as any).relevance_score || 0
-    }]));
-
-    const postIds = feedData.map(p => p.post_id);
-
+  // Helper to enrich posts with profile data
+  const enrichPostsWithProfiles = useCallback(async (feedData: any[]) => {
+    const postIds = feedData.map(p => p.id);
+    
     const { data: fullPosts, error: postsError } = await supabase
       .from('posts')
       .select(`
@@ -360,32 +366,37 @@ const Feed = () => {
       `)
       .in('id', postIds);
 
-    if (postsError) {
+    if (postsError || !fullPosts) {
       console.error('Posts fetch error:', postsError);
-      return await fetchFallbackPosts(userId);
+      return [];
     }
 
-    const postMap = new Map((fullPosts || []).map(p => [p.id, p]));
+    // Create maps for ordering and metadata
+    const postMap = new Map(fullPosts.map(p => [p.id, p]));
+    const metaMap = new Map(feedData.map(p => [p.id, { 
+      is_promoted: p.is_promoted, 
+      is_new_post: p.is_new_post,
+      relevance_score: p.relevance_score || 0
+    }]));
+    
+    // Return posts in the order from the feed function
     const orderedPosts = postIds
       .map(id => postMap.get(id))
       .filter(Boolean)
       .map(post => {
-        const promo = promotedMap.get(post!.id);
+        const meta = metaMap.get(post!.id);
         return {
           ...post!,
-          _isPromoted: promo?.is_promoted || false,
-          _boostLevel: promo?.boost_level || null,
-          _relevanceScore: promo?.relevance_score || 0,
+          _isPromoted: meta?.is_promoted || false,
+          _isNewPost: meta?.is_new_post || false,
+          _relevanceScore: meta?.relevance_score || 0,
+          _boostLevel: null,
           _promoterName: null
         };
       });
 
-    if (orderedPosts.length === 0) {
-      return await fetchFallbackPosts(userId);
-    }
-
     // Cache the results
-    feedCache.set(tab, orderedPosts);
+    feedCache.set('forYou', orderedPosts);
 
     return orderedPosts;
   }, []);
