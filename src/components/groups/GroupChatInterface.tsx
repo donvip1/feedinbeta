@@ -107,7 +107,13 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const [currentUserRole, setCurrentUserRole] = useState<string>('member');
   const [isLoading, setIsLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<{ id: string; content: string; sender: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ 
+    id: string; 
+    content: string; 
+    sender: string;
+    mediaUrl?: string | null;
+    mediaType?: string | null;
+  } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -757,7 +763,13 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
                   isLastInGroup={isLastInGroup(index)}
                   isAdmin={isAdmin}
                   secretMode={secretMode}
-                  onReply={(id, content) => setReplyingTo({ id, content, sender: message.sender.display_name || 'User' })}
+                  onReply={(id, content) => setReplyingTo({ 
+                    id, 
+                    content, 
+                    sender: message.sender.display_name || 'User',
+                    mediaUrl: message.media_url,
+                    mediaType: message.media_type
+                  })}
                   onReact={handleReact}
                   onDelete={handleDelete}
                   onPin={handlePin}
@@ -794,13 +806,45 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         </button>
       )}
       
-      {/* Reply Preview */}
+      {/* Reply Preview - Enhanced with media thumbnail */}
       {replyingTo && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border-t border-slate-800 z-30">
-          <Reply className="w-4 h-4 text-purple-400" />
+        <div className="flex items-center gap-3 px-4 py-2 bg-slate-900 border-t border-slate-800 z-30">
+          <div className="w-1 h-12 bg-purple-500 rounded-full" />
+          
+          {/* Media Thumbnail Preview */}
+          {replyingTo.mediaUrl && (
+            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 ring-2 ring-purple-500/30 bg-slate-800">
+              {replyingTo.mediaType?.startsWith('video') ? (
+                <video 
+                  src={replyingTo.mediaUrl} 
+                  className="w-full h-full object-cover"
+                  muted
+                />
+              ) : replyingTo.mediaType?.startsWith('image') ? (
+                <img 
+                  src={replyingTo.mediaUrl} 
+                  alt="Reply media" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Paperclip className="w-4 h-4 text-slate-400" />
+                </div>
+              )}
+            </div>
+          )}
+          
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-purple-400">{replyingTo.sender}</p>
-            <p className="text-xs text-slate-500 truncate">{replyingTo.content}</p>
+            <p className="text-xs text-slate-500 truncate">
+              {replyingTo.mediaUrl && !replyingTo.content ? (
+                <span className="flex items-center gap-1">
+                  {replyingTo.mediaType?.startsWith('image') ? '📷 Photo' : 
+                   replyingTo.mediaType?.startsWith('video') ? '🎬 Video' : 
+                   replyingTo.mediaType?.startsWith('audio') ? '🎵 Audio' : '📎 File'}
+                </span>
+              ) : replyingTo.content}
+            </p>
           </div>
           <Button 
             variant="ghost" 

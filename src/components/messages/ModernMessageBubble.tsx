@@ -230,18 +230,19 @@ export const ModernMessageBubble = ({
           </div>
         )}
 
-        {/* Story Reply Indicator */}
-        {message.reply_metadata?.type === 'story_reply' && (
+        {/* Story Reply/Reaction Indicator - Enhanced with larger thumbnail */}
+        {(message.reply_metadata?.type === 'story_reply' || message.reply_metadata?.type === 'story_reaction') && (
           <div className={cn(
-            "flex items-center gap-2 p-2 mb-1 rounded-xl backdrop-blur-sm",
-            isOwn ? "bg-white/10" : "bg-primary/10"
+            "flex items-center gap-3 p-2 mb-1.5 rounded-xl backdrop-blur-sm border",
+            isOwn ? "bg-white/10 border-white/20" : "bg-primary/10 border-primary/20"
           )}>
             {message.reply_metadata.story_media_url && (
-              <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 ring-2 ring-primary/30">
+              <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 ring-2 ring-primary/40 shadow-md">
                 {message.reply_metadata.story_media_type?.startsWith('video') ? (
                   <video 
                     src={message.reply_metadata.story_media_url} 
                     className="w-full h-full object-cover"
+                    muted
                   />
                 ) : (
                   <img 
@@ -252,7 +253,12 @@ export const ModernMessageBubble = ({
                 )}
               </div>
             )}
-            <span className="text-xs opacity-70">Replied to story</span>
+            <div className="flex flex-col">
+              <span className="text-xs font-medium opacity-90">
+                {message.reply_metadata?.type === 'story_reaction' ? 'Reacted to story' : 'Replied to story'}
+              </span>
+              <span className="text-[10px] opacity-60">Tap to view</span>
+            </div>
           </div>
         )}
 
