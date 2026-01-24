@@ -1206,18 +1206,18 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               {showFullCaption ? 'less' : 'more'}
             </button>
           )}
-          {/* Promote Button */}
+          {/* Promote Text Link */}
           {user && !isPromoted && (
-            <button 
+            <span 
               onClick={(e) => {
                 e.stopPropagation();
                 navigate(`/promote/${post.id}`);
               }}
-              className="flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+              className="inline-block mt-2 text-pink-500 text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity"
+              style={{ textShadow: '0 0 8px rgba(236, 72, 153, 0.5)' }}
             >
-              <TrendingUp className="w-4 h-4 text-white" />
-              <span className="text-white text-xs font-semibold">Promote</span>
-            </button>
+              Promote
+            </span>
           )}
         </div>
       )}
