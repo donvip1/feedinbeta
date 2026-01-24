@@ -899,7 +899,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <div className={cn(
                 "absolute right-3 z-50 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
                 isImmersiveMode ? "bottom-8" : "bottom-4",
-                (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
+                // In normal mode, always show. In immersive mode, show only when UI is toggled visible
+                isImmersiveMode ? (showImmersiveUI ? "opacity-100" : "opacity-0 pointer-events-none") : "opacity-100"
               )}>
                 {/* Like - always visible */}
                 <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
