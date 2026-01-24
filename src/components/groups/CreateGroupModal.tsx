@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Lock, Globe, Sparkles } from 'lucide-react';
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface CreateGroupModalProps {
 }
 
 export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupModalProps) => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [name, setName] = useState('');
@@ -42,19 +44,23 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
 
     setLoading(true);
     try {
-      const { error } = await supabase.from('groups').insert({
+      // Insert group - the database trigger will:
+      // 1. Add creator as owner in group_members
+      // 2. Create default permanent invite link
+      // 3. Set member_count to 1
+      const { data: newGroup, error } = await supabase.from('groups').insert({
         name: name.trim(),
         description: description.trim(),
         is_private: isPrivate,
         is_premium: isPremium,
         created_by: user?.id,
-      });
+      }).select().single();
 
       if (error) throw error;
 
       toast({
-        title: 'Success',
-        description: 'Group created successfully',
+        title: 'Group created!',
+        description: 'Your group is ready. A shareable link has been generated automatically.',
       });
 
       setName('');
@@ -62,6 +68,12 @@ export const CreateGroupModal = ({ open, onOpenChange, onSuccess }: CreateGroupM
       setIsPrivate(false);
       setIsPremium(false);
       onOpenChange(false);
+      
+      // Navigate to the new group chat
+      if (newGroup?.id) {
+        navigate(`/groups/${newGroup.id}/chat`);
+      }
+      
       onSuccess();
     } catch (error: any) {
       console.error('Error creating group:', error);

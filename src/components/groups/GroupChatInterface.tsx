@@ -104,6 +104,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const [members, setMembers] = useState<Member[]>([]);
   const [memberCount, setMemberCount] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string>('member');
   const [isLoading, setIsLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [replyingTo, setReplyingTo] = useState<{ id: string; content: string; sender: string } | null>(null);
@@ -266,7 +267,9 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       setMemberCount(formattedMembers.length);
       
       const currentMember = formattedMembers.find(m => m.user_id === user?.id);
-      setIsAdmin(currentMember?.role === 'admin' || currentMember?.role === 'moderator');
+      const userRole = currentMember?.role || 'member';
+      setCurrentUserRole(userRole);
+      setIsAdmin(userRole === 'admin' || userRole === 'owner' || userRole === 'moderator');
       setIsMember(!!currentMember);
     }
   };
@@ -1050,6 +1053,8 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         groupId={groupId}
         members={members}
         isAdmin={isAdmin}
+        currentUserRole={currentUserRole}
+        onMembersChanged={loadMembers}
       />
     </div>
   );
