@@ -681,7 +681,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       {/* Input Area */}
       {!showVoiceRecorder && (
         <div className="flex items-end gap-2 p-4 border-t border-border bg-background">
-          <AttachmentPicker onSelect={handleFileSelect} />
+          <AttachmentPicker onFileSelect={handleFileSelect} />
           
           <div className="flex-1 relative">
             <Input
