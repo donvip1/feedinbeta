@@ -935,7 +935,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Caption, Music, and Promote moved to footer section below media */}
 
           {/* --- RIGHT SIDEBAR: Social Buttons (with collapsible "more" for long captions) --- */}
-          {(!isImmersiveMode || showImmersiveUI) && (() => {
+          {/* Hide for plain text posts - they have their own horizontal layout */}
+          {!isPlainText && (!isImmersiveMode || showImmersiveUI) && (() => {
             const hasLongCaption = caption && countWords(caption) > 15;
             return (
               <div className={cn(
