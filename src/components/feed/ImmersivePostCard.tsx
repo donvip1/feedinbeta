@@ -973,6 +973,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
                 </button>
 
+                {/* Gift - always visible */}
+                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
+                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                    <Gift className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+                </button>
+
                 {/* Collapsible buttons - show when no long caption OR when expanded */}
                 {(!hasLongCaption || showMoreActions) && (
                   <>
@@ -990,14 +998,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                         <Repeat className="w-5 h-5 text-white" />
                       </div>
                       <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-                    </button>
-
-                    {/* Gift */}
-                    <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                        <Gift className="w-5 h-5 text-white" />
-                      </div>
-                      <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
                     </button>
 
                     {/* Share */}
