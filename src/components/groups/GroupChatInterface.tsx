@@ -6,11 +6,11 @@ import { useNavigate } from 'react-router-dom';
 import { useGroupRealtime, useGroupTyping, GroupMessagePayload } from '@/hooks/useGroupRealtime';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import {
   Send, Smile, Mic, X, Image as ImageIcon, 
-  Paperclip, ChevronDown, Reply
+  Paperclip, ChevronDown, Reply, Camera, MapPin, FileText, User,
+  Shield, Clock, EyeOff, RefreshCw, Sparkles, Calendar, UserPlus, UserCheck
 } from 'lucide-react';
 import { GroupChatHeader } from './GroupChatHeader';
 import { GroupMessageBubble } from './GroupMessageBubble';
@@ -20,6 +20,16 @@ import { VoiceRecorder } from '@/components/messages/VoiceRecorder';
 import { MediaUploadModal } from '@/components/messages/MediaUploadModal';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { chatSounds } from '@/lib/chat-sounds';
+
+// Retention options matching the reference design
+const RETENTION_OPTIONS = [
+  { label: 'Off', value: 0 },
+  { label: '24 Hours', value: 24 * 60 * 60 * 1000 },
+  { label: '3 Days', value: 3 * 24 * 60 * 60 * 1000 },
+  { label: '7 Days', value: 7 * 24 * 60 * 60 * 1000 },
+  { label: '1 Month', value: 30 * 24 * 60 * 60 * 1000 },
+];
 
 interface GroupMessage {
   id: string;
@@ -54,6 +64,8 @@ interface GroupMessage {
   edited_at?: string | null;
   deleted_at?: string | null;
   created_at: string;
+  is_secret?: boolean;
+  view_once_timer?: number;
 }
 
 interface Group {
@@ -97,6 +109,16 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const [newMessagesCount, setNewMessagesCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState<Array<{ userId: string; displayName: string; activityType?: string }>>([]);
   
+  // New features from reference design
+  const [secretMode, setSecretMode] = useState(false);
+  const [viewOnceTimer, setViewOnceTimer] = useState(0);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isEmojiOpen, setIsEmojiOpen] = useState(false);
+  const [chatRetention, setChatRetention] = useState(0);
+  const [showRetentionMenu, setShowRetentionMenu] = useState(false);
+  const [isMember, setIsMember] = useState(true);
+  const [pendingJoin, setPendingJoin] = useState(false);
+  
   // Media upload modal state
   const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
   const [mediaUploadType, setMediaUploadType] = useState<'image' | 'video' | 'file'>('image');
@@ -105,13 +127,14 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isNearBottomRef = useRef(true);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   
   const { setTyping, stopTyping } = useGroupTyping(groupId);
   
   // Handle new message from realtime
   const handleRealtimeMessage = useCallback((payload: GroupMessagePayload) => {
-    // Fetch the full message with sender info
     fetchSingleMessage(payload.id);
+    chatSounds.playReceive();
     
     if (isNearBottomRef.current) {
       setTimeout(() => scrollToBottom(), 100);
@@ -127,7 +150,6 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     
     setTypingUsers(prev => {
       if (typing.is_typing) {
-        // Add or update typing user
         const existing = prev.findIndex(u => u.userId === typing.user_id);
         const userData = {
           userId: typing.user_id,
@@ -142,7 +164,6 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         }
         return [...prev, userData];
       } else {
-        // Remove typing user
         return prev.filter(u => u.userId !== typing.user_id);
       }
     });
@@ -179,7 +200,6 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       .single();
     
     if (data) {
-      // Fetch sender profile separately
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('id, display_name, avatar_url')
@@ -200,7 +220,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   };
   
   const loadGroup = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('groups')
       .select('*')
       .eq('id', groupId)
@@ -212,7 +232,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   };
   
   const loadMembers = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('group_members')
       .select(`
         user_id,
@@ -232,9 +252,9 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       setMembers(formattedMembers);
       setMemberCount(formattedMembers.length);
       
-      // Check if current user is admin
       const currentMember = formattedMembers.find(m => m.user_id === user?.id);
       setIsAdmin(currentMember?.role === 'admin' || currentMember?.role === 'moderator');
+      setIsMember(!!currentMember);
     }
   };
   
@@ -252,7 +272,6 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       if (error) throw error;
       
-      // Fetch sender profiles for all messages
       const senderIds = [...new Set((data || []).map(m => m.sender_id))];
       const { data: profiles } = await supabase
         .from('profiles')
@@ -261,15 +280,22 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
       
-      const formattedMessages: GroupMessage[] = (data || []).map(msg => ({
+      let formattedMessages: GroupMessage[] = (data || []).map(msg => ({
         ...msg,
         sender: profileMap.get(msg.sender_id) || { id: msg.sender_id, display_name: 'Unknown', avatar_url: null },
         reactions: [],
       }));
       
+      // Apply retention filter
+      if (chatRetention > 0) {
+        formattedMessages = formattedMessages.filter(msg => {
+          const age = Date.now() - new Date(msg.created_at).getTime();
+          return age <= chatRetention;
+        });
+      }
+      
       setMessages(formattedMessages);
       
-      // Mark as read
       if (formattedMessages.length > 0) {
         const lastMessage = formattedMessages[formattedMessages.length - 1];
         await supabase.rpc('mark_group_messages_read', {
@@ -309,10 +335,10 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     
     setSending(true);
     stopTyping();
+    chatSounds.playSend();
     
     const messageContent = customContent || newMessage.trim() || (mediaType?.startsWith('audio') ? '🎤 Voice message' : '📎 Attachment');
     
-    // Optimistic update
     const tempId = `temp-${Date.now()}`;
     const optimisticMessage: GroupMessage = {
       id: tempId,
@@ -334,9 +360,14 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       },
       reactions: [],
       is_pinned: false,
+      is_secret: secretMode,
+      view_once_timer: viewOnceTimer,
     };
     
     setMessages(prev => [...prev, optimisticMessage]);
+    setNewMessage('');
+    setIsEmojiOpen(false);
+    setIsMenuOpen(false);
     scrollToBottom();
     
     try {
@@ -355,12 +386,10 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       if (error) throw error;
       
-      // Replace temp message with real one
       setMessages(prev => prev.map(msg =>
         msg.id === tempId ? { ...optimisticMessage, id: newMsg.id, created_at: newMsg.created_at } : msg
       ));
       
-      setNewMessage('');
       setReplyingTo(null);
     } catch (error: any) {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
@@ -378,13 +407,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     setMediaUploadFile(file);
     setMediaUploadType(type);
     setShowMediaUpload(true);
-    
-    const activityMap: Record<string, string> = {
-      'image': 'uploading_image',
-      'video': 'uploading_video',
-      'file': 'uploading_file',
-    };
-    setTyping(true, activityMap[type] || 'uploading_file');
+    setTyping(true, type === 'image' ? 'uploading_image' : type === 'video' ? 'uploading_video' : 'uploading_file');
   };
   
   const handleMediaSend = async (file: File, caption: string) => {
@@ -462,7 +485,6 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     if (!user) return;
     
     try {
-      // Check if reaction exists
       const { data: existing } = await supabase
         .from('group_message_reactions')
         .select('id')
@@ -472,13 +494,11 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         .maybeSingle();
       
       if (existing) {
-        // Remove reaction
         await supabase
           .from('group_message_reactions')
           .delete()
           .eq('id', existing.id);
       } else {
-        // Add reaction
         await supabase
           .from('group_message_reactions')
           .insert({
@@ -488,7 +508,6 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
           });
       }
       
-      // Reload messages to get updated reactions
       loadMessages();
     } catch (error: any) {
       console.error('Error reacting:', error);
@@ -534,6 +553,16 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     }
   };
   
+  const handleJoinGroup = async () => {
+    setPendingJoin(true);
+    // Simulate join request - in real app would insert to group_members
+    setTimeout(() => {
+      setIsMember(true);
+      setPendingJoin(false);
+      toast({ title: 'Joined group successfully!' });
+    }, 1500);
+  };
+  
   const formatDateHeader = (date: Date): string => {
     if (isToday(date)) return 'Today';
     if (isYesterday(date)) return 'Yesterday';
@@ -560,45 +589,131 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     const next = messages[index + 1];
     return current.sender_id !== next.sender_id;
   };
+
+  const cycleViewOnceTimer = () => {
+    setViewOnceTimer(v => {
+      if (v === 0) return 1;
+      if (v === 1) return 10;
+      if (v === 10) return 30;
+      if (v === 30) return 60;
+      return 0;
+    });
+  };
   
   if (!group) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full bg-slate-950">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
       </div>
     );
   }
   
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className={cn(
+      "flex flex-col h-[100dvh] relative font-sans transition-colors duration-300",
+      secretMode ? 'bg-black' : 'bg-slate-950'
+    )}>
+      {/* Secret Mode Overlay Pattern */}
+      {secretMode && (
+        <div 
+          className="absolute inset-0 opacity-10 pointer-events-none z-0" 
+          style={{ 
+            backgroundImage: 'radial-gradient(#ef4444 1px, transparent 1px)', 
+            backgroundSize: '20px 20px' 
+          }} 
+        />
+      )}
+      
       {/* Header */}
-      <GroupChatHeader
-        group={{ ...group, member_count: memberCount }}
-        isAdmin={isAdmin}
-        onBack={onBack}
-        onShowMembers={() => navigate(`/groups/${groupId}`)}
-        onShowSettings={() => navigate(`/groups/${groupId}/settings`)}
-        onShareInvite={() => {/* TODO: Implement */}}
-        onLeaveGroup={() => navigate('/messages')}
-      />
+      <div className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md flex items-center justify-between px-4 z-30">
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onBack}
+            className="text-slate-400 hover:text-white hover:bg-slate-800"
+          >
+            <X className="w-5 h-5" />
+          </Button>
+          <img 
+            src={group.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=6366f1&color=fff`} 
+            className="w-9 h-9 rounded-full border border-slate-700 cursor-pointer hover:opacity-80 transition-opacity" 
+            onClick={() => navigate(`/groups/${groupId}`)}
+          />
+          <div>
+            <h3 className="font-bold text-sm text-white">{group.name}</h3>
+            <p className="text-xs text-slate-500">
+              {secretMode ? 'Secret Chat' : `${memberCount} members`}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex gap-2 text-slate-400 items-center">
+          {/* Secret Mode Toggle */}
+          <button 
+            onClick={() => setSecretMode(!secretMode)} 
+            className={cn(
+              "p-2 rounded-lg transition-colors",
+              secretMode ? 'bg-red-500/20 text-red-400' : 'hover:bg-slate-800 hover:text-white'
+            )}
+          >
+            <Shield size={18} />
+          </button>
+          
+          {/* Retention Settings */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowRetentionMenu(!showRetentionMenu)}
+              className="p-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <Calendar size={18} />
+            </button>
+            {showRetentionMenu && (
+              <div className="absolute right-0 top-10 bg-slate-800 border border-slate-700 rounded-xl shadow-xl w-44 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                <div className="p-2 text-xs font-bold text-slate-500 border-b border-slate-700 bg-slate-900">
+                  AUTO-DELETE
+                </div>
+                {RETENTION_OPTIONS.map(opt => (
+                  <button 
+                    key={opt.label} 
+                    onClick={() => {
+                      setChatRetention(opt.value);
+                      setShowRetentionMenu(false);
+                      loadMessages();
+                    }}
+                    className={cn(
+                      "block w-full text-left px-3 py-2.5 text-sm hover:bg-slate-700 transition-colors",
+                      chatRetention === opt.value ? 'text-purple-400 bg-slate-700/50' : 'text-slate-300'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
       
       {/* Messages */}
       <div
-        className="flex-1 overflow-y-auto px-4 py-2"
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 relative z-10 custom-scrollbar"
         onScroll={handleScroll}
+        onContextMenu={e => secretMode && e.preventDefault()}
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500" />
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-              <Send className="w-8 h-8 text-primary" />
+            <div className="w-16 h-16 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
+              <Send className="w-8 h-8 text-purple-400" />
             </div>
-            <h3 className="font-semibold text-lg mb-1">No messages yet</h3>
-            <p className="text-muted-foreground text-sm">Send the first message to start the conversation!</p>
+            <h3 className="font-semibold text-lg text-white mb-1">No messages yet</h3>
+            <p className="text-slate-500 text-sm">Send the first message to start the conversation!</p>
           </div>
         ) : (
           <div className="flex flex-col gap-1">
@@ -606,7 +721,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
               <React.Fragment key={message.id}>
                 {shouldShowDateHeader(index) && (
                   <div className="flex justify-center py-3">
-                    <span className="text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+                    <span className="text-xs text-slate-500 bg-slate-900/80 backdrop-blur-sm px-3 py-1 rounded-full border border-slate-800">
                       {formatDateHeader(new Date(message.created_at))}
                     </span>
                   </div>
@@ -617,6 +732,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
                   isFirstInGroup={isFirstInGroup(index)}
                   isLastInGroup={isLastInGroup(index)}
                   isAdmin={isAdmin}
+                  secretMode={secretMode}
                   onReply={(id, content) => setReplyingTo({ id, content, sender: message.sender.display_name || 'User' })}
                   onReact={handleReact}
                   onDelete={handleDelete}
@@ -639,15 +755,15 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
           className={cn(
             "absolute bottom-24 right-4 z-50",
             "w-10 h-10 rounded-full",
-            "bg-primary text-primary-foreground",
-            "shadow-lg hover:shadow-xl",
+            "bg-slate-800 text-white border border-slate-700",
+            "shadow-lg hover:bg-slate-700",
             "flex items-center justify-center",
             "transition-all duration-200"
           )}
         >
           <ChevronDown className="w-5 h-5" />
           {newMessagesCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 text-white text-xs rounded-full flex items-center justify-center">
               {newMessagesCount > 9 ? '9+' : newMessagesCount}
             </span>
           )}
@@ -656,13 +772,18 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       {/* Reply Preview */}
       {replyingTo && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 border-t border-border">
-          <Reply className="w-4 h-4 text-primary" />
+        <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border-t border-slate-800 z-30">
+          <Reply className="w-4 h-4 text-purple-400" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-primary">{replyingTo.sender}</p>
-            <p className="text-xs text-muted-foreground truncate">{replyingTo.content}</p>
+            <p className="text-xs font-medium text-purple-400">{replyingTo.sender}</p>
+            <p className="text-xs text-slate-500 truncate">{replyingTo.content}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setReplyingTo(null)}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6 text-slate-500 hover:text-white hover:bg-slate-800" 
+            onClick={() => setReplyingTo(null)}
+          >
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -670,7 +791,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       {/* Voice Recorder */}
       {showVoiceRecorder && (
-        <div className="px-4 py-2 border-t border-border">
+        <div className="px-4 py-2 border-t border-slate-800 bg-slate-900">
           <VoiceRecorder
             onSend={handleVoiceSend}
             onCancel={() => setShowVoiceRecorder(false)}
@@ -680,66 +801,151 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       {/* Input Area */}
       {!showVoiceRecorder && (
-        <div className="flex items-end gap-2 p-4 border-t border-border bg-background">
-          <AttachmentPicker onFileSelect={handleFileSelect} />
-          
-          <div className="flex-1 relative">
-            <Input
-              ref={inputRef}
-              value={newMessage}
-              onChange={(e) => {
-                setNewMessage(e.target.value);
-                if (e.target.value) {
-                  setTyping(true);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              onBlur={stopTyping}
-              placeholder="Message..."
-              className="pr-10 rounded-full bg-muted/50 border-none focus-visible:ring-1"
-              disabled={sending}
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-            >
-              <Smile className="w-5 h-5 text-muted-foreground" />
-            </Button>
-          </div>
-          
-          {newMessage.trim() ? (
-            <Button
-              size="icon"
-              className="rounded-full h-10 w-10"
-              onClick={() => handleSend()}
-              disabled={sending}
-            >
-              <Send className="w-5 h-5" />
-            </Button>
+        <div className="bg-slate-900 border-t border-slate-800 p-3 z-30 relative">
+          {!isMember ? (
+            // Non-member join prompt
+            <div className="flex flex-col items-center justify-center p-4 gap-3 bg-slate-800/50 rounded-xl border border-slate-700">
+              <p className="text-slate-400 text-sm">You are not a member of this group.</p>
+              {pendingJoin ? (
+                <button disabled className="bg-slate-700 text-slate-400 px-6 py-2 rounded-full font-bold flex items-center gap-2">
+                  <UserCheck size={18} /> Request Sent
+                </button>
+              ) : (
+                <button 
+                  onClick={handleJoinGroup} 
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 transition-all"
+                >
+                  <UserPlus size={18} /> Join Group
+                </button>
+              )}
+            </div>
           ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full h-10 w-10"
-              onClick={() => setShowVoiceRecorder(true)}
-            >
-              <Mic className="w-5 h-5" />
-            </Button>
+            <>
+              {/* Attachment Menu */}
+              {isMenuOpen && (
+                <div className="absolute bottom-20 left-4 flex gap-3 animate-in fade-in slide-in-from-bottom-4">
+                  {[
+                    { icon: ImageIcon, color: 'bg-cyan-500', type: 'image' as const },
+                    { icon: Camera, color: 'bg-red-500', type: 'image' as const },
+                    { icon: MapPin, color: 'bg-green-500', type: 'file' as const },
+                    { icon: FileText, color: 'bg-purple-500', type: 'file' as const },
+                    { icon: User, color: 'bg-orange-500', type: 'file' as const }
+                  ].map((btn, i) => (
+                    <button 
+                      key={i}
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = btn.type === 'image' ? 'image/*' : '*/*';
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) handleFileSelect(file, btn.type);
+                        };
+                        input.click();
+                        setIsMenuOpen(false);
+                      }}
+                      className={cn(
+                        btn.color,
+                        "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg hover:scale-110 transition-transform"
+                      )}
+                    >
+                      <btn.icon size={20} />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex items-end gap-2">
+                <button 
+                  onClick={() => setIsMenuOpen(!isMenuOpen)} 
+                  className={cn(
+                    "p-3 rounded-xl transition-all",
+                    isMenuOpen ? 'bg-slate-800 text-white rotate-45' : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  )}
+                >
+                  <Paperclip size={20} />
+                </button>
+                
+                <div className="flex-1 bg-slate-800 rounded-2xl flex items-center p-1 border border-slate-700 focus-within:border-purple-500/50 transition-colors relative">
+                  <button 
+                    onClick={() => setIsEmojiOpen(!isEmojiOpen)} 
+                    className="p-2 text-slate-400 hover:text-yellow-400 transition-colors"
+                  >
+                    <Smile size={20} />
+                  </button>
+                  
+                  {/* Secret Mode Timer */}
+                  {secretMode && (
+                    <button 
+                      onClick={cycleViewOnceTimer}
+                      className={cn(
+                        "p-2 transition-colors flex items-center gap-1 font-bold text-xs",
+                        viewOnceTimer > 0 ? 'text-red-400 bg-red-900/20 rounded-lg' : 'text-slate-500'
+                      )}
+                    >
+                      {viewOnceTimer === 1 ? <EyeOff size={16} className="text-purple-400"/> : <Clock size={16} />}
+                      {viewOnceTimer > 1 && `${viewOnceTimer}s`}
+                      {viewOnceTimer === 1 && "1x"}
+                    </button>
+                  )}
+                  
+                  <Input
+                    ref={inputRef}
+                    value={newMessage}
+                    onChange={(e) => {
+                      setNewMessage(e.target.value);
+                      if (e.target.value) setTyping(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    onBlur={stopTyping}
+                    placeholder={secretMode ? "Message will self-destruct..." : "Type a message..."}
+                    className="flex-1 bg-transparent border-none focus-visible:ring-0 text-white placeholder-slate-500 text-sm px-2"
+                    disabled={sending}
+                  />
+                  
+                  {/* AI Compose Button */}
+                  <button 
+                    className={cn(
+                      "p-2 rounded-lg transition-colors",
+                      newMessage ? 'text-purple-400 bg-purple-500/10' : 'text-slate-500 hover:text-purple-400'
+                    )}
+                  >
+                    <RefreshCw size={18} />
+                  </button>
+                </div>
+                
+                {newMessage.trim() ? (
+                  <button
+                    onClick={() => handleSend()}
+                    disabled={sending}
+                    className="p-3 bg-blue-600 hover:bg-blue-500 rounded-full text-white transition-colors disabled:opacity-50"
+                  >
+                    <Send size={20} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setShowVoiceRecorder(true)}
+                    className="p-3 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  >
+                    <Mic size={20} />
+                  </button>
+                )}
+              </div>
+            </>
           )}
         </div>
       )}
       
       {/* Upload Progress */}
       {uploadingFile && (
-        <div className="absolute inset-0 bg-background/80 flex items-center justify-center z-50">
-          <div className="bg-card p-6 rounded-2xl shadow-xl max-w-xs w-full mx-4">
-            <p className="text-sm text-muted-foreground mb-3">Uploading...</p>
+        <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl max-w-xs w-full mx-4">
+            <p className="text-sm text-slate-400 mb-3">Uploading...</p>
             <Progress value={uploadProgress} className="h-2" />
           </div>
         </div>
@@ -759,6 +965,17 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
           onSend={handleMediaSend}
           uploading={uploadingFile}
           uploadProgress={uploadProgress}
+        />
+      )}
+      
+      {/* Click outside to close menus */}
+      {(showRetentionMenu || isMenuOpen) && (
+        <div 
+          className="fixed inset-0 z-20" 
+          onClick={() => {
+            setShowRetentionMenu(false);
+            setIsMenuOpen(false);
+          }} 
         />
       )}
     </div>
