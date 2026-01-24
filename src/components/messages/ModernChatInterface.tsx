@@ -7,6 +7,7 @@ import { usePresence, formatLastSeen } from '@/hooks/usePresence';
 import { useMessageCache } from '@/hooks/useMessageCache';
 import { useMessageRealtime } from '@/hooks/useMessageRealtime';
 import { MessagePayload, TypingPayload } from '@/lib/unified-realtime';
+import { chatSounds } from '@/lib/chat-sounds';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -14,7 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { 
   ArrowLeft, Send, Smile, Phone, Video, Mic, X, Image as ImageIcon, 
-  Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin
+  Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin,
+  Gift, Sparkles
 } from 'lucide-react';
 import { AttachmentPicker } from './AttachmentPicker';
 import { ModernMessageBubble } from './ModernMessageBubble';
@@ -23,6 +25,8 @@ import { TypingIndicator, getActivityText, getActivityIcon, ActivityType } from 
 import { VoiceRecorder } from './VoiceRecorder';
 import { MediaUploadModal } from './MediaUploadModal';
 import { DeleteMessageModal, DeleteOption } from './DeleteMessageModal';
+import { AIReplySuggestions } from './AIReplySuggestions';
+import { ChatGiftButton } from './ChatGiftButton';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -116,6 +120,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   // Delete modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<Message | null>(null);
+  
+  // AI suggestions state
+  const [showAiSuggestions, setShowAiSuggestions] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -230,6 +237,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       setShowScrollButton(true);
       setNewMessagesCount(prev => prev + 1);
     }
+    
+    // Play receive sound for messages from other users
+    chatSounds.playReceive();
   }, [otherUser, appendMessage]);
 
   // Handle typing indicator from realtime
@@ -618,6 +628,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
 
     setMessages((prev) => [...prev, optimisticMessage]);
     scrollToBottom();
+    
+    // Play send sound
+    chatSounds.playSend();
 
     try {
       const { data: newMsg, error } = await supabase
@@ -1283,11 +1296,40 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
+      {/* AI Reply Suggestions */}
+      {showAiSuggestions && messages.length > 0 && !showVoiceRecorder && user && (
+        <div className="flex-shrink-0 px-3 pt-2 pb-0 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40">
+          <AIReplySuggestions
+            conversationId={conversationId}
+            lastMessages={messages.slice(-5).map(m => ({
+              content: m.content,
+              sender_id: m.sender_id
+            }))}
+            currentUserId={user.id}
+            onSelectSuggestion={(suggestion) => {
+              setNewMessage(suggestion);
+              setShowAiSuggestions(false);
+            }}
+            onClose={() => setShowAiSuggestions(false)}
+          />
+        </div>
+      )}
+
       {/* Input Area - At bottom in flex layout */}
       {!showVoiceRecorder && (
         <div className="flex-shrink-0 p-3 border-t border-border/50 bg-background/95 backdrop-blur-lg z-40 pb-[max(12px,env(safe-area-inset-bottom))]">
           <div className="flex items-end gap-2">
             <AttachmentPicker onFileSelect={handleFileSelect} />
+            
+            {/* Gift Button */}
+            {otherUser?.id && (
+              <ChatGiftButton 
+                recipientId={otherUser.id} 
+                recipientName={otherUser.display_name || 'User'}
+                recipientAvatar={otherUser.avatar_url}
+                conversationId={conversationId}
+              />
+            )}
             
             <div className="flex-1 relative">
               <Input
@@ -1368,14 +1410,29 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                 <Send className="w-5 h-5" />
               </Button>
             ) : (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="shrink-0 rounded-full hover:bg-primary/10"
-                onClick={() => setShowVoiceRecorder(true)}
-              >
-                <Mic className="w-5 h-5" />
-              </Button>
+              <div className="flex gap-1">
+                {/* AI Suggestions Toggle */}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    "shrink-0 rounded-full",
+                    showAiSuggestions ? "text-primary bg-primary/10" : "hover:bg-primary/10"
+                  )}
+                  onClick={() => setShowAiSuggestions(!showAiSuggestions)}
+                  title="AI Smart Replies"
+                >
+                  <Sparkles className="w-5 h-5" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="shrink-0 rounded-full hover:bg-primary/10"
+                  onClick={() => setShowVoiceRecorder(true)}
+                >
+                  <Mic className="w-5 h-5" />
+                </Button>
+              </div>
             )}
           </div>
         </div>
