@@ -19,9 +19,10 @@ import { useDistributedNotifications } from '@/hooks/useDistributedNotifications
 interface BottomNavProps {
   currentPage?: 'feed' | 'ai' | 'default';
   hidden?: boolean;
+  transparent?: boolean;
 }
 
-export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNavProps) => {
+export const BottomNav = ({ currentPage = 'default', hidden = false, transparent = true }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useAuth();
@@ -210,7 +211,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
         >
           <TooltipProvider>
             <nav 
-              className="fixed bottom-0 left-0 right-0 z-[70] bg-transparent native-bottom-nav"
+              className={`fixed bottom-0 left-0 right-0 z-[70] native-bottom-nav ${
+                transparent ? 'bg-transparent' : 'bg-background/95 backdrop-blur-md border-t border-border/50'
+              }`}
               style={{
                 paddingBottom: 'env(safe-area-inset-bottom)',
                 transform: 'translateZ(0)',
@@ -224,6 +227,11 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
               const active = isActive(item.path);
               const isPressed = pressedId === item.id;
               const badgeCount = getNavBadgeCount(item.id);
+              
+              // Dynamic colors based on transparent mode
+              const textColor = transparent 
+                ? (active ? 'text-white' : 'text-white/80 hover:text-white')
+                : (active ? 'text-primary' : 'text-muted-foreground hover:text-foreground');
               
               return (
                 <Tooltip key={item.id}>
@@ -242,12 +250,16 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                         onClick={() => handleNavClick(item.path, item.id)}
                         variant="ghost"
                         size="icon"
-                        className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${
-                          active ? 'text-white' : 'text-white/80 hover:text-white'
-                        }`}
+                        className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${textColor}`}
                       >
                         {item.isProfile && avatarUrl ? (
-                          <div className={`rounded-full transition-all duration-150 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' : ''}`}>
+                          <div className={`rounded-full transition-all duration-150 ${
+                            active 
+                              ? transparent 
+                                ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' 
+                                : 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                              : ''
+                          }`}>
                             <Avatar className="w-7 h-7">
                               <AvatarImage src={avatarUrl} />
                               <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>

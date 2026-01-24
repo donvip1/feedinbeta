@@ -571,7 +571,7 @@ const Wallet = () => {
         </DialogContent>
       </Dialog>
 
-      <BottomNav />
+      <BottomNav transparent={false} />
     </div>
   );
 };

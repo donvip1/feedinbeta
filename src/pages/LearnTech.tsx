@@ -854,7 +854,7 @@ export default function LearnTech() {
         </Tabs>
       </div>
 
-      <BottomNav />
+      <BottomNav transparent={false} />
     </div>
   );
 }

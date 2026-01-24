@@ -14,6 +14,7 @@ import { NewConversationModal } from '@/components/messages/NewConversationModal
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { StoriesBar } from '@/components/stories/StoriesBar';
 import { UnreadBadge } from '@/components/shared/UnreadBadge';
+import { BottomNav } from '@/components/navigation/BottomNav';
 import { useToast } from '@/hooks/use-toast';
 import { useConversationCache, useGroupCache } from '@/hooks/useConversationCache';
 import { useConversationListRealtime } from '@/hooks/useMessageRealtime';
@@ -765,6 +766,8 @@ export default function Messages() {
         onOpenChange={setShowCreateGroup}
         onSuccess={loadGroups}
       />
+      
+      <BottomNav transparent={false} />
     </div>
   );
 }

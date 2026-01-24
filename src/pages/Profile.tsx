@@ -1242,7 +1242,7 @@ const Profile = () => {
         onCropComplete={handleCroppedAvatarUpload}
       />
       
-      <BottomNav />
+      <BottomNav transparent={false} />
     </div>
   );
 };
