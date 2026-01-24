@@ -78,7 +78,7 @@ export default function Messages() {
   const [groups, setGroups] = useState<Group[]>(cachedGroups);
   const [myGroups, setMyGroups] = useState<Group[]>(cachedMyGroups);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chats' | 'stories' | 'live'>('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'groups' | 'stories' | 'live'>('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
   const [secretMode, setSecretMode] = useState(false);
   const handledLocationStateRef = useRef(false);
@@ -539,7 +539,10 @@ export default function Messages() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => activeTab === 'chats' ? setShowNewConversation(true) : setShowCreateGroup(true)}
+                onClick={() => {
+                  if (activeTab === 'chats') setShowNewConversation(true);
+                  else if (activeTab === 'groups') setShowCreateGroup(true);
+                }}
                 className={secretMode ? "hover:bg-slate-800" : ""}
               >
                 <Plus className="w-5 h-5" />
@@ -663,7 +666,7 @@ export default function Messages() {
                         </div>
                         {conv.last_message && (
                           <span className="text-xs text-muted-foreground">
-                            {new Date(conv.last_message.created_at).toLocaleDateString()}
+                            {new Date(conv.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         )}
                       </div>
@@ -697,9 +700,9 @@ export default function Messages() {
             </div>
           )}
 
-          {/* Groups Content - Only show in chats tab for groups section */}
-          {activeTab === 'chats' && (filteredMyGroups.length > 0 || filteredGroups.length > 0) && (
-            <>
+          {/* Groups Content - Separate tab */}
+          {activeTab === 'groups' && (
+            <div className="pb-20">
               {filteredMyGroups.length > 0 && (
                 <div className="p-4">
                   <h3 className={cn(
@@ -743,9 +746,17 @@ export default function Messages() {
                   "text-sm font-semibold mb-2",
                   secretMode ? "text-slate-400" : "text-muted-foreground"
                 )}>Discover Groups</h3>
-                {filteredGroups.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No groups found
+                {filteredGroups.length === 0 && filteredMyGroups.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Users className="w-12 h-12 mb-4 text-muted-foreground" />
+                    <p className="text-muted-foreground">No groups found</p>
+                    <Button
+                      variant="outline"
+                      className="mt-4"
+                      onClick={() => setShowCreateGroup(true)}
+                    >
+                      Create a group
+                    </Button>
                   </div>
                 ) : (
                   filteredGroups.map((group) => (
@@ -783,7 +794,7 @@ export default function Messages() {
                   ))
                 )}
               </div>
-            </>
+            </div>
           )}
 
           {/* Stories Content */}

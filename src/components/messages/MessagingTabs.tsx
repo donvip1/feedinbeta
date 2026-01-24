@@ -1,18 +1,20 @@
 import React from 'react';
-import { MessageCircle, Circle, Tv } from 'lucide-react';
+import { MessageCircle, Circle, Tv, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { motion } from 'framer-motion';
 
 interface MessagingTabsProps {
-  activeTab: 'chats' | 'stories' | 'live';
-  onTabChange: (tab: 'chats' | 'stories' | 'live') => void;
+  activeTab: 'chats' | 'groups' | 'stories' | 'live';
+  onTabChange: (tab: 'chats' | 'groups' | 'stories' | 'live') => void;
   unreadCount?: number;
+  groupUnreadCount?: number;
   secretMode?: boolean;
 }
 
 const tabs = [
   { id: 'chats' as const, icon: MessageCircle, label: 'Chats' },
+  { id: 'groups' as const, icon: Users, label: 'Groups' },
   { id: 'stories' as const, icon: Circle, label: 'Stories' },
   { id: 'live' as const, icon: Tv, label: 'Live' },
 ];
@@ -21,6 +23,7 @@ export const MessagingTabs = ({
   activeTab,
   onTabChange,
   unreadCount = 0,
+  groupUnreadCount = 0,
   secretMode = false,
 }: MessagingTabsProps) => {
   return (
@@ -53,6 +56,16 @@ export const MessagingTabs = ({
               className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
+          )}
+          
+          {/* Unread Badge for Groups */}
+          {tab.id === 'groups' && groupUnreadCount > 0 && (
+            <Badge 
+              variant="destructive" 
+              className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1"
+            >
+              {groupUnreadCount > 99 ? '99+' : groupUnreadCount}
             </Badge>
           )}
           
