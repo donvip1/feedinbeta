@@ -132,7 +132,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isMediaLoaded, setIsMediaLoaded] = useState(false);
-  const [showControls, setShowControls] = useState(true);
+  const [showControls, setShowControls] = useState(false); // Start hidden, only show after user taps
   // Use global immersive state if provided, allows all cards to stay in immersive mode when scrolling
   const isImmersiveMode = isGlobalImmersive;
   const [showImmersiveUI, setShowImmersiveUI] = useState(false); // Toggle UI visibility while in immersive mode
@@ -837,7 +837,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     enterImmersiveMode();
                   }
                 }}
-                className="w-16 h-16 bg-black/40 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
+                className="w-16 h-16 bg-black/20 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
               >
                 {isPlaying ? (
                   <Pause className="w-8 h-8 text-white" fill="white" />
