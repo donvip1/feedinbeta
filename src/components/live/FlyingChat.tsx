@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AnimatedGiftEmoji } from '@/components/shared/AnimatedGiftEmoji';
 import { Coins, Crown } from 'lucide-react';
-
+import { FullScreenGiftEffect } from './FullScreenGiftEffect';
 interface ChatMessage {
   id: string;
   content: string;
@@ -64,7 +64,20 @@ export const FlyingChat = ({
   const navigate = useNavigate();
   const [displayedMessages, setDisplayedMessages] = useState<(ChatMessage & { _key: string })[]>([]);
   const [flyingGifts, setFlyingGifts] = useState<(FlyingGift & { _animKey: string })[]>([]);
+  const [fullScreenEffects, setFullScreenEffects] = useState<Array<{
+    id: string;
+    giftType: string;
+    intensity: 'basic' | 'premium' | 'exclusive';
+    timestamp: number;
+  }>>([]);
   const messageCountRef = useRef(0);
+
+  // Determine gift intensity based on credit value
+  const getGiftIntensity = (creditValue: number): 'basic' | 'premium' | 'exclusive' => {
+    if (creditValue >= 500) return 'exclusive';
+    if (creditValue >= 100) return 'premium';
+    return 'basic';
+  };
 
   // Add new messages with animation
   useEffect(() => {
@@ -97,9 +110,19 @@ export const FlyingChat = ({
         const animKey = `${latestGift.id}-${Date.now()}`;
         setFlyingGifts(prev => [...prev, { ...latestGift, _animKey: animKey }]);
         
+        // Trigger full-screen effect for all gifts
+        const newEffect = {
+          id: animKey,
+          giftType: latestGift.gift_type,
+          intensity: getGiftIntensity(latestGift.credit_value),
+          timestamp: Date.now(),
+        };
+        setFullScreenEffects(prev => [...prev, newEffect]);
+        
         // Remove after animation
         setTimeout(() => {
           setFlyingGifts(prev => prev.filter(g => g._animKey !== animKey));
+          setFullScreenEffects(prev => prev.filter(e => e.id !== animKey));
         }, 5000);
       }
     }
@@ -138,15 +161,19 @@ export const FlyingChat = ({
   const getGiftEmoji = (type: string) => GIFT_EMOJIS[type] || '🎁';
 
   return (
-    <div 
-      className={cn(
-        "absolute left-0 right-16 pointer-events-none overflow-hidden z-20",
-        className
-      )}
-      style={{ bottom: `${bottomOffset}px`, maxHeight: '40vh' }}
-    >
-      {/* TikTok-Style Flying Gifts - Center screen, prominent */}
-      <AnimatePresence>
+    <>
+      {/* Full-Screen Floating Emoji Effects */}
+      <FullScreenGiftEffect gifts={fullScreenEffects} />
+      
+      <div 
+        className={cn(
+          "absolute left-0 right-16 pointer-events-none overflow-hidden z-20",
+          className
+        )}
+        style={{ bottom: `${bottomOffset}px`, maxHeight: '40vh' }}
+      >
+        {/* TikTok-Style Flying Gifts - Center screen, prominent */}
+        <AnimatePresence>
         {flyingGifts.map((gift, index) => (
           <motion.div
             key={gift._animKey}
@@ -273,6 +300,7 @@ export const FlyingChat = ({
           })}
         </AnimatePresence>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
