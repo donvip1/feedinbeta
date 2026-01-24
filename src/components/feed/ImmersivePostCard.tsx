@@ -446,6 +446,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         videoRef.current.play();
         setIsPlaying(true);
       }
+      // Only show play/pause icon when user manually taps (not on auto-play)
       setShowPlayIcon(true);
       setTimeout(() => setShowPlayIcon(false), 500);
     }
@@ -591,14 +592,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   };
 
   // Parse caption for display - different limits based on media type
-  // Video posts: max 25 words, Photo+ posts: max 125 words
+  // Video posts: max 90 characters, Photo+ posts: max 125 words
   const caption = post.content || '';
   const wordCount = countWords(caption);
   const isVideoPost = hasVideo;
-  const maxWords = isVideoPost ? 25 : 125;
-  const shouldTruncateCaption = wordCount > maxWords;
-  const words = caption.trim().split(/\s+/);
-  const truncatedCaption = shouldTruncateCaption ? words.slice(0, maxWords).join(' ') + '...' : caption;
+  
+  // For video posts, truncate by character count (90 chars)
+  // For photo/text posts, truncate by word count (125 words)
+  const shouldTruncateCaption = isVideoPost 
+    ? caption.length > 90 
+    : wordCount > 125;
+  
+  const truncatedCaption = isVideoPost
+    ? (caption.length > 90 ? caption.slice(0, 90).trim() + '...' : caption)
+    : (wordCount > 125 ? caption.trim().split(/\s+/).slice(0, 125).join(' ') + '...' : caption);
 
   return (
     <>
