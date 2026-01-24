@@ -3826,6 +3826,7 @@ export type Database = {
       }
       live_streams: {
         Row: {
+          banned_users: string[] | null
           category: string | null
           cf_hls_url: string | null
           cf_live_input_id: string | null
@@ -3838,6 +3839,7 @@ export type Database = {
           duration: number | null
           ended_at: string | null
           id: string
+          is_chat_locked: boolean | null
           is_premium: boolean | null
           last_health_check: string | null
           peak_viewers: number | null
@@ -3855,6 +3857,7 @@ export type Database = {
           viewer_count: number | null
         }
         Insert: {
+          banned_users?: string[] | null
           category?: string | null
           cf_hls_url?: string | null
           cf_live_input_id?: string | null
@@ -3867,6 +3870,7 @@ export type Database = {
           duration?: number | null
           ended_at?: string | null
           id?: string
+          is_chat_locked?: boolean | null
           is_premium?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
@@ -3884,6 +3888,7 @@ export type Database = {
           viewer_count?: number | null
         }
         Update: {
+          banned_users?: string[] | null
           category?: string | null
           cf_hls_url?: string | null
           cf_live_input_id?: string | null
@@ -3896,6 +3901,7 @@ export type Database = {
           duration?: number | null
           ended_at?: string | null
           id?: string
+          is_chat_locked?: boolean | null
           is_premium?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
@@ -4098,9 +4104,11 @@ export type Database = {
           deleted_for_receiver: boolean | null
           deleted_for_sender: boolean | null
           edited_at: string | null
+          expires_at: string | null
           id: string
           is_pinned: boolean | null
           is_read: boolean | null
+          is_secret: boolean | null
           media_type: string | null
           media_url: string | null
           read_at: string | null
@@ -4110,6 +4118,8 @@ export type Database = {
           sender_id: string
           status: string | null
           updated_at: string
+          view_once_timer: number | null
+          viewed_by: string[] | null
         }
         Insert: {
           content: string
@@ -4119,9 +4129,11 @@ export type Database = {
           deleted_for_receiver?: boolean | null
           deleted_for_sender?: boolean | null
           edited_at?: string | null
+          expires_at?: string | null
           id?: string
           is_pinned?: boolean | null
           is_read?: boolean | null
+          is_secret?: boolean | null
           media_type?: string | null
           media_url?: string | null
           read_at?: string | null
@@ -4131,6 +4143,8 @@ export type Database = {
           sender_id: string
           status?: string | null
           updated_at?: string
+          view_once_timer?: number | null
+          viewed_by?: string[] | null
         }
         Update: {
           content?: string
@@ -4140,9 +4154,11 @@ export type Database = {
           deleted_for_receiver?: boolean | null
           deleted_for_sender?: boolean | null
           edited_at?: string | null
+          expires_at?: string | null
           id?: string
           is_pinned?: boolean | null
           is_read?: boolean | null
+          is_secret?: boolean | null
           media_type?: string | null
           media_url?: string | null
           read_at?: string | null
@@ -4152,6 +4168,8 @@ export type Database = {
           sender_id?: string
           status?: string | null
           updated_at?: string
+          view_once_timer?: number | null
+          viewed_by?: string[] | null
         }
         Relationships: [
           {
