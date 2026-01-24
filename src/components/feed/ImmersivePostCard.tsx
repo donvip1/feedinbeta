@@ -614,8 +614,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         className={cn(
           "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
           // In immersive mode, card takes full viewport height but stays in scroll flow
-          // In normal mode with video, reduce height to leave room for caption below
-          isImmersiveMode ? "h-[100dvh] max-w-none" : (hasVideo && caption && !isTextStyled && !isPlainText ? "h-[calc(100dvh-140px)]" : "h-[calc(100dvh-68px)]")
+          // In normal mode with video, reduce height to leave room for caption + compact nav (28px)
+          isImmersiveMode ? "h-[100dvh] max-w-none" : (hasVideo && caption && !isTextStyled && !isPlainText ? "h-[calc(100dvh-95px)]" : "h-[calc(100dvh-35px)]")
         )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
