@@ -9,7 +9,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       position="top-center"
       closeButton={false}
-      duration={3000}
+      duration={2500}
       gap={8}
       toastOptions={{
         classNames: {
