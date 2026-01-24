@@ -136,12 +136,10 @@ const PostDetail = () => {
   }, [user, navigate]);
 
   const handleBack = () => {
-    // Use replace: true to remove PostDetail from history stack
-    // This way, when user clicks back from Profile, they go to Feed (not back to PostDetail)
-    if (clickedPost?.profiles?.username) {
-      navigate(`/profile/${clickedPost.profiles.username}`, { replace: true });
-    } else if (clickedPost?.user_id) {
-      navigate(`/profile/${clickedPost.user_id}`, { replace: true });
+    // Simply go back in history - this preserves the user's navigation flow
+    // If they came from a refeed post, they'll return there
+    if (window.history.length > 1) {
+      navigate(-1);
     } else {
       navigate('/feed', { replace: true });
     }
