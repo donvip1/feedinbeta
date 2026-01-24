@@ -167,10 +167,15 @@ export const FlyingChat = ({
       
       <div 
         className={cn(
-          "absolute left-0 right-16 pointer-events-none overflow-hidden z-20",
+          "absolute left-0 pointer-events-none overflow-hidden z-20",
           className
         )}
-        style={{ bottom: `${bottomOffset}px`, maxHeight: '40vh' }}
+        style={{ 
+          bottom: `${bottomOffset}px`, 
+          maxHeight: '40vh',
+          maxWidth: '55%',  // Constrain to left side only
+          width: '55%'
+        }}
       >
         {/* TikTok-Style Flying Gifts - Center screen, prominent */}
         <AnimatePresence>
