@@ -24,6 +24,7 @@ import { CallLogBubble } from './CallLogBubble';
 import { TypingIndicator, getActivityText, getActivityIcon, ActivityType } from './TypingIndicator';
 import { VoiceRecorder } from './VoiceRecorder';
 import { MediaUploadModal } from './MediaUploadModal';
+import { MediaPreviewBar } from './MediaPreviewBar';
 import { DeleteMessageModal, DeleteOption } from './DeleteMessageModal';
 import { AIReplySuggestions } from './AIReplySuggestions';
 import { ChatGiftButton } from './ChatGiftButton';
@@ -116,6 +117,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
   const [mediaUploadType, setMediaUploadType] = useState<'image' | 'video' | 'file'>('image');
   const [showMediaUpload, setShowMediaUpload] = useState(false);
+  
+  // Pending file for inline preview (before sending)
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   
   // Delete modal state
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -322,11 +326,19 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     }
   }, []);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback((immediate = false) => {
     if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollIntoView({ 
+            behavior: immediate ? 'auto' : 'smooth',
+            block: 'end'
+          });
+        }
+      });
     }
-  };
+  }, []);
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -627,10 +639,14 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
-    scrollToBottom();
     
     // Play send sound
     chatSounds.playSend();
+    
+    // Scroll to bottom after adding message - use setTimeout to ensure DOM update
+    setTimeout(() => {
+      scrollToBottom(false);
+    }, 50);
 
     try {
       const { data: newMsg, error } = await supabase
@@ -688,6 +704,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const handleFileSelect = async (file: File, type: 'image' | 'video' | 'file') => {
     if (!user) return;
 
+    // Set pending file for inline preview
+    setPendingFile(file);
+    
     // Show media upload modal for preview/editing
     setMediaUploadFile(file);
     setMediaUploadType(type);
@@ -700,6 +719,13 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       'file': 'uploading_file',
     };
     handleTyping(activityMap[type] || 'uploading_file');
+  };
+
+  const handleClearPendingFile = () => {
+    setPendingFile(null);
+    setShowMediaUpload(false);
+    setMediaUploadFile(null);
+    stopTyping();
   };
 
   const handleMediaSend = async (file: File, caption: string) => {
@@ -1258,28 +1284,12 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </div>
       )}
 
-      {/* Media Preview - Above input in flex layout */}
-      {previewMedia && (
-        <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2 bg-muted/50 border-t border-border/50 z-40">
-          <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted">
-            {previewMedia.type.startsWith('image') ? (
-              <img src={previewMedia.url} alt="Preview" className="w-full h-full object-cover" />
-            ) : (
-              <video src={previewMedia.url} className="w-full h-full object-cover" />
-            )}
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium">Sending media</p>
-            <p className="text-xs text-muted-foreground">Add a caption below</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setPreviewMedia(null)}
-          >
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
+      {/* Media Preview Bar - Telegram/WhatsApp style with file size */}
+      {pendingFile && !showMediaUpload && (
+        <MediaPreviewBar
+          file={pendingFile}
+          onRemove={handleClearPendingFile}
+        />
       )}
 
       {/* Voice Recorder - At bottom in flex layout */}
@@ -1453,11 +1463,15 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         onClose={() => {
           setShowMediaUpload(false);
           setMediaUploadFile(null);
+          setPendingFile(null);
           stopTyping();
         }}
         file={mediaUploadFile}
         fileType={mediaUploadType}
-        onSend={handleMediaSend}
+        onSend={(file, caption) => {
+          setPendingFile(null);
+          handleMediaSend(file, caption);
+        }}
         uploading={uploadingFile}
         uploadProgress={uploadProgress}
       />

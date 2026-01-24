@@ -18,6 +18,7 @@ import { GroupTypingIndicator } from './GroupTypingIndicator';
 import { AttachmentPicker } from '@/components/messages/AttachmentPicker';
 import { VoiceRecorder } from '@/components/messages/VoiceRecorder';
 import { MediaUploadModal } from '@/components/messages/MediaUploadModal';
+import { MediaPreviewBar } from '@/components/messages/MediaPreviewBar';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { chatSounds } from '@/lib/chat-sounds';
@@ -123,6 +124,9 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
   const [mediaUploadType, setMediaUploadType] = useState<'image' | 'video' | 'file'>('image');
   const [showMediaUpload, setShowMediaUpload] = useState(false);
+  
+  // Pending file for inline preview (before sending)
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -312,11 +316,19 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     }
   };
   
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback((immediate = false) => {
     if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.scrollIntoView({ 
+            behavior: immediate ? 'auto' : 'smooth',
+            block: 'end'
+          });
+        }
+      });
     }
-  };
+  }, []);
   
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -368,7 +380,14 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     setNewMessage('');
     setIsEmojiOpen(false);
     setIsMenuOpen(false);
-    scrollToBottom();
+    
+    // Play send sound
+    chatSounds.playSend();
+    
+    // Scroll to bottom after adding message - use setTimeout to ensure DOM update
+    setTimeout(() => {
+      scrollToBottom(false);
+    }, 50);
     
     try {
       const { data: newMsg, error } = await supabase
@@ -404,10 +423,20 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   };
   
   const handleFileSelect = async (file: File, type: 'image' | 'video' | 'file') => {
+    // Set pending file for inline preview
+    setPendingFile(file);
+    
     setMediaUploadFile(file);
     setMediaUploadType(type);
     setShowMediaUpload(true);
     setTyping(true, type === 'image' ? 'uploading_image' : type === 'video' ? 'uploading_video' : 'uploading_file');
+  };
+  
+  const handleClearPendingFile = () => {
+    setPendingFile(null);
+    setShowMediaUpload(false);
+    setMediaUploadFile(null);
+    stopTyping();
   };
   
   const handleMediaSend = async (file: File, caption: string) => {
@@ -751,7 +780,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       {/* Scroll to bottom button */}
       {showScrollButton && (
         <button
-          onClick={scrollToBottom}
+          onClick={() => scrollToBottom()}
           className={cn(
             "absolute bottom-24 right-4 z-50",
             "w-10 h-10 rounded-full",
@@ -787,6 +816,14 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
             <X className="w-4 h-4" />
           </Button>
         </div>
+      )}
+      
+      {/* Media Preview Bar - Telegram/WhatsApp style with file size */}
+      {pendingFile && !showMediaUpload && (
+        <MediaPreviewBar
+          file={pendingFile}
+          onRemove={handleClearPendingFile}
+        />
       )}
       
       {/* Voice Recorder */}
@@ -958,11 +995,15 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
           onClose={() => {
             setShowMediaUpload(false);
             setMediaUploadFile(null);
+            setPendingFile(null);
             stopTyping();
           }}
           file={mediaUploadFile}
           fileType={mediaUploadType}
-          onSend={handleMediaSend}
+          onSend={(file, caption) => {
+            setPendingFile(null);
+            handleMediaSend(file, caption);
+          }}
           uploading={uploadingFile}
           uploadProgress={uploadProgress}
         />
