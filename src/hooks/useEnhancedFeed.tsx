@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type FeedType = 'forYou' | 'following' | 'explore';
 export type MediaFilter = 'all' | 'video' | 'photo';
@@ -24,6 +24,7 @@ interface FeedPost {
   original_post_id: string | null;
   is_promoted?: boolean;
   is_ad?: boolean;
+  is_new_post?: boolean;
   profiles?: {
     username: string | null;
     display_name: string | null;
@@ -33,6 +34,7 @@ interface FeedPost {
   title?: string;
   description?: string;
   click_url?: string;
+  advertiser_name?: string;
 }
 
 interface FeedResponse {
@@ -41,6 +43,7 @@ interface FeedResponse {
   mediaFilter: MediaFilter;
   hasMore: boolean;
   cycleReset: boolean;
+  sessionId?: string;
 }
 
 interface UseEnhancedFeedOptions {
@@ -51,6 +54,14 @@ interface UseEnhancedFeedOptions {
   adFrequency?: number;
 }
 
+/**
+ * Generate a unique session ID for feed rotation
+ * Different session ID = different starting position in feed
+ */
+const generateSessionId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
+
 export const useEnhancedFeed = ({
   feedType,
   mediaFilter,
@@ -60,14 +71,37 @@ export const useEnhancedFeed = ({
 }: UseEnhancedFeedOptions) => {
   const { user, session } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Session ID for feed rotation - new session when user returns
+  const [sessionId] = useState(() => generateSessionId());
+  const isNewSessionRef = useRef(true);
+
+  // Track when user leaves and returns to trigger rotation
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // User returned - mark as new session for rotation
+        isNewSessionRef.current = true;
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const fetchFeed = async ({ pageParam = 0 }): Promise<FeedResponse & { nextOffset: number }> => {
     if (!user || !session) {
       throw new Error('User not authenticated');
     }
 
+    // Determine if this is a new session (for rotation)
+    const isNewSession = isNewSessionRef.current && pageParam === 0;
+    if (isNewSession) {
+      isNewSessionRef.current = false; // Reset after first fetch
+    }
+
     try {
-      // Try the new personalized-feed-v2 edge function
+      // Use the enhanced personalized-feed-v2 edge function
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/personalized-feed-v2`,
         {
@@ -83,6 +117,8 @@ export const useEnhancedFeed = ({
             offset: pageParam,
             includeAds,
             adFrequency,
+            sessionId,
+            isNewSession, // Tell backend to rotate starting position
           }),
         }
       );
@@ -125,6 +161,7 @@ export const useEnhancedFeed = ({
     ...query,
     posts,
     cycleWasReset,
+    sessionId,
   };
 };
 
@@ -255,6 +292,7 @@ async function fetchFallbackFeed(
 
 /**
  * Hook to track user engagement and update interests
+ * Also tracks media preferences (video vs photo)
  */
 export const useEngagementTracker = () => {
   const { user, session } = useAuth();
@@ -262,7 +300,8 @@ export const useEngagementTracker = () => {
   const trackEngagement = useCallback(async (
     postId: string,
     engagementType: 'like' | 'comment' | 'share' | 'refeed' | 'save' | 'watch',
-    watchDuration?: number
+    watchDuration?: number,
+    mediaType?: string
   ) => {
     if (!user || !session) return;
 
@@ -274,12 +313,44 @@ export const useEngagementTracker = () => {
         p_engagement_type: engagementType,
         p_watch_duration: watchDuration || null,
       });
+
+      // Track media preference if media type is provided
+      if (mediaType) {
+        await supabase.rpc('track_media_preference' as any, {
+          p_user_id: user.id,
+          p_media_type: mediaType,
+          p_watch_duration: watchDuration || null,
+          p_completed: engagementType === 'watch' && (watchDuration || 0) > 30,
+        });
+      }
     } catch (error) {
       console.error('Failed to track engagement for interests:', error);
     }
   }, [user, session]);
 
-  return { trackEngagement };
+  /**
+   * Track media view/watch for preference learning
+   */
+  const trackMediaView = useCallback(async (
+    mediaType: 'video' | 'image' | 'photo' | 'text',
+    watchDuration?: number,
+    completed?: boolean
+  ) => {
+    if (!user) return;
+
+    try {
+      await supabase.rpc('track_media_preference' as any, {
+        p_user_id: user.id,
+        p_media_type: mediaType,
+        p_watch_duration: watchDuration || null,
+        p_completed: completed || false,
+      });
+    } catch (error) {
+      console.error('Failed to track media preference:', error);
+    }
+  }, [user]);
+
+  return { trackEngagement, trackMediaView };
 };
 
 /**
@@ -310,4 +381,36 @@ export const useFeedCycleReset = () => {
   });
 
   return checkAndReset;
+};
+
+/**
+ * Hook to get user's media preferences
+ */
+export const useMediaPreferences = () => {
+  const { user } = useAuth();
+
+  const { data: preferences } = useInfiniteQuery({
+    queryKey: ['media-preferences', user?.id],
+    initialPageParam: 0,
+    queryFn: async () => {
+      if (!user) return null;
+      
+      const { data } = await supabase
+        .from('user_media_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+      
+      return data;
+    },
+    getNextPageParam: () => undefined,
+    enabled: !!user,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  return {
+    preferredMediaType: preferences?.pages?.[0]?.preferred_media_type || 'all',
+    videoWatchSeconds: preferences?.pages?.[0]?.video_watch_seconds || 0,
+    photoViewCount: preferences?.pages?.[0]?.photo_view_count || 0,
+  };
 };

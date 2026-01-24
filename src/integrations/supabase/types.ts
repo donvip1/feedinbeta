@@ -5266,21 +5266,27 @@ export type Database = {
         Row: {
           id: string
           post_id: string
+          session_id: string | null
           user_id: string
+          view_count: number | null
           view_date: string
           viewed_at: string
         }
         Insert: {
           id?: string
           post_id: string
+          session_id?: string | null
           user_id: string
+          view_count?: number | null
           view_date?: string
           viewed_at?: string
         }
         Update: {
           id?: string
           post_id?: string
+          session_id?: string | null
           user_id?: string
+          view_count?: number | null
           view_date?: string
           viewed_at?: string
         }
@@ -6474,6 +6480,7 @@ export type Database = {
           engagement_type: string
           full_watch: boolean | null
           id: string
+          media_type: string | null
           post_id: string | null
           user_id: string
           watch_duration_seconds: number | null
@@ -6483,6 +6490,7 @@ export type Database = {
           engagement_type: string
           full_watch?: boolean | null
           id?: string
+          media_type?: string | null
           post_id?: string | null
           user_id: string
           watch_duration_seconds?: number | null
@@ -6492,6 +6500,7 @@ export type Database = {
           engagement_type?: string
           full_watch?: boolean | null
           id?: string
+          media_type?: string | null
           post_id?: string | null
           user_id?: string
           watch_duration_seconds?: number | null
@@ -6502,6 +6511,64 @@ export type Database = {
             columns: ["post_id"]
             isOneToOne: false
             referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_feed_sessions: {
+        Row: {
+          created_at: string | null
+          feed_type: string | null
+          id: string
+          last_position: number | null
+          last_post_id: string | null
+          posts_viewed_this_session: number | null
+          session_start: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          feed_type?: string | null
+          id?: string
+          last_position?: number | null
+          last_post_id?: string | null
+          posts_viewed_this_session?: number | null
+          session_start?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          feed_type?: string | null
+          id?: string
+          last_position?: number | null
+          last_post_id?: string | null
+          posts_viewed_this_session?: number | null
+          session_start?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_feed_sessions_last_post_id_fkey"
+            columns: ["last_post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_feed_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_feed_sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -6595,6 +6662,57 @@ export type Database = {
           weight?: number | null
         }
         Relationships: []
+      }
+      user_media_preferences: {
+        Row: {
+          id: string
+          photo_view_count: number | null
+          preferred_media_type: string | null
+          text_view_count: number | null
+          updated_at: string | null
+          user_id: string
+          video_completion_rate: number | null
+          video_count: number | null
+          video_watch_seconds: number | null
+        }
+        Insert: {
+          id?: string
+          photo_view_count?: number | null
+          preferred_media_type?: string | null
+          text_view_count?: number | null
+          updated_at?: string | null
+          user_id: string
+          video_completion_rate?: number | null
+          video_count?: number | null
+          video_watch_seconds?: number | null
+        }
+        Update: {
+          id?: string
+          photo_view_count?: number | null
+          preferred_media_type?: string | null
+          text_view_count?: number | null
+          updated_at?: string | null
+          user_id?: string
+          video_completion_rate?: number | null
+          video_count?: number | null
+          video_watch_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_media_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_media_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_mfa_settings: {
         Row: {
@@ -7203,6 +7321,35 @@ export type Database = {
           views_count: number
         }[]
       }
+      get_feed_with_rotation: {
+        Args: {
+          p_feed_type?: string
+          p_limit?: number
+          p_media_filter?: string
+          p_offset?: number
+          p_user_id: string
+        }
+        Returns: {
+          comments_count: number
+          content: string
+          created_at: string
+          id: string
+          is_new_post: boolean
+          is_promoted: boolean
+          likes_count: number
+          location: string
+          media_type: string
+          media_types: string[]
+          media_url: string
+          media_urls: string[]
+          original_post_id: string
+          post_type: string
+          refeeds_count: number
+          relevance_score: number
+          user_id: string
+          views_count: number
+        }[]
+      }
       get_following_feed: {
         Args: { p_limit?: number; p_offset?: number; p_user_id: string }
         Returns: {
@@ -7338,6 +7485,27 @@ export type Database = {
         }[]
       }
       get_profits_wallet_summary: { Args: never; Returns: Json }
+      get_randomized_feed_cycle: {
+        Args: { p_limit?: number; p_media_filter?: string; p_user_id: string }
+        Returns: {
+          comments_count: number
+          content: string
+          created_at: string
+          id: string
+          is_promoted: boolean
+          likes_count: number
+          location: string
+          media_type: string
+          media_types: string[]
+          media_url: string
+          media_urls: string[]
+          original_post_id: string
+          post_type: string
+          refeeds_count: number
+          user_id: string
+          views_count: number
+        }[]
+      }
       get_recent_gift_transactions: {
         Args: { p_limit?: number }
         Returns: {
@@ -7391,6 +7559,23 @@ export type Database = {
           media_type: string
           media_url: string
           relevance_score: number
+          title: string
+        }[]
+      }
+      get_targeted_ads_v2: {
+        Args: {
+          p_limit?: number
+          p_user_id: string
+          p_user_interests?: string[]
+        }
+        Returns: {
+          ad_id: string
+          advertiser_name: string
+          click_url: string
+          description: string
+          media_type: string
+          media_url: string
+          priority: number
           title: string
         }[]
       }
@@ -7579,6 +7764,10 @@ export type Database = {
         }[]
       }
       restore_deleted_post: { Args: { post_id: string }; Returns: boolean }
+      rotate_feed_session: {
+        Args: { p_feed_type?: string; p_user_id: string }
+        Returns: number
+      }
       send_direct_gift: {
         Args: {
           p_credit_value: number
@@ -7618,9 +7807,27 @@ export type Database = {
         Args: { p_monetize: boolean; p_user_id: string }
         Returns: Json
       }
+      track_media_preference: {
+        Args: {
+          p_completed?: boolean
+          p_media_type: string
+          p_user_id: string
+          p_watch_duration?: number
+        }
+        Returns: undefined
+      }
       transfer_credits: {
         Args: { p_amount: number; p_recipient_username: string }
         Returns: Json
+      }
+      update_feed_session: {
+        Args: {
+          p_feed_type: string
+          p_last_post_id: string
+          p_position: number
+          p_user_id: string
+        }
+        Returns: undefined
       }
       update_my_phone_number: { Args: { new_phone: string }; Returns: boolean }
       update_user_interests_from_engagement: {
