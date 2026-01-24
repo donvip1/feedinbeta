@@ -474,57 +474,90 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
                         </span>
                       </div>
-                      <p className="text-sm leading-relaxed break-words mb-2">
-                        {formatTextWithHashtagsAndMentions(c.content).map((part: any) => {
-                          if (part.type === "hashtag") {
-                            return (
-                              <span
-                                key={part.key}
-                                className="text-primary cursor-pointer hover:underline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/search?q=${encodeURIComponent(part.searchTerm)}`);
-                                }}
-                              >
-                                {part.text}
-                              </span>
-                            );
-                          }
-                          if (part.type === "mention") {
-                            return (
-                              <span
-                                key={part.key}
-                                className="text-primary cursor-pointer hover:underline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`/profile/${part.username}`);
-                                }}
-                              >
-                                {part.text}
-                              </span>
-                            );
-                          }
-                          return <span key={part.key}>{part.text}</span>;
-                        })}
-                      </p>
-                      <div className="flex items-center gap-4">
-                        <button
-                          onClick={() => handleLikeComment(c.id)}
-                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          <Heart className="w-3.5 h-3.5" />
-                          <span>{c.comment_likes?.[0]?.count || 0}</span>
-                        </button>
-                        <button
-                          onClick={() => setReplyTo({ id: c.id, username: c.profiles?.display_name || "User" })}
-                          className="text-xs text-muted-foreground hover:text-primary transition-colors font-medium"
-                        >
-                          Reply
-                        </button>
-                      </div>
+                      
+                      {/* Edit mode UI */}
+                      {editingCommentId === c.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editContent}
+                            onChange={(e) => setEditContent(e.target.value)}
+                            className="w-full resize-none min-h-[60px] max-h-[120px] rounded-lg border-2 border-primary bg-background px-3 py-2 text-sm focus:outline-none"
+                            autoFocus
+                          />
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleEditComment(c.id)}
+                              disabled={!editContent.trim()}
+                              className="h-7 px-3 text-xs"
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => { setEditingCommentId(null); setEditContent(""); }}
+                              className="h-7 px-3 text-xs"
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm leading-relaxed break-words mb-2">
+                            {formatTextWithHashtagsAndMentions(c.content).map((part: any) => {
+                              if (part.type === "hashtag") {
+                                return (
+                                  <span
+                                    key={part.key}
+                                    className="text-primary cursor-pointer hover:underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/search?q=${encodeURIComponent(part.searchTerm)}`);
+                                    }}
+                                  >
+                                    {part.text}
+                                  </span>
+                                );
+                              }
+                              if (part.type === "mention") {
+                                return (
+                                  <span
+                                    key={part.key}
+                                    className="text-primary cursor-pointer hover:underline"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate(`/profile/${part.username}`);
+                                    }}
+                                  >
+                                    {part.text}
+                                  </span>
+                                );
+                              }
+                              return <span key={part.key}>{part.text}</span>;
+                            })}
+                          </p>
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() => handleLikeComment(c.id)}
+                              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors"
+                            >
+                              <Heart className="w-3.5 h-3.5" />
+                              <span>{c.comment_likes?.[0]?.count || 0}</span>
+                            </button>
+                            <button
+                              onClick={() => setReplyTo({ id: c.id, username: c.profiles?.display_name || "User" })}
+                              className="text-xs text-muted-foreground hover:text-primary transition-colors font-medium"
+                            >
+                              Reply
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                     {/* Edit/Delete menu for own comments */}
-                    {user?.id === c.user_id ? (
+                    {user?.id === c.user_id && editingCommentId !== c.id ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0">
@@ -540,11 +573,11 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    ) : (
+                    ) : user?.id !== c.user_id ? (
                       <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                         <MoreVertical className="w-4 h-4" />
                       </Button>
-                    )}
+                    ) : null}
                   </div>
 
                   {/* Replies */}
