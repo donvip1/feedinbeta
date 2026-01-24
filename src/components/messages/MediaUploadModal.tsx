@@ -76,6 +76,15 @@ export const MediaUploadModal = ({
   const [videoQuality, setVideoQuality] = useState(0.9);
   const videoRef = useRef<HTMLVideoElement>(null);
   
+  // Video cropping
+  const [showVideoCropper, setShowVideoCropper] = useState(false);
+  const [videoCrop, setVideoCrop] = useState({ x: 0, y: 0 });
+  const [videoZoom, setVideoZoom] = useState(1);
+  const [videoAspectRatio, setVideoAspectRatio] = useState<number | undefined>(undefined);
+  const [videoCroppedAreaPixels, setVideoCroppedAreaPixels] = useState<CropArea | null>(null);
+  const [videoFramePreview, setVideoFramePreview] = useState<string>('');
+  const [videoCropApplied, setVideoCropApplied] = useState(false);
+  
   const [flipH, setFlipH] = useState(false);
   const [flipV, setFlipV] = useState(false);
 
@@ -99,16 +108,28 @@ export const MediaUploadModal = ({
     setFlipV(false);
     setAspectRatio(undefined); // Reset to free crop
     
+    // Reset video cropping state
+    setShowVideoCropper(false);
+    setVideoCrop({ x: 0, y: 0 });
+    setVideoZoom(1);
+    setVideoAspectRatio(undefined);
+    setVideoCroppedAreaPixels(null);
+    setVideoFramePreview('');
+    setVideoCropApplied(false);
+    
     return () => URL.revokeObjectURL(url);
   }, [file, fileType]);
 
-  // Video duration
+  // Video duration and frame capture
   useEffect(() => {
     if (videoRef.current && fileType === 'video') {
       const handleLoadedMetadata = () => {
         const duration = videoRef.current?.duration || 0;
         setVideoDuration(duration);
         setTrimEnd(duration);
+        
+        // Capture first frame for cropping preview
+        captureVideoFrame();
       };
       videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata);
       return () => {
@@ -116,6 +137,24 @@ export const MediaUploadModal = ({
       };
     }
   }, [fileType, videoPreview]);
+
+  const captureVideoFrame = useCallback(() => {
+    if (!videoRef.current) return;
+    
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      setVideoFramePreview(canvas.toDataURL('image/jpeg', 0.8));
+    }
+  }, []);
+
+  const onVideoCropComplete = useCallback((croppedArea: any, croppedAreaPixels: CropArea) => {
+    setVideoCroppedAreaPixels(croppedAreaPixels);
+  }, []);
 
   const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: CropArea) => {
     setCroppedAreaPixels(croppedAreaPixels);
@@ -354,86 +393,176 @@ export const MediaUploadModal = ({
             </div>
           )}
 
-          {/* Video Preview & Trimmer */}
+          {/* Video Preview & Cropper/Trimmer */}
           {fileType === 'video' && (
             <div className="relative bg-black">
-              <video
-                ref={videoRef}
-                src={videoPreview}
-                className="w-full max-h-[250px] object-contain"
-                controls
-              />
-              
-              {/* Video Trim Controls */}
-              <div className="p-4 bg-muted/30 space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Scissors className="w-4 h-4" />
-                    Trim Video
-                  </Label>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{formatDuration(trimStart)}</span>
-                    <div className="flex-1 relative h-2">
-                      <div className="absolute inset-0 bg-muted rounded-full" />
-                      <div
-                        className="absolute h-full bg-primary rounded-full"
-                        style={{
-                          left: `${(trimStart / videoDuration) * 100}%`,
-                          width: `${((trimEnd - trimStart) / videoDuration) * 100}%`,
+              {showVideoCropper && videoFramePreview ? (
+                <div className="h-[350px] relative bg-black">
+                  <Cropper
+                    image={videoFramePreview}
+                    crop={videoCrop}
+                    zoom={videoZoom}
+                    aspect={videoAspectRatio}
+                    onCropChange={setVideoCrop}
+                    onCropComplete={onVideoCropComplete}
+                    onZoomChange={setVideoZoom}
+                  />
+                  
+                  {/* Video Crop Controls */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent p-4 space-y-3">
+                    {/* Aspect Ratio Selector */}
+                    <div className="flex items-center justify-center gap-1 overflow-x-auto pb-1">
+                      {ASPECT_RATIO_OPTIONS.map((option) => (
+                        <Button
+                          key={option.label}
+                          size="sm"
+                          variant={videoAspectRatio === option.value ? 'default' : 'secondary'}
+                          onClick={() => setVideoAspectRatio(option.value)}
+                          className="h-8 px-3 text-xs whitespace-nowrap"
+                        >
+                          <span className="mr-1">{option.icon}</span>
+                          {option.label}
+                        </Button>
+                      ))}
+                    </div>
+                    
+                    {/* Zoom slider */}
+                    <div className="flex items-center gap-3">
+                      <ZoomOut className="w-4 h-4 text-white" />
+                      <Slider
+                        value={[videoZoom]}
+                        min={1}
+                        max={3}
+                        step={0.1}
+                        onValueChange={([val]) => setVideoZoom(val)}
+                        className="flex-1"
+                      />
+                      <ZoomIn className="w-4 h-4 text-white" />
+                    </div>
+                    
+                    {/* Action buttons */}
+                    <div className="flex items-center justify-center gap-2">
+                      <Button variant="outline" onClick={() => setShowVideoCropper(false)}>
+                        Cancel
+                      </Button>
+                      <Button onClick={() => {
+                        setVideoCropApplied(true);
+                        setShowVideoCropper(false);
+                        toast({ title: 'Video crop area set', description: 'Crop will be applied during processing' });
+                      }}>
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Apply Crop
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <video
+                      ref={videoRef}
+                      src={videoPreview}
+                      className="w-full max-h-[250px] object-contain"
+                      controls
+                      onLoadedData={captureVideoFrame}
+                    />
+                    
+                    {/* Video Edit Controls */}
+                    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-black/60 rounded-full p-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 text-white hover:bg-white/20"
+                        onClick={() => {
+                          captureVideoFrame();
+                          setShowVideoCropper(true);
                         }}
-                      />
-                    </div>
-                    <span>{formatDuration(trimEnd)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Start</Label>
-                      <Slider
-                        value={[trimStart]}
-                        min={0}
-                        max={trimEnd - 1}
-                        step={0.1}
-                        onValueChange={([val]) => setTrimStart(val)}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">End</Label>
-                      <Slider
-                        value={[trimEnd]}
-                        min={trimStart + 1}
-                        max={videoDuration}
-                        step={0.1}
-                        onValueChange={([val]) => setTrimEnd(val)}
-                      />
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Quality Selection */}
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Quality
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {QUALITY_OPTIONS.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => setVideoQuality(option.value)}
-                        className={cn(
-                          'p-2 rounded-lg text-left transition-all border',
-                          videoQuality === option.value
-                            ? 'border-primary bg-primary/10'
-                            : 'border-border hover:bg-muted/50'
-                        )}
                       >
-                        <p className="text-sm font-medium">{option.label}</p>
-                        <p className="text-xs text-muted-foreground">{option.description}</p>
-                      </button>
-                    ))}
+                        <Crop className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    
+                    {/* Crop applied indicator */}
+                    {videoCropApplied && (
+                      <div className="absolute top-2 right-2 flex items-center gap-1 bg-primary/90 text-primary-foreground px-2 py-1 rounded-full text-xs">
+                        <Crop className="w-3 h-3" />
+                        Cropped
+                      </div>
+                    )}
                   </div>
-                </div>
-              </div>
+                  
+                  {/* Video Trim Controls */}
+                  <div className="p-4 bg-muted/30 space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Scissors className="w-4 h-4" />
+                        Trim Video
+                      </Label>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{formatDuration(trimStart)}</span>
+                        <div className="flex-1 relative h-2">
+                          <div className="absolute inset-0 bg-muted rounded-full" />
+                          <div
+                            className="absolute h-full bg-primary rounded-full"
+                            style={{
+                              left: `${(trimStart / videoDuration) * 100}%`,
+                              width: `${((trimEnd - trimStart) / videoDuration) * 100}%`,
+                            }}
+                          />
+                        </div>
+                        <span>{formatDuration(trimEnd)}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Start</Label>
+                          <Slider
+                            value={[trimStart]}
+                            min={0}
+                            max={trimEnd - 1}
+                            step={0.1}
+                            onValueChange={([val]) => setTrimStart(val)}
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">End</Label>
+                          <Slider
+                            value={[trimEnd]}
+                            min={trimStart + 1}
+                            max={videoDuration}
+                            step={0.1}
+                            onValueChange={([val]) => setTrimEnd(val)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Quality Selection */}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-2">
+                        <Sparkles className="w-4 h-4" />
+                        Quality
+                      </Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {QUALITY_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setVideoQuality(option.value)}
+                            className={cn(
+                              'p-2 rounded-lg text-left transition-all border',
+                              videoQuality === option.value
+                                ? 'border-primary bg-primary/10'
+                                : 'border-border hover:bg-muted/50'
+                            )}
+                          >
+                            <p className="text-sm font-medium">{option.label}</p>
+                            <p className="text-xs text-muted-foreground">{option.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
