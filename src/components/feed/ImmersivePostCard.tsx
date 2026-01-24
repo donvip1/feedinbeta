@@ -1091,7 +1091,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* --- FOOTER SECTION: Caption, Music, Promote (Below Media) - Hidden in immersive mode --- */}
         {!isImmersiveMode && !isTextStyled && !isPlainText && (
-          <div className="flex-shrink-0 bg-black px-4 py-3 z-20">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
+            className="flex-shrink-0 bg-black px-4 py-3 z-20"
+          >
             {/* Caption */}
             {caption && (
               <div className="mb-2">
@@ -1141,7 +1146,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-xs font-semibold">Promote</span>
               </button>
             )}
-          </div>
+          </motion.div>
         )}
         {/* Social buttons for Plain Text - positioned at bottom */}
         {isPlainText && (

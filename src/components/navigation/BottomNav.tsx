@@ -228,38 +228,45 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
               return (
                 <Tooltip key={item.id}>
                   <TooltipTrigger asChild>
-                    <Button
-                      onClick={() => handleNavClick(item.path, item.id)}
-                      variant="ghost"
-                      size="icon"
-                      className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${
-                        active ? 'text-white' : 'text-white/80 hover:text-white'
-                      }`}
-                      style={{
-                        transform: isPressed ? 'scale(0.9)' : 'scale(1)',
-                        transition: 'transform 0.1s ease-out',
+                    <motion.div
+                      whileTap={{ 
+                        scale: 0.85,
+                        transition: { type: "spring", stiffness: 400, damping: 17 }
                       }}
+                      animate={isPressed ? {
+                        y: [0, -4, 0],
+                        transition: { duration: 0.3, ease: "easeOut" }
+                      } : {}}
                     >
-                      {item.isProfile && avatarUrl ? (
-                        <div className={`rounded-full transition-all duration-150 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' : ''}`}>
-                          <Avatar className="w-7 h-7">
-                            <AvatarImage src={avatarUrl} />
-                            <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
-                          </Avatar>
-                        </div>
-                      ) : (
-                        <div className="relative">
-                          <Icon 
-                            size={24}
-                            strokeWidth={2.5}
-                            className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
-                          />
-                          {badgeCount > 0 && (
-                            <UnreadBadge count={badgeCount} size="sm" />
-                          )}
-                        </div>
-                      )}
-                    </Button>
+                      <Button
+                        onClick={() => handleNavClick(item.path, item.id)}
+                        variant="ghost"
+                        size="icon"
+                        className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${
+                          active ? 'text-white' : 'text-white/80 hover:text-white'
+                        }`}
+                      >
+                        {item.isProfile && avatarUrl ? (
+                          <div className={`rounded-full transition-all duration-150 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' : ''}`}>
+                            <Avatar className="w-7 h-7">
+                              <AvatarImage src={avatarUrl} />
+                              <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
+                            </Avatar>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Icon 
+                              size={24}
+                              strokeWidth={2.5}
+                              className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
+                            />
+                            {badgeCount > 0 && (
+                              <UnreadBadge count={badgeCount} size="sm" />
+                            )}
+                          </div>
+                        )}
+                      </Button>
+                    </motion.div>
                   </TooltipTrigger>
                   <TooltipContent side="top">
                     <p>{item.label}</p>
