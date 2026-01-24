@@ -10,11 +10,15 @@ import { Progress } from '@/components/ui/progress';
 import {
   Send, Smile, Mic, X, Image as ImageIcon, 
   Paperclip, ChevronDown, Reply, Camera, MapPin, FileText, User,
-  Shield, Clock, EyeOff, RefreshCw, Sparkles, Calendar, UserPlus, UserCheck
+  Shield, Clock, EyeOff, RefreshCw, Sparkles, Calendar, UserPlus, UserCheck,
+  MoreVertical, ArrowLeft
 } from 'lucide-react';
 import { GroupChatHeader } from './GroupChatHeader';
 import { GroupMessageBubble } from './GroupMessageBubble';
 import { GroupTypingIndicator } from './GroupTypingIndicator';
+import { GroupChatMenu } from './GroupChatMenu';
+import { GroupInfoSheet } from './GroupInfoSheet';
+import { GroupMembersSheet } from './GroupMembersSheet';
 import { AttachmentPicker } from '@/components/messages/AttachmentPicker';
 import { VoiceRecorder } from '@/components/messages/VoiceRecorder';
 import { MediaUploadModal } from '@/components/messages/MediaUploadModal';
@@ -119,6 +123,11 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const [showRetentionMenu, setShowRetentionMenu] = useState(false);
   const [isMember, setIsMember] = useState(true);
   const [pendingJoin, setPendingJoin] = useState(false);
+  
+  // Sheet states for new Telegram-style menu
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [showMembersSheet, setShowMembersSheet] = useState(false);
   
   // Media upload modal state
   const [mediaUploadFile, setMediaUploadFile] = useState<File | null>(null);
@@ -653,74 +662,57 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         />
       )}
       
-      {/* Header */}
+      {/* Header - Telegram style with clickable title and 3-dot menu */}
       <div className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md flex items-center justify-between px-4 z-30">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           <Button 
             variant="ghost" 
             size="icon" 
             onClick={onBack}
             className="text-slate-400 hover:text-white hover:bg-slate-800"
           >
-            <X className="w-5 h-5" />
+            <ArrowLeft className="w-5 h-5" />
           </Button>
-          <img 
-            src={group.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=6366f1&color=fff`} 
-            className="w-9 h-9 rounded-full border border-slate-700 cursor-pointer hover:opacity-80 transition-opacity" 
-            onClick={() => navigate(`/groups/${groupId}`)}
-          />
-          <div>
-            <h3 className="font-bold text-sm text-white">{group.name}</h3>
-            <p className="text-xs text-slate-500">
-              {secretMode ? 'Secret Chat' : `${memberCount} members`}
-            </p>
+          
+          {/* Clickable group info - opens info sheet */}
+          <div 
+            className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setShowGroupInfo(true)}
+          >
+            <img 
+              src={group.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(group.name)}&background=6366f1&color=fff`} 
+              className="w-9 h-9 rounded-full border border-slate-700" 
+            />
+            <div className="min-w-0">
+              <h3 className="font-bold text-sm text-white truncate">{group.name}</h3>
+              <p className="text-xs text-slate-500">
+                {secretMode ? 'Secret Chat' : `${memberCount} members`}
+              </p>
+            </div>
           </div>
         </div>
         
-        <div className="flex gap-2 text-slate-400 items-center">
-          {/* Secret Mode Toggle */}
-          <button 
-            onClick={() => setSecretMode(!secretMode)} 
-            className={cn(
-              "p-2 rounded-lg transition-colors",
-              secretMode ? 'bg-red-500/20 text-red-400' : 'hover:bg-slate-800 hover:text-white'
-            )}
-          >
-            <Shield size={18} />
-          </button>
-          
-          {/* Retention Settings */}
-          <div className="relative">
+        <div className="flex gap-1 text-slate-400 items-center">
+          {/* Secret Mode Toggle - only show for private groups */}
+          {group.is_private && (
             <button 
-              onClick={() => setShowRetentionMenu(!showRetentionMenu)}
-              className="p-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+              onClick={() => setSecretMode(!secretMode)} 
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                secretMode ? 'bg-red-500/20 text-red-400' : 'hover:bg-slate-800 hover:text-white'
+              )}
             >
-              <Calendar size={18} />
+              <Shield size={18} />
             </button>
-            {showRetentionMenu && (
-              <div className="absolute right-0 top-10 bg-slate-800 border border-slate-700 rounded-xl shadow-xl w-44 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2">
-                <div className="p-2 text-xs font-bold text-slate-500 border-b border-slate-700 bg-slate-900">
-                  AUTO-DELETE
-                </div>
-                {RETENTION_OPTIONS.map(opt => (
-                  <button 
-                    key={opt.label} 
-                    onClick={() => {
-                      setChatRetention(opt.value);
-                      setShowRetentionMenu(false);
-                      loadMessages();
-                    }}
-                    className={cn(
-                      "block w-full text-left px-3 py-2.5 text-sm hover:bg-slate-700 transition-colors",
-                      chatRetention === opt.value ? 'text-purple-400 bg-slate-700/50' : 'text-slate-300'
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          )}
+          
+          {/* 3-dot Menu - Telegram style */}
+          <button 
+            onClick={() => setShowChatMenu(true)}
+            className="p-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+          >
+            <MoreVertical size={18} />
+          </button>
         </div>
       </div>
       
@@ -1010,15 +1002,55 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       )}
       
       {/* Click outside to close menus */}
-      {(showRetentionMenu || isMenuOpen) && (
+      {isMenuOpen && (
         <div 
           className="fixed inset-0 z-20" 
-          onClick={() => {
-            setShowRetentionMenu(false);
-            setIsMenuOpen(false);
-          }} 
+          onClick={() => setIsMenuOpen(false)} 
         />
       )}
+      
+      {/* Telegram-style Group Chat Menu */}
+      <GroupChatMenu
+        open={showChatMenu}
+        onOpenChange={setShowChatMenu}
+        groupId={groupId}
+        group={group}
+        isAdmin={isAdmin}
+        isMember={isMember}
+        memberCount={memberCount}
+        onShowInfo={() => setShowGroupInfo(true)}
+        onShowMembers={() => setShowMembersSheet(true)}
+        chatRetention={chatRetention}
+        onRetentionChange={(value) => {
+          setChatRetention(value);
+          loadMessages();
+        }}
+      />
+      
+      {/* Group Info Sheet - shown when clicking group title */}
+      <GroupInfoSheet
+        open={showGroupInfo}
+        onOpenChange={setShowGroupInfo}
+        groupId={groupId}
+        group={group}
+        members={members}
+        memberCount={memberCount}
+        isAdmin={isAdmin}
+        isMember={isMember}
+        onShowMembers={() => {
+          setShowGroupInfo(false);
+          setShowMembersSheet(true);
+        }}
+      />
+      
+      {/* Group Members Sheet */}
+      <GroupMembersSheet
+        open={showMembersSheet}
+        onOpenChange={setShowMembersSheet}
+        groupId={groupId}
+        members={members}
+        isAdmin={isAdmin}
+      />
     </div>
   );
 };
