@@ -90,10 +90,8 @@ export default function PlainTextPostCreator({ onClose, onSubmit }: PlainTextPos
 
       onSubmit();
       
-      // Navigate to the new post
-      if (newPost?.id) {
-        navigate(`/feed/post/${newPost.id}`);
-      }
+      // Navigate to the main feed page
+      navigate('/feed');
     } catch (error) {
       console.error('Error posting:', error);
       toast({

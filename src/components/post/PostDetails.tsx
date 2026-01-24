@@ -289,10 +289,10 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
         description: 'Your post has been published successfully.',
       });
 
-      // Short delay to show 100% then navigate to the new post
+      // Short delay to show 100% then navigate to main feed
       setTimeout(() => {
         onSubmit();
-        navigate(`/feed/post/${newPost.id}`);
+        navigate('/feed');
       }, 500);
     } catch (error: any) {
       console.error('Error creating post:', error);
