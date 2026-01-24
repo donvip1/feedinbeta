@@ -363,7 +363,7 @@ const AICopilot = () => {
 
   return (
     <>
-      <div className="flex flex-col min-h-screen bg-background pb-20">
+      <div className="flex flex-col min-h-screen bg-background pb-40">
         {/* Header */}
         <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
           <div className="flex items-center justify-between p-4">
