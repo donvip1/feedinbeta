@@ -889,7 +889,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* --- CAPTION OVERLAY with Promote Button (positioned at bottom left) --- */}
           {!isImmersiveMode && caption && !isTextStyled && !isPlainText && (
-            <div className="absolute left-4 right-16 bottom-14 z-10 transition-opacity duration-200 pr-2">
+            <div className="absolute left-4 right-16 bottom-4 z-10 transition-opacity duration-200 pr-2">
               <p className="text-white text-sm leading-snug break-words" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>
                 {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
               </p>
@@ -911,7 +911,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     e.stopPropagation();
                     navigate(`/promote/${post.id}`);
                   }}
-                  className="flex items-center gap-1.5 mt-6 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+                  className="flex items-center gap-1.5 mt-4 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
                 >
                   <TrendingUp className="w-4 h-4 text-white" />
                   <span className="text-white text-xs font-semibold">Promote</span>
@@ -922,7 +922,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* Promote Button for posts without caption */}
           {!isImmersiveMode && (!caption || isTextStyled || isPlainText) && user && !isPromoted && (
-            <div className="absolute left-4 bottom-14 z-10">
+            <div className="absolute left-4 bottom-4 z-10">
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -942,7 +942,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             return (
               <div className={cn(
                 "absolute right-3 z-50 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
-                isImmersiveMode ? "bottom-16" : "bottom-14",
+                isImmersiveMode ? "bottom-8" : "bottom-4",
                 (isImmersiveMode ? showImmersiveUI : showControls) ? "opacity-100" : "opacity-0 pointer-events-none"
               )}>
                 {/* Like - always visible */}
@@ -1033,7 +1033,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* Immersive Mode: Caption overlay - shown when UI is visible */}
           {isImmersiveMode && showImmersiveUI && caption && !isTextStyled && !isPlainText && (
-            <div className="absolute left-4 right-16 bottom-32 z-20 transition-opacity duration-200">
+            <div className="absolute left-4 right-16 bottom-8 z-20 transition-opacity duration-200">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-white font-bold text-sm" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>{displayName}</span>
               </div>
@@ -1058,7 +1058,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     e.stopPropagation();
                     navigate(`/promote/${post.id}`);
                   }}
-                  className="flex items-center gap-1.5 mt-9 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+                  className="flex items-center gap-1.5 mt-4 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
                 >
                   <TrendingUp className="w-4 h-4 text-white" />
                   <span className="text-white text-xs font-semibold">Promote</span>
