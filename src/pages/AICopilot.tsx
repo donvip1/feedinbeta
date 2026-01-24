@@ -584,9 +584,14 @@ const AICopilot = () => {
           </div>
         </ScrollArea>
 
-        {/* Quick Chat Input */}
-        <div className="sticky bottom-20 left-0 right-0 border-t border-border bg-background/95 backdrop-blur-sm p-4">
-          <div className="flex items-center gap-2 max-w-2xl mx-auto">
+        {/* Quick Chat Input - positioned directly above nav bar */}
+        <div 
+          className="fixed left-0 right-0 z-[60] border-t border-border bg-background"
+          style={{
+            bottom: 'calc(56px + env(safe-area-inset-bottom))',
+          }}
+        >
+          <div className="flex items-center gap-2 max-w-2xl mx-auto p-3">
             <Input
               placeholder="Ask FeedAI anything..."
               value={input}
