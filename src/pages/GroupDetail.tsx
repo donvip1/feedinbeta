@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { GroupInviteLinkSheet } from '@/components/groups/GroupInviteLinkSheet';
 import { ArrowLeft, Users, Settings, UserPlus, UserCheck, MessageCircle, Link, Lock, Globe } from 'lucide-react';
@@ -291,64 +290,63 @@ const GroupDetail = () => {
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content - Simplified, no tabs since Posts/Members/About are in chat now */}
       <div className="container mx-auto px-4 py-6">
-        <Tabs defaultValue="posts">
-          <TabsList className="w-full">
-            <TabsTrigger value="posts" className="flex-1">Posts</TabsTrigger>
-            <TabsTrigger value="members" className="flex-1">Members</TabsTrigger>
-            <TabsTrigger value="about" className="flex-1">About</TabsTrigger>
-          </TabsList>
-          <TabsContent value="posts" className="mt-6">
-            {isMember ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p className="mb-4">Group posts will appear here</p>
-                <Button onClick={() => navigate(`/groups/${groupId}/chat`)}>
-                  Go to Chat
-                </Button>
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                Join the group to view posts
-              </div>
-            )}
-          </TabsContent>
-          <TabsContent value="members" className="mt-6">
-            {isMember ? (
-              <div className="text-center py-12 text-muted-foreground">
-                Group members will appear here
-              </div>
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                Join the group to view members
-              </div>
-            )}
-          </TabsContent>
-          <TabsContent value="about" className="mt-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-semibold mb-2">Description</h3>
-                <p className="text-muted-foreground">{group.description}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold mb-2">Privacy</h3>
-                <p className="text-muted-foreground">
-                  {group.is_private ? 'Private Group - Only members can see content' : 'Public Group - Anyone can join and view content'}
-                </p>
-              </div>
-              {isAdmin && (
-                <div>
-                  <h3 className="font-semibold mb-2">Invite Links</h3>
-                  <Button variant="outline" onClick={() => setShowInviteSheet(true)}>
-                    <Link className="w-4 h-4 mr-2" />
-                    Manage Invite Links
-                  </Button>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+        {/* Description */}
+        {group.description && (
+          <div className="bg-slate-800/30 rounded-xl p-4 mb-4 border border-slate-700/50">
+            <h3 className="font-semibold mb-2 text-sm text-slate-300">About</h3>
+            <p className="text-sm text-slate-400">{group.description}</p>
+          </div>
+        )}
+        
+        {/* Privacy Info */}
+        <div className="bg-slate-800/30 rounded-xl p-4 mb-4 border border-slate-700/50">
+          <h3 className="font-semibold mb-2 text-sm text-slate-300">Privacy</h3>
+          <p className="text-sm text-slate-400">
+            {group.is_private 
+              ? 'Private Group - Only members can see content and invite others via link'
+              : 'Public Group - Anyone can join and view content'
+            }
+          </p>
+        </div>
+        
+        {/* Quick Actions for Members */}
+        {isMember && (
+          <div className="space-y-3">
+            <Button 
+              className="w-full"
+              onClick={() => navigate(`/groups/${groupId}/chat`)}
+            >
+              <MessageCircle className="w-4 h-4 mr-2" />
+              Open Group Chat
+            </Button>
+            
+            <Button 
+              variant="outline"
+              className="w-full border-slate-700"
+              onClick={() => setShowInviteSheet(true)}
+            >
+              <Link className="w-4 h-4 mr-2" />
+              Share Invite Link
+            </Button>
+          </div>
+        )}
+        
+        {/* Admin Settings */}
+        {isAdmin && (
+          <div className="mt-6 pt-6 border-t border-slate-700">
+            <h3 className="font-semibold mb-3 text-sm text-slate-300">Admin Settings</h3>
+            <Button 
+              variant="outline"
+              className="w-full border-slate-700"
+              onClick={() => setShowInviteSheet(true)}
+            >
+              <Link className="w-4 h-4 mr-2" />
+              Manage Invite Links
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Invite Links Sheet */}
