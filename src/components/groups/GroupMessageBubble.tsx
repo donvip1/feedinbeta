@@ -2,7 +2,10 @@ import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { Reply, Smile, MoreVertical, Copy, Trash2, Check, CheckCheck, FileText, Edit2, Pin } from 'lucide-react';
+import { 
+  Reply, Smile, MoreVertical, Copy, Trash2, Check, CheckCheck, 
+  FileText, Edit2, Pin, Flame, EyeOff 
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -47,6 +50,8 @@ interface GroupMessage {
   }>;
   is_pinned?: boolean;
   edited_at?: string | null;
+  is_secret?: boolean;
+  view_once_timer?: number;
 }
 
 interface GroupMessageBubbleProps {
@@ -55,6 +60,7 @@ interface GroupMessageBubbleProps {
   isFirstInGroup?: boolean;
   isLastInGroup?: boolean;
   isAdmin?: boolean;
+  secretMode?: boolean;
   onReply: (messageId: string, content: string) => void;
   onReact: (messageId: string, emoji: string) => void;
   onDelete?: (messageId: string) => void;
@@ -68,6 +74,7 @@ export const GroupMessageBubble = ({
   isFirstInGroup = true,
   isLastInGroup = true,
   isAdmin = false,
+  secretMode = false,
   onReply,
   onReact,
   onDelete,
@@ -148,24 +155,12 @@ export const GroupMessageBubble = ({
     return acc;
   }, {} as Record<string, typeof message.reactions>);
 
-  const bubbleRadius = cn(
-    isOwn ? (
-      isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-br-md' :
-      isFirstInGroup ? 'rounded-2xl rounded-br-md' :
-      isLastInGroup ? 'rounded-2xl rounded-tr-md' :
-      'rounded-2xl rounded-r-md'
-    ) : (
-      isFirstInGroup && isLastInGroup ? 'rounded-2xl rounded-bl-md' :
-      isFirstInGroup ? 'rounded-2xl rounded-bl-md' :
-      isLastInGroup ? 'rounded-2xl rounded-tl-md' :
-      'rounded-2xl rounded-l-md'
-    )
-  );
+  const isViewOnce = message.view_once_timer === 1;
 
   return (
     <div
       className={cn(
-        "flex gap-2 group relative transition-transform duration-150",
+        "flex gap-2 group relative transition-transform duration-150 animate-in slide-in-from-bottom-2",
         isOwn ? 'flex-row-reverse' : 'flex-row',
         !isLastInGroup && 'mb-0.5'
       )}
@@ -183,21 +178,21 @@ export const GroupMessageBubble = ({
       {/* Swipe Reply Indicator */}
       {swipeOffset > 30 && (
         <div className={cn(
-          "absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-primary/20 animate-pulse",
+          "absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-purple-500/20 animate-pulse",
           isOwn ? "right-0" : "left-0"
         )}>
-          <Reply className="w-5 h-5 text-primary" />
+          <Reply className="w-5 h-5 text-purple-400" />
         </div>
       )}
 
       {/* Avatar - Show for other users only */}
       {!isOwn && isLastInGroup && (
         <Avatar
-          className="w-8 h-8 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0 mt-auto"
+          className="w-8 h-8 cursor-pointer hover:ring-2 hover:ring-purple-500/30 transition-all flex-shrink-0 mt-auto border border-slate-700"
           onClick={() => window.location.href = `/profile/${message.sender_id}`}
         >
           <AvatarImage src={message.sender.avatar_url || ''} />
-          <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-xs font-medium">
+          <AvatarFallback className="bg-slate-800 text-slate-300 text-xs font-medium">
             {message.sender.display_name?.[0]?.toUpperCase() || 'U'}
           </AvatarFallback>
         </Avatar>
@@ -210,14 +205,14 @@ export const GroupMessageBubble = ({
       )}>
         {/* Sender Name - Show for first message in group from others */}
         {!isOwn && isFirstInGroup && (
-          <span className="text-xs text-primary font-medium mb-0.5 ml-1">
+          <span className="text-xs text-purple-400 font-medium mb-0.5 ml-1">
             {message.sender.display_name || 'Unknown User'}
           </span>
         )}
 
         {/* Pinned Badge */}
         {message.is_pinned && (
-          <div className="flex items-center gap-1 text-xs text-primary mb-1">
+          <div className="flex items-center gap-1 text-xs text-purple-400 mb-1">
             <Pin className="w-3 h-3" />
             <span>Pinned</span>
           </div>
@@ -226,8 +221,8 @@ export const GroupMessageBubble = ({
         {/* Reply Indicator */}
         {message.reply_to_message && (
           <div className={cn(
-            "flex items-start gap-2 p-2 mb-1 rounded-xl border-l-2 border-primary/50",
-            isOwn ? "bg-white/10" : "bg-primary/5"
+            "flex items-start gap-2 p-2 mb-1 rounded-xl border-l-2 border-purple-500/50",
+            isOwn ? "bg-white/10" : "bg-purple-500/10"
           )}>
             {message.reply_to_message.media_url && (
               <div className="w-8 h-8 rounded-md overflow-hidden flex-shrink-0">
@@ -243,15 +238,15 @@ export const GroupMessageBubble = ({
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full bg-muted flex items-center justify-center">
-                    <FileText className="w-3 h-3" />
+                  <div className="w-full h-full bg-slate-800 flex items-center justify-center">
+                    <FileText className="w-3 h-3 text-slate-400" />
                   </div>
                 )}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-xs text-primary">{message.reply_to_message.sender.display_name}</p>
-              <p className="truncate text-xs opacity-70">{message.reply_to_message.content}</p>
+              <p className="font-semibold text-xs text-purple-400">{message.reply_to_message.sender.display_name}</p>
+              <p className="truncate text-xs text-slate-400">{message.reply_to_message.content}</p>
             </div>
           </div>
         )}
@@ -260,32 +255,53 @@ export const GroupMessageBubble = ({
           {/* Message Bubble */}
           <div
             className={cn(
-              "px-3 py-2 transition-all duration-200",
-              bubbleRadius,
+              "px-3 py-2 rounded-2xl transition-all duration-200",
               isOwn
-                ? 'bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/20'
-                : 'bg-card text-card-foreground shadow-sm border border-border/50'
+                ? 'bg-blue-600 text-white'
+                : secretMode 
+                  ? 'bg-slate-900 border border-red-900 text-red-100' 
+                  : 'bg-slate-800 text-slate-100'
             )}
           >
-            {renderMedia()}
-            {message.content && !message.media_type?.includes('file') && (
-              <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+            {/* View Once indicator for own messages */}
+            {isViewOnce && isOwn ? (
+              <div className="flex items-center gap-2 italic text-sm text-white/80">
+                <EyeOff size={16}/> View Once Sent
+              </div>
+            ) : (
+              <>
+                {renderMedia()}
+                {message.content && !message.media_type?.includes('file') && (
+                  <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+                )}
+              </>
             )}
 
-            {/* Inline Time */}
+            {/* Inline Time & Status */}
             <div className={cn(
               "flex items-center gap-1 mt-0.5 -mb-0.5",
               isOwn ? 'justify-end' : 'justify-start'
             )}>
+              {/* Secret/ViewOnce Badge */}
+              {message.is_secret && (
+                <span className={cn(
+                  "flex items-center gap-0.5 text-[10px] px-1 rounded",
+                  isViewOnce ? 'text-purple-300 bg-purple-900/30' : 'text-red-300 bg-red-900/30'
+                )}>
+                  {isViewOnce ? <EyeOff size={8} /> : <Flame size={8} />}
+                  {isViewOnce ? '1x' : `${message.view_once_timer || 30}s`}
+                </span>
+              )}
               {message.edited_at && (
                 <span className="text-[10px] opacity-50">edited</span>
               )}
               <span className={cn(
                 "text-[10px]",
-                isOwn ? "text-primary-foreground/70" : "text-muted-foreground"
+                isOwn ? "text-white/60" : "text-slate-500"
               )}>
                 {formatTime(message.created_at)}
               </span>
+              {isOwn && <CheckCheck size={12} className="text-white/60" />}
             </div>
           </div>
 
@@ -300,12 +316,15 @@ export const GroupMessageBubble = ({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7 rounded-full hover:bg-primary/10"
+                  className="h-7 w-7 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white"
                 >
                   <Smile className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-1.5 rounded-full bg-background/95 backdrop-blur-xl border-border/50" side={isOwn ? "left" : "right"}>
+              <PopoverContent 
+                className="w-auto p-1.5 rounded-full bg-slate-800/95 backdrop-blur-xl border-slate-700" 
+                side={isOwn ? "left" : "right"}
+              >
                 <div className="flex gap-0.5">
                   {DEFAULT_EMOJIS.map((emoji, index) => (
                     <button
@@ -314,10 +333,10 @@ export const GroupMessageBubble = ({
                         onReact(message.id, emoji);
                         setShowReactions(false);
                       }}
-                      className="emoji-reaction-btn text-xl p-1.5 rounded-full hover:bg-muted/50 hover:scale-125 active:scale-90 transition-all duration-200"
+                      className="text-xl p-1.5 rounded-full hover:bg-slate-700 hover:scale-125 active:scale-90 transition-all duration-200"
                       style={{ animationDelay: `${index * 30}ms` }}
                     >
-                      <span className="emoji-pop">{emoji}</span>
+                      <span>{emoji}</span>
                     </button>
                   ))}
                 </div>
@@ -327,7 +346,7 @@ export const GroupMessageBubble = ({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 rounded-full hover:bg-primary/10"
+              className="h-7 w-7 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white"
               onClick={() => onReply(message.id, message.content)}
             >
               <Reply className="w-4 h-4" />
@@ -335,27 +354,37 @@ export const GroupMessageBubble = ({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-primary/10">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white"
+                >
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={isOwn ? 'end' : 'start'} className="w-48 rounded-xl">
-                <DropdownMenuItem onClick={handleCopy} className="gap-2">
+              <DropdownMenuContent 
+                align={isOwn ? 'end' : 'start'} 
+                className="w-48 rounded-xl bg-slate-800 border-slate-700"
+              >
+                <DropdownMenuItem onClick={handleCopy} className="gap-2 text-slate-200 focus:bg-slate-700 focus:text-white">
                   <Copy className="w-4 h-4" />
                   Copy text
                 </DropdownMenuItem>
                 {isAdmin && (
-                  <DropdownMenuItem onClick={() => onPin?.(message.id)} className="gap-2">
+                  <DropdownMenuItem 
+                    onClick={() => onPin?.(message.id)} 
+                    className="gap-2 text-slate-200 focus:bg-slate-700 focus:text-white"
+                  >
                     <Pin className="w-4 h-4" />
                     {message.is_pinned ? 'Unpin' : 'Pin'}
                   </DropdownMenuItem>
                 )}
                 {isOwn && (
                   <>
-                    <DropdownMenuSeparator />
+                    <DropdownMenuSeparator className="bg-slate-700" />
                     <DropdownMenuItem
                       onClick={() => onEdit?.(message.id, message.content)}
-                      className="gap-2"
+                      className="gap-2 text-slate-200 focus:bg-slate-700 focus:text-white"
                     >
                       <Edit2 className="w-4 h-4" />
                       Edit
@@ -365,7 +394,7 @@ export const GroupMessageBubble = ({
                 {(isOwn || isAdmin) && (
                   <DropdownMenuItem
                     onClick={() => onDelete?.(message.id)}
-                    className="gap-2 text-destructive focus:text-destructive"
+                    className="gap-2 text-red-400 focus:text-red-400 focus:bg-slate-700"
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete
@@ -385,11 +414,11 @@ export const GroupMessageBubble = ({
                 <button
                   key={emoji}
                   onClick={() => onReact(message.id, emoji)}
-                  className="reaction-sent flex items-center gap-0.5 px-1.5 py-0.5 bg-background/90 backdrop-blur-sm border border-border/50 rounded-full text-xs hover:scale-110 hover:border-primary/30 transition-all shadow-sm"
+                  className="flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-full text-xs hover:scale-110 hover:border-purple-500/30 transition-all shadow-sm"
                   title={reactions?.map(r => r.user.display_name).join(', ')}
                 >
-                  <span className="emoji-pop">{emoji}</span>
-                  <span className="text-muted-foreground font-medium">{reactions?.length}</span>
+                  <span>{emoji}</span>
+                  <span className="text-slate-400 font-medium">{reactions?.length}</span>
                 </button>
               ))}
             </div>

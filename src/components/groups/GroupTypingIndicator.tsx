@@ -81,27 +81,27 @@ export const GroupTypingIndicator = ({ typingUsers, className }: GroupTypingIndi
   
   return (
     <div className={cn(
-      "flex gap-2 items-center animate-in fade-in slide-in-from-bottom-2 duration-300 px-4 py-2",
+      "flex gap-2 items-center animate-in fade-in slide-in-from-bottom-2 duration-300 px-4 py-2 bg-slate-900/80 backdrop-blur-sm border-t border-slate-800",
       className
     )}>
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-muted/80 backdrop-blur-sm border border-border/50">
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-800/80 backdrop-blur-sm border border-slate-700">
         {/* Activity icon */}
         <div className={cn(
-          "text-primary",
-          activityType === 'voice_recording' && 'animate-pulse text-red-500'
+          "text-purple-400",
+          activityType === 'voice_recording' && 'animate-pulse text-red-400'
         )}>
           {Icon}
         </div>
         
         {/* Animated dots */}
         <div className="flex gap-0.5">
-          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-          <div className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+          <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
         </div>
         
         {/* Text */}
-        <span className="text-xs text-muted-foreground">{text}...</span>
+        <span className="text-xs text-slate-400">{text}...</span>
       </div>
     </div>
   );
