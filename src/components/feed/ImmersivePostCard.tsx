@@ -614,7 +614,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         className={cn(
           "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
           // In immersive mode, card takes full viewport height but stays in scroll flow
-          isImmersiveMode ? "h-[100dvh] max-w-none" : "h-[calc(100dvh-68px)]"
+          // In normal mode with video, reduce height to leave room for caption below
+          isImmersiveMode ? "h-[100dvh] max-w-none" : (hasVideo && caption && !isTextStyled && !isPlainText ? "h-[calc(100dvh-140px)]" : "h-[calc(100dvh-68px)]")
         )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -837,7 +838,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     enterImmersiveMode();
                   }
                 }}
-                className="w-16 h-16 bg-black/20 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
+                className="w-16 h-16 bg-black/10 rounded-full backdrop-blur-xl flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/5"
               >
                 {isPlaying ? (
                   <Pause className="w-8 h-8 text-white" fill="white" />
@@ -888,7 +889,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
 
           {/* --- CAPTION OVERLAY with Promote Button (positioned at bottom left) --- */}
-          {!isImmersiveMode && caption && !isTextStyled && !isPlainText && (
+          {/* For VIDEO posts in NORMAL mode: caption will be rendered OUTSIDE the card, below it */}
+          {/* For IMAGE/OTHER posts in NORMAL mode: keep caption overlaid */}
+          {!isImmersiveMode && caption && !isTextStyled && !isPlainText && !hasVideo && (
             <div className="absolute left-4 right-16 bottom-4 z-10 transition-opacity duration-200 pr-2">
               <p className="text-white text-sm leading-snug break-words" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>
                 {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
@@ -1185,6 +1188,39 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
       </div>
+
+      {/* Caption BELOW the video card in normal mode - sits above nav bar */}
+      {!isImmersiveMode && hasVideo && caption && !isTextStyled && !isPlainText && (
+        <div className="w-full max-w-[430px] mx-auto px-4 py-3 bg-background">
+          <p className="text-foreground text-sm leading-snug break-words">
+            {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+          </p>
+          {shouldTruncateCaption && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFullCaption(!showFullCaption);
+              }}
+              className="text-primary text-xs mt-1 font-medium hover:opacity-80 transition"
+            >
+              {showFullCaption ? 'less' : 'more'}
+            </button>
+          )}
+          {/* Promote Button */}
+          {user && !isPromoted && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/promote/${post.id}`);
+              }}
+              className="flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all active:scale-95 hover:opacity-90"
+            >
+              <TrendingUp className="w-4 h-4 text-white" />
+              <span className="text-white text-xs font-semibold">Promote</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Modals */}
       <CommentsModal
