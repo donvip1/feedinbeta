@@ -1034,8 +1034,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Immersive Mode: Caption overlay - shown when UI is visible */}
           {isImmersiveMode && showImmersiveUI && caption && !isTextStyled && !isPlainText && (
             <div className="absolute left-4 right-16 bottom-8 z-20 transition-opacity duration-200">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-white font-bold text-sm" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>{displayName}</span>
+              <div className="flex items-center gap-2 mb-2" onClick={handleProfileClick}>
+                <Avatar className="w-8 h-8 cursor-pointer border border-white/30">
+                  <AvatarImage src={post.profiles?.avatar_url || ''} />
+                  <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <span className="text-white font-bold text-sm cursor-pointer" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>{displayName}</span>
               </div>
               <p className="text-white text-sm leading-snug pr-2" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>
                 {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
