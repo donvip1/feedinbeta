@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark, Music, Disc3, Sparkles, BarChart3 } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatCompactTime } from '@/lib/format-time';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -635,7 +635,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-sm">{displayName}</p>
                 <span className="text-xs text-muted-foreground">
-                  {formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}
+                  {formatCompactTime(post.created_at)}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">@{username}</p>
@@ -702,29 +702,15 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
               className="flex items-center gap-2 mb-2 cursor-pointer"
               onClick={() => navigate(`/feed/post/${post.original_post.id}`)}
             >
-              <Avatar 
-                className="w-6 h-6 cursor-pointer"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (post.original_post?.profiles?.username || post.original_post?.user_id) {
-                    navigate(`/profile/${post.original_post.profiles?.username || post.original_post.user_id}`);
-                  }
-                }}
-              >
+              <Repeat className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Refeed from</span>
+              <Avatar className="w-5 h-5">
                 <AvatarImage src={post.original_post.profiles?.avatar_url || ''} />
                 <AvatarFallback className="text-xs">
                   {post.original_post.profiles?.display_name?.[0]}
                 </AvatarFallback>
               </Avatar>
-              <span 
-                className="text-sm font-semibold cursor-pointer hover:underline"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (post.original_post?.profiles?.username || post.original_post?.user_id) {
-                    navigate(`/profile/${post.original_post.profiles?.username || post.original_post.user_id}`);
-                  }
-                }}
-              >
+              <span className="text-sm font-semibold hover:underline">
                 {post.original_post.profiles?.display_name}
               </span>
               <span className="text-xs text-muted-foreground">
