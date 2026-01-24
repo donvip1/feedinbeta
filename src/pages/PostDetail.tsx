@@ -136,13 +136,14 @@ const PostDetail = () => {
   }, [user, navigate]);
 
   const handleBack = () => {
-    // Try to go back to the profile page, otherwise go to feed
+    // Use replace: true to remove PostDetail from history stack
+    // This way, when user clicks back from Profile, they go to Feed (not back to PostDetail)
     if (clickedPost?.profiles?.username) {
-      navigate(`/profile/${clickedPost.profiles.username}`);
+      navigate(`/profile/${clickedPost.profiles.username}`, { replace: true });
     } else if (clickedPost?.user_id) {
-      navigate(`/profile/${clickedPost.user_id}`);
+      navigate(`/profile/${clickedPost.user_id}`, { replace: true });
     } else {
-      navigate(-1);
+      navigate('/feed', { replace: true });
     }
   };
 
