@@ -401,57 +401,65 @@ const Feed = () => {
     return orderedPosts;
   }, []);
 
-  // Separate queries for each tab - enables instant tab switching
-  // Videos tab - fetches all posts then filters to video only
+  // Track if we're navigating back to feed (to force fresh data)
+  const [feedSessionKey, setFeedSessionKey] = useState(() => Date.now());
+  
+  // Force fresh fetch when returning to feed page
+  useEffect(() => {
+    // On mount or return, clear cache and get fresh data
+    feedCache.clear();
+    setFeedSessionKey(Date.now());
+  }, []);
+
+  // Separate queries for each tab - ALWAYS fetches fresh from rotation system
+  // Videos tab - fetches rotated posts then filters to video only
   const { data: videoPosts, isLoading: isLoadingVideos, refetch: refetchVideos } = useQuery({
-    queryKey: ['feed-posts-videos', user?.id],
+    queryKey: ['feed-posts-videos', user?.id, feedSessionKey],
     queryFn: async () => {
       if (!user) return [];
-      const cached = await feedCache.get('forYou');
-      if (cached && cached.length > 0) {
-        setTimeout(() => fetchTabPosts('forYou', user.id), 100);
-        // Filter for video posts only
-        return cached.filter((p: any) => 
-          p.media_type === 'video' || 
-          (p.original_post?.media_type === 'video')
-        );
-      }
+      console.log('[Feed] Fetching fresh video posts with rotation...');
+      
+      // ALWAYS fetch fresh from rotation system - no cache returns
       const allPosts = await fetchTabPosts('forYou', user.id);
-      return allPosts.filter((p: any) => 
+      
+      // Filter for video posts only
+      const videosOnly = allPosts.filter((p: any) => 
         p.media_type === 'video' || 
         (p.original_post?.media_type === 'video')
       );
+      
+      console.log('[Feed] Got', videosOnly.length, 'video posts (total:', allPosts.length, ')');
+      return videosOnly;
     },
     enabled: !!user,
-    staleTime: 60000,
-    gcTime: 300000,
-    refetchOnWindowFocus: false,
+    staleTime: 0, // Always consider stale to trigger refetch on navigation
+    gcTime: 0, // Don't cache - always get fresh
+    refetchOnWindowFocus: false, // We handle this manually
   });
 
-  // Photos & Text tab - fetches all posts then filters to non-video
+  // Photos & Text tab - fetches rotated posts then filters to non-video
   const { data: photosTextPosts, isLoading: isLoadingPhotosText, refetch: refetchPhotosText } = useQuery({
-    queryKey: ['feed-posts-photos-text', user?.id],
+    queryKey: ['feed-posts-photos-text', user?.id, feedSessionKey],
     queryFn: async () => {
       if (!user) return [];
-      const cached = await feedCache.get('following');
-      if (cached && cached.length > 0) {
-        setTimeout(() => fetchTabPosts('following', user.id), 100);
-        // Filter for non-video posts (images, text, styled text)
-        return cached.filter((p: any) => 
-          p.media_type !== 'video' && 
-          (!p.original_post || p.original_post.media_type !== 'video')
-        );
-      }
+      console.log('[Feed] Fetching fresh photo/text posts with rotation...');
+      
+      // ALWAYS fetch fresh from rotation system - no cache returns
       const allPosts = await fetchTabPosts('following', user.id);
-      return allPosts.filter((p: any) => 
+      
+      // Filter for non-video posts (images, text, styled text)
+      const nonVideos = allPosts.filter((p: any) => 
         p.media_type !== 'video' && 
         (!p.original_post || p.original_post.media_type !== 'video')
       );
+      
+      console.log('[Feed] Got', nonVideos.length, 'photo/text posts (total:', allPosts.length, ')');
+      return nonVideos;
     },
     enabled: !!user,
-    staleTime: 60000,
-    gcTime: 300000,
-    refetchOnWindowFocus: false,
+    staleTime: 0, // Always consider stale to trigger refetch on navigation  
+    gcTime: 0, // Don't cache - always get fresh
+    refetchOnWindowFocus: false, // We handle this manually
   });
 
   // Derive current posts based on active tab
@@ -562,18 +570,20 @@ const Feed = () => {
     };
   }, [isLoadingMore]);
 
-  // Refetch feed when user returns to the app/page (triggers database reset check)
+  // Refetch feed when user returns to the app/page - forces fresh rotation
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && user) {
-        // User returned to the app - refetch to get fresh posts (database will auto-reset if needed)
-        refetch();
+        // User returned to the app - trigger new session to get different posts
+        console.log('[Feed] User returned - triggering fresh feed rotation');
+        feedCache.clear();
+        setFeedSessionKey(Date.now()); // This changes the queryKey and forces a fresh fetch
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user, refetch]);
+  }, [user]);
 
   useEffect(() => {
     if (authLoading) return;
