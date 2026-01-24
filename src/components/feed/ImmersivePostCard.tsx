@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye, MoreHorizontal, X } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye, MoreHorizontal, X, MoreVertical } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -679,16 +679,68 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   </div>
                 </div>
               </div>
-              {/* Delete button - only show for post owner/admin */}
+              {/* Three-dots menu - show for post owner/admin to access delete */}
               {canDeletePost && (
-                <button 
-                  onClick={() => setShowDeleteDialog(true)}
-                  className="p-2 rounded-full transition-all active:scale-95 hover:bg-white/10"
-                >
-                  <Trash2 className="w-5 h-5 text-destructive" />
-                </button>
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowMoreActions(!showMoreActions)}
+                    className="p-2 rounded-full transition-all active:scale-95 hover:bg-white/10"
+                  >
+                    <MoreVertical className="w-5 h-5 text-white" />
+                  </button>
+                  {showMoreActions && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowMoreActions(false)}
+                      />
+                      <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 min-w-[120px] overflow-hidden">
+                        <button
+                          onClick={() => {
+                            setShowMoreActions(false);
+                            setShowDeleteDialog(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
+            
+            {/* Refeed/Quote indicator - show original poster */}
+            {isRefeed && post.original_post && (
+              <div className="flex items-center gap-2 mt-2 px-1 py-1.5 bg-white/5 rounded-lg">
+                <Repeat className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs text-muted-foreground">
+                  {post.post_type === 'quote' ? 'Quoted' : 'Refeeded'} from
+                </span>
+                <div 
+                  className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const opUsername = post.original_post?.profiles?.username || post.original_post?.user_id;
+                    if (opUsername) {
+                      navigate(`/profile/${opUsername}`);
+                    }
+                  }}
+                >
+                  <Avatar className="w-4 h-4">
+                    <AvatarImage src={post.original_post.profiles?.avatar_url || ''} />
+                    <AvatarFallback className="text-[8px] bg-primary text-white">
+                      {post.original_post.profiles?.display_name?.[0]?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium text-white truncate max-w-[100px]">
+                    {post.original_post.profiles?.display_name || post.original_post.profiles?.username || 'User'}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -847,6 +899,22 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 >
                   @{post.profiles?.username || 'user'}
                 </span>
+                {/* Refeed/Quote indicator in immersive mode */}
+                {isRefeed && post.original_post && (
+                  <div 
+                    className="flex items-center gap-1.5 mt-1 cursor-pointer hover:opacity-80 transition"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const opUsername = post.original_post?.profiles?.username || post.original_post?.user_id;
+                      if (opUsername) navigate(`/profile/${opUsername}`);
+                    }}
+                  >
+                    <Repeat className="w-3 h-3 text-white/60" />
+                    <span className="text-[10px] text-white/60">
+                      From @{post.original_post.profiles?.username || 'user'}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -937,7 +1005,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* --- RIGHT SIDEBAR: Social Buttons (with collapsible "more" for long captions) --- */}
           {/* Hide for plain text posts - they have their own horizontal layout */}
           {!isPlainText && (!isImmersiveMode || showImmersiveUI) && (() => {
+            // For videos: always show only 3 buttons (Like, Comment, Gift) by default
+            // Views, Refeed, Share hidden under "more" toggle for videos
+            const shouldCollapseForVideo = isVideoPost;
             const hasLongCaption = caption && countWords(caption) > 15;
+            const shouldCollapse = shouldCollapseForVideo || hasLongCaption;
             return (
               <div className={cn(
                 "absolute right-3 z-50 flex flex-col items-center gap-2 pointer-events-auto transition-opacity duration-200",
@@ -981,8 +1053,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
                 </button>
 
-                {/* Collapsible buttons - show when no long caption OR when expanded */}
-                {(!hasLongCaption || showMoreActions) && (
+                {/* Collapsible buttons - show when not collapsed OR when expanded via toggle */}
+                {(!shouldCollapse || showMoreActions) && (
                   <>
                     {/* Views */}
                     <div className="flex flex-col items-center gap-0.5">
@@ -1009,8 +1081,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   </>
                 )}
 
-                {/* More/Close toggle button - only show when caption is long */}
-                {hasLongCaption && (
+                {/* More/Close toggle button - show when video or long caption */}
+                {shouldCollapse && (
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
