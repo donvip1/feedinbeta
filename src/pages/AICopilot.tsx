@@ -610,7 +610,7 @@ const AICopilot = () => {
         </div>
       </div>
 
-      <BottomNav />
+      <BottomNav transparent={false} />
     </>
   );
 };
