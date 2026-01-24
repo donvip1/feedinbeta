@@ -52,6 +52,8 @@ const ImageGeneration = lazy(() => import("./pages/ImageGeneration"));
 const ImageEnhancement = lazy(() => import("./pages/ImageEnhancement"));
 const Groups = lazy(() => import("./pages/Groups"));
 const GroupDetail = lazy(() => import("./pages/GroupDetail"));
+const GroupChat = lazy(() => import("./pages/GroupChat"));
+const GroupJoin = lazy(() => import("./pages/GroupJoin"));
 const Subscription = lazy(() => import("./pages/Subscription"));
 const Credits = lazy(() => import("./pages/Credits"));
 const SavedPosts = lazy(() => import("./pages/SavedPosts"));
@@ -362,6 +364,8 @@ const App = () => {
             {/* Groups */}
             <Route path="/groups" element={<Groups />} />
             <Route path="/groups/:groupId" element={<GroupDetail />} />
+            <Route path="/groups/:groupId/chat" element={<GroupChat />} />
+            <Route path="/groups/join/:inviteCode" element={<GroupJoin />} />
             
             {/* Wallet & Credits */}
             <Route path="/wallet" element={<Wallet />} />

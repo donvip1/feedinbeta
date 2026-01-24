@@ -2495,6 +2495,82 @@ export type Database = {
         }
         Relationships: []
       }
+      group_invite_links: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          expires_at: string | null
+          group_id: string
+          id: string
+          invite_code: string
+          is_revoked: boolean | null
+          link_type: string | null
+          max_uses: number | null
+          use_count: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          expires_at?: string | null
+          group_id: string
+          id?: string
+          invite_code: string
+          is_revoked?: boolean | null
+          link_type?: string | null
+          max_uses?: number | null
+          use_count?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          expires_at?: string | null
+          group_id?: string
+          id?: string
+          invite_code?: string
+          is_revoked?: boolean | null
+          link_type?: string | null
+          max_uses?: number | null
+          use_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_invite_links_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_invite_uses: {
+        Row: {
+          id: string
+          invite_link_id: string
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          invite_link_id: string
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          id?: string
+          invite_link_id?: string
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_invite_uses_invite_link_id_fkey"
+            columns: ["invite_link_id"]
+            isOneToOne: false
+            referencedRelation: "group_invite_links"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_join_requests: {
         Row: {
           created_at: string | null
@@ -7621,6 +7697,7 @@ export type Database = {
       }
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
+      generate_unique_invite_code: { Args: never; Returns: string }
       get_active_sessions_count: { Args: never; Returns: number }
       get_conversations_with_details: {
         Args: { p_user_id: string }
@@ -8132,6 +8209,7 @@ export type Database = {
         Returns: boolean
       }
       is_username_available: { Args: { p_username: string }; Returns: boolean }
+      join_group_via_invite: { Args: { p_invite_code: string }; Returns: Json }
       log_gift_analytics: {
         Args: {
           p_credit_value: number

@@ -723,7 +723,7 @@ export default function Messages() {
                   {filteredMyGroups.map((group) => (
                     <button
                       key={group.id}
-                      onClick={() => navigate(`/groups/${group.id}`)}
+                      onClick={() => navigate(`/groups/${group.id}/chat`)}
                       className={cn(
                         "w-full p-3 flex items-start gap-3 transition-colors rounded-lg mb-2",
                         secretMode ? "hover:bg-slate-800" : "hover:bg-accent"

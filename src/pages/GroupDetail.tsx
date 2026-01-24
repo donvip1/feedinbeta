@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Users, Settings, UserPlus, UserCheck } from 'lucide-react';
+import { GroupInviteLinkSheet } from '@/components/groups/GroupInviteLinkSheet';
+import { ArrowLeft, Users, Settings, UserPlus, UserCheck, MessageCircle, Link, Lock, Globe } from 'lucide-react';
 
 interface Group {
   id: string;
@@ -20,6 +21,7 @@ interface Group {
   member_count: number;
   post_count: number;
   created_by: string;
+  invite_code?: string;
 }
 
 const GroupDetail = () => {
@@ -29,8 +31,10 @@ const GroupDetail = () => {
   const { toast } = useToast();
   const [group, setGroup] = useState<Group | null>(null);
   const [isMember, setIsMember] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
 
   useEffect(() => {
     if (!user) {
@@ -51,15 +55,16 @@ const GroupDetail = () => {
       if (groupError) throw groupError;
       setGroup(groupData);
 
-      // Check if user is a member
+      // Check if user is a member and their role
       const { data: memberData } = await supabase
         .from('group_members')
-        .select('id')
+        .select('id, role')
         .eq('group_id', groupId)
         .eq('user_id', user?.id)
         .single();
 
       setIsMember(!!memberData);
+      setIsAdmin(memberData?.role === 'admin' || memberData?.role === 'owner' || memberData?.role === 'moderator');
     } catch (error: any) {
       console.error('Error loading group:', error);
       toast({
@@ -155,6 +160,7 @@ const GroupDetail = () => {
       if (error) throw error;
 
       setIsMember(false);
+      setIsAdmin(false);
       toast({
         title: 'Left Group',
         description: 'You have left the group',
@@ -195,12 +201,32 @@ const GroupDetail = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <Button
-              onClick={() => navigate('/groups')}
+              onClick={() => navigate('/messages')}
               variant="ghost"
               size="icon"
             >
               <ArrowLeft className="w-5 h-5" />
             </Button>
+            <div className="flex items-center gap-2">
+              {isMember && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowInviteSheet(true)}
+                >
+                  <Link className="w-5 h-5" />
+                </Button>
+              )}
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toast({ title: 'Settings coming soon' })}
+                >
+                  <Settings className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -214,7 +240,14 @@ const GroupDetail = () => {
               <AvatarFallback>{group.name[0]}</AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <h1 className="text-2xl font-bold mb-1">{group.name}</h1>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-2xl font-bold">{group.name}</h1>
+                {group.is_private ? (
+                  <Lock className="w-4 h-4 text-muted-foreground" />
+                ) : (
+                  <Globe className="w-4 h-4 text-muted-foreground" />
+                )}
+              </div>
               <p className="text-muted-foreground mb-3">{group.description}</p>
               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
                 <div className="flex items-center gap-1">
@@ -223,9 +256,16 @@ const GroupDetail = () => {
                 </div>
                 <span>{group.post_count} posts</span>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 {isMember ? (
                   <>
+                    <Button
+                      onClick={() => navigate(`/groups/${groupId}/chat`)}
+                      className="flex-1 min-w-[120px]"
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      Open Chat
+                    </Button>
                     <Button
                       onClick={handleLeaveGroup}
                       disabled={actionLoading}
@@ -239,6 +279,7 @@ const GroupDetail = () => {
                   <Button
                     onClick={handleJoinGroup}
                     disabled={actionLoading}
+                    className="w-full"
                   >
                     <UserPlus className="w-4 h-4 mr-2" />
                     {group.is_private ? 'Request to Join' : 'Join Group'}
@@ -261,7 +302,11 @@ const GroupDetail = () => {
           <TabsContent value="posts" className="mt-6">
             {isMember ? (
               <div className="text-center py-12 text-muted-foreground">
-                Group posts will appear here
+                <MessageCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p className="mb-4">Group posts will appear here</p>
+                <Button onClick={() => navigate(`/groups/${groupId}/chat`)}>
+                  Go to Chat
+                </Button>
               </div>
             ) : (
               <div className="text-center py-12 text-muted-foreground">
@@ -289,13 +334,31 @@ const GroupDetail = () => {
               <div>
                 <h3 className="font-semibold mb-2">Privacy</h3>
                 <p className="text-muted-foreground">
-                  {group.is_private ? 'Private Group' : 'Public Group'}
+                  {group.is_private ? 'Private Group - Only members can see content' : 'Public Group - Anyone can join and view content'}
                 </p>
               </div>
+              {isAdmin && (
+                <div>
+                  <h3 className="font-semibold mb-2">Invite Links</h3>
+                  <Button variant="outline" onClick={() => setShowInviteSheet(true)}>
+                    <Link className="w-4 h-4 mr-2" />
+                    Manage Invite Links
+                  </Button>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Invite Links Sheet */}
+      <GroupInviteLinkSheet
+        open={showInviteSheet}
+        onOpenChange={setShowInviteSheet}
+        groupId={groupId || ''}
+        groupName={group.name}
+        isAdmin={isAdmin}
+      />
 
       <BottomNav />
     </div>
