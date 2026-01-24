@@ -860,8 +860,6 @@ export default function Messages() {
         onOpenChange={setShowCreateGroup}
         onSuccess={loadGroups}
       />
-      
-      <BottomNav transparent={false} />
     </div>
   );
 }

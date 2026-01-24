@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
 import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye, MoreHorizontal, X, MoreVertical } from 'lucide-react';
-import { formatDistanceToNow } from 'date-fns';
+import { formatCompactTime } from '@/lib/format-time';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -675,7 +675,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     <Globe className="w-2.5 h-2.5" />
                     <span>Public</span>
                     <span className="opacity-50">•</span>
-                    <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
+                    <span>{formatCompactTime(post.created_at)}</span>
                   </div>
                 </div>
               </div>
@@ -714,21 +714,18 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             
             {/* Refeed/Quote indicator - show original poster */}
             {isRefeed && post.original_post && (
-              <div className="flex items-center gap-2 mt-2 px-1 py-1.5 bg-white/5 rounded-lg">
+              <div 
+                className="flex items-center gap-2 mt-2 px-1 py-1.5 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/feed/post/${post.original_post.id}`);
+                }}
+              >
                 <Repeat className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                 <span className="text-xs text-muted-foreground">
-                  {post.post_type === 'quote' ? 'Quoted' : 'Refeeded'} from
+                  Refeed from
                 </span>
-                <div 
-                  className="flex items-center gap-1.5 cursor-pointer hover:opacity-80 transition"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const opUsername = post.original_post?.profiles?.username || post.original_post?.user_id;
-                    if (opUsername) {
-                      navigate(`/profile/${opUsername}`);
-                    }
-                  }}
-                >
+                <div className="flex items-center gap-1.5">
                   <Avatar className="w-4 h-4">
                     <AvatarImage src={post.original_post.profiles?.avatar_url || ''} />
                     <AvatarFallback className="text-[8px] bg-primary text-white">
