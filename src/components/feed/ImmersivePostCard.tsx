@@ -650,7 +650,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                         disabled={isFollowLoading}
                         className={cn(
                           "font-bold text-sm transition",
-                          isFollowing ? "text-gray-400 hover:text-gray-300" : "text-blue-400 hover:text-blue-300",
+                          isFollowing ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary/80",
                           isFollowLoading && "opacity-50"
                         )}
                       >
@@ -671,10 +671,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  {/* Username beneath display name */}
+                  <span className="text-xs text-muted-foreground cursor-pointer hover:underline" onClick={handleProfileClick}>
+                    @{post.profiles?.username || 'user'}
+                  </span>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
                     <Globe className="w-2.5 h-2.5" />
                     <span>Public</span>
-                    <span className="text-gray-500">•</span>
+                    <span className="opacity-50">•</span>
                     <span>{formatDistanceToNow(new Date(post.created_at), { addSuffix: true })}</span>
                   </div>
                 </div>
@@ -988,16 +992,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             );
           })()}
 
-          {/* Immersive Mode: Caption overlay - shown when UI is visible */}
+          {/* Immersive Mode: Caption overlay - shown when UI is visible (no avatar, just caption) */}
           {isImmersiveMode && showImmersiveUI && caption && !isTextStyled && !isPlainText && (
             <div className="absolute left-4 right-16 bottom-8 z-20 transition-opacity duration-200">
-              <div className="flex items-center gap-2 mb-2" onClick={handleProfileClick}>
-                <Avatar className="w-8 h-8 cursor-pointer border border-white/30">
-                  <AvatarImage src={post.profiles?.avatar_url || ''} />
-                  <AvatarFallback className="bg-primary text-white text-xs">{displayName[0]?.toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <span className="text-white font-bold text-sm cursor-pointer" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>{displayName}</span>
-              </div>
               <p className="text-white text-sm leading-snug pr-2" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>
                 {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
               </p>
