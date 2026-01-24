@@ -2277,6 +2277,60 @@ export type Database = {
           },
         ]
       }
+      feed_cycle_status: {
+        Row: {
+          cycle_reset_count: number | null
+          cycle_started_at: string | null
+          id: string
+          last_post_position: number | null
+          last_reset_at: string | null
+          last_session_id: string | null
+          posts_viewed_in_cycle: number | null
+          total_posts_available: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          cycle_reset_count?: number | null
+          cycle_started_at?: string | null
+          id?: string
+          last_post_position?: number | null
+          last_reset_at?: string | null
+          last_session_id?: string | null
+          posts_viewed_in_cycle?: number | null
+          total_posts_available?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          cycle_reset_count?: number | null
+          cycle_started_at?: string | null
+          id?: string
+          last_post_position?: number | null
+          last_reset_at?: string | null
+          last_session_id?: string | null
+          posts_viewed_in_cycle?: number | null
+          total_posts_available?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feed_cycle_status_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_cycle_status_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       follows: {
         Row: {
           created_at: string
@@ -6411,6 +6465,55 @@ export type Database = {
           },
         ]
       }
+      user_ad_impressions: {
+        Row: {
+          ad_id: string
+          clicked: boolean | null
+          id: string
+          impression_date: string
+          impressions_count: number | null
+          user_id: string
+        }
+        Insert: {
+          ad_id: string
+          clicked?: boolean | null
+          id?: string
+          impression_date?: string
+          impressions_count?: number | null
+          user_id: string
+        }
+        Update: {
+          ad_id?: string
+          clicked?: boolean | null
+          id?: string
+          impression_date?: string
+          impressions_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_ad_impressions_ad_id_fkey"
+            columns: ["ad_id"]
+            isOneToOne: false
+            referencedRelation: "feed_ads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_ad_impressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_ad_impressions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_analytics: {
         Row: {
           created_at: string | null
@@ -6870,6 +6973,58 @@ export type Database = {
         }
         Relationships: []
       }
+      user_seen_posts: {
+        Row: {
+          id: string
+          media_type: string | null
+          post_id: string
+          seen_at: string
+          seen_date: string
+          user_id: string
+          watch_time_seconds: number | null
+        }
+        Insert: {
+          id?: string
+          media_type?: string | null
+          post_id: string
+          seen_at?: string
+          seen_date?: string
+          user_id: string
+          watch_time_seconds?: number | null
+        }
+        Update: {
+          id?: string
+          media_type?: string | null
+          post_id?: string
+          seen_at?: string
+          seen_date?: string
+          user_id?: string
+          watch_time_seconds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_seen_posts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_seen_posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_seen_posts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_sessions: {
         Row: {
           created_at: string | null
@@ -7255,6 +7410,10 @@ export type Database = {
         Returns: boolean
       }
       delete_expired_stories: { Args: never; Returns: undefined }
+      filter_seen_posts: {
+        Args: { p_post_ids: string[]; p_user_id: string }
+        Returns: string[]
+      }
       generate_feed_id: { Args: never; Returns: string }
       generate_stream_key: { Args: never; Returns: string }
       get_active_sessions_count: { Args: never; Returns: number }
@@ -7318,6 +7477,76 @@ export type Database = {
           post_type: string
           refeeds_count: number
           user_id: string
+          views_count: number
+        }[]
+      }
+      get_feed: {
+        Args: {
+          p_include_trending?: boolean
+          p_limit?: number
+          p_media_filter?: string
+          p_offset?: number
+          p_user_id: string
+        }
+        Returns: {
+          comments_count: number
+          content: string
+          created_at: string
+          id: string
+          is_new_post: boolean
+          is_promoted: boolean
+          is_trending: boolean
+          likes_count: number
+          location: string
+          media_type: string
+          media_types: string[]
+          media_url: string
+          media_urls: string[]
+          original_post_id: string
+          post_type: string
+          post_user_id: string
+          refeeds_count: number
+          relevance_score: number
+          views_count: number
+        }[]
+      }
+      get_feed_status: {
+        Args: { p_user_id: string }
+        Returns: {
+          cycle_reset_count: number
+          last_reset_at: string
+          needs_cycle_reset: boolean
+          posts_viewed_today: number
+          total_posts_available: number
+          viewing_progress_percent: number
+        }[]
+      }
+      get_feed_with_ads: {
+        Args: {
+          p_ad_frequency?: number
+          p_limit?: number
+          p_media_filter?: string
+          p_offset?: number
+          p_user_id: string
+        }
+        Returns: {
+          advertiser_name: string
+          click_url: string
+          comments_count: number
+          content: string
+          created_at: string
+          display_order: number
+          is_new_post: boolean
+          is_promoted: boolean
+          item_id: string
+          item_type: string
+          likes_count: number
+          media_type: string
+          media_types: string[]
+          media_url: string
+          media_urls: string[]
+          post_user_id: string
+          relevance_score: number
           views_count: number
         }[]
       }
@@ -7654,6 +7883,24 @@ export type Database = {
         Args: { referrer_id: string }
         Returns: undefined
       }
+      insert_ads: {
+        Args: {
+          p_ad_count?: number
+          p_user_id: string
+          p_user_interests?: string[]
+        }
+        Returns: {
+          ad_id: string
+          advertiser_name: string
+          click_url: string
+          description: string
+          is_ad: boolean
+          media_type: string
+          media_url: string
+          priority: number
+          title: string
+        }[]
+      }
       invalidate_all_sessions: { Args: never; Returns: undefined }
       invalidate_session: { Args: { p_session_id: string }; Returns: boolean }
       is_account_locked: { Args: { p_identifier: string }; Returns: boolean }
@@ -7711,6 +7958,14 @@ export type Database = {
         Returns: undefined
       }
       mark_conversation_read: { Args: { conv_id: string }; Returns: undefined }
+      prioritize_new_posts: {
+        Args: { p_post_ids: string[] }
+        Returns: {
+          age_hours: number
+          is_new: boolean
+          post_id: string
+        }[]
+      }
       process_payout_request: {
         Args: { p_action: string; p_notes?: string; p_request_id: string }
         Returns: Json
@@ -7734,6 +7989,14 @@ export type Database = {
             }
             Returns: Json
           }
+      randomize_feed_order: {
+        Args: { p_post_ids: string[] }
+        Returns: string[]
+      }
+      record_ad_impression: {
+        Args: { p_ad_id: string; p_clicked?: boolean; p_user_id: string }
+        Returns: undefined
+      }
       record_platform_revenue: {
         Args: {
           p_amount: number
@@ -7743,7 +8006,17 @@ export type Database = {
         }
         Returns: undefined
       }
-      record_post_view: { Args: { p_post_id: string }; Returns: undefined }
+      record_post_view:
+        | { Args: { p_post_id: string }; Returns: undefined }
+        | {
+            Args: {
+              p_media_type?: string
+              p_post_id: string
+              p_user_id: string
+              p_watch_time?: number
+            }
+            Returns: undefined
+          }
       record_profit: {
         Args: {
           p_amount: number
