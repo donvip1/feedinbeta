@@ -217,8 +217,8 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                 WebkitTransform: 'translateZ(0)',
               }}
             >
-        <div className="max-w-screen-xl mx-auto px-3">
-          <div className="flex items-center justify-between h-7">
+        <div className="max-w-screen-xl mx-auto px-2">
+          <div className="flex items-center justify-between py-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.path);
@@ -232,7 +232,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       onClick={() => handleNavClick(item.path, item.id)}
                       variant="ghost"
                       size="icon"
-                      className={`h-6 w-6 hover:bg-transparent transition-all duration-150 touch-feedback ${
+                      className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${
                         active ? 'text-white' : 'text-white/80 hover:text-white'
                       }`}
                       style={{
@@ -241,16 +241,16 @@ export const BottomNav = ({ currentPage = 'default', hidden = false }: BottomNav
                       }}
                     >
                       {item.isProfile && avatarUrl ? (
-                        <div className={`rounded-full transition-all duration-150 ${active ? 'ring-1 ring-white ring-offset-1 ring-offset-transparent' : ''}`}>
-                          <Avatar className="w-5 h-5">
+                        <div className={`rounded-full transition-all duration-150 ${active ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' : ''}`}>
+                          <Avatar className="w-7 h-7">
                             <AvatarImage src={avatarUrl} />
-                            <AvatarFallback><Icon className="w-2.5 h-2.5" /></AvatarFallback>
+                            <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
                           </Avatar>
                         </div>
                       ) : (
                         <div className="relative">
                           <Icon 
-                            size={16}
+                            size={24}
                             strokeWidth={2.5}
                             className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
                           />

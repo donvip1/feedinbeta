@@ -614,8 +614,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         className={cn(
           "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
           // In immersive mode, card takes full viewport height but stays in scroll flow
-          // In normal mode with video, reduce height to leave room for caption + compact nav (28px)
-          isImmersiveMode ? "h-[100dvh] max-w-none" : (hasVideo && caption && !isTextStyled && !isPlainText ? "h-[calc(100dvh-95px)]" : "h-[calc(100dvh-35px)]")
+          isImmersiveMode ? "h-[100dvh] max-w-none" : "h-[calc(100dvh-68px)]"
         )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -838,7 +837,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     enterImmersiveMode();
                   }
                 }}
-                className="w-16 h-16 bg-black/10 rounded-full backdrop-blur-xl flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/5"
+                className="w-16 h-16 bg-black/20 rounded-full backdrop-blur-md flex items-center justify-center pointer-events-auto transition-transform hover:scale-110 active:scale-95 border border-white/10"
               >
                 {isPlaying ? (
                   <Pause className="w-8 h-8 text-white" fill="white" />
@@ -889,9 +888,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
 
           {/* --- CAPTION OVERLAY with Promote Button (positioned at bottom left) --- */}
-          {/* For VIDEO posts in NORMAL mode: caption will be rendered OUTSIDE the card, below it */}
-          {/* For IMAGE/OTHER posts in NORMAL mode: keep caption overlaid */}
-          {!isImmersiveMode && caption && !isTextStyled && !isPlainText && !hasVideo && (
+          {!isImmersiveMode && caption && !isTextStyled && !isPlainText && (
             <div className="absolute left-4 right-16 bottom-4 z-10 transition-opacity duration-200 pr-2">
               <p className="text-white text-sm leading-snug break-words" style={{ textShadow: '0 1px 1px rgba(0,0,0,0.15)' }}>
                 {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
@@ -950,8 +947,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               )}>
                 {/* Like - always visible */}
                 <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-                  <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
-                    <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
+                  <div className={cn(
+                    "p-1.5 rounded-full transition-all active:scale-90",
+                    liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+                  )}>
+                    <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
                 </button>
@@ -967,7 +967,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   }} 
                   className="flex flex-col items-center gap-0.5 group"
                 >
-                  <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
                     <MessageCircle className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
@@ -975,7 +975,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                 {/* Gift - always visible */}
                 <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                  <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
                     <Gift className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
@@ -986,7 +986,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   <>
                     {/* Views */}
                     <div className="flex flex-col items-center gap-0.5">
-                      <div className="p-1.5" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full">
                         <Eye className="w-5 h-5 text-white" />
                       </div>
                       <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
@@ -994,7 +994,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                     {/* Refeed */}
                     <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                      <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
                         <Repeat className="w-5 h-5 text-white" />
                       </div>
                       <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
@@ -1002,7 +1002,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                     {/* Share */}
                     <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                      <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
                         <Share2 className="w-5 h-5 text-white" />
                       </div>
                     </button>
@@ -1018,7 +1018,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     }} 
                     className="flex flex-col items-center gap-0.5 group"
                   >
-                    <div className="p-1.5 transition-all active:scale-90" style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.15))' }}>
+                    <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
                       {showMoreActions ? (
                         <X className="w-5 h-5 text-white" />
                       ) : (
@@ -1185,39 +1185,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </div>
         )}
       </div>
-
-      {/* Caption BELOW the video card in normal mode - sits above nav bar */}
-      {!isImmersiveMode && hasVideo && caption && !isTextStyled && !isPlainText && (
-        <div className="w-full max-w-[430px] mx-auto px-4 py-3 bg-background">
-          <p className="text-foreground text-sm leading-snug break-words">
-            {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
-          </p>
-          {shouldTruncateCaption && (
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowFullCaption(!showFullCaption);
-              }}
-              className="text-primary text-xs mt-1 font-medium hover:opacity-80 transition"
-            >
-              {showFullCaption ? 'less' : 'more'}
-            </button>
-          )}
-          {/* Promote Text Link */}
-          {user && !isPromoted && (
-            <span 
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/promote/${post.id}`);
-              }}
-              className="inline-block mt-2 text-pink-500 text-xs font-semibold cursor-pointer hover:opacity-80 transition-opacity"
-              style={{ textShadow: '0 0 8px rgba(236, 72, 153, 0.5)' }}
-            >
-              Promote
-            </span>
-          )}
-        </div>
-      )}
 
       {/* Modals */}
       <CommentsModal
