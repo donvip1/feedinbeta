@@ -101,7 +101,13 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const [isTyping, setIsTyping] = useState(false);
   const [activityType, setActivityType] = useState<ActivityType>('typing');
   const [sending, setSending] = useState(false);
-  const [replyingTo, setReplyingTo] = useState<{ id: string; content: string; sender: string } | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ 
+    id: string; 
+    content: string; 
+    sender: string;
+    mediaUrl?: string | null;
+    mediaType?: string | null;
+  } | null>(null);
   const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1219,7 +1225,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                           onReply={(id, content) => setReplyingTo({ 
                             id, 
                             content, 
-                            sender: msg.profiles.display_name || 'Unknown' 
+                            sender: msg.profiles.display_name || 'Unknown',
+                            mediaUrl: msg.media_url,
+                            mediaType: msg.media_type
                           })}
                           onReact={handleReact}
                           onDelete={handleDelete}
@@ -1265,13 +1273,45 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
         </Button>
       )}
 
-      {/* Reply Preview - Above input in flex layout */}
+      {/* Reply Preview - Above input in flex layout - Enhanced with media thumbnail */}
       {replyingTo && (
         <div className="flex-shrink-0 flex items-center gap-3 px-4 py-2 bg-primary/5 border-t border-border/50 z-40">
-          <div className="w-1 h-10 bg-primary rounded-full" />
+          <div className="w-1 h-12 bg-primary rounded-full" />
+          
+          {/* Media Thumbnail Preview */}
+          {replyingTo.mediaUrl && (
+            <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 ring-2 ring-primary/30 bg-muted">
+              {replyingTo.mediaType?.startsWith('video') ? (
+                <video 
+                  src={replyingTo.mediaUrl} 
+                  className="w-full h-full object-cover"
+                  muted
+                />
+              ) : replyingTo.mediaType?.startsWith('image') ? (
+                <img 
+                  src={replyingTo.mediaUrl} 
+                  alt="Reply media" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-muted">
+                  <Paperclip className="w-4 h-4 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+          )}
+          
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-primary">Replying to {replyingTo.sender}</p>
-            <p className="text-sm text-muted-foreground truncate">{replyingTo.content}</p>
+            <p className="text-sm text-muted-foreground truncate">
+              {replyingTo.mediaUrl && !replyingTo.content ? (
+                <span className="flex items-center gap-1">
+                  {replyingTo.mediaType?.startsWith('image') ? '📷 Photo' : 
+                   replyingTo.mediaType?.startsWith('video') ? '🎬 Video' : 
+                   replyingTo.mediaType?.startsWith('audio') ? '🎵 Audio' : '📎 File'}
+                </span>
+              ) : replyingTo.content}
+            </p>
           </div>
           <Button
             variant="ghost"
