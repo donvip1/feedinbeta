@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical } from 'lucide-react';
+import { MessageSettingsSheet } from '@/components/messages/MessageSettingsSheet';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
@@ -81,6 +82,7 @@ export default function Messages() {
   const [activeTab, setActiveTab] = useState<'chats' | 'groups' | 'stories' | 'live'>('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
   const [secretMode, setSecretMode] = useState(false);
+  const [showMessageSettings, setShowMessageSettings] = useState(false);
   const handledLocationStateRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
 
@@ -547,6 +549,15 @@ export default function Messages() {
               >
                 <Plus className="w-5 h-5" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowMessageSettings(true)}
+                className={secretMode ? "hover:bg-slate-800" : ""}
+                title="Message Settings"
+              >
+                <MoreVertical className="w-5 h-5" />
+              </Button>
             </div>
           </div>
           
@@ -870,6 +881,12 @@ export default function Messages() {
         open={showCreateGroup}
         onOpenChange={setShowCreateGroup}
         onSuccess={loadGroups}
+      />
+
+      <MessageSettingsSheet
+        isOpen={showMessageSettings}
+        onClose={() => setShowMessageSettings(false)}
+        secretMode={secretMode}
       />
     </div>
   );
