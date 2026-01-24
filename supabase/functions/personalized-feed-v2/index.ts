@@ -12,6 +12,8 @@ interface FeedConfig {
   offset: number;
   includeAds: boolean;
   adFrequency: number;
+  sessionId?: string;
+  isNewSession?: boolean; // True when user returns to app
 }
 
 interface Post {
@@ -33,6 +35,8 @@ interface Post {
   is_promoted?: boolean;
   discovery_score?: number;
   is_ad?: boolean;
+  is_new_post?: boolean;
+  relevance_score?: number;
 }
 
 interface Ad {
@@ -42,7 +46,8 @@ interface Ad {
   media_url: string;
   media_type: string;
   click_url: string | null;
-  relevance_score: number;
+  advertiser_name?: string;
+  priority?: number;
   is_ad: boolean;
 }
 
@@ -83,23 +88,57 @@ Deno.serve(async (req) => {
       offset: body.offset || 0,
       includeAds: body.includeAds !== false,
       adFrequency: body.adFrequency || 5,
+      sessionId: body.sessionId,
+      isNewSession: body.isNewSession || false,
     };
 
-    // Check cycle reset
+    // =============================================
+    // SESSION ROTATION LOGIC
+    // When user returns, rotate starting position so they don't see same posts first
+    // =============================================
+    if (config.isNewSession && config.offset === 0) {
+      await supabase.rpc('rotate_feed_session', {
+        p_user_id: user.id,
+        p_feed_type: config.feedType,
+      });
+    }
+
+    // =============================================
+    // CYCLE RESET CHECK
+    // If user has viewed most posts (>90%), reset cycle with randomized order
+    // =============================================
     const { data: cycleStatus } = await supabase.rpc('reset_viewed_posts_cycle', { p_user_id: user.id });
     const cycleReset = Array.isArray(cycleStatus) && cycleStatus[0]?.was_reset;
 
-    // Fetch posts based on feed type
+    // =============================================
+    // FETCH USER INTERESTS FOR AD TARGETING
+    // =============================================
+    const { data: userInterests } = await supabase
+      .from('user_interests')
+      .select('hashtags(name)')
+      .eq('user_id', user.id)
+      .order('interest_score', { ascending: false })
+      .limit(10);
+
+    const interestTags = (userInterests || [])
+      .map((i: any) => i.hashtags?.name)
+      .filter(Boolean);
+
+    // =============================================
+    // FETCH POSTS BASED ON FEED TYPE
+    // Uses new enhanced functions with rotation, new-first ordering, viewed exclusion
+    // =============================================
     let posts: Post[] = [];
     
-    if (config.feedType === 'forYou') {
-      const { data } = await supabase.rpc('get_personalized_for_you_feed', {
+    if (cycleReset) {
+      // Use randomized order when cycle resets (user has seen most posts)
+      const { data } = await supabase.rpc('get_randomized_feed_cycle', {
         p_user_id: user.id,
         p_limit: config.limit,
-        p_offset: config.offset,
+        p_media_filter: config.mediaFilter,
       });
       posts = (data as any[] || []).map((p: any) => ({
-        id: p.post_id || p.id,
+        id: p.id,
         user_id: p.user_id,
         content: p.content,
         media_url: p.media_url,
@@ -115,33 +154,76 @@ Deno.serve(async (req) => {
         post_type: p.post_type,
         original_post_id: p.original_post_id,
         is_promoted: p.is_promoted || false,
+        is_new_post: false, // Randomized cycle shows all as equal
+      }));
+    } else if (config.feedType === 'forYou') {
+      // Use enhanced rotation feed with new posts first, session awareness
+      const { data } = await supabase.rpc('get_feed_with_rotation', {
+        p_user_id: user.id,
+        p_limit: config.limit,
+        p_offset: config.offset,
+        p_feed_type: 'forYou',
+        p_media_filter: config.mediaFilter,
+      });
+      posts = (data as any[] || []).map((p: any) => ({
+        id: p.id,
+        user_id: p.user_id,
+        content: p.content,
+        media_url: p.media_url,
+        media_type: p.media_type,
+        media_urls: p.media_urls,
+        media_types: p.media_types,
+        created_at: p.created_at,
+        likes_count: p.likes_count || 0,
+        comments_count: p.comments_count || 0,
+        views_count: p.views_count || 0,
+        refeeds_count: p.refeeds_count || 0,
+        location: p.location,
+        post_type: p.post_type,
+        original_post_id: p.original_post_id,
+        is_promoted: p.is_promoted || false,
+        is_new_post: p.is_new_post || false,
+        relevance_score: p.relevance_score,
       }));
     } else if (config.feedType === 'following') {
-      const { data: following } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id);
-      
-      const followingIds = (following as any[] || []).map((f: any) => f.following_id);
-      
-      if (followingIds.length > 0) {
-        const { data: postsData } = await supabase
-          .from('posts')
-          .select('*')
-          .in('user_id', followingIds)
-          .order('created_at', { ascending: false })
-          .range(config.offset, config.offset + config.limit - 1);
-        
-        posts = (postsData as any[] || []).map((p: any) => ({ ...p, is_promoted: false }));
-      }
-    } else if (config.feedType === 'explore') {
-      const { data } = await supabase.rpc('get_explore_feed', {
+      // Use enhanced rotation feed for following
+      const { data } = await supabase.rpc('get_feed_with_rotation', {
         p_user_id: user.id,
         p_limit: config.limit,
         p_offset: config.offset,
+        p_feed_type: 'following',
+        p_media_filter: config.mediaFilter,
       });
       posts = (data as any[] || []).map((p: any) => ({
-        id: p.post_id,
+        id: p.id,
+        user_id: p.user_id,
+        content: p.content,
+        media_url: p.media_url,
+        media_type: p.media_type,
+        media_urls: p.media_urls,
+        media_types: p.media_types,
+        created_at: p.created_at,
+        likes_count: p.likes_count || 0,
+        comments_count: p.comments_count || 0,
+        views_count: p.views_count || 0,
+        refeeds_count: p.refeeds_count || 0,
+        location: p.location,
+        post_type: p.post_type,
+        original_post_id: p.original_post_id,
+        is_promoted: false,
+        is_new_post: p.is_new_post || false,
+      }));
+    } else if (config.feedType === 'explore') {
+      // Use enhanced rotation feed for explore
+      const { data } = await supabase.rpc('get_feed_with_rotation', {
+        p_user_id: user.id,
+        p_limit: config.limit,
+        p_offset: config.offset,
+        p_feed_type: 'explore',
+        p_media_filter: config.mediaFilter,
+      });
+      posts = (data as any[] || []).map((p: any) => ({
+        id: p.id,
         user_id: p.user_id,
         content: p.content,
         media_url: p.media_url,
@@ -157,31 +239,26 @@ Deno.serve(async (req) => {
         post_type: p.post_type,
         original_post_id: p.original_post_id,
         is_promoted: p.is_promoted || false,
-        discovery_score: p.discovery_score,
+        is_new_post: p.is_new_post || false,
+        discovery_score: p.relevance_score,
       }));
     }
 
-    // Apply media filter
-    if (config.mediaFilter === 'video') {
-      posts = posts.filter(p => 
-        p.media_type?.startsWith('video') || 
-        p.media_types?.some(t => t?.startsWith('video'))
-      );
-    } else if (config.mediaFilter === 'photo') {
-      posts = posts.filter(p => 
-        (p.media_type?.startsWith('image') || p.post_type === 'text') ||
-        p.media_types?.some(t => t?.startsWith('image'))
-      );
-    }
-
-    // Insert ads if enabled
+    // =============================================
+    // INSERT ADS AT INTERVALS
+    // Uses enhanced ad targeting with daily impression limits
+    // Ads won't repeat within the same day
+    // =============================================
     let finalFeed: (Post | Ad)[] = [...posts];
     
     if (config.includeAds && posts.length >= config.adFrequency) {
-      const adCount = Math.floor(posts.length / config.adFrequency);
-      const { data: ads } = await supabase.rpc('get_targeted_ads', {
+      const adCount = Math.ceil(posts.length / config.adFrequency);
+      
+      // Use enhanced ad function with interest matching and daily exclusion
+      const { data: ads } = await supabase.rpc('get_targeted_ads_v2', {
         p_user_id: user.id,
         p_limit: adCount,
+        p_user_interests: interestTags.length > 0 ? interestTags : null,
       });
 
       if (ads && Array.isArray(ads) && ads.length > 0) {
@@ -190,9 +267,31 @@ Deno.serve(async (req) => {
 
         for (let i = 0; i < posts.length; i++) {
           result.push(posts[i]);
+          // Insert ad every adFrequency posts
           if ((i + 1) % config.adFrequency === 0 && adIndex < ads.length) {
             const ad = ads[adIndex] as any;
-            result.push({ ...ad, is_ad: true });
+            result.push({
+              ad_id: ad.ad_id,
+              title: ad.title,
+              description: ad.description,
+              media_url: ad.media_url,
+              media_type: ad.media_type,
+              click_url: ad.click_url,
+              advertiser_name: ad.advertiser_name,
+              priority: ad.priority,
+              is_ad: true,
+            });
+            
+            // Record ad impression (fire and forget)
+            supabase.from('ad_impressions').upsert({
+              ad_id: ad.ad_id,
+              user_id: user.id,
+              impression_date: new Date().toISOString().split('T')[0],
+              impressions_count: 1,
+            }, {
+              onConflict: 'ad_id,user_id,impression_date',
+            }).then(() => {});
+            
             adIndex++;
           }
         }
@@ -200,7 +299,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch profiles
+    // =============================================
+    // FETCH PROFILES FOR POSTS
+    // =============================================
     const userIds = [...new Set(posts.map(p => p.user_id))];
     const { data: profiles } = await supabase
       .from('profiles')
@@ -214,6 +315,20 @@ Deno.serve(async (req) => {
       return { ...item, profiles: profileMap.get((item as Post).user_id) || null };
     });
 
+    // =============================================
+    // UPDATE SESSION POSITION
+    // Track where user is in the feed for rotation on return
+    // =============================================
+    if (posts.length > 0) {
+      const lastPost = posts[posts.length - 1];
+      supabase.rpc('update_feed_session', {
+        p_user_id: user.id,
+        p_feed_type: config.feedType,
+        p_last_post_id: lastPost.id,
+        p_position: config.offset + posts.length,
+      }).then(() => {});
+    }
+
     return new Response(
       JSON.stringify({
         posts: postsWithProfiles,
@@ -221,6 +336,7 @@ Deno.serve(async (req) => {
         mediaFilter: config.mediaFilter,
         hasMore: posts.length === config.limit,
         cycleReset,
+        sessionId: config.sessionId,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

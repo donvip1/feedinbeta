@@ -4,20 +4,29 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface ViewedPostsState {
   viewedPostIds: string[];
-  markAsViewed: (postId: string) => void;
+  markAsViewed: (postId: string, mediaType?: string) => void;
   isViewed: (postId: string) => boolean;
   resetViewedPosts: () => void;
   loading: boolean;
   hasViewedAllPosts: boolean;
   canCountView: (postId: string) => boolean;
+  sessionId: string;
 }
+
+/**
+ * Generate a unique session ID for tracking views within a session
+ */
+const generateSessionId = (): string => {
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
 
 export function useViewedPosts(): ViewedPostsState {
   const { user } = useAuth();
   const [viewedPostIds, setViewedPostIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasViewedAllPosts, setHasViewedAllPosts] = useState(false);
-  const pendingViews = useRef<Set<string>>(new Set());
+  const [sessionId] = useState(() => generateSessionId());
+  const pendingViews = useRef<Map<string, string | undefined>>(new Map()); // postId -> mediaType
   const flushTimeout = useRef<NodeJS.Timeout | null>(null);
 
   // Load today's viewed posts from database on mount
@@ -56,22 +65,42 @@ export function useViewedPosts(): ViewedPostsState {
   const flushPendingViews = useCallback(async () => {
     if (!user || pendingViews.current.size === 0) return;
 
-    const viewsToFlush = Array.from(pendingViews.current);
+    const viewsToFlush = Array.from(pendingViews.current.entries());
     pendingViews.current.clear();
 
     // Record views in batch (fire and forget)
-    for (const postId of viewsToFlush) {
+    for (const [postId, mediaType] of viewsToFlush) {
       try {
         await supabase.rpc('record_post_view', { p_post_id: postId });
+        
+        // Also track media preference if media type is provided
+        if (mediaType) {
+          await supabase.rpc('track_media_preference' as any, {
+            p_user_id: user.id,
+            p_media_type: mediaType,
+            p_watch_duration: null,
+            p_completed: false,
+          });
+        }
       } catch (err) {
         console.error('Error recording post view:', err);
       }
     }
   }, [user]);
 
-  // Flush on unmount or when user changes
+  // Flush on unmount, visibility change, or when user changes
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Flush immediately when user leaves
+        flushPendingViews();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (flushTimeout.current) {
         clearTimeout(flushTimeout.current);
       }
@@ -79,7 +108,12 @@ export function useViewedPosts(): ViewedPostsState {
     };
   }, [flushPendingViews]);
 
-  const markAsViewed = useCallback((postId: string) => {
+  /**
+   * Mark a post as viewed
+   * @param postId - The post ID to mark as viewed
+   * @param mediaType - Optional media type for preference tracking (video, image, text)
+   */
+  const markAsViewed = useCallback((postId: string, mediaType?: string) => {
     if (!user) return;
     
     // Optimistically update local state
@@ -88,10 +122,10 @@ export function useViewedPosts(): ViewedPostsState {
       return [...prev, postId];
     });
 
-    // Add to pending batch
-    pendingViews.current.add(postId);
+    // Add to pending batch with media type
+    pendingViews.current.set(postId, mediaType);
 
-    // Debounce the flush
+    // Debounce the flush (2 seconds)
     if (flushTimeout.current) {
       clearTimeout(flushTimeout.current);
     }
@@ -132,5 +166,6 @@ export function useViewedPosts(): ViewedPostsState {
     loading,
     hasViewedAllPosts,
     canCountView,
+    sessionId,
   };
 }
