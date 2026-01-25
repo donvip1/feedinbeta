@@ -22,6 +22,7 @@ import { TestAudioModal } from './TestAudioModal';
 import { SpeakerAvatarWithWaves } from './SpeakerAvatarWithWaves';
 import { ListenersModal } from './ListenersModal';
 import { cn } from '@/lib/utils';
+import { shareUrls } from '@/lib/url-utils';
 import { useNavigation } from '@/context/NavigationContext';
 import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -925,7 +926,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/space/${space?.share_link || spaceId}`;
+    const shareUrl = shareUrls.liveSpace(space?.share_link || spaceId);
     
     // Try native share first (mobile devices)
     if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {

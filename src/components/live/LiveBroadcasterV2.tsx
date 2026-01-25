@@ -13,6 +13,7 @@ import {
   Volume2, VolumeX, MessageCircle, Monitor, MonitorOff
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { shareUrls } from "@/lib/url-utils";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { LiveInviteModal } from "./LiveInviteModal";
 import { ViewerListPanel } from "./ViewerListPanel";
@@ -819,7 +820,7 @@ export const LiveBroadcasterV2 = ({ streamId, onClose }: LiveBroadcasterV2Props)
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
+    const shareUrl = shareUrls.liveStream(streamId);
     
     if (navigator.share) {
       try {

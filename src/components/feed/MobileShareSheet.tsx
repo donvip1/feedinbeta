@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { addWatermarkToMedia } from '@/lib/watermark-utils';
+import { shareUrls } from '@/lib/url-utils';
 
 
 interface MobileShareSheetProps {
@@ -110,10 +111,11 @@ export default function MobileShareSheet({
   };
 
   const handleShareExternal = () => {
+    const postUrl = shareUrls.post(postId);
     if (navigator.share) {
       navigator.share({
         title: 'Check out this post on feedin',
-        url: `${window.location.origin}/post/${postId}`
+        url: postUrl
       });
     } else {
       toast({ title: 'Sharing not supported on this device' });
@@ -121,7 +123,8 @@ export default function MobileShareSheet({
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/post/${postId}`);
+    const postUrl = shareUrls.post(postId);
+    navigator.clipboard.writeText(postUrl);
     toast({ 
       title: 'Link copied!',
       description: 'Post link copied to clipboard'

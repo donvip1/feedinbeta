@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
 import { Copy, Share2, Users, Gift, Check, ExternalLink } from 'lucide-react';
+import { createShareableUrl } from '@/lib/url-utils';
 
 export const ReferralSection = () => {
   const { user } = useAuth();
@@ -48,11 +49,8 @@ export const ReferralSection = () => {
     ttl: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Use published URL for referral links (update to custom domain when available)
-  const PUBLISHED_URL = 'https://feedinbeta.lovable.app';
-  
   const referralLink = profile?.username 
-    ? `${PUBLISHED_URL}/referral/${profile.username}`
+    ? createShareableUrl(`/referral/${profile.username}`)
     : '';
 
   const handleCopy = async () => {
