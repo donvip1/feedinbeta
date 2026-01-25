@@ -1130,14 +1130,14 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
                   <button
                     onClick={() => handleSend()}
                     disabled={sending}
-                    className="p-3 bg-blue-600 hover:bg-blue-500 rounded-full text-white transition-colors disabled:opacity-50"
+                    className="p-3 bg-primary hover:bg-primary/90 rounded-full text-primary-foreground transition-colors disabled:opacity-50"
                   >
                     <Send size={20} />
                   </button>
                 ) : (
                   <button
                     onClick={() => setShowVoiceRecorder(true)}
-                    className="p-3 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    className="p-3 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                   >
                     <Mic size={20} />
                   </button>
