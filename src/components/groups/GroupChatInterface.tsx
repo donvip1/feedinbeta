@@ -542,20 +542,58 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const handleReact = async (messageId: string, emoji: string) => {
     if (!user) return;
     
-    try {
-      const { data: existing } = await supabase
-        .from('group_message_reactions')
-        .select('id')
-        .eq('message_id', messageId)
-        .eq('user_id', user.id)
-        .eq('emoji', emoji)
-        .maybeSingle();
+    // Get user profile for optimistic update
+    const userProfile = members.find(m => m.user_id === user.id);
+    const displayName = userProfile?.display_name || 'You';
+    const avatarUrl = userProfile?.avatar_url || null;
+    
+    // Check if reaction already exists
+    const message = messages.find(m => m.id === messageId);
+    const existingReaction = message?.reactions?.find(
+      r => r.user_id === user.id && r.emoji === emoji
+    );
+    
+    // Optimistically update UI first
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== messageId) return msg;
       
-      if (existing) {
+      const currentReactions = msg.reactions || [];
+      
+      if (existingReaction) {
+        // Remove the reaction
+        return {
+          ...msg,
+          reactions: currentReactions.filter(
+            r => !(r.user_id === user.id && r.emoji === emoji)
+          ),
+        };
+      } else {
+        // Add the reaction
+        return {
+          ...msg,
+          reactions: [
+            ...currentReactions,
+            {
+              emoji,
+              user_id: user.id,
+              user: {
+                display_name: displayName,
+                avatar_url: avatarUrl,
+              },
+            },
+          ],
+        };
+      }
+    }));
+    
+    try {
+      if (existingReaction) {
         await supabase
           .from('group_message_reactions')
           .delete()
-          .eq('id', existing.id);
+          .eq('message_id', messageId)
+          .eq('user_id', user.id)
+          .eq('emoji', emoji);
       } else {
         await supabase
           .from('group_message_reactions')
@@ -565,10 +603,10 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
             emoji,
           });
       }
-      
-      loadMessages();
     } catch (error: any) {
       console.error('Error reacting:', error);
+      // Revert on error - reload messages
+      loadMessages();
     }
   };
   

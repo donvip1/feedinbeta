@@ -794,11 +794,45 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const handleReact = async (messageId: string, emoji: string) => {
     if (!user) return;
 
-    try {
-      const existingReaction = messages
-        .find(m => m.id === messageId)
-        ?.reactions?.find(r => r.user_id === user.id && r.emoji === emoji);
+    // Check if reaction already exists
+    const existingReaction = messages
+      .find(m => m.id === messageId)
+      ?.reactions?.find(r => r.user_id === user.id && r.emoji === emoji);
 
+    // Optimistically update UI first
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== messageId) return msg;
+      
+      const currentReactions = msg.reactions || [];
+      
+      if (existingReaction) {
+        // Remove the reaction
+        return {
+          ...msg,
+          reactions: currentReactions.filter(
+            r => !(r.user_id === user.id && r.emoji === emoji)
+          ),
+        };
+      } else {
+        // Add the reaction
+        return {
+          ...msg,
+          reactions: [
+            ...currentReactions,
+            {
+              emoji,
+              user_id: user.id,
+              user: {
+                display_name: user.user_metadata?.display_name || 'You',
+                avatar_url: user.user_metadata?.avatar_url || null,
+              },
+            },
+          ],
+        };
+      }
+    }));
+
+    try {
       if (existingReaction) {
         await supabase
           .from('message_reactions')
