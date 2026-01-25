@@ -61,6 +61,13 @@ interface MessageBubbleProps {
     status?: 'sending' | 'sent' | 'delivered' | 'read';
     is_pinned?: boolean;
     edited_at?: string | null;
+    forwarded_from?: {
+      original_sender_id: string;
+      original_sender_name: string;
+      original_timestamp: string;
+      source_type: 'dm' | 'group';
+      source_id: string;
+    } | null;
   };
   isOwn: boolean;
   showAvatar?: boolean;
@@ -220,6 +227,14 @@ export const ModernMessageBubble = ({
         "flex flex-col max-w-[75%] relative",
         isOwn ? 'items-end' : 'items-start'
       )}>
+        {/* Forwarded Label */}
+        {message.forwarded_from && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+            <Forward className="w-3 h-3" />
+            <span>Forwarded</span>
+          </div>
+        )}
+
         {/* Pinned Badge */}
         {message.is_pinned && (
           <div className="flex items-center gap-1 text-xs text-primary mb-1">
