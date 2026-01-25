@@ -8466,6 +8466,31 @@ export type Database = {
         Args: { p_feed_type?: string; p_user_id: string }
         Returns: number
       }
+      search_messages: {
+        Args: {
+          p_conversation_id?: string
+          p_end_date?: string
+          p_group_id?: string
+          p_limit?: number
+          p_media_type?: string
+          p_offset?: number
+          p_query?: string
+          p_sender_id?: string
+          p_start_date?: string
+          p_user_id: string
+        }
+        Returns: {
+          content: string
+          context_type: string
+          created_at: string
+          id: string
+          media_type: string
+          media_url: string
+          sender_avatar: string
+          sender_id: string
+          sender_name: string
+        }[]
+      }
       send_direct_gift: {
         Args: {
           p_credit_value: number

@@ -33,6 +33,8 @@ interface GroupChatHeaderProps {
   };
   isAdmin?: boolean;
   isMuted?: boolean;
+  onlineCount?: number;
+  typingText?: string | null;
   onBack: () => void;
   onShowMembers: () => void;
   onShowSettings?: () => void;
@@ -47,6 +49,8 @@ export const GroupChatHeader = ({
   group,
   isAdmin = false,
   isMuted = false,
+  onlineCount = 0,
+  typingText,
   onBack,
   onShowMembers,
   onShowSettings,
@@ -56,6 +60,19 @@ export const GroupChatHeader = ({
   onLeaveGroup,
   className,
 }: GroupChatHeaderProps) => {
+  // Generate status text
+  const getStatusText = () => {
+    if (typingText) {
+      return typingText;
+    }
+    
+    const memberCount = group.member_count || 0;
+    if (onlineCount > 0) {
+      return `${memberCount} members, ${onlineCount} online`;
+    }
+    return `${memberCount} members`;
+  };
+
   return (
     <div className={cn(
       "flex items-center gap-3 p-3 bg-background/95 backdrop-blur-sm border-b border-border/50",
@@ -67,6 +84,7 @@ export const GroupChatHeader = ({
         size="icon"
         className="h-9 w-9 rounded-full"
         onClick={onBack}
+        type="button"
       >
         <ArrowLeft className="h-5 w-5" />
       </Button>
@@ -90,8 +108,11 @@ export const GroupChatHeader = ({
               <Shield className="w-3.5 h-3.5 text-muted-foreground" />
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {group.member_count || 0} members
+          <p className={cn(
+            "text-xs truncate",
+            typingText ? "text-primary animate-pulse" : "text-muted-foreground"
+          )}>
+            {getStatusText()}
           </p>
         </div>
       </div>
@@ -103,13 +124,14 @@ export const GroupChatHeader = ({
           size="icon"
           className="h-9 w-9 rounded-full"
           onClick={onShowSearch}
+          type="button"
         >
           <Search className="h-5 w-5" />
         </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full">
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" type="button">
               <MoreVertical className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>

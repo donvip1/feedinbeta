@@ -1,16 +1,19 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Pencil, Mic, ImageIcon, Video, FileText, Smile, Sticker } from 'lucide-react';
 
 interface TypingUser {
   userId: string;
   displayName: string;
   activityType?: string;
+  avatarUrl?: string | null;
 }
 
 interface GroupTypingIndicatorProps {
   typingUsers: TypingUser[];
   className?: string;
+  compact?: boolean;
 }
 
 const getActivityIcon = (activityType: string = 'typing') => {
@@ -71,7 +74,13 @@ const formatNames = (names: string[]): string => {
   return `${names[0]}, ${names[1]}, and ${names.length - 2} others`;
 };
 
-export const GroupTypingIndicator = ({ typingUsers, className }: GroupTypingIndicatorProps) => {
+// Get just the typing text for header display
+export const getTypingHeaderText = (users: TypingUser[]): string | null => {
+  if (users.length === 0) return null;
+  return getActivityText(users) + '...';
+};
+
+export const GroupTypingIndicator = ({ typingUsers, className, compact = false }: GroupTypingIndicatorProps) => {
   if (typingUsers.length === 0) return null;
   
   // Get the primary activity type (most common)
@@ -79,12 +88,61 @@ export const GroupTypingIndicator = ({ typingUsers, className }: GroupTypingIndi
   const Icon = getActivityIcon(activityType);
   const text = getActivityText(typingUsers);
   
+  // Limit avatars to show
+  const maxAvatars = 3;
+  const visibleUsers = typingUsers.slice(0, maxAvatars);
+  const extraCount = typingUsers.length - maxAvatars;
+  
+  if (compact) {
+    return (
+      <div className={cn(
+        "flex items-center gap-1.5 text-xs text-primary animate-pulse",
+        className
+      )}>
+        <div className="flex -space-x-1.5">
+          {visibleUsers.map((user, i) => (
+            <Avatar key={user.userId} className="h-4 w-4 border border-background">
+              <AvatarImage src={user.avatarUrl || ''} />
+              <AvatarFallback className="text-[8px] bg-primary/20">
+                {user.displayName?.[0]?.toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+          ))}
+        </div>
+        <span>{text}...</span>
+      </div>
+    );
+  }
+  
   return (
     <div className={cn(
       "flex gap-2 items-center animate-in fade-in slide-in-from-bottom-2 duration-300 px-4 py-2 bg-slate-900/80 backdrop-blur-sm border-t border-slate-800",
       className
     )}>
       <div className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-slate-800/80 backdrop-blur-sm border border-slate-700">
+        {/* User avatars */}
+        <div className="flex -space-x-2">
+          {visibleUsers.map((user, i) => (
+            <Avatar 
+              key={user.userId} 
+              className={cn(
+                "h-6 w-6 border-2 border-slate-800 ring-1 ring-slate-700",
+                i > 0 && "-ml-2"
+              )}
+            >
+              <AvatarImage src={user.avatarUrl || ''} />
+              <AvatarFallback className="text-[10px] bg-gradient-to-br from-primary/30 to-primary/50">
+                {user.displayName?.[0]?.toUpperCase() || 'U'}
+              </AvatarFallback>
+            </Avatar>
+          ))}
+          {extraCount > 0 && (
+            <div className="h-6 w-6 rounded-full bg-slate-700 border-2 border-slate-800 flex items-center justify-center -ml-2">
+              <span className="text-[10px] text-slate-300">+{extraCount}</span>
+            </div>
+          )}
+        </div>
+        
         {/* Activity icon */}
         <div className={cn(
           "text-purple-400",

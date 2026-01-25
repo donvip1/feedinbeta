@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -8,12 +8,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useGroupPresence, getPresenceColor, formatLastSeen } from '@/hooks/useGroupPresence';
 import {
   X, Search, UserPlus, UserCheck, MessageCircle, Clock, MoreVertical,
   Shield, Crown, ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GroupRoleManagement } from './GroupRoleManagement';
+import { PresenceStatus } from '@/hooks/usePresence';
 
 interface GroupMembersSheetProps {
   open: boolean;
@@ -55,6 +57,15 @@ export const GroupMembersSheet = ({
   const [loadingFriend, setLoadingFriend] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [showRoleManagement, setShowRoleManagement] = useState(false);
+
+  // Get member IDs for presence tracking
+  const memberIds = useMemo(() => members.map(m => m.user_id), [members]);
+  
+  // Group presence hook
+  const { onlineCount, getMemberStatus, isMemberOnline } = useGroupPresence({
+    groupId,
+    memberIds,
+  });
 
   useEffect(() => {
     if (open && user?.id) {
@@ -194,6 +205,11 @@ export const GroupMembersSheet = ({
               </Button>
               <SheetTitle className="text-white flex-1">
                 {members.length} Members
+                {onlineCount > 0 && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    · {onlineCount} online
+                  </span>
+                )}
               </SheetTitle>
             </div>
           </SheetHeader>
@@ -231,18 +247,26 @@ export const GroupMembersSheet = ({
                     )}
                     onClick={() => handleMemberClick(member)}
                   >
-                    <Avatar
-                      className="h-11 w-11 cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/profile/${member.user_id}`);
-                      }}
-                    >
-                      <AvatarImage src={member.avatar_url || ''} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
-                        {member.display_name?.[0]?.toUpperCase() || 'U'}
-                      </AvatarFallback>
-                    </Avatar>
+                    {/* Avatar with online status dot */}
+                    <div className="relative">
+                      <Avatar
+                        className="h-11 w-11 cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/profile/${member.user_id}`);
+                        }}
+                      >
+                        <AvatarImage src={member.avatar_url || ''} />
+                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-sm">
+                          {member.display_name?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                      {/* Online status dot */}
+                      <div className={cn(
+                        "absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-900",
+                        getPresenceColor(getMemberStatus(member.user_id) as PresenceStatus)
+                      )} />
+                    </div>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
