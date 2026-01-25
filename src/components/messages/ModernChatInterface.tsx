@@ -16,8 +16,9 @@ import { Progress } from '@/components/ui/progress';
 import { 
   ArrowLeft, Send, Smile, Phone, Video, Mic, X, Image as ImageIcon, 
   Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin,
-  Gift, Sparkles
+  Gift, Sparkles, Clock
 } from 'lucide-react';
+import { ScheduleMessageModal } from './ScheduleMessageModal';
 import { AttachmentPicker } from './AttachmentPicker';
 import { ModernMessageBubble } from './ModernMessageBubble';
 import { CallLogBubble } from './CallLogBubble';
@@ -142,6 +143,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   
   // AI suggestions state
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
+  
+  // Scheduling state
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
   
   // Forwarding state
   const [forwardingMessage, setForwardingMessage] = useState<{
@@ -969,6 +973,38 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     }
   };
 
+  // Schedule message handler
+  const handleScheduleMessage = async (scheduledAt: Date) => {
+    if (!user || !newMessage.trim()) return;
+
+    try {
+      const { error } = await supabase
+        .from('scheduled_messages')
+        .insert({
+          user_id: user.id,
+          conversation_id: conversationId,
+          content: newMessage.trim(),
+          scheduled_at: scheduledAt.toISOString(),
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Message scheduled',
+        description: `Your message will be sent on ${scheduledAt.toLocaleDateString()} at ${scheduledAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+      });
+
+      setNewMessage('');
+      setShowScheduleModal(false);
+    } catch (error: any) {
+      toast({
+        title: 'Error scheduling message',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Function to initiate a call
   const initiateCall = async (callType: 'voice' | 'video') => {
     if (!user) {
@@ -1538,20 +1574,34 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             </div>
 
             {newMessage.trim() || previewMedia ? (
-              <Button
-                size="icon"
-                className="shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
-                onClick={() => {
-                  if (previewMedia) {
-                    handleSend(previewMedia.url, previewMedia.type);
-                  } else {
-                    handleSend();
-                  }
-                }}
-                disabled={sending || uploadingFile}
-              >
-                <Send className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {/* Schedule Button - only show for text messages */}
+                {newMessage.trim() && !previewMedia && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="shrink-0 rounded-full hover:bg-primary/10"
+                    onClick={() => setShowScheduleModal(true)}
+                    title="Schedule message"
+                  >
+                    <Clock className="w-5 h-5 text-muted-foreground" />
+                  </Button>
+                )}
+                <Button
+                  size="icon"
+                  className="shrink-0 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
+                  onClick={() => {
+                    if (previewMedia) {
+                      handleSend(previewMedia.url, previewMedia.type);
+                    } else {
+                      handleSend();
+                    }
+                  }}
+                  disabled={sending || uploadingFile}
+                >
+                  <Send className="w-5 h-5" />
+                </Button>
+              </div>
             ) : (
               <div className="flex gap-1">
                 {/* AI Suggestions Toggle */}
@@ -1635,6 +1685,14 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           sourceType: 'dm',
           sourceId: conversationId,
         } : null}
+      />
+      
+      {/* Schedule Message Modal */}
+      <ScheduleMessageModal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        onSchedule={handleScheduleMessage}
+        messageContent={newMessage}
       />
     </div>
   );
