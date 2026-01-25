@@ -170,17 +170,21 @@ export default function ShareModal({ isOpen, onClose, postId, postData, onSavePo
     if (!user) return;
 
     try {
-      await supabase.from('group_posts').insert({
+      // Insert as a group message (group chats use group_messages table)
+      const { error } = await supabase.from('group_messages').insert({
         group_id: groupId,
-        user_id: user.id,
-        content: `Shared: ${window.location.origin}/post/${postId}`,
-        media_url: postData?.media_url,
-        media_type: postData?.media_type,
+        sender_id: user.id,
+        content: `Shared a post: ${window.location.origin}/post/${postId}`,
+        media_url: postData?.media_url || null,
+        media_type: postData?.media_url ? (postData?.media_type || 'image') : null,
       });
+
+      if (error) throw error;
 
       toast({ title: 'Shared to group!' });
       onClose();
     } catch (error) {
+      console.error('Error sharing to group:', error);
       toast({ 
         title: 'Error sharing to group',
         variant: 'destructive'
