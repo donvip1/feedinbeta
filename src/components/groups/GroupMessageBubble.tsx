@@ -60,6 +60,7 @@ interface GroupMessageBubbleProps {
   isLastInGroup?: boolean;
   isAdmin?: boolean;
   secretMode?: boolean;
+  currentUserId?: string;
   onReply: (messageId: string, content: string) => void;
   onReact: (messageId: string, emoji: string) => void;
   onDelete?: (messageId: string) => void;
@@ -75,6 +76,7 @@ export const GroupMessageBubble = ({
   isLastInGroup = true,
   isAdmin = false,
   secretMode = false,
+  currentUserId,
   onReply,
   onReact,
   onDelete,
@@ -327,6 +329,7 @@ export const GroupMessageBubble = ({
               <MessageReactionsDisplay
                 reactions={message.reactions}
                 isOwn={isOwn}
+                currentUserId={currentUserId}
                 onReact={(emoji) => onReact(message.id, emoji)}
               />
             )}
