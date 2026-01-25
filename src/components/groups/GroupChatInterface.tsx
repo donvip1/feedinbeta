@@ -11,7 +11,7 @@ import {
   Send, Smile, Mic, X, Image as ImageIcon, 
   Paperclip, ChevronDown, Reply, Camera, MapPin, FileText, User,
   Shield, Clock, EyeOff, RefreshCw, Sparkles, Calendar, UserPlus, UserCheck,
-  MoreVertical, ArrowLeft, BarChart3
+  MoreVertical, ArrowLeft, BarChart3, Search
 } from 'lucide-react';
 import { GroupChatHeader } from './GroupChatHeader';
 import { GroupMessageBubble } from './GroupMessageBubble';
@@ -25,6 +25,8 @@ import { MediaUploadModal } from '@/components/messages/MediaUploadModal';
 import { MediaPreviewBar } from '@/components/messages/MediaPreviewBar';
 import { CreatePollModal } from './polls/CreatePollModal';
 import { PollCard } from './polls/PollCard';
+import { MessageSearchSheet } from '@/components/messages/MessageSearchSheet';
+import { getTypingHeaderText } from './GroupTypingIndicator';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { chatSounds } from '@/lib/chat-sounds';
@@ -149,6 +151,9 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   // Poll state
   const [showPollModal, setShowPollModal] = useState(false);
   const [polls, setPolls] = useState<Record<string, any>>({});
+  
+  // Search state
+  const [showSearchSheet, setShowSearchSheet] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -708,6 +713,15 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         </div>
         
         <div className="flex gap-1 text-slate-400 items-center">
+          {/* Search Button */}
+          <button 
+            onClick={() => setShowSearchSheet(true)}
+            className="p-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+            type="button"
+          >
+            <Search size={18} />
+          </button>
+          
           {/* Secret Mode Toggle - only show for private groups */}
           {group.is_private && (
             <button 
@@ -716,6 +730,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
                 "p-2 rounded-lg transition-colors",
                 secretMode ? 'bg-red-500/20 text-red-400' : 'hover:bg-slate-800 hover:text-white'
               )}
+              type="button"
             >
               <Shield size={18} />
             </button>
@@ -725,6 +740,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
           <button 
             onClick={() => setShowChatMenu(true)}
             className="p-2 rounded-lg hover:bg-slate-800 hover:text-white transition-colors"
+            type="button"
           >
             <MoreVertical size={18} />
           </button>
@@ -1125,6 +1141,23 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
             content: `📊 Poll created`,
           });
           loadMessages();
+        }}
+      />
+      
+      {/* Message Search Sheet */}
+      <MessageSearchSheet
+        open={showSearchSheet}
+        onOpenChange={setShowSearchSheet}
+        groupId={groupId}
+        participants={members.map(m => ({
+          id: m.user_id,
+          name: m.display_name || 'User',
+          avatar: m.avatar_url,
+        }))}
+        onResultClick={(messageId) => {
+          // Scroll to message
+          const element = document.getElementById(`message-${messageId}`);
+          element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }}
       />
     </div>
