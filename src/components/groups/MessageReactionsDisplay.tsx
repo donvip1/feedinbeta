@@ -20,12 +20,14 @@ interface Reaction {
 interface MessageReactionsDisplayProps {
   reactions: Reaction[];
   isOwn: boolean;
+  currentUserId?: string;
   onReact: (emoji: string) => void;
 }
 
 export const MessageReactionsDisplay = ({
   reactions,
   isOwn,
+  currentUserId,
   onReact,
 }: MessageReactionsDisplayProps) => {
   const navigate = useNavigate();
@@ -114,16 +116,21 @@ export const MessageReactionsDisplay = ({
                 </button>
               ))}
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                onReact(emoji);
-                setOpenEmoji(null);
-              }}
-              className="w-full mt-2 pt-2 border-t border-border text-xs text-primary hover:underline"
-            >
-              Add {emoji} reaction
-            </button>
+            {(() => {
+              const userHasReacted = currentUserId && emojiReactions.some(r => r.user_id === currentUserId);
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onReact(emoji);
+                    setOpenEmoji(null);
+                  }}
+                  className={`w-full mt-2 pt-2 border-t border-border text-xs hover:underline ${userHasReacted ? 'text-destructive' : 'text-primary'}`}
+                >
+                  {userHasReacted ? `Remove ${emoji} reaction` : `Add ${emoji} reaction`}
+                </button>
+              );
+            })()}
           </PopoverContent>
         </Popover>
       ))}

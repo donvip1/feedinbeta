@@ -64,6 +64,7 @@ interface MessageBubbleProps {
   showAvatar?: boolean;
   isFirstInGroup?: boolean;
   isLastInGroup?: boolean;
+  currentUserId?: string;
   onReply: (messageId: string, content: string) => void;
   onReact: (messageId: string, emoji: string) => void;
   onDelete?: (messageId: string) => void;
@@ -78,6 +79,7 @@ export const ModernMessageBubble = ({
   showAvatar = true,
   isFirstInGroup = true,
   isLastInGroup = true,
+  currentUserId,
   onReply, 
   onReact, 
   onDelete,
@@ -357,6 +359,7 @@ export const ModernMessageBubble = ({
               <MessageReactionsDisplay
                 reactions={message.reactions}
                 isOwn={isOwn}
+                currentUserId={currentUserId}
                 onReact={(emoji) => onReact(message.id, emoji)}
               />
             )}

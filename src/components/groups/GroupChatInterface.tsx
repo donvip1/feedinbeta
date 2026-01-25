@@ -568,11 +568,10 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     const displayName = userProfile?.display_name || 'You';
     const avatarUrl = userProfile?.avatar_url || null;
     
-    // Check if reaction already exists
+    // Check if user already has ANY reaction on this message
     const message = messages.find(m => m.id === messageId);
-    const existingReaction = message?.reactions?.find(
-      r => r.user_id === user.id && r.emoji === emoji
-    );
+    const existingReaction = message?.reactions?.find(r => r.user_id === user.id);
+    const isSameEmoji = existingReaction?.emoji === emoji;
     
     // Optimistically update UI first
     setMessages(prev => prev.map(msg => {
@@ -580,16 +579,24 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       const currentReactions = msg.reactions || [];
       
-      if (existingReaction) {
-        // Remove the reaction
+      if (isSameEmoji) {
+        // Remove the reaction (toggle off)
         return {
           ...msg,
-          reactions: currentReactions.filter(
-            r => !(r.user_id === user.id && r.emoji === emoji)
+          reactions: currentReactions.filter(r => r.user_id !== user.id),
+        };
+      } else if (existingReaction) {
+        // Replace existing reaction with new emoji
+        return {
+          ...msg,
+          reactions: currentReactions.map(r => 
+            r.user_id === user.id 
+              ? { ...r, emoji } 
+              : r
           ),
         };
       } else {
-        // Add the reaction
+        // Add new reaction
         return {
           ...msg,
           reactions: [
@@ -608,14 +615,30 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
     }));
     
     try {
-      if (existingReaction) {
+      if (isSameEmoji) {
+        // Remove the reaction
         await supabase
           .from('group_message_reactions')
           .delete()
           .eq('message_id', messageId)
-          .eq('user_id', user.id)
-          .eq('emoji', emoji);
+          .eq('user_id', user.id);
+      } else if (existingReaction) {
+        // Delete old reaction then insert new one (replace)
+        await supabase
+          .from('group_message_reactions')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('user_id', user.id);
+        
+        await supabase
+          .from('group_message_reactions')
+          .insert({
+            message_id: messageId,
+            user_id: user.id,
+            emoji,
+          });
       } else {
+        // Insert new reaction
         await supabase
           .from('group_message_reactions')
           .insert({
@@ -844,6 +867,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
                   isLastInGroup={isLastInGroup(index)}
                   isAdmin={isAdmin}
                   secretMode={secretMode}
+                  currentUserId={user?.id}
                   onReply={(id, content) => setReplyingTo({ 
                     id, 
                     content, 
