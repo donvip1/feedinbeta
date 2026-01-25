@@ -39,8 +39,7 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
       onPointerLeave={() => setIsPressed(false)}
       className={cn(
         'fixed bottom-[72px] md:bottom-20 z-[80]',
-        // Positioned between FeedAI and Profile icons - centered in that gap
-        'right-[72px] md:right-auto md:left-1/2 md:ml-[calc(min(256px,50vw-2rem)-28px)]',
+        'right-4 md:right-6',
         'flex items-center justify-center',
         'transition-all duration-200 ease-out',
         'touch-manipulation',
@@ -53,12 +52,12 @@ export const FloatingActionButton = ({ onClick, hidden = false }: FloatingAction
       {/* Pulse ring effect */}
       <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" style={{ animationDuration: '2s' }} />
       
-      {/* Icon - increased by 30% */}
+      {/* Icon - reduced by 20% */}
       <img 
         src={editIcon} 
         alt="Create post" 
         className={cn(
-          'w-12 h-12 md:w-[52px] md:h-[52px] object-contain relative z-10',
+          'w-10 h-10 md:w-[42px] md:h-[42px] object-contain relative z-10',
           'transition-transform duration-150'
         )} 
       />
