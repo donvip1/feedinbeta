@@ -475,7 +475,7 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
     }
   }, [comments]);
 
-  // Subscribe to reactions
+  // Subscribe to reactions - with sender name
   useEffect(() => {
     const channel = supabase.channel(`reactions-${streamId}`)
       .on('postgres_changes', {
@@ -483,14 +483,30 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
         schema: 'public',
         table: 'live_stream_reactions',
         filter: `stream_id=eq.${streamId}`,
-      }, (payload: any) => {
+      }, async (payload: any) => {
+        // Fetch sender profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("display_name, username")
+          .eq("id", payload.new.user_id)
+          .single();
+
+        const senderName = profile?.display_name || profile?.username || 'Someone';
+
         const reaction = {
           type: payload.new.reaction_type,
           id: Date.now() + Math.random(),
           x: Math.random() * 40 + 55,
           y: Math.random() * 30 + 40,
+          senderName,
         };
         setReactions(prev => [...prev, reaction]);
+        
+        // Show toast so host sees it
+        toast(`${senderName} sent ${REACTION_EMOJIS[payload.new.reaction_type] || '❤️'}`, {
+          duration: 2000,
+        });
+
         setTimeout(() => {
           setReactions(prev => prev.filter(r => r.id !== reaction.id));
         }, 3000);
@@ -579,6 +595,7 @@ export const SimpleBroadcaster = ({ streamId, onClose }: SimpleBroadcasterProps)
       <FloatingReactions reactions={reactions.map(r => ({
         id: r.id,
         type: r.type,
+        senderName: r.senderName,
       }))} />
 
       {/* Flying Gifts */}
