@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { Reply, Forward, Check, CheckCheck, FileText, Pin } from 'lucide-react';
@@ -93,8 +93,13 @@ export const ModernMessageBubble = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
   const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>(undefined);
+  
+  // Long press detection
+  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
+  const isLongPress = useRef(false);
+  const longPressThreshold = 500; // ms
 
-  const handleTouchStart = (e: React.TouchEvent) => {
+  const handleSwipeTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
   };
 
@@ -106,7 +111,7 @@ export const ModernMessageBubble = ({
     }
   };
 
-  const handleTouchEnd = () => {
+  const handleSwipeTouchEnd = () => {
     if (swipeOffset > 50) {
       onReply(message.id, message.content);
     }
@@ -114,23 +119,47 @@ export const ModernMessageBubble = ({
     setTouchStart(0);
   };
 
-  const handleBubbleTap = (e: React.MouseEvent | React.TouchEvent) => {
-    // Prevent opening context menu when clicking on media or links
+  const openContextMenu = useCallback((clientX: number, clientY: number) => {
+    setMenuPosition({ x: clientX, y: clientY });
+    setShowContextMenu(true);
+  }, []);
+
+  // Long press handlers for touch
+  const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('a, video, img, button')) return;
     
-    // Get tap position
-    let clientX: number, clientY: number;
-    if ('touches' in e) {
-      clientX = e.touches[0]?.clientX ?? window.innerWidth / 2;
-      clientY = e.touches[0]?.clientY ?? window.innerHeight / 2;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
+    isLongPress.current = false;
+    const touch = e.touches[0];
     
-    setMenuPosition({ x: clientX, y: clientY });
-    setShowContextMenu(true);
+    longPressTimer.current = setTimeout(() => {
+      isLongPress.current = true;
+      openContextMenu(touch.clientX, touch.clientY);
+    }, longPressThreshold);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+
+  // Click handler (for desktop tap)
+  const handleBubbleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('a, video, img, button')) return;
+    
+    openContextMenu(e.clientX, e.clientY);
+  };
+
+  // Context menu handler (right-click on desktop)
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const target = e.target as HTMLElement;
+    if (target.closest('a, video, img, button')) return;
+    
+    openContextMenu(e.clientX, e.clientY);
   };
 
   const formatTime = (dateStr: string) => {
@@ -197,9 +226,9 @@ export const ModernMessageBubble = ({
             ? `translateX(${isOwn ? -swipeOffset : swipeOffset}px)` 
             : undefined 
         }}
-        onTouchStart={handleTouchStart}
+        onTouchStart={handleSwipeTouchStart}
         onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onTouchEnd={handleSwipeTouchEnd}
       >
         {/* Swipe Reply Indicator */}
         {swipeOffset > 30 && (
@@ -311,11 +340,14 @@ export const ModernMessageBubble = ({
           )}
 
           <div className="relative">
-            {/* Message Bubble - Tap to open context menu */}
+            {/* Message Bubble - Tap or long-press to open context menu */}
             <div
-              onClick={handleBubbleTap}
+              onClick={handleBubbleClick}
+              onContextMenu={handleContextMenu}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
               className={cn(
-                "px-3 py-2 transition-all duration-200 cursor-pointer active:scale-[0.98]",
+                "px-3 py-2 transition-all duration-200 cursor-pointer active:scale-[0.98] select-none",
                 bubbleRadius,
                 isOwn
                   ? 'bg-gradient-to-br from-primary via-primary to-primary/90 text-primary-foreground shadow-lg shadow-primary/20'
