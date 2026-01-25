@@ -55,6 +55,7 @@ export const MessageReactionsDisplay = ({
         >
           <PopoverTrigger asChild>
             <button
+              type="button"
               className="flex items-center gap-0.5 px-1.5 py-0.5 bg-background/90 backdrop-blur-sm border border-border rounded-full text-xs hover:scale-110 hover:border-primary/30 transition-all shadow-sm group"
             >
               <span>{emoji}</span>
@@ -93,6 +94,7 @@ export const MessageReactionsDisplay = ({
             <div className="space-y-1.5 max-h-40 overflow-y-auto">
               {emojiReactions.map((reaction, i) => (
                 <button
+                  type="button"
                   key={reaction.user_id + i}
                   onClick={() => {
                     setOpenEmoji(null);
@@ -113,6 +115,7 @@ export const MessageReactionsDisplay = ({
               ))}
             </div>
             <button
+              type="button"
               onClick={() => {
                 onReact(emoji);
                 setOpenEmoji(null);

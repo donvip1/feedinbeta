@@ -332,6 +332,7 @@ export const GroupMessageBubble = ({
             <Popover open={showReactions} onOpenChange={setShowReactions}>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white"
@@ -346,6 +347,7 @@ export const GroupMessageBubble = ({
                 <div className="flex gap-0.5">
                   {DEFAULT_EMOJIS.map((emoji, index) => (
                     <button
+                      type="button"
                       key={emoji}
                       onClick={() => {
                         onReact(message.id, emoji);
@@ -362,6 +364,7 @@ export const GroupMessageBubble = ({
             </Popover>
 
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-7 w-7 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white"
@@ -373,6 +376,7 @@ export const GroupMessageBubble = ({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
+                  type="button"
                   variant="ghost" 
                   size="icon" 
                   className="h-7 w-7 rounded-full hover:bg-slate-700 text-slate-400 hover:text-white"
