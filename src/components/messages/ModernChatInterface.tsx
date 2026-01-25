@@ -718,6 +718,11 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
       setNewMessage('');
       setReplyingTo(null);
       setPreviewMedia(null);
+      
+      // Keep input focused for continuous typing
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
     } catch (error: any) {
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
       

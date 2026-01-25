@@ -76,6 +76,7 @@ interface GroupMessage {
   created_at: string;
   is_secret?: boolean;
   view_once_timer?: number;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
   forwarded_from?: {
     original_sender_id: string;
     original_sender_name: string;
@@ -424,6 +425,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       is_pinned: false,
       is_secret: secretMode,
       view_once_timer: viewOnceTimer,
+      status: 'sending',
     };
     
     setMessages(prev => [...prev, optimisticMessage]);
@@ -456,10 +458,15 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       if (error) throw error;
       
       setMessages(prev => prev.map(msg =>
-        msg.id === tempId ? { ...optimisticMessage, id: newMsg.id, created_at: newMsg.created_at } : msg
+        msg.id === tempId ? { ...optimisticMessage, id: newMsg.id, created_at: newMsg.created_at, status: 'sent' } : msg
       ));
       
       setReplyingTo(null);
+      
+      // Keep input focused for continuous typing
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 50);
     } catch (error: any) {
       setMessages(prev => prev.filter(msg => msg.id !== tempId));
       toast({
