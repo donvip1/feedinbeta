@@ -52,6 +52,7 @@ const QuickEmojiButton = ({
 interface MessageContextMenuProps {
   isOpen: boolean;
   onClose: () => void;
+  position?: { x: number; y: number };
   message: {
     id: string;
     content: string;
@@ -77,6 +78,7 @@ interface MessageContextMenuProps {
 export const MessageContextMenu = ({
   isOpen,
   onClose,
+  position,
   message,
   isOwn,
   isGroup = false,
@@ -127,13 +129,18 @@ export const MessageContextMenu = ({
             onClick={onClose}
           />
 
-          {/* Compact Menu */}
+          {/* Compact Menu - Positioned at tap location */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
             transition={{ type: 'spring', damping: 25, stiffness: 400 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[101] w-[240px]"
+            className="fixed z-[101] w-[240px] max-h-[80vh] overflow-y-auto"
+            style={{
+              left: position ? Math.min(Math.max(position.x - 120, 8), window.innerWidth - 248) : '50%',
+              top: position ? Math.min(Math.max(position.y - 20, 8), window.innerHeight - 300) : '50%',
+              transform: position ? 'none' : 'translate(-50%, -50%)',
+            }}
           >
             <div className="bg-card border border-border rounded-xl shadow-xl overflow-hidden">
               {/* Quick Reactions Row */}
