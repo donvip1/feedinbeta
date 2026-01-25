@@ -164,12 +164,40 @@ export const GroupChatMenu = ({
   };
 
   const handleShare = async () => {
-    if (!activeInviteLink) {
-      await handleCopyInviteLink();
+    let inviteCode = activeInviteLink;
+    
+    // If no invite link is loaded yet, fetch it first
+    if (!inviteCode) {
+      try {
+        const { data } = await supabase
+          .from('group_invite_links')
+          .select('invite_code')
+          .eq('group_id', groupId)
+          .eq('is_revoked', false)
+          .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (data) {
+          inviteCode = data.invite_code;
+          setActiveInviteLink(data.invite_code);
+        }
+      } catch (error) {
+        console.error('Error fetching invite link:', error);
+      }
+    }
+
+    if (!inviteCode) {
+      toast({
+        title: 'No invite link',
+        description: 'Ask an admin to create an invite link',
+        variant: 'destructive',
+      });
       return;
     }
 
-    const fullUrl = `${window.location.origin}/groups/join/${activeInviteLink}`;
+    const fullUrl = `${window.location.origin}/groups/join/${inviteCode}`;
     
     if (navigator.share) {
       try {
@@ -179,7 +207,9 @@ export const GroupChatMenu = ({
           url: fullUrl,
         });
       } catch (err) {
-        // User cancelled
+        // User cancelled - copy to clipboard as fallback
+        await navigator.clipboard.writeText(fullUrl);
+        toast({ title: 'Link copied!' });
       }
     } else {
       await navigator.clipboard.writeText(fullUrl);
