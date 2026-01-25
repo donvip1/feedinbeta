@@ -57,6 +57,13 @@ interface GroupMessage {
   is_secret?: boolean;
   view_once_timer?: number;
   poll_id?: string | null;
+  forwarded_from?: {
+    original_sender_id: string;
+    original_sender_name: string;
+    original_timestamp: string;
+    source_type: 'dm' | 'group';
+    source_id: string;
+  } | null;
 }
 
 interface GroupMessageBubbleProps {
@@ -221,6 +228,13 @@ export const GroupMessageBubble = ({
         "flex flex-col max-w-[75%] relative",
         isOwn ? 'items-end' : 'items-start'
       )}>
+        {/* Forwarded Label */}
+        {message.forwarded_from && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mb-1">
+            <Forward className="w-3 h-3" />
+            <span>Forwarded</span>
+          </div>
+        )}
         {/* Sender Name - Show for first message in group from others */}
         {!isOwn && isFirstInGroup && (
           <span className="text-xs text-purple-400 font-medium mb-0.5 ml-1">

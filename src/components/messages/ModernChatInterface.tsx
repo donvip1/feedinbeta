@@ -28,6 +28,7 @@ import { MediaPreviewBar } from './MediaPreviewBar';
 import { DeleteMessageModal, DeleteOption } from './DeleteMessageModal';
 import { AIReplySuggestions } from './AIReplySuggestions';
 import { ChatGiftButton } from './ChatGiftButton';
+import { ForwardMessageSheet } from './ForwardMessageSheet';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -81,6 +82,13 @@ interface Message {
   status?: 'sending' | 'sent' | 'delivered' | 'read';
   is_pinned?: boolean;
   edited_at?: string | null;
+  forwarded_from?: {
+    original_sender_id: string;
+    original_sender_name: string;
+    original_timestamp: string;
+    source_type: 'dm' | 'group';
+    source_id: string;
+  } | null;
 }
 
 interface ChatInterfaceProps {
@@ -134,6 +142,17 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   
   // AI suggestions state
   const [showAiSuggestions, setShowAiSuggestions] = useState(false);
+  
+  // Forwarding state
+  const [forwardingMessage, setForwardingMessage] = useState<{
+    id: string;
+    content: string;
+    mediaUrl?: string | null;
+    mediaType?: string | null;
+    senderId: string;
+    senderName: string;
+    timestamp: string;
+  } | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -1266,6 +1285,20 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                           })}
                           onReact={handleReact}
                           onDelete={handleDelete}
+                          onForward={(id) => {
+                            const message = messages.find(m => m.id === id);
+                            if (message) {
+                              setForwardingMessage({
+                                id: message.id,
+                                content: message.content,
+                                mediaUrl: message.media_url,
+                                mediaType: message.media_type,
+                                senderId: message.sender_id,
+                                senderName: message.profiles.display_name || 'Unknown',
+                                timestamp: message.created_at,
+                              });
+                            }
+                          }}
                         />
                       )}
                     </React.Fragment>
@@ -1566,6 +1599,17 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
             ? differenceInHours(new Date(), new Date(messageToDelete.created_at)) < 24 
             : false
         }
+      />
+      
+      {/* Forward Message Sheet */}
+      <ForwardMessageSheet
+        isOpen={!!forwardingMessage}
+        onClose={() => setForwardingMessage(null)}
+        message={forwardingMessage ? {
+          ...forwardingMessage,
+          sourceType: 'dm',
+          sourceId: conversationId,
+        } : null}
       />
     </div>
   );

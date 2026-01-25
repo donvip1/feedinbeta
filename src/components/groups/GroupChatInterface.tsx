@@ -26,6 +26,7 @@ import { MediaPreviewBar } from '@/components/messages/MediaPreviewBar';
 import { CreatePollModal } from './polls/CreatePollModal';
 import { PollCard } from './polls/PollCard';
 import { MessageSearchSheet } from '@/components/messages/MessageSearchSheet';
+import { ForwardMessageSheet } from '@/components/messages/ForwardMessageSheet';
 import { getTypingHeaderText } from './GroupTypingIndicator';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
@@ -75,6 +76,13 @@ interface GroupMessage {
   created_at: string;
   is_secret?: boolean;
   view_once_timer?: number;
+  forwarded_from?: {
+    original_sender_id: string;
+    original_sender_name: string;
+    original_timestamp: string;
+    source_type: 'dm' | 'group';
+    source_id: string;
+  } | null;
 }
 
 interface Group {
@@ -154,6 +162,17 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   
   // Search state
   const [showSearchSheet, setShowSearchSheet] = useState(false);
+  
+  // Forwarding state
+  const [forwardingMessage, setForwardingMessage] = useState<{
+    id: string;
+    content: string;
+    mediaUrl?: string | null;
+    mediaType?: string | null;
+    senderId: string;
+    senderName: string;
+    timestamp: string;
+  } | null>(null);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -241,6 +260,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         ...data,
         sender: senderProfile || { id: data.sender_id, display_name: 'Unknown', avatar_url: null },
         reactions: [],
+        forwarded_from: data.forwarded_from as GroupMessage['forwarded_from'],
       };
       
       setMessages(prev => {
@@ -317,6 +337,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         ...msg,
         sender: profileMap.get(msg.sender_id) || { id: msg.sender_id, display_name: 'Unknown', avatar_url: null },
         reactions: [],
+        forwarded_from: msg.forwarded_from as GroupMessage['forwarded_from'],
       }));
       
       // Apply retention filter
@@ -833,6 +854,20 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
                   onReact={handleReact}
                   onDelete={handleDelete}
                   onPin={handlePin}
+                  onForward={(id, content, mediaUrl) => {
+                    const msg = messages.find(m => m.id === id);
+                    if (msg) {
+                      setForwardingMessage({
+                        id: msg.id,
+                        content: content,
+                        mediaUrl: mediaUrl,
+                        mediaType: msg.media_type,
+                        senderId: msg.sender_id,
+                        senderName: msg.sender.display_name || 'Unknown',
+                        timestamp: msg.created_at,
+                      });
+                    }
+                  }}
                 />
               </React.Fragment>
             ))}
@@ -1197,6 +1232,17 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
           const element = document.getElementById(`message-${messageId}`);
           element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }}
+      />
+      
+      {/* Forward Message Sheet */}
+      <ForwardMessageSheet
+        isOpen={!!forwardingMessage}
+        onClose={() => setForwardingMessage(null)}
+        message={forwardingMessage ? {
+          ...forwardingMessage,
+          sourceType: 'group',
+          sourceId: groupId,
+        } : null}
       />
     </div>
   );
