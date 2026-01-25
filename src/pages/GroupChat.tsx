@@ -26,11 +26,20 @@ const GroupChat = () => {
     return null;
   }
 
+  const handleBack = () => {
+    // Use browser history if available, otherwise go to groups list
+    if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate('/groups', { replace: true });
+    }
+  };
+
   return (
     <div className="h-screen bg-background">
       <GroupChatInterface
         groupId={groupId}
-        onBack={() => navigate(`/groups/${groupId}`)}
+        onBack={handleBack}
       />
     </div>
   );
