@@ -45,6 +45,7 @@ interface GroupMessage {
   is_secret?: boolean;
   view_once_timer?: number;
   poll_id?: string | null;
+  status?: 'sending' | 'sent' | 'delivered' | 'read';
   forwarded_from?: {
     original_sender_id: string;
     original_sender_name: string;
@@ -365,7 +366,17 @@ export const GroupMessageBubble = ({
                 )}>
                   {formatTime(message.created_at)}
                 </span>
-                {isOwn && <CheckCheck size={12} className="text-primary-foreground/60" />}
+                {isOwn && (
+                  <span className={cn(
+                    "transition-colors",
+                    message.status === 'read' ? 'text-[hsl(199,89%,70%)]' : 'text-primary-foreground/50'
+                  )}>
+                    {message.status === 'sending' && <Check size={12} />}
+                    {message.status === 'sent' && <Check size={12} />}
+                    {(message.status === 'delivered' || !message.status) && <CheckCheck size={12} />}
+                    {message.status === 'read' && <CheckCheck size={12} />}
+                  </span>
+                )}
               </div>
             </div>
 
