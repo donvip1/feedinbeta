@@ -8,6 +8,7 @@ import { ReportMessageModal } from './ReportMessageModal';
 import { MessageReactionsDisplay } from '@/components/groups/MessageReactionsDisplay';
 import { MessageContextMenu } from './MessageContextMenu';
 import { cn } from '@/lib/utils';
+import { getEmojiSizeClass, isEmojiOnly } from '@/lib/emoji-utils';
 
 interface MessageBubbleProps {
   message: {
@@ -323,7 +324,19 @@ export const ModernMessageBubble = ({
             >
               {renderMedia()}
               {message.content && !message.media_type?.includes('file') && (
-                <p className="text-[15px] leading-relaxed break-words whitespace-pre-wrap">{message.content}</p>
+                (() => {
+                  const emojiSize = getEmojiSizeClass(message.content);
+                  const isEmoji = isEmojiOnly(message.content);
+                  return (
+                    <p className={cn(
+                      "break-words whitespace-pre-wrap",
+                      emojiSize ? emojiSize : "text-[15px] leading-relaxed",
+                      isEmoji && "text-center py-1"
+                    )}>
+                      {message.content}
+                    </p>
+                  );
+                })()
               )}
               
               {/* Inline Time and Status */}
