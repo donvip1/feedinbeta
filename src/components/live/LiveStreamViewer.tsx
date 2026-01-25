@@ -14,6 +14,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { shareUrls } from "@/lib/url-utils";
 import { LiveGiftModal } from "./LiveGiftModal";
 import { LiveInviteModal } from "./LiveInviteModal";
 import { useAuth } from "@/hooks/useAuth";
@@ -289,7 +290,7 @@ export const LiveStreamViewer = ({ streamId, onClose }: LiveStreamViewerProps) =
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
+    const shareUrl = shareUrls.liveStream(streamId);
     
     // Try native share first (mobile devices)
     if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {

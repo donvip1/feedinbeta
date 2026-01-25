@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Copy, Link, Clock, RefreshCw, Trash2, Check, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { shareUrls } from '@/lib/url-utils';
 
 interface GroupInviteLinkSheetProps {
   open: boolean;
@@ -146,7 +147,7 @@ export const GroupInviteLinkSheet = ({
   };
 
   const copyLink = async (inviteCode: string, linkId: string) => {
-    const fullUrl = `${window.location.origin}/groups/join/${inviteCode}`;
+    const fullUrl = shareUrls.groupJoin(inviteCode);
     await navigator.clipboard.writeText(fullUrl);
     setCopiedId(linkId);
     setTimeout(() => setCopiedId(null), 2000);
@@ -154,7 +155,7 @@ export const GroupInviteLinkSheet = ({
   };
 
   const shareLink = async (inviteCode: string) => {
-    const fullUrl = `${window.location.origin}/groups/join/${inviteCode}`;
+    const fullUrl = shareUrls.groupJoin(inviteCode);
     
     if (navigator.share) {
       try {

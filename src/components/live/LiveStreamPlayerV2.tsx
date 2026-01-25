@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
+import { shareUrls } from "@/lib/url-utils";
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from "framer-motion";
 import { LiveGiftModal } from "./LiveGiftModal";
@@ -448,7 +449,7 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
 
   // Share stream
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
+    const shareUrl = shareUrls.liveStream(streamId);
     
     if (navigator.share) {
       try {

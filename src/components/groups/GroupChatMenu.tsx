@@ -15,6 +15,7 @@ import {
   Settings, Shield, Share2, Edit, UserMinus, Ban
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { shareUrls } from '@/lib/url-utils';
 import { GroupInviteLinkSheet } from './GroupInviteLinkSheet';
 
 interface GroupChatMenuProps {
@@ -140,7 +141,7 @@ export const GroupChatMenu = ({
       }
 
       if (inviteCode) {
-        const fullUrl = `${window.location.origin}/groups/join/${inviteCode}`;
+        const fullUrl = shareUrls.groupJoin(inviteCode);
         await navigator.clipboard.writeText(fullUrl);
         setCopiedLink(true);
         setTimeout(() => setCopiedLink(false), 2000);
@@ -197,7 +198,7 @@ export const GroupChatMenu = ({
       return;
     }
 
-    const fullUrl = `${window.location.origin}/groups/join/${inviteCode}`;
+    const fullUrl = shareUrls.groupJoin(inviteCode);
     
     if (navigator.share) {
       try {

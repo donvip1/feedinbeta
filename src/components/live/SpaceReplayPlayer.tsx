@@ -5,6 +5,7 @@ import { Slider } from '@/components/ui/slider';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { shareUrls } from '@/lib/url-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
@@ -179,7 +180,7 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
   };
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/space/${spaceId}`;
+    const shareUrl = shareUrls.liveSpace(spaceId);
     
     // Try native share first (mobile devices)
     if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {

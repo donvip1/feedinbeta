@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { createShareableUrl } from '@/lib/url-utils';
 
 interface CertificateCardProps {
   certificate: {
@@ -43,7 +44,7 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
       return;
     }
     
-    const shareUrl = `${window.location.origin}/verify/${certificate.certificate_number}`;
+    const shareUrl = createShareableUrl(`/verify/${certificate.certificate_number}`);
     
     if (navigator.share) {
       try {
