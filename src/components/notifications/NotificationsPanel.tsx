@@ -31,6 +31,13 @@ interface NotificationsPanelProps {
   onUpdate: () => void;
 }
 
+// Message-related types are excluded from general notifications
+// since they have their own badge on the Messages icon
+const MESSAGE_NOTIFICATION_TYPES = [
+  'message', 'friend_request', 'friend_request_accepted', 'friend_accepted',
+  'call_missed', 'group_invite', 'group_message'
+];
+
 export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -40,7 +47,7 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
   const [showPreferences, setShowPreferences] = useState(false);
   const [markingAllRead, setMarkingAllRead] = useState(false);
 
-  // Load ONLY unread notifications for the panel
+  // Load ONLY unread notifications for the panel (excluding message types)
   const loadNotifications = useCallback(async () => {
     if (!user) return;
 
@@ -53,7 +60,8 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
           from_user:profiles!notifications_from_user_id_fkey(display_name, avatar_url)
         `)
         .eq('user_id', user.id)
-        .eq('is_read', false) // Only fetch unread
+        .eq('is_read', false)
+        .not('type', 'in', `(${MESSAGE_NOTIFICATION_TYPES.map(t => `"${t}"`).join(',')})`)
         .order('created_at', { ascending: false })
         .limit(50);
 
@@ -90,9 +98,9 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {
-            // Add new notification to the top (only if unread)
+            // Add new notification to the top (only if unread and not a message type)
             const newNotification = payload.new as any;
-            if (!newNotification.is_read) {
+            if (!newNotification.is_read && !MESSAGE_NOTIFICATION_TYPES.includes(newNotification.type)) {
               // Fetch the from_user profile
               supabase
                 .from('profiles')
