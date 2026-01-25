@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { 
   Reply, Smile, MoreVertical, Copy, Trash2, Check, CheckCheck, 
-  FileText, Edit2, Pin, Flame, EyeOff 
+  FileText, Edit2, Pin, Flame, EyeOff, Forward, Flag 
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -16,8 +16,11 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { WaveformPlayer } from '@/components/messages/WaveformPlayer';
 import { MediaMessageBubble } from '@/components/messages/MediaMessageBubble';
+import { MessageReactionsDisplay } from './MessageReactionsDisplay';
+import { ReportMessageModal } from './ReportMessageModal';
 import { cn } from '@/lib/utils';
 import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
+import { toast } from 'sonner';
 
 interface GroupMessage {
   id: string;
@@ -46,12 +49,14 @@ interface GroupMessage {
     user_id: string;
     user: {
       display_name: string;
+      avatar_url?: string | null;
     };
   }>;
   is_pinned?: boolean;
   edited_at?: string | null;
   is_secret?: boolean;
   view_once_timer?: number;
+  poll_id?: string | null;
 }
 
 interface GroupMessageBubbleProps {
@@ -66,6 +71,7 @@ interface GroupMessageBubbleProps {
   onDelete?: (messageId: string) => void;
   onEdit?: (messageId: string, content: string) => void;
   onPin?: (messageId: string) => void;
+  onForward?: (messageId: string, content: string, mediaUrl?: string | null) => void;
 }
 
 export const GroupMessageBubble = ({
@@ -80,11 +86,23 @@ export const GroupMessageBubble = ({
   onDelete,
   onEdit,
   onPin,
+  onForward,
 }: GroupMessageBubbleProps) => {
   const [showReactions, setShowReactions] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
+  const [showReportModal, setShowReportModal] = useState(false);
+
+  const handleForward = () => {
+    if (onForward) {
+      onForward(message.id, message.content, message.media_url);
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(message.content || message.media_url || '');
+      toast.success('Message copied to clipboard');
+    }
+  };
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
@@ -364,16 +382,20 @@ export const GroupMessageBubble = ({
               </DropdownMenuTrigger>
               <DropdownMenuContent 
                 align={isOwn ? 'end' : 'start'} 
-                className="w-48 rounded-xl bg-slate-800 border-slate-700"
+                className="w-48 rounded-xl bg-background border-border"
               >
-                <DropdownMenuItem onClick={handleCopy} className="gap-2 text-slate-200 focus:bg-slate-700 focus:text-white">
+                <DropdownMenuItem onClick={handleCopy} className="gap-2">
                   <Copy className="w-4 h-4" />
                   Copy text
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleForward} className="gap-2">
+                  <Forward className="w-4 h-4" />
+                  Forward
                 </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem 
                     onClick={() => onPin?.(message.id)} 
-                    className="gap-2 text-slate-200 focus:bg-slate-700 focus:text-white"
+                    className="gap-2"
                   >
                     <Pin className="w-4 h-4" />
                     {message.is_pinned ? 'Unpin' : 'Pin'}
@@ -381,20 +403,30 @@ export const GroupMessageBubble = ({
                 )}
                 {isOwn && (
                   <>
-                    <DropdownMenuSeparator className="bg-slate-700" />
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={() => onEdit?.(message.id, message.content)}
-                      className="gap-2 text-slate-200 focus:bg-slate-700 focus:text-white"
+                      className="gap-2"
                     >
                       <Edit2 className="w-4 h-4" />
                       Edit
                     </DropdownMenuItem>
                   </>
                 )}
+                <DropdownMenuSeparator />
+                {!isOwn && (
+                  <DropdownMenuItem
+                    onClick={() => setShowReportModal(true)}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
+                    <Flag className="w-4 h-4" />
+                    Report
+                  </DropdownMenuItem>
+                )}
                 {(isOwn || isAdmin) && (
                   <DropdownMenuItem
                     onClick={() => onDelete?.(message.id)}
-                    className="gap-2 text-red-400 focus:text-red-400 focus:bg-slate-700"
+                    className="gap-2 text-destructive focus:text-destructive"
                   >
                     <Trash2 className="w-4 h-4" />
                     Delete
@@ -404,27 +436,25 @@ export const GroupMessageBubble = ({
             </DropdownMenu>
           </div>
 
-          {/* Reactions Display */}
-          {reactionGroups && Object.keys(reactionGroups).length > 0 && (
-            <div className={cn(
-              "flex gap-1 mt-1 flex-wrap",
-              isOwn ? 'justify-end' : 'justify-start'
-            )}>
-              {Object.entries(reactionGroups).map(([emoji, reactions]) => (
-                <button
-                  key={emoji}
-                  onClick={() => onReact(message.id, emoji)}
-                  className="flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-800/90 backdrop-blur-sm border border-slate-700 rounded-full text-xs hover:scale-110 hover:border-purple-500/30 transition-all shadow-sm"
-                  title={reactions?.map(r => r.user.display_name).join(', ')}
-                >
-                  <span>{emoji}</span>
-                  <span className="text-slate-400 font-medium">{reactions?.length}</span>
-                </button>
-              ))}
-            </div>
+          {/* Telegram-style Reactions Display with Avatars */}
+          {message.reactions && message.reactions.length > 0 && (
+            <MessageReactionsDisplay
+              reactions={message.reactions}
+              isOwn={isOwn}
+              onReact={(emoji) => onReact(message.id, emoji)}
+            />
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportMessageModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        messageId={message.id}
+        senderId={message.sender_id}
+        messageContent={message.content}
+      />
     </div>
   );
 };

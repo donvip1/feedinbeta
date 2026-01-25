@@ -2778,6 +2778,92 @@ export type Database = {
           },
         ]
       }
+      group_poll_votes: {
+        Row: {
+          created_at: string | null
+          id: string
+          option_index: number
+          poll_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          option_index: number
+          poll_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          option_index?: number
+          poll_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_poll_votes_poll_id_fkey"
+            columns: ["poll_id"]
+            isOneToOne: false
+            referencedRelation: "group_polls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_polls: {
+        Row: {
+          created_at: string | null
+          creator_id: string
+          ends_at: string | null
+          group_id: string
+          id: string
+          is_anonymous: boolean | null
+          is_multiple_choice: boolean | null
+          message_id: string | null
+          options: Json
+          question: string
+        }
+        Insert: {
+          created_at?: string | null
+          creator_id: string
+          ends_at?: string | null
+          group_id: string
+          id?: string
+          is_anonymous?: boolean | null
+          is_multiple_choice?: boolean | null
+          message_id?: string | null
+          options?: Json
+          question: string
+        }
+        Update: {
+          created_at?: string | null
+          creator_id?: string
+          ends_at?: string | null
+          group_id?: string
+          id?: string
+          is_anonymous?: boolean | null
+          is_multiple_choice?: boolean | null
+          message_id?: string | null
+          options?: Json
+          question?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_polls_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "group_polls_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "group_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_posts: {
         Row: {
           comments_count: number | null

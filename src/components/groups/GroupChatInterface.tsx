@@ -11,7 +11,7 @@ import {
   Send, Smile, Mic, X, Image as ImageIcon, 
   Paperclip, ChevronDown, Reply, Camera, MapPin, FileText, User,
   Shield, Clock, EyeOff, RefreshCw, Sparkles, Calendar, UserPlus, UserCheck,
-  MoreVertical, ArrowLeft
+  MoreVertical, ArrowLeft, BarChart3
 } from 'lucide-react';
 import { GroupChatHeader } from './GroupChatHeader';
 import { GroupMessageBubble } from './GroupMessageBubble';
@@ -23,6 +23,8 @@ import { AttachmentPicker } from '@/components/messages/AttachmentPicker';
 import { VoiceRecorder } from '@/components/messages/VoiceRecorder';
 import { MediaUploadModal } from '@/components/messages/MediaUploadModal';
 import { MediaPreviewBar } from '@/components/messages/MediaPreviewBar';
+import { CreatePollModal } from './polls/CreatePollModal';
+import { PollCard } from './polls/PollCard';
 import { cn } from '@/lib/utils';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 import { chatSounds } from '@/lib/chat-sounds';
@@ -143,6 +145,10 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   
   // Pending file for inline preview (before sending)
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  
+  // Poll state
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [polls, setPolls] = useState<Record<string, any>>({});
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -901,24 +907,29 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
               {isMenuOpen && (
                 <div className="absolute bottom-20 left-4 flex gap-3 animate-in fade-in slide-in-from-bottom-4">
                   {[
-                    { icon: ImageIcon, color: 'bg-cyan-500', type: 'image' as const },
-                    { icon: Camera, color: 'bg-red-500', type: 'image' as const },
-                    { icon: MapPin, color: 'bg-green-500', type: 'file' as const },
-                    { icon: FileText, color: 'bg-purple-500', type: 'file' as const },
-                    { icon: User, color: 'bg-orange-500', type: 'file' as const }
+                    { icon: ImageIcon, color: 'bg-cyan-500', type: 'image' as const, action: 'file' },
+                    { icon: Camera, color: 'bg-red-500', type: 'image' as const, action: 'file' },
+                    { icon: BarChart3, color: 'bg-yellow-500', type: 'poll' as const, action: 'poll' },
+                    { icon: FileText, color: 'bg-purple-500', type: 'file' as const, action: 'file' },
+                    { icon: User, color: 'bg-orange-500', type: 'file' as const, action: 'file' }
                   ].map((btn, i) => (
                     <button 
                       key={i}
                       onClick={() => {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = btn.type === 'image' ? 'image/*' : '*/*';
-                        input.onchange = (e) => {
-                          const file = (e.target as HTMLInputElement).files?.[0];
-                          if (file) handleFileSelect(file, btn.type);
-                        };
-                        input.click();
-                        setIsMenuOpen(false);
+                        if (btn.action === 'poll') {
+                          setShowPollModal(true);
+                          setIsMenuOpen(false);
+                        } else {
+                          const input = document.createElement('input');
+                          input.type = 'file';
+                          input.accept = btn.type === 'image' ? 'image/*' : '*/*';
+                          input.onchange = (e) => {
+                            const file = (e.target as HTMLInputElement).files?.[0];
+                            if (file) handleFileSelect(file, btn.type as 'image' | 'video' | 'file');
+                          };
+                          input.click();
+                          setIsMenuOpen(false);
+                        }
                       }}
                       className={cn(
                         btn.color,
@@ -1099,6 +1110,22 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         isAdmin={isAdmin}
         currentUserRole={currentUserRole}
         onMembersChanged={loadMembers}
+      />
+      
+      {/* Poll Creation Modal */}
+      <CreatePollModal
+        isOpen={showPollModal}
+        onClose={() => setShowPollModal(false)}
+        groupId={groupId}
+        onPollCreated={async (pollId) => {
+          // Send a message with the poll
+          await supabase.from('group_messages').insert({
+            group_id: groupId,
+            sender_id: user?.id,
+            content: `📊 Poll created`,
+          });
+          loadMessages();
+        }}
       />
     </div>
   );
