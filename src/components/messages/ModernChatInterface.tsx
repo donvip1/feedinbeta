@@ -71,6 +71,7 @@ interface Message {
     user_id: string;
     user: {
       display_name: string;
+      avatar_url?: string | null;
     };
   }>;
   read_receipts?: Array<{
@@ -380,7 +381,7 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
           reactions:message_reactions(
             emoji,
             user_id,
-            user:profiles(display_name)
+            user:profiles(display_name, avatar_url)
           )
         `)
         .eq('conversation_id', conversationId)

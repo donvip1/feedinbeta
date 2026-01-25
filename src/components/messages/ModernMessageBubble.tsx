@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { format, isToday, isYesterday } from 'date-fns';
-import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck, FileText, Edit2, Pin, Star } from 'lucide-react';
+import { Reply, Smile, MoreVertical, Download, Forward, Copy, Trash2, Check, CheckCheck, FileText, Edit2, Pin, Star, Flag } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +13,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { WaveformPlayer } from './WaveformPlayer';
 import { MediaMessageBubble } from './MediaMessageBubble';
+import { ReportMessageModal } from './ReportMessageModal';
+import { MessageReactionsDisplay } from '@/components/groups/MessageReactionsDisplay';
 import { cn } from '@/lib/utils';
 import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
 
@@ -49,6 +51,7 @@ interface MessageBubbleProps {
       user_id: string;
       user: {
         display_name: string;
+        avatar_url?: string | null;
       };
     }>;
     read_receipts?: Array<{
@@ -90,6 +93,7 @@ export const ModernMessageBubble = ({
   const [isHovered, setIsHovered] = useState(false);
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
@@ -154,13 +158,7 @@ export const ModernMessageBubble = ({
     );
   };
 
-  const reactionGroups = message.reactions?.reduce((acc, reaction) => {
-    if (!acc[reaction.emoji]) {
-      acc[reaction.emoji] = [];
-    }
-    acc[reaction.emoji].push(reaction);
-    return acc;
-  }, {} as Record<string, typeof message.reactions>);
+  // Remove old reaction grouping - now using MessageReactionsDisplay component
 
   const bubbleRadius = cn(
     isOwn ? (
@@ -348,6 +346,7 @@ export const ModernMessageBubble = ({
             <Popover open={showReactions} onOpenChange={setShowReactions}>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7 rounded-full hover:bg-primary/10"
@@ -359,6 +358,7 @@ export const ModernMessageBubble = ({
                 <div className="flex gap-0.5">
                   {DEFAULT_EMOJIS.map((emoji, index) => (
                     <button
+                      type="button"
                       key={emoji}
                       onClick={() => {
                         onReact(message.id, emoji);
@@ -375,6 +375,7 @@ export const ModernMessageBubble = ({
             </Popover>
 
             <Button
+              type="button"
               variant="ghost"
               size="icon"
               className="h-7 w-7 rounded-full hover:bg-primary/10"
@@ -385,7 +386,7 @@ export const ModernMessageBubble = ({
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-primary/10">
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7 rounded-full hover:bg-primary/10">
                   <MoreVertical className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -402,6 +403,18 @@ export const ModernMessageBubble = ({
                   <Pin className="w-4 h-4" />
                   {message.is_pinned ? 'Unpin' : 'Pin'}
                 </DropdownMenuItem>
+                {!isOwn && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => setShowReportModal(true)}
+                      className="gap-2 text-destructive focus:text-destructive"
+                    >
+                      <Flag className="w-4 h-4" />
+                      Report
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {isOwn && (
                   <>
                     <DropdownMenuSeparator />
@@ -425,27 +438,25 @@ export const ModernMessageBubble = ({
             </DropdownMenu>
           </div>
 
-          {/* Reactions Display */}
-          {reactionGroups && Object.keys(reactionGroups).length > 0 && (
-            <div className={cn(
-              "flex gap-1 mt-1 flex-wrap",
-              isOwn ? 'justify-end' : 'justify-start'
-            )}>
-              {Object.entries(reactionGroups).map(([emoji, reactions]) => (
-                <button
-                  key={emoji}
-                  onClick={() => onReact(message.id, emoji)}
-                  className="reaction-sent flex items-center gap-0.5 px-1.5 py-0.5 bg-background/90 backdrop-blur-sm border border-border/50 rounded-full text-xs hover:scale-110 hover:border-primary/30 transition-all shadow-sm"
-                  title={reactions.map(r => r.user.display_name).join(', ')}
-                >
-                  <span className="emoji-pop">{emoji}</span>
-                  <span className="text-muted-foreground font-medium">{reactions.length}</span>
-                </button>
-              ))}
-            </div>
+          {/* Telegram-style Reactions Display */}
+          {message.reactions && message.reactions.length > 0 && (
+            <MessageReactionsDisplay
+              reactions={message.reactions}
+              isOwn={isOwn}
+              onReact={(emoji) => onReact(message.id, emoji)}
+            />
           )}
         </div>
       </div>
+
+      {/* Report Modal */}
+      <ReportMessageModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        messageId={message.id}
+        senderId={message.sender_id}
+        messageContent={message.content}
+      />
     </div>
   );
 };
