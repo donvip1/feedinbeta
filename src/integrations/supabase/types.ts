@@ -2495,6 +2495,91 @@ export type Database = {
         }
         Relationships: []
       }
+      group_call_participants: {
+        Row: {
+          call_id: string
+          id: string
+          is_muted: boolean | null
+          is_speaking: boolean | null
+          is_video_off: boolean | null
+          joined_at: string | null
+          left_at: string | null
+          user_id: string
+        }
+        Insert: {
+          call_id: string
+          id?: string
+          is_muted?: boolean | null
+          is_speaking?: boolean | null
+          is_video_off?: boolean | null
+          joined_at?: string | null
+          left_at?: string | null
+          user_id: string
+        }
+        Update: {
+          call_id?: string
+          id?: string
+          is_muted?: boolean | null
+          is_speaking?: boolean | null
+          is_video_off?: boolean | null
+          joined_at?: string | null
+          left_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_call_participants_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "group_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_calls: {
+        Row: {
+          call_type: string
+          created_at: string | null
+          ended_at: string | null
+          group_id: string
+          id: string
+          initiated_by: string
+          livekit_room_name: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          call_type?: string
+          created_at?: string | null
+          ended_at?: string | null
+          group_id: string
+          id?: string
+          initiated_by: string
+          livekit_room_name: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          call_type?: string
+          created_at?: string | null
+          ended_at?: string | null
+          group_id?: string
+          id?: string
+          initiated_by?: string
+          livekit_room_name?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_calls_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_invite_links: {
         Row: {
           created_at: string | null
@@ -2725,6 +2810,7 @@ export type Database = {
           deleted_at: string | null
           edited_at: string | null
           file_size: number | null
+          forwarded_from: Json | null
           group_id: string
           id: string
           is_pinned: boolean | null
@@ -2739,6 +2825,7 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           file_size?: number | null
+          forwarded_from?: Json | null
           group_id: string
           id?: string
           is_pinned?: boolean | null
@@ -2753,6 +2840,7 @@ export type Database = {
           deleted_at?: string | null
           edited_at?: string | null
           file_size?: number | null
+          forwarded_from?: Json | null
           group_id?: string
           id?: string
           is_pinned?: boolean | null
@@ -4267,6 +4355,7 @@ export type Database = {
           deleted_for_sender: boolean | null
           edited_at: string | null
           expires_at: string | null
+          forwarded_from: Json | null
           id: string
           is_pinned: boolean | null
           is_read: boolean | null
@@ -4292,6 +4381,7 @@ export type Database = {
           deleted_for_sender?: boolean | null
           edited_at?: string | null
           expires_at?: string | null
+          forwarded_from?: Json | null
           id?: string
           is_pinned?: boolean | null
           is_read?: boolean | null
@@ -4317,6 +4407,7 @@ export type Database = {
           deleted_for_sender?: boolean | null
           edited_at?: string | null
           expires_at?: string | null
+          forwarded_from?: Json | null
           id?: string
           is_pinned?: boolean | null
           is_read?: boolean | null
@@ -6444,6 +6535,39 @@ export type Database = {
           ip_address?: string | null
           user_agent?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      starred_messages: {
+        Row: {
+          conversation_id: string | null
+          created_at: string | null
+          group_id: string | null
+          group_message_id: string | null
+          id: string
+          message_id: string | null
+          message_type: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string | null
+          group_id?: string | null
+          group_message_id?: string | null
+          id?: string
+          message_id?: string | null
+          message_type: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string | null
+          group_id?: string | null
+          group_message_id?: string | null
+          id?: string
+          message_id?: string | null
+          message_type?: string
+          user_id?: string
         }
         Relationships: []
       }
