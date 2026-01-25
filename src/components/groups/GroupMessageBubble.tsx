@@ -86,6 +86,7 @@ export const GroupMessageBubble = ({
   const [touchStart, setTouchStart] = useState(0);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showContextMenu, setShowContextMenu] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | undefined>(undefined);
 
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
@@ -107,10 +108,22 @@ export const GroupMessageBubble = ({
     setTouchStart(0);
   };
 
-  const handleBubbleTap = (e: React.MouseEvent) => {
+  const handleBubbleTap = (e: React.MouseEvent | React.TouchEvent) => {
     // Prevent opening context menu when clicking on media or links
     const target = e.target as HTMLElement;
     if (target.closest('a, video, img, button')) return;
+    
+    // Get tap position
+    let clientX: number, clientY: number;
+    if ('touches' in e) {
+      clientX = e.touches[0]?.clientX ?? window.innerWidth / 2;
+      clientY = e.touches[0]?.clientY ?? window.innerHeight / 2;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    
+    setMenuPosition({ x: clientX, y: clientY });
     setShowContextMenu(true);
   };
 
@@ -325,6 +338,7 @@ export const GroupMessageBubble = ({
       <MessageContextMenu
         isOpen={showContextMenu}
         onClose={() => setShowContextMenu(false)}
+        position={menuPosition}
         message={{
           id: message.id,
           content: message.content,
