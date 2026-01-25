@@ -437,7 +437,7 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
     return () => { supabase.removeChannel(channel); };
   }, [streamId]);
 
-  // Subscribe to reactions
+  // Subscribe to reactions - with sender name
   useEffect(() => {
     const channel = supabase.channel(`reactions-${streamId}`)
       .on('postgres_changes', {
@@ -445,14 +445,30 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
         schema: 'public',
         table: 'live_stream_reactions',
         filter: `stream_id=eq.${streamId}`,
-      }, (payload: any) => {
+      }, async (payload: any) => {
+        // Fetch sender profile
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("display_name, username")
+          .eq("id", payload.new.user_id)
+          .single();
+
+        const senderName = profile?.display_name || profile?.username || 'Someone';
+
         const newReaction = { 
           type: payload.new.reaction_type, 
           id: Date.now() + Math.random(),
           x: Math.random() * 40 + 55,
           y: Math.random() * 30 + 40,
+          senderName,
         };
         setReactions(prev => [...prev, newReaction]);
+        
+        // Show toast so host sees it
+        toast(`${senderName} sent ${REACTION_EMOJIS[payload.new.reaction_type] || '❤️'}`, {
+          duration: 2000,
+        });
+
         setTimeout(() => {
           setReactions(prev => prev.filter(r => r.id !== newReaction.id));
         }, 3000);
@@ -540,7 +556,11 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
       </div>
 
       {/* Floating Reactions */}
-      <FloatingReactions reactions={reactions.map(r => ({ ...r, emoji: REACTION_EMOJIS[r.type] || '❤️' }))} />
+      <FloatingReactions reactions={reactions.map(r => ({
+        id: r.id,
+        type: r.type,
+        senderName: r.senderName,
+      }))} />
 
       {/* Flying Gifts */}
       <FlyingChat 
