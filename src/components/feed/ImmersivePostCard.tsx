@@ -610,6 +610,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   // Check if we need a footer section (caption, music, or promote button exists)
   const hasFooterContent = !isImmersiveMode && !isTextStyled && !isPlainText && (caption || hasMusic || (user && !isPromoted));
 
+  // Photo+ layout: caption above image, horizontal social buttons below
+  const isPhotoTextLayout = layoutType === 'photo-text' && !isTextStyled && !isPlainText;
+
   return (
     <>
       <div 
@@ -736,6 +739,26 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     {post.original_post.profiles?.display_name || post.original_post.profiles?.username || 'User'}
                   </span>
                 </div>
+              </div>
+            )}
+
+            {/* Photo+ Layout: Caption ABOVE the image */}
+            {isPhotoTextLayout && caption && (
+              <div className="mt-3 px-1">
+                <p className="text-white text-sm leading-snug break-words">
+                  {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+                </p>
+                {shouldTruncateCaption && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowFullCaption(!showFullCaption);
+                    }}
+                    className="text-primary text-xs mt-1 font-medium hover:opacity-80 transition"
+                  >
+                    {showFullCaption ? 'less' : 'more'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1000,8 +1023,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Caption, Music, and Promote moved to footer section below media */}
 
           {/* --- RIGHT SIDEBAR: Social Buttons (with collapsible "more" for long captions) --- */}
-          {/* Hide for plain text posts - they have their own horizontal layout */}
-          {!isPlainText && (!isImmersiveMode || showImmersiveUI) && (() => {
+          {/* Hide for plain text posts and Photo+ layout - they have their own horizontal layout */}
+          {!isPlainText && !isPhotoTextLayout && (!isImmersiveMode || showImmersiveUI) && (() => {
             // For videos: always show only 3 buttons (Like, Comment, Gift) by default
             // Views, Refeed, Share hidden under "more" toggle for videos
             const shouldCollapseForVideo = isVideoPost;
@@ -1195,8 +1218,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </AnimatePresence>
         </div>
 
-        {/* --- FOOTER SECTION: Caption, Music, Promote (Below Media) - Hidden in immersive mode --- */}
-        {!isImmersiveMode && !isTextStyled && !isPlainText && (
+        {/* --- FOOTER SECTION: Caption, Music, Promote (Below Media) - For Video layout only --- */}
+        {!isImmersiveMode && !isTextStyled && !isPlainText && !isPhotoTextLayout && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -1247,6 +1270,71 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   navigate(`/promote/${post.id}`);
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white hover:from-purple-600 hover:to-pink-600 transition-all active:scale-95 shadow-lg"
+              >
+                <TrendingUp className="w-4 h-4" />
+                <span className="text-xs font-semibold">Promote</span>
+              </button>
+            )}
+          </motion.div>
+        )}
+
+        {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout --- */}
+        {!isImmersiveMode && isPhotoTextLayout && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
+            className="flex-shrink-0 bg-black px-4 py-3 z-20"
+          >
+            {/* Horizontal Social Buttons */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                {/* Like */}
+                <button onClick={handleLike} className="flex items-center gap-1.5 group">
+                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
+                  <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
+                </button>
+                
+                {/* Comments */}
+                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
+                  <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
+                </button>
+                
+                {/* Views */}
+                <div className="flex items-center gap-1.5">
+                  <Eye className="w-5 h-5 text-white" />
+                  <span className="text-white text-xs font-semibold">{formatCount(post.views_count || 0)}</span>
+                </div>
+                
+                {/* Refeed */}
+                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                  <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                  <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                {/* Gift */}
+                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="group">
+                  <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                </button>
+                
+                {/* Share */}
+                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
+                  <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                </button>
+              </div>
+            </div>
+
+            {/* Promote Button */}
+            {user && !isPromoted && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/promote/${post.id}`);
+                }}
+                className="flex items-center gap-1.5 mt-3 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white hover:from-purple-600 hover:to-pink-600 transition-all active:scale-95 shadow-lg"
               >
                 <TrendingUp className="w-4 h-4" />
                 <span className="text-xs font-semibold">Promote</span>
