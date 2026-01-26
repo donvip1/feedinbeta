@@ -845,19 +845,33 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Plain text posts - Facebook-style simple text layout (no background, centered text, inline buttons) */}
+          {/* Plain text posts - Facebook-style simple text layout (no background, left-aligned buttons) */}
           {(isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled)) && (
             <div 
-              className="w-full flex flex-col items-center justify-center px-4 py-8"
+              className="w-full flex flex-col px-4 py-8"
               style={{ touchAction: 'manipulation' }}
               onClick={handleMediaTap}
             >
-              <p className="text-foreground text-lg md:text-xl leading-relaxed break-words whitespace-pre-wrap text-center max-w-lg">
+              <p className="text-foreground text-lg md:text-xl leading-relaxed break-words whitespace-pre-wrap">
                 {renderCaptionWithHashtags(caption)}
               </p>
               
-              {/* Inline Social Buttons - directly under the text */}
-              <div className="flex items-center gap-4 mt-6">
+              {/* Promote Button - left aligned */}
+              {user && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="flex items-center gap-1.5 mt-4 w-fit px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white hover:from-purple-600 hover:to-pink-600 transition-all active:scale-95 shadow-lg"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Promote</span>
+                </button>
+              )}
+              
+              {/* Social Buttons - left aligned, directly under content */}
+              <div className="flex items-center gap-4 mt-4">
                 <button onClick={handleLike} className="flex items-center gap-1.5 group">
                   <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
                   <span className="text-muted-foreground text-xs font-semibold">{formatCount(likesCount)}</span>
@@ -882,20 +896,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
                 </button>
               </div>
-              
-              {/* Promote Button */}
-              {user && !isPromoted && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
-                  }}
-                  className="flex items-center gap-1.5 mt-4 px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white hover:from-purple-600 hover:to-pink-600 transition-all active:scale-95 shadow-lg"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Promote</span>
-                </button>
-              )}
             </div>
           )}
 
