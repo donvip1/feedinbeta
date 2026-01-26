@@ -845,14 +845,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Plain text posts */}
+          {/* Plain text posts - Facebook-style simple text layout */}
           {(isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled)) && (
             <div 
-              className="w-full h-full flex flex-col items-center justify-center px-4 pr-16 py-6 overflow-hidden bg-background"
+              className="w-full min-h-[200px] flex flex-col justify-center px-4 py-6 bg-background"
               style={{ touchAction: 'manipulation' }}
               onClick={handleMediaTap}
             >
-              <p className="text-foreground text-lg md:text-xl leading-relaxed max-w-full break-words whitespace-pre-wrap text-center">
+              <p className="text-foreground text-lg md:text-xl leading-relaxed break-words whitespace-pre-wrap">
                 {renderCaptionWithHashtags(caption)}
               </p>
             </div>
