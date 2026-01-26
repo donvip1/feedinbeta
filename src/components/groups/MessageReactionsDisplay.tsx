@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Popover,
   PopoverContent,
@@ -56,11 +57,19 @@ export const MessageReactionsDisplay = ({
           onOpenChange={(open) => setOpenEmoji(open ? emoji : null)}
         >
           <PopoverTrigger asChild>
-            <button
+            <motion.button
               type="button"
-              className="flex items-center gap-0.5 px-1.5 py-0.5 bg-background/90 backdrop-blur-sm border border-border rounded-full text-xs hover:scale-110 hover:border-primary/30 transition-all shadow-sm group"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              className="flex items-center gap-0.5 px-1.5 py-0.5 bg-background/90 backdrop-blur-sm border border-border rounded-full text-xs hover:border-primary/30 transition-all shadow-sm group"
             >
-              <span>{emoji}</span>
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 500 }}
+              >
+                {emoji}
+              </motion.span>
               {/* Show up to 3 avatars inline */}
               <div className="flex -space-x-1.5 ml-0.5">
                 {emojiReactions.slice(0, 3).map((reaction, i) => (
@@ -80,7 +89,7 @@ export const MessageReactionsDisplay = ({
                   +{emojiReactions.length - 3}
                 </span>
               )}
-            </button>
+            </motion.button>
           </PopoverTrigger>
           <PopoverContent 
             className="w-48 p-2 bg-background border-border rounded-xl"

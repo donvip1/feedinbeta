@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// Telegram-style default emoji set
-export const DEFAULT_EMOJIS = ['❤️', '🔥', '😍', '👏', '😂', '😮', '😢', '🎉'];
+// Telegram-style default emoji set - synced with REACTION_TYPES
+export const DEFAULT_EMOJIS = ['❤️', '🔥', '😂', '👍', '🎉', '🏆', '😍', '👏'];
 
 interface EmojiReactionsProps {
   onReact: (emoji: string) => void;
@@ -26,32 +27,38 @@ export const EmojiReactions = ({
   if (!isVisible) return null;
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9, y: position === 'top' ? 10 : -10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.9, y: position === 'top' ? 10 : -10 }}
+      transition={{ type: 'spring', damping: 20, stiffness: 400 }}
       className={cn(
-        'flex justify-center animate-in fade-in zoom-in-95 duration-200',
-        position === 'top' ? 'slide-in-from-bottom-2' : 'slide-in-from-top-2',
+        'flex justify-center',
         className
       )}
     >
       <div className="flex gap-1 bg-background/90 dark:bg-black/70 backdrop-blur-xl rounded-full px-2 py-1.5 shadow-lg border border-border/50">
         {emojis.map((emoji, index) => (
-          <button
+          <motion.button
             key={emoji}
+            type="button"
             onClick={() => onReact(emoji)}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: index * 0.03, type: 'spring', stiffness: 500 }}
+            whileHover={{ scale: 1.25, y: -2 }}
+            whileTap={{ scale: 0.85 }}
             className={cn(
-              'emoji-reaction-btn text-xl sm:text-2xl p-1.5 rounded-full transition-all duration-200',
-              'hover:scale-125 hover:bg-muted/50 active:scale-90',
-              selectedEmoji === emoji && 'bg-primary/20 scale-110',
+              'text-xl sm:text-2xl p-1.5 rounded-full transition-colors duration-150',
+              'hover:bg-muted/50',
+              selectedEmoji === emoji && 'bg-primary/20 ring-2 ring-primary/30',
             )}
-            style={{
-              animationDelay: `${index * 30}ms`,
-            }}
           >
-            <span className="emoji-pop">{emoji}</span>
-          </button>
+            {emoji}
+          </motion.button>
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -70,9 +77,25 @@ export const FloatingEmoji = ({ emoji, onComplete }: FloatingEmojiProps) => {
   }, [onComplete]);
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-50">
-      <div className="floating-emoji text-8xl">{emoji}</div>
-    </div>
+    <motion.div 
+      className="fixed inset-0 flex items-center justify-center pointer-events-none z-50"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div 
+        className="text-8xl"
+        initial={{ scale: 0, rotate: -10 }}
+        animate={{ 
+          scale: [0, 1.5, 1.2],
+          rotate: [0, 15, -15, 0],
+          y: [0, -30, -50]
+        }}
+        transition={{ duration: 1.2, ease: "easeOut" }}
+      >
+        {emoji}
+      </motion.div>
+    </motion.div>
   );
 };
 
@@ -99,26 +122,36 @@ export const QuickReactionButton = ({
 
   return (
     <div className={cn('relative', className)}>
-      {isExpanded && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2">
-          <EmojiReactions
-            onReact={handleReact}
-            isVisible={true}
-            selectedEmoji={selectedEmoji}
-            position="top"
-          />
-        </div>
-      )}
-      <button
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div 
+            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2"
+            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.9 }}
+          >
+            <EmojiReactions
+              onReact={handleReact}
+              isVisible={true}
+              selectedEmoji={selectedEmoji}
+              position="top"
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <motion.button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
+        whileHover={{ scale: 1.15 }}
+        whileTap={{ scale: 0.9 }}
         className={cn(
-          'text-xl p-2 rounded-full transition-all duration-200',
-          'hover:scale-110 hover:bg-muted/50 active:scale-95',
+          'text-xl p-2 rounded-full transition-colors duration-150',
+          'hover:bg-muted/50',
           isExpanded && 'bg-muted/50'
         )}
       >
         {selectedEmoji || triggerEmoji}
-      </button>
+      </motion.button>
     </div>
   );
 };

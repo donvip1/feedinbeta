@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { StoryViewersList } from './StoryViewersList';
 import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Story {
   id: string;
@@ -490,23 +491,36 @@ export const StoryViewer = ({ userId, allUserStories, onClose, onStoryChange }: 
           ) : (
             // Viewer - show emoji reactions and reply input
             <div className="space-y-3">
-              {/* Emoji reaction bar - Telegram style */}
-              {showEmojiPicker && (
-                <div className="flex justify-center animate-in slide-in-from-bottom-4 duration-200">
-                  <div className="flex gap-1 bg-black/70 backdrop-blur-xl rounded-full px-2 py-1.5 shadow-lg">
-                    {DEFAULT_EMOJIS.map((emoji, index) => (
-                      <button
-                        key={emoji}
-                        onClick={() => handleReaction(emoji)}
-                        className="emoji-reaction-btn text-2xl p-1.5 rounded-full hover:bg-white/10 hover:scale-125 active:scale-90 transition-all duration-200"
-                        style={{ animationDelay: `${index * 30}ms` }}
-                      >
-                        <span className="emoji-pop">{emoji}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Emoji reaction bar - Animated Telegram style */}
+              <AnimatePresence>
+                {showEmojiPicker && (
+                  <motion.div 
+                    className="flex justify-center"
+                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 400 }}
+                  >
+                    <div className="flex gap-1 bg-black/70 backdrop-blur-xl rounded-full px-2 py-1.5 shadow-lg">
+                      {DEFAULT_EMOJIS.map((emoji, index) => (
+                        <motion.button
+                          key={emoji}
+                          type="button"
+                          onClick={() => handleReaction(emoji)}
+                          initial={{ scale: 0, opacity: 0 }}
+                          animate={{ scale: 1, opacity: 1 }}
+                          transition={{ delay: index * 0.03, type: 'spring', stiffness: 500 }}
+                          whileHover={{ scale: 1.3, y: -3 }}
+                          whileTap={{ scale: 0.8 }}
+                          className="text-2xl p-1.5 rounded-full hover:bg-white/10 transition-colors"
+                        >
+                          {emoji}
+                        </motion.button>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Reply input - Telegram style */}
               <div className="flex items-center gap-2">
