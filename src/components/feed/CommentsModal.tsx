@@ -28,6 +28,8 @@ interface CommentsModalProps {
     };
   };
   onCommentAdded?: () => void;
+  videoCurrentTime?: number; // Current playback time of video when comments opened
+  isMuted?: boolean; // Mute state from parent
 }
 
 type Profile = {
@@ -50,7 +52,7 @@ type CommentRow = {
 
 type CommentNode = CommentRow & { replies: CommentNode[] };
 
-export default function CommentsModal({ isOpen, onClose, postId, postData, onCommentAdded }: CommentsModalProps) {
+export default function CommentsModal({ isOpen, onClose, postId, postData, onCommentAdded, videoCurrentTime = 0, isMuted = true }: CommentsModalProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -70,6 +72,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const miniVideoRef = useRef<HTMLVideoElement>(null);
   const mentionStartPos = useRef<number>(0);
 
   // Track IDs added optimistically to avoid realtime echo duplication
@@ -411,29 +414,41 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
     <>
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
-        {/* Post preview */}
-        {postData && (
-          <div className="flex-shrink-0 bg-background relative border-b">
-            {postData.media_url && (
-              <div className="w-full h-[20vh] bg-black flex items-center justify-center overflow-hidden">
-                {postData.media_type?.startsWith("video") ? (
-                  <video
-                    src={postData.media_url}
-                    className="max-w-full max-h-full object-contain"
-                    controls
-                    playsInline
-                    style={{ width: "40%", height: "auto" }}
-                  />
-                ) : (
-                  <img
-                    src={postData.media_url ?? undefined}
-                    alt="Post media"
-                    className="max-w-full max-h-full object-contain"
-                    style={{ width: "40%", height: "auto" }}
-                  />
-                )}
-              </div>
-            )}
+        {/* Minimized Video Preview - Continues playing */}
+        {postData?.media_url && postData.media_type?.startsWith("video") && (
+          <div className="flex-shrink-0 bg-black relative">
+            <div className="w-full h-[25vh] flex items-center justify-center overflow-hidden">
+              <video
+                ref={miniVideoRef}
+                src={postData.media_url}
+                className="h-full w-auto max-w-full object-contain"
+                autoPlay
+                loop
+                playsInline
+                muted={isMuted}
+                onLoadedMetadata={() => {
+                  // Sync playback position when video loads
+                  if (miniVideoRef.current && videoCurrentTime > 0) {
+                    miniVideoRef.current.currentTime = videoCurrentTime;
+                  }
+                }}
+              />
+            </div>
+            {/* Gradient overlay for visual polish */}
+            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent" />
+          </div>
+        )}
+
+        {/* Image Preview (static) */}
+        {postData?.media_url && postData.media_type === 'image' && (
+          <div className="flex-shrink-0 bg-black relative border-b">
+            <div className="w-full h-[20vh] flex items-center justify-center overflow-hidden">
+              <img
+                src={postData.media_url}
+                alt="Post media"
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
           </div>
         )}
 

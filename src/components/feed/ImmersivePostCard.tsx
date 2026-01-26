@@ -1391,7 +1391,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         isOpen={commentsOpen}
         onClose={() => handleCommentsOpenChange(false)}
         postId={post.id}
+        postData={{
+          content: caption,
+          media_url: currentMediaUrl,
+          media_type: currentMediaType,
+          profiles: post.profiles
+        }}
         onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+        videoCurrentTime={videoRef.current?.currentTime || 0}
+        isMuted={isMuted}
       />
 
       <MobileShareSheet
