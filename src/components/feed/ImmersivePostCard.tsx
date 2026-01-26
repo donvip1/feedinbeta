@@ -399,6 +399,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             setLikesCount(newData.likes_count || 0);
             setCommentsCount(newData.comments_count || 0);
             setRefeedsCount(newData.refeeds_count || 0);
+            setGiftsCount(newData.gifts_count || 0);
           }
         }
       )
