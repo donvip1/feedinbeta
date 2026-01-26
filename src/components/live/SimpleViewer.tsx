@@ -6,10 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
-  Users, Send, Heart, Gift, 
-  Volume2, VolumeX, Flame, 
-  PartyPopper, ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Loader2, RefreshCw, ArrowLeft
+  Users, Send, Gift, 
+  Volume2, VolumeX, 
+  MessageCircle, Loader2, RefreshCw, ArrowLeft
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -20,20 +19,12 @@ import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { FloatingReactions } from "./FloatingReactions";
 import { FlyingChat } from "./FlyingChat";
 import { useCloudflarePlayback } from "@/hooks/useCloudflarePlayback";
+import { AnimatedEmojiButton, LIVE_REACTIONS } from "@/components/shared/AnimatedEmojiButton";
 
 interface SimpleViewerProps {
   streamId: string;
   onClose: () => void;
 }
-
-const REACTIONS = [
-  { type: 'heart', emoji: '❤️', icon: Heart, color: 'text-red-500' },
-  { type: 'fire', emoji: '🔥', icon: Flame, color: 'text-orange-500' },
-  { type: 'star', emoji: '⭐', icon: Star, color: 'text-yellow-500' },
-  { type: 'clap', emoji: '👏', icon: PartyPopper, color: 'text-purple-500' },
-  { type: 'like', emoji: '👍', icon: ThumbsUp, color: 'text-blue-500' },
-  { type: 'love', emoji: '😍', icon: Sparkles, color: 'text-pink-500' },
-];
 
 const GIFT_EMOJIS: Record<string, string> = {
   heart: '❤️', star: '⭐', fire: '🔥', lightning: '⚡', 
@@ -598,27 +589,24 @@ export const SimpleViewer = ({ streamId, onClose }: SimpleViewerProps) => {
           transform: 'translateZ(0)', // Force GPU layer for stability
         }}
       >
-        {/* REACTION BAR */}
+        {/* REACTION BAR - Animated */}
         <div className="flex items-center justify-center gap-2 mb-4 overflow-x-auto">
-          {REACTIONS.map((reaction) => (
-            <Button
-              key={reaction.type}
-              variant="ghost"
-              size="sm"
-              className="rounded-full bg-white/10 hover:bg-white/20 min-w-10 h-10"
-              onClick={() => sendReaction(reaction.type)}
-            >
-              <span className="text-xl">{reaction.emoji}</span>
-            </Button>
+          {LIVE_REACTIONS.map((reaction) => (
+            <AnimatedEmojiButton
+              key={reaction.id}
+              reaction={reaction as any}
+              onClick={(id) => sendReaction(id)}
+              size="md"
+              variant="live"
+            />
           ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="rounded-full bg-yellow-500/20 hover:bg-yellow-500/30 min-w-10 h-10"
+          <motion.button
+            whileTap={{ scale: 0.85 }}
+            className="rounded-full bg-gradient-to-r from-yellow-500/30 to-amber-500/30 hover:from-yellow-500/40 hover:to-amber-500/40 min-w-11 h-11 flex items-center justify-center transition-all"
             onClick={() => setShowGiftModal(true)}
           >
             <Gift className="w-5 h-5 text-yellow-400" />
-          </Button>
+          </motion.button>
         </div>
 
         {/* CHAT INPUT */}

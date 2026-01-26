@@ -2,10 +2,12 @@
  * Physics-based Floating Reactions Component
  * TikTok/Tango inspired floating hearts and emojis
  * Uses framer-motion for smooth, organic animations
+ * Now uses unified LIVE_REACTIONS from AnimatedEmojiButton
  */
 
-import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
-import { useEffect, useState, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { LIVE_REACTIONS } from '@/components/shared/AnimatedEmojiButton';
 
 interface FloatingReaction {
   id: string | number;
@@ -26,13 +28,15 @@ interface FloatingReactionsProps {
   className?: string;
 }
 
-const REACTION_EMOJIS: Record<string, string> = {
-  heart: '❤️',
-  fire: '🔥',
-  star: '⭐',
-  clap: '👏',
-  like: '👍',
-  love: '😍',
+// Create emoji map from unified reactions
+const REACTION_EMOJIS: Record<string, string> = LIVE_REACTIONS.reduce((acc, r) => {
+  acc[r.id] = r.emoji;
+  return acc;
+}, {} as Record<string, string>);
+
+// Add additional emojis for backward compatibility
+const EXTENDED_EMOJIS: Record<string, string> = {
+  ...REACTION_EMOJIS,
   wow: '😮',
   laugh: '😂',
   cry: '😢',
@@ -51,7 +55,7 @@ export const FloatingReactions = ({ reactions, className }: FloatingReactionsPro
     // Create floating reaction with random physics properties
     const newFloating: FloatingReaction = {
       id: `${latestReaction.id}-${Date.now()}-${Math.random()}`,
-      emoji: REACTION_EMOJIS[latestReaction.type] || '❤️',
+      emoji: EXTENDED_EMOJIS[latestReaction.type] || REACTION_EMOJIS[latestReaction.type] || '❤️',
       senderName: latestReaction.senderName,
       x: 10 + Math.random() * 30, // Left-center of screen (10-40%) to be fully visible
       size: 1 + Math.random() * 0.5, // 1x to 1.5x scale

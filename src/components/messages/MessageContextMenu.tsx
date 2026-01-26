@@ -1,19 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Reply, Copy, Forward, Pin, Edit2, Trash2, Flag, ChevronDown, ChevronUp,
-  ThumbsUp, Heart, Smile, Trophy, Flame, PartyPopper
+  Reply, Copy, Forward, Pin, Edit2, Trash2, Flag, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { AnimatedEmojiButton, REACTION_TYPES } from '@/components/shared/AnimatedEmojiButton';
 
 // Core 4 reactions shown by default
-const QUICK_REACTIONS = [
-  { id: 'heart', icon: Heart, color: 'bg-red-500', textColor: 'text-red-500', emoji: '❤️' },
-  { id: 'fire', icon: Flame, color: 'bg-orange-500', textColor: 'text-orange-500', emoji: '🔥' },
-  { id: 'laugh', icon: Smile, color: 'bg-yellow-500', textColor: 'text-yellow-500', emoji: '😍' },
-  { id: 'clap', icon: ThumbsUp, color: 'bg-blue-500', textColor: 'text-blue-500', emoji: '👏' },
-];
+const QUICK_REACTIONS = REACTION_TYPES.slice(0, 4);
 
 // Extended emojis shown in dropdown
 const EXTENDED_EMOJIS = [
@@ -21,33 +16,6 @@ const EXTENDED_EMOJIS = [
   '🤔', '😡', '💯', '👍', '👎', '🙏', '💪',
   '🤝', '😘', '🥰', '😭', '🤣', '😱', '💀',
 ];
-
-// Compact Emoji Button
-const QuickEmojiButton = ({ 
-  reaction, 
-  onSelect 
-}: { 
-  reaction: typeof QUICK_REACTIONS[0];
-  onSelect: (emoji: string) => void;
-}) => {
-  const Icon = reaction.icon;
-
-  return (
-    <motion.button
-      type="button"
-      onClick={() => onSelect(reaction.emoji)}
-      className={cn(
-        "p-2 rounded-full transition-colors duration-150",
-        "bg-muted/60 hover:bg-muted active:scale-90",
-        reaction.textColor
-      )}
-      whileHover={{ scale: 1.1 }}
-      whileTap={{ scale: 0.85 }}
-    >
-      <Icon className="w-4 h-4" />
-    </motion.button>
-  );
-};
 
 interface MessageContextMenuProps {
   isOpen: boolean;
@@ -147,10 +115,13 @@ export const MessageContextMenu = ({
               <div className="p-2.5 border-b border-border">
                 <div className="flex items-center justify-center gap-2">
                   {QUICK_REACTIONS.map((reaction) => (
-                    <QuickEmojiButton
+                    <AnimatedEmojiButton
                       key={reaction.id}
                       reaction={reaction}
-                      onSelect={handleReact}
+                      onClick={(_, emoji) => handleReact(emoji)}
+                      size="sm"
+                      variant="ghost"
+                      showLabel
                     />
                   ))}
                   <motion.button

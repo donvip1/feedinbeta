@@ -6,13 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
-  Users, Send, Heart, X, Gift, 
-  Volume2, VolumeX, Flame, 
-  ThumbsUp, Star, Sparkles, 
-  MessageCircle, Home, Share2, Crown,
-  PartyPopper, Coins
+  Users, Send, X, Gift, 
+  Volume2, VolumeX, 
+  MessageCircle, Share2, Crown,
+  Coins
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { shareUrls } from "@/lib/url-utils";
 import { useNavigate } from 'react-router-dom';
@@ -23,20 +21,12 @@ import { useCloudflarePlayback } from "@/hooks/useCloudflarePlayback";
 import { StreamReadyGate } from "./StreamReadyGate";
 import { StreamHealthIndicator } from "./StreamHealthIndicator";
 import { FlyingChat } from "./FlyingChat";
+import { AnimatedEmojiButton, LIVE_REACTIONS } from "@/components/shared/AnimatedEmojiButton";
 
 interface LiveStreamPlayerV2Props {
   streamId: string;
   onClose: () => void;
 }
-
-const REACTIONS = [
-  { type: 'heart', emoji: '❤️', icon: Heart, color: 'text-red-500' },
-  { type: 'fire', emoji: '🔥', icon: Flame, color: 'text-orange-500' },
-  { type: 'star', emoji: '⭐', icon: Star, color: 'text-yellow-500' },
-  { type: 'clap', emoji: '👏', icon: PartyPopper, color: 'text-purple-500' },
-  { type: 'like', emoji: '👍', icon: ThumbsUp, color: 'text-blue-500' },
-  { type: 'love', emoji: '😍', icon: Sparkles, color: 'text-pink-500' },
-];
 
 const GIFT_EMOJIS: Record<string, string> = {
   heart: '❤️', star: '⭐', fire: '🔥', lightning: '⚡', 
@@ -583,14 +573,24 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
           {reactions.map(reaction => (
             <motion.div
               key={reaction.id}
-              initial={{ opacity: 0, y: 100, x: `${reaction.x}%` }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -100 }}
-              transition={{ duration: 2 }}
+              initial={{ opacity: 0, y: 100, x: `${reaction.x}%`, scale: 0.5 }}
+              animate={{ 
+                opacity: [0, 1, 1, 0],
+                y: [100, 0, -50, -150],
+                scale: [0.5, 1.2, 1, 0.8]
+              }}
+              exit={{ opacity: 0, y: -200, scale: 0.5 }}
+              transition={{ duration: 2.5, ease: "easeOut" }}
               className="fixed z-30"
               style={{ left: `${reaction.x}%`, top: `${reaction.y}%` }}
             >
-              <span className="text-3xl">{REACTIONS.find(r => r.type === reaction.type)?.emoji || '❤️'}</span>
+              <motion.span 
+                className="text-4xl drop-shadow-lg"
+                animate={{ rotate: [-10, 10, -10] }}
+                transition={{ duration: 0.5, repeat: 2 }}
+              >
+                {LIVE_REACTIONS.find(r => r.id === reaction.type)?.emoji || '❤️'}
+              </motion.span>
             </motion.div>
           ))}
         </AnimatePresence>
@@ -646,22 +646,21 @@ export const LiveStreamPlayerV2 = ({ streamId, onClose }: LiveStreamPlayerV2Prop
           />
         )}
 
-        {/* RIGHT SIDE ACTIONS - All Reactions */}
+        {/* RIGHT SIDE ACTIONS - Animated Reaction Buttons */}
         <div 
           className="absolute right-3 flex flex-col gap-2 z-20"
           style={{
             bottom: isKeyboardOpen ? `${keyboardHeight + 130}px` : '200px',
           }}
         >
-          {REACTIONS.map((r) => (
-            <motion.button
-              key={r.type}
-              whileTap={{ scale: 0.85 }}
-              onClick={() => sendReaction(r.type)}
-              className="w-10 h-10 rounded-full bg-black/40 backdrop-blur flex items-center justify-center text-2xl hover:scale-110 transition-transform active:scale-90"
-            >
-              {r.emoji}
-            </motion.button>
+          {LIVE_REACTIONS.map((reaction) => (
+            <AnimatedEmojiButton
+              key={reaction.id}
+              reaction={reaction as any}
+              onClick={(id) => sendReaction(id)}
+              size="md"
+              variant="live"
+            />
           ))}
           <motion.button
             whileTap={{ scale: 0.85 }}

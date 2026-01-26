@@ -27,6 +27,7 @@ import { useNavigation } from '@/context/NavigationContext';
 import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
+import { AnimatedEmojiButton, REACTION_TYPES, LIVE_REACTIONS } from '@/components/shared/AnimatedEmojiButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -83,15 +84,13 @@ interface SpaceData {
   allow_mic_for_all?: boolean;
 }
 
-const REACTION_EMOJIS = [
-  { emoji: '❤️', label: 'heart' },
-  { emoji: '🔥', label: 'fire' },
-  { emoji: '👏', label: 'clap' },
-  { emoji: '😂', label: 'laugh' },
-  { emoji: '🎉', label: 'party' },
-  { emoji: '💯', label: '100' },
-  { emoji: '🚀', label: 'rocket' },
-  { emoji: '✨', label: 'sparkle' },
+// Use unified reactions with some space-specific additions
+const SPACE_REACTION_EMOJIS = [
+  ...LIVE_REACTIONS.slice(0, 4).map(r => ({ emoji: r.emoji, label: r.id, icon: r.icon, color: r.color, textColor: r.textColor })),
+  { emoji: '🎉', label: 'party', icon: null, color: 'bg-purple-500', textColor: 'text-purple-500' },
+  { emoji: '💯', label: '100', icon: null, color: 'bg-green-500', textColor: 'text-green-500' },
+  { emoji: '🚀', label: 'rocket', icon: null, color: 'bg-cyan-500', textColor: 'text-cyan-500' },
+  { emoji: '✨', label: 'sparkle', icon: null, color: 'bg-yellow-500', textColor: 'text-yellow-500' },
 ];
 
 export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
@@ -1565,18 +1564,28 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           </div>
         )}
 
-        {/* Quick reactions */}
-        <div className="flex justify-center gap-1 py-3 px-4 border-b border-border/30">
-          {REACTION_EMOJIS.map(({ emoji, label }) => (
-            <motion.button
-              key={label}
-              whileTap={{ scale: 0.85 }}
-              whileHover={{ scale: 1.2 }}
-              className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted/50 transition-colors text-xl"
-              onClick={() => sendReaction(emoji)}
-            >
-              {emoji}
-            </motion.button>
+        {/* Quick reactions - Animated */}
+        <div className="flex justify-center gap-1.5 py-3 px-4 border-b border-border/30">
+          {SPACE_REACTION_EMOJIS.map(({ emoji, label, icon, color, textColor }) => (
+            icon ? (
+              <AnimatedEmojiButton
+                key={label}
+                reaction={{ id: label, emoji, label, icon, color, textColor } as any}
+                onClick={() => sendReaction(emoji)}
+                size="sm"
+                variant="ghost"
+              />
+            ) : (
+              <motion.button
+                key={label}
+                whileTap={{ scale: 0.85 }}
+                whileHover={{ scale: 1.15 }}
+                className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-muted/50 transition-all text-xl"
+                onClick={() => sendReaction(emoji)}
+              >
+                {emoji}
+              </motion.button>
+            )
           ))}
         </div>
 
