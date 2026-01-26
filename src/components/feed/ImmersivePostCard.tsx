@@ -1286,45 +1286,42 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
             className="flex-shrink-0 bg-black px-4 py-3 z-20"
           >
-            {/* Horizontal Social Buttons */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {/* Like */}
-                <button onClick={handleLike} className="flex items-center gap-1.5 group">
-                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
-                  <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
-                </button>
-                
-                {/* Comments */}
-                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                  <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-                  <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
-                </button>
-                
-                {/* Views */}
-                <div className="flex items-center gap-1.5">
-                  <Eye className="w-5 h-5 text-white" />
-                  <span className="text-white text-xs font-semibold">{formatCount(post.views_count || 0)}</span>
-                </div>
-                
-                {/* Refeed */}
-                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-                  <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
-                </button>
+            {/* Horizontal Social Buttons - All in one row */}
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* Like */}
+              <button onClick={handleLike} className="flex items-center gap-1.5 group">
+                <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-white")} />
+                <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
+              </button>
+              
+              {/* Comments */}
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
+                <MessageCircle className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
+              </button>
+              
+              {/* Views */}
+              <div className="flex items-center gap-1.5">
+                <Eye className="w-5 h-5 text-white" />
+                <span className="text-white text-xs font-semibold">{formatCount(post.views_count || 0)}</span>
               </div>
-
-              <div className="flex items-center gap-3">
-                {/* Gift */}
-                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="group">
-                  <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-                </button>
-                
-                {/* Share */}
-                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
-                  <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
-                </button>
-              </div>
+              
+              {/* Refeed */}
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <Repeat className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
+              </button>
+              
+              {/* Gift */}
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <Gift className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+                <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
+              </button>
+              
+              {/* Share */}
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
+                <Share2 className="w-5 h-5 text-white transition-transform group-active:scale-90" />
+              </button>
             </div>
 
             {/* Promote Button */}
