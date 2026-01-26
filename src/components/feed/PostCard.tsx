@@ -385,6 +385,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
             setLikesCount(newData.likes_count || 0);
             setCommentsCount(newData.comments_count || 0);
             setRefeedsCount(newData.refeeds_count || 0);
+            setGiftsCount(newData.gifts_count || 0);
           }
         }
       )
