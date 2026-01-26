@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Bell } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Bell } from 'lucide-react';
 import { NotificationsPanel } from './NotificationsPanel';
 import { notificationSounds } from '@/lib/notification-sounds';
 
@@ -15,6 +15,8 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
   const [showPanel, setShowPanel] = useState(false);
+  const [panelPosition, setPanelPosition] = useState({ x: 0, y: 0 });
+  const bellRef = useRef<HTMLButtonElement>(null);
 
   const loadUnreadCount = useCallback(async () => {
     if (!user) return;
@@ -95,8 +97,18 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
     };
   }, [user, loadUnreadCount]);
 
-  const handleTogglePanel = () => {
+  const handleTogglePanel = (e: React.MouseEvent) => {
     const newState = !showPanel;
+    
+    if (newState && bellRef.current) {
+      // Get bell button position for panel placement
+      const rect = bellRef.current.getBoundingClientRect();
+      setPanelPosition({
+        x: rect.left,
+        y: rect.bottom + 8 // 8px gap below the bell
+      });
+    }
+    
     setShowPanel(newState);
     if (newState) {
       onPanelOpen?.();
@@ -118,6 +130,7 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
     <>
       <div className="relative">
         <Button
+          ref={bellRef}
           variant="ghost"
           size="icon"
           onClick={handleTogglePanel}
@@ -136,12 +149,13 @@ export const NotificationBell = ({ onPanelOpen, onPanelClose }: NotificationBell
         <>
           {/* Backdrop overlay */}
           <div 
-            className="fixed inset-0 z-40" 
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm" 
             onClick={handleClosePanel}
           />
           <NotificationsPanel
             onClose={handleClosePanel}
             onUpdate={handleUpdate}
+            position={panelPosition}
           />
         </>
       )}

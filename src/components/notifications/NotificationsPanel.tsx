@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell, CheckCheck, Settings, History, Loader2, X, ChevronLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
-import { Settings, CheckCheck, Bell, Loader2, History, Trash2 } from 'lucide-react';
 import { NotificationItem } from './NotificationItem';
 import { NotificationPreferences } from './NotificationPreferences';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Notification {
   id: string;
@@ -17,9 +18,9 @@ interface Notification {
   message: string | null;
   related_id: string | null;
   related_type: string | null;
-  from_user_id: string | null;
   is_read: boolean;
   created_at: string;
+  from_user_id: string | null;
   from_user: {
     display_name: string | null;
     avatar_url: string | null;
@@ -29,6 +30,7 @@ interface Notification {
 interface NotificationsPanelProps {
   onClose: () => void;
   onUpdate: () => void;
+  position?: { x: number; y: number };
 }
 
 // Message-related types are excluded from general notifications
@@ -38,7 +40,7 @@ const MESSAGE_NOTIFICATION_TYPES = [
   'call_missed', 'group_invite', 'group_message'
 ];
 
-export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProps) => {
+export const NotificationsPanel = ({ onClose, onUpdate, position }: NotificationsPanelProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -182,83 +184,122 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
     navigate('/notifications/history');
   };
 
+  // Calculate panel position - anchor to top-left near the bell
+  const panelStyle: React.CSSProperties = position ? {
+    position: 'fixed',
+    left: Math.max(16, Math.min(position.x, window.innerWidth - 340)), // Keep within bounds
+    top: position.y,
+    zIndex: 50,
+  } : {
+    position: 'fixed',
+    left: 16,
+    top: 64,
+    zIndex: 50,
+  };
+
   if (showPreferences) {
     return (
-      <NotificationPreferences
-        onClose={() => setShowPreferences(false)}
-        onBack={() => setShowPreferences(false)}
-      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+        style={panelStyle}
+        className="w-80 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-2xl shadow-xl overflow-hidden"
+      >
+        <NotificationPreferences
+          onClose={() => setShowPreferences(false)}
+          onBack={() => setShowPreferences(false)}
+        />
+      </motion.div>
     );
   }
 
   return (
-    <div className="fixed right-4 top-16 w-96 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-lg shadow-lg z-50">
-      {/* Header */}
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-lg font-semibold">Notifications</h3>
-          <div className="flex items-center gap-1">
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+      style={panelStyle}
+      className="w-80 max-w-[calc(100vw-2rem)] bg-background border border-border rounded-2xl shadow-xl overflow-hidden"
+    >
+      {/* Header with Close Button */}
+      <div className="p-3 border-b border-border bg-muted/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleViewHistory}
-              title="View history"
-              className="h-8 w-8"
+              onClick={onClose}
+              className="h-8 w-8 rounded-full"
             >
-              <History className="w-4 h-4" />
+              <ChevronLeft className="w-4 h-4" />
             </Button>
+            <h3 className="text-base font-semibold">Notifications</h3>
+          </div>
+          <div className="flex items-center gap-1">
             <Button
               variant="ghost"
               size="icon"
               onClick={markAllAsRead}
               disabled={notifications.length === 0 || markingAllRead}
               title="Mark all as read"
-              className="h-8 w-8"
+              className="h-7 w-7 rounded-full"
             >
               {markingAllRead ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <CheckCheck className="w-4 h-4" />
+                <CheckCheck className="w-3.5 h-3.5" />
               )}
             </Button>
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowPreferences(true)}
-              title="Notification settings"
-              className="h-8 w-8"
+              title="Settings"
+              className="h-7 w-7 rounded-full"
             >
-              <Settings className="w-4 h-4" />
+              <Settings className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              title="Close"
+              className="h-7 w-7 rounded-full"
+            >
+              <X className="w-3.5 h-3.5" />
             </Button>
           </div>
         </div>
         {notifications.length > 0 && (
-          <p className="text-xs text-muted-foreground">
-            {notifications.length} unread notification{notifications.length !== 1 ? 's' : ''}
+          <p className="text-xs text-muted-foreground mt-1 ml-10">
+            {notifications.length} unread
           </p>
         )}
       </div>
 
       {/* Notifications List - ONLY UNREAD */}
-      <ScrollArea className="h-[400px] max-h-[calc(100vh-250px)]">
+      <ScrollArea className="h-[320px] max-h-[calc(100vh-200px)]">
         {loading ? (
           <div className="flex justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : notifications.length === 0 ? (
-          <div className="text-center py-12 px-4">
-            <Bell className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground font-medium">You're all caught up!</p>
-            <p className="text-xs text-muted-foreground mt-2">
+          <div className="text-center py-10 px-4">
+            <Bell className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+            <p className="text-muted-foreground font-medium text-sm">You're all caught up!</p>
+            <p className="text-xs text-muted-foreground mt-1">
               No new notifications
             </p>
             <Button
               variant="link"
               size="sm"
               onClick={handleViewHistory}
-              className="mt-4 text-primary"
+              className="mt-3 text-primary text-xs"
             >
-              View notification history
+              View history
             </Button>
           </div>
         ) : (
@@ -279,18 +320,18 @@ export const NotificationsPanel = ({ onClose, onUpdate }: NotificationsPanelProp
 
       {/* Footer - View History Link */}
       {notifications.length > 0 && (
-        <div className="p-3 border-t border-border">
+        <div className="p-2 border-t border-border bg-muted/20">
           <Button
             variant="ghost"
             size="sm"
             onClick={handleViewHistory}
-            className="w-full text-primary hover:text-primary/80"
+            className="w-full text-primary hover:text-primary/80 text-xs h-8"
           >
-            <History className="w-4 h-4 mr-2" />
-            View all notification history
+            <History className="w-3.5 h-3.5 mr-1.5" />
+            View all history
           </Button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 };
