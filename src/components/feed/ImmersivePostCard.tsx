@@ -611,8 +611,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   // Check if we need a footer section (caption, music, or promote button exists)
   const hasFooterContent = !isImmersiveMode && !isTextStyled && !isPlainText && (caption || hasMusic || (user && !isPromoted));
 
+  // Determine if this is effectively a plain text post (no media at all)
+  const isEffectivelyPlainText = isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled);
+
   // Photo+ layout: caption above image, horizontal social buttons below
-  const isPhotoTextLayout = layoutType === 'photo-text' && !isTextStyled && !isPlainText;
+  // Excludes plain text posts - they have inline social buttons
+  const isPhotoTextLayout = layoutType === 'photo-text' && !isTextStyled && !isEffectivelyPlainText;
 
   return (
     <>
@@ -744,7 +748,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             )}
 
             {/* Photo+ Layout: Caption ABOVE the image */}
-            {isPhotoTextLayout && caption && (
+            {isPhotoTextLayout && caption && !isEffectivelyPlainText && (
               <div className="mt-3 px-1">
                 <p className="text-white text-sm leading-snug break-words">
                   {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
@@ -846,7 +850,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           )}
 
           {/* Plain text posts - Facebook-style simple text layout (no background, left-aligned buttons) */}
-          {(isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled)) && (
+          {isEffectivelyPlainText && (
             <div 
               className="w-full flex flex-col px-4 py-8"
               style={{ touchAction: 'manipulation' }}
@@ -1321,7 +1325,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         )}
 
         {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout --- */}
-        {!isImmersiveMode && isPhotoTextLayout && (
+        {!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
