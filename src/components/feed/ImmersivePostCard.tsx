@@ -818,18 +818,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Image - Different layouts for Photo+ vs Video posts */}
           {hasImage && currentMediaUrl && (
             <>
-              {/* Photo+ Layout: Multi-image grid with swipe and tap-to-lightbox */}
+              {/* Photo+ Layout: Thumbnail carousel with horizontal scroll */}
               {isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? (
-                <div className="w-full h-full flex flex-col">
-                  {/* Image Grid - 1 or 2 columns */}
-                  <div className={cn(
-                    "grid gap-1 flex-1",
-                    mediaUrls.length === 1 ? "grid-cols-1" : "grid-cols-2"
-                  )}>
+                <div className="w-full px-1 py-2">
+                  {/* Horizontal Scroll Carousel for multiple images */}
+                  <div 
+                    className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  >
                     {mediaUrls.map((url, idx) => (
                       <div 
                         key={idx} 
-                        className="relative overflow-hidden cursor-pointer"
+                        className="relative flex-none snap-center rounded-xl overflow-hidden border border-border cursor-pointer hover:brightness-95 transition-all"
+                        style={{ width: mediaUrls.length === 2 ? 'calc(50% - 4px)' : '70%' }}
                         onClick={(e) => {
                           e.stopPropagation();
                           setLightboxIndex(idx);
@@ -839,17 +840,21 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                         <img
                           src={url}
                           alt={`Image ${idx + 1}`}
-                          className="w-full h-full object-cover transition-opacity duration-300"
+                          className="w-full aspect-[4/5] object-cover transition-opacity duration-300"
                           onLoad={() => idx === 0 && setIsMediaLoaded(true)}
                           onContextMenu={(e) => e.preventDefault()}
                           draggable={false}
                         />
+                        {/* Image index indicator */}
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 rounded text-white text-xs font-medium">
+                          {idx + 1} / {mediaUrls.length}
+                        </div>
                       </div>
                     ))}
                   </div>
                   {/* Swipe indicator dots */}
                   {mediaUrls.length > 1 && (
-                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                    <div className="flex justify-center gap-1.5 mt-2">
                       {mediaUrls.map((_, idx) => (
                         <button
                           key={idx}
@@ -861,14 +866,34 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                           className={cn(
                             "w-1.5 h-1.5 rounded-full transition-all",
                             idx === currentMediaIndex
-                              ? "bg-white w-3"
-                              : "bg-white/50"
+                              ? "bg-primary w-3"
+                              : "bg-muted-foreground/40"
                           )}
                         />
                       ))}
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                </div>
+              ) : isPhotoTextLayout && !hasMultipleMedia && !isImmersiveMode ? (
+                /* Single image in Photo+ - Thumbnail style */
+                <div className="w-full px-1 py-2">
+                  <div 
+                    className="relative rounded-xl overflow-hidden border border-border cursor-pointer hover:brightness-95 transition-all"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setLightboxIndex(0);
+                      setShowLightbox(true);
+                    }}
+                  >
+                    <img
+                      src={currentMediaUrl}
+                      alt="Post media"
+                      className="w-full aspect-[4/5] object-cover transition-opacity duration-300"
+                      onLoad={() => setIsMediaLoaded(true)}
+                      onContextMenu={(e) => e.preventDefault()}
+                      draggable={false}
+                    />
+                  </div>
                 </div>
               ) : (
                 /* Default single image display for video tab or single-image Photo+ */
