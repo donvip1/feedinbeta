@@ -860,20 +860,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 {renderCaptionWithHashtags(caption)}
               </p>
               
-              {/* Promote Button - left aligned */}
-              {user && !isPromoted && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
-                  }}
-                  className="flex items-center gap-1.5 mt-4 w-fit px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white hover:from-purple-600 hover:to-pink-600 transition-all active:scale-95 shadow-lg"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Promote</span>
-                </button>
-              )}
-              
               {/* Social Buttons - left aligned, directly under content */}
               <div className="flex items-center gap-4 mt-4">
                 <button onClick={handleLike} className="flex items-center gap-1.5 group">
@@ -900,6 +886,20 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
                 </button>
               </div>
+              
+              {/* Promote Button - left aligned, AFTER social buttons */}
+              {user && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="flex items-center gap-1.5 mt-3 w-fit px-3 py-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full text-white hover:from-purple-600 hover:to-pink-600 transition-all active:scale-95 shadow-lg"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Promote</span>
+                </button>
+              )}
             </div>
           )}
 
