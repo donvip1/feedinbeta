@@ -307,12 +307,22 @@ export default function ImageLightbox({
           </motion.div>
         </motion.div>
 
-        {/* Caption when comments are open */}
-        {commentsOpen && caption && (
-          <div className="flex-shrink-0 px-4 py-2 bg-black border-b border-border">
-            <p className="text-white text-sm line-clamp-2">{caption}</p>
-          </div>
-        )}
+        {/* Caption - visible when UI is shown or comments are open */}
+        <AnimatePresence>
+          {(showUI || commentsOpen) && caption && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className={cn(
+                "flex-shrink-0 px-4 py-2 bg-gradient-to-t from-black/80 to-transparent",
+                commentsOpen && "bg-black border-b border-border"
+              )}
+            >
+              <p className="text-white text-sm line-clamp-3">{caption}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Social Buttons - Right sidebar (visible when UI shown and comments closed) */}
         <AnimatePresence>

@@ -1418,14 +1418,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </motion.div>
         )}
 
-        {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout --- */}
+        {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout - directly below content --- */}
         {!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: "easeOut", delay: 0.1 }}
-            className="flex-shrink-0 bg-black px-4 py-3 z-20"
-          >
+          <div className="flex-shrink-0 px-4 py-1.5">
             {/* Horizontal Social Buttons - All in one row */}
             <div className="flex items-center gap-4 flex-wrap">
               {/* Like */}
@@ -1477,7 +1472,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-xs font-semibold">Promote</span>
               </button>
             )}
-          </motion.div>
+          </div>
         )}
         {/* Social buttons for Plain Text are now inline within the text section above */}
       </div>
