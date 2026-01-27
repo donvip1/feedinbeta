@@ -78,7 +78,6 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
   }, []);
 
   const handleSubmit = async () => {
-    if (!user) return;
     if (!text.trim() && images.length === 0) {
       toast({
         title: 'Empty post',
@@ -91,12 +90,27 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
     setIsSubmitting(true);
 
     try {
+      // Get fresh session to ensure auth is valid
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session?.user) {
+        toast({
+          title: 'Session expired',
+          description: 'Please sign in again to create posts.',
+          variant: 'destructive'
+        });
+        setIsSubmitting(false);
+        return;
+      }
+
+      const authenticatedUserId = sessionData.session.user.id;
+
       // Upload images if any
       const mediaUrls: string[] = [];
       const mediaTypes: string[] = [];
 
       for (const img of images) {
-        const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
+        const fileName = `${authenticatedUserId}/${Date.now()}-${Math.random().toString(36).substring(7)}.jpg`;
         const { data, error } = await supabase.storage
           .from('post-media')
           .upload(fileName, img.file, { contentType: img.file.type });
@@ -119,11 +133,11 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
         mediaType = 'image';
       }
 
-      // Create the post
+      // Create the post using authenticated user ID from session
       const { data: newPost, error: postError } = await supabase
         .from('posts')
         .insert({
-          user_id: user.id,
+          user_id: authenticatedUserId,
           content: fullContent || null,
           media_url: mediaUrls[0] || null,
           media_urls: mediaUrls.length > 0 ? mediaUrls : null,
