@@ -331,33 +331,33 @@ export default function ImageLightbox({
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="absolute right-3 bottom-24 z-50 flex flex-col items-center gap-3"
+              className="absolute right-3 bottom-24 z-50 flex flex-col items-center gap-2"
             >
               {/* Like */}
               <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
                 <div className={cn(
-                  "p-2 rounded-full transition-all active:scale-90",
-                  liked ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+                  "p-1.5 rounded-full transition-all active:scale-90",
+                  liked ? "bg-pink-500/90" : "bg-transparent"
                 )}>
-                  <Heart className={cn("w-6 h-6 transition-transform", liked ? "text-white fill-white" : "text-white")} />
+                  <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
                 </div>
-                <span className="text-white text-xs font-semibold">{formatCount(likesCount)}</span>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
               </button>
 
               {/* Comments */}
               <button onClick={handleCommentsOpen} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <MessageCircle className="w-6 h-6 text-white" />
+                <div className="p-1.5 rounded-full transition-all active:scale-90">
+                  <MessageCircle className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white text-xs font-semibold">{formatCount(commentsCount)}</span>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
               </button>
 
               {/* Views */}
               <div className="flex flex-col items-center gap-0.5">
-                <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full">
-                  <Eye className="w-6 h-6 text-white" />
+                <div className="p-1.5 rounded-full">
+                  <Eye className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white text-xs font-semibold">{formatCount(initialViewsCount)}</span>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(initialViewsCount)}</span>
               </div>
 
               {/* Refeed */}
@@ -368,10 +368,10 @@ export default function ImageLightbox({
                 }} 
                 className="flex flex-col items-center gap-0.5 group"
               >
-                <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Repeat className="w-6 h-6 text-white" />
+                <div className="p-1.5 rounded-full transition-all active:scale-90">
+                  <Repeat className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white text-xs font-semibold">{formatCount(refeedsCount)}</span>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
               </button>
 
               {/* Gift */}
@@ -382,10 +382,10 @@ export default function ImageLightbox({
                 }} 
                 className="flex flex-col items-center gap-0.5 group"
               >
-                <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Gift className="w-6 h-6 text-white" />
+                <div className="p-1.5 rounded-full transition-all active:scale-90">
+                  <Gift className="w-5 h-5 text-white" />
                 </div>
-                <span className="text-white text-xs font-semibold">{formatCount(giftsCount)}</span>
+                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
               </button>
 
               {/* Share */}
@@ -396,8 +396,8 @@ export default function ImageLightbox({
                 }} 
                 className="flex flex-col items-center gap-0.5 group"
               >
-                <div className="p-2 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
-                  <Share2 className="w-6 h-6 text-white" />
+                <div className="p-1.5 rounded-full transition-all active:scale-90">
+                  <Share2 className="w-5 h-5 text-white" />
                 </div>
               </button>
 
