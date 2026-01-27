@@ -324,95 +324,84 @@ export default function ImageLightbox({
           )}
         </AnimatePresence>
 
-        {/* Social Buttons - Right sidebar (visible when UI shown and comments closed) */}
+        {/* Social Buttons - Horizontal bottom bar (visible when UI shown and comments closed) */}
         <AnimatePresence>
           {showUI && !commentsOpen && postId && (
             <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="absolute right-[5%] bottom-24 z-50 flex flex-col items-center gap-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="absolute bottom-8 left-4 right-4 z-50"
             >
-              {/* Like */}
-              <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
-                <div className={cn(
-                  "p-1.5 rounded-full transition-all active:scale-90",
-                  liked ? "bg-pink-500/90" : "bg-transparent"
-                )}>
-                  <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-white fill-white" : "text-white")} />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(likesCount)}</span>
-              </button>
+              {/* Horizontal Social Buttons Row */}
+              <div className="flex items-center gap-4 flex-wrap">
+                {/* Like */}
+                <button onClick={handleLike} className="flex items-center gap-1 group">
+                  <Heart className={cn("w-5 h-5 transition-transform active:scale-90", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
+                  <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(likesCount)}</span>
+                </button>
 
-              {/* Comments */}
-              <button onClick={handleCommentsOpen} className="flex flex-col items-center gap-0.5 group">
-                <div className="p-1.5 rounded-full transition-all active:scale-90">
-                  <MessageCircle className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
-              </button>
+                {/* Comments */}
+                <button onClick={handleCommentsOpen} className="flex items-center gap-1 group">
+                  <MessageCircle className="w-5 h-5 text-white active:scale-90 transition-transform" />
+                  <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(commentsCount)}</span>
+                </button>
 
-              {/* Views */}
-              <div className="flex flex-col items-center gap-0.5">
-                <div className="p-1.5 rounded-full">
+                {/* Views */}
+                <div className="flex items-center gap-1">
                   <Eye className="w-5 h-5 text-white" />
+                  <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(initialViewsCount)}</span>
                 </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(initialViewsCount)}</span>
-              </div>
 
-              {/* Refeed */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRefeedOpen(true);
-                }} 
-                className="flex flex-col items-center gap-0.5 group"
-              >
-                <div className="p-1.5 rounded-full transition-all active:scale-90">
-                  <Repeat className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
-              </button>
-
-              {/* Gift */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setGiftOpen(true);
-                }} 
-                className="flex flex-col items-center gap-0.5 group"
-              >
-                <div className="p-1.5 rounded-full transition-all active:scale-90">
-                  <Gift className="w-5 h-5 text-white" />
-                </div>
-                <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
-              </button>
-
-              {/* Share */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShareOpen(true);
-                }} 
-                className="flex flex-col items-center gap-0.5 group"
-              >
-                <div className="p-1.5 rounded-full transition-all active:scale-90">
-                  <Share2 className="w-5 h-5 text-white" />
-                </div>
-              </button>
-
-              {/* Promote */}
-              {user && postId && (
+                {/* Refeed */}
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/promote/${postId}`);
-                  }}
-                  className="p-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all active:scale-90"
+                    setRefeedOpen(true);
+                  }} 
+                  className="flex items-center gap-1 group"
                 >
-                  <TrendingUp className="w-5 h-5 text-white" />
+                  <Repeat className="w-5 h-5 text-white active:scale-90 transition-transform" />
+                  <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(refeedsCount)}</span>
                 </button>
-              )}
+
+                {/* Gift */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setGiftOpen(true);
+                  }} 
+                  className="flex items-center gap-1 group"
+                >
+                  <Gift className="w-5 h-5 text-white active:scale-90 transition-transform" />
+                  <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(giftsCount)}</span>
+                </button>
+
+                {/* Share */}
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShareOpen(true);
+                  }} 
+                  className="flex items-center gap-1 group"
+                >
+                  <Share2 className="w-5 h-5 text-white active:scale-90 transition-transform" />
+                </button>
+
+                {/* Promote */}
+                {user && postId && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/promote/${postId}`);
+                    }}
+                    className="ml-auto px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all active:scale-95 flex items-center gap-1"
+                  >
+                    <TrendingUp className="w-4 h-4 text-white" />
+                    <span className="text-white text-xs font-medium">Promote</span>
+                  </button>
+                )}
+              </div>
             </motion.div>
           )}
         </AnimatePresence>
