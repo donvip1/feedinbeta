@@ -1,231 +1,139 @@
 
-# Photo+ Feed Rebuild & FAB Menu Restructuring
+
+# Database Cleanup & Photo+ Fixes
 
 ## Overview
-This plan transforms the Photo+ tab into a Threads-style feed experience with a new post creation flow. The changes consolidate multiple post types (Gallery, Text Card, Plain Text) into a single unified "Photo+" creation experience while maintaining video posts separately.
+This plan addresses three issues:
+1. Delete all posts from the database to start fresh
+2. Fix the duplicate social buttons issue on plain text posts in Photo+
+3. Fix the RLS error when creating new Photo+ posts
 
-## Changes Summary
+## Part 1: Clear All Posts from Database
 
-### 1. FAB Menu Restructuring
+**What will happen:**
+- All 249 posts will be deleted from the `posts` table
+- Related data in linked tables will also be cleaned up:
+  - `post_likes` (likes on posts)
+  - `post_views` (view records)
+  - `post_comments` (comments on posts)
+  - `post_hashtags` (hashtag associations)
+  - `saved_posts` (saved bookmarks)
+  - `refeeds` (refeed records)
 
-**Current FAB Options:**
-- Camera → Take a photo or video
-- Gallery → Choose from photos
-- Story → Share for 24 hours
-- Text Card → Styled text with backgrounds
-- Plain Text → Share your thoughts
-- Go Live → Start a live stream
-
-**New FAB Options:**
-- Video → Take video or choose from gallery
-- Photo+ → Share your thoughts
-- Story → Share for 24 hours
-- Go Live → Start a live stream
-
-### 2. New Photo+ Post Creation Flow
-
-A Threads-inspired creation modal that supports:
-- Text content (up to 1000 characters)
-- Attach up to 2 images per post
-- Image preview with remove functionality
-- Dynamic text truncation with "See more/less"
-- Responsive image lightbox for viewing
-
-**UI Components:**
-- Desktop: Quick post composer at top of Photo+ feed
-- Mobile: Full-screen creation modal (triggered from FAB)
-
-### 3. Photo+ Feed Display
-
-Based on the provided Threads code, posts will show:
-- User avatar, display name, and timestamp
-- Text content with expandable long text
-- Image grid (1 or 2 images) with lightbox viewer
-- Horizontal social buttons using existing FeedIn button style:
-  - Like (Heart)
-  - Comment (MessageCircle)
-  - Views (Eye)
-  - Refeed (Repeat)
-  - Gift (Gift)
-  - Share (Share2)
-- Promote button (existing gradient style)
-
-### 4. Files to Create/Modify
-
----
-
-## Technical Implementation Details
-
-### Phase 1: Update FAB and Creation Sheet
-
-**File: `src/components/post/NativeCreationSheet.tsx`**
-- Change "Camera" to "Video" with description "Take video or choose from gallery"
-- Replace Gallery, Text Card, Plain Text with single "Photo+" option
-- Description: "Share your thoughts"
-- Update icon to use `ImagePlus` or similar
-
-**File: `src/components/post/PostCreationSelector.tsx`**
-- Update to match NativeCreationSheet changes
-
-### Phase 2: Create Photo+ Post Creator Component
-
-**New File: `src/components/post/PhotoPlusPostCreator.tsx`**
-
-Features:
-- Full-screen modal for mobile
-- Text input area (up to 1000 characters)
-- Image attachment (max 2 images)
-- Image preview grid with remove buttons
-- Privacy selector
-- Location input (optional)
-- Hashtag input
-- Post button
-
+**Database Operations:**
 ```text
-┌─────────────────────────────────┐
-│  Cancel          New Post  Post │
-├─────────────────────────────────┤
-│  ┌──────┐                       │
-│  │Avatar│  What's on your mind? │
-│  └──────┘                       │
-│                                 │
-│  ┌──────────────────────────┐   │
-│  │ Text input area          │   │
-│  │ (1000 char limit)        │   │
-│  └──────────────────────────┘   │
-│                                 │
-│  ┌─────┐ ┌─────┐                │
-│  │Img 1│ │Img 2│ (if attached)  │
-│  │  X  │ │  X  │                │
-│  └─────┘ └─────┘                │
-│                                 │
-│  ┌──────────────────────────┐   │
-│  │ # Add hashtags           │   │
-│  └──────────────────────────┘   │
-│                                 │
-│  Privacy: [Everyone ▼]          │
-│                                 │
-├─────────────────────────────────┤
-│  📷 (Image picker, max 2)       │
-└─────────────────────────────────┘
+1. Delete from post_hashtags
+2. Delete from post_views  
+3. Delete from post_likes
+4. Delete from post_comments
+5. Delete from saved_posts
+6. Delete from refeeds
+7. Delete from posts
 ```
 
-### Phase 3: Update ImmersivePostCard for Photo+ Layout
-
-**File: `src/components/feed/ImmersivePostCard.tsx`**
-
-Changes for Photo+ posts (when `layoutType === 'photo-text'`):
-
-1. **Post Header** (profile info + timestamp at top)
-2. **Text Content** with "See more/less" for long text (threshold: 150 chars)
-3. **Image Grid** (if images attached):
-   - Single image: Full width
-   - Two images: Side-by-side grid
-4. **Social Buttons** - Horizontal row using existing button components
-5. **Promote Button** - Existing gradient style
-
-### Phase 4: Create Image Lightbox Component
-
-**New File: `src/components/feed/ImageLightbox.tsx`**
-
-Features:
-- Fullscreen image viewer
-- Navigation arrows for multiple images
-- Image counter (1/2)
-- Close button
-- Swipe navigation support
-
-### Phase 5: Update Feed.tsx Integration
-
-**File: `src/pages/Feed.tsx`**
-
-Changes:
-- Add new post step: `'photoplus'`
-- Remove `'gallery'`, `'text'`, `'plaintext'` steps for Photo+ context
-- Update NativeCreationSheet handlers:
-  - `onVideoSelect` → Opens camera/gallery for video only
-  - `onPhotoPlusSelect` → Opens PhotoPlusPostCreator
-- Keep video creation flow unchanged
-
-### Phase 6: Database Considerations
-
-The existing `posts` table schema already supports the new Photo+ posts:
-- `content`: Text content
-- `media_urls`: Array for multiple images (up to 2)
-- `media_types`: Array for media type classification
-- `media_type`: Will be `'image'` for Photo+ posts with images, or `'text_plain'` for text-only
-
-No database migrations required.
-
-### Phase 7: Cleanup
-
-**Files to Potentially Deprecate:**
-- `src/components/post/PlainTextPostCreator.tsx` - Replaced by PhotoPlusPostCreator
-- `src/components/post/TextPostCreator.tsx` - Replaced by PhotoPlusPostCreator
-- `src/components/post/MediaGalleryPicker.tsx` - Integrated into PhotoPlusPostCreator (for Photo+ only; Video may still use separate flow)
-
-**Remove from FAB:**
-- Gallery option
-- Text Card option
-- Plain Text option
+This gives users a completely clean slate to start posting fresh content.
 
 ---
 
-## Post Type Flow Summary
+## Part 2: Fix Duplicate Social Buttons on Plain Text Posts
 
-| FAB Option | Opens | Creates Post Type |
-|------------|-------|-------------------|
-| Video | Camera/Gallery picker | `media_type: 'video'` |
-| Photo+ | PhotoPlusPostCreator | `media_type: 'image'` or `'text_plain'` |
-| Story | CreateStoryModal | Story (24h) |
-| Go Live | Navigate to /live | Live stream |
+**Current Problem:**
+In `ImmersivePostCard.tsx`, plain text posts (`isEffectivelyPlainText`) render social buttons inline within the text section (lines 877-902). However, the footer section for Photo+ layout (lines 1328-1387) also renders when `isPhotoTextLayout` is true but `isEffectivelyPlainText` is false. 
 
----
-
-## Component Structure
-
-```text
-Feed.tsx
-├── NativeCreationSheet (FAB menu)
-│   ├── Video → NativeCameraView / NativeGalleryPicker (video only)
-│   ├── Photo+ → PhotoPlusPostCreator (NEW)
-│   ├── Story → CreateStoryModal
-│   └── Go Live → Navigate /live
-│
-├── Photo+ Tab Content
-│   └── ImmersivePostCard (layoutType="photo-text")
-│       ├── Post Header (Avatar, Name, Time)
-│       ├── Text Content (expandable)
-│       ├── Image Grid (1-2 images)
-│       ├── ImageLightbox (on image tap)
-│       ├── Social Buttons (horizontal)
-│       └── Promote Button
-│
-└── Videos Tab Content
-    └── ImmersivePostCard (layoutType="video")
-        └── Existing video layout
+The issue is that `isEffectivelyPlainText` includes posts with `isPlainText` OR posts without any media:
+```tsx
+const isEffectivelyPlainText = isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled);
 ```
 
+But the Photo+ footer condition at line 1328:
+```tsx
+{!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (...)}
+```
+
+This should correctly exclude plain text posts. However, the inline social buttons for plain text (lines 877-902) may be rendering alongside other content incorrectly.
+
+**Fix:**
+Update the conditions to ensure:
+- Plain text posts ONLY show inline social buttons (under the text)
+- Image-based Photo+ posts ONLY show footer social buttons
+- No duplication occurs
+
+The fix will:
+1. Ensure `isEffectivelyPlainText` condition properly gates the inline social buttons section
+2. Add explicit exclusion in the footer section for plain text
+3. Move the Promote button placement to be consistent (after social buttons for both layouts)
+
 ---
 
-## Implementation Order
+## Part 3: Fix RLS Error When Creating Photo+ Posts
 
-1. Create `PhotoPlusPostCreator.tsx` component
-2. Create `ImageLightbox.tsx` component
-3. Update `NativeCreationSheet.tsx` with new options
-4. Update `PostCreationSelector.tsx` to match
-5. Update `Feed.tsx` with new post step handling
-6. Update `ImmersivePostCard.tsx` for Photo+ display improvements
-7. Test integration and fix edge cases
-8. Clean up deprecated components
+**Current Problem:**
+When creating a new Photo+ post, users get an error about "row-level security policy".
+
+**Root Cause:**
+Looking at the RLS policy on `posts` table:
+```
+INSERT policy: ((auth.uid() IS NOT NULL) AND (auth.uid() = user_id))
+```
+
+The policy requires:
+1. User must be authenticated (`auth.uid() IS NOT NULL`)
+2. The `user_id` column in the insert must match `auth.uid()`
+
+The current `PhotoPlusPostCreator.tsx` correctly sets `user_id: user.id` in the insert (line 126). However, the check at line 81 (`if (!user) return`) may not be sufficient if the auth token is stale or the user object doesn't have the correct ID.
+
+**Investigation:**
+The code looks correct. The issue might be:
+1. User session not properly loaded when creating post
+2. The `user.id` not matching the authenticated session
+
+**Fix:**
+1. Add additional auth validation before attempting to create post
+2. Ensure the user object is fresh from the auth session
+3. Add better error messaging to understand the exact RLS failure
 
 ---
 
-## Social Button Consistency
+## Technical Implementation
 
-The Photo+ posts will use the same social button styling as video posts:
-- Same icons (Heart, MessageCircle, Eye, Repeat, Gift, Share2)
-- Same color scheme
-- Same animation effects
-- Positioned horizontally under the content (matching the Threads code structure)
-- Existing real-time synchronization for counts
+### Files to Modify
+
+1. **Database Cleanup (via SQL execution)**
+   - Delete all related records first (foreign key dependencies)
+   - Delete all posts last
+   
+2. **`src/components/feed/ImmersivePostCard.tsx`**
+   - Fix the conditional rendering logic for plain text vs image Photo+ posts
+   - Ensure only ONE set of social buttons renders for each post type
+
+3. **`src/components/post/PhotoPlusPostCreator.tsx`**
+   - Add defensive auth checking
+   - Improve error handling to show more specific messages
+
+### Implementation Steps
+
+**Step 1: Database Cleanup**
+Run SQL to delete all posts and related data in the correct order to respect foreign key constraints.
+
+**Step 2: Fix Duplicate Social Buttons**
+Update `ImmersivePostCard.tsx`:
+- Review and fix the `isEffectivelyPlainText` condition usage
+- Ensure the inline social buttons (lines 877-902) only render when `isEffectivelyPlainText` is true
+- Ensure the footer Photo+ social buttons (lines 1327-1387) never render for plain text
+
+**Step 3: Fix RLS Error**
+Update `PhotoPlusPostCreator.tsx`:
+- Add auth state refresh before submission
+- Add more detailed error logging
+- Ensure user.id matches the authenticated user
+
+---
+
+## Summary of Changes
+
+| Area | Change |
+|------|--------|
+| Database | Delete all 249 posts and related data |
+| ImmersivePostCard | Fix duplicate social button rendering |
+| PhotoPlusPostCreator | Fix auth validation for post creation |
+
