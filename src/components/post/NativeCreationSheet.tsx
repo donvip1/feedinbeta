@@ -1,34 +1,32 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { Camera, Image, Type, Radio, X, Mic, MessageSquare } from 'lucide-react';
+import { Video, ImagePlus, Radio, X, Mic } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NativeCreationSheetProps {
   open: boolean;
   onClose: () => void;
-  onCameraSelect: () => void;
-  onGallerySelect: () => void;
+  onVideoSelect: () => void;
+  onPhotoPlusSelect: () => void;
   onStorySelect: () => void;
-  onTextSelect: () => void;
-  onPlainTextSelect?: () => void;
   onLiveSelect?: () => void;
 }
 
 const options = [
   {
-    id: 'camera',
-    label: 'Camera',
-    description: 'Take a photo or video',
-    icon: Camera,
+    id: 'video',
+    label: 'Video',
+    description: 'Take video or choose from gallery',
+    icon: Video,
     gradient: 'from-blue-500 to-cyan-400',
-    action: 'onCameraSelect',
+    action: 'onVideoSelect',
   },
   {
-    id: 'gallery',
-    label: 'Gallery',
-    description: 'Choose from photos',
-    icon: Image,
+    id: 'photoplus',
+    label: 'Photo+',
+    description: 'Share your thoughts',
+    icon: ImagePlus,
     gradient: 'from-purple-500 to-pink-400',
-    action: 'onGallerySelect',
+    action: 'onPhotoPlusSelect',
   },
   {
     id: 'story',
@@ -37,22 +35,6 @@ const options = [
     icon: Radio,
     gradient: 'from-pink-500 to-rose-400',
     action: 'onStorySelect',
-  },
-  {
-    id: 'text',
-    label: 'Text Card',
-    description: 'Styled text with backgrounds',
-    icon: Type,
-    gradient: 'from-orange-500 to-amber-400',
-    action: 'onTextSelect',
-  },
-  {
-    id: 'plaintext',
-    label: 'Plain Text',
-    description: 'Share your thoughts',
-    icon: MessageSquare,
-    gradient: 'from-slate-600 to-slate-400',
-    action: 'onPlainTextSelect',
   },
   {
     id: 'live',
@@ -67,11 +49,9 @@ const options = [
 export default function NativeCreationSheet({
   open,
   onClose,
-  onCameraSelect,
-  onGallerySelect,
+  onVideoSelect,
+  onPhotoPlusSelect,
   onStorySelect,
-  onTextSelect,
-  onPlainTextSelect,
   onLiveSelect,
 }: NativeCreationSheetProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
@@ -93,15 +73,13 @@ export default function NativeCreationSheet({
   const handleOptionClick = useCallback((action: string) => {
     triggerHaptic();
     const actions: Record<string, (() => void) | undefined> = {
-      onCameraSelect,
-      onGallerySelect,
+      onVideoSelect,
+      onPhotoPlusSelect,
       onStorySelect,
-      onTextSelect,
-      onPlainTextSelect,
       onLiveSelect,
     };
     actions[action]?.();
-  }, [onCameraSelect, onGallerySelect, onStorySelect, onTextSelect, onPlainTextSelect, onLiveSelect, triggerHaptic]);
+  }, [onVideoSelect, onPhotoPlusSelect, onStorySelect, onLiveSelect, triggerHaptic]);
 
   // Handle drag to dismiss
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -145,7 +123,6 @@ export default function NativeCreationSheet({
   // Filter out optional options if handlers not provided
   const displayOptions = options.filter(o => {
     if (o.id === 'live' && !onLiveSelect) return false;
-    if (o.id === 'plaintext' && !onPlainTextSelect) return false;
     return true;
   });
 

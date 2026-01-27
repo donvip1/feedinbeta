@@ -12,8 +12,7 @@ import { useQuery } from '@tanstack/react-query';
 import NativeCreationSheet from '@/components/post/NativeCreationSheet';
 import NativeCameraView from '@/components/post/NativeCameraView';
 import NativeGalleryPicker from '@/components/post/NativeGalleryPicker';
-import TextPostCreator from '@/components/post/TextPostCreator';
-import PlainTextPostCreator from '@/components/post/PlainTextPostCreator';
+import PhotoPlusPostCreator from '@/components/post/PhotoPlusPostCreator';
 import PostDetails from '@/components/post/PostDetails';
 import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { CreateStoryModal } from '@/components/stories/CreateStoryModal';
@@ -53,7 +52,7 @@ const Feed = () => {
     setActiveTab(tabs[index]);
   }, []);
   const { containerRef: scrollContainerRef } = useScrollPosition('feed');
-  const [postStep, setPostStep] = useState<'selector' | 'camera' | 'gallery' | 'story' | 'text' | 'plaintext' | null>(null);
+  const [postStep, setPostStep] = useState<'selector' | 'video' | 'videoGallery' | 'story' | 'photoplus' | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<{ url: string; type: 'image' | 'video'; file: File }[]>([]);
   const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
@@ -663,12 +662,12 @@ const Feed = () => {
   const handleGalleryMediaSelect = (files: { url: string; type: 'image' | 'video'; file: File }[]) => {
     setSelectedMedia(files);
     setCurrentMediaIndex(0);
-    setPostStep('gallery');
+    setPostStep('videoGallery');
   };
 
   const handleMediaEdit = (editedMedia: { url: string; type: 'image' | 'video'; file: File }) => {
     // For now, just go to details - can add multi-media editing later
-    setPostStep('gallery');
+    setPostStep('videoGallery');
   };
 
   return (
@@ -957,40 +956,40 @@ const Feed = () => {
       <NativeCreationSheet
         open={postStep === 'selector'}
         onClose={() => setPostStep(null)}
-        onCameraSelect={() => setPostStep('camera')}
-        onGallerySelect={() => setPostStep('gallery')}
+        onVideoSelect={() => setPostStep('video')}
+        onPhotoPlusSelect={() => setPostStep('photoplus')}
         onStorySelect={() => setPostStep('story')}
-        onTextSelect={() => setPostStep('text')}
-        onPlainTextSelect={() => setPostStep('plaintext')}
         onLiveSelect={() => {
           setPostStep(null);
           navigate('/live');
         }}
       />
 
-      {/* Native Camera */}
-      {postStep === 'camera' && (
+      {/* Native Camera for Video */}
+      {postStep === 'video' && (
         <NativeCameraView
           onCapture={(media) => {
             setSelectedMedia([media]);
-            setPostStep('gallery');
+            setPostStep('videoGallery');
           }}
           onClose={() => setPostStep(null)}
-          onGalleryOpen={() => setPostStep('gallery')}
+          onGalleryOpen={() => setPostStep('videoGallery')}
         />
       )}
 
-      {/* Native Gallery Picker */}
-      {postStep === 'gallery' && selectedMedia.length === 0 && (
+      {/* Native Gallery Picker for Video */}
+      {postStep === 'videoGallery' && selectedMedia.length === 0 && (
         <NativeGalleryPicker
           open={true}
           onClose={() => setPostStep(null)}
           onSelect={(items) => {
             setSelectedMedia(items);
           }}
-          onCameraOpen={() => setPostStep('camera')}
+          onCameraOpen={() => setPostStep('video')}
         />
       )}
+
+      {/* Story Creation */}
       {postStep === 'story' && (
         <CreateStoryModal
           open={true}
@@ -1004,19 +1003,20 @@ const Feed = () => {
           }}
         />
       )}
-      {postStep === 'text' && (
-        <TextPostCreator
+
+      {/* Photo+ Post Creator */}
+      {postStep === 'photoplus' && (
+        <PhotoPlusPostCreator
+          open={true}
           onClose={() => setPostStep(null)}
-          onSubmit={handlePostSubmit}
+          onSuccess={() => {
+            refetch();
+          }}
         />
       )}
-      {postStep === 'plaintext' && (
-        <PlainTextPostCreator
-          onClose={() => setPostStep(null)}
-          onSubmit={handlePostSubmit}
-        />
-      )}
-      {postStep === 'gallery' && selectedMedia.length > 0 && (
+
+      {/* Video Post Details */}
+      {postStep === 'videoGallery' && selectedMedia.length > 0 && (
         <PostDetails
           media={selectedMedia}
           onSubmit={handlePostSubmit}
