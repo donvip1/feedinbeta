@@ -820,10 +820,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             <>
               {/* Photo+ Layout: Thumbnail carousel with horizontal scroll */}
               {isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? (
-                <div className="w-full px-1 py-2">
+                <div className="w-full px-1 pb-1">
                   {/* Horizontal Scroll Carousel for multiple images */}
                   <div 
-                    className="flex gap-2 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+                    className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide"
                     style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
                   >
                     {mediaUrls.map((url, idx) => (
@@ -854,7 +854,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   </div>
                   {/* Swipe indicator dots */}
                   {mediaUrls.length > 1 && (
-                    <div className="flex justify-center gap-1.5 mt-2">
+                    <div className="flex justify-center gap-1.5 mt-1">
                       {mediaUrls.map((_, idx) => (
                         <button
                           key={idx}
@@ -876,8 +876,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </div>
               ) : isPhotoTextLayout && !hasMultipleMedia && !isImmersiveMode ? (
                 /* Single image in Photo+ - Thumbnail style */
-                <div className="w-full px-1 py-2">
-                  <div 
+                <div className="w-full px-1 pb-1">
+                  <div
                     className="relative rounded-xl overflow-hidden border border-border cursor-pointer hover:brightness-95 transition-all"
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1420,7 +1420,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout - directly below content --- */}
         {!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (
-          <div className="flex-shrink-0 px-4 py-1.5">
+          <div className="flex-shrink-0 px-4 pt-1 pb-3">
             {/* Horizontal Social Buttons - All in one row */}
             <div className="flex items-center gap-4 flex-wrap">
               {/* Like */}
