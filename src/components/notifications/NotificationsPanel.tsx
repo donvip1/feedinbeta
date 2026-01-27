@@ -35,9 +35,9 @@ interface NotificationsPanelProps {
 
 // Message-related types are excluded from general notifications
 // since they have their own badge on the Messages icon
+// NOTE: We now include all other types including wallet/credit notifications
 const MESSAGE_NOTIFICATION_TYPES = [
-  'message', 'friend_request', 'friend_request_accepted', 'friend_accepted',
-  'call_missed', 'group_invite', 'group_message'
+  'message', 'group_message'
 ];
 
 export const NotificationsPanel = ({ onClose, onUpdate, position }: NotificationsPanelProps) => {

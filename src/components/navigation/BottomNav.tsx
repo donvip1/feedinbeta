@@ -148,17 +148,14 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
   // Get refresh context (may be null if not wrapped)
   const refreshContext = useContext(RefreshContext);
 
-  // Calculate combined counts for each nav item
+  // Calculate combined counts for each nav item - ONLY show badge on chats
   const getNavBadgeCount = (itemId: string): number => {
     switch (itemId) {
-      case 'feed':
-        return notificationCounts.feed;
       case 'chats':
         // Combine unread messages + message-related notifications (friend requests etc)
         return unreadMessageCount + notificationCounts.messages;
-      case 'wallet':
-        return notificationCounts.wallet;
       default:
+        // Feed and wallet notifications now go to the bell icon only
         return 0;
     }
   };
@@ -174,11 +171,8 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
     const isCurrentPage = isActive(path);
     
     // Mark category as viewed when clicking on nav item
-    if (itemId === 'feed') {
-      markCategoryAsRead('feed');
-    } else if (itemId === 'wallet') {
-      markCategoryAsRead('wallet');
-    } else if (itemId === 'chats') {
+    // Only chats still uses the distributed badge system
+    if (itemId === 'chats') {
       markCategoryAsRead('messages');
     }
     
