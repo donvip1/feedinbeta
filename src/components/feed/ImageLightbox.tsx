@@ -315,11 +315,11 @@ export default function ImageLightbox({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
               className={cn(
-                "flex-shrink-0 px-4 py-2 bg-gradient-to-t from-black/80 to-transparent",
-                commentsOpen && "bg-black border-b border-border"
+                "absolute bottom-20 left-0 right-[15%] z-40 px-4 py-3",
+                commentsOpen && "relative bottom-0 right-0 bg-black border-b border-border"
               )}
             >
-              <p className="text-white text-sm line-clamp-3">{caption}</p>
+              <p className="text-white text-sm line-clamp-3 drop-shadow-lg">{caption}</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -331,7 +331,7 @@ export default function ImageLightbox({
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="absolute right-3 bottom-24 z-50 flex flex-col items-center gap-2"
+              className="absolute right-[5%] bottom-24 z-50 flex flex-col items-center gap-2"
             >
               {/* Like */}
               <button onClick={handleLike} className="flex flex-col items-center gap-0.5 group">
@@ -408,9 +408,9 @@ export default function ImageLightbox({
                     e.stopPropagation();
                     navigate(`/promote/${postId}`);
                   }}
-                  className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all active:scale-90"
+                  className="p-1.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all active:scale-90"
                 >
-                  <TrendingUp className="w-6 h-6 text-white" />
+                  <TrendingUp className="w-5 h-5 text-white" />
                 </button>
               )}
             </motion.div>
