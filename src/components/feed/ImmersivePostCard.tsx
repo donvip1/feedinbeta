@@ -1569,6 +1569,16 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             setLightboxIndex(idx);
             setCurrentMediaIndex(idx);
           }}
+          postId={post.id}
+          postUserId={post.user_id}
+          caption={caption}
+          initialLikesCount={likesCount}
+          initialCommentsCount={commentsCount}
+          initialRefeedsCount={refeedsCount}
+          initialGiftsCount={giftsCount}
+          initialViewsCount={post.views_count || 0}
+          profiles={post.profiles}
+          onLikeUpdate={onLikeUpdate}
         />
       )}
 
