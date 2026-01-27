@@ -1,139 +1,228 @@
 
 
-# Database Cleanup & Photo+ Fixes
+# Complete Activity Database Wipe
 
 ## Overview
-This plan addresses three issues:
-1. Delete all posts from the database to start fresh
-2. Fix the duplicate social buttons issue on plain text posts in Photo+
-3. Fix the RLS error when creating new Photo+ posts
+This plan will wipe ALL user activity data from the database while preserving:
+- User accounts (auth.users - managed by system)
+- User profiles (profiles table)
+- Privacy settings
+- Push notification subscriptions
+- System configuration tables
 
-## Part 1: Clear All Posts from Database
+## Data to be Deleted
 
-**What will happen:**
-- All 249 posts will be deleted from the `posts` table
-- Related data in linked tables will also be cleaned up:
-  - `post_likes` (likes on posts)
-  - `post_views` (view records)
-  - `post_comments` (comments on posts)
-  - `post_hashtags` (hashtag associations)
-  - `saved_posts` (saved bookmarks)
-  - `refeeds` (refeed records)
+### Category 1: Posts & Related Activity (Already partially done)
+| Table | Records | Purpose |
+|-------|---------|---------|
+| post_hashtags | 0 | Hashtag associations |
+| post_views | 0 | View records |
+| post_view_history | - | View history |
+| post_likes | 0 | Likes |
+| post_comments | 0 | Comments |
+| post_shares | - | Shares |
+| post_mentions | - | Mentions |
+| post_promotions | - | Promoted posts |
+| saved_posts | 0 | Saved bookmarks |
+| posts | 0 | Posts (already cleared) |
 
-**Database Operations:**
+### Category 2: Stories
+| Table | Records | Purpose |
+|-------|---------|---------|
+| story_views | 222 | Story views |
+| story_reactions | 34 | Story reactions |
+| story_comments | 23 | Story comments |
+| active_stories | - | Active story tracking |
+| stories | 113 | Stories |
+
+### Category 3: Messages & Conversations
+| Table | Records | Purpose |
+|-------|---------|---------|
+| message_attachments | - | File attachments |
+| message_edit_history | - | Edit history |
+| message_reactions | - | Message reactions |
+| message_read_receipts | - | Read receipts |
+| starred_messages | - | Starred messages |
+| scheduled_messages | - | Scheduled messages |
+| typing_indicators | - | Typing indicators |
+| messages | 608 | Direct messages |
+| conversation_participants | - | Conversation members |
+| conversations | 12 | Conversations |
+
+### Category 4: Groups
+| Table | Records | Purpose |
+|-------|---------|---------|
+| group_message_reactions | - | Message reactions |
+| group_message_read_status | - | Read status |
+| group_messages | 8 | Group messages |
+| group_poll_votes | - | Poll votes |
+| group_polls | - | Polls |
+| group_posts | - | Group posts |
+| group_typing_indicators | - | Typing indicators |
+| group_call_participants | - | Call participants |
+| group_calls | - | Group calls |
+| group_invite_links | - | Invite links |
+| group_invite_uses | - | Invite usage |
+| group_join_requests | - | Join requests |
+| group_members | - | Group members |
+| groups | 3 | Groups |
+
+### Category 5: Calls
+| Table | Records | Purpose |
+|-------|---------|---------|
+| call_invites | - | Call invites |
+| call_participants | - | Call participants |
+| call_signals | - | Signaling data |
+| call_logs | 165 | Call history |
+
+### Category 6: Live Streams & Spaces
+| Table | Records | Purpose |
+|-------|---------|---------|
+| live_stream_analytics | - | Stream analytics |
+| live_stream_comments | - | Stream comments |
+| live_stream_gifts | - | Stream gifts |
+| live_stream_invites | - | Stream invites |
+| live_stream_reactions | - | Stream reactions |
+| live_stream_viewers | - | Viewer records |
+| live_streams | 32 | Live streams |
+| live_streams_public | - | Public streams |
+| live_space_gifts | - | Space gifts |
+| live_space_invitations | - | Space invites |
+| live_space_messages | - | Space messages |
+| live_space_reactions | - | Space reactions |
+| live_space_speakers | - | Space speakers |
+| live_spaces | 8 | Audio spaces |
+
+### Category 7: Notifications & Activity
+| Table | Records | Purpose |
+|-------|---------|---------|
+| notifications | 1545 | All notifications |
+| notification_badges | - | Badge counts |
+| offline_notifications | - | Offline notifications |
+| user_wallet_notifications | - | Wallet notification settings |
+
+### Category 8: Social Connections
+| Table | Records | Purpose |
+|-------|---------|---------|
+| follows | 84 | Follow relationships |
+| friend_requests | 35 | Friend requests |
+| blocked_users | - | Blocked users |
+| muted_users | - | Muted users |
+
+### Category 9: Credits & Transactions
+| Table | Records | Purpose |
+|-------|---------|---------|
+| gift_analytics | 44 | Gift records |
+| credit_transactions | 218 | Credit transactions |
+| user_credits | 20 | User credit balances |
+| creator_payouts | - | Payout records |
+| creator_payout_requests | - | Payout requests |
+| daily_earnings | - | Daily earnings |
+| payment_history | - | Payment history |
+
+### Category 10: Analytics & Tracking
+| Table | Records | Purpose |
+|-------|---------|---------|
+| user_analytics | 4 | User analytics |
+| user_engagement_signals | 0 | Engagement signals |
+| user_feed_sessions | - | Feed sessions |
+| user_seen_posts | - | Seen posts |
+| user_media_preferences | - | Media preferences |
+| trending_searches | 0 | Search trends |
+| ad_impressions | - | Ad impressions |
+| user_ad_impressions | - | User ad views |
+| feed_cycle_status | - | Feed cycle |
+
+### Category 11: AI & Learning
+| Table | Records | Purpose |
+|-------|---------|---------|
+| ai_chat_messages | 21 | AI chat history |
+| ai_agent_conversations | - | Agent conversations |
+| ai_agent_messages | - | Agent messages |
+| ai_tool_results | - | Tool results |
+| ai_tool_usage | - | Tool usage |
+| ai_usage | - | AI usage stats |
+
+### Category 12: Moderation & Reports
+| Table | Records | Purpose |
+|-------|---------|---------|
+| content_flags | - | Content flags |
+| content_reports | - | Reports |
+| moderation_actions | - | Mod actions |
+| moderation_appeals | - | Appeals |
+| moderation_queue | - | Mod queue |
+| user_strikes | - | User strikes |
+| user_strike_summary | - | Strike summaries |
+
+---
+
+## Tables to PRESERVE (Not Delete)
+
+| Table | Reason |
+|-------|--------|
+| profiles | User profile data |
+| public_profiles | Public profile view |
+| privacy_settings | User privacy preferences |
+| notification_preferences | Notification settings |
+| push_subscriptions | Push notification tokens |
+| user_sessions | Login sessions |
+| login_attempts | Security logs |
+| security_events | Security audit |
+| user_identifiers | User identifiers |
+| user_mfa_settings | MFA configuration |
+| user_roles | User roles |
+| profile_sensitive_data | Sensitive profile data |
+| credit_packages | System config |
+| gift_appreciation_options | System config |
+| subscription_tiers | System config |
+| creator_incentive_tiers | System config |
+| hashtags | Reference data |
+| music_tracks | Reference data |
+| courses, lessons, modules | Educational content |
+| All course-related tables | Educational system |
+| All P2P tables | P2P marketplace |
+
+---
+
+## Execution Order
+
+Due to foreign key constraints, tables must be deleted in the correct order (child tables before parent tables):
+
 ```text
-1. Delete from post_hashtags
-2. Delete from post_views  
-3. Delete from post_likes
-4. Delete from post_comments
-5. Delete from saved_posts
-6. Delete from refeeds
-7. Delete from posts
+Phase 1: Post-related (child tables first)
+Phase 2: Story-related
+Phase 3: Message-related
+Phase 4: Group-related
+Phase 5: Call-related
+Phase 6: Live stream/space related
+Phase 7: Notification related
+Phase 8: Social connections
+Phase 9: Credits & transactions
+Phase 10: Analytics & tracking
+Phase 11: AI history
+Phase 12: Moderation
 ```
-
-This gives users a completely clean slate to start posting fresh content.
 
 ---
 
-## Part 2: Fix Duplicate Social Buttons on Plain Text Posts
+## Summary
 
-**Current Problem:**
-In `ImmersivePostCard.tsx`, plain text posts (`isEffectivelyPlainText`) render social buttons inline within the text section (lines 877-902). However, the footer section for Photo+ layout (lines 1328-1387) also renders when `isPhotoTextLayout` is true but `isEffectivelyPlainText` is false. 
+| Category | Tables | Approx Records |
+|----------|--------|----------------|
+| Posts & Activity | 10 | ~0 (already cleared) |
+| Stories | 5 | ~392 |
+| Messages | 10 | ~620+ |
+| Groups | 13 | ~11+ |
+| Calls | 4 | ~165+ |
+| Live Streams/Spaces | 14 | ~40+ |
+| Notifications | 4 | ~1545+ |
+| Social Connections | 4 | ~119+ |
+| Credits & Transactions | 7 | ~282+ |
+| Analytics | 9 | ~4+ |
+| AI History | 6 | ~21+ |
+| Moderation | 7 | Unknown |
 
-The issue is that `isEffectivelyPlainText` includes posts with `isPlainText` OR posts without any media:
-```tsx
-const isEffectivelyPlainText = isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled);
-```
+**Total: ~90+ tables to clear, ~3200+ records to delete**
 
-But the Photo+ footer condition at line 1328:
-```tsx
-{!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (...)}
-```
-
-This should correctly exclude plain text posts. However, the inline social buttons for plain text (lines 877-902) may be rendering alongside other content incorrectly.
-
-**Fix:**
-Update the conditions to ensure:
-- Plain text posts ONLY show inline social buttons (under the text)
-- Image-based Photo+ posts ONLY show footer social buttons
-- No duplication occurs
-
-The fix will:
-1. Ensure `isEffectivelyPlainText` condition properly gates the inline social buttons section
-2. Add explicit exclusion in the footer section for plain text
-3. Move the Promote button placement to be consistent (after social buttons for both layouts)
-
----
-
-## Part 3: Fix RLS Error When Creating Photo+ Posts
-
-**Current Problem:**
-When creating a new Photo+ post, users get an error about "row-level security policy".
-
-**Root Cause:**
-Looking at the RLS policy on `posts` table:
-```
-INSERT policy: ((auth.uid() IS NOT NULL) AND (auth.uid() = user_id))
-```
-
-The policy requires:
-1. User must be authenticated (`auth.uid() IS NOT NULL`)
-2. The `user_id` column in the insert must match `auth.uid()`
-
-The current `PhotoPlusPostCreator.tsx` correctly sets `user_id: user.id` in the insert (line 126). However, the check at line 81 (`if (!user) return`) may not be sufficient if the auth token is stale or the user object doesn't have the correct ID.
-
-**Investigation:**
-The code looks correct. The issue might be:
-1. User session not properly loaded when creating post
-2. The `user.id` not matching the authenticated session
-
-**Fix:**
-1. Add additional auth validation before attempting to create post
-2. Ensure the user object is fresh from the auth session
-3. Add better error messaging to understand the exact RLS failure
-
----
-
-## Technical Implementation
-
-### Files to Modify
-
-1. **Database Cleanup (via SQL execution)**
-   - Delete all related records first (foreign key dependencies)
-   - Delete all posts last
-   
-2. **`src/components/feed/ImmersivePostCard.tsx`**
-   - Fix the conditional rendering logic for plain text vs image Photo+ posts
-   - Ensure only ONE set of social buttons renders for each post type
-
-3. **`src/components/post/PhotoPlusPostCreator.tsx`**
-   - Add defensive auth checking
-   - Improve error handling to show more specific messages
-
-### Implementation Steps
-
-**Step 1: Database Cleanup**
-Run SQL to delete all posts and related data in the correct order to respect foreign key constraints.
-
-**Step 2: Fix Duplicate Social Buttons**
-Update `ImmersivePostCard.tsx`:
-- Review and fix the `isEffectivelyPlainText` condition usage
-- Ensure the inline social buttons (lines 877-902) only render when `isEffectivelyPlainText` is true
-- Ensure the footer Photo+ social buttons (lines 1327-1387) never render for plain text
-
-**Step 3: Fix RLS Error**
-Update `PhotoPlusPostCreator.tsx`:
-- Add auth state refresh before submission
-- Add more detailed error logging
-- Ensure user.id matches the authenticated user
-
----
-
-## Summary of Changes
-
-| Area | Change |
-|------|--------|
-| Database | Delete all 249 posts and related data |
-| ImmersivePostCard | Fix duplicate social button rendering |
-| PhotoPlusPostCreator | Fix auth validation for post creation |
+After this wipe, the app will appear brand new with all registered users intact but zero activity history.
 
