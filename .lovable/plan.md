@@ -1,228 +1,149 @@
 
-
-# Complete Activity Database Wipe
+# Implementation Plan: Fix Notifications, Photo+ Multi-Image Display, and Post Navigation
 
 ## Overview
-This plan will wipe ALL user activity data from the database while preserving:
-- User accounts (auth.users - managed by system)
-- User profiles (profiles table)
-- Privacy settings
-- Push notification subscriptions
-- System configuration tables
 
-## Data to be Deleted
-
-### Category 1: Posts & Related Activity (Already partially done)
-| Table | Records | Purpose |
-|-------|---------|---------|
-| post_hashtags | 0 | Hashtag associations |
-| post_views | 0 | View records |
-| post_view_history | - | View history |
-| post_likes | 0 | Likes |
-| post_comments | 0 | Comments |
-| post_shares | - | Shares |
-| post_mentions | - | Mentions |
-| post_promotions | - | Promoted posts |
-| saved_posts | 0 | Saved bookmarks |
-| posts | 0 | Posts (already cleared) |
-
-### Category 2: Stories
-| Table | Records | Purpose |
-|-------|---------|---------|
-| story_views | 222 | Story views |
-| story_reactions | 34 | Story reactions |
-| story_comments | 23 | Story comments |
-| active_stories | - | Active story tracking |
-| stories | 113 | Stories |
-
-### Category 3: Messages & Conversations
-| Table | Records | Purpose |
-|-------|---------|---------|
-| message_attachments | - | File attachments |
-| message_edit_history | - | Edit history |
-| message_reactions | - | Message reactions |
-| message_read_receipts | - | Read receipts |
-| starred_messages | - | Starred messages |
-| scheduled_messages | - | Scheduled messages |
-| typing_indicators | - | Typing indicators |
-| messages | 608 | Direct messages |
-| conversation_participants | - | Conversation members |
-| conversations | 12 | Conversations |
-
-### Category 4: Groups
-| Table | Records | Purpose |
-|-------|---------|---------|
-| group_message_reactions | - | Message reactions |
-| group_message_read_status | - | Read status |
-| group_messages | 8 | Group messages |
-| group_poll_votes | - | Poll votes |
-| group_polls | - | Polls |
-| group_posts | - | Group posts |
-| group_typing_indicators | - | Typing indicators |
-| group_call_participants | - | Call participants |
-| group_calls | - | Group calls |
-| group_invite_links | - | Invite links |
-| group_invite_uses | - | Invite usage |
-| group_join_requests | - | Join requests |
-| group_members | - | Group members |
-| groups | 3 | Groups |
-
-### Category 5: Calls
-| Table | Records | Purpose |
-|-------|---------|---------|
-| call_invites | - | Call invites |
-| call_participants | - | Call participants |
-| call_signals | - | Signaling data |
-| call_logs | 165 | Call history |
-
-### Category 6: Live Streams & Spaces
-| Table | Records | Purpose |
-|-------|---------|---------|
-| live_stream_analytics | - | Stream analytics |
-| live_stream_comments | - | Stream comments |
-| live_stream_gifts | - | Stream gifts |
-| live_stream_invites | - | Stream invites |
-| live_stream_reactions | - | Stream reactions |
-| live_stream_viewers | - | Viewer records |
-| live_streams | 32 | Live streams |
-| live_streams_public | - | Public streams |
-| live_space_gifts | - | Space gifts |
-| live_space_invitations | - | Space invites |
-| live_space_messages | - | Space messages |
-| live_space_reactions | - | Space reactions |
-| live_space_speakers | - | Space speakers |
-| live_spaces | 8 | Audio spaces |
-
-### Category 7: Notifications & Activity
-| Table | Records | Purpose |
-|-------|---------|---------|
-| notifications | 1545 | All notifications |
-| notification_badges | - | Badge counts |
-| offline_notifications | - | Offline notifications |
-| user_wallet_notifications | - | Wallet notification settings |
-
-### Category 8: Social Connections
-| Table | Records | Purpose |
-|-------|---------|---------|
-| follows | 84 | Follow relationships |
-| friend_requests | 35 | Friend requests |
-| blocked_users | - | Blocked users |
-| muted_users | - | Muted users |
-
-### Category 9: Credits & Transactions
-| Table | Records | Purpose |
-|-------|---------|---------|
-| gift_analytics | 44 | Gift records |
-| credit_transactions | 218 | Credit transactions |
-| user_credits | 20 | User credit balances |
-| creator_payouts | - | Payout records |
-| creator_payout_requests | - | Payout requests |
-| daily_earnings | - | Daily earnings |
-| payment_history | - | Payment history |
-
-### Category 10: Analytics & Tracking
-| Table | Records | Purpose |
-|-------|---------|---------|
-| user_analytics | 4 | User analytics |
-| user_engagement_signals | 0 | Engagement signals |
-| user_feed_sessions | - | Feed sessions |
-| user_seen_posts | - | Seen posts |
-| user_media_preferences | - | Media preferences |
-| trending_searches | 0 | Search trends |
-| ad_impressions | - | Ad impressions |
-| user_ad_impressions | - | User ad views |
-| feed_cycle_status | - | Feed cycle |
-
-### Category 11: AI & Learning
-| Table | Records | Purpose |
-|-------|---------|---------|
-| ai_chat_messages | 21 | AI chat history |
-| ai_agent_conversations | - | Agent conversations |
-| ai_agent_messages | - | Agent messages |
-| ai_tool_results | - | Tool results |
-| ai_tool_usage | - | Tool usage |
-| ai_usage | - | AI usage stats |
-
-### Category 12: Moderation & Reports
-| Table | Records | Purpose |
-|-------|---------|---------|
-| content_flags | - | Content flags |
-| content_reports | - | Reports |
-| moderation_actions | - | Mod actions |
-| moderation_appeals | - | Appeals |
-| moderation_queue | - | Mod queue |
-| user_strikes | - | User strikes |
-| user_strike_summary | - | Strike summaries |
+This plan addresses three key issues:
+1. **Notifications consolidation** - Remove badge counts from Home/Feed and Wallet nav icons, consolidate all notifications to the notification bell icon only
+2. **Photo+ multi-image display** - Fix the bug where only one image shows in Photo+ posts; add horizontal swipe carousel and fullscreen lightbox
+3. **Post creation redirect** - Ensure users are taken directly to the created post after upload with instant visibility
 
 ---
 
-## Tables to PRESERVE (Not Delete)
+## Issue 1: Consolidate Notifications to Bell Icon Only
 
-| Table | Reason |
-|-------|--------|
-| profiles | User profile data |
-| public_profiles | Public profile view |
-| privacy_settings | User privacy preferences |
-| notification_preferences | Notification settings |
-| push_subscriptions | Push notification tokens |
-| user_sessions | Login sessions |
-| login_attempts | Security logs |
-| security_events | Security audit |
-| user_identifiers | User identifiers |
-| user_mfa_settings | MFA configuration |
-| user_roles | User roles |
-| profile_sensitive_data | Sensitive profile data |
-| credit_packages | System config |
-| gift_appreciation_options | System config |
-| subscription_tiers | System config |
-| creator_incentive_tiers | System config |
-| hashtags | Reference data |
-| music_tracks | Reference data |
-| courses, lessons, modules | Educational content |
-| All course-related tables | Educational system |
-| All P2P tables | P2P marketplace |
+### Current Behavior
+- The bottom navigation shows notification badges on Home (feed), Chats, and Wallet icons
+- `useDistributedNotifications` hook categorizes notifications and distributes counts across nav items
+
+### Required Changes
+
+**File: `src/components/navigation/BottomNav.tsx`**
+- Remove the `getNavBadgeCount` function logic for 'feed' and 'wallet' (only keep 'chats' for unread messages)
+- Remove badge rendering for Home and Wallet icons
+- Remove `markCategoryAsRead` calls for 'feed' and 'wallet' on nav clicks
+
+**File: `src/hooks/useDistributedNotifications.tsx`**
+- Keep the hook for internal use but the BottomNav will no longer use distributed counts for nav badges
+
+**File: `src/components/notifications/NotificationsPanel.tsx`**
+- Update to include ALL notification types (remove the filtering that excludes wallet/credit notifications)
+- Ensure wallet notifications show proper descriptions
+
+**File: `src/components/notifications/NotificationItem.tsx`**
+- Verify notification descriptions are properly displayed for all types including wallet/credit
 
 ---
 
-## Execution Order
+## Issue 2: Photo+ Multi-Image Display with Carousel and Lightbox
 
-Due to foreign key constraints, tables must be deleted in the correct order (child tables before parent tables):
+### Current Behavior
+- `ImmersivePostCard` has `media_urls` array but only renders a single image (`currentMediaUrl`)
+- The existing swipe logic changes `currentMediaIndex` but there's no visual indicator of multiple images
+- The `ImageLightbox` component exists but is NOT imported or used in `ImmersivePostCard`
+
+### Required Changes
+
+**File: `src/components/feed/ImmersivePostCard.tsx`**
+
+1. **Import ImageLightbox at the top**:
+```typescript
+import ImageLightbox from './ImageLightbox';
+```
+
+2. **Add state for lightbox**:
+```typescript
+const [showLightbox, setShowLightbox] = useState(false);
+const [lightboxIndex, setLightboxIndex] = useState(0);
+```
+
+3. **Replace single image display with an image grid/carousel for Photo+ posts**:
+   - For Photo+ layout (`isPhotoTextLayout`), display images in a grid (1-2 columns)
+   - Add horizontal swipe indicator dots below images
+   - On image tap, open `ImageLightbox` in fullscreen
+
+4. **Add ImageLightbox component to the modals section**:
+```typescript
+{showLightbox && hasImage && (
+  <ImageLightbox
+    images={mediaUrls}
+    activeIndex={lightboxIndex}
+    onClose={() => setShowLightbox(false)}
+    onNavigate={(idx) => {
+      setLightboxIndex(idx);
+      setCurrentMediaIndex(idx);
+    }}
+  />
+)}
+```
+
+5. **Update image tap handler for Photo+ posts**:
+   - Tapping an image should open lightbox instead of immersive mode
+   - Lightbox shows caption in fullscreen view
+
+6. **Add swipe indicator dots** when `hasMultipleMedia` is true
+
+### Visual Layout for Photo+ Multi-Image Posts
 
 ```text
-Phase 1: Post-related (child tables first)
-Phase 2: Story-related
-Phase 3: Message-related
-Phase 4: Group-related
-Phase 5: Call-related
-Phase 6: Live stream/space related
-Phase 7: Notification related
-Phase 8: Social connections
-Phase 9: Credits & transactions
-Phase 10: Analytics & tracking
-Phase 11: AI history
-Phase 12: Moderation
++---------------------------+
+|  User Info / Caption      |
++---------------------------+
+| +-------+  +-------+      |
+| | Img 1 |  | Img 2 |      |  <- Tappable to open lightbox
+| +-------+  +-------+      |
+|         [• ○]              |  <- Swipe indicator dots
++---------------------------+
+|  Like  Comment  Share...  |
++---------------------------+
 ```
 
 ---
 
-## Summary
+## Issue 3: Instant Post Creation Redirect
 
-| Category | Tables | Approx Records |
-|----------|--------|----------------|
-| Posts & Activity | 10 | ~0 (already cleared) |
-| Stories | 5 | ~392 |
-| Messages | 10 | ~620+ |
-| Groups | 13 | ~11+ |
-| Calls | 4 | ~165+ |
-| Live Streams/Spaces | 14 | ~40+ |
-| Notifications | 4 | ~1545+ |
-| Social Connections | 4 | ~119+ |
-| Credits & Transactions | 7 | ~282+ |
-| Analytics | 9 | ~4+ |
-| AI History | 6 | ~21+ |
-| Moderation | 7 | Unknown |
+### Current Behavior
+- `PhotoPlusPostCreator.tsx` navigates to `/feed` after post creation
+- There may be a delay before the post appears in the feed
 
-**Total: ~90+ tables to clear, ~3200+ records to delete**
+### Required Changes
 
-After this wipe, the app will appear brand new with all registered users intact but zero activity history.
+**File: `src/components/post/PhotoPlusPostCreator.tsx`**
+- Change navigation from `/feed` to `/feed/post/${newPost.id}` to take user directly to their new post
+- This ensures instant visibility without waiting for feed refresh
 
+**File: `src/components/camera/CameraCapture.tsx`** (if exists)
+- Apply same navigation pattern for video posts
+
+**File: Any other post creator components**
+- Update navigation to redirect to the created post's direct URL
+
+---
+
+## Technical Summary
+
+| File | Changes |
+|------|---------|
+| `BottomNav.tsx` | Remove badge counts from Feed and Wallet icons; keep only Chats badge |
+| `useDistributedNotifications.tsx` | No changes needed (hook remains for other uses) |
+| `NotificationsPanel.tsx` | Include wallet/credit notifications (remove exclusion filter) |
+| `ImmersivePostCard.tsx` | Add ImageLightbox import, multi-image grid for Photo+ layout, swipe dots, tap-to-fullscreen |
+| `PhotoPlusPostCreator.tsx` | Navigate to `/feed/post/${newPost.id}` instead of `/feed` |
+
+---
+
+## Implementation Order
+
+1. **Notifications consolidation** (BottomNav + NotificationsPanel updates)
+2. **Photo+ multi-image grid and carousel** (ImmersivePostCard + ImageLightbox integration)
+3. **Post creation redirect** (PhotoPlusPostCreator navigation change)
+
+---
+
+## Expected Outcome
+
+After implementation:
+- All notification badges will only appear on the bell icon in the profile section
+- Photo+ posts with 2 images will display in a side-by-side grid with swipe indicators
+- Tapping any image opens a fullscreen lightbox with horizontal swipe navigation
+- After creating a post, users are immediately taken to view their new post
