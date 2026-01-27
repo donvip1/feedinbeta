@@ -14,6 +14,7 @@ import MobileShareSheet from './MobileShareSheet';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import DraggableCommentsPanel from './DraggableCommentsPanel';
+import ImageLightbox from './ImageLightbox';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
@@ -144,6 +145,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [isFollowing, setIsFollowing] = useState(false); // Follow state
   const [showMoreActions, setShowMoreActions] = useState(false); // Toggle for expanded social buttons when caption is long
   const [isFollowLoading, setIsFollowLoading] = useState(false); // Loading state for follow action
+  const [showLightbox, setShowLightbox] = useState(false); // Lightbox state for Photo+ images
+  const [lightboxIndex, setLightboxIndex] = useState(0); // Active image in lightbox
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -812,24 +815,90 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             />
           )}
 
-          {/* Image */}
+          {/* Image - Different layouts for Photo+ vs Video posts */}
           {hasImage && currentMediaUrl && (
             <>
-              <img
-                src={currentMediaUrl}
-                alt="Post media"
-                className={cn(
-                  "w-full h-full transition-opacity duration-300",
-                  isMediaLoaded ? "opacity-100" : "opacity-0",
-                  isImmersiveMode ? "object-cover" : "object-contain"
-                )}
-                style={{ minHeight: isImmersiveMode ? '100%' : undefined, minWidth: isImmersiveMode ? '100%' : undefined }}
-                onClick={handleMediaTap}
-                onLoad={() => setIsMediaLoaded(true)}
-                onContextMenu={(e) => e.preventDefault()}
-                draggable={false}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+              {/* Photo+ Layout: Multi-image grid with swipe and tap-to-lightbox */}
+              {isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? (
+                <div className="w-full h-full flex flex-col">
+                  {/* Image Grid - 1 or 2 columns */}
+                  <div className={cn(
+                    "grid gap-1 flex-1",
+                    mediaUrls.length === 1 ? "grid-cols-1" : "grid-cols-2"
+                  )}>
+                    {mediaUrls.map((url, idx) => (
+                      <div 
+                        key={idx} 
+                        className="relative overflow-hidden cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLightboxIndex(idx);
+                          setShowLightbox(true);
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`Image ${idx + 1}`}
+                          className="w-full h-full object-cover transition-opacity duration-300"
+                          onLoad={() => idx === 0 && setIsMediaLoaded(true)}
+                          onContextMenu={(e) => e.preventDefault()}
+                          draggable={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {/* Swipe indicator dots */}
+                  {mediaUrls.length > 1 && (
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                      {mediaUrls.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLightboxIndex(idx);
+                            setShowLightbox(true);
+                          }}
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full transition-all",
+                            idx === currentMediaIndex
+                              ? "bg-white w-3"
+                              : "bg-white/50"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                </div>
+              ) : (
+                /* Default single image display for video tab or single-image Photo+ */
+                <>
+                  <img
+                    src={currentMediaUrl}
+                    alt="Post media"
+                    className={cn(
+                      "w-full h-full transition-opacity duration-300",
+                      isMediaLoaded ? "opacity-100" : "opacity-0",
+                      isImmersiveMode ? "object-cover" : "object-contain"
+                    )}
+                    style={{ minHeight: isImmersiveMode ? '100%' : undefined, minWidth: isImmersiveMode ? '100%' : undefined }}
+                    onClick={(e) => {
+                      // For Photo+ with images, open lightbox on tap
+                      if (isPhotoTextLayout && hasImage) {
+                        e.stopPropagation();
+                        setLightboxIndex(currentMediaIndex);
+                        setShowLightbox(true);
+                      } else {
+                        handleMediaTap(e);
+                      }
+                    }}
+                    onLoad={() => setIsMediaLoaded(true)}
+                    onContextMenu={(e) => e.preventDefault()}
+                    draggable={false}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                </>
+              )}
             </>
           )}
 
@@ -1464,6 +1533,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ImageLightbox for Photo+ posts */}
+      {showLightbox && hasImage && mediaUrls.length > 0 && (
+        <ImageLightbox
+          images={mediaUrls}
+          activeIndex={lightboxIndex}
+          onClose={() => setShowLightbox(false)}
+          onNavigate={(idx) => {
+            setLightboxIndex(idx);
+            setCurrentMediaIndex(idx);
+          }}
+        />
+      )}
 
     </>
   );

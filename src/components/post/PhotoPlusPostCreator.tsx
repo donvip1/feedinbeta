@@ -172,7 +172,8 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
       
       onSuccess?.();
       onClose();
-      navigate('/feed');
+      // Navigate directly to the created post for instant visibility
+      navigate(`/feed/post/${newPost.id}`);
     } catch (error: any) {
       console.error('Post creation error:', error);
       toast({
