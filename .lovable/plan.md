@@ -1,110 +1,138 @@
 
-# Plan: Add Vertical Swipe Navigation to Photo+ Fullscreen View
+# Plan: Photo+ Feed Layout and Scrolling Improvements
 
-## Problem
-In the Photo+ section fullscreen view (ImageLightbox), users can only:
-- Swipe left/right to navigate between images within the same post
-- Swipe down to close
+## Current Issues
 
-But they cannot swipe up/down to navigate to the next/previous Photo+ post like they can in the video feed.
+1. **Two-image posts have blank space**: When a post has 2 images, there's too much vertical space between the images and the social buttons
+2. **Card-by-card scrolling in Photo+ normal view**: Currently uses `snap-y snap-mandatory` which forces card-by-card scrolling - user wants free-flowing Facebook-style scroll
+3. **Social buttons not close to content**: For multi-image posts, buttons are too far from images
 
-## Solution
-Transform the ImageLightbox into a fullscreen viewer that supports vertical navigation between posts while maintaining horizontal navigation within multi-image posts.
+## Solution Overview
+
+### 1. Change Photo+ Normal View to Free-Flowing Scroll (Facebook-style)
+- Remove `snap-y snap-mandatory` scrolling for Photo+ tab only
+- Keep card-by-card snap scrolling for Videos tab (unchanged)
+- Allow users to scroll freely, seeing partial posts if needed
+- Multiple posts can be visible on screen at once
+
+### 2. Make Social Buttons Tight to Content
+- Remove fixed heights and padding that cause blank space
+- Social buttons should render directly below the last image with minimal gap (8-12px)
+- Each post takes only as much height as its content requires
+
+### 3. Keep Fullscreen (Lightbox) Behavior Unchanged
+- Fullscreen still uses card-by-card vertical navigation (already implemented)
 
 ---
 
-## Technical Changes
+## Technical Implementation
 
-### File 1: `src/components/feed/ImageLightbox.tsx`
+### File 1: `src/pages/Feed.tsx`
 
-**Add new props to receive all Photo+ posts:**
-```typescript
-interface ImageLightboxProps {
-  // Existing props...
-  // NEW: All Photo+ posts for vertical navigation
-  allPhotoPosts?: Post[];
-  currentPostIndex?: number;
-  onPostChange?: (index: number) => void;
-}
+**Container scrolling changes:**
+- For Videos tab: Keep `snap-y snap-mandatory` for TikTok-style
+- For Photo+ tab: Use regular overflow-y-scroll without snap (Facebook-style)
+
+```
+Line ~782-788: Update container classes to conditionally apply snap
 ```
 
-**Implement vertical scroll-snap container:**
-- Wrap the content in a scroll container with `snap-y snap-mandatory`
-- Each post gets its own full-height snap section
-- Render current post ± 1 for performance (like FullscreenMediaViewer)
+**Post wrapper changes:**
+- For Videos: Keep `snap-start snap-always` wrapper
+- For Photo+: Remove snap classes, let posts flow naturally
 
-**Update gesture handling:**
-- Horizontal swipe: Navigate between images within current post
-- Vertical swipe: Navigate between posts (up = next post, down = previous post OR close if at first post)
-- Keep existing tap-to-toggle-UI behavior
-
-**Key implementation details:**
-- Use `scrollContainerRef` with `snap-y snap-mandatory overflow-y-scroll`
-- Track `currentPostIndex` for which post is being viewed
-- When post changes via scroll, update all social counts, captions, images for new post
-- Reset `currentImageIndex` to 0 when changing posts
+```
+Line ~874: Conditionally apply snap classes based on activeTab
+```
 
 ### File 2: `src/components/feed/ImmersivePostCard.tsx`
 
-**Pass additional props to ImageLightbox:**
-- Pass `allPosts` filtered to only Photo+ posts (non-video)
-- Calculate `currentPostIndex` based on current post's position in filtered list
-- Add `onPostChange` handler to sync state
+**Photo+ layout container changes:**
+- Remove fixed height constraints for Photo+ posts
+- Use `min-h-fit` instead of full viewport height
+- Content-driven height: Author + Caption + Images + Buttons + minimal padding
 
-**Filter Photo+ posts:**
-```typescript
-const allPhotoPosts = allPosts?.filter(p => 
-  p.media_type !== 'video' && 
-  (!p.original_post || p.original_post.media_type !== 'video')
-);
-const currentPhotoPostIndex = allPhotoPosts?.findIndex(p => p.id === post.id) ?? 0;
+```
+Line ~635-650: Main container height logic
+```
+
+**Image grid spacing:**
+- Reduce gap between images and social buttons to 8px
+- Remove extra padding around image container
+
+```
+Line ~835-860: Multi-image grid styling
+Line ~1427: Footer padding adjustment
 ```
 
 ---
 
-## Implementation Details
+## Visual Layout After Fix
 
-### Vertical Scroll Structure
+### Single-Image Photo+ Post:
 ```
-┌─────────────────────────────────┐
-│   Post 1 (current - 1)          │  ← Placeholder if not adjacent
-│   [Images array]                │
-│   snap-start snap-always        │
-├─────────────────────────────────┤
-│   Post 2 (current)              │  ← Active post
-│   [Image carousel]              │
-│   [Caption + Social buttons]    │
-│   snap-start snap-always        │
-├─────────────────────────────────┤
-│   Post 3 (current + 1)          │  ← Pre-rendered for smooth transition
-│   [Images array]                │
-│   snap-start snap-always        │
-└─────────────────────────────────┘
+┌─────────────────────────────┐
+│ [Avatar] DisplayName        │ ← Author header
+│ Caption text here...        │
+├─────────────────────────────┤
+│                             │
+│      [Single Image]         │ ← Natural aspect ratio
+│                             │
+├─────────────────────────────┤
+│ ♥ 💬 🔁 👁 🎁 ⤴ [Promote]   │ ← 8px gap from image
+└─────────────────────────────┘
+       ↑ 16px gap to next post
 ```
 
-### Gesture Logic
+### Two-Image Photo+ Post:
 ```
-if (vertical swipe down && at first post) → close lightbox
-if (vertical swipe down && not at first post) → go to previous post
-if (vertical swipe up) → go to next post
-if (horizontal swipe && multiple images) → navigate images within post
+┌─────────────────────────────┐
+│ [Avatar] DisplayName        │
+│ Caption text here...        │
+├──────────────┬──────────────┤
+│   [Image 1]  │   [Image 2]  │ ← Side-by-side grid
+├──────────────┴──────────────┤
+│ ♥ 💬 🔁 👁 🎁 ⤴ [Promote]   │ ← 8px gap from images
+└─────────────────────────────┘
+       ↑ 16px gap to next post
 ```
+
+### Scroll Behavior Comparison:
+
+**Videos Tab (unchanged):**
+- Full-page snap scrolling
+- One video visible at a time
+- TikTok-style UX
+
+**Photo+ Tab (after fix):**
+- Free-flowing scroll like Facebook/Instagram
+- Multiple posts visible at once
+- No snapping - user can stop at any position
+- Posts take only as much height as needed
 
 ---
 
-## Files Modified
-| File | Change |
-|------|--------|
-| `src/components/feed/ImageLightbox.tsx` | Add scroll-snap vertical navigation, new props for posts array |
-| `src/components/feed/ImmersivePostCard.tsx` | Filter Photo+ posts, pass to lightbox with handlers |
+## Files to Modify
+
+| File | Changes |
+|------|---------|
+| `src/pages/Feed.tsx` | Remove snap scrolling for Photo+ tab, conditionally apply snap classes |
+| `src/components/feed/ImmersivePostCard.tsx` | Remove fixed heights for Photo+ posts, tighten spacing between content and buttons |
 
 ---
 
 ## Expected Behavior After Fix
-- Swipe left/right: Navigate between images in current post (unchanged)
-- Swipe up: Go to next Photo+ post
-- Swipe down: Go to previous post (or close if at first post)
-- Arrow buttons: Still work for image navigation within post
-- UI toggle: Tap to show/hide controls (unchanged)
-- Social buttons: Update to reflect current post's data
-- Feels native like TikTok/Instagram stories vertical scroll
+
+1. **Photo+ Normal View:**
+   - Smooth free-flowing scroll (not card-by-card)
+   - Social buttons are directly under images with 8px gap
+   - No blank space between content and buttons
+   - Multiple posts can be visible simultaneously
+
+2. **Photo+ Fullscreen (Lightbox):**
+   - Keep existing card-by-card vertical swipe navigation
+   - Unchanged from current implementation
+
+3. **Videos Tab:**
+   - Keep existing full-screen snap scrolling
+   - Unchanged from current implementation
