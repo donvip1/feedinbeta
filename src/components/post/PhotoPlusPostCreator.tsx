@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Image as ImageIcon, ChevronLeft, Hash } from 'lucide-react';
+import { X, Image as ImageIcon, ChevronLeft, Hash, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +34,9 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
   const [images, setImages] = useState<{ file: File; preview: string }[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [location, setLocation] = useState('');
+  const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
+  const [detectingLocation, setDetectingLocation] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch user profile
@@ -49,6 +52,71 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
     };
     fetchProfile();
   }, [user]);
+
+  // Location detection
+  const detectLocation = async () => {
+    setDetectingLocation(true);
+    try {
+      if ('geolocation' in navigator) {
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+            try {
+              const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+              );
+              const data = await response.json();
+              
+              if (data.display_name) {
+                const locationName = data.address?.city || data.address?.town || data.address?.village || data.display_name;
+                setLocation(locationName);
+              }
+            } catch (error) {
+              console.error('Geocoding error:', error);
+            }
+            setDetectingLocation(false);
+          },
+          (error) => {
+            console.error('Location error:', error);
+            toast({
+              title: 'Location Error',
+              description: 'Unable to detect your location. Please enter manually.',
+              variant: 'destructive',
+            });
+            setDetectingLocation(false);
+          }
+        );
+      } else {
+        toast({
+          title: 'Not Supported',
+          description: 'Geolocation is not supported by your browser.',
+          variant: 'destructive',
+        });
+        setDetectingLocation(false);
+      }
+    } catch (error) {
+      console.error('Error detecting location:', error);
+      setDetectingLocation(false);
+    }
+  };
+
+  const fetchLocationSuggestions = async (query: string) => {
+    if (query.length < 3) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
+      );
+      const data = await response.json();
+      const suggestions = data.map((item: any) => item.display_name);
+      setLocationSuggestions(suggestions);
+    } catch (error) {
+      console.error('Error fetching location suggestions:', error);
+    }
+  };
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -143,6 +211,7 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
           media_urls: mediaUrls.length > 0 ? mediaUrls : null,
           media_type: mediaType,
           media_types: mediaTypes.length > 0 ? mediaTypes : null,
+          location: location || null,
         } as any)
         .select('id')
         .single();
@@ -169,6 +238,8 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
       setText('');
       setHashtags('');
       setImages([]);
+      setLocation('');
+      setLocationSuggestions([]);
       
       onSuccess?.();
       onClose();
@@ -296,6 +367,74 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                   placeholder="Add hashtags (e.g., #trending #viral)"
                   className="flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground text-sm"
                 />
+              </div>
+
+              {/* Location Input */}
+              <div className="pt-4 border-t border-border">
+                <div className="flex items-center gap-2 mb-2">
+                  <MapPin className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-sm font-medium text-muted-foreground">Location</span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={detectLocation}
+                    disabled={detectingLocation}
+                    className="ml-auto text-xs h-7 px-2"
+                  >
+                    {detectingLocation ? (
+                      <>
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        Detecting...
+                      </>
+                    ) : (
+                      'Auto-detect'
+                    )}
+                  </Button>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={location}
+                    onChange={(e) => {
+                      setLocation(e.target.value);
+                      fetchLocationSuggestions(e.target.value);
+                    }}
+                    placeholder="Add location..."
+                    className="w-full bg-transparent text-foreground outline-none placeholder:text-muted-foreground text-sm py-2"
+                  />
+                  {locationSuggestions.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      {locationSuggestions.map((suggestion, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => {
+                            setLocation(suggestion);
+                            setLocationSuggestions([]);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {location && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded-full flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {location.length > 40 ? location.slice(0, 40) + '...' : location}
+                      <button
+                        onClick={() => setLocation('')}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
