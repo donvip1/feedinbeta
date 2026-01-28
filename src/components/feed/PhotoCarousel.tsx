@@ -20,6 +20,7 @@ const PhotoCarousel = memo(function PhotoCarousel({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const autoSlideRef = useRef<NodeJS.Timeout | null>(null);
   const inactivityRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   // Start auto-slide timer
   const startAutoSlide = useCallback(() => {
@@ -120,6 +121,41 @@ const PhotoCarousel = memo(function PhotoCarousel({
     };
   }, [isUserInteracting, resetInactivityTimer]);
 
+  // Handle tap vs swipe detection
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    handleActivity();
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      time: Date.now()
+    };
+  }, [handleActivity]);
+
+  const handleImageTap = useCallback((idx: number, e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    
+    // For touch events, check if it was a tap (not a swipe)
+    if ('touches' in e || 'changedTouches' in e) {
+      if (touchStartRef.current) {
+        const touch = 'changedTouches' in e ? e.changedTouches[0] : null;
+        if (touch) {
+          const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+          const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+          const deltaTime = Date.now() - touchStartRef.current.time;
+          
+          // If user swiped more than 10px or held for more than 300ms, it's not a tap
+          if (deltaX > 10 || deltaY > 10 || deltaTime > 300) {
+            touchStartRef.current = null;
+            return;
+          }
+        }
+      }
+      touchStartRef.current = null;
+    }
+    
+    onImageClick?.(idx);
+  }, [onImageClick]);
+
   if (images.length === 0) return null;
 
   // Single image - no carousel needed
@@ -127,7 +163,10 @@ const PhotoCarousel = memo(function PhotoCarousel({
     return (
       <div 
         className={cn("w-full rounded-xl overflow-hidden border border-border cursor-pointer hover:brightness-95 transition-all", className)}
-        onClick={() => onImageClick?.(0)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onImageClick?.(0);
+        }}
       >
         <img
           src={images[0]}
@@ -147,7 +186,7 @@ const PhotoCarousel = memo(function PhotoCarousel({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        onTouchStart={handleActivity}
+        onTouchStart={handleTouchStart}
         onMouseDown={handleActivity}
         className="w-full overflow-x-scroll snap-x snap-mandatory scrollbar-hide rounded-xl border border-border"
         style={{ 
@@ -161,15 +200,13 @@ const PhotoCarousel = memo(function PhotoCarousel({
             <div
               key={idx}
               className="w-1/2 flex-shrink-0 snap-start cursor-pointer hover:brightness-95 transition-all px-0.5"
-              onClick={(e) => {
-                e.stopPropagation();
-                onImageClick?.(idx);
-              }}
+              onClick={(e) => handleImageTap(idx, e)}
+              onTouchEnd={(e) => handleImageTap(idx, e)}
             >
               <img
                 src={url}
                 alt={`Image ${idx + 1}`}
-                className="w-full aspect-square object-cover rounded-lg"
+                className="w-full aspect-square object-cover rounded-lg pointer-events-none"
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
               />
