@@ -147,6 +147,19 @@ const PhotoCarousel = memo(function PhotoCarousel({
     }
   }, []);
 
+  // Stop propagation on touch end to prevent SwipeableTabs from navigating
+  const handleCarouselTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (touchStartRef.current) {
+      const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+      const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+      
+      // If it was a horizontal swipe on the carousel, stop it from bubbling
+      if (deltaX > deltaY && deltaX > 10) {
+        e.stopPropagation();
+      }
+    }
+  }, []);
+
   const handleImageTap = useCallback((idx: number, e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     
@@ -204,6 +217,7 @@ const PhotoCarousel = memo(function PhotoCarousel({
         onScroll={handleScroll}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
+        onTouchEnd={handleCarouselTouchEnd}
         onMouseDown={handleActivity}
         className="w-full overflow-x-scroll snap-x snap-mandatory scrollbar-hide rounded-xl border border-border"
         style={{ 
