@@ -147,7 +147,7 @@ export default function ImageLightbox({
                 exit={{ opacity: 0, y: -20 }}
                 className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent"
               >
-                <button
+              <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onClose();
@@ -157,11 +157,7 @@ export default function ImageLightbox({
                   <X size={24} />
                 </button>
                 
-                {/* Post Counter */}
-                <div className="px-3 py-1.5 bg-black/60 rounded-full text-white text-sm font-medium">
-                  {activePostIdx + 1} / {allPhotoPosts.length}
-                </div>
-                
+                {/* Empty space to center close button */}
                 <div className="w-10" />
               </motion.div>
             )}
@@ -246,13 +242,7 @@ export default function ImageLightbox({
                 <X size={24} />
               </button>
               
-              {/* Image Counter */}
-              {images.length > 1 && (
-                <div className="px-3 py-1.5 bg-black/60 rounded-full text-white text-sm font-medium">
-                  {currentImageIdx + 1} / {images.length}
-                </div>
-              )}
-              
+              {/* Empty space to center close button */}
               <div className="w-10" />
             </motion.div>
           )}

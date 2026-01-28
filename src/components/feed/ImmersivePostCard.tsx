@@ -858,6 +858,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                           onContextMenu={(e) => e.preventDefault()}
                           draggable={false}
                         />
+                        {/* Image number indicator at bottom-left */}
+                        <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-black/60 rounded text-white text-[10px] font-medium">
+                          {idx + 1}/{Math.min(mediaUrls.length, 2)}
+                        </div>
                       </div>
                     ))}
                   </div>
