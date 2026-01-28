@@ -1,217 +1,184 @@
 
-# Plan: Photo+ Section - 4 Images with Auto-Slide Carousel
+# Plan: Fix Photo+ Carousel - Show 2 Images at Once with Counter
 
-## Overview
+## Issues to Fix
 
-Increase the maximum allowed images from 2 to 4 in the Photo+ section, with a horizontal carousel in normal view that auto-slides every 4 seconds when idle, and fullscreen vertical swipe navigation with horizontal image swiping (1/4, 2/4, etc.).
-
----
-
-## Changes Summary
-
-| Component | Change |
-|-----------|--------|
-| `PhotoPlusPostCreator.tsx` | Increase MAX_IMAGES from 2 to 4, update grid layout for previews |
-| `ImmersivePostCard.tsx` | Replace grid with horizontal carousel, add auto-slide with activity detection |
-| `PhotoPostSlide.tsx` | Support up to 4 images with horizontal swipe in fullscreen |
-| `ImageLightbox.tsx` | Update image counter to show 1/4 format |
+1. **Carousel shows 1 image instead of 2**: Each image takes full width, user wants to see 2 images side by side
+2. **No image counter**: Only dots exist, need text like "1/4", "2/3" etc.
+3. **Swiping not working properly**: The scroll snap behavior needs adjustment for multi-image view
+4. **Fullscreen not opening on click**: The click handler may not be firing correctly
 
 ---
 
-## Technical Implementation
+## Solution
 
-### File 1: `src/components/post/PhotoPlusPostCreator.tsx`
+### File: `src/components/feed/PhotoCarousel.tsx`
 
-**Changes:**
-- Line 18: Change `MAX_IMAGES = 2` to `MAX_IMAGES = 4`
-- Line 57-58: Update toast message to reflect "4 images"
-- Lines 261-264: Update preview grid to handle 3-4 images:
-  - 1 image: single column
-  - 2 images: 2 columns
-  - 3-4 images: 2x2 grid
+**Key Changes:**
 
-```
-Preview Grid Layout:
-1 image:  [  Full  ]
-2 images: [ 1 ][ 2 ]
-3 images: [ 1 ][ 2 ]
-          [ 3 ]
-4 images: [ 1 ][ 2 ]
-          [ 3 ][ 4 ]
-```
+1. **Show 2 images at once (50% width each)**:
+   - Change each image from `w-full` to `w-1/2` so 2 images display side by side
+   - Keep horizontal scroll-snap for sliding through images
+   - Users can swipe to reveal more images
 
----
+2. **Add image counter (1/4 format)**:
+   - Add a text counter below/above the carousel showing "1/4", "2/4" etc.
+   - Counter updates as user scrolls
 
-### File 2: `src/components/feed/ImmersivePostCard.tsx`
+3. **Fix scroll calculation**:
+   - Adjust scroll detection to account for 2 images visible at once
+   - Auto-slide now advances by 1 image (not full width)
 
-**Replace side-by-side grid with horizontal carousel:**
-
-Lines ~838-883: Create a new `PhotoCarousel` component with:
-
-1. **Horizontal scrollable carousel** using CSS scroll-snap
-2. **Auto-slide every 4 seconds** when no activity detected
-3. **Activity detection** that pauses auto-slide on:
-   - Touch/mouse interaction on the carousel
-   - Scroll events on the page
-   - Any user interaction
-4. **Resume auto-slide** after 4 seconds of inactivity
-5. **Manual swipe** support for left/right navigation
-6. **Dot indicators** showing current position (1/4)
-7. **Tap to fullscreen** - opens ImageLightbox at tapped image
-
-```
-Carousel Behavior:
-+----------------------------------+
-|  [Image 1]  →  [Image 2]  →  ... |  (horizontal scroll)
-+----------------------------------+
-         ● ○ ○ ○                    (dot indicators)
-
-Auto-slide: Every 4 seconds, advance to next image
-           When reaching last image, loop back to first
-Activity:   Any touch/scroll pauses auto-slide
-            Resume after 4 seconds of no activity
-```
-
-**State variables to add:**
-- `autoSlideInterval` - ref for interval timer
-- `activityTimeout` - ref for activity detection timeout
-- `isUserInteracting` - boolean to track user activity
-
-**Key Logic:**
-```text
-1. On mount: Start 4-second auto-slide timer
-2. On any activity (touch, scroll, click):
-   - Clear auto-slide interval
-   - Set isUserInteracting = true
-   - Start 4-second inactivity timeout
-3. After 4 seconds of no activity:
-   - Set isUserInteracting = false
-   - Resume auto-slide timer
-4. Auto-slide advances to next image (loops at end)
-5. On unmount: Clear all timers
-```
+4. **Ensure click-to-fullscreen works**:
+   - Add proper touch handling
+   - Ensure onClick fires correctly on mobile
 
 ---
 
-### File 3: `src/components/feed/PhotoPostSlide.tsx`
+## Visual Layout After Fix
 
-**Support up to 4 images in fullscreen:**
-
-- Already handles multiple images via `images` array from `post.media_urls`
-- Image dots (lines 229-253) already map all images dynamically
-- Horizontal swipe (lines 124-136) already works for any count
-- Image counter already shows `currentImageIndex + 1 / images.length`
-
-**Minor updates:**
-- Ensure smooth transitions for 4-image navigation
-- Update arrow navigation to loop properly
-
----
-
-### File 4: `src/components/feed/ImageLightbox.tsx`
-
-**Already supports multiple images:**
-- Lines 249-254: Counter shows `{currentImageIdx + 1} / {images.length}`
-- Single post mode (lines 207-276) passes all images to PhotoPostSlide
-- No changes needed - already handles arrays of any size
-
----
-
-## Visual Layout After Changes
-
-### Normal View - Photo+ Carousel (4 images):
+### Normal View - 2 Images Visible:
 ```
 +----------------------------------+
 | [Avatar] DisplayName             |
 | Caption text here...             |
 +----------------------------------+
-|  ┌──────────────────────────┐   |
-|  │       [Image 1]          │   | ← Visible
-|  │                          │   |
-|  └──────────────────────────┘   |
-|         ● ○ ○ ○                  | ← Dots (1/4)
+|  ┌──────────┬──────────┐        |
+|  │ [Img 1]  │ [Img 2]  │ → more | ← 2 visible, swipe for more
+|  │          │          │        |
+|  └──────────┴──────────┘        |
+|         1 / 4                    | ← Text counter
+|         ● ○ ○ ○                  | ← Dots (optional)
 +----------------------------------+
-| ♥ 💬 🔁 👁 🎁 ⤴  [Promote]      | ← Social buttons
-+----------------------------------+
-
-After 4 seconds of no activity:
-→ Auto-slides to Image 2
-→ Dots update: ○ ● ○ ○
-```
-
-### Fullscreen View (ImageLightbox):
-```
-+----------------------------------+
-| [X]              1 / 4           | ← Close + counter
-+----------------------------------+
-|                                  |
-|         [Current Image]          | ← Swipe left/right
-|                                  |
-|              ● ○ ○ ○             | ← Image dots
-+----------------------------------+
-| Caption text                     |
 | ♥ 💬 🔁 👁 🎁 ⤴  [Promote]      |
 +----------------------------------+
 ```
 
-### Post Creator Preview (4 images):
+### After swiping left:
 ```
-+----------------------------------+
-| [Avatar]                         |
-| Caption input...                 |
-+----------------------------------+
-|  [ 1/4 ]  [ 2/4 ]               |
-|  [ 3/4 ]  [ 4/4 ]               | ← 2x2 grid
-+----------------------------------+
-| # Add hashtags                   |
-| [📷]                             | ← Disabled when 4 reached
-+----------------------------------+
+|  ┌──────────┬──────────┐        |
+|  │ [Img 2]  │ [Img 3]  │ → more |
+|  │          │          │        |
+|  └──────────┴──────────┘        |
+|         2 / 4                    | ← Counter updates
 ```
 
 ---
 
-## Auto-Slide Behavior Details
+## Technical Implementation
 
-| Event | Action |
-|-------|--------|
-| Component mounts | Start 4-second auto-slide interval |
-| Touch on carousel | Pause auto-slide, start 4s inactivity timer |
-| Manual swipe | Pause auto-slide, start 4s inactivity timer |
-| Page scroll | Pause auto-slide, start 4s inactivity timer |
-| Any click/tap | Pause auto-slide, start 4s inactivity timer |
-| 4 seconds no activity | Resume auto-slide |
-| Reach last image | Loop to first image |
-| Component unmounts | Clear all timers |
+### Update `PhotoCarousel.tsx`:
+
+**Line ~158-178 (Image rendering):**
+```typescript
+// Change from w-full to w-1/2 for each image
+<div className="flex">
+  {images.map((url, idx) => (
+    <div
+      key={idx}
+      className="w-1/2 flex-shrink-0 snap-start cursor-pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        onImageClick?.(idx);
+      }}
+    >
+      <img
+        src={url}
+        alt={`Image ${idx + 1}`}
+        className="w-full aspect-square object-cover px-0.5"
+        draggable={false}
+      />
+    </div>
+  ))}
+</div>
+```
+
+**Add image counter (Line ~180):**
+```typescript
+{/* Image Counter - Text format like "1/4" */}
+<div className="text-center text-xs text-muted-foreground mt-1">
+  {currentIndex + 1} / {images.length}
+</div>
+```
+
+**Fix scroll calculation (Line ~75-86):**
+```typescript
+// Adjust scroll detection for 50% width items
+const handleScroll = useCallback(() => {
+  if (!scrollContainerRef.current) return;
+  
+  const container = scrollContainerRef.current;
+  const scrollLeft = container.scrollLeft;
+  const itemWidth = container.clientWidth / 2; // Each image is 50% width
+  const newIndex = Math.round(scrollLeft / itemWidth);
+  
+  if (newIndex !== currentIndex && newIndex >= 0 && newIndex < images.length) {
+    setCurrentIndex(newIndex);
+  }
+}, [currentIndex, images.length]);
+```
+
+**Fix auto-slide to scroll by 1 image (Line ~66-72):**
+```typescript
+// Scroll by one image width (50% of container)
+useEffect(() => {
+  if (!scrollContainerRef.current) return;
+  
+  const container = scrollContainerRef.current;
+  const itemWidth = container.clientWidth / 2;
+  const targetScroll = currentIndex * itemWidth;
+  container.scrollTo({ left: targetScroll, behavior: 'smooth' });
+}, [currentIndex]);
+```
+
+**Handle single image (keep full width):**
+```typescript
+if (images.length === 1) {
+  // Single image still shows full width
+  return (
+    <div 
+      className="w-full rounded-xl overflow-hidden..."
+      onClick={() => onImageClick?.(0)}
+    >
+      <img src={images[0]} ... />
+    </div>
+  );
+}
+```
+
+---
+
+## Expected Behavior After Fix
+
+1. **Normal View (Photo+ tab):**
+   - 2 images visible side-by-side
+   - Swipe left/right to see more images
+   - Counter shows "1/4", "2/4" etc.
+   - Auto-slides every 4 seconds when idle
+   - Tapping any image opens fullscreen lightbox at that index
+
+2. **Fullscreen View:**
+   - Shows single image at a time (unchanged)
+   - Swipe between images with 1/4 counter
+   - Swipe up/down between posts
+
+3. **Single Image Posts:**
+   - Still display full width (unchanged)
 
 ---
 
 ## Files to Modify
 
-| File | Lines | Changes |
-|------|-------|---------|
-| `src/components/post/PhotoPlusPostCreator.tsx` | 18, 57-58, 261-286 | MAX_IMAGES=4, updated grid layout |
-| `src/components/feed/ImmersivePostCard.tsx` | 838-883 | Replace grid with auto-slide carousel |
-| `src/components/feed/PhotoPostSlide.tsx` | - | Already supports multiple images (minimal changes) |
-| `src/components/feed/ImageLightbox.tsx` | - | Already dynamic (no changes needed) |
+| File | Changes |
+|------|---------|
+| `src/components/feed/PhotoCarousel.tsx` | Change image width to 50%, add text counter, fix scroll calculation |
 
 ---
 
-## Expected Behavior
+## Summary
 
-1. **Post Creation:**
-   - Users can upload up to 4 images
-   - Preview shows 2x2 grid for 3-4 images
-   - "Maximum 4 images reached" message when limit hit
-
-2. **Normal Feed View (Photo+ tab):**
-   - Images display as horizontal carousel
-   - Auto-slides every 4 seconds when idle
-   - Manual swipe left/right works
-   - Any activity pauses auto-slide for 4 seconds
-   - Tap opens fullscreen at current image
-
-3. **Fullscreen View:**
-   - Swipe left/right between images (1/4, 2/4, etc.)
-   - Counter shows current position
-   - All social interactions work
-   - Swipe up/down navigates between posts
+- Each image = 50% width (shows 2 at once)
+- Add text counter: "1/4", "2/3" etc.
+- Fix scroll snap to work with half-width items
+- Auto-slide advances by 1 image
+- Click any image → opens fullscreen at that index
