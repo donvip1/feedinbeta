@@ -298,20 +298,24 @@ const Feed = () => {
   };
 
   // Helper function to fetch posts for a specific tab using the new rotation system
-  const fetchTabPosts = useCallback(async (tab: 'following' | 'forYou', userId: string) => {
+  const fetchTabPosts = useCallback(async (tab: 'following' | 'forYou', userId: string, sessionKey: number) => {
     try {
-      // Use the new get_feed_with_rotation function that:
-      // 1. Excludes posts already viewed today
-      // 2. Prioritizes new posts (last 24h) over old posts
-      // 3. Applies session-based rotation for different starting positions
+      // Use the get_feed_with_rotation function with session-based randomization
+      // Each different sessionKey produces a different random order (TikTok/YouTube style)
+      // New posts (last 24h) get priority, then unviewed, then viewed posts
       const feedType = tab === 'following' ? 'following' : 'forYou';
+      
+      // Create a unique session seed from the session key
+      // This makes posts appear in different random order each time user returns
+      const sessionSeed = `${sessionKey}-${userId.substring(0, 8)}`;
       
       const { data, error } = await supabase.rpc('get_feed_with_rotation', {
         p_user_id: userId,
         p_limit: 100,
         p_offset: 0,
         p_feed_type: feedType,
-        p_media_filter: 'all'
+        p_media_filter: 'all',
+        p_session_seed: sessionSeed
       });
       
       if (error) {
@@ -321,23 +325,6 @@ const Feed = () => {
       }
       
       if (!data || data.length === 0) {
-        // Check if cycle needs reset (user has seen most posts)
-        const { data: cycleData } = await supabase.rpc('reset_viewed_posts_cycle', { p_user_id: userId });
-        const wasReset = Array.isArray(cycleData) && cycleData[0]?.was_reset;
-        
-        if (wasReset) {
-          // Cycle was reset, try fetching again with randomized order
-          const { data: randomData } = await supabase.rpc('get_randomized_feed_cycle', {
-            p_user_id: userId,
-            p_limit: 100,
-            p_media_filter: 'all'
-          });
-          
-          if (randomData && randomData.length > 0) {
-            return await enrichPostsWithProfiles(randomData);
-          }
-        }
-        
         return await fetchFallbackPosts(userId);
       }
       
@@ -416,10 +403,10 @@ const Feed = () => {
     queryKey: ['feed-posts-videos', user?.id, feedSessionKey],
     queryFn: async () => {
       if (!user) return [];
-      console.log('[Feed] Fetching fresh video posts with rotation...');
+      console.log('[Feed] Fetching fresh video posts with session rotation:', feedSessionKey);
       
-      // ALWAYS fetch fresh from rotation system - no cache returns
-      const allPosts = await fetchTabPosts('forYou', user.id);
+      // Pass feedSessionKey to get different random order each visit
+      const allPosts = await fetchTabPosts('forYou', user.id, feedSessionKey);
       
       // Filter for video posts only
       const videosOnly = allPosts.filter((p: any) => 
@@ -441,10 +428,10 @@ const Feed = () => {
     queryKey: ['feed-posts-photos-text', user?.id, feedSessionKey],
     queryFn: async () => {
       if (!user) return [];
-      console.log('[Feed] Fetching fresh photo/text posts with rotation...');
+      console.log('[Feed] Fetching fresh photo/text posts with session rotation:', feedSessionKey);
       
-      // ALWAYS fetch fresh from rotation system - use 'forYou' to get ALL posts, not just following
-      const allPosts = await fetchTabPosts('forYou', user.id);
+      // Pass feedSessionKey to get different random order each visit
+      const allPosts = await fetchTabPosts('forYou', user.id, feedSessionKey);
       
       // Filter for non-video posts (images, text, styled text)
       const nonVideos = allPosts.filter((p: any) => 
