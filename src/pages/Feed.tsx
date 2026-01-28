@@ -1026,6 +1026,10 @@ const Feed = () => {
             setSelectedMedia([]);
             setCurrentMediaIndex(0);
           }}
+          onBack={() => {
+            // Go back to gallery to reselect video
+            setSelectedMedia([]);
+          }}
         />
       )}
 

@@ -17,6 +17,7 @@ interface NativeGalleryPickerProps {
   maxSelection?: number;
   allowMultiple?: boolean;
   acceptType?: 'video' | 'image' | 'all';
+  autoOpenPicker?: boolean; // Whether to auto-open file picker on mount
 }
 
 export default function NativeGalleryPicker({
@@ -27,6 +28,7 @@ export default function NativeGalleryPicker({
   maxSelection = 1,
   allowMultiple = false,
   acceptType = 'all',
+  autoOpenPicker = true, // Default to auto-open for backwards compatibility
 }: NativeGalleryPickerProps) {
   
   // Compute the accept attribute based on acceptType
@@ -38,6 +40,7 @@ export default function NativeGalleryPicker({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedItems, setSelectedItems] = useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const hasOpenedPickerRef = useRef(false); // Track if picker was already opened
 
   const triggerHaptic = useCallback(async (type: 'light' | 'medium' = 'light') => {
     try {
@@ -51,12 +54,23 @@ export default function NativeGalleryPicker({
     } catch {}
   }, []);
 
-  // Open file picker on mount
+  // Open file picker on mount - only once per component mount
   useEffect(() => {
-    if (open && fileInputRef.current) {
-      fileInputRef.current.click();
+    if (open && autoOpenPicker && fileInputRef.current && !hasOpenedPickerRef.current) {
+      hasOpenedPickerRef.current = true;
+      // Small delay to ensure component is fully mounted
+      setTimeout(() => {
+        fileInputRef.current?.click();
+      }, 100);
     }
-  }, [open]);
+  }, [open, autoOpenPicker]);
+  
+  // Reset the opened flag when component unmounts
+  useEffect(() => {
+    return () => {
+      hasOpenedPickerRef.current = false;
+    };
+  }, []);
 
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -162,7 +176,7 @@ export default function NativeGalleryPicker({
         </button>
 
         <h1 className="text-lg font-semibold text-white">
-          {allowMultiple ? 'Select Media' : 'Choose Photo'}
+          {acceptType === 'video' ? 'Choose Video' : allowMultiple ? 'Select Media' : 'Choose Photo'}
         </h1>
 
         {allowMultiple && selectedItems.length > 0 && (
@@ -249,16 +263,24 @@ export default function NativeGalleryPicker({
       {!isLoading && selectedItems.length === 0 && (
         <div className="flex-1 flex flex-col items-center justify-center p-8 space-y-6">
           <div className="text-center space-y-2">
-            <p className="text-white/60">No media selected</p>
-            <p className="text-white/40 text-sm">Choose from your gallery or take a new photo</p>
+            <p className="text-white/60">No {acceptType === 'video' ? 'video' : 'media'} selected</p>
+            <p className="text-white/40 text-sm">
+              {acceptType === 'video' 
+                ? 'Choose a video from your gallery or record a new one'
+                : 'Choose from your gallery or take a new photo'
+              }
+            </p>
           </div>
 
           <div className="flex gap-4">
             <button
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                hasOpenedPickerRef.current = false; // Allow reopening
+                fileInputRef.current?.click();
+              }}
               className="px-6 py-3 bg-white/10 rounded-xl text-white font-medium active:scale-95 transition-transform"
             >
-              Choose from Gallery
+              {acceptType === 'video' ? 'Choose Video' : 'Choose from Gallery'}
             </button>
             <button
               onClick={() => {
@@ -268,7 +290,7 @@ export default function NativeGalleryPicker({
               className="px-6 py-3 bg-primary rounded-xl text-white font-medium active:scale-95 transition-transform flex items-center gap-2"
             >
               <Camera className="w-5 h-5" />
-              Camera
+              {acceptType === 'video' ? 'Record' : 'Camera'}
             </button>
           </div>
         </div>
