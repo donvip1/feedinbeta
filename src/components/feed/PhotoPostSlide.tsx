@@ -166,8 +166,8 @@ export default function PhotoPostSlide({
 
   return (
     <div className="w-full h-full flex flex-col relative">
-      {/* Image Container */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden">
+      {/* Image Container - Full height with proper sizing like TikTok */}
+      <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
         <motion.div
           drag={images.length > 1 ? 'x' : false}
           dragConstraints={{ left: -100, right: 100 }}
@@ -181,13 +181,17 @@ export default function PhotoPostSlide({
             key={`${post.id}-${currentImageIndex}`}
             src={images[currentImageIndex]}
             alt={`Image ${currentImageIndex + 1}`}
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="max-w-full max-h-full object-contain select-none pointer-events-none"
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="w-full h-full object-contain select-none pointer-events-none"
           />
         </motion.div>
+
+        {/* Gradient overlays for better UI visibility */}
+        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
 
         {/* Image Navigation Arrows */}
         <AnimatePresence>
@@ -201,9 +205,9 @@ export default function PhotoPostSlide({
                   e.stopPropagation();
                   navigatePrevImage();
                 }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
+                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2.5 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
               >
-                <ChevronLeft size={24} />
+                <ChevronLeft size={22} />
               </motion.button>
               <motion.button
                 initial={{ opacity: 0, x: 20 }}
@@ -213,22 +217,22 @@ export default function PhotoPostSlide({
                   e.stopPropagation();
                   navigateNextImage();
                 }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2.5 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
               >
-                <ChevronRight size={24} />
+                <ChevronRight size={22} />
               </motion.button>
             </>
           )}
         </AnimatePresence>
 
-        {/* Image Dots */}
+        {/* Image Dots - positioned above social buttons */}
         <AnimatePresence>
           {showUI && images.length > 1 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2"
+              className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex gap-1.5"
             >
               {images.map((_, idx) => (
                 <button
@@ -238,9 +242,9 @@ export default function PhotoPostSlide({
                     setCurrentImageIndex(idx);
                   }}
                   className={cn(
-                    "w-2 h-2 rounded-full transition-all",
+                    "w-1.5 h-1.5 rounded-full transition-all",
                     idx === currentImageIndex
-                      ? "bg-white w-4"
+                      ? "bg-white w-3"
                       : "bg-white/40 hover:bg-white/60"
                   )}
                 />
@@ -248,77 +252,79 @@ export default function PhotoPostSlide({
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Caption - positioned above social buttons */}
+        <AnimatePresence>
+          {showUI && caption && !commentsOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-20 left-4 right-4 z-20"
+            >
+              <p className="text-white text-sm line-clamp-3 drop-shadow-lg" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+                {caption}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Social Buttons Row - All on one line at bottom including Promote */}
+        <AnimatePresence>
+          {showUI && !commentsOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-6 left-4 right-4 z-30"
+            >
+              <div className="flex items-center justify-between">
+                {/* Social buttons group */}
+                <div className="flex items-center gap-3">
+                  <button onClick={handleLike} className="flex items-center gap-1 group">
+                    <Heart className={cn("w-[18px] h-[18px] transition-transform active:scale-90", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
+                    <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(likesCount)}</span>
+                  </button>
+
+                  <button onClick={(e) => { e.stopPropagation(); setCommentsOpen(true); }} className="flex items-center gap-1 group">
+                    <MessageCircle className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
+                    <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(commentsCount)}</span>
+                  </button>
+
+                  <button onClick={(e) => { e.stopPropagation(); setRefeedOpen(true); }} className="flex items-center gap-1 group">
+                    <Repeat className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
+                    <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(refeedsCount)}</span>
+                  </button>
+
+                  <div className="flex items-center gap-1">
+                    <Eye className="w-[18px] h-[18px] text-white" />
+                    <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
+                  </div>
+
+                  <button onClick={(e) => { e.stopPropagation(); setGiftOpen(true); }} className="group">
+                    <Gift className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
+                  </button>
+
+                  <button onClick={(e) => { e.stopPropagation(); setShareOpen(true); }} className="group">
+                    <Share2 className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
+                  </button>
+                </div>
+
+                {/* Promote button - on same line, smaller */}
+                {user && post.id && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); navigate(`/promote/${post.id}`); }}
+                    className="px-2.5 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all active:scale-95 flex items-center gap-1"
+                  >
+                    <TrendingUp className="w-3.5 h-3.5 text-white" />
+                    <span className="text-white text-[10px] font-semibold">Promote</span>
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-
-      {/* Social Buttons & Caption - Fixed at bottom */}
-      <AnimatePresence>
-        {showUI && !commentsOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="absolute bottom-8 left-4 right-4 z-30 flex flex-col gap-3"
-          >
-            {/* Caption */}
-            {caption && (
-              <div className="max-h-24 overflow-y-auto pr-[15%]">
-                <p className="text-white text-sm line-clamp-4 drop-shadow-lg">{caption}</p>
-              </div>
-            )}
-            
-            {/* Social Buttons Row */}
-            <div className="flex items-center gap-4 flex-wrap">
-              <button onClick={handleLike} className="flex items-center gap-1 group">
-                <Heart className={cn("w-5 h-5 transition-transform active:scale-90", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
-                <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(likesCount)}</span>
-              </button>
-
-              <button onClick={(e) => { e.stopPropagation(); setCommentsOpen(true); }} className="flex items-center gap-1 group">
-                <MessageCircle className="w-5 h-5 text-white active:scale-90 transition-transform" />
-                <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(commentsCount)}</span>
-              </button>
-
-              <div className="flex items-center gap-1">
-                <Eye className="w-5 h-5 text-white" />
-                <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
-              </div>
-
-              <button 
-                onClick={(e) => { e.stopPropagation(); setRefeedOpen(true); }} 
-                className="flex items-center gap-1 group"
-              >
-                <Repeat className="w-5 h-5 text-white active:scale-90 transition-transform" />
-                <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(refeedsCount)}</span>
-              </button>
-
-              <button 
-                onClick={(e) => { e.stopPropagation(); setGiftOpen(true); }} 
-                className="flex items-center gap-1 group"
-              >
-                <Gift className="w-5 h-5 text-white active:scale-90 transition-transform" />
-                <span className="text-white text-xs font-medium drop-shadow-lg">{formatCount(giftsCount)}</span>
-              </button>
-
-              <button 
-                onClick={(e) => { e.stopPropagation(); setShareOpen(true); }} 
-                className="flex items-center gap-1 group"
-              >
-                <Share2 className="w-5 h-5 text-white active:scale-90 transition-transform" />
-              </button>
-
-              {user && post.id && (
-                <button 
-                  onClick={(e) => { e.stopPropagation(); navigate(`/promote/${post.id}`); }}
-                  className="ml-auto px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all active:scale-95 flex items-center gap-1"
-                >
-                  <TrendingUp className="w-4 h-4 text-white" />
-                  <span className="text-white text-xs font-medium">Promote</span>
-                </button>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Comments Modal */}
       <CommentsModal

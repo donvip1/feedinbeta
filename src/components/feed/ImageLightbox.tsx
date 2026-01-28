@@ -167,7 +167,7 @@ export default function ImageLightbox({
             )}
           </AnimatePresence>
 
-          {/* Vertical Scroll Container */}
+          {/* Vertical Scroll Container - Smooth scrolling like TikTok */}
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
@@ -175,7 +175,8 @@ export default function ImageLightbox({
             style={{ 
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              scrollBehavior: 'smooth'
             }}
           >
             {postsToRender.map(({ post, idx, shouldRender }) => (
