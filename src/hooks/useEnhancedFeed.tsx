@@ -248,7 +248,7 @@ async function fetchFallbackFeed(
     } catch (error) {
       console.error('RPC fallback failed:', error);
       
-      // Ultimate fallback - basic posts query
+      // Ultimate fallback - basic posts query (includes user's own posts)
       const { data } = await supabase
         .from('posts')
         .select(`
@@ -259,7 +259,7 @@ async function fetchFallbackFeed(
             avatar_url
           )
         `)
-        .neq('user_id', userId)
+        .eq('status', 'active')
         .order('created_at', { ascending: false })
         .range(offset, offset + 19);
 
