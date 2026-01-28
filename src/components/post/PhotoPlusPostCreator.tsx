@@ -324,12 +324,12 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
               )}
 
               {/* Image Picker Cards */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex justify-center gap-3">
                 {/* Card 1 */}
                 <div
                   onClick={() => fileInputRef1.current?.click()}
                   className={cn(
-                    "relative aspect-square rounded-xl border-2 border-dashed border-border",
+                    "relative w-[calc(37.5%-6px)] aspect-square rounded-xl border-2 border-dashed border-border",
                     "flex items-center justify-center cursor-pointer",
                     "hover:border-primary/50 hover:bg-accent/50 transition-all",
                     images[0] && "border-solid border-primary/30"
@@ -354,8 +354,8 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                     </>
                   ) : (
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">
-                        <Plus className="w-6 h-6" />
+                      <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                        <Plus className="w-5 h-5" />
                       </div>
                       <span className="text-xs">Add Photo</span>
                     </div>
@@ -366,7 +366,7 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                 <div
                   onClick={() => fileInputRef2.current?.click()}
                   className={cn(
-                    "relative aspect-square rounded-xl border-2 border-dashed border-border",
+                    "relative w-[calc(37.5%-6px)] aspect-square rounded-xl border-2 border-dashed border-border",
                     "flex items-center justify-center cursor-pointer",
                     "hover:border-primary/50 hover:bg-accent/50 transition-all",
                     images[1] && "border-solid border-primary/30"
@@ -391,8 +391,8 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                     </>
                   ) : (
                     <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">
-                        <Plus className="w-6 h-6" />
+                      <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                        <Plus className="w-5 h-5" />
                       </div>
                       <span className="text-xs">Add Photo</span>
                     </div>
