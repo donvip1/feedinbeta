@@ -1,72 +1,43 @@
 
-# Plan: Fix Photo+ Carousel Swipe Conflict with Tab Navigation
+# Plan: Fix Photo+ Carousel - Stop TouchEnd from Triggering Tab Navigation
 
-## Problem
+## Root Cause Found
 
-When users swipe left/right on images in the Photo+ carousel, the touch events bubble up to the parent `SwipeableTabs` component, which interprets them as tab navigation gestures and switches between Videos/Photo+/Live tabs instead of scrolling the carousel images.
+The `SwipeableTabs` component triggers tab navigation in **`onTouchEnd`** (line 37-60), NOT in `onTouchStart` or `onTouchMove`. 
 
----
+Currently, the PhotoCarousel stops propagation on:
+- `onTouchStart` (line 205) 
+- `onTouchMove` (line 206) 
 
-## Root Cause
+But it does **NOT** stop propagation on `onTouchEnd`, which is exactly where SwipeableTabs makes the decision to switch tabs!
 
-The `SwipeableTabs` component (lines 62-70) wraps the entire feed content and captures all touch events:
-
-```typescript
-<div
-  onTouchStart={handleTouchStart}
-  onTouchEnd={handleTouchEnd}
-  className="w-full h-full"
->
-  {children}
-</div>
 ```
-
-The PhotoCarousel has its own horizontal scroll, but touch events bubble up through the DOM and trigger the parent's tab-switching logic.
+SwipeableTabs.tsx (line 37-60):
+const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+  // This calculates the swipe and triggers tab change
+  if (velocity > VELOCITY_THRESHOLD || Math.abs(deltaX) > SWIPE_THRESHOLD) {
+    onTabChange(activeIndex + 1);  // <-- This still fires!
+  }
+}, ...);
+```
 
 ---
 
 ## Solution
 
-Prevent touch events from bubbling out of the PhotoCarousel when the user is interacting with it. This requires stopping event propagation on the carousel's touch handlers.
+Add `onTouchEnd` handler to the PhotoCarousel that stops propagation when the user is swiping horizontally on the carousel.
 
 ### File: `src/components/feed/PhotoCarousel.tsx`
 
-**Key Changes:**
-
-1. **Stop propagation on touch start** - Prevent the swipe from reaching SwipeableTabs
-2. **Add touch move handler** - Stop propagation during the swipe motion
-3. **Keep existing scroll behavior** - The native horizontal scroll will work once parent doesn't intercept
-
----
-
-## Technical Implementation
-
-### Update PhotoCarousel touch handlers:
-
-**Line 125 - Update handleTouchStart:**
+**Add new handleTouchEnd handler:**
 ```typescript
-const handleTouchStart = useCallback((e: React.TouchEvent) => {
-  // CRITICAL: Stop propagation to prevent SwipeableTabs from capturing the swipe
-  e.stopPropagation();
-  
-  handleActivity();
-  touchStartRef.current = {
-    x: e.touches[0].clientX,
-    y: e.touches[0].clientY,
-    time: Date.now()
-  };
-}, [handleActivity]);
-```
-
-**Add new handleTouchMove handler:**
-```typescript
-const handleTouchMove = useCallback((e: React.TouchEvent) => {
-  // Stop propagation during horizontal swipe to prevent tab switching
+// Stop propagation on touch end to prevent SwipeableTabs from navigating
+const handleTouchEnd = useCallback((e: React.TouchEvent) => {
   if (touchStartRef.current) {
-    const deltaX = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
-    const deltaY = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+    const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
     
-    // If horizontal movement is dominant, this is a carousel swipe
+    // If it was a horizontal swipe on the carousel, stop it from bubbling
     if (deltaX > deltaY && deltaX > 10) {
       e.stopPropagation();
     }
@@ -74,15 +45,16 @@ const handleTouchMove = useCallback((e: React.TouchEvent) => {
 }, []);
 ```
 
-**Line 189 - Add onTouchMove to scroll container:**
+**Add onTouchEnd to scroll container (line 206):**
 ```typescript
 <div
   ref={scrollContainerRef}
   onScroll={handleScroll}
   onTouchStart={handleTouchStart}
-  onTouchMove={handleTouchMove}  // NEW: Stop horizontal swipes from bubbling
+  onTouchMove={handleTouchMove}
+  onTouchEnd={handleTouchEnd}  // NEW: Stop horizontal swipes from triggering tab change
   onMouseDown={handleActivity}
-  className="w-full overflow-x-scroll snap-x snap-mandatory..."
+  ...
 >
 ```
 
@@ -90,23 +62,11 @@ const handleTouchMove = useCallback((e: React.TouchEvent) => {
 
 ## Event Flow After Fix
 
-```
-Before Fix:
-+------------------+
-| SwipeableTabs    | ← Captures swipe, switches to Videos tab
-|  +------------+  |
-|  | Carousel   |  | ← User swipes here
-|  +------------+  |
-+------------------+
-
-After Fix:
-+------------------+
-| SwipeableTabs    | ← Never receives the swipe (stopped)
-|  +------------+  |
-|  | Carousel   |  | ← User swipes, carousel scrolls images
-|  +------------+  |
-+------------------+
-```
+| Event | PhotoCarousel | SwipeableTabs |
+|-------|--------------|---------------|
+| `touchstart` | Captures, stops propagation | Never receives |
+| `touchmove` | Captures horizontal, stops propagation | Never receives |
+| `touchend` | **Captures horizontal, stops propagation** | **Never receives → No tab switch!** |
 
 ---
 
@@ -114,29 +74,13 @@ After Fix:
 
 | File | Changes |
 |------|---------|
-| `src/components/feed/PhotoCarousel.tsx` | Add `e.stopPropagation()` to handleTouchStart, add handleTouchMove handler |
+| `src/components/feed/PhotoCarousel.tsx` | Add `handleTouchEnd` function, attach to scroll container |
 
 ---
 
 ## Expected Behavior After Fix
 
-1. **Photo+ Carousel:**
-   - Swiping left/right on images scrolls through the carousel
-   - Tab navigation does NOT trigger when swiping on images
-   - Auto-slide continues to work when idle
-
-2. **Tab Navigation (outside carousel):**
-   - Swiping on caption, social buttons, or empty areas still switches tabs
-   - Videos ↔ Photo+ ↔ Live navigation works normally
-
-3. **Single Image Posts:**
-   - No horizontal swipe needed, so no change in behavior
-   - Tab navigation still works when swiping on single-image posts
-
----
-
-## Summary
-
-- Add `e.stopPropagation()` to carousel touch handlers
-- Add `onTouchMove` handler to catch swipe gestures
-- Only block propagation for horizontal swipes (carousel), allow vertical (scrolling)
+1. **Swiping on carousel images:** Scrolls through images, tabs stay on Photo+
+2. **Swiping on caption/buttons/empty areas:** Still switches between Videos/Photo+/Live tabs
+3. **Tapping images:** Opens fullscreen lightbox (unchanged)
+4. **Auto-slide:** Continues working when idle (unchanged)
