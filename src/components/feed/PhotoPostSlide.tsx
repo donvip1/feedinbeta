@@ -225,30 +225,16 @@ export default function PhotoPostSlide({
           )}
         </AnimatePresence>
 
-        {/* Image Dots - positioned above social buttons */}
+        {/* Image Counter - positioned at bottom left */}
         <AnimatePresence>
-          {showUI && images.length > 1 && (
+          {showUI && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-24 left-1/2 -translate-x-1/2 z-20 flex gap-1.5"
+              className="absolute bottom-24 left-4 z-20 px-2 py-1 bg-black/60 rounded-full text-white text-xs font-medium"
             >
-              {images.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentImageIndex(idx);
-                  }}
-                  className={cn(
-                    "w-1.5 h-1.5 rounded-full transition-all",
-                    idx === currentImageIndex
-                      ? "bg-white w-3"
-                      : "bg-white/40 hover:bg-white/60"
-                  )}
-                />
-              ))}
+              {currentImageIndex + 1} / {images.length}
             </motion.div>
           )}
         </AnimatePresence>
