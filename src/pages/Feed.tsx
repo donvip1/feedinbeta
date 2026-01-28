@@ -986,6 +986,7 @@ const Feed = () => {
             setSelectedMedia(items);
           }}
           onCameraOpen={() => setPostStep('video')}
+          acceptType="video"
         />
       )}
 

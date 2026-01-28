@@ -16,6 +16,7 @@ interface NativeGalleryPickerProps {
   onCameraOpen: () => void;
   maxSelection?: number;
   allowMultiple?: boolean;
+  acceptType?: 'video' | 'image' | 'all';
 }
 
 export default function NativeGalleryPicker({
@@ -25,7 +26,15 @@ export default function NativeGalleryPicker({
   onCameraOpen,
   maxSelection = 1,
   allowMultiple = false,
+  acceptType = 'all',
 }: NativeGalleryPickerProps) {
+  
+  // Compute the accept attribute based on acceptType
+  const acceptAttribute = acceptType === 'video' 
+    ? 'video/*' 
+    : acceptType === 'image' 
+      ? 'image/*' 
+      : 'image/*,video/*';
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedItems, setSelectedItems] = useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -137,7 +146,7 @@ export default function NativeGalleryPicker({
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept={acceptAttribute}
         multiple={allowMultiple}
         onChange={handleFileSelect}
         className="hidden"
