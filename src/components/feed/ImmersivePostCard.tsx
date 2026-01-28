@@ -640,8 +640,12 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         ref={postRef}
         className={cn(
           "relative w-full max-w-[430px] mx-auto bg-black overflow-hidden rounded-none sm:rounded-2xl flex flex-col transition-all duration-300",
-          // In immersive mode, card takes full viewport height but stays in scroll flow
-          isImmersiveMode ? "h-[100dvh] max-w-none" : "h-[calc(100dvh-68px)]"
+          // In immersive mode, card takes full viewport height
+          isImmersiveMode && "h-[100dvh] max-w-none",
+          // Video layout: full viewport height for TikTok-style
+          !isImmersiveMode && layoutType === 'video' && "h-[calc(100dvh-68px)]",
+          // Photo+ layout: content-driven height with minimal padding, no fixed height
+          !isImmersiveMode && isPhotoTextLayout && "min-h-fit pb-4"
         )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -833,13 +837,13 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             <>
               {/* Photo+ Layout: Thumbnail carousel with horizontal scroll */}
               {isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? (
-                <div className="w-full px-1">
-                  {/* Side-by-side grid for 2 images like reference screenshot */}
-                  <div className="flex gap-1.5">
+                <div className="w-full px-1 mb-2">
+                  {/* Side-by-side grid for 2 images - tight to social buttons */}
+                  <div className="flex gap-1">
                     {mediaUrls.slice(0, 2).map((url, idx) => (
                       <div 
                         key={idx} 
-                        className="relative flex-1 rounded-xl overflow-hidden border border-border cursor-pointer hover:brightness-95 transition-all"
+                        className="relative flex-1 rounded-lg overflow-hidden border border-border/50 cursor-pointer hover:brightness-95 transition-all"
                         onClick={(e) => {
                           e.stopPropagation();
                           setLightboxIndex(idx);
@@ -849,7 +853,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                         <img
                           src={url}
                           alt={`Image ${idx + 1}`}
-                          className="w-full aspect-[4/5] object-cover transition-opacity duration-300"
+                          className="w-full aspect-square object-cover transition-opacity duration-300"
                           onLoad={() => idx === 0 && setIsMediaLoaded(true)}
                           onContextMenu={(e) => e.preventDefault()}
                           draggable={false}
@@ -1422,9 +1426,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </motion.div>
         )}
 
-        {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout - directly below content, all on one line --- */}
+        {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout - tight to content, 8px gap --- */}
         {!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (
-          <div className="flex-shrink-0 px-4 pt-2 pb-3">
+          <div className="flex-shrink-0 px-3 pt-2 pb-0">
             {/* All buttons in one row including Promote */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
