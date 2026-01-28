@@ -94,6 +94,12 @@ const Profile = () => {
 
   const [isOwnProfile, setIsOwnProfile] = useState(false);
   const [areMutualFriends, setAreMutualFriends] = useState(false);
+  // Track if viewed user has sent a friend request TO the current user
+  const [incomingRequestFromUser, setIncomingRequestFromUser] = useState<{
+    id: string;
+    sender_id: string;
+    created_at: string;
+  } | null>(null);
   const [pendingFriendRequests, setPendingFriendRequests] = useState<{
     id: string;
     sender_id: string;
@@ -209,7 +215,8 @@ const Profile = () => {
         checkFollowStatus(),
         checkIfFollowingMe(),
         checkFriendRequestStatus(),
-        checkMutualFriendStatus()
+        checkMutualFriendStatus(),
+        checkIncomingRequestFromUser()
       ]);
     }
   }, [resolvedUserId, user?.id]);
@@ -371,6 +378,26 @@ const Profile = () => {
       setAreMutualFriends(!!data);
     } catch (error: any) {
       console.error('Error checking mutual friend status:', error);
+    }
+  };
+
+  // Check if the viewed user has sent a friend request TO the current user
+  const checkIncomingRequestFromUser = async () => {
+    if (!user || !resolvedUserId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('friend_requests')
+        .select('id, sender_id, created_at')
+        .eq('sender_id', resolvedUserId)
+        .eq('receiver_id', user.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setIncomingRequestFromUser(data);
+    } catch (error: any) {
+      console.error('Error checking incoming request:', error);
     }
   };
 
@@ -999,38 +1026,71 @@ const Profile = () => {
               </Button>
             </div>
           ) : (
-            <div className="flex gap-3 mb-6 justify-center max-w-md mx-auto">
-              <Button
-                onClick={toggleFollow}
-                className={
-                  isFollowing
-                    ? 'flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border'
-                    : 'flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg'
-                }
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </Button>
-              
-              {areMutualFriends ? (
-                <Button
-                  onClick={() => navigate('/messages')}
-                  variant="outline"
-                  className="flex-1 border-primary/50 text-primary hover:bg-primary/10"
-                >
-                  <MessageCircle className="w-4 h-4 mr-2" />
-                  Message
-                </Button>
-              ) : (
-                <Button
-                  onClick={requestChat}
-                  disabled={hasPendingRequest}
-                  variant="outline"
-                  className="flex-1 border-primary/50 text-primary hover:bg-primary/10 disabled:opacity-50"
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  {hasPendingRequest ? 'Request Sent' : 'Request Chat'}
-                </Button>
+            <div className="flex flex-col gap-3 mb-6 max-w-md mx-auto">
+              {/* Incoming request Accept/Decline buttons */}
+              {incomingRequestFromUser && !areMutualFriends && (
+                <div className="flex gap-2 p-3 bg-primary/10 rounded-xl border border-primary/20">
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {profile?.display_name || profile?.username || 'This user'} sent you a chat request
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleAcceptFriendRequest(incomingRequestFromUser.id, incomingRequestFromUser.sender_id)}
+                        size="sm"
+                        className="flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground"
+                      >
+                        <UserCheck className="w-4 h-4 mr-1" />
+                        Accept
+                      </Button>
+                      <Button
+                        onClick={() => handleDeclineFriendRequest(incomingRequestFromUser.id)}
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 border-destructive/50 text-destructive hover:bg-destructive/10"
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Decline
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               )}
+              
+              {/* Follow and Message buttons */}
+              <div className="flex gap-3 justify-center">
+                <Button
+                  onClick={toggleFollow}
+                  className={
+                    isFollowing
+                      ? 'flex-1 bg-secondary hover:bg-secondary/80 text-secondary-foreground border border-border'
+                      : 'flex-1 bg-gradient-to-r from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg'
+                  }
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Button>
+                
+                {areMutualFriends ? (
+                  <Button
+                    onClick={startConversation}
+                    variant="outline"
+                    className="flex-1 border-primary/50 text-primary hover:bg-primary/10"
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    Message
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={requestChat}
+                    disabled={hasPendingRequest || !!incomingRequestFromUser}
+                    variant="outline"
+                    className="flex-1 border-primary/50 text-primary hover:bg-primary/10 disabled:opacity-50"
+                  >
+                    <UserPlus className="w-4 h-4 mr-2" />
+                    {hasPendingRequest ? 'Request Sent' : incomingRequestFromUser ? 'Request Pending' : 'Request Chat'}
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

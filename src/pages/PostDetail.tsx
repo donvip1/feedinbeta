@@ -14,9 +14,16 @@ const PostDetail = () => {
   const { postId: id } = useParams<{ postId: string }>();
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
-  const [globalMuted, setGlobalMuted] = useState(true);
+  const [globalMuted, setGlobalMuted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledToPost = useRef(false);
+
+  // Helper to determine layout type based on post media
+  const getLayoutType = (post: any): 'video' | 'photo-text' => {
+    if (post.media_type === 'video') return 'video';
+    if (post.original_post?.media_type === 'video') return 'video';
+    return 'photo-text';
+  };
 
   // First, get the clicked post to know the user_id
   const { data: clickedPost, isLoading: isLoadingPost } = useQuery({
@@ -242,6 +249,7 @@ const PostDetail = () => {
                 onGlobalMuteToggle={toggleGlobalMute}
                 onImmersiveModeChange={setIsImmersiveMode}
                 isGlobalImmersive={isImmersiveMode}
+                layoutType={getLayoutType(post)}
               />
             </div>
           );
