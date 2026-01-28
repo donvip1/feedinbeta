@@ -135,27 +135,34 @@ export default function ImageLightbox({
     onNavigate?.(newIndex);
   }, [currentIndex, images.length, onNavigate]);
 
-  // Swipe handling
+  // Combined swipe handling for both horizontal navigation and vertical close
   const handleDragEnd = useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const threshold = 50;
-    const velocity = info.velocity.x;
-    const offset = info.offset.x;
+    const horizontalThreshold = 30;
+    const verticalThreshold = 80;
+    const velocityX = info.velocity.x;
+    const velocityY = info.velocity.y;
+    const offsetX = info.offset.x;
+    const offsetY = info.offset.y;
 
-    if (Math.abs(velocity) > 300 || Math.abs(offset) > threshold) {
-      if (offset > 0 || velocity > 300) {
-        navigatePrev();
-      } else {
-        navigateNext();
+    // Determine if this is primarily a horizontal or vertical gesture
+    const isHorizontalGesture = Math.abs(offsetX) > Math.abs(offsetY);
+
+    if (isHorizontalGesture && images.length > 1) {
+      // Horizontal swipe for navigation
+      if (Math.abs(velocityX) > 200 || Math.abs(offsetX) > horizontalThreshold) {
+        if (offsetX > 0 || velocityX > 200) {
+          navigatePrev();
+        } else if (offsetX < 0 || velocityX < -200) {
+          navigateNext();
+        }
+      }
+    } else {
+      // Vertical swipe to close
+      if (offsetY > verticalThreshold || velocityY > 300) {
+        onClose();
       }
     }
-  }, [navigatePrev, navigateNext]);
-
-  // Vertical swipe to close
-  const handleVerticalDrag = useCallback((event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.offset.y > 100) {
-      onClose();
-    }
-  }, [onClose]);
+  }, [navigatePrev, navigateNext, onClose, images.length]);
 
   // Toggle UI visibility on tap
   const handleImageTap = (e: React.MouseEvent) => {
@@ -278,14 +285,16 @@ export default function ImageLightbox({
           }}
           transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           className="relative flex-shrink-0 flex items-center justify-center overflow-hidden"
+          style={{ touchAction: 'none' }}
         >
           <motion.div
-            drag={commentsOpen ? false : "x"}
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.2}
+            drag={commentsOpen ? false : true}
+            dragConstraints={{ left: -100, right: 100, top: 0, bottom: 100 }}
+            dragElastic={0.3}
             onDragEnd={handleDragEnd}
             onClick={handleImageTap}
             className="w-full h-full flex items-center justify-center p-4"
+            style={{ touchAction: 'none' }}
           >
             <motion.img
               key={currentIndex}
@@ -295,12 +304,8 @@ export default function ImageLightbox({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.2 }}
-              drag={commentsOpen ? false : "y"}
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={0.3}
-              onDragEnd={handleVerticalDrag}
               className={cn(
-                "max-w-full max-h-full object-contain rounded-lg select-none",
+                "max-w-full max-h-full object-contain rounded-lg select-none pointer-events-none",
                 commentsOpen && "object-cover w-full h-full"
               )}
             />
