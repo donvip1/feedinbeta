@@ -15,7 +15,6 @@ import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import DraggableCommentsPanel from './DraggableCommentsPanel';
 import ImageLightbox from './ImageLightbox';
-import PhotoCarousel from './PhotoCarousel';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
@@ -648,9 +647,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           // Photo+ layout: content-driven height with minimal padding, no fixed height
           !isImmersiveMode && isPhotoTextLayout && "min-h-fit pb-4"
         )}
-        // Only attach swipe handlers when NOT showing PhotoCarousel (it has its own scroll)
-        onTouchStart={isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? undefined : handleTouchStart}
-        onTouchEnd={isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? undefined : handleTouchEnd}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         {/* --- TOP SECTION: User Info (NOT overlayed) - Hidden in immersive mode --- */}
         {!isImmersiveMode && (
@@ -837,16 +835,51 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Image - Different layouts for Photo+ vs Video posts */}
           {hasImage && currentMediaUrl && (
             <>
-              {/* Photo+ Layout: Auto-slide carousel with horizontal scroll */}
+              {/* Photo+ Layout: Thumbnail carousel with horizontal scroll */}
               {isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? (
                 <div className="w-full px-1 mb-2">
-                  <PhotoCarousel
-                    images={mediaUrls}
-                    onImageClick={(idx) => {
-                      setLightboxIndex(idx);
-                      setShowLightbox(true);
-                    }}
-                  />
+                  {/* Side-by-side grid for 2 images - tight to social buttons */}
+                  <div className="flex gap-1">
+                    {mediaUrls.slice(0, 2).map((url, idx) => (
+                      <div 
+                        key={idx} 
+                        className="relative flex-1 rounded-lg overflow-hidden border border-border/50 cursor-pointer hover:brightness-95 transition-all"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLightboxIndex(idx);
+                          setShowLightbox(true);
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`Image ${idx + 1}`}
+                          className="w-full aspect-square object-cover transition-opacity duration-300"
+                          onLoad={() => idx === 0 && setIsMediaLoaded(true)}
+                          onContextMenu={(e) => e.preventDefault()}
+                          draggable={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {/* Show indicator if more than 2 images */}
+                  {mediaUrls.length > 2 && (
+                    <div className="flex justify-center gap-1.5 mt-1.5">
+                      {mediaUrls.map((_, idx) => (
+                        <button
+                          key={idx}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLightboxIndex(idx);
+                            setShowLightbox(true);
+                          }}
+                          className={cn(
+                            "w-1.5 h-1.5 rounded-full transition-all",
+                            idx < 2 ? "bg-primary" : "bg-muted-foreground/40"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ) : isPhotoTextLayout && !hasMultipleMedia && !isImmersiveMode ? (
                 /* Single image in Photo+ - Natural aspect ratio */

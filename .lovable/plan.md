@@ -1,72 +1,114 @@
 
-# Plan: Fix Photo+ Carousel - Stop TouchEnd from Triggering Tab Navigation
+# Plan: Photo+ Feed Layout and Scrolling Improvements
 
-## Root Cause Found
+## Current Issues
 
-The `SwipeableTabs` component triggers tab navigation in **`onTouchEnd`** (line 37-60), NOT in `onTouchStart` or `onTouchMove`. 
+1. **Two-image posts have blank space**: When a post has 2 images, there's too much vertical space between the images and the social buttons
+2. **Card-by-card scrolling in Photo+ normal view**: Currently uses `snap-y snap-mandatory` which forces card-by-card scrolling - user wants free-flowing Facebook-style scroll
+3. **Social buttons not close to content**: For multi-image posts, buttons are too far from images
 
-Currently, the PhotoCarousel stops propagation on:
-- `onTouchStart` (line 205) 
-- `onTouchMove` (line 206) 
+## Solution Overview
 
-But it does **NOT** stop propagation on `onTouchEnd`, which is exactly where SwipeableTabs makes the decision to switch tabs!
+### 1. Change Photo+ Normal View to Free-Flowing Scroll (Facebook-style)
+- Remove `snap-y snap-mandatory` scrolling for Photo+ tab only
+- Keep card-by-card snap scrolling for Videos tab (unchanged)
+- Allow users to scroll freely, seeing partial posts if needed
+- Multiple posts can be visible on screen at once
+
+### 2. Make Social Buttons Tight to Content
+- Remove fixed heights and padding that cause blank space
+- Social buttons should render directly below the last image with minimal gap (8-12px)
+- Each post takes only as much height as its content requires
+
+### 3. Keep Fullscreen (Lightbox) Behavior Unchanged
+- Fullscreen still uses card-by-card vertical navigation (already implemented)
+
+---
+
+## Technical Implementation
+
+### File 1: `src/pages/Feed.tsx`
+
+**Container scrolling changes:**
+- For Videos tab: Keep `snap-y snap-mandatory` for TikTok-style
+- For Photo+ tab: Use regular overflow-y-scroll without snap (Facebook-style)
 
 ```
-SwipeableTabs.tsx (line 37-60):
-const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-  // This calculates the swipe and triggers tab change
-  if (velocity > VELOCITY_THRESHOLD || Math.abs(deltaX) > SWIPE_THRESHOLD) {
-    onTabChange(activeIndex + 1);  // <-- This still fires!
-  }
-}, ...);
+Line ~782-788: Update container classes to conditionally apply snap
+```
+
+**Post wrapper changes:**
+- For Videos: Keep `snap-start snap-always` wrapper
+- For Photo+: Remove snap classes, let posts flow naturally
+
+```
+Line ~874: Conditionally apply snap classes based on activeTab
+```
+
+### File 2: `src/components/feed/ImmersivePostCard.tsx`
+
+**Photo+ layout container changes:**
+- Remove fixed height constraints for Photo+ posts
+- Use `min-h-fit` instead of full viewport height
+- Content-driven height: Author + Caption + Images + Buttons + minimal padding
+
+```
+Line ~635-650: Main container height logic
+```
+
+**Image grid spacing:**
+- Reduce gap between images and social buttons to 8px
+- Remove extra padding around image container
+
+```
+Line ~835-860: Multi-image grid styling
+Line ~1427: Footer padding adjustment
 ```
 
 ---
 
-## Solution
+## Visual Layout After Fix
 
-Add `onTouchEnd` handler to the PhotoCarousel that stops propagation when the user is swiping horizontally on the carousel.
-
-### File: `src/components/feed/PhotoCarousel.tsx`
-
-**Add new handleTouchEnd handler:**
-```typescript
-// Stop propagation on touch end to prevent SwipeableTabs from navigating
-const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-  if (touchStartRef.current) {
-    const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
-    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-    
-    // If it was a horizontal swipe on the carousel, stop it from bubbling
-    if (deltaX > deltaY && deltaX > 10) {
-      e.stopPropagation();
-    }
-  }
-}, []);
+### Single-Image Photo+ Post:
+```
+┌─────────────────────────────┐
+│ [Avatar] DisplayName        │ ← Author header
+│ Caption text here...        │
+├─────────────────────────────┤
+│                             │
+│      [Single Image]         │ ← Natural aspect ratio
+│                             │
+├─────────────────────────────┤
+│ ♥ 💬 🔁 👁 🎁 ⤴ [Promote]   │ ← 8px gap from image
+└─────────────────────────────┘
+       ↑ 16px gap to next post
 ```
 
-**Add onTouchEnd to scroll container (line 206):**
-```typescript
-<div
-  ref={scrollContainerRef}
-  onScroll={handleScroll}
-  onTouchStart={handleTouchStart}
-  onTouchMove={handleTouchMove}
-  onTouchEnd={handleTouchEnd}  // NEW: Stop horizontal swipes from triggering tab change
-  onMouseDown={handleActivity}
-  ...
->
+### Two-Image Photo+ Post:
+```
+┌─────────────────────────────┐
+│ [Avatar] DisplayName        │
+│ Caption text here...        │
+├──────────────┬──────────────┤
+│   [Image 1]  │   [Image 2]  │ ← Side-by-side grid
+├──────────────┴──────────────┤
+│ ♥ 💬 🔁 👁 🎁 ⤴ [Promote]   │ ← 8px gap from images
+└─────────────────────────────┘
+       ↑ 16px gap to next post
 ```
 
----
+### Scroll Behavior Comparison:
 
-## Event Flow After Fix
+**Videos Tab (unchanged):**
+- Full-page snap scrolling
+- One video visible at a time
+- TikTok-style UX
 
-| Event | PhotoCarousel | SwipeableTabs |
-|-------|--------------|---------------|
-| `touchstart` | Captures, stops propagation | Never receives |
-| `touchmove` | Captures horizontal, stops propagation | Never receives |
-| `touchend` | **Captures horizontal, stops propagation** | **Never receives → No tab switch!** |
+**Photo+ Tab (after fix):**
+- Free-flowing scroll like Facebook/Instagram
+- Multiple posts visible at once
+- No snapping - user can stop at any position
+- Posts take only as much height as needed
 
 ---
 
@@ -74,13 +116,23 @@ const handleTouchEnd = useCallback((e: React.TouchEvent) => {
 
 | File | Changes |
 |------|---------|
-| `src/components/feed/PhotoCarousel.tsx` | Add `handleTouchEnd` function, attach to scroll container |
+| `src/pages/Feed.tsx` | Remove snap scrolling for Photo+ tab, conditionally apply snap classes |
+| `src/components/feed/ImmersivePostCard.tsx` | Remove fixed heights for Photo+ posts, tighten spacing between content and buttons |
 
 ---
 
 ## Expected Behavior After Fix
 
-1. **Swiping on carousel images:** Scrolls through images, tabs stay on Photo+
-2. **Swiping on caption/buttons/empty areas:** Still switches between Videos/Photo+/Live tabs
-3. **Tapping images:** Opens fullscreen lightbox (unchanged)
-4. **Auto-slide:** Continues working when idle (unchanged)
+1. **Photo+ Normal View:**
+   - Smooth free-flowing scroll (not card-by-card)
+   - Social buttons are directly under images with 8px gap
+   - No blank space between content and buttons
+   - Multiple posts can be visible simultaneously
+
+2. **Photo+ Fullscreen (Lightbox):**
+   - Keep existing card-by-card vertical swipe navigation
+   - Unchanged from current implementation
+
+3. **Videos Tab:**
+   - Keep existing full-screen snap scrolling
+   - Unchanged from current implementation
