@@ -15,7 +15,7 @@ interface PhotoPlusPostCreatorProps {
   onSuccess?: () => void;
 }
 
-const MAX_IMAGES = 2;
+const MAX_IMAGES = 4;
 const MAX_CHARS = 1000;
 
 interface UserProfile {
@@ -54,8 +54,8 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
     const files = Array.from(e.target.files || []);
     if (images.length + files.length > MAX_IMAGES) {
       toast({
-        title: 'Maximum 2 images',
-        description: 'You can only attach up to 2 images per post.',
+        title: 'Maximum 4 images',
+        description: 'You can only attach up to 4 images per post.',
         variant: 'destructive'
       });
       return;
@@ -256,7 +256,7 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                 </div>
               )}
 
-              {/* Image Previews */}
+              {/* Image Previews - 2x2 grid for 3-4 images */}
               {images.length > 0 && (
                 <div className={cn(
                   "grid gap-2",
@@ -265,7 +265,10 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                   {images.map((img, idx) => (
                     <div
                       key={idx}
-                      className="relative aspect-square rounded-xl overflow-hidden border border-border"
+                      className={cn(
+                        "relative rounded-xl overflow-hidden border border-border",
+                        images.length === 1 ? "aspect-video" : "aspect-square"
+                      )}
                     >
                       <img
                         src={img.preview}
