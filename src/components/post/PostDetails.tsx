@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock, CheckCircle2, Music, Play, Pause, Disc3, ArrowLeft } from 'lucide-react';
+import { Globe, Users, UserCheck, Lock, Loader2, MapPin, X, Calendar, Clock, CheckCircle2, Music, Play, Pause, Disc3, ArrowLeft, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { MusicPicker } from './MusicPicker';
 import { MusicUploader } from './MusicUploader';
+import { HashtagInput } from './HashtagInput';
 
 interface SelectedMusic {
   id: string;
@@ -392,7 +393,7 @@ export default function PostDetails({ media, onSubmit, onClose, onBack }: PostDe
 
       <div className="w-full mb-4">
         <div className="flex items-center gap-2 mb-2">
-          <Hash className="w-4 h-4 text-muted-foreground" />
+          <FileText className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Caption</span>
         </div>
         <textarea
@@ -405,31 +406,15 @@ export default function PostDetails({ media, onSubmit, onClose, onBack }: PostDe
       </div>
 
       {/* Hashtags Input */}
-      <div className="w-full mb-4">
-        <div className="flex items-center gap-2 mb-2">
-          <Hash className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Hashtags</span>
-        </div>
-        <input
-          type="text"
-          placeholder="#fashion #vibes #trending"
+      <div className="w-full mb-4 p-3 border border-border rounded-lg bg-background">
+        <HashtagInput
           value={hashtagsInput}
-          onChange={(e) => setHashtagsInput(e.target.value)}
-          className="w-full p-3 border border-border rounded-lg text-sm bg-background"
+          onChange={setHashtagsInput}
+          maxHashtags={5}
+          placeholder="Add hashtags..."
+          showLabel={true}
+          showPreview={true}
         />
-        {hashtagsInput.trim() && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {hashtagsInput
-              .split(/[,\s]+/)
-              .map((tag) => tag.replace(/^#/, '').trim().toLowerCase())
-              .filter((tag) => tag.length > 0)
-              .map((tag, idx) => (
-                <span key={idx} className="px-2 py-1 bg-primary/10 text-primary rounded-full text-xs">
-                  #{tag}
-                </span>
-              ))}
-          </div>
-        )}
       </div>
 
       {/* Music Selection - TikTok/Instagram Style */}

@@ -11,7 +11,6 @@ import {
   Users,
   UserCheck,
   Lock,
-  Hash,
   MapPin,
   X,
   Music,
@@ -22,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { MusicPicker } from './MusicPicker';
 import { MusicUploader } from './MusicUploader';
+import { HashtagInput } from './HashtagInput';
 
 type Stage = 'camera' | 'filters' | 'details';
 type MediaType = 'image' | 'video';
@@ -695,25 +695,16 @@ export default function TikTokPortraitPostFlow({
           />
 
           {/* Hashtags */}
-          <label className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground w-full">
-            <Hash className="h-4 w-4" /> Hashtags
-          </label>
-          <input
-            type="text"
-            placeholder="e.g. #fashion #vibes"
-            value={hashtagsInput}
-            onChange={(e) => setHashtagsInput(e.target.value)}
-            className="mb-3 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          />
-          {parsedHashtags.length > 0 && (
-            <div className="mb-3 w-full flex flex-wrap gap-2">
-              {parsedHashtags.map((h) => (
-                <span key={h} className="rounded-full bg-muted px-3 py-1 text-xs font-medium">
-                  #{h}
-                </span>
-              ))}
-            </div>
-          )}
+          <div className="mb-3 w-full rounded-lg border border-input bg-background px-3 py-2">
+            <HashtagInput
+              value={hashtagsInput}
+              onChange={setHashtagsInput}
+              maxHashtags={5}
+              placeholder="Add hashtags..."
+              showLabel={true}
+              showPreview={true}
+            />
+          </div>
 
           {/* Location */}
           <label className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground w-full">

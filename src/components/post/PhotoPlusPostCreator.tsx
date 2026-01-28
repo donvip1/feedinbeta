@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Plus, ChevronLeft, Hash, MapPin, Loader2 } from 'lucide-react';
+import { X, Plus, ChevronLeft, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { HashtagInput } from './HashtagInput';
 
 interface PhotoPlusPostCreatorProps {
   open: boolean;
@@ -417,14 +418,13 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
               />
 
               {/* Hashtags Input */}
-              <div className="flex items-center gap-2 pt-4 border-t border-border">
-                <Hash className="w-5 h-5 text-muted-foreground" />
-                <input
-                  type="text"
+              <div className="pt-4 border-t border-border">
+                <HashtagInput
                   value={hashtags}
-                  onChange={(e) => setHashtags(e.target.value)}
-                  placeholder="Add hashtags (e.g., #trending #viral)"
-                  className="flex-1 bg-transparent text-foreground outline-none placeholder:text-muted-foreground text-sm"
+                  onChange={setHashtags}
+                  maxHashtags={5}
+                  placeholder="Add hashtags..."
+                  showPreview={true}
                 />
               </div>
 
