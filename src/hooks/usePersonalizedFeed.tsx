@@ -133,8 +133,11 @@ export const useFollowingFeed = (enabled: boolean = true) => {
         .eq('follower_id', user.id);
 
       const followingIds = following?.map(f => f.following_id) || [];
+      
+      // Include user's own posts in the following feed
+      const userIdsToFetch = [...followingIds, user.id];
 
-      if (followingIds.length === 0) {
+      if (userIdsToFetch.length === 0) {
         return { posts: [], nextOffset: 0, hasMore: false };
       }
 
@@ -150,7 +153,8 @@ export const useFollowingFeed = (enabled: boolean = true) => {
             avatar_url
           )
         `)
-        .in('user_id', followingIds)
+        .in('user_id', userIdsToFetch)
+        .eq('status', 'active')
         .order('created_at', { ascending: false })
         .range(offset, offset + 19);
 
