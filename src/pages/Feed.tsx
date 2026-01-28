@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -870,8 +870,8 @@ const Feed = () => {
                 inlineLiveContent[index === 4 ? 1 : (inlineLiveContent[2] ? 2 : 1)];
 
               return (
-                <>
-                  <div key={uniqueKey} className="snap-start snap-always">
+                <Fragment key={uniqueKey}>
+                  <div className="snap-start snap-always">
                     <ImmersivePostCard
                       post={post}
                       isPromoted={post._isPromoted || false}
@@ -892,7 +892,7 @@ const Feed = () => {
                     />
                   </div>
                   {showInlineLive && (
-                    <div key={`live-${index}`} className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
+                    <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
                       <InlineLiveCard
                         item={{
                           ...inlineLiveContent[index === 4 ? 1 : 2],
@@ -910,7 +910,7 @@ const Feed = () => {
                       />
                     </div>
                   )}
-                </>
+                </Fragment>
               );
             })}
             
