@@ -121,8 +121,11 @@ const PhotoCarousel = memo(function PhotoCarousel({
     };
   }, [isUserInteracting, resetInactivityTimer]);
 
-  // Handle tap vs swipe detection
+  // Handle tap vs swipe detection - stop propagation to prevent SwipeableTabs from capturing
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    // CRITICAL: Stop propagation to prevent SwipeableTabs from capturing the swipe
+    e.stopPropagation();
+    
     handleActivity();
     touchStartRef.current = {
       x: e.touches[0].clientX,
@@ -130,6 +133,19 @@ const PhotoCarousel = memo(function PhotoCarousel({
       time: Date.now()
     };
   }, [handleActivity]);
+
+  // Stop propagation during horizontal swipe to prevent tab switching
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartRef.current) {
+      const deltaX = Math.abs(e.touches[0].clientX - touchStartRef.current.x);
+      const deltaY = Math.abs(e.touches[0].clientY - touchStartRef.current.y);
+      
+      // If horizontal movement is dominant, this is a carousel swipe - stop it from bubbling
+      if (deltaX > deltaY && deltaX > 10) {
+        e.stopPropagation();
+      }
+    }
+  }, []);
 
   const handleImageTap = useCallback((idx: number, e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
@@ -187,6 +203,7 @@ const PhotoCarousel = memo(function PhotoCarousel({
         ref={scrollContainerRef}
         onScroll={handleScroll}
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onMouseDown={handleActivity}
         className="w-full overflow-x-scroll snap-x snap-mandatory scrollbar-hide rounded-xl border border-border"
         style={{ 
