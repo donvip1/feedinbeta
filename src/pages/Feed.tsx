@@ -443,8 +443,8 @@ const Feed = () => {
       if (!user) return [];
       console.log('[Feed] Fetching fresh photo/text posts with rotation...');
       
-      // ALWAYS fetch fresh from rotation system - no cache returns
-      const allPosts = await fetchTabPosts('following', user.id);
+      // ALWAYS fetch fresh from rotation system - use 'forYou' to get ALL posts, not just following
+      const allPosts = await fetchTabPosts('forYou', user.id);
       
       // Filter for non-video posts (images, text, styled text)
       const nonVideos = allPosts.filter((p: any) => 
