@@ -171,7 +171,7 @@ export default function ImageLightbox({
             )}
           </AnimatePresence>
 
-          {/* Vertical Scroll Container - TikTok-style snap scrolling */}
+          {/* Vertical Scroll Container - TikTok-style snap scrolling with smooth behavior */}
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
@@ -179,7 +179,9 @@ export default function ImageLightbox({
             style={{ 
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch'
+              WebkitOverflowScrolling: 'touch',
+              scrollBehavior: 'smooth',
+              overscrollBehavior: 'contain'
             }}
           >
             {postsToRender.map(({ post, idx, shouldRender }) => (
