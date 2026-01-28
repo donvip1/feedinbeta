@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { TrendingUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import PostCard from '@/components/feed/PostCard';
@@ -7,16 +7,31 @@ import { useViewedPosts } from '@/hooks/useViewedPosts';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { BottomNav } from '@/components/navigation/BottomNav';
 
+// Fisher-Yates shuffle with seed for consistent randomization per session
+const seededShuffle = <T,>(array: T[], seed: number): T[] => {
+  const result = [...array];
+  let currentSeed = seed;
+  
+  const random = () => {
+    currentSeed = (currentSeed * 9301 + 49297) % 233280;
+    return currentSeed / 233280;
+  };
+  
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  
+  return result;
+};
+
 const TrendingContent = () => {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sessionKey] = useState(() => Date.now()); // New session = new random order
   const { viewedPostIds, markAsViewed } = useViewedPosts();
 
-  useEffect(() => {
-    loadTrending();
-  }, [viewedPostIds.length]);
-
-  const loadTrending = async () => {
+  const loadTrending = useCallback(async () => {
     try {
       // Get active promotions
       const { data: promotions } = await supabase
@@ -42,43 +57,51 @@ const TrendingContent = () => {
         .eq('status', 'active')
         .order('likes_count', { ascending: false })
         .order('views_count', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
       
       const allPosts = data || [];
       
-      // Separate unviewed and viewed
+      // Separate unviewed and viewed (for prioritization, not exclusion)
       const unviewedPosts = allPosts.filter(p => !viewedPostIds.includes(p.id));
       const viewedPosts = allPosts.filter(p => viewedPostIds.includes(p.id));
 
-      // Sort by promotion priority, then by engagement
-      const sortByPriority = (posts: typeof allPosts) => {
+      // Get promoted posts (always first)
+      const promotedUnviewed = unviewedPosts.filter(p => promotedPostIds.has(p.id));
+      const promotedViewed = viewedPosts.filter(p => promotedPostIds.has(p.id));
+      const regularUnviewed = unviewedPosts.filter(p => !promotedPostIds.has(p.id));
+      const regularViewed = viewedPosts.filter(p => !promotedPostIds.has(p.id));
+
+      // Sort promoted by boost level
+      const sortByBoost = (posts: typeof allPosts) => {
         return posts.sort((a, b) => {
-          const aPriority = promotedPostIds.has(a.id) 
-            ? (promotionLevels[a.id] === 'premium' ? 3 : promotionLevels[a.id] === 'standard' ? 2 : 1) 
-            : 0;
-          const bPriority = promotedPostIds.has(b.id) 
-            ? (promotionLevels[b.id] === 'premium' ? 3 : promotionLevels[b.id] === 'standard' ? 2 : 1) 
-            : 0;
-          
-          if (aPriority !== bPriority) return bPriority - aPriority;
-          return (b.likes_count || 0) - (a.likes_count || 0);
+          const aBoost = promotionLevels[a.id] === 'premium' ? 3 : promotionLevels[a.id] === 'standard' ? 2 : 1;
+          const bBoost = promotionLevels[b.id] === 'premium' ? 3 : promotionLevels[b.id] === 'standard' ? 2 : 1;
+          return bBoost - aBoost;
         });
       };
 
-      let finalPosts = sortByPriority(unviewedPosts);
-      if (finalPosts.length < 20 && viewedPosts.length > 0) {
-        finalPosts = [...finalPosts, ...sortByPriority(viewedPosts)];
-      }
+      // Build final list: promoted first, then randomized unviewed, then randomized viewed
+      // Each session gets a different random order (TikTok-style)
+      const finalPosts = [
+        ...sortByBoost(promotedUnviewed),
+        ...sortByBoost(promotedViewed),
+        ...seededShuffle(regularUnviewed, sessionKey),
+        ...seededShuffle(regularViewed, sessionKey + 1)
+      ].slice(0, 50);
 
-      setPosts(finalPosts.slice(0, 20));
+      setPosts(finalPosts);
     } catch (error) {
       console.error('Error loading trending:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionKey, viewedPostIds]);
+
+  useEffect(() => {
+    loadTrending();
+  }, [loadTrending]);
 
   if (loading) {
     return (
