@@ -858,7 +858,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                         <img
                           src={url}
                           alt={`Image ${idx + 1}`}
-                          className="w-full aspect-[4/5] object-cover transition-opacity duration-300"
+                          className="w-full aspect-square object-cover transition-opacity duration-300"
                           onLoad={() => idx === 0 && setIsMediaLoaded(true)}
                           onContextMenu={(e) => e.preventDefault()}
                           draggable={false}
