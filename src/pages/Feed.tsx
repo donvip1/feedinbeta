@@ -780,7 +780,9 @@ const Feed = () => {
         <div
           ref={containerRef}
           className={cn(
-            "w-full mx-auto snap-y snap-mandatory overflow-y-scroll scroll-smooth native-scroll-container relative",
+            "w-full mx-auto overflow-y-scroll scroll-smooth native-scroll-container relative",
+            // Videos tab uses snap scrolling (TikTok-style), Photo+ uses free-flowing (Facebook-style)
+            activeTab === 'videos' && "snap-y snap-mandatory",
             // In immersive mode, container takes full viewport for seamless fullscreen scrolling
             isImmersiveMode ? "h-[100dvh] fixed inset-0 z-50 bg-black" : "h-[calc(100dvh-68px)]"
           )}
@@ -871,7 +873,11 @@ const Feed = () => {
 
               return (
                 <Fragment key={uniqueKey}>
-                  <div className="snap-start snap-always">
+                  <div className={cn(
+                    // Videos tab: snap scrolling (TikTok-style)
+                    // Photo+ tab: no snap, free-flowing (Facebook-style)
+                    activeTab === 'videos' && "snap-start snap-always"
+                  )}>
                     <ImmersivePostCard
                       post={post}
                       isPromoted={post._isPromoted || false}
