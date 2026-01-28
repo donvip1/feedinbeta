@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Repeat, Gift, Eye, TrendingUp } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Repeat, Gift, Eye, TrendingUp, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +10,8 @@ import MobileShareSheet from './MobileShareSheet';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import { useNavigate } from 'react-router-dom';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { formatCompactTime } from '@/lib/format-time';
 
 // Format count for display
 const formatCount = (count: number): string => {
@@ -28,6 +30,8 @@ export interface PhotoPost {
   comments_count: number | null;
   refeeds_count: number | null;
   views_count: number | null;
+  created_at?: string;
+  visibility?: string | null;
   profiles?: {
     username: string | null;
     display_name: string | null;
@@ -64,6 +68,10 @@ export default function PhotoPostSlide({
   const images = post.media_urls?.length ? post.media_urls : (post.media_url ? [post.media_url] : []);
   const caption = post.content || '';
   
+  // Follow state
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  
   // Image navigation state
   const [currentImageIndex, setCurrentImageIndex] = useState(initialImageIndex);
   
@@ -93,21 +101,66 @@ export default function PhotoPostSlide({
     setRefeedsCount(post.refeeds_count || 0);
   }, [post]);
 
-  // Check like status when active
+  // Check like and follow status when active
   useEffect(() => {
     if (!isActive || !user || !post.id) return;
     
-    const checkLikeStatus = async () => {
-      const { data } = await supabase
-        .from('post_likes')
-        .select('id')
-        .eq('post_id', post.id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-      setLiked(!!data);
+    const checkStatuses = async () => {
+      const [likeResult, followResult] = await Promise.all([
+        supabase
+          .from('post_likes')
+          .select('id')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .maybeSingle(),
+        post.user_id !== user.id 
+          ? supabase
+              .from('follows')
+              .select('id')
+              .eq('follower_id', user.id)
+              .eq('following_id', post.user_id)
+              .maybeSingle()
+          : { data: null }
+      ]);
+      
+      setLiked(!!likeResult.data);
+      setIsFollowing(!!followResult.data);
     };
-    checkLikeStatus();
-  }, [isActive, user, post.id]);
+    checkStatuses();
+  }, [isActive, user, post.id, post.user_id]);
+
+  // Handle follow/unfollow
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user || !post.user_id || post.user_id === user.id) return;
+    
+    setIsFollowLoading(true);
+    try {
+      if (isFollowing) {
+        await supabase
+          .from('follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', post.user_id);
+        setIsFollowing(false);
+      } else {
+        await supabase
+          .from('follows')
+          .insert({ follower_id: user.id, following_id: post.user_id });
+        setIsFollowing(true);
+      }
+    } catch (error) {
+      console.error('Error toggling follow:', error);
+    } finally {
+      setIsFollowLoading(false);
+    }
+  };
+
+  const handleProfileClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClose();
+    navigate(`/profile/${post.profiles?.username || post.user_id}`);
+  };
 
   const navigatePrevImage = useCallback(() => {
     const newIdx = (currentImageIndex - 1 + images.length) % images.length;
@@ -164,6 +217,9 @@ export default function PhotoPostSlide({
 
   if (images.length === 0) return null;
 
+  const isPublic = post.visibility !== 'private' && post.visibility !== 'friends';
+  const postTime = post.created_at ? formatCompactTime(post.created_at) : '';
+
   return (
     <div className="w-full h-full flex flex-col relative">
       {/* Image Container - Full height with proper sizing like TikTok */}
@@ -190,8 +246,66 @@ export default function PhotoPostSlide({
         </motion.div>
 
         {/* Gradient overlays for better UI visibility */}
-        <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/50 to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/70 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+
+        {/* Top Bar - Poster Info */}
+        <AnimatePresence>
+          {showUI && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="absolute top-0 left-0 right-0 z-20 p-4"
+            >
+              <div className="flex items-center justify-between">
+                <div 
+                  className="flex items-center gap-3 cursor-pointer"
+                  onClick={handleProfileClick}
+                >
+                  <Avatar className="w-10 h-10 border-2 border-white/30">
+                    <AvatarImage src={post.profiles?.avatar_url || ''} />
+                    <AvatarFallback className="bg-gray-700 text-white">
+                      {displayName[0]?.toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-white text-sm drop-shadow-lg">
+                        {displayName}
+                      </span>
+                      {user && post.user_id !== user.id && (
+                        <button
+                          onClick={handleFollow}
+                          disabled={isFollowLoading}
+                          className={cn(
+                            "text-xs font-medium px-2 py-0.5 rounded-full transition-all",
+                            isFollowing 
+                              ? "bg-white/20 text-white/80" 
+                              : "bg-pink-500 text-white"
+                          )}
+                        >
+                          {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-white/60 text-xs">
+                      <span>@{post.profiles?.username || 'user'}</span>
+                      <span>•</span>
+                      <span>{postTime}</span>
+                      <span>•</span>
+                      {isPublic ? (
+                        <Globe className="w-3 h-3" />
+                      ) : (
+                        <Lock className="w-3 h-3" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Image Navigation Arrows */}
         <AnimatePresence>
