@@ -648,8 +648,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           // Photo+ layout: content-driven height with minimal padding, no fixed height
           !isImmersiveMode && isPhotoTextLayout && "min-h-fit pb-4"
         )}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+        // Only attach swipe handlers when NOT showing PhotoCarousel (it has its own scroll)
+        onTouchStart={isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? undefined : handleTouchStart}
+        onTouchEnd={isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? undefined : handleTouchEnd}
       >
         {/* --- TOP SECTION: User Info (NOT overlayed) - Hidden in immersive mode --- */}
         {!isImmersiveMode && (

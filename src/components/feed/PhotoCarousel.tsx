@@ -121,11 +121,8 @@ const PhotoCarousel = memo(function PhotoCarousel({
     };
   }, [isUserInteracting, resetInactivityTimer]);
 
-  // Handle tap vs swipe detection - stop propagation to prevent SwipeableTabs from capturing
+  // Track touch start for swipe detection - DON'T stop propagation here, only in move/end
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    // CRITICAL: Stop propagation to prevent SwipeableTabs from capturing the swipe
-    e.stopPropagation();
-    
     handleActivity();
     touchStartRef.current = {
       x: e.touches[0].clientX,
@@ -213,13 +210,33 @@ const PhotoCarousel = memo(function PhotoCarousel({
             <div
               key={idx}
               className="w-1/2 flex-shrink-0 snap-start cursor-pointer hover:brightness-95 transition-all px-0.5"
-              onClick={(e) => handleImageClick(idx, e)}
             >
               <img
                 src={url}
                 alt={`Image ${idx + 1}`}
-                className="w-full aspect-square object-cover rounded-lg"
+                className="w-full aspect-square object-cover rounded-lg cursor-pointer select-none"
                 draggable={false}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  console.log('[PhotoCarousel] Image clicked:', idx);
+                  onImageClick?.(idx);
+                }}
+                onTouchEnd={(e) => {
+                  // Handle tap on touch devices
+                  if (touchStartRef.current) {
+                    const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+                    const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+                    const deltaTime = Date.now() - touchStartRef.current.time;
+                    
+                    // Only trigger if it's a tap (small movement, short duration)
+                    if (deltaX < 15 && deltaY < 15 && deltaTime < 300) {
+                      e.stopPropagation();
+                      e.preventDefault(); // Prevent click from also firing
+                      console.log('[PhotoCarousel] Image tapped:', idx);
+                      onImageClick?.(idx);
+                    }
+                  }
+                }}
                 onContextMenu={(e) => e.preventDefault()}
               />
             </div>
