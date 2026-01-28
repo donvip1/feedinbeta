@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, Fragment } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils';
 
 const Feed = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { haptic } = useNativeFeatures();
@@ -387,15 +388,34 @@ const Feed = () => {
     return orderedPosts;
   }, []);
 
-  // Track if we're navigating back to feed (to force fresh data)
+  // Track session for random feed rotation - changes trigger new random order
   const [feedSessionKey, setFeedSessionKey] = useState(() => Date.now());
+  const mountTimeRef = useRef(Date.now());
   
-  // Force fresh fetch when returning to feed page
+  // Generate new session key on EVERY mount (component remount = new random order)
+  // This ensures navigating away and back produces different posts order
   useEffect(() => {
-    // On mount or return, clear cache and get fresh data
+    const newSessionKey = Date.now();
+    console.log('[Feed] Component mounted - new session key:', newSessionKey);
     feedCache.clear();
-    setFeedSessionKey(Date.now());
+    setFeedSessionKey(newSessionKey);
+    mountTimeRef.current = newSessionKey;
   }, []);
+  
+  // Also generate new session key when user returns to app from background
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && user) {
+        const newSessionKey = Date.now();
+        console.log('[Feed] App returned to foreground - new session key:', newSessionKey);
+        feedCache.clear();
+        setFeedSessionKey(newSessionKey);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [user]);
 
   // Separate queries for each tab - ALWAYS fetches fresh from rotation system
   // Videos tab - fetches rotated posts then filters to video only
@@ -556,20 +576,7 @@ const Feed = () => {
     };
   }, [isLoadingMore]);
 
-  // Refetch feed when user returns to the app/page - forces fresh rotation
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && user) {
-        // User returned to the app - trigger new session to get different posts
-        console.log('[Feed] User returned - triggering fresh feed rotation');
-        feedCache.clear();
-        setFeedSessionKey(Date.now()); // This changes the queryKey and forces a fresh fetch
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [user]);
+  // Note: Visibility change handler for feed rotation is now in the session key effect above
 
   useEffect(() => {
     if (authLoading) return;
