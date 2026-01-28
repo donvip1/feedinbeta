@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { X, Image as ImageIcon, ChevronLeft, Hash, MapPin, Loader2 } from 'lucide-react';
+import { X, Plus, ChevronLeft, Hash, MapPin, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
@@ -37,7 +37,8 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
   const [location, setLocation] = useState('');
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
   const [detectingLocation, setDetectingLocation] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef1 = useRef<HTMLInputElement>(null);
+  const fileInputRef2 = useRef<HTMLInputElement>(null);
 
   // Fetch user profile
   useEffect(() => {
@@ -118,28 +119,23 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
     }
   };
 
-  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (images.length + files.length > MAX_IMAGES) {
-      toast({
-        title: 'Maximum 2 images',
-        description: 'You can only attach up to 2 images per post.',
-        variant: 'destructive'
-      });
-      return;
-    }
+  const handleFileChange = useCallback((index: number) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImages(prev => [...prev, { file, preview: reader.result as string }].slice(0, MAX_IMAGES));
-      };
-      reader.readAsDataURL(file);
-    });
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImages(prev => {
+        const newImages = [...prev];
+        newImages[index] = { file, preview: reader.result as string };
+        return newImages.filter(Boolean);
+      });
+    };
+    reader.readAsDataURL(file);
 
     // Clear input so same file can be selected again if removed
     if (e.target) e.target.value = '';
-  }, [images.length, toast]);
+  }, []);
 
   const removeImage = useCallback((index: number) => {
     setImages(prev => prev.filter((_, i) => i !== index));
@@ -310,7 +306,7 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                 autoFocus
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, MAX_CHARS))}
-                placeholder="What's on your mind?"
+                placeholder="Share your thoughts"
                 className={cn(
                   "w-full bg-transparent text-foreground text-lg outline-none border-none resize-none min-h-[120px]",
                   "placeholder:text-muted-foreground"
@@ -327,35 +323,98 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                 </div>
               )}
 
-              {/* Image Previews */}
-              {images.length > 0 && (
-                <div className={cn(
-                  "grid gap-2",
-                  images.length === 1 ? "grid-cols-1" : "grid-cols-2"
-                )}>
-                  {images.map((img, idx) => (
-                    <div
-                      key={idx}
-                      className="relative aspect-square rounded-xl overflow-hidden border border-border"
-                    >
+              {/* Image Picker Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Card 1 */}
+                <div
+                  onClick={() => fileInputRef1.current?.click()}
+                  className={cn(
+                    "relative aspect-square rounded-xl border-2 border-dashed border-border",
+                    "flex items-center justify-center cursor-pointer",
+                    "hover:border-primary/50 hover:bg-accent/50 transition-all",
+                    images[0] && "border-solid border-primary/30"
+                  )}
+                >
+                  {images[0] ? (
+                    <>
                       <img
-                        src={img.preview}
-                        className="w-full h-full object-cover"
-                        alt={`Preview ${idx + 1}`}
+                        src={images[0].preview}
+                        className="w-full h-full object-cover rounded-xl"
+                        alt="Preview 1"
                       />
                       <button
-                        onClick={() => removeImage(idx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage(0);
+                        }}
                         className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white hover:bg-black transition-colors"
                       >
-                        <X size={16} />
+                        <X size={14} />
                       </button>
-                      <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 rounded text-white text-xs">
-                        {idx + 1} / {images.length}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">
+                        <Plus className="w-6 h-6" />
                       </div>
+                      <span className="text-xs">Add Photo</span>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+
+                {/* Card 2 */}
+                <div
+                  onClick={() => fileInputRef2.current?.click()}
+                  className={cn(
+                    "relative aspect-square rounded-xl border-2 border-dashed border-border",
+                    "flex items-center justify-center cursor-pointer",
+                    "hover:border-primary/50 hover:bg-accent/50 transition-all",
+                    images[1] && "border-solid border-primary/30"
+                  )}
+                >
+                  {images[1] ? (
+                    <>
+                      <img
+                        src={images[1].preview}
+                        className="w-full h-full object-cover rounded-xl"
+                        alt="Preview 2"
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeImage(1);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white hover:bg-black transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                      <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center">
+                        <Plus className="w-6 h-6" />
+                      </div>
+                      <span className="text-xs">Add Photo</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Hidden file inputs */}
+              <input
+                type="file"
+                ref={fileInputRef1}
+                onChange={handleFileChange(0)}
+                hidden
+                accept="image/*"
+              />
+              <input
+                type="file"
+                ref={fileInputRef2}
+                onChange={handleFileChange(1)}
+                hidden
+                accept="image/*"
+              />
 
               {/* Hashtags Input */}
               <div className="flex items-center gap-2 pt-4 border-t border-border">
@@ -440,35 +499,11 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
           </div>
         </div>
 
-        {/* Footer - Image Picker */}
-        <div className="p-4 border-t border-border flex items-center gap-4 safe-area-bottom">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={images.length >= MAX_IMAGES}
-            className={cn(
-              "p-2 rounded-full transition-colors",
-              images.length >= MAX_IMAGES
-                ? "text-muted-foreground/30 cursor-not-allowed"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-            )}
-          >
-            <ImageIcon size={24} />
-          </button>
-          
-          {images.length >= MAX_IMAGES && (
-            <span className="text-xs text-muted-foreground">
-              Maximum {MAX_IMAGES} images reached
-            </span>
-          )}
-          
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            hidden
-            multiple
-            accept="image/*"
-          />
+        {/* Footer - simplified without gallery button */}
+        <div className="p-4 border-t border-border safe-area-bottom">
+          <p className="text-xs text-muted-foreground text-center">
+            Tap the cards above to add up to 2 photos
+          </p>
         </div>
       </motion.div>
     </AnimatePresence>
