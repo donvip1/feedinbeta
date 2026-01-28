@@ -142,12 +142,16 @@ const PostDetail = () => {
     }
   }, [user, navigate]);
 
-  const handleBack = () => {
-    // Simply go back in history - this preserves the user's navigation flow
-    // If they came from a refeed post, they'll return there
-    if (window.history.length > 1) {
+  const handleBack = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Check if we have a valid history to go back to
+    // window.history.length includes the current page, so we need > 2 for a real back
+    if (window.history.length > 2) {
       navigate(-1);
     } else {
+      // No history, go to feed as fallback
       navigate('/feed', { replace: true });
     }
   };
@@ -186,14 +190,14 @@ const PostDetail = () => {
     <div className="min-h-screen bg-black relative">
       {/* Fixed Back Button - Always visible */}
       <div className={cn(
-        "fixed top-4 left-4 z-[60] transition-opacity duration-200",
-        isImmersiveMode ? "opacity-0 pointer-events-none" : "opacity-100"
+        "fixed top-4 left-4 z-[100] transition-opacity duration-200",
+        isImmersiveMode ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
       )}>
         <Button
           variant="ghost"
           size="icon"
           onClick={handleBack}
-          className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+          className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 cursor-pointer"
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>
@@ -201,7 +205,7 @@ const PostDetail = () => {
 
       {/* User's Posts Header - Hidden in immersive mode */}
       {!isImmersiveMode && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60]">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] pointer-events-none">
           <div className="px-4 py-2 rounded-full bg-black/60 backdrop-blur-sm">
             <span className="text-white text-sm font-medium">{profileName}'s Posts</span>
           </div>
@@ -210,12 +214,16 @@ const PostDetail = () => {
 
       {/* Immersive mode close button */}
       {isImmersiveMode && (
-        <div className="fixed top-4 left-4 z-[60]">
+        <div className="fixed top-4 left-4 z-[100] pointer-events-auto">
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setIsImmersiveMode(false)}
-            className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsImmersiveMode(false);
+            }}
+            className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-sm text-white hover:bg-black/80 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </Button>
