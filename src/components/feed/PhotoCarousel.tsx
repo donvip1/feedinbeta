@@ -164,9 +164,9 @@ const PhotoCarousel = memo(function PhotoCarousel({
     e.stopPropagation();
     
     // For touch events, check if it was a tap (not a swipe)
-    if ('touches' in e || 'changedTouches' in e) {
+    if ('changedTouches' in e) {
       if (touchStartRef.current) {
-        const touch = 'changedTouches' in e ? e.changedTouches[0] : null;
+        const touch = e.changedTouches[0];
         if (touch) {
           const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
           const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
@@ -180,8 +180,12 @@ const PhotoCarousel = memo(function PhotoCarousel({
         }
       }
       touchStartRef.current = null;
+      e.preventDefault(); // Prevent subsequent click event (avoid double-firing)
+      onImageClick?.(idx);
+      return;
     }
     
+    // Mouse click - always trigger
     onImageClick?.(idx);
   }, [onImageClick]);
 
@@ -219,11 +223,12 @@ const PhotoCarousel = memo(function PhotoCarousel({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleCarouselTouchEnd}
         onMouseDown={handleActivity}
-        className="w-full overflow-x-scroll snap-x snap-mandatory scrollbar-hide rounded-xl border border-border"
+        className="w-full overflow-x-scroll snap-x snap-mandatory scrollbar-hide rounded-xl border border-border touch-pan-x"
         style={{ 
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
-          WebkitOverflowScrolling: 'touch'
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-x'
         }}
       >
         <div className="flex">
