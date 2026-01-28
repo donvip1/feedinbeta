@@ -1572,28 +1572,57 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ImageLightbox for Photo+ posts */}
-      {showLightbox && hasImage && mediaUrls.length > 0 && (
-        <ImageLightbox
-          images={mediaUrls}
-          activeIndex={lightboxIndex}
-          onClose={() => setShowLightbox(false)}
-          onNavigate={(idx) => {
-            setLightboxIndex(idx);
-            setCurrentMediaIndex(idx);
-          }}
-          postId={post.id}
-          postUserId={post.user_id}
-          caption={caption}
-          initialLikesCount={likesCount}
-          initialCommentsCount={commentsCount}
-          initialRefeedsCount={refeedsCount}
-          initialGiftsCount={giftsCount}
-          initialViewsCount={post.views_count || 0}
-          profiles={post.profiles}
-          onLikeUpdate={onLikeUpdate}
-        />
-      )}
+      {/* ImageLightbox for Photo+ posts with vertical swipe between posts */}
+      {showLightbox && hasImage && mediaUrls.length > 0 && (() => {
+        // Filter to Photo+ posts only (non-video) for vertical navigation
+        const photoPosts = allPosts?.filter(p => {
+          const pMediaType = p.media_type;
+          const originalMediaType = p.original_post?.media_type;
+          // Exclude video posts
+          return pMediaType !== 'video' && originalMediaType !== 'video';
+        }).map(p => ({
+          id: p.id,
+          user_id: p.user_id,
+          content: p.content,
+          media_url: p.media_url,
+          media_urls: p.media_urls,
+          likes_count: p.likes_count,
+          comments_count: p.comments_count,
+          refeeds_count: p.refeeds_count,
+          views_count: p.views_count,
+          profiles: p.profiles
+        })) || [];
+        
+        const currentPhotoPostIndex = photoPosts.findIndex(p => p.id === post.id);
+        
+        return (
+          <ImageLightbox
+            images={mediaUrls}
+            activeIndex={lightboxIndex}
+            onClose={() => setShowLightbox(false)}
+            onNavigate={(idx) => {
+              setLightboxIndex(idx);
+              setCurrentMediaIndex(idx);
+            }}
+            postId={post.id}
+            postUserId={post.user_id}
+            caption={caption}
+            initialLikesCount={likesCount}
+            initialCommentsCount={commentsCount}
+            initialRefeedsCount={refeedsCount}
+            initialGiftsCount={giftsCount}
+            initialViewsCount={post.views_count || 0}
+            profiles={post.profiles}
+            onLikeUpdate={onLikeUpdate}
+            // Multi-post vertical navigation
+            allPhotoPosts={photoPosts.length > 1 ? photoPosts : undefined}
+            currentPostIndex={currentPhotoPostIndex >= 0 ? currentPhotoPostIndex : 0}
+            onPostChange={(idx) => {
+              // Optional: Could sync back to parent if needed
+            }}
+          />
+        );
+      })()}
 
     </>
   );
