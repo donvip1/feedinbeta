@@ -62,22 +62,23 @@ const PhotoCarousel = memo(function PhotoCarousel({
     resetInactivityTimer();
   }, [resetInactivityTimer]);
 
-  // Scroll to current index
+  // Scroll to current index (each image is 50% width)
   useEffect(() => {
     if (!scrollContainerRef.current) return;
     
     const container = scrollContainerRef.current;
-    const targetScroll = currentIndex * container.clientWidth;
+    const itemWidth = container.clientWidth / 2;
+    const targetScroll = currentIndex * itemWidth;
     container.scrollTo({ left: targetScroll, behavior: 'smooth' });
   }, [currentIndex]);
 
-  // Handle scroll snap detection
+  // Handle scroll snap detection (each image is 50% width)
   const handleScroll = useCallback(() => {
     if (!scrollContainerRef.current) return;
     
     const container = scrollContainerRef.current;
     const scrollLeft = container.scrollLeft;
-    const itemWidth = container.clientWidth;
+    const itemWidth = container.clientWidth / 2;
     const newIndex = Math.round(scrollLeft / itemWidth);
     
     if (newIndex !== currentIndex && newIndex >= 0 && newIndex < images.length) {
@@ -159,7 +160,7 @@ const PhotoCarousel = memo(function PhotoCarousel({
           {images.map((url, idx) => (
             <div
               key={idx}
-              className="w-full flex-shrink-0 snap-start snap-always cursor-pointer hover:brightness-95 transition-all"
+              className="w-1/2 flex-shrink-0 snap-start cursor-pointer hover:brightness-95 transition-all px-0.5"
               onClick={(e) => {
                 e.stopPropagation();
                 onImageClick?.(idx);
@@ -168,8 +169,7 @@ const PhotoCarousel = memo(function PhotoCarousel({
               <img
                 src={url}
                 alt={`Image ${idx + 1}`}
-                className="w-full object-cover"
-                style={{ maxHeight: '60vh' }}
+                className="w-full aspect-square object-cover rounded-lg"
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
               />
@@ -178,8 +178,13 @@ const PhotoCarousel = memo(function PhotoCarousel({
         </div>
       </div>
       
+      {/* Image Counter - Text format */}
+      <div className="text-center text-xs text-muted-foreground mt-2">
+        {currentIndex + 1} / {images.length}
+      </div>
+      
       {/* Dot indicators */}
-      <div className="flex justify-center gap-1.5 mt-2">
+      <div className="flex justify-center gap-1.5 mt-1">
         {images.map((_, idx) => (
           <button
             key={idx}
