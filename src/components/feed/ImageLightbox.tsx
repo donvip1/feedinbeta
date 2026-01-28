@@ -55,6 +55,7 @@ export default function ImageLightbox({
   const [activePostIdx, setActivePostIdx] = useState(currentPostIndex);
   const [currentImageIdx, setCurrentImageIdx] = useState(activeIndex); // Track current image in single-post mode
   const isMultiPostMode = allPhotoPosts && allPhotoPosts.length > 0;
+  const hasInitiallyScrolled = useRef(false);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -69,13 +70,20 @@ export default function ImageLightbox({
     setActivePostIdx(currentPostIndex);
   }, [currentPostIndex]);
 
-  // Scroll to active post on mount/change
+  // Scroll to active post on mount (instant) and on change (smooth)
   useEffect(() => {
     if (!isMultiPostMode || !scrollContainerRef.current) return;
     
     const container = scrollContainerRef.current;
     const targetScroll = activePostIdx * container.clientHeight;
-    container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    
+    // Use instant scroll on initial mount, smooth scroll after
+    if (!hasInitiallyScrolled.current) {
+      container.scrollTo({ top: targetScroll, behavior: 'instant' });
+      hasInitiallyScrolled.current = true;
+    } else {
+      container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+    }
   }, [activePostIdx, isMultiPostMode]);
 
   // Handle scroll snap to detect post changes
