@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import PhotoPostSlide, { PhotoPost } from './PhotoPostSlide';
@@ -146,27 +146,24 @@ export default function ImageLightbox({
           exit={{ opacity: 0 }}
           className="fixed inset-0 z-[200] bg-black"
         >
-          {/* Top Bar - Close button */}
+          {/* Top Bar - Back button on right side */}
           <AnimatePresence>
             {showUI && (
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent"
+                className="absolute top-4 right-4 z-50"
               >
-              <button
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     onClose();
                   }}
-                  className="p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
+                  className="p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
                 >
-                  <X size={24} />
+                  <ArrowLeft size={24} />
                 </button>
-                
-                {/* Empty space to center close button */}
-                <div className="w-10" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -231,27 +228,24 @@ export default function ImageLightbox({
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-[200] bg-black flex flex-col"
       >
-        {/* Top Bar - Close button */}
+        {/* Top Bar - Back button on right side */}
         <AnimatePresence>
           {showUI && (
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent"
+              className="absolute top-4 right-4 z-50"
             >
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onClose();
                 }}
-                className="p-2 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
+                className="p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
               >
-                <X size={24} />
+                <ArrowLeft size={24} />
               </button>
-              
-              {/* Empty space to center close button */}
-              <div className="w-10" />
             </motion.div>
           )}
         </AnimatePresence>
