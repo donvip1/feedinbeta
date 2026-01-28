@@ -581,8 +581,21 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const handleCommentsOpenChange = (open: boolean) => {
     setCommentsOpen(open);
     onCommentsOpenChange?.(open);
-    if (open) onInteractionStart?.();
-    else onInteractionEnd?.();
+    if (open) {
+      onInteractionStart?.();
+      // Pause main video when comments open to prevent audio echo
+      if (videoRef.current && hasVideo) {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    } else {
+      onInteractionEnd?.();
+      // Resume video when comments close
+      if (videoRef.current && hasVideo) {
+        videoRef.current.play().catch(() => {});
+        setIsPlaying(true);
+      }
+    }
   };
 
   // Generate gradient background for text posts
@@ -823,8 +836,13 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <div className="w-full px-1 pb-1">
                   {/* Horizontal Scroll Carousel for multiple images */}
                   <div 
-                    className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide"
-                    style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                    className="flex gap-2 overflow-x-auto pb-1 snap-x snap-mandatory scrollbar-hide touch-pan-x"
+                    style={{ 
+                      scrollbarWidth: 'none', 
+                      msOverflowStyle: 'none',
+                      WebkitOverflowScrolling: 'touch',
+                      scrollSnapType: 'x mandatory'
+                    }}
                   >
                     {mediaUrls.map((url, idx) => (
                       <div 

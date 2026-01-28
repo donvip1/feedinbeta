@@ -72,7 +72,7 @@ const Feed = () => {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   
   // Global mute state - persists across all feed videos
-  const [globalMuted, setGlobalMuted] = useState(true); // Default muted for autoplay policy
+  const [globalMuted, setGlobalMuted] = useState(false); // Default unmuted - user can mute manually
   const toggleGlobalMute = useCallback(() => {
     setGlobalMuted(prev => !prev);
   }, []);
