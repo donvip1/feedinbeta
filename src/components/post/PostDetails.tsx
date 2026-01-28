@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock, CheckCircle2, Music, Play, Pause, Disc3 } from 'lucide-react';
+import { Globe, Users, UserCheck, Lock, Loader2, MapPin, Hash, X, Calendar, Clock, CheckCircle2, Music, Play, Pause, Disc3, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -22,9 +22,10 @@ interface PostDetailsProps {
   media: { url: string; type: 'image' | 'video'; file: File }[];
   onSubmit: () => void;
   onClose: () => void;
+  onBack?: () => void; // Optional callback to go back to media selection
 }
 
-export default function PostDetails({ media, onSubmit, onClose }: PostDetailsProps) {
+export default function PostDetails({ media, onSubmit, onClose, onBack }: PostDetailsProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -321,11 +322,23 @@ export default function PostDetails({ media, onSubmit, onClose }: PostDetailsPro
   return (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-start p-4 overflow-y-auto max-w-sm mx-auto">
       <div className="w-full flex items-center justify-between mb-4">
-        <button onClick={onClose} className="text-foreground">
-          <X className="w-6 h-6" />
-        </button>
+        {onBack ? (
+          <button onClick={onBack} className="text-foreground p-1 -ml-1">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+        ) : (
+          <button onClick={onClose} className="text-foreground">
+            <X className="w-6 h-6" />
+          </button>
+        )}
         <h2 className="text-lg font-semibold">Post Details</h2>
-        <div className="w-6" />
+        {onBack ? (
+          <button onClick={onClose} className="text-foreground">
+            <X className="w-6 h-6" />
+          </button>
+        ) : (
+          <div className="w-6" />
+        )}
       </div>
 
       {/* Media Preview with Counter */}
