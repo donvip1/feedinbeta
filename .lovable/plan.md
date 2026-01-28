@@ -1,149 +1,202 @@
 
-# Implementation Plan: Fix Notifications, Photo+ Multi-Image Display, and Post Navigation
+# Plan: Fix 8 Feed and Profile Issues
 
 ## Overview
-
-This plan addresses three key issues:
-1. **Notifications consolidation** - Remove badge counts from Home/Feed and Wallet nav icons, consolidate all notifications to the notification bell icon only
-2. **Photo+ multi-image display** - Fix the bug where only one image shows in Photo+ posts; add horizontal swipe carousel and fullscreen lightbox
-3. **Post creation redirect** - Ensure users are taken directly to the created post after upload with instant visibility
+This plan addresses 8 distinct issues affecting the feed, profile, and messaging functionality. Each issue requires targeted code changes.
 
 ---
 
-## Issue 1: Consolidate Notifications to Bell Icon Only
+## Issue 1: Feeds Not Appearing Without Refresh
 
-### Current Behavior
-- The bottom navigation shows notification badges on Home (feed), Chats, and Wallet icons
-- `useDistributedNotifications` hook categorizes notifications and distributes counts across nav items
+**Problem**: Video and Photo+ tabs sometimes show empty content until manually refreshed.
 
-### Required Changes
+**Root Cause**: The `displayPosts` state is only updated when `posts` changes via useEffect, but there may be a timing issue where `posts` is undefined initially.
 
-**File: `src/components/navigation/BottomNav.tsx`**
-- Remove the `getNavBadgeCount` function logic for 'feed' and 'wallet' (only keep 'chats' for unread messages)
-- Remove badge rendering for Home and Wallet icons
-- Remove `markCategoryAsRead` calls for 'feed' and 'wallet' on nav clicks
+**Solution**:
+- In `Feed.tsx`, ensure posts are displayed directly from the query result when available
+- Add a fallback to show loading state properly while data is being fetched
+- Ensure the initial `displayPosts` state is populated immediately when posts are available
 
-**File: `src/hooks/useDistributedNotifications.tsx`**
-- Keep the hook for internal use but the BottomNav will no longer use distributed counts for nav badges
-
-**File: `src/components/notifications/NotificationsPanel.tsx`**
-- Update to include ALL notification types (remove the filtering that excludes wallet/credit notifications)
-- Ensure wallet notifications show proper descriptions
-
-**File: `src/components/notifications/NotificationItem.tsx`**
-- Verify notification descriptions are properly displayed for all types including wallet/credit
+**File**: `src/pages/Feed.tsx`
 
 ---
 
-## Issue 2: Photo+ Multi-Image Display with Carousel and Lightbox
+## Issue 2: Video Volume Should Be Unmuted by Default
 
-### Current Behavior
-- `ImmersivePostCard` has `media_urls` array but only renders a single image (`currentMediaUrl`)
-- The existing swipe logic changes `currentMediaIndex` but there's no visual indicator of multiple images
-- The `ImageLightbox` component exists but is NOT imported or used in `ImmersivePostCard`
+**Problem**: Videos are muted by default; users must manually unmute.
 
-### Required Changes
+**Root Cause**: Line 75 in `Feed.tsx` sets `const [globalMuted, setGlobalMuted] = useState(true)`
 
-**File: `src/components/feed/ImmersivePostCard.tsx`**
+**Solution**:
+- Change the default state to `useState(false)` so videos play with sound by default
+- Users can mute manually if desired
 
-1. **Import ImageLightbox at the top**:
+**File**: `src/pages/Feed.tsx`
+
+---
+
+## Issue 3: Photo Posts Not Appearing on Photo+ Page
+
+**Problem**: Newly created photo posts don't appear in the Photo+ tab until viewed through profile.
+
+**Root Cause**: The Photo+ query filters for non-video posts, but there may be a cache issue or the post's `media_type` may not be set correctly.
+
+**Solution**:
+- Ensure the Photo+ query includes all non-video post types: `image`, `text_plain`, `text_styled`, and null media types
+- Force fresh data fetch when navigating to feed
+- Also ensure that when creating posts, the correct media_type is being saved
+
+**File**: `src/pages/Feed.tsx`
+
+---
+
+## Issue 4: Profile Page Photo Posts Show Vertical Social Buttons
+
+**Problem**: When viewing a photo post from a profile, social buttons appear vertically (sidebar style) instead of horizontally (bottom bar style).
+
+**Root Cause**: `PostDetail.tsx` doesn't pass `layoutType` prop to `ImmersivePostCard`, so it defaults to `'video'` layout which shows vertical sidebar.
+
+**Solution**:
+- In `PostDetail.tsx`, detect the post's media type
+- Pass `layoutType='photo-text'` when the post is an image, text, or styled text post
+- This ensures horizontal social buttons for photo/text content
+
+**File**: `src/pages/PostDetail.tsx`
+
+---
+
+## Issue 5: Carousel Swiping Not Working Smoothly for Multiple Images
+
+**Problem**: Swiping between images in Photo+ posts with 2 images doesn't work smoothly.
+
+**Root Cause**: The CSS carousel implementation uses `overflow-x-auto` with snap points, but the scrollbar-hide class and touch handling may not be optimal.
+
+**Solution**:
+- Improve the carousel CSS with better touch-action properties
+- Add explicit touch scrolling behavior
+- Ensure smooth snap scrolling with proper CSS
+- Consider adding swipe gesture detection for better mobile experience
+
+**File**: `src/components/feed/ImmersivePostCard.tsx`
+
+---
+
+## Issue 6: Audio Echo When Commenting on Video
+
+**Problem**: When opening comments on a video, the audio starts echoing as if two videos are playing simultaneously.
+
+**Root Cause**: `CommentsModal.tsx` has a mini video preview that plays with `autoPlay`, while the main video in `ImmersivePostCard` continues playing.
+
+**Solution**:
+- In `ImmersivePostCard.tsx`, pause the main video when comments are opened
+- Pass a callback or use the existing `onCommentsOpenChange` to pause playback
+- Ensure the mini video in CommentsModal respects the mute state properly
+
+**Files**: `src/components/feed/ImmersivePostCard.tsx`, `src/components/feed/CommentsModal.tsx`
+
+---
+
+## Issue 7: Show Accept/Decline Request on Sender's Profile
+
+**Problem**: When viewing the profile of someone who sent you a chat/friend request, the Accept/Decline options don't appear.
+
+**Root Cause**: Profile.tsx only checks for pending friend requests where the current user is the owner of the profile, not when viewing someone else's profile who may have sent a request TO the current user.
+
+**Solution**:
+- Add a new state `incomingRequestFromUser` to track if the viewed profile's user has sent a request to the current user
+- Add a check in `useEffect` to query friend_requests where `sender_id = resolvedUserId` and `receiver_id = user.id`
+- Display Accept/Decline buttons when such a request exists
+
+**File**: `src/pages/Profile.tsx`
+
+---
+
+## Issue 8: Message Icon Should Navigate to User's DM
+
+**Problem**: Clicking the Message icon on a user's profile navigates to the Messages dashboard instead of directly to the conversation with that user.
+
+**Root Cause**: Line 1016 in `Profile.tsx` navigates to `/messages` without specifying the conversation ID.
+
+**Solution**:
+- Use the existing `startConversation` function which creates/gets a conversation and navigates with the ID
+- Replace the navigation call with `startConversation()` which properly handles this
+
+**File**: `src/pages/Profile.tsx`
+
+---
+
+## Implementation Summary
+
+| Issue | File(s) | Change Type |
+|-------|---------|-------------|
+| 1 | Feed.tsx | Fix state initialization |
+| 2 | Feed.tsx | Change default state value |
+| 3 | Feed.tsx | Verify filter logic |
+| 4 | PostDetail.tsx | Add layoutType prop |
+| 5 | ImmersivePostCard.tsx | Improve carousel CSS |
+| 6 | ImmersivePostCard.tsx, CommentsModal.tsx | Pause video on comments open |
+| 7 | Profile.tsx | Add incoming request check |
+| 8 | Profile.tsx | Use startConversation function |
+
+---
+
+## Technical Details
+
+### Issue 1 - Feed Initialization
 ```typescript
-import ImageLightbox from './ImageLightbox';
+// Ensure displayPosts updates immediately
+useEffect(() => {
+  if (posts && posts.length > 0) {
+    setDisplayPosts(posts);
+  }
+}, [posts]);
 ```
 
-2. **Add state for lightbox**:
+### Issue 2 - Unmute Default
 ```typescript
-const [showLightbox, setShowLightbox] = useState(false);
-const [lightboxIndex, setLightboxIndex] = useState(0);
+// Change from true to false
+const [globalMuted, setGlobalMuted] = useState(false);
 ```
 
-3. **Replace single image display with an image grid/carousel for Photo+ posts**:
-   - For Photo+ layout (`isPhotoTextLayout`), display images in a grid (1-2 columns)
-   - Add horizontal swipe indicator dots below images
-   - On image tap, open `ImageLightbox` in fullscreen
-
-4. **Add ImageLightbox component to the modals section**:
+### Issue 4 - PostDetail Layout Detection
 ```typescript
-{showLightbox && hasImage && (
-  <ImageLightbox
-    images={mediaUrls}
-    activeIndex={lightboxIndex}
-    onClose={() => setShowLightbox(false)}
-    onNavigate={(idx) => {
-      setLightboxIndex(idx);
-      setCurrentMediaIndex(idx);
-    }}
-  />
-)}
+// Detect layout type based on media
+const getLayoutType = (post) => {
+  if (post.media_type === 'video') return 'video';
+  return 'photo-text';
+};
 ```
 
-5. **Update image tap handler for Photo+ posts**:
-   - Tapping an image should open lightbox instead of immersive mode
-   - Lightbox shows caption in fullscreen view
-
-6. **Add swipe indicator dots** when `hasMultipleMedia` is true
-
-### Visual Layout for Photo+ Multi-Image Posts
-
-```text
-+---------------------------+
-|  User Info / Caption      |
-+---------------------------+
-| +-------+  +-------+      |
-| | Img 1 |  | Img 2 |      |  <- Tappable to open lightbox
-| +-------+  +-------+      |
-|         [• ○]              |  <- Swipe indicator dots
-+---------------------------+
-|  Like  Comment  Share...  |
-+---------------------------+
+### Issue 6 - Pause Video on Comments
+```typescript
+// In ImmersivePostCard, when commentsOpen changes
+useEffect(() => {
+  if (commentsOpen && videoRef.current) {
+    videoRef.current.pause();
+  }
+}, [commentsOpen]);
 ```
 
----
+### Issue 7 - Incoming Request Check
+```typescript
+// New state and check
+const [incomingRequest, setIncomingRequest] = useState(null);
 
-## Issue 3: Instant Post Creation Redirect
+// In useEffect, check for incoming request
+const checkIncomingRequest = async () => {
+  const { data } = await supabase
+    .from('friend_requests')
+    .select('*')
+    .eq('sender_id', resolvedUserId)
+    .eq('receiver_id', user.id)
+    .eq('status', 'pending')
+    .maybeSingle();
+  setIncomingRequest(data);
+};
+```
 
-### Current Behavior
-- `PhotoPlusPostCreator.tsx` navigates to `/feed` after post creation
-- There may be a delay before the post appears in the feed
-
-### Required Changes
-
-**File: `src/components/post/PhotoPlusPostCreator.tsx`**
-- Change navigation from `/feed` to `/feed/post/${newPost.id}` to take user directly to their new post
-- This ensures instant visibility without waiting for feed refresh
-
-**File: `src/components/camera/CameraCapture.tsx`** (if exists)
-- Apply same navigation pattern for video posts
-
-**File: Any other post creator components**
-- Update navigation to redirect to the created post's direct URL
-
----
-
-## Technical Summary
-
-| File | Changes |
-|------|---------|
-| `BottomNav.tsx` | Remove badge counts from Feed and Wallet icons; keep only Chats badge |
-| `useDistributedNotifications.tsx` | No changes needed (hook remains for other uses) |
-| `NotificationsPanel.tsx` | Include wallet/credit notifications (remove exclusion filter) |
-| `ImmersivePostCard.tsx` | Add ImageLightbox import, multi-image grid for Photo+ layout, swipe dots, tap-to-fullscreen |
-| `PhotoPlusPostCreator.tsx` | Navigate to `/feed/post/${newPost.id}` instead of `/feed` |
-
----
-
-## Implementation Order
-
-1. **Notifications consolidation** (BottomNav + NotificationsPanel updates)
-2. **Photo+ multi-image grid and carousel** (ImmersivePostCard + ImageLightbox integration)
-3. **Post creation redirect** (PhotoPlusPostCreator navigation change)
-
----
-
-## Expected Outcome
-
-After implementation:
-- All notification badges will only appear on the bell icon in the profile section
-- Photo+ posts with 2 images will display in a side-by-side grid with swipe indicators
-- Tapping any image opens a fullscreen lightbox with horizontal swipe navigation
-- After creating a post, users are immediately taken to view their new post
+### Issue 8 - Direct DM Navigation
+```typescript
+// Replace navigate('/messages') with:
+onClick={startConversation}
+```
