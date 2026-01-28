@@ -144,7 +144,7 @@ export default function ImageLightbox({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[200] bg-black flex flex-col"
+          className="fixed inset-0 z-[200] bg-black"
         >
           {/* Top Bar - Close button */}
           <AnimatePresence>
@@ -171,23 +171,21 @@ export default function ImageLightbox({
             )}
           </AnimatePresence>
 
-          {/* Vertical Scroll Container - Smooth scrolling like TikTok */}
+          {/* Vertical Scroll Container - TikTok-style snap scrolling */}
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="flex-1 overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+            className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
             style={{ 
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch',
-              scrollBehavior: 'smooth'
+              WebkitOverflowScrolling: 'touch'
             }}
           >
             {postsToRender.map(({ post, idx, shouldRender }) => (
               <div
                 key={post.id}
-                className="w-full h-full snap-start snap-always flex-shrink-0"
-                style={{ height: '100dvh' }}
+                className="h-[100dvh] w-full snap-start snap-always"
               >
                 {shouldRender ? (
                   <PhotoPostSlide
