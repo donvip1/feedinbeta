@@ -312,23 +312,6 @@ export default function ImageLightbox({
           </motion.div>
         </motion.div>
 
-        {/* Caption - visible when UI is shown or comments are open */}
-        <AnimatePresence>
-          {(showUI || commentsOpen) && caption && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              className={cn(
-                "absolute bottom-20 left-0 right-[15%] z-40 px-4 py-3",
-                commentsOpen && "relative bottom-0 right-0 bg-black border-b border-border"
-              )}
-            >
-              <p className="text-white text-sm line-clamp-3 drop-shadow-lg">{caption}</p>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Social Buttons - Horizontal bottom bar (visible when UI shown and comments closed) */}
         <AnimatePresence>
           {showUI && !commentsOpen && postId && (
@@ -336,8 +319,16 @@ export default function ImageLightbox({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="absolute bottom-8 left-4 right-4 z-50"
+              className="absolute bottom-8 left-4 right-4 z-50 flex flex-col gap-3"
             >
+              {/* Caption - positioned above social buttons */}
+              {caption && (
+                <div className="max-h-24 overflow-y-auto pr-[15%]">
+                  <p className="text-white text-sm line-clamp-4 drop-shadow-lg">{caption}</p>
+                </div>
+              )}
+              
+              {/* Horizontal Social Buttons Row */}
               {/* Horizontal Social Buttons Row */}
               <div className="flex items-center gap-4 flex-wrap">
                 {/* Like */}
@@ -407,6 +398,20 @@ export default function ImageLightbox({
                   </button>
                 )}
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Caption when comments are open */}
+        <AnimatePresence>
+          {commentsOpen && caption && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="relative bg-black border-b border-border px-4 py-3"
+            >
+              <p className="text-white text-sm line-clamp-3 drop-shadow-lg">{caption}</p>
             </motion.div>
           )}
         </AnimatePresence>
