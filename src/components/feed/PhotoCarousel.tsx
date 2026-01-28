@@ -160,32 +160,9 @@ const PhotoCarousel = memo(function PhotoCarousel({
     }
   }, []);
 
-  const handleImageTap = useCallback((idx: number, e: React.MouseEvent | React.TouchEvent) => {
+  // Simple click handler for opening fullscreen
+  const handleImageClick = useCallback((idx: number, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    // For touch events, check if it was a tap (not a swipe)
-    if ('changedTouches' in e) {
-      if (touchStartRef.current) {
-        const touch = e.changedTouches[0];
-        if (touch) {
-          const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-          const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-          const deltaTime = Date.now() - touchStartRef.current.time;
-          
-          // If user swiped more than 10px or held for more than 300ms, it's not a tap
-          if (deltaX > 10 || deltaY > 10 || deltaTime > 300) {
-            touchStartRef.current = null;
-            return;
-          }
-        }
-      }
-      touchStartRef.current = null;
-      e.preventDefault(); // Prevent subsequent click event (avoid double-firing)
-      onImageClick?.(idx);
-      return;
-    }
-    
-    // Mouse click - always trigger
     onImageClick?.(idx);
   }, [onImageClick]);
 
@@ -236,13 +213,12 @@ const PhotoCarousel = memo(function PhotoCarousel({
             <div
               key={idx}
               className="w-1/2 flex-shrink-0 snap-start cursor-pointer hover:brightness-95 transition-all px-0.5"
-              onClick={(e) => handleImageTap(idx, e)}
-              onTouchEnd={(e) => handleImageTap(idx, e)}
+              onClick={(e) => handleImageClick(idx, e)}
             >
               <img
                 src={url}
                 alt={`Image ${idx + 1}`}
-                className="w-full aspect-square object-cover rounded-lg pointer-events-none"
+                className="w-full aspect-square object-cover rounded-lg"
                 draggable={false}
                 onContextMenu={(e) => e.preventDefault()}
               />
