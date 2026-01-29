@@ -69,6 +69,14 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
   const images = post.media_urls?.length ? post.media_urls : (post.media_url ? [post.media_url] : []);
   const caption = post.content || '';
   
+  // Caption truncation - use 125 words limit for Photo+ posts (matching ImmersivePostCard)
+  const countWords = (text: string) => text.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const wordCount = countWords(caption);
+  const shouldTruncateCaption = wordCount > 125;
+  const truncatedCaption = shouldTruncateCaption 
+    ? caption.trim().split(/\s+/).slice(0, 125).join(' ') + '...' 
+    : caption;
+  
   // Follow state
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
@@ -89,10 +97,14 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
   const [shareOpen, setShareOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [refeedOpen, setRefeedOpen] = useState(false);
+  
+  // Caption expansion state
+  const [showFullCaption, setShowFullCaption] = useState(false);
 
-  // Reset image index when post changes
+  // Reset image index and caption state when post changes
   useEffect(() => {
     setCurrentImageIndex(initialImageIndex);
+    setShowFullCaption(false);
   }, [post.id, initialImageIndex]);
 
   // Update counts when post changes
@@ -374,12 +386,32 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           )}
         </AnimatePresence>
 
-        {/* Caption - positioned above social buttons - NO AnimatePresence for stability */}
+        {/* Caption - positioned above social buttons with expandable text */}
         {showUI && caption && (
-          <div className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200">
-            <p className="text-white text-sm line-clamp-3 drop-shadow-lg" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
-              {caption}
+          <div 
+            className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p 
+              className={cn(
+                "text-white text-sm drop-shadow-lg leading-relaxed",
+                !showFullCaption && shouldTruncateCaption && "line-clamp-3"
+              )} 
+              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
+            >
+              {showFullCaption ? caption : truncatedCaption}
             </p>
+            {shouldTruncateCaption && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowFullCaption(!showFullCaption);
+                }}
+                className="text-white/70 text-xs mt-1 font-medium hover:text-white transition"
+              >
+                {showFullCaption ? 'less' : 'more'}
+              </button>
+            )}
           </div>
         )}
 
