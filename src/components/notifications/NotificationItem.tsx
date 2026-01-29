@@ -136,20 +136,25 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
       case 'comment':
       case 'reply':
         if (notification.related_id) {
-          try {
-            const { data: comment } = await supabase
-              .from('post_comments')
-              .select('post_id')
-              .eq('id', notification.related_id)
-              .single();
-            
-            if (comment?.post_id) {
-              navigate(`/feed/post/${comment.post_id}`, { 
-                state: { openComments: true, highlightComment: notification.related_id } 
-              });
+          // Check if related_type is 'comment' (new format) or 'post' (old format)
+          if (notification.related_type === 'comment') {
+            // New format: related_id is the comment ID
+            try {
+              const { data: comment } = await supabase
+                .from('post_comments')
+                .select('post_id')
+                .eq('id', notification.related_id)
+                .maybeSingle();
+              
+              if (comment?.post_id) {
+                navigate(`/feed/post/${comment.post_id}?commentId=${notification.related_id}`);
+              }
+            } catch (error) {
+              console.error('Error fetching comment:', error);
             }
-          } catch (error) {
-            console.error('Error fetching comment:', error);
+          } else {
+            // Old format: related_id is the post ID
+            navigate(`/feed/post/${notification.related_id}`);
           }
         }
         break;
@@ -196,12 +201,10 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
               .from('post_comments')
               .select('post_id')
               .eq('id', notification.related_id)
-              .single();
+              .maybeSingle();
             
             if (comment?.post_id) {
-              navigate(`/feed/post/${comment.post_id}`, { 
-                state: { openComments: true, highlightComment: notification.related_id } 
-              });
+              navigate(`/feed/post/${comment.post_id}?commentId=${notification.related_id}`);
             }
           } catch (error) {
             console.error('Error fetching comment for mention:', error);
