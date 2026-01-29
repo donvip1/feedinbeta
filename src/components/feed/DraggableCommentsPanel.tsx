@@ -18,6 +18,7 @@ interface DraggableCommentsPanelProps {
   postId: string;
   onCommentAdded?: () => void;
   commentsCount?: number;
+  highlightCommentId?: string | null;
 }
 
 type Profile = {
@@ -45,7 +46,8 @@ export default function DraggableCommentsPanel({
   onClose, 
   postId, 
   onCommentAdded,
-  commentsCount = 0
+  commentsCount = 0,
+  highlightCommentId
 }: DraggableCommentsPanelProps) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -56,6 +58,7 @@ export default function DraggableCommentsPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [replyTo, setReplyTo] = useState<{ id: string; username: string } | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(highlightCommentId || null);
 
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentions, setShowMentions] = useState(false);
@@ -65,7 +68,8 @@ export default function DraggableCommentsPanel({
   const mentionStartPos = useRef<number>(0);
   const optimisticallyAddedIds = useRef<Set<string>>(new Set());
   const panelRef = useRef<HTMLDivElement>(null);
-
+  const commentRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hasScrolledToHighlight = useRef(false);
   // Drag handling
   const y = useMotionValue(0);
   const dragStartY = useRef(0);
@@ -101,6 +105,7 @@ export default function DraggableCommentsPanel({
   useEffect(() => {
     if (!isOpen) {
       setIsExpanded(false);
+      hasScrolledToHighlight.current = false;
       return;
     }
 
@@ -144,6 +149,28 @@ export default function DraggableCommentsPanel({
       supabase.removeChannel(channel);
     };
   }, [isOpen, postId]);
+
+  // Scroll to highlighted comment when comments load
+  useEffect(() => {
+    if (highlightCommentId && comments.length > 0 && !hasScrolledToHighlight.current) {
+      // Expand panel when highlighting a comment
+      setIsExpanded(true);
+      
+      // Wait for DOM to update
+      setTimeout(() => {
+        const commentEl = commentRefs.current.get(highlightCommentId);
+        if (commentEl) {
+          commentEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          hasScrolledToHighlight.current = true;
+          
+          // Clear highlight after animation
+          setTimeout(() => {
+            setHighlightedId(null);
+          }, 3000);
+        }
+      }, 300);
+    }
+  }, [highlightCommentId, comments]);
 
   const fetchUsers = async () => {
     try {
@@ -443,9 +470,16 @@ export default function DraggableCommentsPanel({
         ) : (
           <div className="space-y-3 pb-2">
             {comments.map((c) => (
-              <div key={c.id} className="space-y-2">
+              <div 
+                key={c.id} 
+                className="space-y-2"
+                ref={(el) => { if (el) commentRefs.current.set(c.id, el); }}
+              >
                 {/* Main comment */}
-                <div className="flex gap-2.5 group">
+                <div className={cn(
+                  "flex gap-2.5 group rounded-lg transition-all duration-500",
+                  highlightedId === c.id && "bg-primary/20 ring-2 ring-primary/50 p-2 -mx-2 animate-pulse"
+                )}>
                   <Avatar
                     className="w-7 h-7 flex-shrink-0 cursor-pointer"
                     onClick={() => handleNavigateToProfile(c.profiles?.username || null, c.user_id)}
@@ -520,7 +554,14 @@ export default function DraggableCommentsPanel({
                 {c.replies && c.replies.length > 0 && (
                   <div className="ml-9 space-y-2 border-l-2 border-border pl-3">
                     {c.replies.map((reply) => (
-                      <div key={reply.id} className="flex gap-2 group">
+                      <div 
+                        key={reply.id} 
+                        className={cn(
+                          "flex gap-2 group rounded-lg transition-all duration-500",
+                          highlightedId === reply.id && "bg-primary/20 ring-2 ring-primary/50 p-2 -mx-2 animate-pulse"
+                        )}
+                        ref={(el) => { if (el) commentRefs.current.set(reply.id, el); }}
+                      >
                         <Avatar
                           className="w-5 h-5 flex-shrink-0 cursor-pointer"
                           onClick={() => handleNavigateToProfile(reply.profiles?.username || null, reply.user_id)}

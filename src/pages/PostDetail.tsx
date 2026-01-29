@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,16 +7,21 @@ import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import DraggableCommentsPanel from '@/components/feed/DraggableCommentsPanel';
 
 const PostDetail = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { postId: id } = useParams<{ postId: string }>();
+  const [searchParams] = useSearchParams();
+  const commentId = searchParams.get('commentId');
+  
   const [isCommentsOpen, setIsCommentsOpen] = useState(false);
   const [isImmersiveMode, setIsImmersiveMode] = useState(false);
   const [globalMuted, setGlobalMuted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledToPost = useRef(false);
+  const hasOpenedComments = useRef(false);
 
   // Helper to determine layout type based on post media
   const getLayoutType = (post: any): 'video' | 'photo-text' => {
@@ -134,6 +139,14 @@ const PostDetail = () => {
       return () => clearTimeout(timer);
     }
   }, [userPosts, clickedPostIndex]);
+
+  // Auto-open comments if commentId is provided
+  useEffect(() => {
+    if (commentId && clickedPost && !hasOpenedComments.current) {
+      setIsCommentsOpen(true);
+      hasOpenedComments.current = true;
+    }
+  }, [commentId, clickedPost]);
 
   useEffect(() => {
     if (!user) {
@@ -263,6 +276,17 @@ const PostDetail = () => {
           );
         })}
       </div>
+      
+      {/* Comments Panel for deep-linking to specific comments */}
+      {commentId && id && (
+        <DraggableCommentsPanel
+          isOpen={isCommentsOpen}
+          onClose={() => setIsCommentsOpen(false)}
+          postId={id}
+          highlightCommentId={commentId}
+          commentsCount={clickedPost?.comments_count || 0}
+        />
+      )}
     </div>
   );
 };

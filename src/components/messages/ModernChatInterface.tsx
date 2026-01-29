@@ -96,11 +96,19 @@ interface ChatInterfaceProps {
   conversationId: string;
   onBack: () => void;
   onMessagesRead?: () => void;
+  highlightMessageId?: string | null;
+  onHighlightCleared?: () => void;
 }
 
 const EMOJI_QUICK = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
-export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: ChatInterfaceProps) => {
+export const ModernChatInterface = ({ 
+  conversationId, 
+  onBack, 
+  onMessagesRead,
+  highlightMessageId,
+  onHighlightCleared 
+}: ChatInterfaceProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -168,6 +176,9 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
   const isNearBottomRef = useRef(true);
   const lastScrollPositionRef = useRef<number>(0);
   const [firstUnreadId, setFirstUnreadId] = useState<string | null>(null);
+  const messageRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const hasScrolledToHighlight = useRef(false);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(highlightMessageId || null);
 
   // Load cached messages immediately on mount
   useEffect(() => {
@@ -345,6 +356,26 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
     }
     // Don't auto-scroll on subsequent message updates - let user control
   }, [firstUnreadId]); // Remove messages dependency to stop auto-scrolling on new messages
+
+  // Scroll to highlighted message from notification deep-link
+  useEffect(() => {
+    if (highlightMessageId && messages.length > 0 && !hasScrolledToHighlight.current) {
+      // Wait for DOM to update
+      setTimeout(() => {
+        const messageEl = messageRefs.current.get(highlightMessageId);
+        if (messageEl) {
+          messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          hasScrolledToHighlight.current = true;
+          
+          // Clear highlight after animation
+          setTimeout(() => {
+            setHighlightedMessageId(null);
+            onHighlightCleared?.();
+          }, 3000);
+        }
+      }, 300);
+    }
+  }, [highlightMessageId, messages, onHighlightCleared]);
 
   // With flexbox layout, browser handles keyboard automatically
   // No need for manual keyboard offset calculations
@@ -1305,6 +1336,8 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                     }
                   }
                   
+                  const isHighlighted = msg.id === highlightedMessageId;
+                  
                   return (
                     <React.Fragment key={msg.id}>
                       {isFirstUnread && (
@@ -1320,23 +1353,30 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                         </div>
                       )}
                       
-                      {isCallLog && callLogData ? (
-                        <div className={cn(
-                          "flex py-2",
-                          msg.sender_id === user?.id ? "justify-end" : "justify-start"
-                        )}>
-                          <CallLogBubble
-                            callType={callLogData.callType}
-                            callStatus={callLogData.callStatus}
-                            duration={callLogData.duration}
-                            isOutgoing={msg.sender_id === user?.id}
-                            createdAt={msg.created_at}
-                            isOwn={msg.sender_id === user?.id}
-                          />
-                        </div>
-                      ) : (
-                        <ModernMessageBubble
-                          message={msg}
+                      <div 
+                        ref={(el) => { if (el) messageRefs.current.set(msg.id, el); }}
+                        className={cn(
+                          "transition-all duration-500",
+                          isHighlighted && "bg-primary/20 ring-2 ring-primary/50 rounded-lg animate-pulse"
+                        )}
+                      >
+                        {isCallLog && callLogData ? (
+                          <div className={cn(
+                            "flex py-2",
+                            msg.sender_id === user?.id ? "justify-end" : "justify-start"
+                          )}>
+                            <CallLogBubble
+                              callType={callLogData.callType}
+                              callStatus={callLogData.callStatus}
+                              duration={callLogData.duration}
+                              isOutgoing={msg.sender_id === user?.id}
+                              createdAt={msg.created_at}
+                              isOwn={msg.sender_id === user?.id}
+                            />
+                          </div>
+                        ) : (
+                          <ModernMessageBubble
+                            message={msg}
                           isOwn={msg.sender_id === user?.id}
                           showAvatar={true}
                           isFirstInGroup={msg.isFirstInGroup}
@@ -1366,7 +1406,8 @@ export const ModernChatInterface = ({ conversationId, onBack, onMessagesRead }: 
                             }
                           }}
                         />
-                      )}
+                        )}
+                      </div>
                     </React.Fragment>
                   );
                 })}
