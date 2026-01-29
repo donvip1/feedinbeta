@@ -86,6 +86,7 @@ export default function Messages() {
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
   const [secretMode, setSecretMode] = useState(false);
   const [showMessageSettings, setShowMessageSettings] = useState(false);
+  const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
   const handledLocationStateRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
 
@@ -100,7 +101,12 @@ export default function Messages() {
   useEffect(() => {
     if (handledLocationStateRef.current) return;
     
-    const state = location.state as { sharedImage?: string; conversationId?: string };
+    const state = location.state as { 
+      sharedImage?: string; 
+      conversationId?: string; 
+      highlightMessageId?: string 
+    };
+    
     if (state?.sharedImage) {
       setSharedImageUrl(state.sharedImage);
       setShowNewConversation(true);
@@ -112,6 +118,12 @@ export default function Messages() {
     if (state?.conversationId) {
       setSelectedConversationId(state.conversationId);
       setActiveTab('chats');
+      
+      // Handle highlight message ID for deep-linking to specific messages
+      if (state?.highlightMessageId) {
+        setHighlightMessageId(state.highlightMessageId);
+      }
+      
       handledLocationStateRef.current = true;
       // Clear the state without causing navigation
       window.history.replaceState({}, '', location.pathname);
@@ -824,7 +836,10 @@ export default function Messages() {
         {selectedConversationId ? (
           <ModernChatInterface
             conversationId={selectedConversationId}
-            onBack={() => setSelectedConversationId(null)}
+            onBack={() => {
+              setSelectedConversationId(null);
+              setHighlightMessageId(null);
+            }}
             onMessagesRead={() => {
               // Clear unread count for this conversation
               setConversations(prev => prev.map(conv => 
@@ -833,6 +848,8 @@ export default function Messages() {
                   : conv
               ));
             }}
+            highlightMessageId={highlightMessageId}
+            onHighlightCleared={() => setHighlightMessageId(null)}
           />
         ) : (
           <div className="hidden md:flex items-center justify-center h-full">

@@ -174,24 +174,62 @@ const NotificationHistory = () => {
       );
     }
 
-    // Navigate based on type
+    // Navigate based on type with deep-linking support
     switch (notification.type) {
       case 'friend_request':
         navigate('/friends');
         break;
       case 'like':
-      case 'comment':
-      case 'reply':
       case 'refeed':
       case 'quote':
-      case 'mention':
+        // For likes and refeeds, go to the post
         if (notification.related_id) {
           navigate(`/feed/post/${notification.related_id}`);
         }
         break;
-      case 'message':
+      case 'comment':
+      case 'reply':
+      case 'mention':
+        // For comments, replies, and mentions, go to the post with commentId to highlight the specific comment
         if (notification.related_id) {
-          navigate('/messages', { state: { conversationId: notification.related_id } });
+          // The related_id for comment notifications is the comment ID
+          // We need to first get the post_id from the comment
+          const { data: commentData } = await supabase
+            .from('post_comments')
+            .select('post_id')
+            .eq('id', notification.related_id)
+            .maybeSingle();
+          
+          if (commentData?.post_id) {
+            navigate(`/feed/post/${commentData.post_id}?commentId=${notification.related_id}`);
+          } else {
+            // Fallback: try treating related_id as post_id
+            navigate(`/feed/post/${notification.related_id}`);
+          }
+        }
+        break;
+      case 'message':
+        // For messages, go to the conversation and highlight the specific message
+        if (notification.related_id) {
+          // The related_id could be the message ID or conversation ID
+          // Try to get the conversation_id and message details
+          const { data: messageData } = await supabase
+            .from('messages')
+            .select('id, conversation_id')
+            .eq('id', notification.related_id)
+            .maybeSingle();
+          
+          if (messageData?.conversation_id) {
+            navigate('/messages', { 
+              state: { 
+                conversationId: messageData.conversation_id,
+                highlightMessageId: messageData.id 
+              } 
+            });
+          } else {
+            // Fallback: treat related_id as conversation_id
+            navigate('/messages', { state: { conversationId: notification.related_id } });
+          }
         }
         break;
       case 'follow':
@@ -203,7 +241,12 @@ const NotificationHistory = () => {
       case 'gift':
       case 'gift_received':
       case 'credit_received':
-        navigate('/wallet');
+        // For gifts, navigate to wallet with the transaction highlighted
+        if (notification.related_id) {
+          navigate('/wallet', { state: { highlightTransactionId: notification.related_id } });
+        } else {
+          navigate('/wallet');
+        }
         break;
       case 'live_gift':
       case 'live_invite':
@@ -216,6 +259,17 @@ const NotificationHistory = () => {
           navigate(`/feed/post/${notification.related_id}`);
         } else if (notification.related_type === 'profile' && notification.related_id) {
           navigate(`/profile/${notification.related_id}`);
+        } else if (notification.related_type === 'comment' && notification.related_id) {
+          // Get the post_id for the comment
+          const { data: commentData } = await supabase
+            .from('post_comments')
+            .select('post_id')
+            .eq('id', notification.related_id)
+            .maybeSingle();
+          
+          if (commentData?.post_id) {
+            navigate(`/feed/post/${commentData.post_id}?commentId=${notification.related_id}`);
+          }
         }
     }
   };
