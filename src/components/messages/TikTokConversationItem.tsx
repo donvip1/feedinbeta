@@ -1,7 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { Check, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ActivityType, getActivityIcon, getActivityColor } from './TypingIndicator';
@@ -40,42 +38,36 @@ export const TikTokConversationItem = ({
   activityType = 'typing',
   isSelected = false,
   onClick,
-  index = 0,
   hasStoryRing = false,
 }: TikTokConversationItemProps) => {
   const isOwnMessage = lastMessageSenderId === currentUserId;
   const hasUnread = unreadCount > 0;
   
   return (
-    <motion.button
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2, delay: index * 0.03 }}
+    <button
       onClick={onClick}
       className={cn(
-        "w-full flex items-center gap-3 p-3 rounded-xl transition-all",
+        "flex items-center gap-4 py-3 group cursor-pointer rounded-2xl px-2 -mx-2 transition-colors w-full",
         isSelected 
-          ? "bg-primary/10 border border-primary/20" 
-          : "hover:bg-accent/50"
+          ? "bg-primary/10" 
+          : "hover:bg-accent/50 active:bg-accent"
       )}
     >
       {/* Avatar with story ring and online indicator */}
-      <div className="relative flex-shrink-0">
-        <div
-          className={cn(
-            "rounded-full p-[2.5px]",
-            hasStoryRing 
-              ? "bg-gradient-to-tr from-pink-500 via-rose-500 to-orange-400" 
-              : "bg-transparent"
-          )}
-        >
+      <div className="relative shrink-0">
+        <div className={cn(
+          "rounded-full",
+          hasStoryRing 
+            ? "p-[2px] bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600" 
+            : ""
+        )}>
           <div className={cn(
-            "rounded-full",
-            hasStoryRing && "bg-background p-[2px]"
+            "rounded-full overflow-hidden border-2 border-background shadow-sm ring-1 ring-muted",
+            hasStoryRing ? "w-[52px] h-[52px]" : "w-[56px] h-[56px]"
           )}>
-            <Avatar className={cn(hasStoryRing ? "w-11 h-11" : "w-12 h-12")}>
-              <AvatarImage src={avatarUrl || ''} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-400 to-rose-500 text-white font-semibold">
+            <Avatar className="w-full h-full">
+              <AvatarImage src={avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${displayName}`} />
+              <AvatarFallback className="bg-gradient-to-br from-pink-400 to-rose-500 text-white">
                 {displayName?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
@@ -84,36 +76,21 @@ export const TikTokConversationItem = ({
         
         {/* Online indicator */}
         {isOnline && (
-          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-background shadow-sm" />
+          <div className="absolute bottom-0 right-0 w-4 h-4 bg-emerald-500 rounded-full border-[3px] border-background shadow-sm" />
         )}
       </div>
       
       {/* Content */}
-      <div className="flex-1 min-w-0 text-left">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className={cn(
-              "font-semibold truncate",
-              hasUnread && "text-foreground"
-            )}>
-              {displayName}
-            </span>
-            {isOnline && (
-              <span className="text-[9px] text-emerald-500 font-medium flex-shrink-0">
-                online
-              </span>
-            )}
-          </div>
+      <div className="flex-1 flex justify-between items-center min-w-0">
+        <div className="max-w-[70%] text-left">
+          <h5 className={cn(
+            "font-bold truncate",
+            hasUnread ? "text-foreground" : "text-foreground"
+          )}>
+            {displayName}
+          </h5>
           
-          {lastMessageTime && (
-            <span className="text-xs text-muted-foreground flex-shrink-0">
-              {lastMessageTime}
-            </span>
-          )}
-        </div>
-        
-        {/* Last message or typing indicator */}
-        <div className="flex items-center gap-1.5 mt-0.5">
+          {/* Last message or typing indicator */}
           {isTyping ? (
             <div className="flex items-center gap-1.5">
               <span className={getActivityColor(activityType)}>
@@ -132,9 +109,9 @@ export const TikTokConversationItem = ({
               </span>
             </div>
           ) : (
-            <>
+            <div className="flex items-center gap-1">
               {/* Message status for own messages */}
-              {isOwnMessage && (
+              {isOwnMessage && lastMessage && (
                 <span className="flex-shrink-0">
                   {hasUnread ? (
                     <Check className="w-3.5 h-3.5 text-muted-foreground" />
@@ -143,27 +120,30 @@ export const TikTokConversationItem = ({
                   )}
                 </span>
               )}
-              
-              <span className={cn(
+              <p className={cn(
                 "text-sm truncate",
-                hasUnread ? "text-foreground font-medium" : "text-muted-foreground"
+                hasUnread ? "text-foreground font-semibold" : "text-muted-foreground"
               )}>
                 {lastMessage || 'Start a conversation'}
-              </span>
-            </>
+              </p>
+            </div>
+          )}
+        </div>
+        
+        <div className="text-right shrink-0 flex flex-col items-end gap-1">
+          {lastMessageTime && (
+            <p className="text-[10px] text-muted-foreground">{lastMessageTime}</p>
+          )}
+          
+          {/* Unread badge */}
+          {hasUnread && (
+            <div className="w-5 h-5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold shadow-md shadow-pink-200/50">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </div>
           )}
         </div>
       </div>
-      
-      {/* Unread badge */}
-      {hasUnread && (
-        <Badge 
-          className="h-5 min-w-[20px] flex items-center justify-center text-[10px] font-bold px-1.5 bg-gradient-to-r from-pink-500 to-rose-500 text-white border-0"
-        >
-          {unreadCount > 99 ? '99+' : unreadCount}
-        </Badge>
-      )}
-    </motion.button>
+    </button>
   );
 };
 
