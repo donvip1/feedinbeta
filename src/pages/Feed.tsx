@@ -35,6 +35,7 @@ import { SwipeableTabs } from '@/components/feed/SwipeableTabs';
 import { useNativeFeatures } from '@/hooks/useNativeFeatures';
 import { useFeedPreloader } from '@/hooks/useFeedPreloader';
 import { batchPrefetchCounts } from '@/hooks/useProfileCounts';
+import { useFeedAds, injectAdsIntoPosts, trackAdImpression } from '@/hooks/useFeedAds';
 import { cn } from '@/lib/utils';
 
 const Feed = () => {
@@ -77,6 +78,9 @@ const Feed = () => {
   const toggleGlobalMute = useCallback(() => {
     setGlobalMuted(prev => !prev);
   }, []);
+
+  // Fetch sponsored/promoted ads for the feed
+  const { data: feedAds } = useFeedAds();
 
   // Fetch live content count for indicator (always enabled) - real-time with fast refetch
   const { data: liveCount, refetch: refetchLiveCount } = useQuery({
@@ -527,12 +531,16 @@ const Feed = () => {
     refetch();
   }, [refetch]));
 
-  // Initialize display posts and handle infinite scroll
+  // Initialize display posts and handle infinite scroll - inject sponsored ads
   useEffect(() => {
     if (posts) {
-      setDisplayPosts(posts);
+      // Inject sponsored ads every 4 posts for higher visibility
+      const postsWithAds = feedAds && feedAds.length > 0 
+        ? injectAdsIntoPosts(posts, feedAds as any, 4)
+        : posts;
+      setDisplayPosts(postsWithAds);
     }
-  }, [posts]);
+  }, [posts, feedAds]);
 
   // Infinite scroll handler - NO cycling, posts only appear once until database allows reset
   useEffect(() => {
@@ -870,6 +878,15 @@ const Feed = () => {
                 (index === 4 || index === 9) &&
                 inlineLiveContent[index === 4 ? 1 : (inlineLiveContent[2] ? 2 : 1)];
 
+              // Handle view tracking - for ads, track impression
+              const handlePostView = () => {
+                if (post._isAd && post._adData && user) {
+                  trackAdImpression(user.id, post._adData.ad_id);
+                } else {
+                  markAsViewed(post.id);
+                }
+              };
+
               return (
                 <Fragment key={uniqueKey}>
                   <div className={cn(
@@ -879,13 +896,13 @@ const Feed = () => {
                   )}>
                     <ImmersivePostCard
                       post={post}
-                      isPromoted={post._isPromoted || false}
+                      isPromoted={post._isPromoted || post._isSponsored || false}
                       promoterName={post._promoterName}
                       boostLevel={post._boostLevel}
                       onCommentsOpenChange={setIsCommentsOpen}
                       onInteractionStart={handleInteractionStart}
                       onInteractionEnd={handleInteractionEnd}
-                      onView={() => markAsViewed(post.id)}
+                      onView={handlePostView}
                       allPosts={displayPosts}
                       allVideoPosts={allVideoPostsRef.current}
                       onMarkAsViewed={markAsViewed}
