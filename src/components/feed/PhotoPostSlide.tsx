@@ -407,9 +407,13 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
                   e.stopPropagation();
                   setShowFullCaption(!showFullCaption);
                 }}
-                className="text-white/70 text-xs mt-1 font-medium hover:text-white transition"
+                className="mt-1.5 px-2.5 py-0.5 bg-black/70 text-white text-[11px] font-bold uppercase tracking-wide rounded-full hover:bg-black/90 transition-all"
+                style={{ 
+                  boxShadow: '0 1px 4px rgba(255,255,255,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+                  letterSpacing: '0.05em'
+                }}
               >
-                {showFullCaption ? 'less' : 'more'}
+                {showFullCaption ? 'Less' : 'More'}
               </button>
             )}
           </div>
