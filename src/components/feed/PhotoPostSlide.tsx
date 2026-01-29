@@ -519,6 +519,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
         onClose={() => setGiftOpen(false)}
         recipientId={post.user_id}
         postId={post.id}
+        recipientName={displayName}
       />
 
       {/* Refeed Modal */}
