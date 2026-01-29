@@ -69,12 +69,12 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
   const images = post.media_urls?.length ? post.media_urls : (post.media_url ? [post.media_url] : []);
   const caption = post.content || '';
   
-  // Caption truncation - use 125 words limit for Photo+ posts (matching ImmersivePostCard)
+  // Caption truncation - use 30 words limit for Photo+ posts
   const countWords = (text: string) => text.trim().split(/\s+/).filter(w => w.length > 0).length;
   const wordCount = countWords(caption);
-  const shouldTruncateCaption = wordCount > 125;
+  const shouldTruncateCaption = wordCount > 30;
   const truncatedCaption = shouldTruncateCaption 
-    ? caption.trim().split(/\s+/).slice(0, 125).join(' ') + '...' 
+    ? caption.trim().split(/\s+/).slice(0, 30).join(' ') + '...' 
     : caption;
   
   // Follow state
