@@ -18,6 +18,9 @@ interface ImageLightboxProps {
   initialRefeedsCount?: number;
   initialGiftsCount?: number;
   initialViewsCount?: number;
+  createdAt?: string;
+  visibility?: string | null;
+  location?: string | null;
   profiles?: {
     username: string | null;
     display_name: string | null;
@@ -43,6 +46,9 @@ export default function ImageLightbox({
   initialRefeedsCount = 0,
   initialGiftsCount = 0,
   initialViewsCount = 0,
+  createdAt,
+  visibility,
+  location,
   profiles,
   onLikeUpdate,
   // Multi-post props
@@ -243,6 +249,9 @@ export default function ImageLightbox({
     comments_count: initialCommentsCount,
     refeeds_count: initialRefeedsCount,
     views_count: initialViewsCount,
+    created_at: createdAt,
+    visibility: visibility,
+    location: location,
     profiles
   };
 

@@ -1568,6 +1568,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         }}
         recipientId={post.user_id}
         postId={post.id}
+        recipientName={displayName}
       />
 
       <RefeedModal

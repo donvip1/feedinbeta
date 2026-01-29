@@ -47,7 +47,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
         return;
       }
 
-      // Create a refeed post - set media_type to 'refeed' to identify it properly
+      // Create a refeed post - use null for media_type (constraint only allows image/video/photo_plus/null)
       const { error: postError } = await supabase.from("posts").insert([
         {
           user_id: user.id,
@@ -57,7 +57,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
           status: "active",
           content: null, // No content for simple refeed
           media_url: null, // Don't duplicate media
-          media_type: "refeed", // Identify as refeed type for profile display
+          media_type: null, // Must be null, image, video, or photo_plus - post_type identifies this as refeed
         },
       ]);
 
@@ -93,7 +93,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
 
     setIsPosting(true);
     try {
-      // Create new post with quote - set media_type to 'quote' to identify it properly
+      // Create new post with quote - use null for media_type (constraint only allows image/video/photo_plus/null)
       const { error: insertError } = await supabase.from("posts").insert([
         {
           user_id: user.id,
@@ -103,7 +103,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
           post_type: "quote",
           status: "active",
           media_url: null, // Don't duplicate media
-          media_type: "quote", // Identify as quote type for profile display
+          media_type: null, // Must be null, image, video, or photo_plus - post_type identifies this as quote
         },
       ]);
 
