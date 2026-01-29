@@ -37,7 +37,8 @@ import {
   Moon,
   Sun,
   BarChart3,
-  Gift
+  Gift,
+  Rocket
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -204,6 +205,13 @@ const Settings = () => {
   ];
 
   const contentOptions = [
+    {
+      icon: Rocket,
+      title: 'Manage Ads',
+      description: 'Create and track your ad campaigns',
+      route: '/ads/my-ads',
+      color: 'text-amber-500'
+    },
     {
       icon: TrendingUp,
       title: 'Trending',

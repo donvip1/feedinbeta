@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { Play, Trash2, Eye, ExternalLink } from 'lucide-react';
+import { Play, Trash2, Eye, ExternalLink, Rocket } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -231,13 +231,22 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
                 View Post
               </DropdownMenuItem>
               {isOwnProfile && (
-                <DropdownMenuItem 
-                  onClick={() => setDeletePostId(post.id)}
-                  className="cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Post
-                </DropdownMenuItem>
+                <>
+                  <DropdownMenuItem 
+                    onClick={() => navigate(`/ads/builder/${post.id}`)}
+                    className="cursor-pointer text-primary"
+                  >
+                    <Rocket className="w-4 h-4 mr-2" />
+                    Promote Post
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => setDeletePostId(post.id)}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Post
+                  </DropdownMenuItem>
+                </>
               )}
             </DropdownMenuContent>
           </DropdownMenu>

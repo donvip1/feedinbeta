@@ -116,6 +116,8 @@ const Referral = lazy(() => import("./pages/Referral"));
 const NotificationHistory = lazy(() => import("./pages/NotificationHistory"));
 const AIToolsHub = lazy(() => import("./pages/AIToolsHub"));
 const AIAgent = lazy(() => import("./pages/AIAgent"));
+const AdBuilder = lazy(() => import("./pages/AdBuilder"));
+const MyAds = lazy(() => import("./pages/MyAds"));
 
 // Lazy load ALL AI tools - reduces memory during build
 const BackgroundRemover = lazy(() => import("./pages/tools/BackgroundRemover"));
@@ -383,6 +385,11 @@ const App = () => {
             <Route path="/promotions" element={<Promotions />} />
             <Route path="/promote/:postId" element={<Promote />} />
             <Route path="/moderation" element={<Moderation />} />
+            
+            {/* Ads Management */}
+            <Route path="/ads/builder" element={<AdBuilder />} />
+            <Route path="/ads/builder/:postId" element={<AdBuilder />} />
+            <Route path="/ads/my-ads" element={<MyAds />} />
             
             {/* Notifications */}
             <Route path="/notifications/history" element={<NotificationHistory />} />
