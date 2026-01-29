@@ -413,7 +413,7 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
   return (
     <>
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col">
+      <SheetContent side="bottom" className="h-[90vh] p-0 flex flex-col z-[250]">
         {/* Minimized Video Preview - Continues playing */}
         {postData?.media_url && postData.media_type?.startsWith("video") && (
           <div className="flex-shrink-0 bg-black relative">

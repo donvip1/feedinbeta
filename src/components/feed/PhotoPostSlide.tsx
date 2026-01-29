@@ -376,7 +376,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
 
         {/* Caption - positioned above social buttons */}
         <AnimatePresence>
-          {showUI && caption && !commentsOpen && (
+          {showUI && caption && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -392,7 +392,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
 
         {/* Social Buttons Row - All on one line at bottom including Promote */}
         <AnimatePresence>
-          {showUI && !commentsOpen && (
+          {showUI && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
