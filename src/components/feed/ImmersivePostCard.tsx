@@ -704,6 +704,13 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     <span>Public</span>
                     <span className="opacity-50">•</span>
                     <span>{formatCompactTime(post.created_at)}</span>
+                    {/* Location display */}
+                    {post.location && (
+                      <>
+                        <span className="opacity-50">•</span>
+                        <span className="truncate max-w-[120px]">{post.location}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1162,8 +1169,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </button>
           )}
 
-          {/* Promoted Badge - hidden in immersive mode, or shown when immersive UI is visible */}
-          {isPromoted && (!isImmersiveMode || showImmersiveUI) && (
+          {/* Promoted Badge - only show when post is actually promoted */}
+          {isPromoted === true && (!isImmersiveMode || showImmersiveUI) && (
             <div className="absolute top-4 left-4 z-10">
               <Badge className="bg-pink-500/90 backdrop-blur-sm text-white text-xs font-semibold">
                 <Sparkles className="w-3 h-3 mr-1" />
@@ -1293,7 +1300,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </button>
               )}
               {/* Promote Button - always at bottom of caption area in immersive mode */}
-              {user && !isPromoted && (
+              {user && isPromoted !== true && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -1414,8 +1421,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               </div>
             )}
 
-            {/* Promote Button */}
-            {user && !isPromoted && (
+            {/* Promote Button - show for all posts (own and others) except already promoted */}
+            {user && isPromoted !== true && (
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1471,8 +1478,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </button>
               </div>
 
-              {/* Promote Button - on same line */}
-              {user && !isPromoted && (
+              {/* Promote Button - on same line, show for all non-promoted posts */}
+              {user && isPromoted !== true && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();

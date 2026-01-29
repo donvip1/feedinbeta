@@ -237,11 +237,15 @@ export default function PhotoPostSlide({
             key={`${post.id}-${currentImageIndex}`}
             src={images[currentImageIndex]}
             alt={`Image ${currentImageIndex + 1}`}
-            initial={{ opacity: 0, scale: 0.98 }}
+            initial={false}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.15 }}
-            className="w-full h-full object-contain select-none pointer-events-none"
+            className="w-full h-full object-contain select-none pointer-events-none will-change-transform"
+            draggable={false}
+            style={{ 
+              transform: 'translate3d(0,0,0)',
+              backfaceVisibility: 'hidden' 
+            }}
           />
         </motion.div>
 
