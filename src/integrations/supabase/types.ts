@@ -7072,6 +7072,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          last_active: string | null
           last_purchase_at: string | null
           total_credits_purchased: number | null
           total_credits_spent: number | null
@@ -7083,6 +7084,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          last_active?: string | null
           last_purchase_at?: string | null
           total_credits_purchased?: number | null
           total_credits_spent?: number | null
@@ -7094,6 +7096,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          last_active?: string | null
           last_purchase_at?: string | null
           total_credits_purchased?: number | null
           total_credits_spent?: number | null
