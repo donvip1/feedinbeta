@@ -5,7 +5,6 @@ import { Plus } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CreateStoryModal } from './CreateStoryModal';
 import { StoryViewer } from './StoryViewer';
-import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface Story {
@@ -34,111 +33,55 @@ interface UserStories {
   has_viewed: boolean;
 }
 
-interface TikTokStoryCircleProps {
-  user: {
-    display_name: string | null;
-    username: string | null;
-    avatar_url: string | null;
-  };
-  hasViewed: boolean;
-  isOwn: boolean;
-  hasLiveIndicator?: boolean;
-  onClick: () => void;
-  delay?: number;
-}
-
+// TikTok-style Story Circle with gradient ring
 const TikTokStoryCircle = ({ 
-  user, 
-  hasViewed, 
-  isOwn, 
-  hasLiveIndicator = false,
-  onClick,
-  delay = 0
-}: TikTokStoryCircleProps) => {
-  return (
-    <motion.button
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, delay: delay * 0.05 }}
-      onClick={onClick}
-      className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
-    >
-      <div className="relative">
-        {/* Gradient ring for unviewed / gray for viewed */}
-        <div
-          className={cn(
-            "w-[68px] h-[68px] rounded-full p-[3px] transition-all duration-300",
-            hasViewed
-              ? "bg-muted-foreground/30"
-              : "bg-gradient-to-tr from-pink-500 via-rose-500 to-orange-400 shadow-pink"
-          )}
-        >
-          <div className="w-full h-full rounded-full bg-background p-[2px]">
-            <Avatar className="w-full h-full">
-              <AvatarImage 
-                src={user.avatar_url || ''} 
-                className="object-cover"
-              />
-              <AvatarFallback className="bg-gradient-to-br from-pink-400 to-rose-500 text-white text-lg font-semibold">
-                {user.display_name?.[0]?.toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
+  label, 
+  isCreate, 
+  image,
+  hasViewed = false,
+  onClick
+}: { 
+  label: string; 
+  isCreate?: boolean; 
+  image?: string;
+  hasViewed?: boolean;
+  onClick?: () => void;
+}) => (
+  <button 
+    onClick={onClick}
+    className="flex flex-col items-center gap-1.5 shrink-0 select-none active:scale-95 transition-transform"
+  >
+    <div className={cn(
+      "p-[2.5px] rounded-full shadow-sm transition-transform",
+      isCreate 
+        ? "border-2 border-primary border-dashed" 
+        : hasViewed
+          ? "bg-muted-foreground/40"
+          : "bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600"
+    )}>
+      <div className="w-[60px] h-[60px] rounded-full border-2 border-background bg-muted overflow-hidden relative">
+        {isCreate ? (
+          <div className="w-full h-full flex items-center justify-center bg-primary/10">
+            <Plus className="w-6 h-6 text-primary" />
           </div>
-        </div>
-        
-        {/* Live indicator badge */}
-        {hasLiveIndicator && (
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-md">
-            <span className="text-[9px] font-bold text-white uppercase tracking-wide">Live</span>
-          </div>
+        ) : (
+          <Avatar className="w-full h-full">
+            <AvatarImage 
+              src={image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${label}`} 
+              className="object-cover"
+            />
+            <AvatarFallback className="bg-gradient-to-br from-pink-400 to-rose-500 text-white">
+              {label?.[0]?.toUpperCase() || 'U'}
+            </AvatarFallback>
+          </Avatar>
         )}
       </div>
-      
-      <span className="text-[11px] text-muted-foreground max-w-[68px] truncate text-center group-hover:text-foreground transition-colors">
-        {isOwn ? 'Your Story' : (user.display_name?.split(' ')[0] || 'User')}
-      </span>
-    </motion.button>
-  );
-};
-
-interface CreateStoryButtonProps {
-  onClick: () => void;
-}
-
-const CreateStoryButton = ({ onClick }: CreateStoryButtonProps) => {
-  return (
-    <motion.button
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
-      onClick={onClick}
-      className="flex-shrink-0 flex flex-col items-center gap-1.5 group"
-    >
-      <div className="relative">
-        <div className="w-[68px] h-[68px] rounded-full bg-gradient-to-br from-pink-500 via-rose-500 to-orange-400 p-[3px] shadow-pink group-hover:shadow-glow transition-all duration-300">
-          <div className="w-full h-full rounded-full bg-card flex items-center justify-center">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center group-hover:scale-110 transition-transform">
-              <Plus className="w-5 h-5 text-white" />
-            </div>
-          </div>
-        </div>
-        
-        {/* "What's up?" bubble */}
-        <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-          <motion.div
-            initial={{ opacity: 0, y: 5 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="px-2.5 py-1 bg-card border border-border rounded-full shadow-sm"
-          >
-            <span className="text-[10px] text-muted-foreground">What's up?</span>
-          </motion.div>
-        </div>
-      </div>
-      
-      <span className="text-[11px] text-primary font-medium">Create</span>
-    </motion.button>
-  );
-};
+    </div>
+    <span className="text-[10px] font-bold text-muted-foreground truncate w-14 text-center">
+      {label}
+    </span>
+  </button>
+);
 
 export const TikTokStoriesBar = () => {
   const { user } = useAuth();
@@ -153,7 +96,10 @@ export const TikTokStoriesBar = () => {
 
   useEffect(() => {
     loadStories();
-    subscribeToStories();
+    const unsubscribe = subscribeToStories();
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [user]);
 
   const loadStories = async () => {
@@ -248,7 +194,7 @@ export const TikTokStoriesBar = () => {
     };
   };
 
-  // Touch/swipe handlers for horizontal scroll
+  // Mouse drag handlers for desktop
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     setStartX(e.pageX - (scrollContainerRef.current?.offsetLeft || 0));
@@ -269,6 +215,7 @@ export const TikTokStoriesBar = () => {
     setIsDragging(false);
   };
 
+  // Touch handlers for mobile
   const handleTouchStart = (e: React.TouchEvent) => {
     setStartX(e.touches[0].pageX - (scrollContainerRef.current?.offsetLeft || 0));
     setScrollLeft(scrollContainerRef.current?.scrollLeft || 0);
@@ -284,46 +231,66 @@ export const TikTokStoriesBar = () => {
 
   if (loading) {
     return (
-      <div className="flex gap-3 px-4 py-3 overflow-hidden">
-        {[1, 2, 3, 4, 5].map(i => (
-          <div key={i} className="flex-shrink-0 flex flex-col items-center gap-1.5">
-            <div className="w-[68px] h-[68px] rounded-full bg-muted animate-pulse" />
-            <div className="w-12 h-2 bg-muted rounded animate-pulse" />
-          </div>
-        ))}
+      <div className="relative w-full overflow-hidden border-b border-border/50 mb-1">
+        <div className="flex gap-4 py-2 overflow-x-auto scrollbar-hide">
+          <div className="pl-4 shrink-0" />
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="flex flex-col items-center gap-1.5 shrink-0">
+              <div className="w-[60px] h-[60px] rounded-full bg-muted animate-pulse" />
+              <div className="w-10 h-2 bg-muted rounded animate-pulse" />
+            </div>
+          ))}
+          <div className="pr-4 shrink-0" />
+        </div>
       </div>
     );
   }
 
   return (
     <>
-      <div 
-        ref={scrollContainerRef}
-        className="flex gap-3 px-4 py-3 overflow-x-auto scrollbar-hide cursor-grab active:cursor-grabbing"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        style={{ scrollBehavior: isDragging ? 'auto' : 'smooth' }}
-      >
-        {/* Create Story Button - Always first */}
-        <CreateStoryButton onClick={() => setShowCreateModal(true)} />
-
-        {/* User Stories */}
-        <AnimatePresence>
-          {userStories.map((userStory, index) => (
+      {/* Stories Section with improved padding & scrollability */}
+      <div className="relative w-full overflow-hidden border-b border-border/50 mb-1">
+        <div 
+          ref={scrollContainerRef}
+          className="flex gap-4 py-2 overflow-x-auto scrollbar-hide scroll-smooth touch-pan-x cursor-grab active:cursor-grabbing"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          style={{ 
+            scrollBehavior: isDragging ? 'auto' : 'smooth',
+            WebkitOverflowScrolling: 'touch'
+          }}
+        >
+          {/* Left Margin Spacer */}
+          <div className="pl-4 shrink-0" />
+          
+          {/* Create Story Button */}
+          <TikTokStoryCircle 
+            label="Create" 
+            isCreate 
+            onClick={() => setShowCreateModal(true)}
+          />
+          
+          {/* User Stories */}
+          {userStories.map((userStory) => (
             <TikTokStoryCircle
               key={userStory.user_id}
-              user={userStory.user}
+              label={userStory.user_id === user?.id 
+                ? 'Your Story' 
+                : (userStory.user.display_name?.split(' ')[0] || 'User')
+              }
+              image={userStory.user.avatar_url || undefined}
               hasViewed={userStory.has_viewed}
-              isOwn={userStory.user_id === user?.id}
               onClick={() => setSelectedUserId(userStory.user_id)}
-              delay={index}
             />
           ))}
-        </AnimatePresence>
+          
+          {/* Right Margin Spacer - Fixes the cutting off issue */}
+          <div className="pr-4 shrink-0" />
+        </div>
       </div>
 
       <CreateStoryModal

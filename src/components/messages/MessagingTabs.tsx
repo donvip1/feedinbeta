@@ -1,8 +1,6 @@
 import React from 'react';
-import { MessageCircle, Circle, Tv, Users } from 'lucide-react';
+import { MessageSquare, Circle, Tv, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
-import { motion } from 'framer-motion';
 
 interface MessagingTabsProps {
   activeTab: 'chats' | 'groups' | 'stories' | 'live';
@@ -13,7 +11,7 @@ interface MessagingTabsProps {
 }
 
 const tabs = [
-  { id: 'chats' as const, icon: MessageCircle, label: 'Chats' },
+  { id: 'chats' as const, icon: MessageSquare, label: 'Chats' },
   { id: 'groups' as const, icon: Users, label: 'Groups' },
   { id: 'stories' as const, icon: Circle, label: 'Stories' },
   { id: 'live' as const, icon: Tv, label: 'Live' },
@@ -27,23 +25,20 @@ export const MessagingTabs = ({
   secretMode = false,
 }: MessagingTabsProps) => {
   return (
-    <div className={cn(
-      "flex rounded-xl overflow-hidden transition-colors",
-      secretMode ? "bg-slate-800" : "bg-muted"
-    )}>
+    <div className="flex items-center justify-between px-2">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
           className={cn(
-            "flex-1 py-2.5 flex items-center justify-center gap-1.5 text-xs font-semibold transition-all relative",
-            activeTab === tab.id
+            "flex items-center gap-2 pb-2 px-3 text-sm font-medium transition-all relative",
+            activeTab === tab.id 
               ? secretMode 
-                ? 'bg-slate-700 text-white' 
-                : 'bg-background text-foreground shadow-sm'
+                ? "text-red-400" 
+                : "text-primary"
               : secretMode
-                ? 'text-slate-400 hover:text-slate-300'
-                : 'text-muted-foreground hover:text-foreground'
+                ? "text-slate-400 hover:text-slate-300"
+                : "text-muted-foreground hover:text-foreground"
           )}
         >
           <tab.icon className="w-4 h-4" />
@@ -51,34 +46,27 @@ export const MessagingTabs = ({
           
           {/* Unread Badge for Chats */}
           {tab.id === 'chats' && unreadCount > 0 && (
-            <Badge 
-              className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white border-0"
-            >
+            <span className="h-4 min-w-[16px] flex items-center justify-center text-[10px] font-bold px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full">
               {unreadCount > 99 ? '99+' : unreadCount}
-            </Badge>
+            </span>
           )}
           
           {/* Unread Badge for Groups */}
           {tab.id === 'groups' && groupUnreadCount > 0 && (
-            <Badge 
-              className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white border-0"
-            >
+            <span className="h-4 min-w-[16px] flex items-center justify-center text-[10px] font-bold px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-full">
               {groupUnreadCount > 99 ? '99+' : groupUnreadCount}
-            </Badge>
+            </span>
           )}
           
           {/* Active Indicator */}
           {activeTab === tab.id && (
-            <motion.div
-              layoutId="messaging-tab-indicator"
+            <div 
               className={cn(
-                "absolute bottom-0 left-0 right-0 h-0.5",
+                "absolute bottom-0 left-0 right-0 h-0.5 rounded-full animate-in fade-in slide-in-from-bottom-1",
                 secretMode 
                   ? "bg-gradient-to-r from-red-500 to-orange-500" 
-                  : "bg-gradient-to-r from-primary to-accent"
+                  : "bg-primary"
               )}
-              initial={false}
-              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
             />
           )}
         </button>

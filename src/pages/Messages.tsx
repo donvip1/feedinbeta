@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, Heart, Bell } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, Heart, Bell, UserPlus, ChevronLeft } from 'lucide-react';
 import { MessageSettingsSheet } from '@/components/messages/MessageSettingsSheet';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
@@ -493,46 +493,45 @@ export default function Messages() {
         selectedConversationId ? 'hidden md:flex' : 'flex',
         secretMode ? "bg-slate-900 border-slate-800" : "bg-background border-border"
       )}>
-        {/* User Header */}
+        {/* User Header - TikTok Style */}
         <div className={cn(
-          "p-4 border-b transition-colors duration-300",
-          secretMode ? "border-slate-800" : "border-border"
+          "pt-4 border-b transition-colors duration-300",
+          secretMode ? "border-slate-800 bg-slate-900/80" : "border-border bg-background/80 backdrop-blur-md"
         )}>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+          {/* Title & Top Icons */}
+          <div className="flex items-center justify-between mb-4 px-4">
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => navigate('/feed')}
-                className={secretMode ? "hover:bg-slate-800" : ""}
+                className={cn("w-9 h-9", secretMode ? "hover:bg-slate-800" : "")}
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ChevronLeft className="w-6 h-6" />
               </Button>
-            </div>
-            
-            {/* TikTok-style Inbox title with online indicator */}
-            <div className="flex items-center gap-2">
-              <h1 className={cn(
-                "text-xl font-bold",
-                secretMode && "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400"
-              )}>
-                {secretMode ? "Secret Mode" : "Inbox"}
-              </h1>
-              {!secretMode && (
-                <div className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] text-muted-foreground">▼</span>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <h1 className={cn(
+                    "text-xl font-bold",
+                    secretMode 
+                      ? "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400" 
+                      : "text-foreground"
+                  )}>
+                    {secretMode ? "Secret Mode" : "Inbox"}
+                  </h1>
+                  {!secretMode && (
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-background shadow-sm animate-pulse" />
+                  )}
                 </div>
-              )}
+              </div>
             </div>
-            
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 text-muted-foreground">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSecretMode(!secretMode)}
                 className={cn(
-                  "transition-colors",
+                  "w-9 h-9 transition-colors",
                   secretMode 
                     ? "bg-destructive/20 text-destructive hover:bg-destructive/30" 
                     : "hover:bg-muted"
@@ -541,17 +540,6 @@ export default function Messages() {
               >
                 <Shield className="w-5 h-5" />
               </Button>
-              {activeTab === 'chats' && totalUnreadCount > 0 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={markAllMessagesAsRead}
-                  title="Mark all as read"
-                  className={secretMode ? "hover:bg-slate-800" : ""}
-                >
-                  <CheckCheck className="w-5 h-5" />
-                </Button>
-              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -559,7 +547,7 @@ export default function Messages() {
                   if (activeTab === 'chats') setShowNewConversation(true);
                   else if (activeTab === 'groups') setShowCreateGroup(true);
                 }}
-                className={secretMode ? "hover:bg-slate-800" : ""}
+                className={cn("w-9 h-9", secretMode ? "hover:bg-slate-800" : "")}
               >
                 <Plus className="w-5 h-5" />
               </Button>
@@ -567,7 +555,7 @@ export default function Messages() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowMessageSettings(true)}
-                className={secretMode ? "hover:bg-slate-800" : ""}
+                className={cn("w-9 h-9", secretMode ? "hover:bg-slate-800" : "")}
                 title="Message Settings"
               >
                 <MoreVertical className="w-5 h-5" />
@@ -575,27 +563,31 @@ export default function Messages() {
             </div>
           </div>
           
-          {/* Search */}
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          {/* Search Bar */}
+          <div className="relative mb-4 px-4">
+            <div className="absolute inset-y-0 left-7 flex items-center pointer-events-none">
+              <Search className="w-4 h-4 text-muted-foreground" />
+            </div>
             <Input
               placeholder={`Search ${activeTab}...`}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={cn(
-                "pl-9",
+                "w-full rounded-xl py-2.5 pl-10 pr-4 text-sm",
                 secretMode && "bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
               )}
             />
           </div>
           
-          {/* Modern Tab Navigation */}
-          <MessagingTabs
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            unreadCount={totalUnreadCount}
-            secretMode={secretMode}
-          />
+          {/* Navigation Tabs */}
+          <div className="pb-1">
+            <MessagingTabs
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              unreadCount={totalUnreadCount}
+              secretMode={secretMode}
+            />
+          </div>
         </div>
 
         <ScrollArea className="flex-1">
@@ -605,58 +597,50 @@ export default function Messages() {
               {/* TikTok-style Stories Bar at the top */}
               <TikTokStoriesBar />
               
-              {/* Activity Section */}
+              {/* Activity Section - TikTok Style */}
               <div className="px-2 py-1">
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3 }}
+                <button
                   onClick={() => navigate('/friends')}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-accent/50 rounded-xl transition-colors group"
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-accent/50 transition-colors cursor-pointer active:scale-[0.98] w-full rounded-xl"
                 >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-pink">
-                    <Users className="w-6 h-6 text-primary-foreground" />
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-sm">
+                    <UserPlus className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="font-semibold text-foreground">New followers</p>
-                    <p className="text-sm text-muted-foreground truncate">Check who followed you</p>
+                  <div className="flex-1 text-left border-b border-border/50 pb-3">
+                    <h3 className="font-semibold text-foreground">Follow requests</h3>
+                    <p className="text-sm text-muted-foreground">People want to follow you</p>
                   </div>
-                </motion.button>
+                </button>
                 
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.05 }}
+                <button
                   onClick={() => navigate('/notification-history')}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-accent/50 rounded-xl transition-colors group"
+                  className="flex items-center gap-4 px-4 py-3 hover:bg-accent/50 transition-colors cursor-pointer active:scale-[0.98] w-full rounded-xl"
                 >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-pink">
-                    <Heart className="w-6 h-6 text-white fill-white" />
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-sm">
+                    <Heart className="w-6 h-6 text-white" />
                   </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="font-semibold text-foreground">Activity</p>
-                    <p className="text-sm text-muted-foreground truncate">Likes, comments & more</p>
+                  <div className="flex-1 text-left border-b border-border/50 pb-3">
+                    <h3 className="font-semibold text-foreground">Engagement</h3>
+                    <p className="text-sm text-muted-foreground">Likes, comments & mentions</p>
                   </div>
-                </motion.button>
+                </button>
                 
-                <motion.button
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.3, delay: 0.1 }}
-                  onClick={() => navigate('/notification-history')}
-                  className="w-full flex items-center gap-3 p-3 hover:bg-accent/50 rounded-xl transition-colors group"
-                >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-muted to-secondary flex items-center justify-center border border-border">
-                    <Bell className="w-6 h-6 text-muted-foreground" />
+                {/* Direct Messages Section Label */}
+                <div className="px-4 py-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                      Direct Messages
+                    </h4>
+                    {totalUnreadCount > 0 && (
+                      <button 
+                        onClick={markAllMessagesAsRead}
+                        className="text-[10px] text-primary font-bold hover:underline"
+                      >
+                        Mark all read
+                      </button>
+                    )}
                   </div>
-                  <div className="flex-1 text-left min-w-0">
-                    <p className="font-semibold text-foreground">System notifications</p>
-                    <p className="text-sm text-muted-foreground truncate">Updates & announcements</p>
-                  </div>
-                </motion.button>
-                
-                {/* Divider */}
-                <div className="h-px bg-border/50 my-2 mx-3" />
+                </div>
               </div>
               
               {/* Conversations List */}
