@@ -88,23 +88,35 @@ export const useUserAds = () => {
     try {
       setCreating(true);
 
-      // Check user balance first
-      const { data: balanceData, error: balanceError } = await supabase
-        .from('user_credits')
-        .select('balance')
+      // Check if user is admin/super_admin (skip credit checks for admins)
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
         .eq('user_id', user.id)
+        .in('role', ['admin', 'super_admin'])
         .maybeSingle();
 
-      if (balanceError) throw balanceError;
+      const isAdmin = !!roleData;
 
-      const currentBalance = balanceData?.balance || 0;
-      if (currentBalance < params.budgetCredits) {
-        toast({
-          title: 'Insufficient credits',
-          description: `You need ${params.budgetCredits} credits but only have ${currentBalance}.`,
-          variant: 'destructive',
-        });
-        return false;
+      // Only check balance for non-admin users
+      if (!isAdmin) {
+        const { data: balanceData, error: balanceError } = await supabase
+          .from('user_credits')
+          .select('balance')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (balanceError) throw balanceError;
+
+        const currentBalance = balanceData?.balance || 0;
+        if (currentBalance < params.budgetCredits) {
+          toast({
+            title: 'Insufficient credits',
+            description: `You need ${params.budgetCredits} credits but only have ${currentBalance}.`,
+            variant: 'destructive',
+          });
+          return false;
+        }
       }
 
       // Calculate end date based on duration
@@ -136,17 +148,20 @@ export const useUserAds = () => {
 
       if (adError) throw adError;
 
-      // Deduct credits via transaction (trigger handles balance update)
-      const { error: transactionError } = await supabase
-        .from('credit_transactions')
-        .insert({
-          user_id: user.id,
-          amount: -params.budgetCredits,
-          type: 'ad_promotion',
-          description: `Ad promotion: ${params.title}`,
-        });
+      // Only deduct credits for non-admin users
+      // Admins have unlimited credits that shouldn't be tracked
+      if (!isAdmin) {
+        const { error: transactionError } = await supabase
+          .from('credit_transactions')
+          .insert({
+            user_id: user.id,
+            amount: -params.budgetCredits,
+            type: 'ad_promotion',
+            description: `Ad promotion: ${params.title}`,
+          });
 
-      if (transactionError) throw transactionError;
+        if (transactionError) throw transactionError;
+      }
 
       toast({
         title: 'Ad created successfully!',
