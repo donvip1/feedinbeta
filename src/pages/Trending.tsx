@@ -6,6 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useViewedPosts } from '@/hooks/useViewedPosts';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { useFeedAds, injectAdsIntoPosts } from '@/hooks/useFeedAds';
+import { useAuth } from '@/hooks/useAuth';
 
 // Fisher-Yates shuffle with seed for consistent randomization per session
 const seededShuffle = <T,>(array: T[], seed: number): T[] => {
@@ -27,9 +29,12 @@ const seededShuffle = <T,>(array: T[], seed: number): T[] => {
 
 const TrendingContent = () => {
   const [posts, setPosts] = useState<any[]>([]);
+  const [displayPosts, setDisplayPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sessionKey] = useState(() => Date.now()); // New session = new random order
   const { viewedPostIds, markAsViewed } = useViewedPosts();
+  const { user } = useAuth();
+  const { data: feedAds } = useFeedAds();
 
   const loadTrending = useCallback(async () => {
     try {
@@ -103,6 +108,18 @@ const TrendingContent = () => {
     loadTrending();
   }, [loadTrending]);
 
+  // Inject ads when posts or ads change
+  useEffect(() => {
+    if (posts.length > 0) {
+      const postsWithAds = feedAds && feedAds.length > 0
+        ? injectAdsIntoPosts(posts, feedAds as any, 4)
+        : posts;
+      setDisplayPosts(postsWithAds);
+    } else {
+      setDisplayPosts([]);
+    }
+  }, [posts, feedAds]);
+
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-6 max-w-2xl space-y-4">
@@ -117,15 +134,16 @@ const TrendingContent = () => {
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-2xl space-y-4">
-      {posts.length === 0 ? (
+      {displayPosts.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground">No trending posts yet</p>
         </div>
       ) : (
-        posts.map((post) => (
+        displayPosts.map((post) => (
           <PostCard 
             key={post.id} 
-            post={post} 
+            post={post}
+            isPromoted={post._isPromoted || post._isSponsored || false}
             onView={() => markAsViewed(post.id)}
           />
         ))

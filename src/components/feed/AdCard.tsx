@@ -50,9 +50,9 @@ export const AdCard: React.FC<AdCardProps> = memo(({
       )}
       onClick={handleClick}
     >
-      {/* Sponsored Badge */}
-      <div className="absolute top-2 left-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-background/80 backdrop-blur-sm text-xs text-muted-foreground">
-        <Megaphone className="w-3 h-3" />
+      {/* Sponsored Badge - More prominent with gradient and animation */}
+      <div className="absolute top-2 left-2 z-10 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 text-white text-xs font-bold shadow-lg animate-pulse">
+        <Megaphone className="w-3.5 h-3.5" />
         <span>Sponsored</span>
       </div>
 

@@ -1169,11 +1169,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </button>
           )}
 
-          {/* Promoted Badge - only show when post is actually promoted */}
+          {/* Promoted/Sponsored Badge - prominent indicator for boosted content */}
           {isPromoted === true && (!isImmersiveMode || showImmersiveUI) && (
-            <div className="absolute top-4 left-4 z-10">
-              <Badge className="bg-pink-500/90 backdrop-blur-sm text-white text-xs font-semibold">
-                <Sparkles className="w-3 h-3 mr-1" />
+            <div className="absolute top-4 left-4 z-10 animate-pulse-slow">
+              <Badge className="bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 shadow-lg border border-white/20">
+                <Sparkles className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
                 Sponsored
               </Badge>
             </div>
