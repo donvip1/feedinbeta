@@ -279,17 +279,17 @@ export default function PhotoPostSlide({
                         {displayName}
                       </span>
                       {user && post.user_id !== user.id && (
-                        <button
+                        <button 
                           onClick={handleFollow}
                           disabled={isFollowLoading}
                           className={cn(
-                            "text-xs font-medium px-2 py-0.5 rounded-full transition-all",
-                            isFollowing 
-                              ? "bg-white/20 text-white/80" 
-                              : "bg-pink-500 text-white"
+                            "font-bold text-xs transition",
+                            isFollowing ? "text-white/60 hover:text-white/80" : "text-pink-500 hover:text-pink-400",
+                            isFollowLoading && "opacity-50"
                           )}
+                          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
                         >
-                          {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                          • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
                         </button>
                       )}
                     </div>

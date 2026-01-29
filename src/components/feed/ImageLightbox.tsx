@@ -168,23 +168,22 @@ export default function ImageLightbox({
             )}
           </AnimatePresence>
 
-          {/* Vertical Scroll Container - TikTok-style snap scrolling with smooth behavior */}
+          {/* Vertical Scroll Container - Smooth free-flowing scroll like normal (no snap) */}
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
-            className="h-full w-full overflow-y-scroll snap-y snap-mandatory scrollbar-hide"
+            className="h-full w-full overflow-y-auto scrollbar-hide"
             style={{ 
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              scrollBehavior: 'smooth',
               overscrollBehavior: 'contain'
             }}
           >
             {postsToRender.map(({ post, idx, shouldRender }) => (
               <div
                 key={post.id}
-                className="h-[100dvh] w-full snap-start snap-always"
+                className="h-[100dvh] w-full"
               >
                 {shouldRender ? (
                   <PhotoPostSlide
