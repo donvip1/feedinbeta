@@ -921,6 +921,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         )}
 
         {/* --- MEDIA SECTION (takes available space, footer sits below) --- */}
+        {/* Plain text posts render their own self-contained card below, so skip this wrapper for them */}
+        {!isEffectivelyPlainText && (
         <div className={cn(
           "relative overflow-hidden",
           isImmersiveMode ? "flex-1 h-full w-full" : "flex-1 min-h-0"
@@ -1086,120 +1088,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Plain text posts - Facebook-style card layout with proper margins */}
-          {isEffectivelyPlainText && (
-            <div className="w-full bg-card rounded-lg border border-border shadow-sm mt-14 mx-auto max-w-[430px]">
-              {/* Post Header - User info */}
-              <div className="flex items-center gap-3 p-4 pb-3">
-                <Avatar 
-                  className="w-10 h-10 cursor-pointer"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleProfileClick();
-                  }}
-                >
-                  <AvatarImage src={post.profiles?.avatar_url || ''} />
-                  <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span 
-                      className="font-semibold text-foreground text-sm cursor-pointer hover:underline"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleProfileClick();
-                      }}
-                    >
-                      {displayName}
-                    </span>
-                    {user && user.id !== post.user_id && (
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleFollow(e);
-                        }}
-                        disabled={isFollowLoading}
-                        className={cn(
-                          "font-semibold text-xs transition",
-                          isFollowing ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary/80",
-                          isFollowLoading && "opacity-50"
-                        )}
-                      >
-                        • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
-                      </button>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-                    <span>@{post.profiles?.username || 'user'}</span>
-                    <span>•</span>
-                    <span>{formatCompactTime(post.created_at || '')}</span>
-                    {post.location && (
-                      <>
-                        <span>•</span>
-                        <MapPin className="w-3 h-3" />
-                        <span className="truncate max-w-[80px]">{post.location}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Text Content */}
-              <div className="px-4 pb-4">
-                <p className="text-foreground text-base leading-relaxed break-words whitespace-pre-wrap">
-                  {renderCaptionWithHashtags(caption)}
-                </p>
-              </div>
-              
-              {/* Divider */}
-              <div className="border-t border-border mx-4" />
-              
-              {/* Social Buttons Row - Facebook style, evenly spaced at bottom */}
-              <div className="flex items-center justify-between px-4 py-3">
-                <button onClick={handleLike} className="flex items-center gap-1.5 group flex-1 justify-center">
-                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
-                  <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
-                </button>
-                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group flex-1 justify-center">
-                  <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
-                </button>
-                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
-                  <Repeat className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-medium">{formatCount(refeedsCount)}</span>
-                </button>
-                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
-                  <Gift className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-medium">{formatCount(giftsCount)}</span>
-                </button>
-                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
-                  <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                </button>
-              </div>
-              
-              {/* Views count - subtle at bottom */}
-              <div className="flex items-center justify-between px-4 pb-3">
-                <div className="flex items-center gap-1">
-                  <Eye className="w-4 h-4 text-muted-foreground/60" />
-                  <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)} views</span>
-                </div>
-                
-                {/* Promote Button */}
-                {user && !isPromoted && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/promote/${post.id}`);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-sm"
-                  >
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="text-xs font-semibold">Promote</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Plain text posts are rendered outside the media section */}
 
           {/* Gradient overlays for buttons readability - shown when NOT in immersive mode */}
           {(hasVideo || hasImage) && !isImmersiveMode && (
@@ -1588,6 +1477,153 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             )}
           </AnimatePresence>
         </div>
+        )}
+
+        {/* Plain text posts - Facebook-style card layout with proper margins - rendered OUTSIDE the media section */}
+        {isEffectivelyPlainText && (
+          <div className="w-full bg-card rounded-lg border border-border shadow-sm mt-14 mx-auto max-w-[430px]">
+            {/* Post Header - User info */}
+            <div className="flex items-center gap-3 p-4 pb-3">
+              <Avatar 
+                className="w-10 h-10 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleProfileClick();
+                }}
+              >
+                <AvatarImage src={post.profiles?.avatar_url || ''} />
+                <AvatarFallback className="bg-primary text-primary-foreground text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span 
+                    className="font-semibold text-foreground text-sm cursor-pointer hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProfileClick();
+                    }}
+                  >
+                    {displayName}
+                  </span>
+                  {user && user.id !== post.user_id && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFollow(e);
+                      }}
+                      disabled={isFollowLoading}
+                      className={cn(
+                        "font-semibold text-xs transition",
+                        isFollowing ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary/80",
+                        isFollowLoading && "opacity-50"
+                      )}
+                    >
+                      • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                  <span>@{post.profiles?.username || 'user'}</span>
+                  <span>•</span>
+                  <span>{formatCompactTime(post.created_at || '')}</span>
+                  {post.location && (
+                    <>
+                      <span>•</span>
+                      <MapPin className="w-3 h-3" />
+                      <span className="truncate max-w-[80px]">{post.location}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              {/* Three-dots menu */}
+              {canDeletePost && (
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowMoreActions(!showMoreActions)}
+                    className="p-2 rounded-full transition-all active:scale-95 hover:bg-muted"
+                  >
+                    <MoreVertical className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                  {showMoreActions && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowMoreActions(false)}
+                      />
+                      <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 min-w-[120px] overflow-hidden">
+                        <button
+                          onClick={() => {
+                            setShowMoreActions(false);
+                            setShowDeleteDialog(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Text Content */}
+            <div className="px-4 pb-4">
+              <p className="text-foreground text-base leading-relaxed break-words whitespace-pre-wrap">
+                {renderCaptionWithHashtags(caption)}
+              </p>
+            </div>
+            
+            {/* Divider */}
+            <div className="border-t border-border mx-4" />
+            
+            {/* Social Buttons Row - Facebook style, evenly spaced at bottom */}
+            <div className="flex items-center justify-between px-4 py-3">
+              <button onClick={handleLike} className="flex items-center gap-1.5 group flex-1 justify-center">
+                <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
+                <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
+              </button>
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group flex-1 justify-center">
+                <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
+              </button>
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
+                <Repeat className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                <span className="text-muted-foreground text-xs font-medium">{formatCount(refeedsCount)}</span>
+              </button>
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
+                <Gift className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                <span className="text-muted-foreground text-xs font-medium">{formatCount(giftsCount)}</span>
+              </button>
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
+                <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+              </button>
+            </div>
+            
+            {/* Views count - subtle at bottom */}
+            <div className="flex items-center justify-between px-4 pb-3">
+              <div className="flex items-center gap-1">
+                <Eye className="w-4 h-4 text-muted-foreground/60" />
+                <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)} views</span>
+              </div>
+              
+              {/* Promote Button */}
+              {user && !isPromoted && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-sm"
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span className="text-xs font-semibold">Promote</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* --- FOOTER SECTION: Caption, Music, Promote (Below Media) - For Video layout only --- */}
         {!isImmersiveMode && !isTextStyled && !isPlainText && !isPhotoTextLayout && (
