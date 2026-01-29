@@ -7,13 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, Heart, Bell, UserPlus, ChevronLeft } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, ChevronLeft } from 'lucide-react';
 import { MessageSettingsSheet } from '@/components/messages/MessageSettingsSheet';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
 import { TikTokStoriesBar } from '@/components/stories/TikTokStoriesBar';
-import { StoriesBar } from '@/components/stories/StoriesBar';
+import { InboxActivitySection } from '@/components/messages/InboxActivitySection';
 import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useToast } from '@/hooks/use-toast';
@@ -82,7 +82,7 @@ export default function Messages() {
   const [groups, setGroups] = useState<Group[]>(cachedGroups);
   const [myGroups, setMyGroups] = useState<Group[]>(cachedMyGroups);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
-  const [activeTab, setActiveTab] = useState<'chats' | 'groups' | 'stories' | 'live'>('chats');
+  const [activeTab, setActiveTab] = useState<'chats' | 'groups' | 'live'>('chats');
   const [sharedImageUrl, setSharedImageUrl] = useState<string | null>(null);
   const [secretMode, setSecretMode] = useState(false);
   const [showMessageSettings, setShowMessageSettings] = useState(false);
@@ -563,21 +563,8 @@ export default function Messages() {
             </div>
           </div>
           
-          {/* Search Bar */}
-          <div className="relative mb-4 px-4">
-            <div className="absolute inset-y-0 left-7 flex items-center pointer-events-none">
-              <Search className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <Input
-              placeholder={`Search ${activeTab}...`}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={cn(
-                "w-full rounded-xl py-2.5 pl-10 pr-4 text-sm",
-                secretMode && "bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-              )}
-            />
-          </div>
+          {/* TikTok-style Stories Bar - Always visible above tabs */}
+          <TikTokStoriesBar />
           
           {/* Navigation Tabs */}
           <div className="pb-1">
@@ -590,58 +577,36 @@ export default function Messages() {
           </div>
         </div>
 
+        {/* Search Bar - Outside header for scrolling */}
+        <div className={cn(
+          "relative px-4 py-2",
+          secretMode ? "bg-slate-900" : "bg-background"
+        )}>
+          <div className="absolute inset-y-0 left-7 flex items-center pointer-events-none">
+            <Search className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <Input
+            placeholder={`Search ${activeTab}...`}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className={cn(
+              "w-full rounded-xl py-2.5 pl-10 pr-4 text-sm",
+              secretMode && "bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+            )}
+          />
+        </div>
+
         <ScrollArea className="flex-1">
           {/* Chats Content with TikTok-style Stories at top */}
           {activeTab === 'chats' && (
             <div className="pb-20">
-              {/* TikTok-style Stories Bar at the top */}
-              <TikTokStoriesBar />
-              
               {/* Activity Section - TikTok Style */}
-              <div className="px-2 py-1">
-                <button
-                  onClick={() => navigate('/friends')}
-                  className="flex items-center gap-4 px-4 py-3 hover:bg-accent/50 transition-colors cursor-pointer active:scale-[0.98] w-full rounded-xl"
-                >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-violet-600 flex items-center justify-center shadow-sm">
-                    <UserPlus className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 text-left border-b border-border/50 pb-3">
-                    <h3 className="font-semibold text-foreground">Follow requests</h3>
-                    <p className="text-sm text-muted-foreground">People want to follow you</p>
-                  </div>
-                </button>
-                
-                <button
-                  onClick={() => navigate('/notification-history')}
-                  className="flex items-center gap-4 px-4 py-3 hover:bg-accent/50 transition-colors cursor-pointer active:scale-[0.98] w-full rounded-xl"
-                >
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-sm">
-                    <Heart className="w-6 h-6 text-white" />
-                  </div>
-                  <div className="flex-1 text-left border-b border-border/50 pb-3">
-                    <h3 className="font-semibold text-foreground">Engagement</h3>
-                    <p className="text-sm text-muted-foreground">Likes, comments & mentions</p>
-                  </div>
-                </button>
-                
-                {/* Direct Messages Section Label */}
-                <div className="px-4 py-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
-                      Direct Messages
-                    </h4>
-                    {totalUnreadCount > 0 && (
-                      <button 
-                        onClick={markAllMessagesAsRead}
-                        className="text-[10px] text-primary font-bold hover:underline"
-                      >
-                        Mark all read
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <InboxActivitySection
+                onFollowersClick={() => navigate('/friends')}
+                onActivityClick={() => navigate('/notification-history')}
+                totalUnreadCount={totalUnreadCount}
+                onMarkAllRead={markAllMessagesAsRead}
+              />
               
               {/* Conversations List */}
               {loadError && conversations.length === 0 ? (
@@ -824,10 +789,6 @@ export default function Messages() {
             </div>
           )}
 
-          {/* Stories Content */}
-          {activeTab === 'stories' && (
-            <StoriesBar />
-          )}
 
           {/* Live Content */}
           {activeTab === 'live' && (

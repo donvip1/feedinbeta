@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserPlus, Heart, Bell } from 'lucide-react';
+import { UserPlus, Heart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ActivityItemProps {
@@ -28,13 +28,15 @@ const ActivityItem = ({ icon: Icon, color, title, desc, onClick }: ActivityItemP
 interface InboxActivitySectionProps {
   onFollowersClick?: () => void;
   onActivityClick?: () => void;
-  onSystemClick?: () => void;
+  totalUnreadCount?: number;
+  onMarkAllRead?: () => void;
 }
 
 export const InboxActivitySection = ({ 
   onFollowersClick, 
-  onActivityClick, 
-  onSystemClick 
+  onActivityClick,
+  totalUnreadCount = 0,
+  onMarkAllRead,
 }: InboxActivitySectionProps) => {
   return (
     <div className="px-2 py-1">
@@ -52,13 +54,6 @@ export const InboxActivitySection = ({
         desc="Likes, comments & mentions"
         onClick={onActivityClick}
       />
-      <ActivityItem 
-        icon={Bell} 
-        color="bg-gradient-to-br from-muted to-secondary border border-border" 
-        title="System notifications" 
-        desc="Updates & announcements"
-        onClick={onSystemClick}
-      />
       
       {/* Divider */}
       <div className="h-px bg-border/50 my-2 mx-3" />
@@ -68,9 +63,14 @@ export const InboxActivitySection = ({
         <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
           Direct Messages
         </h4>
-        <button className="text-[10px] text-primary font-bold hover:underline">
-          Mark all read
-        </button>
+        {totalUnreadCount > 0 && (
+          <button 
+            onClick={onMarkAllRead}
+            className="text-[10px] text-primary font-bold hover:underline"
+          >
+            Mark all read
+          </button>
+        )}
       </div>
     </div>
   );
