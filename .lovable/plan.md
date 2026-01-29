@@ -1,135 +1,104 @@
 
+# Add Expandable Caption to Photo+ Fullscreen Mode
 
-# Fix Photo+ Fullscreen Social Buttons Not Working
-
-## Problem Summary
-
-In the Photo+ fullscreen mode, social buttons (Comments, Refeed, Gift, Share) don't work properly:
-1. **Comments, Refeed, Gift, Share buttons don't show their modals** - they appear frozen/non-responsive
-2. **Buttons hide when tapped** instead of triggering their actions
-3. **Modals appear behind the lightbox** due to z-index conflicts
-
-## Root Cause Analysis
-
-### Issue 1: Z-Index Conflict
-- `ImageLightbox` uses `z-[200]` for its fullscreen container
-- Modal components (`Sheet`, `Dialog`) use `z-50` by default
-- When modals open, they render BEHIND the lightbox instead of on top
-
-### Issue 2: UI Toggle Interference  
-The social buttons row has condition `{showUI && !commentsOpen && (...)}` - when a modal opens, `showUI` might get toggled, causing buttons to disappear.
+## Problem
+In the Photo+ fullscreen mode, posts with lengthy captions only show a fraction of the text (limited to 3 lines via `line-clamp-3`). There's no way to read the full caption - users need a "show more/show less" toggle.
 
 ## Solution
-
-### Part 1: Fix Modal Z-Index for Photo+ Fullscreen
-
-Update `PhotoPostSlide.tsx` to pass higher z-index classes to the modals so they appear above the lightbox (z-[200]):
-
-**CommentsModal**: Add `className` prop to SheetContent with `z-[250]`
-**MobileShareSheet**: Add `className` prop to SheetContent with `z-[250]`
-**GiftModal**: Add `className` prop to DialogContent with `z-[250]`
-**RefeedModal**: Add `className` prop to SheetContent with `z-[250]`
-
-### Part 2: Prevent Buttons From Hiding When Modals Open
-
-Update the social buttons visibility condition in `PhotoPostSlide.tsx` from:
-```typescript
-{showUI && !commentsOpen && (
-```
-to:
-```typescript
-{showUI && (
-```
-
-The buttons should remain visible when modals are open since the modals have their own overlays.
-
-### Part 3: Update Modal Components to Accept z-index Override
-
-Ensure the base UI components (`Sheet`, `Dialog`) can accept custom z-index via className without breaking.
-
----
+Implement the same expandable caption pattern used in the video fullscreen mode (`ImmersivePostCard.tsx`):
+1. Add `showFullCaption` state to control expansion
+2. Calculate `truncatedCaption` and `shouldTruncateCaption` 
+3. Show "more" button when caption is truncated
+4. Show "less" button when caption is expanded
+5. Expand to show full text when tapped
 
 ## Technical Implementation
 
-### File 1: `src/components/feed/PhotoPostSlide.tsx`
+### File: `src/components/feed/PhotoPostSlide.tsx`
 
-**Change 1** - Remove `!commentsOpen` from social buttons condition (lines ~395):
+**Change 1: Add state for caption expansion (around line 91)**
 ```typescript
-// Before
-{showUI && !commentsOpen && (
-
-// After
-{showUI && (
+// Add new state
+const [showFullCaption, setShowFullCaption] = useState(false);
 ```
 
-**Change 2** - Remove `!commentsOpen` from caption condition (lines ~379):
+**Change 2: Add caption truncation logic (after line 70)**
 ```typescript
-// Before
-{showUI && caption && !commentsOpen && (
+// Caption truncation - use 125 words limit for Photo+ posts (matching ImmersivePostCard)
+const countWords = (text: string) => text.trim().split(/\s+/).filter(w => w.length > 0).length;
+const wordCount = countWords(caption);
+const shouldTruncateCaption = wordCount > 125;
+const truncatedCaption = shouldTruncateCaption 
+  ? caption.trim().split(/\s+/).slice(0, 125).join(' ') + '...' 
+  : caption;
+```
 
-// After
+**Change 3: Replace caption display (lines 377-384)**
+
+Current code:
+```typescript
 {showUI && caption && (
+  <div className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200">
+    <p className="text-white text-sm line-clamp-3 drop-shadow-lg" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
+      {caption}
+    </p>
+  </div>
+)}
 ```
 
-### File 2: `src/components/feed/CommentsModal.tsx`
-
-Add z-index to SheetContent for proper layering inside lightbox:
+New code:
 ```typescript
-<SheetContent 
-  side="bottom" 
-  className="h-[85vh] p-0 rounded-t-3xl z-[250]"
->
+{showUI && caption && (
+  <div 
+    className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200"
+    onClick={(e) => e.stopPropagation()}
+  >
+    <p 
+      className={cn(
+        "text-white text-sm drop-shadow-lg leading-relaxed",
+        !showFullCaption && shouldTruncateCaption && "line-clamp-3"
+      )} 
+      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
+    >
+      {showFullCaption ? caption : truncatedCaption}
+    </p>
+    {shouldTruncateCaption && (
+      <button 
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowFullCaption(!showFullCaption);
+        }}
+        className="text-white/70 text-xs mt-1 font-medium hover:text-white transition"
+      >
+        {showFullCaption ? 'less' : 'more'}
+      </button>
+    )}
+  </div>
+)}
 ```
 
-### File 3: `src/components/feed/MobileShareSheet.tsx`
-
-Add z-index to SheetContent:
+**Change 4: Reset caption state when post changes (update existing useEffect around line 93-96)**
 ```typescript
-<SheetContent 
-  side="bottom" 
-  className="... z-[250]"
->
-```
-
-### File 4: `src/components/feed/GiftModal.tsx`
-
-Add z-index to DialogContent:
-```typescript
-<DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl z-[250]">
-```
-
-### File 5: `src/components/feed/RefeedModal.tsx`
-
-Add z-index to SheetContent:
-```typescript
-<SheetContent 
-  side="bottom" 
-  className="... z-[250]"
->
+useEffect(() => {
+  setCurrentImageIndex(initialImageIndex);
+  setShowFullCaption(false); // Reset caption expansion on post change
+}, [post.id, initialImageIndex]);
 ```
 
 ---
 
-## Files to Modify
+## Summary of Changes
 
-| File | Changes |
-|------|---------|
-| `src/components/feed/PhotoPostSlide.tsx` | Remove `!commentsOpen` conditions from social buttons and caption |
-| `src/components/feed/CommentsModal.tsx` | Add `z-[250]` to SheetContent |
-| `src/components/feed/MobileShareSheet.tsx` | Add `z-[250]` to SheetContent |
-| `src/components/feed/GiftModal.tsx` | Add `z-[250]` to DialogContent |
-| `src/components/feed/RefeedModal.tsx` | Add `z-[250]` to SheetContent |
+| Location | Change |
+|----------|--------|
+| Line ~91 | Add `showFullCaption` state |
+| After line 70 | Add `countWords`, `shouldTruncateCaption`, `truncatedCaption` |
+| Lines 377-384 | Replace static caption with expandable version |
+| Lines 93-96 | Reset `showFullCaption` when post changes |
 
----
-
-## Expected Outcome
-
-After these changes:
-- Social buttons will remain visible and accessible in Photo+ fullscreen mode
-- Tapping Comment button will open the comments sheet on top of the lightbox
-- Tapping Refeed/Quote button will show the refeed options
-- Tapping Gift button will open the gift modal properly
-- Tapping Share button will show the share sheet
-- All modals will appear above the fullscreen lightbox (z-[250] > z-[200])
-- Behavior will match the video-based fullscreen experience
-
+## Expected Result
+- Captions longer than 125 words will show truncated with "more" button
+- Tapping "more" reveals the full caption text
+- Tapping "less" collapses it back to truncated form
+- Caption expansion state resets when navigating to a different post
+- Matches the behavior of video fullscreen mode exactly
