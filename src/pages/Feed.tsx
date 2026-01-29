@@ -321,19 +321,19 @@ const Feed = () => {
       
       if (error) {
         console.error('Feed rotation error:', error);
-        // Fall back to old method
-        return await fetchFallbackPosts(userId);
+        // Fall back to old method - don't exclude user's own posts
+        return await fetchFallbackPosts();
       }
       
       if (!data || data.length === 0) {
-        return await fetchFallbackPosts(userId);
+        return await fetchFallbackPosts();
       }
       
       // Enrich with profile data
       return await enrichPostsWithProfiles(data);
     } catch (err) {
       console.error('Feed RPC error:', err);
-      return await fetchFallbackPosts(userId);
+      return await fetchFallbackPosts();
     }
   }, []);
 
