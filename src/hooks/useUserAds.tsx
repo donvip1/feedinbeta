@@ -136,21 +136,17 @@ export const useUserAds = () => {
 
       if (adError) throw adError;
 
-      // Deduct credits
-      const { error: deductError } = await supabase
-        .from('user_credits')
-        .update({ balance: currentBalance - params.budgetCredits })
-        .eq('user_id', user.id);
+      // Deduct credits via transaction (trigger handles balance update)
+      const { error: transactionError } = await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: user.id,
+          amount: -params.budgetCredits,
+          type: 'ad_promotion',
+          description: `Ad promotion: ${params.title}`,
+        });
 
-      if (deductError) throw deductError;
-
-      // Log transaction
-      await supabase.from('credit_transactions').insert({
-        user_id: user.id,
-        amount: -params.budgetCredits,
-        type: 'ad_promotion',
-        description: `Ad promotion: ${params.title}`,
-      });
+      if (transactionError) throw transactionError;
 
       toast({
         title: 'Ad created successfully!',
