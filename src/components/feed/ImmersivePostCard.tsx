@@ -231,6 +231,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const hasVideo = currentMediaType === 'video';
   const hasImage = currentMediaType === 'image';
   const hasMusic = !!post.music_url;
+  
+  // Determine if this is effectively a plain text post (no media at all) - needed for early function definitions
+  const isEffectivelyPlainText = isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled);
 
   const displayName = post.profiles?.display_name || post.profiles?.username || 'Anonymous';
   const username = post.profiles?.username || 'user';
@@ -461,6 +464,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     e.stopPropagation();
     e.preventDefault();
     
+    // Don't enter fullscreen for plain text posts - they should stay inline
+    if (isEffectivelyPlainText) {
+      return;
+    }
+    
     if (isImmersiveMode) {
       // In immersive mode, tap toggles UI visibility (not exit)
       toggleImmersiveUI();
@@ -627,8 +635,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   // Check if we need a footer section (caption, music, or promote button exists)
   const hasFooterContent = !isImmersiveMode && !isTextStyled && !isPlainText && (caption || hasMusic || (user && !isPromoted));
 
-  // Determine if this is effectively a plain text post (no media at all)
-  const isEffectivelyPlainText = isPlainText || (!currentMediaUrl && !hasVideo && !hasImage && !isTextStyled);
+  // isEffectivelyPlainText is already defined earlier (line 236) for use in callbacks
 
   // Photo+ layout: caption above image, horizontal social buttons below
   // Excludes plain text posts - they have inline social buttons
@@ -962,57 +969,118 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Plain text posts - Facebook-style simple text layout (no background, left-aligned buttons) */}
+          {/* Plain text posts - Facebook-style card layout with proper margins */}
           {isEffectivelyPlainText && (
-            <div 
-              className="w-full flex flex-col px-4 py-8"
-              style={{ touchAction: 'manipulation' }}
-              onClick={handleMediaTap}
-            >
-              <p className="text-foreground text-lg md:text-xl leading-relaxed break-words whitespace-pre-wrap">
-                {renderCaptionWithHashtags(caption)}
-              </p>
-              
-              {/* Social Buttons - left aligned, directly under content */}
-              <div className="flex items-center gap-4 mt-4">
-                <button onClick={handleLike} className="flex items-center gap-1.5 group">
-                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
-                  <span className="text-muted-foreground text-xs font-semibold">{formatCount(likesCount)}</span>
-                </button>
-                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                  <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-semibold">{formatCount(commentsCount)}</span>
-                </button>
-                <div className="flex items-center gap-1.5">
-                  <Eye className="w-5 h-5 text-muted-foreground" />
-                  <span className="text-muted-foreground text-xs font-semibold">{formatCount(post.views_count || 0)}</span>
+            <div className="w-full bg-card rounded-lg border border-border shadow-sm">
+              {/* Post Header - User info */}
+              <div className="flex items-center gap-3 p-4 pb-3">
+                <Avatar 
+                  className="w-10 h-10 cursor-pointer"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleProfileClick();
+                  }}
+                >
+                  <AvatarImage src={post.profiles?.avatar_url || ''} />
+                  <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className="font-semibold text-foreground text-sm cursor-pointer hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleProfileClick();
+                      }}
+                    >
+                      {displayName}
+                    </span>
+                    {user && user.id !== post.user_id && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFollow(e);
+                        }}
+                        disabled={isFollowLoading}
+                        className={cn(
+                          "font-semibold text-xs transition",
+                          isFollowing ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary/80",
+                          isFollowLoading && "opacity-50"
+                        )}
+                      >
+                        • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                    <span>@{post.profiles?.username || 'user'}</span>
+                    <span>•</span>
+                    <span>{formatCompactTime(post.created_at || '')}</span>
+                    {post.location && (
+                      <>
+                        <span>•</span>
+                        <MapPin className="w-3 h-3" />
+                        <span className="truncate max-w-[80px]">{post.location}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+              </div>
+              
+              {/* Text Content */}
+              <div className="px-4 pb-4">
+                <p className="text-foreground text-base leading-relaxed break-words whitespace-pre-wrap">
+                  {renderCaptionWithHashtags(caption)}
+                </p>
+              </div>
+              
+              {/* Divider */}
+              <div className="border-t border-border mx-4" />
+              
+              {/* Social Buttons Row - Facebook style, evenly spaced at bottom */}
+              <div className="flex items-center justify-between px-4 py-3">
+                <button onClick={handleLike} className="flex items-center gap-1.5 group flex-1 justify-center">
+                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
+                  <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
+                </button>
+                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group flex-1 justify-center">
+                  <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                  <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
+                </button>
+                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
                   <Repeat className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-semibold">{formatCount(refeedsCount)}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{formatCount(refeedsCount)}</span>
                 </button>
-                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
                   <Gift className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-semibold">{formatCount(giftsCount)}</span>
+                  <span className="text-muted-foreground text-xs font-medium">{formatCount(giftsCount)}</span>
                 </button>
-                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
+                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
                   <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
                 </button>
               </div>
               
-              {/* Promote Button - left aligned, AFTER social buttons */}
-              {user && !isPromoted && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
-                  }}
-                  className="flex items-center gap-1.5 mt-3 w-fit px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-lg"
-                >
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Promote</span>
-                </button>
-              )}
+              {/* Views count - subtle at bottom */}
+              <div className="flex items-center justify-between px-4 pb-3">
+                <div className="flex items-center gap-1">
+                  <Eye className="w-4 h-4 text-muted-foreground/60" />
+                  <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)} views</span>
+                </div>
+                
+                {/* Promote Button */}
+                {user && !isPromoted && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/promote/${post.id}`);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-sm"
+                  >
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span className="text-xs font-semibold">Promote</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
