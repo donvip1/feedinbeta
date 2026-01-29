@@ -7,11 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, Heart, Bell } from 'lucide-react';
 import { MessageSettingsSheet } from '@/components/messages/MessageSettingsSheet';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
 import { CreateGroupModal } from '@/components/groups/CreateGroupModal';
+import { TikTokStoriesBar } from '@/components/stories/TikTokStoriesBar';
 import { StoriesBar } from '@/components/stories/StoriesBar';
 import { UnreadBadge } from '@/components/shared/UnreadBadge';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -25,7 +26,9 @@ import { realtimeManager } from '@/lib/unified-realtime';
 import { SectionErrorBoundary } from '@/components/shared/SectionErrorBoundary';
 import { QueryErrorFallback } from '@/components/shared/QueryErrorFallback';
 import { MessagingTabs } from '@/components/messages/MessagingTabs';
+import { TikTokConversationItem } from '@/components/messages/TikTokConversationItem';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 interface Conversation {
   id: string;
@@ -506,12 +509,23 @@ export default function Messages() {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </div>
-            <h1 className={cn(
-              "text-xl font-bold",
-              secretMode && "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400"
-            )}>
-              {secretMode ? "Secret Mode" : "Messages"}
-            </h1>
+            
+            {/* TikTok-style Inbox title with online indicator */}
+            <div className="flex items-center gap-2">
+              <h1 className={cn(
+                "text-xl font-bold",
+                secretMode && "bg-clip-text text-transparent bg-gradient-to-r from-red-400 to-orange-400"
+              )}>
+                {secretMode ? "Secret Mode" : "Inbox"}
+              </h1>
+              {!secretMode && (
+                <div className="flex items-center gap-1">
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] text-muted-foreground">▼</span>
+                </div>
+              )}
+            </div>
+            
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -585,9 +599,67 @@ export default function Messages() {
         </div>
 
         <ScrollArea className="flex-1">
-          {/* Chats Content */}
+          {/* Chats Content with TikTok-style Stories at top */}
           {activeTab === 'chats' && (
-            <div className="m-0">
+            <div className="pb-20">
+              {/* TikTok-style Stories Bar at the top */}
+              <TikTokStoriesBar />
+              
+              {/* Activity Section */}
+              <div className="px-2 py-1">
+                <motion.button
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                  onClick={() => navigate('/friends')}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-accent/50 rounded-xl transition-colors group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-pink">
+                    <Users className="w-6 h-6 text-primary-foreground" />
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="font-semibold text-foreground">New followers</p>
+                    <p className="text-sm text-muted-foreground truncate">Check who followed you</p>
+                  </div>
+                </motion.button>
+                
+                <motion.button
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.05 }}
+                  onClick={() => navigate('/notification-history')}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-accent/50 rounded-xl transition-colors group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center shadow-pink">
+                    <Heart className="w-6 h-6 text-white fill-white" />
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="font-semibold text-foreground">Activity</p>
+                    <p className="text-sm text-muted-foreground truncate">Likes, comments & more</p>
+                  </div>
+                </motion.button>
+                
+                <motion.button
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  onClick={() => navigate('/notification-history')}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-accent/50 rounded-xl transition-colors group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-muted to-secondary flex items-center justify-center border border-border">
+                    <Bell className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <div className="flex-1 text-left min-w-0">
+                    <p className="font-semibold text-foreground">System notifications</p>
+                    <p className="text-sm text-muted-foreground truncate">Updates & announcements</p>
+                  </div>
+                </motion.button>
+                
+                {/* Divider */}
+                <div className="h-px bg-border/50 my-2 mx-3" />
+              </div>
+              
+              {/* Conversations List */}
               {loadError && conversations.length === 0 ? (
                 <div className="p-4">
                   <QueryErrorFallback 
@@ -597,11 +669,10 @@ export default function Messages() {
                   />
                 </div>
               ) : showSkeleton ? (
-                // Skeleton loading for instant perceived performance
-                <div className="space-y-1">
+                <div className="space-y-1 px-2">
                   {[1, 2, 3, 4, 5].map((i) => (
-                    <div key={i} className="w-full p-4 flex items-start gap-3">
-                      <Skeleton className="w-10 h-10 rounded-full" />
+                    <div key={i} className="w-full p-3 flex items-center gap-3">
+                      <Skeleton className="w-12 h-12 rounded-full" />
                       <div className="flex-1 space-y-2">
                         <Skeleton className="h-4 w-32" />
                         <Skeleton className="h-3 w-48" />
@@ -611,102 +682,63 @@ export default function Messages() {
                 </div>
               ) : filteredConversations.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                  <MessageSquarePlus className="w-12 h-12 mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">No conversations yet</p>
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-4">
+                    <MessageSquarePlus className="w-10 h-10 text-primary" />
+                  </div>
+                  <p className="text-foreground font-semibold mb-1">No conversations yet</p>
+                  <p className="text-muted-foreground text-sm mb-4">Start chatting with friends</p>
                   <Button
-                    variant="outline"
-                    className="mt-4"
                     onClick={() => setShowNewConversation(true)}
+                    className="bg-gradient-to-r from-primary to-accent text-white"
                   >
                     Start a conversation
                   </Button>
                 </div>
               ) : (
-                filteredConversations.map((conv) => (
-                  <button
-                    key={conv.id}
-                    onClick={() => {
-                      setSelectedConversationId(conv.id);
-                      // Mark messages as read locally and in database without reloading
-                      if (user && conv.unread_count != null && conv.unread_count > 0) {
-                        // Update local state immediately
-                        setConversations(prev => prev.map(c => 
-                          c.id === conv.id ? { ...c, unread_count: 0 } : c
-                        ));
-                        // Update database in background (no await)
-                        supabase
-                          .from('messages')
-                          .update({ is_read: true, read_at: new Date().toISOString() })
-                          .eq('conversation_id', conv.id)
-                          .neq('sender_id', user.id)
-                          .eq('is_read', false)
-                          .then(() => {});
+                <div className="px-2">
+                  {filteredConversations.map((conv, index) => (
+                    <TikTokConversationItem
+                      key={conv.id}
+                      id={conv.id}
+                      avatarUrl={conv.other_participant.avatar_url}
+                      displayName={conv.other_participant.display_name || 'Unknown User'}
+                      username={conv.other_participant.username}
+                      lastMessage={
+                        conv.last_message 
+                          ? `${conv.last_message.sender_id === user?.id ? 'You: ' : ''}${conv.last_message.content}`
+                          : undefined
                       }
-                    }}
-                    className={cn(
-                      "w-full p-4 flex items-start gap-3 transition-colors",
-                      selectedConversationId === conv.id 
-                        ? (secretMode ? "bg-slate-800" : "bg-accent")
-                        : (secretMode ? "hover:bg-slate-800/50" : "hover:bg-accent")
-                    )}
-                  >
-                    <div className="relative">
-                      <Avatar>
-                        <AvatarImage src={conv.other_participant.avatar_url || ''} />
-                        <AvatarFallback>
-                          {conv.other_participant.display_name?.[0] || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      {/* Online indicator */}
-                      {conv.isOnline && (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 rounded-full border-2 border-background" />
-                      )}
-                      {conv.unread_count != null && conv.unread_count > 0 ? (
-                        <UnreadBadge count={conv.unread_count} size="sm" />
-                      ) : null}
-                    </div>
-                    <div className="flex-1 text-left overflow-hidden">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold truncate">
-                            {conv.other_participant.display_name || 'Unknown User'}
-                          </p>
-                          {conv.isOnline && (
-                            <span className="text-[10px] text-emerald-500 font-medium">online</span>
-                          )}
-                        </div>
-                        {conv.last_message && (
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(conv.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        )}
-                      </div>
-                      {conv.isTyping ? (
-                        <div className="flex items-center gap-1.5 animate-pulse">
-                          <span className={getActivityColor(conv.activityType || 'typing')}>
-                            {getActivityIcon(conv.activityType || 'typing')}
-                          </span>
-                          <span className={`text-xs ${getActivityColor(conv.activityType || 'typing')}`}>
-                            {conv.activityType === 'typing' ? 'typing...' :
-                             conv.activityType === 'emoji' ? 'choosing emoji...' :
-                             conv.activityType === 'sticker' ? 'picking sticker...' :
-                             conv.activityType === 'voice_recording' ? 'recording voice...' :
-                             conv.activityType === 'uploading_image' ? 'sending image...' :
-                             conv.activityType === 'uploading_video' ? 'sending video...' :
-                             conv.activityType === 'uploading_file' ? 'sending file...' :
-                             conv.activityType === 'focused' ? 'composing...' :
-                             'typing...'}
-                          </span>
-                        </div>
-                      ) : conv.last_message ? (
-                        <p className={`text-sm truncate ${conv.unread_count != null && conv.unread_count > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-                          {conv.last_message.sender_id === user?.id ? 'You: ' : ''}
-                          {conv.last_message.content}
-                        </p>
-                      ) : null}
-                    </div>
-                  </button>
-                ))
+                      lastMessageTime={
+                        conv.last_message 
+                          ? new Date(conv.last_message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                          : undefined
+                      }
+                      lastMessageSenderId={conv.last_message?.sender_id}
+                      currentUserId={user?.id}
+                      unreadCount={conv.unread_count}
+                      isOnline={conv.isOnline}
+                      isTyping={conv.isTyping}
+                      activityType={conv.activityType}
+                      isSelected={selectedConversationId === conv.id}
+                      index={index}
+                      onClick={() => {
+                        setSelectedConversationId(conv.id);
+                        if (user && conv.unread_count != null && conv.unread_count > 0) {
+                          setConversations(prev => prev.map(c => 
+                            c.id === conv.id ? { ...c, unread_count: 0 } : c
+                          ));
+                          supabase
+                            .from('messages')
+                            .update({ is_read: true, read_at: new Date().toISOString() })
+                            .eq('conversation_id', conv.id)
+                            .neq('sender_id', user.id)
+                            .eq('is_read', false)
+                            .then(() => {});
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
               )}
             </div>
           )}

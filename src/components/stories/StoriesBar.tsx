@@ -149,12 +149,12 @@ export const StoriesBar = () => {
           {/* Add Story Button */}
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex-shrink-0 flex flex-col items-center gap-2"
+            className="flex-shrink-0 flex flex-col items-center gap-2 group"
           >
-            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-pink-500 to-blue-500 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-pink-500 via-rose-500 to-orange-400 flex items-center justify-center shadow-pink group-hover:shadow-glow transition-all">
               <Plus className="w-6 h-6 text-white" />
             </div>
-            <span className="text-xs text-muted-foreground">Add Story</span>
+            <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Add Story</span>
           </button>
 
           {/* User Stories */}

@@ -66,10 +66,12 @@ export default {
         "gradient-primary": "var(--gradient-primary)",
         "gradient-accent": "var(--gradient-accent)",
         "gradient-subtle": "var(--gradient-subtle)",
+        "gradient-story": "var(--gradient-story)",
       },
       boxShadow: {
         elegant: "var(--shadow-elegant)",
         glow: "var(--shadow-glow)",
+        pink: "var(--shadow-pink)",
       },
       borderRadius: {
         lg: "var(--radius)",
