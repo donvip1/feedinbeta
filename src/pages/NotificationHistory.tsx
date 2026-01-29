@@ -192,18 +192,27 @@ const NotificationHistory = () => {
       case 'mention':
         // For comments, replies, and mentions, go to the post with commentId to highlight the specific comment
         if (notification.related_id) {
-          // The related_id for comment notifications is the comment ID
-          // We need to first get the post_id from the comment
-          const { data: commentData } = await supabase
-            .from('post_comments')
-            .select('post_id')
-            .eq('id', notification.related_id)
-            .maybeSingle();
-          
-          if (commentData?.post_id) {
-            navigate(`/feed/post/${commentData.post_id}?commentId=${notification.related_id}`);
+          // Check if related_type is 'comment' (new format) or 'post' (old format)
+          if (notification.related_type === 'comment') {
+            // New format: related_id is the comment ID
+            const { data: commentData } = await supabase
+              .from('post_comments')
+              .select('post_id')
+              .eq('id', notification.related_id)
+              .maybeSingle();
+            
+            if (commentData?.post_id) {
+              navigate(`/feed/post/${commentData.post_id}?commentId=${notification.related_id}`);
+            } else {
+              // Comment may have been deleted
+              toast({
+                title: 'Comment not found',
+                description: 'This comment may have been deleted',
+                variant: 'destructive',
+              });
+            }
           } else {
-            // Fallback: try treating related_id as post_id
+            // Old format: related_id is the post ID - just go to post
             navigate(`/feed/post/${notification.related_id}`);
           }
         }
