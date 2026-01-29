@@ -7142,6 +7142,7 @@ export type Database = {
           balance: number
           created_at: string | null
           id: string
+          is_admin_minted: boolean | null
           total_earned: number
           total_spent: number
           updated_at: string | null
@@ -7151,6 +7152,7 @@ export type Database = {
           balance?: number
           created_at?: string | null
           id?: string
+          is_admin_minted?: boolean | null
           total_earned?: number
           total_spent?: number
           updated_at?: string | null
@@ -7160,6 +7162,7 @@ export type Database = {
           balance?: number
           created_at?: string | null
           id?: string
+          is_admin_minted?: boolean | null
           total_earned?: number
           total_spent?: number
           updated_at?: string | null
