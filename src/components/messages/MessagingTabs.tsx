@@ -28,7 +28,7 @@ export const MessagingTabs = ({
 }: MessagingTabsProps) => {
   return (
     <div className={cn(
-      "flex rounded-lg overflow-hidden transition-colors",
+      "flex rounded-xl overflow-hidden transition-colors",
       secretMode ? "bg-slate-800" : "bg-muted"
     )}>
       {tabs.map((tab) => (
@@ -52,8 +52,7 @@ export const MessagingTabs = ({
           {/* Unread Badge for Chats */}
           {tab.id === 'chats' && unreadCount > 0 && (
             <Badge 
-              variant="destructive" 
-              className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1"
+              className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white border-0"
             >
               {unreadCount > 99 ? '99+' : unreadCount}
             </Badge>
@@ -62,8 +61,7 @@ export const MessagingTabs = ({
           {/* Unread Badge for Groups */}
           {tab.id === 'groups' && groupUnreadCount > 0 && (
             <Badge 
-              variant="destructive" 
-              className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1"
+              className="h-4 min-w-[16px] flex items-center justify-center text-[10px] px-1 ml-1 bg-gradient-to-r from-pink-500 to-rose-500 text-white border-0"
             >
               {groupUnreadCount > 99 ? '99+' : groupUnreadCount}
             </Badge>
@@ -77,7 +75,7 @@ export const MessagingTabs = ({
                 "absolute bottom-0 left-0 right-0 h-0.5",
                 secretMode 
                   ? "bg-gradient-to-r from-red-500 to-orange-500" 
-                  : "bg-primary"
+                  : "bg-gradient-to-r from-primary to-accent"
               )}
               initial={false}
               transition={{ type: 'spring', stiffness: 500, damping: 30 }}
