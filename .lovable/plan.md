@@ -1,54 +1,135 @@
 
-## Fix Duplicate Text/Promote Button on Text-Only Posts
 
-### Problem Analysis
-The screenshot shows a text-only post "Greeting guys." appearing twice:
-1. First in a proper Facebook-style card layout with header, content, social buttons, and a Promote button
-2. A second time below with just the text and another Promote button (but no social buttons)
+# Fix Photo+ Fullscreen Social Buttons Not Working
 
-**Root Cause**: The footer section at lines 1628-1686 has the condition:
+## Problem Summary
+
+In the Photo+ fullscreen mode, social buttons (Comments, Refeed, Gift, Share) don't work properly:
+1. **Comments, Refeed, Gift, Share buttons don't show their modals** - they appear frozen/non-responsive
+2. **Buttons hide when tapped** instead of triggering their actions
+3. **Modals appear behind the lightbox** due to z-index conflicts
+
+## Root Cause Analysis
+
+### Issue 1: Z-Index Conflict
+- `ImageLightbox` uses `z-[200]` for its fullscreen container
+- Modal components (`Sheet`, `Dialog`) use `z-50` by default
+- When modals open, they render BEHIND the lightbox instead of on top
+
+### Issue 2: UI Toggle Interference  
+The social buttons row has condition `{showUI && !commentsOpen && (...)}` - when a modal opens, `showUI` might get toggled, causing buttons to disappear.
+
+## Solution
+
+### Part 1: Fix Modal Z-Index for Photo+ Fullscreen
+
+Update `PhotoPostSlide.tsx` to pass higher z-index classes to the modals so they appear above the lightbox (z-[200]):
+
+**CommentsModal**: Add `className` prop to SheetContent with `z-[250]`
+**MobileShareSheet**: Add `className` prop to SheetContent with `z-[250]`
+**GiftModal**: Add `className` prop to DialogContent with `z-[250]`
+**RefeedModal**: Add `className` prop to SheetContent with `z-[250]`
+
+### Part 2: Prevent Buttons From Hiding When Modals Open
+
+Update the social buttons visibility condition in `PhotoPostSlide.tsx` from:
 ```typescript
-!isImmersiveMode && !isTextStyled && !isPlainText && !isPhotoTextLayout
+{showUI && !commentsOpen && (
+```
+to:
+```typescript
+{showUI && (
 ```
 
-However, `isPlainText` only checks for `post.media_type === 'text_plain'`, while `isEffectivelyPlainText` is the broader condition that catches posts with NO media at all (null media_type). 
+The buttons should remain visible when modals are open since the modals have their own overlays.
 
-When a post has `media_type = null` and no media URL:
-- `isPlainText` = false (because it's not exactly 'text_plain')
-- `isEffectivelyPlainText` = true (because there's no media)
+### Part 3: Update Modal Components to Accept z-index Override
 
-This causes the footer section to still render, showing the caption and Promote button again.
+Ensure the base UI components (`Sheet`, `Dialog`) can accept custom z-index via className without breaking.
 
 ---
 
-### Solution
+## Technical Implementation
 
-Add `!isEffectivelyPlainText` to the footer section condition so it doesn't render for posts that already have their own self-contained card layout.
+### File 1: `src/components/feed/PhotoPostSlide.tsx`
 
-**File: `src/components/feed/ImmersivePostCard.tsx`**
-
-**Change at line 1629:**
+**Change 1** - Remove `!commentsOpen` from social buttons condition (lines ~395):
 ```typescript
-// BEFORE
-{!isImmersiveMode && !isTextStyled && !isPlainText && !isPhotoTextLayout && (
+// Before
+{showUI && !commentsOpen && (
 
-// AFTER  
-{!isImmersiveMode && !isTextStyled && !isPlainText && !isPhotoTextLayout && !isEffectivelyPlainText && (
+// After
+{showUI && (
 ```
 
-This ensures that:
-- Text-only posts render ONLY as a self-contained Facebook-style card
-- The footer section (caption + promote button) is skipped for text posts since they already have their own built-in footer
-- No more duplicate text or promote buttons
+**Change 2** - Remove `!commentsOpen` from caption condition (lines ~379):
+```typescript
+// Before
+{showUI && caption && !commentsOpen && (
+
+// After
+{showUI && caption && (
+```
+
+### File 2: `src/components/feed/CommentsModal.tsx`
+
+Add z-index to SheetContent for proper layering inside lightbox:
+```typescript
+<SheetContent 
+  side="bottom" 
+  className="h-[85vh] p-0 rounded-t-3xl z-[250]"
+>
+```
+
+### File 3: `src/components/feed/MobileShareSheet.tsx`
+
+Add z-index to SheetContent:
+```typescript
+<SheetContent 
+  side="bottom" 
+  className="... z-[250]"
+>
+```
+
+### File 4: `src/components/feed/GiftModal.tsx`
+
+Add z-index to DialogContent:
+```typescript
+<DialogContent className="max-w-md p-0 overflow-hidden rounded-2xl z-[250]">
+```
+
+### File 5: `src/components/feed/RefeedModal.tsx`
+
+Add z-index to SheetContent:
+```typescript
+<SheetContent 
+  side="bottom" 
+  className="... z-[250]"
+>
+```
 
 ---
 
-### Technical Details
+## Files to Modify
 
-| Condition | Current | After Fix |
-|-----------|---------|-----------|
-| `isEffectivelyPlainText` | Not checked in footer | Excluded from footer |
-| Footer renders for | Video posts only | Video posts only |
-| Text card self-contained | Yes (has its own promote) | Yes (no duplicate) |
+| File | Changes |
+|------|---------|
+| `src/components/feed/PhotoPostSlide.tsx` | Remove `!commentsOpen` conditions from social buttons and caption |
+| `src/components/feed/CommentsModal.tsx` | Add `z-[250]` to SheetContent |
+| `src/components/feed/MobileShareSheet.tsx` | Add `z-[250]` to SheetContent |
+| `src/components/feed/GiftModal.tsx` | Add `z-[250]` to DialogContent |
+| `src/components/feed/RefeedModal.tsx` | Add `z-[250]` to SheetContent |
 
-This is a single-line fix that resolves the duplicate rendering issue.
+---
+
+## Expected Outcome
+
+After these changes:
+- Social buttons will remain visible and accessible in Photo+ fullscreen mode
+- Tapping Comment button will open the comments sheet on top of the lightbox
+- Tapping Refeed/Quote button will show the refeed options
+- Tapping Gift button will open the gift modal properly
+- Tapping Share button will show the share sheet
+- All modals will appear above the fullscreen lightbox (z-[250] > z-[200])
+- Behavior will match the video-based fullscreen experience
+
