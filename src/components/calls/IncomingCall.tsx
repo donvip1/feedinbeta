@@ -299,7 +299,7 @@ export const IncomingCall = ({
 
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/3 left-1/3 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/3 right-1/3 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
       </div>
 
@@ -314,7 +314,7 @@ export const IncomingCall = ({
           )}
           <Avatar className="w-36 h-36 border-4 border-primary shadow-2xl shadow-primary/50 relative">
             <AvatarImage src={callerAvatar || ''} />
-            <AvatarFallback className="text-5xl bg-gradient-to-br from-purple-600 to-blue-600">
+            <AvatarFallback className="text-5xl bg-gradient-to-br from-pink-600 to-rose-600">
               {callerName[0] || 'U'}
             </AvatarFallback>
           </Avatar>

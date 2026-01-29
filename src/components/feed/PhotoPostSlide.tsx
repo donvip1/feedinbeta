@@ -418,7 +418,7 @@ export default function PhotoPostSlide({
                 {user && post.id && (
                   <button 
                     onClick={(e) => { e.stopPropagation(); navigate(`/promote/${post.id}`); }}
-                    className="px-2.5 py-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all active:scale-95 flex items-center gap-1"
+                    className="px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all active:scale-95 flex items-center gap-1"
                   >
                     <TrendingUp className="w-3.5 h-3.5 text-white" />
                     <span className="text-white text-[10px] font-semibold">Promote</span>

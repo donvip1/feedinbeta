@@ -172,7 +172,7 @@ export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = tru
               className={cn(
                 "shadow-lg gap-2",
                 isOwner 
-                  ? "bg-gradient-to-r from-primary to-purple-500 hover:from-primary/90 hover:to-purple-500/90 text-white shadow-primary/30"
+                  ? "bg-gradient-to-r from-primary to-pink-500 hover:from-primary/90 hover:to-pink-500/90 text-white shadow-primary/30"
                   : "bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white shadow-red-500/30"
               )}
             >
@@ -194,7 +194,7 @@ export const LiveStreamPreviewCard = ({ stream, onClick, isOwner, autoPlay = tru
             isLive ? "ring-red-500/50" : "ring-border"
           )}>
             <AvatarImage src={stream.profiles?.avatar_url || undefined} />
-            <AvatarFallback className="bg-gradient-to-br from-primary/50 to-purple-500/50">
+            <AvatarFallback className="bg-gradient-to-br from-primary/50 to-pink-500/50">
               {stream.profiles?.display_name?.[0] || 'U'}
             </AvatarFallback>
           </Avatar>

@@ -248,7 +248,7 @@ export const SpaceCard = ({ space, speakers = [], onClick, isOwner, isJoined, on
             "w-full mt-4 text-white border-0 shadow-lg transition-shadow",
             isJoined 
               ? "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-green-500/25 group-hover:shadow-green-500/40"
-              : "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 shadow-purple-500/25 group-hover:shadow-purple-500/40"
+              : "bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 shadow-pink-500/25 group-hover:shadow-pink-500/40"
           )}>
             <Mic className="w-4 h-4 mr-2" />
             {isJoined ? 'Rejoin Space' : 'Join Space'}

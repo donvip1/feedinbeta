@@ -631,7 +631,7 @@ const Call = () => {
 
   if (!callData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-pink-900 to-slate-900 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -641,7 +641,7 @@ const Call = () => {
   const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white flex flex-col relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-pink-900 to-slate-900 text-white flex flex-col relative overflow-hidden">
       {/* Hidden audio element for voice calls - with explicit attributes */}
       <audio 
         ref={remoteAudioRef} 
@@ -652,7 +652,7 @@ const Call = () => {
       
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
       </div>
 
@@ -746,7 +746,7 @@ const Call = () => {
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
                   <Avatar className="w-24 h-24 border-4 border-primary shadow-xl">
                     <AvatarImage src={otherUserProfile?.avatar_url || ''} />
-                    <AvatarFallback className="text-3xl bg-gradient-to-br from-purple-600 to-blue-600">
+                    <AvatarFallback className="text-3xl bg-gradient-to-br from-pink-600 to-rose-600">
                       {otherUserProfile?.display_name?.[0] || 'U'}
                     </AvatarFallback>
                   </Avatar>
@@ -848,7 +848,7 @@ const Call = () => {
               )}
               <Avatar className="w-40 h-40 border-8 border-primary/30 shadow-2xl shadow-primary/20 relative">
                 <AvatarImage src={otherUserProfile?.avatar_url || ''} />
-                <AvatarFallback className="text-5xl bg-gradient-to-br from-purple-600 to-blue-600">
+                <AvatarFallback className="text-5xl bg-gradient-to-br from-pink-600 to-rose-600">
                   {otherUserProfile?.display_name?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
