@@ -1,10 +1,10 @@
 import React from 'react';
-import { MessageSquare, Circle, Tv, Users } from 'lucide-react';
+import { MessageSquare, Tv, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MessagingTabsProps {
-  activeTab: 'chats' | 'groups' | 'stories' | 'live';
-  onTabChange: (tab: 'chats' | 'groups' | 'stories' | 'live') => void;
+  activeTab: 'chats' | 'groups' | 'live';
+  onTabChange: (tab: 'chats' | 'groups' | 'live') => void;
   unreadCount?: number;
   groupUnreadCount?: number;
   secretMode?: boolean;
@@ -13,7 +13,6 @@ interface MessagingTabsProps {
 const tabs = [
   { id: 'chats' as const, icon: MessageSquare, label: 'Chats' },
   { id: 'groups' as const, icon: Users, label: 'Groups' },
-  { id: 'stories' as const, icon: Circle, label: 'Stories' },
   { id: 'live' as const, icon: Tv, label: 'Live' },
 ];
 
@@ -25,7 +24,7 @@ export const MessagingTabs = ({
   secretMode = false,
 }: MessagingTabsProps) => {
   return (
-    <div className="flex items-center justify-between px-2">
+    <div className="flex items-center justify-around px-2">
       {tabs.map((tab) => (
         <button
           key={tab.id}
