@@ -372,20 +372,6 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           )}
         </AnimatePresence>
 
-        {/* Image Counter - positioned at bottom left */}
-        <AnimatePresence>
-          {showUI && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-24 left-4 z-20 px-2 py-1 bg-black/60 rounded-full text-white text-xs font-medium"
-            >
-              {currentImageIndex + 1} / {images.length}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
         {/* Caption - positioned above social buttons with expandable text */}
         {showUI && caption && (
           <div 
