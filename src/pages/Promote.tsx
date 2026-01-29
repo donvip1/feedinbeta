@@ -90,7 +90,7 @@ const promotionPlans: PromotionPlan[] = [
     duration: '3 days',
     features: ['Maximum visibility', 'Top For You placement', 'Trending page feature', 'Analytics dashboard'],
     icon: <Rocket className="w-6 h-6" />,
-    gradient: 'from-purple-500 to-pink-500',
+    gradient: 'from-pink-500 to-rose-500',
     popular: true,
   },
   {

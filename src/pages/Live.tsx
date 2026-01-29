@@ -411,7 +411,7 @@ const Live = () => {
           
           {/* Animated orbs */}
           <div className="absolute top-10 right-10 w-32 h-32 bg-primary/20 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-0 left-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute bottom-0 left-10 w-40 h-40 bg-pink-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
           
           <div className="relative container mx-auto px-4 py-8">
             <motion.div 
@@ -421,7 +421,7 @@ const Live = () => {
             >
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 via-pink-500 to-purple-600 flex items-center justify-center shadow-lg shadow-primary/25">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 via-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-primary/25">
                     <Radio className="w-7 h-7 text-white" />
                   </div>
                   {liveCount > 0 && (
@@ -478,14 +478,14 @@ const Live = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3 }}
-                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 p-4"
+                className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-pink-500/10 to-pink-600/5 border border-pink-500/20 p-4"
               >
                 <div className="flex items-center gap-2 mb-1">
-                  <Crown className="w-3 h-3 text-purple-400" />
-                  <span className="text-xs font-medium text-purple-400">YOUR CONTENT</span>
+                  <Crown className="w-3 h-3 text-pink-400" />
+                  <span className="text-xs font-medium text-pink-400">YOUR CONTENT</span>
                 </div>
                 <p className="text-2xl font-bold">{myContentCount}</p>
-                <Sparkles className="absolute right-2 bottom-2 w-8 h-8 text-purple-500/20" />
+                <Sparkles className="absolute right-2 bottom-2 w-8 h-8 text-pink-500/20" />
               </motion.div>
             </div>
           </div>

@@ -200,7 +200,7 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
           </div>
           
           <div className="relative flex flex-col items-center text-center">
-            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center mb-3 ${sending ? 'gift-pulse' : ''}`}>
+            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center mb-3 ${sending ? 'gift-pulse' : ''}`}>
               <Gift className="w-10 h-10 text-white" />
             </div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">

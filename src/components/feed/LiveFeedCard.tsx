@@ -48,7 +48,7 @@ export const LiveFeedCard = ({ item, onClick }: LiveFeedCardProps) => {
           "absolute inset-0",
           isSpace 
             ? "bg-gradient-to-br from-primary/20 via-accent/10 to-primary/20"
-            : "bg-gradient-to-br from-red-500/20 via-pink-500/10 to-purple-500/20"
+            : "bg-gradient-to-br from-red-500/20 via-pink-500/10 to-rose-500/20"
         )}>
           {/* Animated wave pattern for spaces */}
           {isSpace && (
