@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo, useCallback } from 'react';
-import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye, MoreHorizontal, X, MoreVertical } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Repeat, Gift, TrendingUp, Volume2, VolumeX, Play, Pause, Trash2, Music, Sparkles, Plus, Globe, Star, ArrowLeft, Eye, MoreHorizontal, X, MoreVertical, MapPin } from 'lucide-react';
 import { formatCompactTime } from '@/lib/format-time';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -1068,16 +1068,29 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     </button>
                   )}
                 </div>
-                <span 
-                  className="text-xs text-white/70 cursor-pointer hover:text-white/90 transition"
-                  style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleProfileClick();
-                  }}
-                >
-                  @{post.profiles?.username || 'user'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span 
+                    className="text-xs text-white/70 cursor-pointer hover:text-white/90 transition"
+                    style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProfileClick();
+                    }}
+                  >
+                    @{post.profiles?.username || 'user'}
+                  </span>
+                  {post.location && (
+                    <>
+                      <span className="text-white/50 text-xs">•</span>
+                      <div className="flex items-center gap-1 text-white/60">
+                        <MapPin className="w-3 h-3" />
+                        <span className="text-xs truncate max-w-[100px]" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                          {post.location}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
                 {/* Refeed/Quote indicator in immersive mode */}
                 {isRefeed && post.original_post && (
                   <div 
