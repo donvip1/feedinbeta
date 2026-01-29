@@ -53,9 +53,11 @@ export default function ImageLightbox({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showUI, setShowUI] = useState(true);
   const [activePostIdx, setActivePostIdx] = useState(currentPostIndex);
-  const [currentImageIdx, setCurrentImageIdx] = useState(activeIndex); // Track current image in single-post mode
+  const [currentImageIdx, setCurrentImageIdx] = useState(activeIndex);
   const isMultiPostMode = allPhotoPosts && allPhotoPosts.length > 0;
   const hasInitiallyScrolled = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScrollTop = useRef(0);
 
   // Lock body scroll when open
   useEffect(() => {
@@ -70,36 +72,53 @@ export default function ImageLightbox({
     setActivePostIdx(currentPostIndex);
   }, [currentPostIndex]);
 
-  // Scroll to active post on mount (instant) and on change (smooth)
+  // Scroll to active post on mount (instant)
   useEffect(() => {
     if (!isMultiPostMode || !scrollContainerRef.current) return;
     
     const container = scrollContainerRef.current;
     const targetScroll = activePostIdx * container.clientHeight;
     
-    // Use instant scroll on initial mount, smooth scroll after
+    // Only use instant scroll on initial mount
     if (!hasInitiallyScrolled.current) {
       container.scrollTo({ top: targetScroll, behavior: 'instant' });
       hasInitiallyScrolled.current = true;
-    } else {
-      container.scrollTo({ top: targetScroll, behavior: 'smooth' });
     }
   }, [activePostIdx, isMultiPostMode]);
 
-  // Handle scroll snap to detect post changes
+  // Throttled scroll handler - only update index when scroll settles
   const handleScroll = useCallback(() => {
     if (!isMultiPostMode || !scrollContainerRef.current || !allPhotoPosts) return;
     
-    const container = scrollContainerRef.current;
-    const scrollTop = container.scrollTop;
-    const itemHeight = container.clientHeight;
-    const newIndex = Math.round(scrollTop / itemHeight);
-    
-    if (newIndex !== activePostIdx && newIndex >= 0 && newIndex < allPhotoPosts.length) {
-      setActivePostIdx(newIndex);
-      onPostChange?.(newIndex);
+    // Clear any pending timeout
+    if (scrollTimeoutRef.current) {
+      clearTimeout(scrollTimeoutRef.current);
     }
+    
+    // Debounce: only calculate after scroll stops for 100ms
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      
+      const scrollTop = container.scrollTop;
+      const itemHeight = container.clientHeight;
+      const newIndex = Math.round(scrollTop / itemHeight);
+      
+      if (newIndex !== activePostIdx && newIndex >= 0 && newIndex < allPhotoPosts.length) {
+        setActivePostIdx(newIndex);
+        onPostChange?.(newIndex);
+      }
+    }, 100);
   }, [activePostIdx, allPhotoPosts, isMultiPostMode, onPostChange]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Keyboard navigation
   useEffect(() => {
@@ -168,7 +187,7 @@ export default function ImageLightbox({
             )}
           </AnimatePresence>
 
-          {/* Vertical Scroll Container - Smooth free-flowing scroll like normal (no snap) */}
+          {/* Vertical Scroll Container - GPU-accelerated smooth scrolling */}
           <div
             ref={scrollContainerRef}
             onScroll={handleScroll}
@@ -177,13 +196,21 @@ export default function ImageLightbox({
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
               WebkitOverflowScrolling: 'touch',
-              overscrollBehavior: 'contain'
+              overscrollBehavior: 'contain',
+              transform: 'translate3d(0,0,0)',
+              willChange: 'scroll-position',
+              backfaceVisibility: 'hidden'
             }}
           >
             {postsToRender.map(({ post, idx, shouldRender }) => (
               <div
                 key={post.id}
                 className="h-[100dvh] w-full"
+                style={{
+                  transform: 'translate3d(0,0,0)',
+                  backfaceVisibility: 'hidden',
+                  willChange: idx === activePostIdx ? 'transform' : 'auto'
+                }}
               >
                 {shouldRender ? (
                   <PhotoPostSlide
