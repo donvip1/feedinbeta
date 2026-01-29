@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Repeat, Gift, Eye, TrendingUp, Globe, Lock } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Repeat, Gift, Eye, TrendingUp, Globe, Lock, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
@@ -32,6 +32,7 @@ export interface PhotoPost {
   views_count: number | null;
   created_at?: string;
   visibility?: string | null;
+  location?: string | null;
   profiles?: {
     username: string | null;
     display_name: string | null;
@@ -309,6 +310,15 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
                         <Globe className="w-3 h-3" />
                       ) : (
                         <Lock className="w-3 h-3" />
+                      )}
+                      {post.location && (
+                        <>
+                          <span>•</span>
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />
+                            <span className="truncate max-w-[100px]">{post.location}</span>
+                          </div>
+                        </>
                       )}
                     </div>
                   </div>

@@ -9,12 +9,12 @@ interface FeedAd {
   media_url: string;
   media_type: string | null;
   click_url: string | null;
-  target_gender: string | null;
+  target_genders: string[] | null;
   target_age_min: number | null;
   target_age_max: number | null;
   target_interests: string[] | null;
-  target_locations: string[] | null;
-  priority: number | null;
+  target_countries: string[] | null;
+  target_cities: string[] | null;
   daily_budget_credits: number | null;
   spent_credits: number | null;
   impressions: number | null;
@@ -34,7 +34,6 @@ export const useFeedAds = () => {
         .eq('is_active', true)
         .eq('approval_status', 'approved')
         .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
-        .order('priority', { ascending: false })
         .order('impressions', { ascending: true }) // Show less-viewed ads first
         .limit(10);
 
