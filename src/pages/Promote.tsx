@@ -240,7 +240,7 @@ const Promote = () => {
         p_post_id: postId,
         p_plan_name: plan.name,
         p_cost: plan.cost,
-        p_original_author_id: originalAuthorId,
+        p_original_author_id: originalAuthorId || undefined,
       });
 
       if (error) throw error;
