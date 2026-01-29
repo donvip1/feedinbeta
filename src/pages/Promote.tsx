@@ -323,7 +323,10 @@ const Promote = () => {
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
-              onClick={() => navigate(-1)}
+              onClick={() => {
+                // Navigate back to the specific post to maintain context
+                navigate(`/feed/post/${postId}`, { replace: true });
+              }}
               variant="ghost"
               size="icon"
               className="text-muted-foreground hover:text-foreground"

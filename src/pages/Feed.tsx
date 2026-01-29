@@ -634,6 +634,11 @@ const Feed = () => {
   };
 
   const handleCreatePost = () => {
+    // Pause all videos when opening post creation
+    const videos = document.querySelectorAll('video');
+    videos.forEach(video => {
+      video.pause();
+    });
     setPostStep('selector');
   };
 

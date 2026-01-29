@@ -143,6 +143,7 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
   }, []);
 
   const handleSubmit = async () => {
+    // Allow text-only posts - only require text OR images (not both)
     if (!text.trim() && images.length === 0) {
       toast({
         title: 'Empty post',
