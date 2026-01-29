@@ -7075,6 +7075,7 @@ export type Database = {
           last_purchase_at: string | null
           total_credits_purchased: number | null
           total_credits_spent: number | null
+          total_promotions: number | null
           total_subscriptions: number | null
           updated_at: string | null
           user_id: string | null
@@ -7085,6 +7086,7 @@ export type Database = {
           last_purchase_at?: string | null
           total_credits_purchased?: number | null
           total_credits_spent?: number | null
+          total_promotions?: number | null
           total_subscriptions?: number | null
           updated_at?: string | null
           user_id?: string | null
@@ -7095,6 +7097,7 @@ export type Database = {
           last_purchase_at?: string | null
           total_credits_purchased?: number | null
           total_credits_spent?: number | null
+          total_promotions?: number | null
           total_subscriptions?: number | null
           updated_at?: string | null
           user_id?: string | null
