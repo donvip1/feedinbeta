@@ -1626,7 +1626,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         )}
 
         {/* --- FOOTER SECTION: Caption, Music, Promote (Below Media) - For Video layout only --- */}
-        {!isImmersiveMode && !isTextStyled && !isPlainText && !isPhotoTextLayout && (
+        {!isImmersiveMode && !isTextStyled && !isPlainText && !isPhotoTextLayout && !isEffectivelyPlainText && (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
