@@ -180,7 +180,7 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md p-0 overflow-hidden bg-background/95 backdrop-blur-xl border-primary/20">
+      <DialogContent className="max-w-md p-0 overflow-hidden bg-background/95 backdrop-blur-xl border-primary/20 z-[250]">
         {/* Floating Animated Emojis */}
         {floatingEmojis.map(({ id, giftId, x }) => (
           <div

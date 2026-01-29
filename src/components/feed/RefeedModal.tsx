@@ -148,7 +148,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
   if (showQuoteComposer) {
     return (
       <Sheet open={isOpen} onOpenChange={resetAndClose}>
-        <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-3xl">
+        <SheetContent side="bottom" className="h-[85vh] p-0 rounded-t-3xl z-[250]">
           <div className="flex flex-col h-full">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -232,7 +232,7 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
 
   return (
     <Sheet open={isOpen} onOpenChange={resetAndClose}>
-      <SheetContent side="bottom" className="h-auto rounded-t-3xl p-0 pb-8">
+      <SheetContent side="bottom" className="h-auto rounded-t-3xl p-0 pb-8 z-[250]">
         <div className="w-12 h-1 bg-muted-foreground/30 rounded-full mx-auto mt-3 mb-4" />
         <div className="space-y-1 px-4">
           <Button

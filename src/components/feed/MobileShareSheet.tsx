@@ -297,7 +297,7 @@ export default function MobileShareSheet({
   if (view === 'friends') {
     return (
       <Sheet open={isOpen} onOpenChange={() => setView('main')}>
-        <SheetContent side="bottom" className="h-[70vh] p-0 flex flex-col rounded-t-3xl">
+        <SheetContent side="bottom" className="h-[70vh] p-0 flex flex-col rounded-t-3xl z-[250]">
           <div className="flex items-center justify-between p-4 border-b">
             <button onClick={() => setView('main')} className="p-2 -ml-2 text-muted-foreground">
               <X className="w-5 h-5" />
@@ -347,7 +347,7 @@ export default function MobileShareSheet({
   if (view === 'groups') {
     return (
       <Sheet open={isOpen} onOpenChange={() => setView('main')}>
-        <SheetContent side="bottom" className="h-[70vh] p-0 flex flex-col rounded-t-3xl">
+        <SheetContent side="bottom" className="h-[70vh] p-0 flex flex-col rounded-t-3xl z-[250]">
           <div className="flex items-center justify-between p-4 border-b">
             <button onClick={() => setView('main')} className="p-2 -ml-2 text-muted-foreground">
               <X className="w-5 h-5" />
@@ -396,7 +396,7 @@ export default function MobileShareSheet({
   // Main share sheet - WhatsApp/Telegram style
   return (
     <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="bottom" className="h-auto rounded-t-3xl p-0 pb-safe">
+      <SheetContent side="bottom" className="h-auto rounded-t-3xl p-0 pb-safe z-[250]">
         {/* Handle bar */}
         <div className="flex justify-center pt-3 pb-2">
           <div className="w-10 h-1 bg-muted-foreground/30 rounded-full" />
