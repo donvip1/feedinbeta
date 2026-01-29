@@ -5865,7 +5865,7 @@ export type Database = {
           created_at: string | null
           deleted_at: string | null
           deleted_by: string | null
-          feed_id: string
+          feed_id: string | null
           gifts_count: number | null
           has_blur_background: boolean | null
           id: string
@@ -5904,7 +5904,7 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
-          feed_id: string
+          feed_id?: string | null
           gifts_count?: number | null
           has_blur_background?: boolean | null
           id?: string
@@ -5943,7 +5943,7 @@ export type Database = {
           created_at?: string | null
           deleted_at?: string | null
           deleted_by?: string | null
-          feed_id?: string
+          feed_id?: string | null
           gifts_count?: number | null
           has_blur_background?: boolean | null
           id?: string

@@ -1550,6 +1550,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           onInteractionEnd?.();
         }}
         postId={post.id}
+        post={{
+          id: post.id,
+          content: post.content,
+          media_url: currentMediaUrl || post.media_url,
+          media_type: post.media_type,
+          media_urls: post.media_urls,
+          media_types: post.media_types,
+          profiles: post.profiles
+        }}
         onRefeedAdded={() => {
           setRefeedsCount(prev => prev + 1);
           onLikeUpdate?.();

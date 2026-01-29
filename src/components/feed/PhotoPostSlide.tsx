@@ -475,6 +475,14 @@ export default function PhotoPostSlide({
         isOpen={refeedOpen}
         onClose={() => setRefeedOpen(false)}
         postId={post.id}
+        post={{
+          id: post.id,
+          content: post.content,
+          media_url: images[currentImageIndex] || post.media_url,
+          media_type: 'image',
+          media_urls: post.media_urls,
+          profiles: post.profiles
+        }}
         onRefeedAdded={() => setRefeedsCount(prev => prev + 1)}
       />
     </div>
