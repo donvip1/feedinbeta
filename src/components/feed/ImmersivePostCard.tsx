@@ -658,7 +658,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         onTouchEnd={handleTouchEnd}
       >
         {/* --- TOP SECTION: User Info (NOT overlayed) - Hidden in immersive mode and for plain text posts (they have their own header) --- */}
-        {!isImmersiveMode && !isEffectivelyPlainText && (
+        {/* Video posts keep dark background header */}
+        {!isImmersiveMode && !isEffectivelyPlainText && !isPhotoTextLayout && (
           <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
             <div className="flex items-start justify-between">
               <div className="flex gap-3 flex-1">
@@ -780,11 +781,102 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </div>
               </div>
             )}
+          </div>
+        )}
 
-            {/* Photo+ Layout: Caption ABOVE the image */}
-            {isPhotoTextLayout && caption && !isEffectivelyPlainText && (
-              <div className="mt-3 px-1">
-                <p className="text-white text-sm leading-snug break-words">
+        {/* --- Photo+ Facebook-style Card Layout: Header + Caption + Image + Social Buttons --- */}
+        {!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (
+          <div className="flex-shrink-0 bg-card rounded-t-lg border-x border-t border-border mt-14 mx-2">
+            {/* Post Header - User info */}
+            <div className="flex items-center gap-3 p-4 pb-3">
+              <Avatar 
+                className="w-10 h-10 cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleProfileClick();
+                }}
+              >
+                <AvatarImage src={post.profiles?.avatar_url || ''} />
+                <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span 
+                    className="font-semibold text-foreground text-sm cursor-pointer hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleProfileClick();
+                    }}
+                  >
+                    {displayName}
+                  </span>
+                  {user && user.id !== post.user_id && (
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFollow(e);
+                      }}
+                      disabled={isFollowLoading}
+                      className={cn(
+                        "font-semibold text-xs transition",
+                        isFollowing ? "text-muted-foreground hover:text-foreground" : "text-primary hover:text-primary/80",
+                        isFollowLoading && "opacity-50"
+                      )}
+                    >
+                      • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                  <span>@{post.profiles?.username || 'user'}</span>
+                  <span>•</span>
+                  <span>{formatCompactTime(post.created_at || '')}</span>
+                  {post.location && (
+                    <>
+                      <span>•</span>
+                      <MapPin className="w-3 h-3" />
+                      <span className="truncate max-w-[80px]">{post.location}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              {/* Three-dots menu */}
+              {canDeletePost && (
+                <div className="relative">
+                  <button 
+                    onClick={() => setShowMoreActions(!showMoreActions)}
+                    className="p-2 rounded-full transition-all active:scale-95 hover:bg-muted"
+                  >
+                    <MoreVertical className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                  {showMoreActions && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowMoreActions(false)}
+                      />
+                      <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 min-w-[120px] overflow-hidden">
+                        <button
+                          onClick={() => {
+                            setShowMoreActions(false);
+                            setShowDeleteDialog(true);
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Caption - BEFORE the image */}
+            {caption && (
+              <div className="px-4 pb-3">
+                <p className="text-foreground text-sm leading-relaxed break-words whitespace-pre-wrap">
                   {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
                 </p>
                 {shouldTruncateCaption && (
@@ -798,6 +890,31 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     {showFullCaption ? 'less' : 'more'}
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Refeed/Quote indicator */}
+            {isRefeed && post.original_post && (
+              <div 
+                className="flex items-center gap-2 mx-4 mb-3 px-2 py-1.5 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/feed/post/${post.original_post.id}`);
+                }}
+              >
+                <Repeat className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                <span className="text-xs text-muted-foreground">Refeed from</span>
+                <div className="flex items-center gap-1.5">
+                  <Avatar className="w-4 h-4">
+                    <AvatarImage src={post.original_post.profiles?.avatar_url || ''} />
+                    <AvatarFallback className="text-[8px] bg-primary text-white">
+                      {post.original_post.profiles?.display_name?.[0]?.toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-xs font-medium text-foreground truncate max-w-[100px]">
+                    {post.original_post.profiles?.display_name || post.original_post.profiles?.username || 'User'}
+                  </span>
+                </div>
               </div>
             )}
           </div>
@@ -849,11 +966,11 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Image - Different layouts for Photo+ vs Video posts */}
           {hasImage && currentMediaUrl && (
             <>
-              {/* Photo+ Layout: Thumbnail carousel with horizontal scroll */}
+              {/* Photo+ Layout: Multi-image grid within card */}
               {isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? (
-                <div className="w-full px-1 mb-2">
-                  {/* Side-by-side grid for 2 images - tight to social buttons */}
-                  <div className="flex gap-1">
+                <div className="w-full bg-card border-x border-border mx-2 px-3 py-2">
+                  {/* Side-by-side grid for 2 images */}
+                  <div className="flex gap-2">
                     {mediaUrls.slice(0, 2).map((url, idx) => (
                       <div 
                         key={idx} 
@@ -881,7 +998,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   </div>
                   {/* Show indicator if more than 2 images */}
                   {mediaUrls.length > 2 && (
-                    <div className="flex justify-center gap-1.5 mt-1.5">
+                    <div className="flex justify-center gap-1.5 mt-2">
                       {mediaUrls.map((_, idx) => (
                         <button
                           key={idx}
@@ -900,10 +1017,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   )}
                 </div>
               ) : isPhotoTextLayout && !hasMultipleMedia && !isImmersiveMode ? (
-                /* Single image in Photo+ - Natural aspect ratio */
-                <div className="w-full px-1">
+                /* Single image in Photo+ within card */
+                <div className="w-full bg-card border-x border-border mx-2 px-3 py-2">
                   <div
-                    className="relative rounded-xl overflow-hidden border border-border cursor-pointer hover:brightness-95 transition-all"
+                    className="relative rounded-lg overflow-hidden border border-border cursor-pointer hover:brightness-95 transition-all"
                     onClick={(e) => {
                       e.stopPropagation();
                       setLightboxIndex(0);
@@ -914,7 +1031,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                       src={currentMediaUrl}
                       alt="Post media"
                       className="w-full object-cover transition-opacity duration-300"
-                      style={{ maxHeight: '60vh' }}
+                      style={{ maxHeight: '50vh' }}
                       onLoad={() => setIsMediaLoaded(true)}
                       onContextMenu={(e) => e.preventDefault()}
                       draggable={false}
@@ -922,7 +1039,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   </div>
                 </div>
               ) : (
-                /* Default single image display for video tab or single-image Photo+ */
+                /* Default single image display for video tab or immersive mode */
                 <>
                   <img
                     src={currentMediaUrl}
@@ -1532,60 +1649,66 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           </motion.div>
         )}
 
-        {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout - tight to content, 8px gap --- */}
+        {/* --- FOOTER SECTION: Horizontal Social Buttons for Photo+ Layout - Facebook-style card footer --- */}
         {!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (
-          <div className="flex-shrink-0 px-3 pt-2 pb-0">
-            {/* All buttons in one row including Promote */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+          <div className="flex-shrink-0 bg-card border-x border-b border-border rounded-b-lg mx-2">
+            {/* Divider line */}
+            <div className="border-t border-border mx-3" />
+            
+            {/* Social buttons row */}
+            <div className="flex items-center justify-between px-3 py-2.5">
+              <div className="flex items-center gap-4">
                 {/* Like */}
-                <button onClick={handleLike} className="flex items-center gap-1 group">
-                  <Heart className={cn("w-[18px] h-[18px] transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
-                  <span className="text-muted-foreground text-[11px] font-medium">{formatCount(likesCount)}</span>
+                <button onClick={handleLike} className="flex items-center gap-1.5 group">
+                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
+                  <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
                 </button>
                 
                 {/* Comments */}
-                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1 group">
-                  <MessageCircle className="w-[18px] h-[18px] text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-[11px] font-medium">{formatCount(commentsCount)}</span>
+                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
+                  <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                  <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
                 </button>
                 
                 {/* Refeed */}
-                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1 group">
-                  <Repeat className="w-[18px] h-[18px] text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-[11px] font-medium">{formatCount(refeedsCount)}</span>
+                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                  <Repeat className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                  <span className="text-muted-foreground text-xs font-medium">{formatCount(refeedsCount)}</span>
                 </button>
-                
-                {/* Views */}
-                <div className="flex items-center gap-1">
-                  <Eye className="w-[18px] h-[18px] text-muted-foreground" />
-                  <span className="text-muted-foreground text-[11px] font-medium">{formatCount(post.views_count || 0)}</span>
-                </div>
 
                 {/* Gift */}
-                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="group">
-                  <Gift className="w-[18px] h-[18px] text-muted-foreground transition-transform group-active:scale-90" />
+                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                  <Gift className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
                 </button>
                 
                 {/* Share */}
-                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="group">
-                  <Share2 className="w-[18px] h-[18px] text-muted-foreground transition-transform group-active:scale-90" />
+                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                  <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
                 </button>
               </div>
 
-              {/* Promote Button - on same line, show for all non-promoted posts */}
-              {user && isPromoted !== true && (
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
-                  }}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95"
-                >
-                  <TrendingUp className="w-3.5 h-3.5" />
-                  <span className="text-[10px] font-semibold">Promote</span>
-                </button>
-              )}
+              {/* Views + Promote */}
+              <div className="flex items-center gap-3">
+                {/* Views */}
+                <div className="flex items-center gap-1">
+                  <Eye className="w-4 h-4 text-muted-foreground/60" />
+                  <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)}</span>
+                </div>
+
+                {/* Promote Button */}
+                {user && isPromoted !== true && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/promote/${post.id}`);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95"
+                  >
+                    <TrendingUp className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-semibold">Promote</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         )}
