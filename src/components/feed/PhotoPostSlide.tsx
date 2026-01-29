@@ -392,31 +392,63 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               <div className="flex items-center justify-between">
                 {/* Social buttons group */}
                 <div className="flex items-center gap-3">
-                  <button onClick={handleLike} className="flex items-center gap-1 group">
+                  {/* Like */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleLike(e); }} 
+                    className="flex items-center gap-1 group touch-manipulation"
+                    type="button"
+                    aria-label="Like post"
+                  >
                     <Heart className={cn("w-[18px] h-[18px] transition-transform active:scale-90", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
                     <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(likesCount)}</span>
                   </button>
 
-                  <button onClick={(e) => { e.stopPropagation(); setCommentsOpen(true); }} className="flex items-center gap-1 group">
+                  {/* Comment */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); setCommentsOpen(true); }} 
+                    className="flex items-center gap-1 group touch-manipulation"
+                    type="button"
+                    aria-label="View comments"
+                  >
                     <MessageCircle className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
                     <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(commentsCount)}</span>
                   </button>
 
-                  <button onClick={(e) => { e.stopPropagation(); setRefeedOpen(true); }} className="flex items-center gap-1 group">
+                  {/* Refeed */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); setRefeedOpen(true); }} 
+                    className="flex items-center gap-1 group touch-manipulation"
+                    type="button"
+                    aria-label="Refeed post"
+                  >
                     <Repeat className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
                     <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(refeedsCount)}</span>
                   </button>
 
-                  <div className="flex items-center gap-1">
+                  {/* Views */}
+                  <div className="flex items-center gap-1" aria-label="View count">
                     <Eye className="w-[18px] h-[18px] text-white" />
                     <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(post.views_count || 0)}</span>
                   </div>
 
-                  <button onClick={(e) => { e.stopPropagation(); setGiftOpen(true); }} className="group">
+                  {/* Gift */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); setGiftOpen(true); }} 
+                    className="flex items-center gap-1 group touch-manipulation"
+                    type="button"
+                    aria-label="Send gift"
+                  >
                     <Gift className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
+                    <span className="text-white text-[11px] font-medium drop-shadow-lg">{formatCount(giftsCount)}</span>
                   </button>
 
-                  <button onClick={(e) => { e.stopPropagation(); setShareOpen(true); }} className="group">
+                  {/* Share */}
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); setShareOpen(true); }} 
+                    className="group touch-manipulation"
+                    type="button"
+                    aria-label="Share post"
+                  >
                     <Share2 className="w-[18px] h-[18px] text-white active:scale-90 transition-transform" />
                   </button>
                 </div>
@@ -424,8 +456,10 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
                 {/* Promote button - on same line, smaller */}
                 {user && post.id && (
                   <button 
-                    onClick={(e) => { e.stopPropagation(); navigate(`/promote/${post.id}`); }}
-                    className="px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all active:scale-95 flex items-center gap-1"
+                    onClick={(e) => { e.stopPropagation(); e.preventDefault(); navigate(`/promote/${post.id}`); }}
+                    className="px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all active:scale-95 flex items-center gap-1 touch-manipulation"
+                    type="button"
+                    aria-label="Promote post"
                   >
                     <TrendingUp className="w-3.5 h-3.5 text-white" />
                     <span className="text-white text-[10px] font-semibold">Promote</span>
