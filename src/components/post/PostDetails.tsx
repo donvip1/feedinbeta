@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Globe, Users, UserCheck, Lock, Loader2, MapPin, X, Calendar, Clock, CheckCircle2, Music, Play, Pause, Disc3, ArrowLeft, FileText } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +50,44 @@ export default function PostDetails({ media, onSubmit, onClose, onBack }: PostDe
   const [showMusicUploader, setShowMusicUploader] = useState(false);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Auto-detect location on component mount
+  useEffect(() => {
+    if (!location) {
+      detectLocationSilently();
+    }
+  }, []);
+
+  // Silent location detection (no error toasts, auto-runs on mount)
+  const detectLocationSilently = async () => {
+    if (!('geolocation' in navigator)) return;
+    
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          
+          if (data.display_name) {
+            const locationName = data.address?.city || data.address?.town || data.address?.village || data.display_name;
+            setLocation(locationName);
+          }
+        } catch (error) {
+          console.warn('Geocoding error:', error);
+        }
+        setDetectingLocation(false);
+      },
+      (error) => {
+        console.warn('Auto-location error:', error);
+        setDetectingLocation(false);
+      },
+      { timeout: 10000, maximumAge: 300000 }
+    );
+  };
 
   const toggleMusicPreview = () => {
     if (!selectedMusic || !musicAudioRef.current) return;

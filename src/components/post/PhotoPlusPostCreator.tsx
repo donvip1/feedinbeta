@@ -55,6 +55,44 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
     fetchProfile();
   }, [user]);
 
+  // Auto-detect location on component mount
+  useEffect(() => {
+    if (open && !location) {
+      detectLocationSilently();
+    }
+  }, [open]);
+
+  // Silent location detection (no error toasts)
+  const detectLocationSilently = async () => {
+    if (!('geolocation' in navigator)) return;
+    
+    setDetectingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          
+          if (data.display_name) {
+            const locationName = data.address?.city || data.address?.town || data.address?.village || data.display_name;
+            setLocation(locationName);
+          }
+        } catch (error) {
+          console.warn('Geocoding error:', error);
+        }
+        setDetectingLocation(false);
+      },
+      (error) => {
+        console.warn('Auto-location error:', error);
+        setDetectingLocation(false);
+      },
+      { timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   // Location detection
   const detectLocation = async () => {
     setDetectingLocation(true);
@@ -193,8 +231,8 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
         ? `${text.trim()}\n\n${hashtags.trim()}`
         : text.trim();
 
-      // Determine media_type
-      let mediaType: string = 'text_plain';
+      // Determine media_type - allow null for text-only posts
+      let mediaType: string | null = null;
       if (images.length > 0) {
         mediaType = 'image';
       }
