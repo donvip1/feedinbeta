@@ -657,8 +657,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* --- TOP SECTION: User Info (NOT overlayed) - Hidden in immersive mode --- */}
-        {!isImmersiveMode && (
+        {/* --- TOP SECTION: User Info (NOT overlayed) - Hidden in immersive mode and for plain text posts (they have their own header) --- */}
+        {!isImmersiveMode && !isEffectivelyPlainText && (
           <div className="flex-shrink-0 bg-black/95 px-4 pt-16 pb-3 z-20">
             <div className="flex items-start justify-between">
               <div className="flex gap-3 flex-1">
@@ -971,7 +971,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* Plain text posts - Facebook-style card layout with proper margins */}
           {isEffectivelyPlainText && (
-            <div className="w-full bg-card rounded-lg border border-border shadow-sm">
+            <div className="w-full bg-card rounded-lg border border-border shadow-sm mt-14 mx-auto max-w-[430px]">
               {/* Post Header - User info */}
               <div className="flex items-center gap-3 p-4 pb-3">
                 <Avatar 
@@ -1277,8 +1277,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Caption, Music, and Promote moved to footer section below media */}
 
           {/* --- RIGHT SIDEBAR: Social Buttons (with collapsible "more" for long captions) --- */}
-          {/* Hide for plain text posts and Photo+ layout - they have their own horizontal layout */}
-          {!isPlainText && !isPhotoTextLayout && (!isImmersiveMode || showImmersiveUI) && (() => {
+          {/* Hide for plain text posts (effectively plain text) and Photo+ layout - they have their own horizontal layout */}
+          {!isEffectivelyPlainText && !isPhotoTextLayout && (!isImmersiveMode || showImmersiveUI) && (() => {
             // For videos: always show only 3 buttons (Like, Comment, Gift) by default
             // Views, Refeed, Share hidden under "more" toggle for videos
             const shouldCollapseForVideo = isVideoPost;
