@@ -362,12 +362,31 @@ const Feed = () => {
       return [];
     }
 
+    // Get promoter profiles for promoted posts
+    const promoterIds = feedData
+      .filter(p => p.is_promoted && p.promoter_id)
+      .map(p => p.promoter_id);
+    
+    let promoterMap = new Map<string, string>();
+    if (promoterIds.length > 0) {
+      const { data: promoters } = await supabase
+        .from('profiles')
+        .select('id, display_name, username')
+        .in('id', promoterIds);
+      
+      promoterMap = new Map(
+        (promoters || []).map(p => [p.id, p.display_name || p.username || 'Unknown'])
+      );
+    }
+
     // Create maps for ordering and metadata
     const postMap = new Map(fullPosts.map(p => [p.id, p]));
     const metaMap = new Map(feedData.map(p => [p.id, { 
       is_promoted: p.is_promoted, 
       is_new_post: p.is_new_post,
-      relevance_score: p.relevance_score || 0
+      relevance_score: p.relevance_score || 0,
+      boost_level: p.boost_level || null,
+      promoter_id: p.promoter_id || null
     }]));
     
     // Return posts in the order from the feed function
@@ -376,13 +395,14 @@ const Feed = () => {
       .filter(Boolean)
       .map(post => {
         const meta = metaMap.get(post!.id);
+        const promoterName = meta?.promoter_id ? promoterMap.get(meta.promoter_id) : null;
         return {
           ...post!,
           _isPromoted: meta?.is_promoted || false,
           _isNewPost: meta?.is_new_post || false,
           _relevanceScore: meta?.relevance_score || 0,
-          _boostLevel: null,
-          _promoterName: null
+          _boostLevel: meta?.boost_level || null,
+          _promoterName: promoterName || null
         };
       });
 

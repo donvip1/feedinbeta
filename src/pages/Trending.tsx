@@ -38,16 +38,32 @@ const TrendingContent = () => {
 
   const loadTrending = useCallback(async () => {
     try {
-      // Get active promotions
+      // Get active promotions with promoter info
       const { data: promotions } = await supabase
         .from('post_promotions')
-        .select('post_id, boost_level')
+        .select('post_id, boost_level, user_id')
         .eq('is_active', true)
         .gt('expires_at', new Date().toISOString());
 
       const promotedPostIds = new Set(promotions?.map(p => p.post_id) || []);
-      const promotionLevels: Record<string, string> = {};
-      promotions?.forEach(p => { promotionLevels[p.post_id] = p.boost_level; });
+      const promotionData: Record<string, { boost_level: string; promoter_id: string }> = {};
+      promotions?.forEach(p => { 
+        promotionData[p.post_id] = { 
+          boost_level: p.boost_level, 
+          promoter_id: p.user_id 
+        }; 
+      });
+
+      // Get promoter names
+      const promoterIds = [...new Set(promotions?.map(p => p.user_id) || [])];
+      let promoterMap = new Map<string, string>();
+      if (promoterIds.length > 0) {
+        const { data: promoters } = await supabase
+          .from('profiles')
+          .select('id, display_name, username')
+          .in('id', promoterIds);
+        promoterMap = new Map((promoters || []).map(p => [p.id, p.display_name || p.username || 'Unknown']));
+      }
 
       const { data, error } = await supabase
         .from('posts')
@@ -66,28 +82,40 @@ const TrendingContent = () => {
 
       if (error) throw error;
       
-      const allPosts = data || [];
+      const allPosts = (data || []).map(post => ({
+        ...post,
+        _isPromoted: promotedPostIds.has(post.id),
+        _boostLevel: promotionData[post.id]?.boost_level || null,
+        _promoterName: promotionData[post.id]?.promoter_id 
+          ? promoterMap.get(promotionData[post.id].promoter_id) || null 
+          : null
+      }));
       
       // Separate unviewed and viewed (for prioritization, not exclusion)
       const unviewedPosts = allPosts.filter(p => !viewedPostIds.includes(p.id));
       const viewedPosts = allPosts.filter(p => viewedPostIds.includes(p.id));
 
-      // Get promoted posts (always first)
-      const promotedUnviewed = unviewedPosts.filter(p => promotedPostIds.has(p.id));
-      const promotedViewed = viewedPosts.filter(p => promotedPostIds.has(p.id));
-      const regularUnviewed = unviewedPosts.filter(p => !promotedPostIds.has(p.id));
-      const regularViewed = viewedPosts.filter(p => !promotedPostIds.has(p.id));
+      // Get promoted posts (always first) - ULTIMATE PRIORITY
+      const promotedUnviewed = unviewedPosts.filter(p => p._isPromoted);
+      const promotedViewed = viewedPosts.filter(p => p._isPromoted);
+      const regularUnviewed = unviewedPosts.filter(p => !p._isPromoted);
+      const regularViewed = viewedPosts.filter(p => !p._isPromoted);
 
-      // Sort promoted by boost level
+      // Sort promoted by boost level (higher boost = higher priority)
+      const getBoostPriority = (boostLevel: string | null) => {
+        if (!boostLevel) return 1;
+        if (boostLevel.toLowerCase().includes('elite')) return 5;
+        if (boostLevel.toLowerCase().includes('premium')) return 4;
+        if (boostLevel.toLowerCase().includes('pro')) return 3;
+        if (boostLevel.toLowerCase().includes('basic')) return 2;
+        return 1;
+      };
+      
       const sortByBoost = (posts: typeof allPosts) => {
-        return posts.sort((a, b) => {
-          const aBoost = promotionLevels[a.id] === 'premium' ? 3 : promotionLevels[a.id] === 'standard' ? 2 : 1;
-          const bBoost = promotionLevels[b.id] === 'premium' ? 3 : promotionLevels[b.id] === 'standard' ? 2 : 1;
-          return bBoost - aBoost;
-        });
+        return posts.sort((a, b) => getBoostPriority(b._boostLevel) - getBoostPriority(a._boostLevel));
       };
 
-      // Build final list: promoted first, then randomized unviewed, then randomized viewed
+      // Build final list: promoted first (by boost level), then randomized unviewed, then randomized viewed
       // Each session gets a different random order (TikTok-style)
       const finalPosts = [
         ...sortByBoost(promotedUnviewed),
@@ -144,6 +172,8 @@ const TrendingContent = () => {
             key={post.id} 
             post={post}
             isPromoted={post._isPromoted || post._isSponsored || false}
+            promoterName={post._promoterName}
+            boostLevel={post._boostLevel}
             onView={() => markAsViewed(post.id)}
           />
         ))

@@ -1171,11 +1171,25 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
           {/* Promoted/Sponsored Badge - prominent indicator for boosted content */}
           {isPromoted === true && (!isImmersiveMode || showImmersiveUI) && (
-            <div className="absolute top-4 left-4 z-10 animate-pulse-slow">
-              <Badge className="bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 shadow-lg border border-white/20">
+            <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+              <Badge className="bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 backdrop-blur-md text-white text-xs font-bold px-3 py-1.5 shadow-lg border border-white/20 animate-pulse-slow">
                 <Sparkles className="w-3.5 h-3.5 mr-1.5 animate-pulse" />
                 Sponsored
               </Badge>
+              {(boostLevel || promoterName) && (
+                <div className="flex flex-wrap gap-1">
+                  {boostLevel && (
+                    <Badge variant="secondary" className="bg-black/40 backdrop-blur-sm text-white/90 text-[10px] px-2 py-0.5 border border-white/10">
+                      {boostLevel}
+                    </Badge>
+                  )}
+                  {promoterName && (
+                    <Badge variant="secondary" className="bg-black/40 backdrop-blur-sm text-white/90 text-[10px] px-2 py-0.5 border border-white/10">
+                      by {promoterName}
+                    </Badge>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
