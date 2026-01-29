@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, memo } from 'react';
 import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Repeat, Gift, Eye, TrendingUp, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
@@ -50,7 +50,7 @@ interface PhotoPostSlideProps {
   onImageIndexChange?: (index: number) => void;
 }
 
-export default function PhotoPostSlide({
+const PhotoPostSlide = memo(function PhotoPostSlide({
   post,
   isActive,
   showUI,
@@ -221,7 +221,14 @@ export default function PhotoPostSlide({
   const postTime = post.created_at ? formatCompactTime(post.created_at) : '';
 
   return (
-    <div className="w-full h-full flex flex-col relative">
+    <div 
+      className="w-full h-full flex flex-col relative"
+      style={{
+        transform: 'translate3d(0,0,0)',
+        backfaceVisibility: 'hidden',
+        willChange: 'transform'
+      }}
+    >
       {/* Image Container - Full height with proper sizing like TikTok */}
       <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
         <motion.div
@@ -487,4 +494,6 @@ export default function PhotoPostSlide({
       />
     </div>
   );
-}
+});
+
+export default PhotoPostSlide;
