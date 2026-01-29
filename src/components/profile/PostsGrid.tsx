@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { Play, Trash2, Eye, ExternalLink } from 'lucide-react';
@@ -33,15 +33,23 @@ interface PostsGridProps {
   userId: string;
 }
 
+// Threshold in pixels - if touch moves more than this, it's a scroll not a tap
+const TAP_THRESHOLD = 10;
+
 export const PostsGrid = ({ userId }: PostsGridProps) => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletePostId, setDeletePostId] = useState<string | null>(null);
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
   
   const isOwnProfile = user?.id === userId;
+  
+  // Touch tracking refs
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isTapRef = useRef(false);
 
   useEffect(() => {
     loadPosts();
@@ -69,7 +77,6 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
     if (!deletePostId || !user) return;
 
     try {
-      // Update post status to deleted and track deletion metadata
       const { error } = await supabase
         .from('posts')
         .update({ 
@@ -78,11 +85,10 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
           deleted_by: user.id
         })
         .eq('id', deletePostId)
-        .eq('user_id', user.id); // Ensure user can only delete their own posts
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
-      // Remove from local state
       setPosts(posts.filter(p => p.id !== deletePostId));
       
       toast({
@@ -100,6 +106,42 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
       setDeletePostId(null);
     }
   };
+
+  // Touch handlers for tap detection
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    isTapRef.current = true;
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+    
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+    
+    // If moved more than threshold, it's a scroll not a tap
+    if (deltaX > TAP_THRESHOLD || deltaY > TAP_THRESHOLD) {
+      isTapRef.current = false;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback((postId: string) => {
+    if (isTapRef.current && touchStartRef.current) {
+      // It was a tap, open the menu
+      setOpenMenuPostId(postId);
+    }
+    touchStartRef.current = null;
+    isTapRef.current = false;
+  }, []);
+
+  // For mouse clicks (desktop), always open menu
+  const handleClick = useCallback((e: React.MouseEvent, postId: string) => {
+    // Prevent if it was a touch event (handled by touch handlers)
+    if (touchStartRef.current !== null) return;
+    setOpenMenuPostId(postId);
+  }, []);
 
   if (loading) {
     return (
@@ -123,10 +165,20 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
     <>
       <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 max-h-[480px] overflow-y-auto rounded-lg border border-border p-2 bg-card/30">
         {posts.map((post) => (
-          <DropdownMenu key={post.id}>
+          <DropdownMenu 
+            key={post.id} 
+            open={openMenuPostId === post.id}
+            onOpenChange={(open) => {
+              if (!open) setOpenMenuPostId(null);
+            }}
+          >
             <DropdownMenuTrigger asChild>
               <div
                 className="aspect-square bg-muted rounded-lg cursor-pointer hover:opacity-90 transition relative overflow-hidden group"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={() => handleTouchEnd(post.id)}
+                onClick={(e) => handleClick(e, post.id)}
               >
                 {post.media_url && post.media_type === 'image' && (
                   <img 
@@ -164,7 +216,7 @@ export const PostsGrid = ({ userId }: PostsGridProps) => {
                 )}
 
                 {/* Hover overlay */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors pointer-events-none" />
               </div>
             </DropdownMenuTrigger>
             <DropdownMenuContent 
