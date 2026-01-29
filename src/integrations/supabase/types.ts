@@ -8152,6 +8152,37 @@ export type Database = {
       get_feed_with_rotation:
         | {
             Args: {
+              p_feed_type: string
+              p_limit: number
+              p_media_filter: string
+              p_offset: number
+              p_session_id: string
+              p_user_id: string
+            }
+            Returns: {
+              comments_count: number
+              content: string
+              created_at: string
+              is_new_post: boolean
+              is_own_post: boolean
+              is_promoted: boolean
+              likes_count: number
+              location: string
+              media_type: string
+              media_types: string[]
+              media_url: string
+              media_urls: string[]
+              original_post_id: string
+              post_id: string
+              post_type: string
+              refeeds_count: number
+              relevance_score: number
+              user_id: string
+              views_count: number
+            }[]
+          }
+        | {
+            Args: {
               p_feed_type?: string
               p_limit?: number
               p_media_filter?: string
