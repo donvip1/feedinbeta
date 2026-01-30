@@ -8817,7 +8817,7 @@ export type Database = {
               p_gift_type: string
               p_recipient_identifier: string
             }
-            Returns: Json
+            Returns: string
           }
       send_gift:
         | {
@@ -8836,6 +8836,15 @@ export type Database = {
               p_recipient_id: string
             }
             Returns: undefined
+          }
+        | {
+            Args: {
+              p_conversation_id?: string
+              p_credit_value: number
+              p_gift_type: string
+              p_recipient_id: string
+            }
+            Returns: string
           }
       send_live_gift: {
         Args: {
