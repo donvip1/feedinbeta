@@ -1,104 +1,179 @@
 
-# Add Expandable Caption to Photo+ Fullscreen Mode
+# Plan: Carousel Image Display for Photo+ Posts
 
-## Problem
-In the Photo+ fullscreen mode, posts with lengthy captions only show a fraction of the text (limited to 3 lines via `line-clamp-3`). There's no way to read the full caption - users need a "show more/show less" toggle.
+## Overview
+This plan transforms how Photo+ posts with 2 images are displayed. Instead of showing both images side-by-side, we will display one image at a time with slider navigation controls. Additionally, the caption in normal mode will be limited to a configurable number of lines with "more/less" toggle functionality.
 
-## Solution
-Implement the same expandable caption pattern used in the video fullscreen mode (`ImmersivePostCard.tsx`):
-1. Add `showFullCaption` state to control expansion
-2. Calculate `truncatedCaption` and `shouldTruncateCaption` 
-3. Show "more" button when caption is truncated
-4. Show "less" button when caption is expanded
-5. Expand to show full text when tapped
+---
+
+## Current Behavior
+- **Photo+ Post Creator**: Supports up to 2 images selected via two separate picker cards
+- **Normal Mode Display**: Shows 2 images in a side-by-side grid (`flex gap-2`)
+- **Fullscreen Mode**: Uses `PhotoPostSlide.tsx` with horizontal swipe navigation between images and left/right arrow buttons
+- **Caption**: Currently truncates by word count (125 words) in normal mode, but does not limit by lines
+
+---
+
+## Proposed Changes
+
+### 1. Image Display in Normal Mode (ImmersivePostCard.tsx)
+**Location**: Lines 972-1020
+
+**Current**: Side-by-side grid with `flex gap-2` showing both images at once
+**New**: Single image carousel with:
+- Dot indicators at the bottom showing current position (1/2)
+- Left/right arrow buttons (hidden on mobile, visible on hover for desktop)
+- Horizontal swipe gesture support to navigate between images
+- Smooth transition animation when switching images
+
+### 2. Caption Line Limiting in Normal Mode
+**Location**: Lines 627-633 and 876-892
+
+**Current**: Truncates by word count (125 words for Photo+ posts)
+**New**: 
+- Limit caption display to 3 lines maximum initially
+- Use CSS `line-clamp-3` for the truncated state
+- Add "more" button that expands to show full caption
+- "less" button to collapse back to 3 lines
+
+### 3. Fullscreen Mode (PhotoPostSlide.tsx)
+**Status**: Already supports swipe navigation and arrow buttons
+**Enhancement**: Ensure consistency with normal mode indicators
+
+---
 
 ## Technical Implementation
 
-### File: `src/components/feed/PhotoPostSlide.tsx`
+### File 1: `src/components/feed/ImmersivePostCard.tsx`
 
-**Change 1: Add state for caption expansion (around line 91)**
-```typescript
-// Add new state
-const [showFullCaption, setShowFullCaption] = useState(false);
+#### A. Replace Side-by-Side Grid with Carousel (Lines 972-1020)
+- Replace the `flex gap-2` grid with a single image container
+- Add carousel state management using existing `currentMediaIndex` state
+- Add navigation arrows and dot indicators
+- Implement swipe gesture handling using existing touch handlers
+
+#### B. Update Caption Truncation Logic (Lines 627-633)
+- Change from word-count truncation to line-based truncation
+- Use CSS `line-clamp-3` class for visual truncation
+- Keep the "more/less" toggle functionality
+
+#### C. Update Caption Display (Lines 876-892)
+- Apply `line-clamp-3` when `showFullCaption` is false
+- Ensure smooth expansion/collapse animation
+
+### File 2: `src/components/feed/PhotoPostSlide.tsx`
+- No major changes needed - already has image navigation
+- Ensure consistency with normal mode's dot indicators style
+
+### File 3: `src/components/post/PhotoPlusPostCreator.tsx`
+- No changes needed to posting method - already supports 2 images
+- The `media_urls` array storage works correctly for carousel display
+
+---
+
+## UI/UX Details
+
+### Carousel Controls (Normal Mode)
+```
++----------------------------------+
+|                                  |
+|         [Single Image]           |
+|                                  |
+|   <                          >   |  <- Arrow buttons (hover/tap)
+|                                  |
+|            ● ○                   |  <- Dot indicators
++----------------------------------+
 ```
 
-**Change 2: Add caption truncation logic (after line 70)**
-```typescript
-// Caption truncation - use 125 words limit for Photo+ posts (matching ImmersivePostCard)
-const countWords = (text: string) => text.trim().split(/\s+/).filter(w => w.length > 0).length;
-const wordCount = countWords(caption);
-const shouldTruncateCaption = wordCount > 125;
-const truncatedCaption = shouldTruncateCaption 
-  ? caption.trim().split(/\s+/).slice(0, 125).join(' ') + '...' 
-  : caption;
+### Caption with Line Limit
 ```
+This is a longer caption that spans
+multiple lines and needs to be
+truncated after three lines...
+[more]
 
-**Change 3: Replace caption display (lines 377-384)**
+--- After clicking "more" ---
 
-Current code:
-```typescript
-{showUI && caption && (
-  <div className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200">
-    <p className="text-white text-sm line-clamp-3 drop-shadow-lg" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}>
-      {caption}
-    </p>
-  </div>
-)}
-```
-
-New code:
-```typescript
-{showUI && caption && (
-  <div 
-    className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200"
-    onClick={(e) => e.stopPropagation()}
-  >
-    <p 
-      className={cn(
-        "text-white text-sm drop-shadow-lg leading-relaxed",
-        !showFullCaption && shouldTruncateCaption && "line-clamp-3"
-      )} 
-      style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
-    >
-      {showFullCaption ? caption : truncatedCaption}
-    </p>
-    {shouldTruncateCaption && (
-      <button 
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowFullCaption(!showFullCaption);
-        }}
-        className="text-white/70 text-xs mt-1 font-medium hover:text-white transition"
-      >
-        {showFullCaption ? 'less' : 'more'}
-      </button>
-    )}
-  </div>
-)}
-```
-
-**Change 4: Reset caption state when post changes (update existing useEffect around line 93-96)**
-```typescript
-useEffect(() => {
-  setCurrentImageIndex(initialImageIndex);
-  setShowFullCaption(false); // Reset caption expansion on post change
-}, [post.id, initialImageIndex]);
+This is a longer caption that spans
+multiple lines and needs to be
+truncated after three lines. But now
+you can see the entire caption with
+all the hashtags and mentions.
+[less]
 ```
 
 ---
 
-## Summary of Changes
+## Implementation Sequence
 
-| Location | Change |
-|----------|--------|
-| Line ~91 | Add `showFullCaption` state |
-| After line 70 | Add `countWords`, `shouldTruncateCaption`, `truncatedCaption` |
-| Lines 377-384 | Replace static caption with expandable version |
-| Lines 93-96 | Reset `showFullCaption` when post changes |
+1. **Update ImmersivePostCard.tsx - Image Carousel**
+   - Replace side-by-side grid (lines 972-1020) with carousel component
+   - Add dot indicators below the image
+   - Add navigation arrows with proper touch handling
 
-## Expected Result
-- Captions longer than 125 words will show truncated with "more" button
-- Tapping "more" reveals the full caption text
-- Tapping "less" collapses it back to truncated form
-- Caption expansion state resets when navigating to a different post
-- Matches the behavior of video fullscreen mode exactly
+2. **Update ImmersivePostCard.tsx - Caption Line Limit**
+   - Modify truncation logic to use line-clamp
+   - Update the caption rendering section
+
+3. **Test End-to-End**
+   - Verify carousel works in normal mode
+   - Verify swipe navigation in fullscreen mode
+   - Verify caption expand/collapse
+   - Test on mobile and desktop
+
+---
+
+## Technical Details
+
+### Carousel State Management
+```typescript
+// Already exists in ImmersivePostCard
+const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
+
+// Navigation functions (already exist)
+const handleSwipe = () => { /* swipe logic */ };
+const handleTouchStart = (e: React.TouchEvent) => { /* ... */ };
+const handleTouchEnd = (e: React.TouchEvent) => { /* ... */ };
+```
+
+### CSS Line Clamp
+```css
+/* Already available via Tailwind */
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+```
+
+### Dot Indicators Component
+```tsx
+{hasMultipleMedia && (
+  <div className="flex justify-center gap-2 mt-3">
+    {mediaUrls.map((_, idx) => (
+      <button
+        key={idx}
+        onClick={() => setCurrentMediaIndex(idx)}
+        className={cn(
+          "w-2 h-2 rounded-full transition-all",
+          idx === currentMediaIndex 
+            ? "bg-primary w-4" 
+            : "bg-muted-foreground/40"
+        )}
+      />
+    ))}
+  </div>
+)}
+```
+
+---
+
+## Files to Modify
+1. `src/components/feed/ImmersivePostCard.tsx` - Main changes for carousel and caption
+2. `src/components/feed/PhotoPostSlide.tsx` - Minor updates for consistency (if needed)
+
+## No Changes Required
+- `src/components/post/PhotoPlusPostCreator.tsx` - Posting method already works correctly
+- `src/components/feed/ImageLightbox.tsx` - Already supports multi-image navigation
+- Database schema - No changes needed
