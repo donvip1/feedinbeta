@@ -1,95 +1,68 @@
 
+# Plan: Fix Missing `gifts` Table - Allow Admin to Send Gifts
 
-# Plan: Remove Carousel Dot Indicators from Photo+ Posts
+## Problem Identified
 
-## Summary
+The error message **"relation 'gifts' does not exist"** is causing gift sending to fail for **everyone**, including the admin.
 
-Remove the carousel dot indicators (vertical short lines/dots) that appear in the top-right corner and below images in the Photo+ section of normal mode posts. Users will navigate between multiple images using only the swipe arrow buttons.
+The `send_gift` RPC function is trying to insert into a table called `gifts`:
 
-## Current Indicators to Remove
-
-There are **3 sets of dot indicators** in the codebase:
-
-### 1. Normal Mode - Image Counter Badge (Top Right)
-**File**: `src/components/feed/ImmersivePostCard.tsx`  
-**Lines 1010-1013**: Shows "1/3" style counter
-```tsx
-{/* Image counter indicator at top-right */}
-<div className="absolute top-2 right-2 px-2 py-0.5 bg-black/60 rounded-full text-white text-[10px] font-medium">
-  {currentMediaIndex + 1}/{mediaUrls.length}
-</div>
+```sql
+INSERT INTO gifts (sender_id, receiver_id, post_id, gift_type, credit_value, platform_fee, creator_amount)
+VALUES (v_sender_id, v_receiver_id, p_post_id, p_gift_type, p_credit_value, v_platform_fee, v_creator_amount)
+RETURNING id INTO v_gift_id;
 ```
 
-### 2. Normal Mode - Dot Indicators Below Image
-**File**: `src/components/feed/ImmersivePostCard.tsx`  
-**Lines 1039-1056**: Horizontal dots below image carousel
-```tsx
-{/* Dot indicators below image */}
-<div className="flex justify-center gap-2 mt-3">
-  {mediaUrls.map((_, idx) => (
-    <button ... />
-  ))}
-</div>
+**But this table does not exist!** The existing gift-related tables are:
+- `gift_analytics` (the correct table to use)
+- `live_stream_gifts`
+- `live_space_gifts`
+- `gift_appreciation_options`
+
+## Solution
+
+Update the `send_gift` function to:
+1. **Use `gift_analytics` table** instead of the non-existent `gifts` table
+2. **Include `source_type`** column which is required (NOT NULL) in `gift_analytics`
+3. **Map columns correctly** to match the `gift_analytics` schema
+
+### Current `gift_analytics` Schema
+| Column | Type | Required |
+|--------|------|----------|
+| id | uuid | YES |
+| sender_id | uuid | NO |
+| receiver_id | uuid | YES |
+| gift_type | text | YES |
+| credit_value | integer | YES |
+| source_type | text | YES |
+| source_id | uuid | NO |
+| platform_fee | integer | NO |
+| created_at | timestamptz | NO |
+| is_converted | boolean | NO |
+
+## Database Changes
+
+### Fix the `send_gift` Function
+
+Replace the INSERT statement to use the correct table:
+
+```sql
+-- Change FROM:
+INSERT INTO gifts (sender_id, receiver_id, post_id, gift_type, credit_value, platform_fee, creator_amount)
+VALUES (...)
+
+-- Change TO:
+INSERT INTO gift_analytics (sender_id, receiver_id, gift_type, credit_value, source_type, source_id, platform_fee, is_converted)
+VALUES (v_sender_id, v_receiver_id, p_gift_type, p_credit_value, 'post', p_post_id, v_platform_fee, false)
+RETURNING id INTO v_gift_id;
 ```
-
-### 3. Immersive/Video Mode - Multiple Media Indicator (Top Right)
-**File**: `src/components/feed/ImmersivePostCard.tsx`  
-**Lines 1267-1280**: Dot indicators at top-right in immersive mode
-```tsx
-{/* Multiple Media Indicator */}
-{hasMultipleMedia && (
-  <div className="absolute top-4 right-16 flex gap-1.5 z-10">
-    {mediaUrls.map((_, idx) => (
-      <div ... />
-    ))}
-  </div>
-)}
-```
-
-### 4. Fullscreen Mode - Dot Indicators (PhotoPostSlide)
-**File**: `src/components/feed/PhotoPostSlide.tsx`  
-**Lines 358-378**: Dot indicators in fullscreen photo view
-```tsx
-{/* Dot Indicators - above caption overlay */}
-{images.length > 1 && (
-  <div className="absolute bottom-[100px] left-0 right-0 flex justify-center gap-2 z-20">
-    ...
-  </div>
-)}
-```
-
-## What Will Remain
-
-The **navigation arrow buttons** will remain intact (lines 1017-1036 in ImmersivePostCard.tsx):
-- Left arrow: Previous image
-- Right arrow: Next image
-
-Users can still swipe/tap the arrows to navigate between images.
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `src/components/feed/ImmersivePostCard.tsx` | Remove 3 indicator sections (lines 1010-1013, 1039-1056, 1267-1280) |
-| `src/components/feed/PhotoPostSlide.tsx` | Remove dot indicators section (lines 358-378) |
+| Change | Description |
+|--------|-------------|
+| Database Migration | Update `send_gift` function to use `gift_analytics` table instead of non-existent `gifts` table |
 
-## Visual Before/After
+## Summary
 
-**Before:**
-```
-┌──────────────────────────────────────┐
-│  [Image]                      1/4 ●  │  ← Counter badge & dots at top-right
-│  ◄                            ►      │  ← Arrow buttons
-│  ● ○ ○ ○                             │  ← Dot indicators below
-└──────────────────────────────────────┘
-```
-
-**After:**
-```
-┌──────────────────────────────────────┐
-│  [Image]                             │  ← Clean - no indicators
-│  ◄                            ►      │  ← Arrow buttons remain
-│                                      │  ← No dots below
-└──────────────────────────────────────┘
-```
-
+The issue is NOT about admin restrictions - it's that the `gifts` table referenced in the function doesn't exist at all. Once we fix this to use `gift_analytics`, both admin and regular users will be able to send gifts (with admin bypassing balance/rate-limit checks as already implemented).
