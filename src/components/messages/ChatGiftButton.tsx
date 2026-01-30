@@ -52,13 +52,15 @@ export const ChatGiftButton = ({
     if (!user) return;
     
     const { data, error } = await supabase
-      .from('credit_transactions')
-      .select('amount')
-      .eq('user_id', user.id);
+      .from('user_credits')
+      .select('balance')
+      .eq('user_id', user.id)
+      .single();
     
     if (!error && data) {
-      const total = data.reduce((sum, t) => sum + t.amount, 0);
-      setUserCredits(total);
+      setUserCredits(data.balance || 0);
+    } else {
+      setUserCredits(0);
     }
   };
 
