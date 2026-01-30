@@ -234,6 +234,64 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
         willChange: 'transform'
       }}
     >
+      {/* User Info Header - Fixed at top */}
+      <div 
+        className="flex-shrink-0 px-4 py-3 bg-black/80 border-b border-white/10"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div 
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={handleProfileClick}
+        >
+          <Avatar className="w-10 h-10 border-2 border-white/30">
+            <AvatarImage src={post.profiles?.avatar_url || ''} />
+            <AvatarFallback className="bg-white/20 text-white">
+              {displayName[0]?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-white text-sm">
+                {displayName}
+              </span>
+              {user && post.user_id !== user.id && (
+                <button 
+                  onClick={handleFollow}
+                  disabled={isFollowLoading}
+                  className={cn(
+                    "font-bold text-xs transition",
+                    isFollowing ? "text-white/70 hover:text-white" : "text-pink-400 hover:text-pink-300",
+                    isFollowLoading && "opacity-50"
+                  )}
+                >
+                  • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-white/60 text-xs">
+              <span>@{post.profiles?.username || 'user'}</span>
+              <span>•</span>
+              <span>{postTime}</span>
+              <span>•</span>
+              {isPublic ? (
+                <Globe className="w-3 h-3" />
+              ) : (
+                <Lock className="w-3 h-3" />
+              )}
+              {post.location && (
+                <>
+                  <span>•</span>
+                  <div className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    <span className="truncate max-w-[100px]">{post.location}</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Fullscreen Image Container */}
       <div className="flex-1 relative overflow-hidden">
         {/* Image - fills container */}
@@ -286,9 +344,9 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           </>
         )}
 
-        {/* Dot Indicators - above overlay */}
+        {/* Dot Indicators - above caption overlay */}
         {images.length > 1 && (
-          <div className="absolute bottom-[180px] left-0 right-0 flex justify-center gap-2 z-20">
+          <div className="absolute bottom-[100px] left-0 right-0 flex justify-center gap-2 z-20">
             {images.map((_, idx) => (
               <button
                 key={idx}
@@ -308,64 +366,11 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           </div>
         )}
 
-        {/* Bottom Overlay with User Info and Caption */}
+        {/* Bottom Overlay with Caption Only */}
         <div 
-          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-16 pointer-events-auto"
+          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* User Info */}
-          <div 
-            className="px-4 pb-2 flex items-center gap-3 cursor-pointer"
-            onClick={handleProfileClick}
-          >
-            <Avatar className="w-10 h-10 border-2 border-white/30">
-              <AvatarImage src={post.profiles?.avatar_url || ''} />
-              <AvatarFallback className="bg-white/20 text-white">
-                {displayName[0]?.toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col flex-1">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold text-white text-sm">
-                  {displayName}
-                </span>
-                {user && post.user_id !== user.id && (
-                  <button 
-                    onClick={handleFollow}
-                    disabled={isFollowLoading}
-                    className={cn(
-                      "font-bold text-xs transition",
-                      isFollowing ? "text-white/70 hover:text-white" : "text-pink-400 hover:text-pink-300",
-                      isFollowLoading && "opacity-50"
-                    )}
-                  >
-                    • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2 text-white/60 text-xs">
-                <span>@{post.profiles?.username || 'user'}</span>
-                <span>•</span>
-                <span>{postTime}</span>
-                <span>•</span>
-                {isPublic ? (
-                  <Globe className="w-3 h-3" />
-                ) : (
-                  <Lock className="w-3 h-3" />
-                )}
-                {post.location && (
-                  <>
-                    <span>•</span>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3" />
-                      <span className="truncate max-w-[100px]">{post.location}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
           {/* Caption Section - Scrollable when expanded */}
           {caption && (
             <div 
