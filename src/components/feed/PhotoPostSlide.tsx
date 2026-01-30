@@ -94,6 +94,9 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
   const [refeedsCount, setRefeedsCount] = useState(post.refeeds_count || 0);
   const [giftsCount, setGiftsCount] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [hasCommented, setHasCommented] = useState(false);
+  const [hasRefeeded, setHasRefeeded] = useState(false);
+  const [hasGifted, setHasGifted] = useState(false);
   
   // Modals
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -117,12 +120,12 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
     setRefeedsCount(post.refeeds_count || 0);
   }, [post]);
 
-  // Check like and follow status when active
+  // Check like, follow, gift, refeed, comment status when active
   useEffect(() => {
     if (!isActive || !user || !post.id) return;
     
     const checkStatuses = async () => {
-      const [likeResult, followResult] = await Promise.all([
+      const [likeResult, followResult, giftResult, refeedResult, commentResult] = await Promise.all([
         supabase
           .from('post_likes')
           .select('id')
@@ -136,11 +139,34 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               .eq('follower_id', user.id)
               .eq('following_id', post.user_id)
               .maybeSingle()
-          : { data: null }
+          : { data: null },
+        supabase
+          .from('gift_analytics')
+          .select('id')
+          .eq('source_id', post.id)
+          .eq('sender_id', user.id)
+          .eq('source_type', 'post')
+          .maybeSingle(),
+        supabase
+          .from('post_shares')
+          .select('id')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .in('share_type', ['refeed', 'quote'])
+          .maybeSingle(),
+        supabase
+          .from('post_comments')
+          .select('id')
+          .eq('post_id', post.id)
+          .eq('user_id', user.id)
+          .maybeSingle()
       ]);
       
       setLiked(!!likeResult.data);
       setIsFollowing(!!followResult.data);
+      setHasGifted(!!giftResult.data);
+      setHasRefeeded(!!refeedResult.data);
+      setHasCommented(!!commentResult.data);
     };
     checkStatuses();
   }, [isActive, user, post.id, post.user_id]);
@@ -420,8 +446,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
             }} 
             className="flex items-center gap-1.5 group"
           >
-            <MessageCircle className="w-5 h-5 text-white" />
-            <span className="text-white text-xs font-medium">{formatCount(commentsCount)}</span>
+            <MessageCircle className={cn("w-5 h-5", hasCommented ? "text-blue-500 fill-blue-500" : "text-white")} />
+            <span className={cn("text-xs font-medium", hasCommented ? "text-blue-500" : "text-white")}>{formatCount(commentsCount)}</span>
           </button>
 
           {/* Refeed */}
@@ -433,8 +459,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
             }} 
             className="flex items-center gap-1.5 group"
           >
-            <Repeat className="w-5 h-5 text-white" />
-            <span className="text-white text-xs font-medium">{formatCount(refeedsCount)}</span>
+            <Repeat className={cn("w-5 h-5", hasRefeeded ? "text-green-500" : "text-white")} />
+            <span className={cn("text-xs font-medium", hasRefeeded ? "text-green-500" : "text-white")}>{formatCount(refeedsCount)}</span>
           </button>
 
           {/* Gift */}
@@ -446,8 +472,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
             }} 
             className="flex items-center gap-1.5 group"
           >
-            <Gift className="w-5 h-5 text-white" />
-            <span className="text-white text-xs font-medium">{formatCount(giftsCount)}</span>
+            <Gift className={cn("w-5 h-5", hasGifted ? "text-pink-500" : "text-white")} />
+            <span className={cn("text-xs font-medium", hasGifted ? "text-pink-500" : "text-white")}>{formatCount(giftsCount)}</span>
           </button>
 
           {/* Views */}
@@ -498,7 +524,10 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           media_type: 'image',
           profiles: post.profiles
         }}
-        onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+        onCommentAdded={() => {
+          setCommentsCount(prev => prev + 1);
+          setHasCommented(true);
+        }}
       />
 
       {/* Share Modal */}
@@ -526,6 +555,10 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
         recipientId={post.user_id}
         postId={post.id}
         recipientName={displayName}
+        onGiftSent={() => {
+          setGiftsCount(prev => prev + 1);
+          setHasGifted(true);
+        }}
       />
 
       {/* Refeed Modal */}
@@ -541,7 +574,10 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           media_urls: post.media_urls,
           profiles: post.profiles
         }}
-        onRefeedAdded={() => setRefeedsCount(prev => prev + 1)}
+        onRefeedAdded={() => {
+          setRefeedsCount(prev => prev + 1);
+          setHasRefeeded(true);
+        }}
       />
     </div>
   );
