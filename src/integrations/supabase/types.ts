@@ -2443,11 +2443,13 @@ export type Database = {
       }
       gift_analytics: {
         Row: {
+          converted_at: string | null
           created_at: string | null
           credit_value: number
           feedback_timestamp: string | null
           gift_type: string
           id: string
+          is_converted: boolean | null
           platform_fee: number | null
           receiver_feedback: string | null
           receiver_id: string
@@ -2457,11 +2459,13 @@ export type Database = {
           source_type: string
         }
         Insert: {
+          converted_at?: string | null
           created_at?: string | null
           credit_value: number
           feedback_timestamp?: string | null
           gift_type: string
           id?: string
+          is_converted?: boolean | null
           platform_fee?: number | null
           receiver_feedback?: string | null
           receiver_id: string
@@ -2471,11 +2475,13 @@ export type Database = {
           source_type: string
         }
         Update: {
+          converted_at?: string | null
           created_at?: string | null
           credit_value?: number
           feedback_timestamp?: string | null
           gift_type?: string
           id?: string
+          is_converted?: boolean | null
           platform_fee?: number | null
           receiver_feedback?: string | null
           receiver_id?: string
@@ -8080,6 +8086,8 @@ export type Database = {
       check_all_posts_viewed: { Args: never; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       cleanup_old_view_history: { Args: never; Returns: undefined }
+      convert_all_gifts: { Args: never; Returns: Json }
+      convert_gift: { Args: { p_gift_id: string }; Returns: Json }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       deduct_credits_safe: {
         Args: { p_amount: number; p_description?: string; p_user_id: string }
@@ -8791,14 +8799,23 @@ export type Database = {
           sender_name: string
         }[]
       }
-      send_direct_gift: {
-        Args: {
-          p_credit_value: number
-          p_gift_type: string
-          p_recipient_identifier: string
-        }
-        Returns: string
-      }
+      send_direct_gift:
+        | {
+            Args: {
+              p_credit_value: number
+              p_gift_type: string
+              p_recipient_identifier: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_credit_value: number
+              p_gift_type: string
+              p_recipient_identifier: string
+            }
+            Returns: string
+          }
       send_gift:
         | {
             Args: {

@@ -1,12 +1,14 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { User, Image, Radio, Send, ChevronRight } from 'lucide-react';
+import { User, Image, Radio, Send, ChevronRight, RefreshCw, Check, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const giftEmojis: Record<string, string> = {
   heart: '❤️',
@@ -19,12 +21,15 @@ const giftEmojis: Record<string, string> = {
   rose: '🌹',
   gift: '🎁',
   money: '💰',
+  sparkle: '✨',
+  custom: '🎁',
 };
 
 export const ReceivedGifts = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [convertingId, setConvertingId] = useState<string | null>(null);
 
   const { data: gifts, isLoading, refetch } = useQuery({
     queryKey: ['received-gifts', user?.id],
@@ -59,7 +64,7 @@ export const ReceivedGifts = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'gift_analytics',
           filter: `receiver_id=eq.${user.id}`,
@@ -74,6 +79,36 @@ export const ReceivedGifts = () => {
       supabase.removeChannel(channel);
     };
   }, [user, refetch]);
+
+  const handleConvertGift = async (giftId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConvertingId(giftId);
+    
+    try {
+      const { data, error } = await supabase.rpc('convert_gift', { p_gift_id: giftId });
+      
+      if (error) throw error;
+      
+      const result = data as { success: boolean; error?: string; credits_added?: number };
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to convert gift');
+      }
+      
+      toast.success(`Gift converted! +${result.credits_added} credits added`);
+      
+      // Refresh queries
+      queryClient.invalidateQueries({ queryKey: ['received-gifts'] });
+      queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+      queryClient.invalidateQueries({ queryKey: ['gift-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['unconverted-gifts'] });
+    } catch (error: any) {
+      console.error('Error converting gift:', error);
+      toast.error(error.message || 'Failed to convert gift');
+    } finally {
+      setConvertingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -130,6 +165,8 @@ export const ReceivedGifts = () => {
         const sender = gift.sender as any;
         const netAmount = gift.credit_value - (gift.platform_fee || 0);
         const clickable = isClickable(gift);
+        const isConverted = gift.is_converted === true;
+        const isConverting = convertingId === gift.id;
         
         return (
           <div
@@ -161,10 +198,38 @@ export const ReceivedGifts = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <div className="text-right">
-                <p className="font-bold text-green-500">+{netAmount}</p>
-                <p className="text-xs text-muted-foreground">credits</p>
-              </div>
+              {isConverted ? (
+                <div className="text-right">
+                  <div className="flex items-center gap-1 text-green-500">
+                    <Check className="w-3 h-3" />
+                    <span className="font-bold">+{netAmount}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">converted</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="text-right">
+                    <p className="font-bold text-yellow-500">{netAmount}</p>
+                    <p className="text-xs text-muted-foreground">credits</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => handleConvertGift(gift.id, e)}
+                    disabled={isConverting}
+                    className="h-7 px-2 text-xs border-green-500/50 text-green-500 hover:bg-green-500/10"
+                  >
+                    {isConverting ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <>
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Convert
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
               {clickable && (
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
               )}

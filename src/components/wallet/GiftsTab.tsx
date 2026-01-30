@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Gift, Send, ArrowDownLeft, Sparkles } from 'lucide-react';
+import { Gift, Send, ArrowDownLeft, Sparkles, RefreshCw, Loader2 } from 'lucide-react';
 import { ReceivedGifts } from './ReceivedGifts';
 import { SentGifts } from './SentGifts';
 import { SendDirectGiftModal } from './SendDirectGiftModal';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
 
 export const GiftsTab = () => {
   const { user } = useAuth();
   const [showSendGiftModal, setShowSendGiftModal] = useState(false);
+  const [isConvertingAll, setIsConvertingAll] = useState(false);
   const queryClient = useQueryClient();
 
   // Fetch gift statistics
@@ -21,7 +23,7 @@ export const GiftsTab = () => {
       // Get received gifts count and total
       const { data: received, error: recError } = await supabase
         .from('gift_analytics')
-        .select('credit_value, platform_fee')
+        .select('credit_value, platform_fee, is_converted')
         .eq('receiver_id', user?.id);
 
       if (recError) throw recError;
@@ -49,6 +51,56 @@ export const GiftsTab = () => {
     enabled: !!user,
   });
 
+  // Fetch unconverted gifts statistics
+  const { data: unconvertedStats, refetch: refetchUnconverted } = useQuery({
+    queryKey: ['unconverted-gifts', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('gift_analytics')
+        .select('credit_value, platform_fee')
+        .eq('receiver_id', user?.id)
+        .or('is_converted.eq.false,is_converted.is.null');
+
+      if (error) throw error;
+
+      const count = data?.length || 0;
+      const totalValue = data?.reduce((sum, g) => sum + (g.credit_value - (g.platform_fee || 0)), 0) || 0;
+
+      return { count, totalValue };
+    },
+    enabled: !!user,
+  });
+
+  // Handle convert all gifts
+  const handleConvertAll = async () => {
+    setIsConvertingAll(true);
+    
+    try {
+      const { data, error } = await supabase.rpc('convert_all_gifts');
+      
+      if (error) throw error;
+      
+      const result = data as { success: boolean; error?: string; gifts_converted?: number; credits_added?: number };
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to convert gifts');
+      }
+      
+      toast.success(`Converted ${result.gifts_converted} gifts! +${result.credits_added} credits added`);
+      
+      // Refresh all relevant queries
+      queryClient.invalidateQueries({ queryKey: ['received-gifts'] });
+      queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+      queryClient.invalidateQueries({ queryKey: ['gift-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['unconverted-gifts'] });
+    } catch (error: any) {
+      console.error('Error converting all gifts:', error);
+      toast.error(error.message || 'Failed to convert gifts');
+    } finally {
+      setIsConvertingAll(false);
+    }
+  };
+
   // Real-time subscription for gift updates
   useEffect(() => {
     if (!user) return;
@@ -58,15 +110,16 @@ export const GiftsTab = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'gift_analytics',
         },
         (payload) => {
-          const newGift = payload.new as any;
+          const gift = payload.new as any;
           // If the user is the sender or receiver, refetch
-          if (newGift.sender_id === user.id || newGift.receiver_id === user.id) {
+          if (gift?.sender_id === user.id || gift?.receiver_id === user.id) {
             refetchStats();
+            refetchUnconverted();
             queryClient.invalidateQueries({ queryKey: ['received-gifts', user.id] });
             queryClient.invalidateQueries({ queryKey: ['sent-gifts', user.id] });
           }
@@ -77,10 +130,44 @@ export const GiftsTab = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, refetchStats, queryClient]);
+  }, [user, refetchStats, refetchUnconverted, queryClient]);
+
+  const hasUnconvertedGifts = (unconvertedStats?.count || 0) > 0;
 
   return (
     <div className="space-y-5">
+      {/* Unconverted Gifts Card */}
+      {hasUnconvertedGifts && (
+        <div className="rounded-xl bg-gradient-to-br from-yellow-500/20 to-orange-500/10 border border-yellow-500/30 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <Gift className="w-4 h-4 text-yellow-500" />
+                <span className="font-semibold text-sm">Unconverted Gifts</span>
+              </div>
+              <p className="text-2xl font-bold text-yellow-500">
+                {unconvertedStats?.count || 0}
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  worth {unconvertedStats?.totalValue || 0} credits
+                </span>
+              </p>
+            </div>
+            <Button
+              onClick={handleConvertAll}
+              disabled={isConvertingAll}
+              className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
+            >
+              {isConvertingAll ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <RefreshCw className="w-4 h-4 mr-2" />
+              )}
+              Convert All
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Gift Stats Cards - Compact on mobile */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-500/10 border border-green-500/30 p-3">
