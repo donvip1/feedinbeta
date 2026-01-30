@@ -87,9 +87,12 @@ export default function FullscreenMediaViewer({
   const [likesCount, setLikesCount] = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
   const [refeedsCount, setRefeedsCount] = useState(0);
+  const [giftsCount, setGiftsCount] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [landscapeVideos, setLandscapeVideos] = useState<Set<string>>(new Set());
+  const [hasRefeeded, setHasRefeeded] = useState(false);
+  const [hasGifted, setHasGifted] = useState(false);
   
   // Modal states - render inside fullscreen to stay open
   const [showComments, setShowComments] = useState(false);
@@ -269,25 +272,44 @@ export default function FullscreenMediaViewer({
     getUser();
   }, []);
 
-  // Check like status and counts
+  // Check like status, refeed status, gift status, and counts
   useEffect(() => {
     if (!currentPost || !currentUserId) return;
     
-    const checkLikeStatus = async () => {
-      const { data: likeData } = await supabase
-        .from('post_likes')
-        .select('id')
-        .eq('post_id', actualPostId || currentPost.id)
-        .eq('user_id', currentUserId)
-        .maybeSingle();
+    const checkStatus = async () => {
+      const [likeCheck, refeedCheck, giftCheck] = await Promise.all([
+        supabase
+          .from('post_likes')
+          .select('id')
+          .eq('post_id', actualPostId || currentPost.id)
+          .eq('user_id', currentUserId)
+          .maybeSingle(),
+        supabase
+          .from('post_shares')
+          .select('id')
+          .eq('post_id', actualPostId || currentPost.id)
+          .eq('user_id', currentUserId)
+          .in('share_type', ['refeed', 'quote'])
+          .maybeSingle(),
+        supabase
+          .from('gift_analytics')
+          .select('id')
+          .eq('source_id', actualPostId || currentPost.id)
+          .eq('sender_id', currentUserId)
+          .eq('source_type', 'post')
+          .maybeSingle()
+      ]);
       
-      setIsLiked(!!likeData);
+      setIsLiked(!!likeCheck.data);
+      setHasRefeeded(!!refeedCheck.data);
+      setHasGifted(!!giftCheck.data);
     };
     
     setLikesCount(parentLikesCount ?? currentPost.likes_count ?? 0);
     setCommentsCount(parentCommentsCount ?? currentPost.comments_count ?? 0);
     setRefeedsCount(parentRefeedsCount ?? currentPost.refeeds_count ?? 0);
-    checkLikeStatus();
+    setGiftsCount((currentPost as any).gifts_count ?? 0);
+    checkStatus();
   }, [currentPost?.id, currentUserId, actualPostId, parentLikesCount, parentCommentsCount, parentRefeedsCount]);
 
   // Sync counts
@@ -714,16 +736,17 @@ export default function FullscreenMediaViewer({
                         </button>
 
                         <button onClick={handleRefeed} className="flex flex-col items-center gap-1">
-                          <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                          <div className={`p-3 rounded-full transition-all ${hasRefeeded ? 'bg-green-500' : 'bg-black/50 hover:bg-black/70'}`}>
                             <Repeat2 className="w-6 h-6 text-white" />
                           </div>
                           <span className="text-white text-xs font-medium">{refeedsCount}</span>
                         </button>
 
                         <button onClick={handleGift} className="flex flex-col items-center gap-1">
-                          <div className="p-3 bg-black/50 rounded-full hover:bg-black/70 transition-all">
+                          <div className={`p-3 rounded-full transition-all ${hasGifted ? 'bg-pink-500' : 'bg-black/50 hover:bg-black/70'}`}>
                             <Gift className="w-6 h-6 text-white" />
                           </div>
+                          <span className="text-white text-xs font-medium">{giftsCount}</span>
                         </button>
 
                         <button onClick={handleShare} className="flex flex-col items-center gap-1">
@@ -853,8 +876,15 @@ export default function FullscreenMediaViewer({
         onClose={() => setShowRefeed(false)}
         postId={actualPostId || currentPost?.id || ''}
         post={currentPost}
+        hasRefeeded={hasRefeeded}
         onRefeedAdded={() => {
           setRefeedsCount(prev => prev + 1);
+          setHasRefeeded(true);
+          setShowRefeed(false);
+        }}
+        onUnrefeed={() => {
+          setRefeedsCount(prev => Math.max(0, prev - 1));
+          setHasRefeeded(false);
           setShowRefeed(false);
         }}
       />

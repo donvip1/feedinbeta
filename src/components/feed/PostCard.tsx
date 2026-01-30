@@ -176,6 +176,8 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
   const [refeedsCount, setRefeedsCount] = useState(post.refeeds_count || 0);
   const [giftsCount, setGiftsCount] = useState((post as any).gifts_count || 0);
   const [saved, setSaved] = useState(false);
+  const [hasRefeeded, setHasRefeeded] = useState(false);
+  const [hasGifted, setHasGifted] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -247,13 +249,13 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
     handleSwipe();
   };
 
-  // Check if post is liked and saved
+  // Check if post is liked, saved, refeeded, and gifted
   useEffect(() => {
     const checkStatus = async () => {
       if (!user) return;
 
       try {
-        const [likeCheck, saveCheck] = await Promise.all([
+        const [likeCheck, saveCheck, refeedCheck, giftCheck] = await Promise.all([
           supabase
             .from('post_likes')
             .select('id')
@@ -265,11 +267,27 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
             .select('id')
             .eq('post_id', post.id)
             .eq('user_id', user.id)
-            .single()
+            .single(),
+          supabase
+            .from('post_shares')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('user_id', user.id)
+            .in('share_type', ['refeed', 'quote'])
+            .maybeSingle(),
+          supabase
+            .from('gift_analytics')
+            .select('id')
+            .eq('source_id', post.id)
+            .eq('sender_id', user.id)
+            .eq('source_type', 'post')
+            .maybeSingle()
         ]);
 
         setLiked(!!likeCheck.data);
         setSaved(!!saveCheck.data);
+        setHasRefeeded(!!refeedCheck.data);
+        setHasGifted(!!giftCheck.data);
       } catch (error) {
         // Errors expected when not liked/saved
       }
@@ -1006,9 +1024,9 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
                 }}
                 className="p-2 hover:bg-muted rounded-full transition-colors ml-2"
               >
-                <Repeat className="w-4 h-4" />
+                <Repeat className={cn("w-4 h-4", hasRefeeded && "text-green-500")} />
               </button>
-              <span className="text-sm">{refeedsCount}</span>
+              <span className={cn("text-sm", hasRefeeded && "text-green-500 font-medium")}>{refeedsCount}</span>
 
               <button
                 onClick={() => {
@@ -1022,11 +1040,9 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
                 }}
                 className="p-2 hover:bg-muted rounded-full transition-colors"
               >
-                <Gift className="w-4 h-4" />
+                <Gift className={cn("w-4 h-4", hasGifted && "text-pink-500")} />
               </button>
-              {giftsCount > 0 && (
-                <span className="text-sm text-pink-500 font-medium">{giftsCount}</span>
-              )}
+              <span className={cn("text-sm", hasGifted ? "text-pink-500 font-medium" : giftsCount > 0 ? "text-pink-500 font-medium" : "")}>{giftsCount}</span>
 
               <button
                 onClick={() => {
@@ -1107,7 +1123,15 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
         }}
         postId={post.id}
         post={post}
-        onRefeedAdded={() => setRefeedsCount(prev => prev + 1)}
+        hasRefeeded={hasRefeeded}
+        onRefeedAdded={() => {
+          setRefeedsCount(prev => prev + 1);
+          setHasRefeeded(true);
+        }}
+        onUnrefeed={() => {
+          setRefeedsCount(prev => Math.max(0, prev - 1));
+          setHasRefeeded(false);
+        }}
       />
 
       {/* Delete Confirmation Dialog */}

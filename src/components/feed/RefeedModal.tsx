@@ -13,15 +13,60 @@ interface RefeedModalProps {
   onClose: () => void;
   postId: string;
   post?: any;
+  hasRefeeded?: boolean;
   onRefeedAdded?: () => void;
+  onUnrefeed?: () => void;
 }
 
-export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdded }: RefeedModalProps) {
+export default function RefeedModal({ isOpen, onClose, postId, post, hasRefeeded, onRefeedAdded, onUnrefeed }: RefeedModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const [showQuoteComposer, setShowQuoteComposer] = useState(false);
   const [quoteText, setQuoteText] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [isUnrefeeding, setIsUnrefeeding] = useState(false);
+
+  const handleUnrefeed = async () => {
+    if (!user) return;
+    
+    setIsUnrefeeding(true);
+    try {
+      // 1. Delete share record
+      const { error: shareError } = await supabase
+        .from("post_shares")
+        .delete()
+        .eq("post_id", postId)
+        .eq("user_id", user.id)
+        .in("share_type", ["refeed", "quote"]);
+
+      if (shareError) throw shareError;
+
+      // 2. Delete the refeed post itself
+      const { error: postError } = await supabase
+        .from("posts")
+        .delete()
+        .eq("original_post_id", postId)
+        .eq("user_id", user.id)
+        .in("post_type", ["refeed", "quote"]);
+
+      if (postError) throw postError;
+
+      toast({
+        title: "Removed",
+        description: "Refeed has been removed from your feed",
+      });
+      onUnrefeed?.();
+      onClose();
+    } catch (error) {
+      console.error("Un-refeed error:", error);
+      toast({
+        title: "Error removing refeed",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUnrefeeding(false);
+    }
+  };
 
   const handleRefeed = async () => {
     if (!user) return;
@@ -235,19 +280,38 @@ export default function RefeedModal({ isOpen, onClose, postId, post, onRefeedAdd
       <SheetContent side="bottom" className="h-auto rounded-t-3xl p-0 pb-8 z-[250]">
         <div className="w-12 h-1 bg-muted-foreground/30 rounded-full mx-auto mt-3 mb-4" />
         <div className="space-y-1 px-4">
-          <Button
-            onClick={handleRefeed}
-            className="w-full flex items-center justify-start gap-3 h-14 rounded-xl"
-            variant="ghost"
-          >
-            <div className="p-2 bg-muted rounded-full">
-              <Repeat className="w-5 h-5" />
-            </div>
-            <div className="text-left">
-              <span className="font-semibold block">Refeed</span>
-              <span className="text-xs text-muted-foreground">Share to your followers</span>
-            </div>
-          </Button>
+          {hasRefeeded ? (
+            // Show undo refeed option when already refeeded
+            <Button
+              onClick={handleUnrefeed}
+              disabled={isUnrefeeding}
+              className="w-full flex items-center justify-start gap-3 h-14 rounded-xl text-destructive hover:text-destructive"
+              variant="ghost"
+            >
+              <div className="p-2 bg-green-500/20 rounded-full">
+                <Repeat className="w-5 h-5 text-green-500" />
+              </div>
+              <div className="text-left">
+                <span className="font-semibold block">{isUnrefeeding ? "Removing..." : "Undo Refeed"}</span>
+                <span className="text-xs text-muted-foreground">Remove from your feed</span>
+              </div>
+            </Button>
+          ) : (
+            // Show normal refeed option
+            <Button
+              onClick={handleRefeed}
+              className="w-full flex items-center justify-start gap-3 h-14 rounded-xl"
+              variant="ghost"
+            >
+              <div className="p-2 bg-muted rounded-full">
+                <Repeat className="w-5 h-5" />
+              </div>
+              <div className="text-left">
+                <span className="font-semibold block">Refeed</span>
+                <span className="text-xs text-muted-foreground">Share to your followers</span>
+              </div>
+            </Button>
+          )}
 
           <Button
             onClick={() => setShowQuoteComposer(true)}
