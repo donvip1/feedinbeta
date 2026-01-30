@@ -89,37 +89,37 @@
   }
 
   .dark {
-    /* Dark mode - Feminine pink/magenta palette */
-    --background: 320 25% 8%;
-    --foreground: 330 20% 95%;
-    --card: 320 25% 12%;
-    --card-foreground: 330 20% 95%;
-    --popover: 320 25% 12%;
-    --popover-foreground: 330 20% 95%;
+    /* Dark mode - Clean neutral dark theme */
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 8%;
+    --popover-foreground: 210 40% 98%;
     --primary: 330 85% 60%;
     --primary-foreground: 0 0% 100%;
     --primary-glow: 340 80% 70%;
-    --secondary: 320 20% 18%;
-    --secondary-foreground: 330 20% 95%;
-    --muted: 320 20% 18%;
-    --muted-foreground: 330 15% 60%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
     --accent: 320 75% 65%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 320 20% 20%;
-    --input: 320 20% 20%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
     --ring: 330 85% 60%;
     
     /* Story gradient ring */
     --story-gradient: linear-gradient(135deg, hsl(330, 100%, 60%) 0%, hsl(340, 90%, 55%) 50%, hsl(350, 85%, 60%) 100%);
-    --story-viewed: hsl(320, 10%, 35%);
+    --story-viewed: hsl(215, 15%, 35%);
     
     /* Feminine Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(330, 85%, 60%), hsl(350, 80%, 65%));
     --gradient-accent: linear-gradient(135deg, hsl(330, 85%, 60%), hsl(280, 70%, 65%));
     --gradient-story: linear-gradient(45deg, hsl(330, 100%, 60%), hsl(350, 90%, 55%), hsl(20, 100%, 60%));
-    --gradient-subtle: linear-gradient(180deg, hsl(320, 25%, 8%), hsl(320, 25%, 12%));
+    --gradient-subtle: linear-gradient(180deg, hsl(222, 47%, 6%), hsl(222, 47%, 10%));
     
     /* Shadows */
     --shadow-elegant: 0 10px 30px -10px hsl(330 85% 60% / 0.4);
