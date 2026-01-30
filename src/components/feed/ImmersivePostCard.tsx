@@ -1734,50 +1734,47 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             {/* Divider line */}
             <div className="border-t border-border mx-3" />
             
-            {/* Social buttons row */}
-            <div className="flex items-center justify-between px-3 py-2.5">
-              {/* Views on left */}
-              <div className="flex items-center gap-1">
-                <Eye className="w-4 h-4 text-muted-foreground/60" />
-                <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)}</span>
-              </div>
+            {/* Social buttons row - LEFT ALIGNED */}
+            <div className="flex items-center justify-start gap-4 px-3 py-2.5">
+              {/* Like */}
+              <button onClick={handleLike} className="flex items-center gap-1.5 group">
+                <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
+                <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
+              </button>
+              
+              {/* Comments */}
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
+                <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
+              </button>
+              
+              {/* Refeed */}
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <Repeat className={cn("w-5 h-5 transition-transform group-active:scale-90", hasRefeeded ? "text-green-500" : "text-muted-foreground")} />
+                <span className={cn("text-xs font-medium", hasRefeeded ? "text-green-500" : "text-muted-foreground")}>{formatCount(refeedsCount)}</span>
+              </button>
 
-              {/* Social buttons on right */}
-              <div className="flex items-center gap-4">
-                {/* Like */}
-                <button onClick={handleLike} className="flex items-center gap-1.5 group">
-                  <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
-                  <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
-                </button>
-                
-                {/* Comments */}
-                <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                  <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
-                </button>
-                
-                {/* Refeed */}
-                <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Repeat className={cn("w-5 h-5 transition-transform group-active:scale-90", hasRefeeded ? "text-green-500" : "text-muted-foreground")} />
-                  <span className={cn("text-xs font-medium", hasRefeeded ? "text-green-500" : "text-muted-foreground")}>{formatCount(refeedsCount)}</span>
-                </button>
+              {/* Gift */}
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <Gift className={cn("w-5 h-5 transition-transform group-active:scale-90", hasGifted ? "text-pink-500" : "text-muted-foreground")} />
+                <span className={cn("text-xs font-medium", hasGifted ? "text-pink-500" : "text-muted-foreground")}>{formatCount(giftsCount)}</span>
+              </button>
 
-                {/* Gift */}
-                <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Gift className={cn("w-5 h-5 transition-transform group-active:scale-90", hasGifted ? "text-pink-500" : "text-muted-foreground")} />
-                  <span className={cn("text-xs font-medium", hasGifted ? "text-pink-500" : "text-muted-foreground")}>{formatCount(giftsCount)}</span>
-                </button>
-                
-                {/* Share */}
-                <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                </button>
+              {/* Views */}
+              <div className="flex items-center gap-1.5">
+                <Eye className="w-5 h-5 text-muted-foreground/60" />
+                <span className="text-muted-foreground/60 text-xs font-medium">{formatCount(post.views_count || 0)}</span>
               </div>
+              
+              {/* Share */}
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
+                <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+              </button>
             </div>
 
-            {/* Promote Button - on its own row below */}
+            {/* Promote Button - LEFT ALIGNED */}
             {user && isPromoted !== true && (
-              <div className="flex justify-end px-3 pb-2.5">
+              <div className="flex justify-start px-3 pb-2.5">
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();

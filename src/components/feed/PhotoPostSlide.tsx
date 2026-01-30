@@ -417,8 +417,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
 
       {/* Fixed Social Buttons Bar */}
       <div className="flex-shrink-0 bg-black/90 px-4 py-3">
-        {/* Social buttons row */}
-        <div className="flex items-center justify-end gap-4">
+        {/* Social buttons row - LEFT ALIGNED, LARGER ICONS */}
+        <div className="flex items-center justify-start gap-4">
           {/* Like */}
           <button 
             onClick={(e) => { 
@@ -426,10 +426,10 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               e.preventDefault(); 
               handleLike(e); 
             }} 
-            className="flex items-center gap-1 group"
+            className="flex items-center gap-1.5 group"
           >
-            <Heart className={cn("w-4 h-4 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
-            <span className="text-white text-[10px] font-medium">{formatCount(likesCount)}</span>
+            <Heart className={cn("w-5 h-5 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
+            <span className="text-white text-xs font-medium">{formatCount(likesCount)}</span>
           </button>
 
           {/* Comments */}
@@ -439,10 +439,23 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               e.preventDefault(); 
               setCommentsOpen(true); 
             }} 
-            className="flex items-center gap-1 group"
+            className="flex items-center gap-1.5 group"
           >
-            <MessageCircle className="w-4 h-4 text-white" />
-            <span className="text-white text-[10px] font-medium">{formatCount(commentsCount)}</span>
+            <MessageCircle className="w-5 h-5 text-white" />
+            <span className="text-white text-xs font-medium">{formatCount(commentsCount)}</span>
+          </button>
+
+          {/* Refeed */}
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              e.preventDefault(); 
+              setRefeedOpen(true); 
+            }} 
+            className="flex items-center gap-1.5 group"
+          >
+            <Repeat className="w-5 h-5 text-white" />
+            <span className="text-white text-xs font-medium">{formatCount(refeedsCount)}</span>
           </button>
 
           {/* Gift */}
@@ -452,30 +465,17 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               e.preventDefault(); 
               setGiftOpen(true); 
             }} 
-            className="flex items-center gap-1 group"
+            className="flex items-center gap-1.5 group"
           >
-            <Gift className="w-4 h-4 text-white" />
-            <span className="text-white text-[10px] font-medium">{formatCount(giftsCount)}</span>
+            <Gift className="w-5 h-5 text-white" />
+            <span className="text-white text-xs font-medium">{formatCount(giftsCount)}</span>
           </button>
 
           {/* Views */}
-          <div className="flex items-center gap-1">
-            <Eye className="w-4 h-4 text-white/60" />
-            <span className="text-white/60 text-[10px] font-medium">{formatCount(post.views_count || 0)}</span>
+          <div className="flex items-center gap-1.5">
+            <Eye className="w-5 h-5 text-white/60" />
+            <span className="text-white/60 text-xs font-medium">{formatCount(post.views_count || 0)}</span>
           </div>
-
-          {/* Refeed */}
-          <button 
-            onClick={(e) => { 
-              e.stopPropagation(); 
-              e.preventDefault(); 
-              setRefeedOpen(true); 
-            }} 
-            className="flex items-center gap-1 group"
-          >
-            <Repeat className="w-4 h-4 text-white" />
-            <span className="text-white text-[10px] font-medium">{formatCount(refeedsCount)}</span>
-          </button>
 
           {/* Share */}
           <button 
@@ -484,15 +484,15 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               e.preventDefault(); 
               setShareOpen(true); 
             }} 
-            className="flex items-center gap-1 group"
+            className="flex items-center gap-1.5 group"
           >
-            <Share2 className="w-4 h-4 text-white" />
+            <Share2 className="w-5 h-5 text-white" />
           </button>
         </div>
 
-        {/* Promote Button - on its own row below */}
+        {/* Promote Button - LEFT ALIGNED */}
         {user && post.id && (
-          <div className="flex justify-end mt-2">
+          <div className="flex justify-start mt-2">
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
