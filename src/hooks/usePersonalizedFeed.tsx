@@ -66,9 +66,31 @@ export const usePersonalizedFeed = (enabled: boolean = true) => {
 
           const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
           
+          // Fetch original posts for refeeds
+          const refeedIds = data.posts.filter((p: any) => p.original_post_id).map((p: any) => p.original_post_id);
+          let originalPosts: any[] = [];
+          
+          if (refeedIds.length > 0) {
+            const { data: originals } = await supabase
+              .from('posts')
+              .select(`
+                *,
+                profiles:user_id (
+                  username,
+                  display_name,
+                  avatar_url
+                )
+              `)
+              .in('id', refeedIds);
+            originalPosts = originals || [];
+          }
+
+          const originalPostMap = new Map(originalPosts.map(p => [p.id, p]));
+          
           const postsWithProfiles = data.posts.map((post: any) => ({
             ...post,
             profiles: profileMap.get(post.user_id),
+            original_post: post.original_post_id ? originalPostMap.get(post.original_post_id) : null,
           }));
 
           return {
@@ -100,9 +122,31 @@ export const usePersonalizedFeed = (enabled: boolean = true) => {
 
       const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
+      // Fetch original posts for refeeds
+      const refeedIds = posts?.filter((p: any) => p.original_post_id).map((p: any) => p.original_post_id) || [];
+      let originalPosts: any[] = [];
+      
+      if (refeedIds.length > 0) {
+        const { data: originals } = await supabase
+          .from('posts')
+          .select(`
+            *,
+            profiles:user_id (
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .in('id', refeedIds);
+        originalPosts = originals || [];
+      }
+
+      const originalPostMap = new Map(originalPosts.map(p => [p.id, p]));
+
       const postsWithProfiles = posts?.map((post: any) => ({
         ...post,
         profiles: profileMap.get(post.user_id),
+        original_post: post.original_post_id ? originalPostMap.get(post.original_post_id) : null,
       })) || [];
 
       return {
