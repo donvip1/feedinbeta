@@ -16,7 +16,7 @@ interface PhotoPlusPostCreatorProps {
   onSuccess?: () => void;
 }
 
-const MAX_IMAGES = 2;
+const MAX_IMAGES = 4;
 const MAX_CHARS = 1000;
 
 interface UserProfile {
@@ -38,8 +38,12 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
   const [location, setLocation] = useState('');
   const [locationSuggestions, setLocationSuggestions] = useState<string[]>([]);
   const [detectingLocation, setDetectingLocation] = useState(false);
-  const fileInputRef1 = useRef<HTMLInputElement>(null);
-  const fileInputRef2 = useRef<HTMLInputElement>(null);
+  const fileInputRefs = [
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+    useRef<HTMLInputElement>(null),
+  ];
 
   // Fetch user profile
   useEffect(() => {
@@ -363,98 +367,59 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
                 </div>
               )}
 
-              {/* Image Picker Cards */}
-              <div className="flex justify-center gap-3">
-                {/* Card 1 */}
-                <div
-                  onClick={() => fileInputRef1.current?.click()}
-                  className={cn(
-                    "relative w-[calc(37.5%-6px)] aspect-square rounded-xl border-2 border-dashed border-border",
-                    "flex items-center justify-center cursor-pointer",
-                    "hover:border-primary/50 hover:bg-accent/50 transition-all",
-                    images[0] && "border-solid border-primary/30"
-                  )}
-                >
-                  {images[0] ? (
-                    <>
-                      <img
-                        src={images[0].preview}
-                        className="w-full h-full object-cover rounded-xl"
-                        alt="Preview 1"
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeImage(0);
-                        }}
-                        className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white hover:bg-black transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                        <Plus className="w-5 h-5" />
+              {/* Image Picker Cards - 2x2 Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                {Array.from({ length: MAX_IMAGES }).map((_, index) => (
+                  <div
+                    key={index}
+                    onClick={() => fileInputRefs[index].current?.click()}
+                    className={cn(
+                      "relative aspect-square rounded-xl border-2 border-dashed border-border",
+                      "flex items-center justify-center cursor-pointer",
+                      "hover:border-primary/50 hover:bg-accent/50 transition-all",
+                      images[index] && "border-solid border-primary/30"
+                    )}
+                  >
+                    {images[index] ? (
+                      <>
+                        <img
+                          src={images[index].preview}
+                          className="w-full h-full object-cover rounded-xl"
+                          alt={`Preview ${index + 1}`}
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeImage(index);
+                          }}
+                          className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white hover:bg-black transition-colors"
+                        >
+                          <X size={14} />
+                        </button>
+                      </>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
+                          <Plus className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs">Add Photo</span>
                       </div>
-                      <span className="text-xs">Add Photo</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Card 2 */}
-                <div
-                  onClick={() => fileInputRef2.current?.click()}
-                  className={cn(
-                    "relative w-[calc(37.5%-6px)] aspect-square rounded-xl border-2 border-dashed border-border",
-                    "flex items-center justify-center cursor-pointer",
-                    "hover:border-primary/50 hover:bg-accent/50 transition-all",
-                    images[1] && "border-solid border-primary/30"
-                  )}
-                >
-                  {images[1] ? (
-                    <>
-                      <img
-                        src={images[1].preview}
-                        className="w-full h-full object-cover rounded-xl"
-                        alt="Preview 2"
-                      />
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeImage(1);
-                        }}
-                        className="absolute top-2 right-2 p-1.5 bg-black/60 rounded-full text-white hover:bg-black transition-colors"
-                      >
-                        <X size={14} />
-                      </button>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                      <div className="w-10 h-10 rounded-full bg-accent flex items-center justify-center">
-                        <Plus className="w-5 h-5" />
-                      </div>
-                      <span className="text-xs">Add Photo</span>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                ))}
               </div>
 
               {/* Hidden file inputs */}
-              <input
-                type="file"
-                ref={fileInputRef1}
-                onChange={handleFileChange(0)}
-                hidden
-                accept="image/*"
-              />
-              <input
-                type="file"
-                ref={fileInputRef2}
-                onChange={handleFileChange(1)}
-                hidden
-                accept="image/*"
-              />
+              {fileInputRefs.map((ref, index) => (
+                <input
+                  key={index}
+                  type="file"
+                  ref={ref}
+                  onChange={handleFileChange(index)}
+                  hidden
+                  accept="image/*"
+                />
+              ))}
 
               {/* Hashtags Input */}
               <div className="pt-4 border-t border-border">
@@ -541,7 +506,7 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
         {/* Footer - simplified without gallery button */}
         <div className="p-4 border-t border-border safe-area-bottom">
           <p className="text-xs text-muted-foreground text-center">
-            Tap the cards above to add up to 2 photos
+            Tap the cards above to add up to 4 photos
           </p>
         </div>
       </motion.div>
