@@ -16,6 +16,7 @@ interface GiftModalProps {
   postId: string;
   recipientId: string;
   recipientName?: string;
+  onGiftSent?: () => void;
 }
 
 interface GiftType {
@@ -55,7 +56,7 @@ const allGifts: GiftType[] = [
   { id: 'universe', label: 'Universe', cost: 1000, category: 'exclusive', color: 'from-purple-500 via-pink-500 to-rose-500', animation: 'promote-glow' },
 ];
 
-export default function GiftModal({ isOpen, onClose, postId, recipientId, recipientName }: GiftModalProps) {
+export default function GiftModal({ isOpen, onClose, postId, recipientId, recipientName, onGiftSent }: GiftModalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const { permissions } = useAdminRole();
@@ -156,7 +157,13 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
         setTimeout(() => addFloatingEmoji(gift.id), i * 100);
       }
 
-      setCredits(prev => prev - gift.cost);
+      // Only deduct from UI for non-admin (admin has unlimited)
+      if (!hasUnlimitedCredits) {
+        setCredits(prev => prev - gift.cost);
+      }
+
+      // Notify parent to update counter and hasGifted state
+      onGiftSent?.();
 
       toast({ 
         title: comboCount > 1 ? `${comboCount}x Combo! 🎉` : `Gift sent!`,

@@ -178,6 +178,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
   const [saved, setSaved] = useState(false);
   const [hasRefeeded, setHasRefeeded] = useState(false);
   const [hasGifted, setHasGifted] = useState(false);
+  const [hasCommented, setHasCommented] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
   const [showFullCaption, setShowFullCaption] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -255,7 +256,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
       if (!user) return;
 
       try {
-        const [likeCheck, saveCheck, refeedCheck, giftCheck] = await Promise.all([
+        const [likeCheck, saveCheck, refeedCheck, giftCheck, commentCheck] = await Promise.all([
           supabase
             .from('post_likes')
             .select('id')
@@ -281,6 +282,12 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
             .eq('source_id', post.id)
             .eq('sender_id', user.id)
             .eq('source_type', 'post')
+            .maybeSingle(),
+          supabase
+            .from('post_comments')
+            .select('id')
+            .eq('post_id', post.id)
+            .eq('user_id', user.id)
             .maybeSingle()
         ]);
 
@@ -288,6 +295,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
         setSaved(!!saveCheck.data);
         setHasRefeeded(!!refeedCheck.data);
         setHasGifted(!!giftCheck.data);
+        setHasCommented(!!commentCheck.data);
       } catch (error) {
         // Errors expected when not liked/saved
       }
@@ -1008,9 +1016,9 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
                 onClick={() => handleCommentsOpenChange(true)}
                 className="p-2 hover:bg-muted rounded-full transition-colors ml-2"
               >
-                <MessageCircle className="w-4 h-4" />
+                <MessageCircle className={cn("w-4 h-4", hasCommented && "text-blue-500")} />
               </button>
-              <span className="text-sm">{commentsCount}</span>
+              <span className={cn("text-sm", hasCommented && "text-blue-500 font-medium")}>{commentsCount}</span>
 
               <button className="p-2 hover:bg-muted rounded-full transition-colors ml-2">
                 <Eye className="w-4 h-4" />
@@ -1091,7 +1099,10 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
           media_type: post.media_type,
           profiles: post.profiles,
         }}
-        onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+        onCommentAdded={() => {
+          setCommentsCount(prev => prev + 1);
+          setHasCommented(true);
+        }}
       />
       <ShareModal
         isOpen={shareOpen}
@@ -1114,6 +1125,10 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
         }}
         postId={post.id}
         recipientId={post.user_id}
+        onGiftSent={() => {
+          setGiftsCount(prev => prev + 1);
+          setHasGifted(true);
+        }}
       />
       <RefeedModal
         isOpen={refeedOpen}

@@ -149,6 +149,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [lightboxIndex, setLightboxIndex] = useState(0); // Active image in lightbox
   const [hasRefeeded, setHasRefeeded] = useState(false); // Has user refeeded this post
   const [hasGifted, setHasGifted] = useState(false); // Has user gifted this post
+  const [hasCommented, setHasCommented] = useState(false); // Has user commented on this post
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -269,12 +270,13 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
       if (!user) return;
 
       try {
-        const [likeCheck, saveCheck, followCheck, refeedCheck, giftCheck] = await Promise.all([
+        const [likeCheck, saveCheck, followCheck, refeedCheck, giftCheck, commentCheck] = await Promise.all([
           supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
           supabase.from('saved_posts').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
           supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', post.user_id).maybeSingle(),
           supabase.from('post_shares').select('id').eq('post_id', post.id).eq('user_id', user.id).in('share_type', ['refeed', 'quote']).maybeSingle(),
-          supabase.from('gift_analytics').select('id').eq('source_id', post.id).eq('sender_id', user.id).eq('source_type', 'post').maybeSingle()
+          supabase.from('gift_analytics').select('id').eq('source_id', post.id).eq('sender_id', user.id).eq('source_type', 'post').maybeSingle(),
+          supabase.from('post_comments').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle()
         ]);
 
         setLiked(!!likeCheck.data);
@@ -282,6 +284,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         setIsFollowing(!!followCheck.data);
         setHasRefeeded(!!refeedCheck.data);
         setHasGifted(!!giftCheck.data);
+        setHasCommented(!!commentCheck.data);
       } catch (error) {
         // Expected when not liked/saved/following
       }
@@ -1320,7 +1323,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   }} 
                   className="flex flex-col items-center gap-0.5 group"
                 >
-                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <div className={cn(
+                    "p-1.5 rounded-full transition-all active:scale-90",
+                    hasCommented ? "bg-blue-500/90" : "bg-black/40 backdrop-blur-sm"
+                  )}>
                     <MessageCircle className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(commentsCount)}</span>
@@ -1592,16 +1598,16 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
               </button>
               <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group flex-1 justify-center">
-                <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
+                <MessageCircle className={cn("w-5 h-5 transition-transform group-active:scale-90", hasCommented ? "text-blue-500" : "text-muted-foreground")} />
+                <span className={cn("text-xs font-medium", hasCommented ? "text-blue-500" : "text-muted-foreground")}>{formatCount(commentsCount)}</span>
               </button>
               <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
-                <Repeat className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                <span className="text-muted-foreground text-xs font-medium">{formatCount(refeedsCount)}</span>
+                <Repeat className={cn("w-5 h-5 transition-transform group-active:scale-90", hasRefeeded ? "text-green-500" : "text-muted-foreground")} />
+                <span className={cn("text-xs font-medium", hasRefeeded ? "text-green-500" : "text-muted-foreground")}>{formatCount(refeedsCount)}</span>
               </button>
               <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
-                <Gift className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                <span className="text-muted-foreground text-xs font-medium">{formatCount(giftsCount)}</span>
+                <Gift className={cn("w-5 h-5 transition-transform group-active:scale-90", hasGifted ? "text-pink-500" : "text-muted-foreground")} />
+                <span className={cn("text-xs font-medium", hasGifted ? "text-pink-500" : "text-muted-foreground")}>{formatCount(giftsCount)}</span>
               </button>
               <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
                 <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
@@ -1708,8 +1714,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               
               {/* Comments */}
               <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
-                <MessageCircle className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                <span className="text-muted-foreground text-xs font-medium">{formatCount(commentsCount)}</span>
+                <MessageCircle className={cn("w-5 h-5 transition-transform group-active:scale-90", hasCommented ? "text-blue-500" : "text-muted-foreground")} />
+                <span className={cn("text-xs font-medium", hasCommented ? "text-blue-500" : "text-muted-foreground")}>{formatCount(commentsCount)}</span>
               </button>
               
               {/* Refeed */}
@@ -1767,7 +1773,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           media_type: currentMediaType,
           profiles: post.profiles
         }}
-        onCommentAdded={() => setCommentsCount(prev => prev + 1)}
+        onCommentAdded={() => {
+          setCommentsCount(prev => prev + 1);
+          setHasCommented(true);
+        }}
         videoCurrentTime={videoRef.current?.currentTime || 0}
         isMuted={isMuted}
       />
@@ -1801,6 +1810,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
         recipientId={post.user_id}
         postId={post.id}
         recipientName={displayName}
+        onGiftSent={() => {
+          setGiftsCount(prev => prev + 1);
+          setHasGifted(true);
+        }}
       />
 
       <RefeedModal
