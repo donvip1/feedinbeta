@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -125,6 +125,7 @@ const audienceInterests = [
 const Promote = () => {
   const { postId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
   const [post, setPost] = useState<Post | null>(null);
@@ -324,8 +325,15 @@ const Promote = () => {
           <div className="flex items-center gap-3">
             <Button
               onClick={() => {
-                // Navigate back to the specific post to maintain context
-                navigate(`/feed/post/${postId}`, { replace: true });
+                // Check for passed return path, use navigate(-1), or fallback to post detail
+                const returnTo = (location.state as any)?.returnTo;
+                if (returnTo) {
+                  navigate(returnTo);
+                } else if (window.history.length > 2) {
+                  navigate(-1);
+                } else {
+                  navigate(`/feed/post/${postId}`, { replace: true });
+                }
               }}
               variant="ghost"
               size="icon"

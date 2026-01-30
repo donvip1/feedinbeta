@@ -502,7 +502,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               onClick={(e) => { 
                 e.stopPropagation(); 
                 e.preventDefault(); 
-                navigate(`/promote/${post.id}`); 
+                navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } }); 
               }}
               className="px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full transition-all active:scale-95 flex items-center gap-1"
             >
