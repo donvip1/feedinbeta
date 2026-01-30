@@ -38,6 +38,17 @@ export interface PhotoPost {
     display_name: string | null;
     avatar_url: string | null;
   };
+  // For refeed/quote attribution
+  post_type?: string | null;
+  original_post?: {
+    id: string;
+    user_id: string;
+    profiles?: {
+      username: string | null;
+      display_name: string | null;
+      avatar_url: string | null;
+    };
+  } | null;
 }
 
 interface PhotoPostSlideProps {
