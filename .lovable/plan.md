@@ -1,179 +1,211 @@
 
-# Plan: Carousel Image Display for Photo+ Posts
+# Plan: Restructure Photo+ Fullscreen Layout
 
 ## Overview
-This plan transforms how Photo+ posts with 2 images are displayed. Instead of showing both images side-by-side, we will display one image at a time with slider navigation controls. Additionally, the caption in normal mode will be limited to a configurable number of lines with "more/less" toggle functionality.
+This plan restructures the Photo+ fullscreen mode (`PhotoPostSlide.tsx`) to match the normal mode's card-based layout. Instead of overlaying caption text on top of the image, the fullscreen view will use a scrollable layout where:
+1. User info appears at the top
+2. Caption text appears below the user info (with 3-line limit and More/Less toggle)
+3. Image appears at the bottom of the content
+4. Social buttons remain at the bottom as a fixed bar
 
 ---
 
-## Current Behavior
-- **Photo+ Post Creator**: Supports up to 2 images selected via two separate picker cards
-- **Normal Mode Display**: Shows 2 images in a side-by-side grid (`flex gap-2`)
-- **Fullscreen Mode**: Uses `PhotoPostSlide.tsx` with horizontal swipe navigation between images and left/right arrow buttons
-- **Caption**: Currently truncates by word count (125 words) in normal mode, but does not limit by lines
+## Current Behavior (Problem)
+
+**Fullscreen Mode Structure:**
+```
++---------------------------+
+|  User Info (overlay)      |   <- Absolute positioned
+|                           |
+|                           |
+|    [FULL SCREEN IMAGE]    |   <- object-contain fills screen
+|                           |
+|  Caption overlay extends  |   <- Absolute positioned, overlays image
+|  over user info when long |   <- Overflows beyond display name
+|                           |
+|  [Social Buttons bar]     |   <- Fixed at bottom
++---------------------------+
+```
+
+**Issue:** Long captions overlay on the image and extend beyond the user info, creating visual clutter.
 
 ---
 
-## Proposed Changes
+## Proposed Solution
 
-### 1. Image Display in Normal Mode (ImmersivePostCard.tsx)
-**Location**: Lines 972-1020
-
-**Current**: Side-by-side grid with `flex gap-2` showing both images at once
-**New**: Single image carousel with:
-- Dot indicators at the bottom showing current position (1/2)
-- Left/right arrow buttons (hidden on mobile, visible on hover for desktop)
-- Horizontal swipe gesture support to navigate between images
-- Smooth transition animation when switching images
-
-### 2. Caption Line Limiting in Normal Mode
-**Location**: Lines 627-633 and 876-892
-
-**Current**: Truncates by word count (125 words for Photo+ posts)
-**New**: 
-- Limit caption display to 3 lines maximum initially
-- Use CSS `line-clamp-3` for the truncated state
-- Add "more" button that expands to show full caption
-- "less" button to collapse back to 3 lines
-
-### 3. Fullscreen Mode (PhotoPostSlide.tsx)
-**Status**: Already supports swipe navigation and arrow buttons
-**Enhancement**: Ensure consistency with normal mode indicators
+**New Fullscreen Mode Structure:**
+```
++---------------------------+
+|  [Back Button]            |   <- Fixed top-right
++---------------------------+
+|  User Info                |   <- Part of scrollable content
+|  ----------------------   |
+|  Caption text (3 lines)   |   <- Line-clamped, expandable
+|  [More] button            |
+|  ----------------------   |
+|                           |
+|    [IMAGE]                |   <- After caption, in content flow
+|                           |
+|  (Dot indicators if 2+)   |
++---------------------------+
+|  [Social Buttons bar]     |   <- Fixed at bottom
++---------------------------+
+```
 
 ---
 
 ## Technical Implementation
 
-### File 1: `src/components/feed/ImmersivePostCard.tsx`
+### File: `src/components/feed/PhotoPostSlide.tsx`
 
-#### A. Replace Side-by-Side Grid with Carousel (Lines 972-1020)
-- Replace the `flex gap-2` grid with a single image container
-- Add carousel state management using existing `currentMediaIndex` state
-- Add navigation arrows and dot indicators
-- Implement swipe gesture handling using existing touch handlers
+#### A. Change from Overlay Layout to Scrollable Layout
+- Replace the current fullscreen overlay structure with a scrollable vertical layout
+- Move user info from absolute positioning to normal document flow
+- Move caption from absolute overlay to normal document flow (after user info)
+- Image comes after caption in the flow
+- Social buttons remain fixed at the bottom
 
-#### B. Update Caption Truncation Logic (Lines 627-633)
-- Change from word-count truncation to line-based truncation
-- Use CSS `line-clamp-3` class for visual truncation
-- Keep the "more/less" toggle functionality
+#### B. Update Caption Handling
+- Use the same 3-line truncation logic (`line-clamp-3`) already in place
+- Keep the "More/Less" pill-styled button for expansion
+- When expanded, the content area becomes scrollable, pushing the image down
 
-#### C. Update Caption Display (Lines 876-892)
-- Apply `line-clamp-3` when `showFullCaption` is false
-- Ensure smooth expansion/collapse animation
-
-### File 2: `src/components/feed/PhotoPostSlide.tsx`
-- No major changes needed - already has image navigation
-- Ensure consistency with normal mode's dot indicators style
-
-### File 3: `src/components/post/PhotoPlusPostCreator.tsx`
-- No changes needed to posting method - already supports 2 images
-- The `media_urls` array storage works correctly for carousel display
+#### C. UI Consistency with Normal Mode
+- Caption text uses `text-foreground` (theme-aware) instead of hardcoded white
+- User info styled similarly to normal mode's header
+- Image uses `object-contain` with proper aspect ratio
 
 ---
 
-## UI/UX Details
+## Detailed Changes
 
-### Carousel Controls (Normal Mode)
-```
-+----------------------------------+
-|                                  |
-|         [Single Image]           |
-|                                  |
-|   <                          >   |  <- Arrow buttons (hover/tap)
-|                                  |
-|            ● ○                   |  <- Dot indicators
-+----------------------------------+
-```
-
-### Caption with Line Limit
-```
-This is a longer caption that spans
-multiple lines and needs to be
-truncated after three lines...
-[more]
-
---- After clicking "more" ---
-
-This is a longer caption that spans
-multiple lines and needs to be
-truncated after three lines. But now
-you can see the entire caption with
-all the hashtags and mentions.
-[less]
-```
-
----
-
-## Implementation Sequence
-
-1. **Update ImmersivePostCard.tsx - Image Carousel**
-   - Replace side-by-side grid (lines 972-1020) with carousel component
-   - Add dot indicators below the image
-   - Add navigation arrows with proper touch handling
-
-2. **Update ImmersivePostCard.tsx - Caption Line Limit**
-   - Modify truncation logic to use line-clamp
-   - Update the caption rendering section
-
-3. **Test End-to-End**
-   - Verify carousel works in normal mode
-   - Verify swipe navigation in fullscreen mode
-   - Verify caption expand/collapse
-   - Test on mobile and desktop
-
----
-
-## Technical Details
-
-### Carousel State Management
-```typescript
-// Already exists in ImmersivePostCard
-const [currentMediaIndex, setCurrentMediaIndex] = useState(0);
-
-// Navigation functions (already exist)
-const handleSwipe = () => { /* swipe logic */ };
-const handleTouchStart = (e: React.TouchEvent) => { /* ... */ };
-const handleTouchEnd = (e: React.TouchEvent) => { /* ... */ };
-```
-
-### CSS Line Clamp
-```css
-/* Already available via Tailwind */
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-```
-
-### Dot Indicators Component
+### 1. Main Container Structure
+**Current:**
 ```tsx
-{hasMultipleMedia && (
-  <div className="flex justify-center gap-2 mt-3">
-    {mediaUrls.map((_, idx) => (
-      <button
-        key={idx}
-        onClick={() => setCurrentMediaIndex(idx)}
-        className={cn(
-          "w-2 h-2 rounded-full transition-all",
-          idx === currentMediaIndex 
-            ? "bg-primary w-4" 
-            : "bg-muted-foreground/40"
-        )}
-      />
-    ))}
+<div className="w-full h-full flex flex-col relative">
+  {/* Image Container - Full height */}
+  <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
+    {/* Image */}
+    {/* Gradient overlays */}
+    {/* User Info - ABSOLUTE overlay at top */}
+    {/* Caption - ABSOLUTE overlay at bottom */}
+    {/* Social Buttons - ABSOLUTE overlay at very bottom */}
   </div>
-)}
+</div>
+```
+
+**New:**
+```tsx
+<div className="w-full h-full flex flex-col bg-black">
+  {/* Back button - Fixed top-right */}
+  <button className="absolute top-4 right-4 z-50">...</button>
+  
+  {/* Scrollable Content Area */}
+  <div className="flex-1 overflow-y-auto">
+    {/* User Info Header - Normal flow */}
+    <div className="p-4">...</div>
+    
+    {/* Caption Section - Normal flow, 3-line limit */}
+    <div className="px-4 pb-3">
+      <p className={cn(!showFullCaption && "line-clamp-3")}>
+        {caption}
+      </p>
+      {/* More/Less button */}
+    </div>
+    
+    {/* Image Section - Normal flow, below caption */}
+    <div className="relative">
+      <img className="w-full object-contain" />
+      {/* Navigation arrows for multi-image */}
+      {/* Dot indicators */}
+    </div>
+  </div>
+  
+  {/* Social Buttons Bar - Fixed at bottom */}
+  <div className="flex-shrink-0 px-4 py-3">...</div>
+</div>
+```
+
+### 2. Remove Overlay Gradients
+- Remove `bg-gradient-to-b from-black/70 to-transparent` top gradient
+- Remove `bg-gradient-to-t from-black/80 to-transparent` bottom gradient
+- These are no longer needed since content is no longer overlaid
+
+### 3. Update Text Colors for Theme Compatibility
+- Change hardcoded `text-white` to `text-foreground` for captions
+- User info uses theme-aware colors: `text-foreground` for names, `text-muted-foreground` for metadata
+
+### 4. Image Container Updates
+- Move from absolute positioning inside a flex-1 container
+- Image gets proper aspect ratio handling with `object-contain`
+- Swipe gesture handling for multi-image navigation preserved
+- Dot indicators appear below the image
+
+### 5. Social Buttons Bar
+- Move from absolute overlay to fixed position at container bottom
+- Keep horizontal layout with Promote, Like, Comment, Gift, Views, Refeed, Share
+- Use semi-transparent background for visibility
+
+---
+
+## Visual Comparison
+
+**Before (Long Caption):**
+```
++---------------------------+
+|  @user • 2h • Globe       |   <- Overlaid on image
+|                           |
+|    [IMAGE PARTIALLY       |
+|     VISIBLE BEHIND        |
+|     CAPTION TEXT]         |
+|                           |
+|  This is a very long      |   <- Overlays on image
+|  caption that extends     |   <- Extends upward past
+|  beyond the user info     |   <- user info
+|  covering the image...    |
+|  [More]                   |
+|  [Promote] [♡] [💬] ...  |
++---------------------------+
+```
+
+**After (Long Caption):**
+```
++---------------------------+   [X]
+|  @user • 2h • Globe       |   <- In content flow
+|---------------------------|
+|  This is a very long      |   <- Below user info
+|  caption that extends     |   <- 3-line limit initially
+|  beyond the user...       |
+|  [More]                   |
+|---------------------------|
+|                           |
+|    [IMAGE]                |   <- Below caption
+|                           |
+|    ● ○                    |   <- Dot indicators
++---------------------------+
+|  [Promote] [♡] [💬] ...  |   <- Fixed at bottom
++---------------------------+
 ```
 
 ---
 
 ## Files to Modify
-1. `src/components/feed/ImmersivePostCard.tsx` - Main changes for carousel and caption
-2. `src/components/feed/PhotoPostSlide.tsx` - Minor updates for consistency (if needed)
+1. `src/components/feed/PhotoPostSlide.tsx` - Main restructure
 
 ## No Changes Required
-- `src/components/post/PhotoPlusPostCreator.tsx` - Posting method already works correctly
-- `src/components/feed/ImageLightbox.tsx` - Already supports multi-image navigation
-- Database schema - No changes needed
+- `src/components/feed/ImmersivePostCard.tsx` - Already has correct normal mode layout
+- `src/components/feed/ImageLightbox.tsx` - Container wrapper, no content changes needed
+
+---
+
+## Implementation Notes
+
+1. **Scroll Behavior**: When caption is expanded, the content area becomes scrollable, allowing users to see the full caption and then scroll down to the image
+
+2. **Gesture Handling**: Horizontal swipe for image navigation is preserved using the same touch handlers
+
+3. **Back Button**: Moved from in-ImageLightbox to inside PhotoPostSlide for consistent positioning
+
+4. **Theme Support**: Using `text-foreground` and `bg-background` ensures proper contrast in both light and dark modes
+
+5. **Image Aspect Ratio**: Using `object-contain` with `max-h-[60vh]` ensures the image fits well without taking excessive space
