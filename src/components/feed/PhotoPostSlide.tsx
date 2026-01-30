@@ -69,14 +69,6 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
   const images = post.media_urls?.length ? post.media_urls : (post.media_url ? [post.media_url] : []);
   const caption = post.content || '';
   
-  // Caption truncation - use 30 words limit for Photo+ posts
-  const countWords = (text: string) => text.trim().split(/\s+/).filter(w => w.length > 0).length;
-  const wordCount = countWords(caption);
-  const shouldTruncateCaption = wordCount > 30;
-  const truncatedCaption = shouldTruncateCaption 
-    ? caption.trim().split(/\s+/).slice(0, 30).join(' ') + '...' 
-    : caption;
-  
   // Follow state
   const [isFollowing, setIsFollowing] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
@@ -372,7 +364,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           )}
         </AnimatePresence>
 
-        {/* Caption - positioned above social buttons with expandable text */}
+        {/* Caption - positioned above social buttons with 3-line limit */}
         {showUI && caption && (
           <div 
             className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200"
@@ -380,14 +372,14 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           >
             <p 
               className={cn(
-                "text-white text-sm drop-shadow-lg leading-relaxed",
-                !showFullCaption && shouldTruncateCaption && "line-clamp-3"
+                "text-white text-sm drop-shadow-lg leading-relaxed transition-all duration-300",
+                !showFullCaption && "line-clamp-3"
               )} 
               style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
             >
-              {showFullCaption ? caption : truncatedCaption}
+              {caption}
             </p>
-            {shouldTruncateCaption && (
+            {caption.length > 100 && (
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
