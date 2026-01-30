@@ -2172,6 +2172,39 @@ export type Database = {
         }
         Relationships: []
       }
+      encrypted_user_data: {
+        Row: {
+          address_encrypted: string | null
+          created_at: string | null
+          date_of_birth_encrypted: string | null
+          government_id_encrypted: string | null
+          id: string
+          phone_number_encrypted: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          address_encrypted?: string | null
+          created_at?: string | null
+          date_of_birth_encrypted?: string | null
+          government_id_encrypted?: string | null
+          id?: string
+          phone_number_encrypted?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          address_encrypted?: string | null
+          created_at?: string | null
+          date_of_birth_encrypted?: string | null
+          government_id_encrypted?: string | null
+          id?: string
+          phone_number_encrypted?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       feed_ads: {
         Row: {
           advertiser_id: string | null
@@ -4354,9 +4387,11 @@ export type Database = {
           deleted_for_receiver: boolean | null
           deleted_for_sender: boolean | null
           edited_at: string | null
+          encrypted_content: Json | null
           expires_at: string | null
           forwarded_from: Json | null
           id: string
+          is_encrypted: boolean | null
           is_pinned: boolean | null
           is_read: boolean | null
           is_secret: boolean | null
@@ -4367,6 +4402,7 @@ export type Database = {
           reply_metadata: Json | null
           reply_to_id: string | null
           sender_id: string
+          sender_public_key_version: number | null
           status: string | null
           updated_at: string
           view_once_timer: number | null
@@ -4380,9 +4416,11 @@ export type Database = {
           deleted_for_receiver?: boolean | null
           deleted_for_sender?: boolean | null
           edited_at?: string | null
+          encrypted_content?: Json | null
           expires_at?: string | null
           forwarded_from?: Json | null
           id?: string
+          is_encrypted?: boolean | null
           is_pinned?: boolean | null
           is_read?: boolean | null
           is_secret?: boolean | null
@@ -4393,6 +4431,7 @@ export type Database = {
           reply_metadata?: Json | null
           reply_to_id?: string | null
           sender_id: string
+          sender_public_key_version?: number | null
           status?: string | null
           updated_at?: string
           view_once_timer?: number | null
@@ -4406,9 +4445,11 @@ export type Database = {
           deleted_for_receiver?: boolean | null
           deleted_for_sender?: boolean | null
           edited_at?: string | null
+          encrypted_content?: Json | null
           expires_at?: string | null
           forwarded_from?: Json | null
           id?: string
+          is_encrypted?: boolean | null
           is_pinned?: boolean | null
           is_read?: boolean | null
           is_secret?: boolean | null
@@ -4419,6 +4460,7 @@ export type Database = {
           reply_metadata?: Json | null
           reply_to_id?: string | null
           sender_id?: string
+          sender_public_key_version?: number | null
           status?: string | null
           updated_at?: string
           view_once_timer?: number | null
@@ -7438,6 +7480,33 @@ export type Database = {
           id?: string
           mfa_enabled?: boolean | null
           mfa_required?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_public_keys: {
+        Row: {
+          created_at: string | null
+          id: string
+          key_version: number | null
+          public_key_jwk: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key_version?: number | null
+          public_key_jwk: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key_version?: number | null
+          public_key_jwk?: Json
           updated_at?: string | null
           user_id?: string
         }
