@@ -227,30 +227,106 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
 
   return (
     <div 
-      className="w-full h-full flex flex-col bg-background"
+      className="w-full h-full flex flex-col bg-black"
       style={{
         transform: 'translate3d(0,0,0)',
         backfaceVisibility: 'hidden',
         willChange: 'transform'
       }}
     >
-      {/* Scrollable Content Area */}
-      <div className="flex-1 overflow-y-auto">
-        {/* User Info Header - Normal flow */}
-        <div className="p-4 border-b border-border">
+      {/* Fullscreen Image Container */}
+      <div className="flex-1 relative overflow-hidden">
+        {/* Image - fills container */}
+        <motion.div
+          drag={images.length > 1 ? 'x' : false}
+          dragConstraints={{ left: -100, right: 100 }}
+          dragElastic={0.3}
+          onDragEnd={handleDragEnd}
+          onClick={onToggleUI}
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ touchAction: 'pan-y' }}
+        >
+          <motion.img
+            key={`${post.id}-${currentImageIndex}`}
+            src={images[currentImageIndex]}
+            alt={`Image ${currentImageIndex + 1}`}
+            initial={false}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.15 }}
+            className="w-full h-full object-contain select-none pointer-events-none will-change-transform"
+            draggable={false}
+            style={{ 
+              transform: 'translate3d(0,0,0)',
+              backfaceVisibility: 'hidden' 
+            }}
+          />
+        </motion.div>
+
+        {/* Image Navigation Arrows */}
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigatePrevImage();
+              }}
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigateNextImage();
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white transition-colors"
+            >
+              <ChevronRight size={20} />
+            </button>
+          </>
+        )}
+
+        {/* Dot Indicators - above overlay */}
+        {images.length > 1 && (
+          <div className="absolute bottom-[180px] left-0 right-0 flex justify-center gap-2 z-20">
+            {images.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(idx);
+                  onImageIndexChange?.(idx);
+                }}
+                className={cn(
+                  "h-2 rounded-full transition-all duration-200",
+                  idx === currentImageIndex 
+                    ? "w-4 bg-white" 
+                    : "w-2 bg-white/40 hover:bg-white/60"
+                )}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Bottom Overlay with User Info and Caption */}
+        <div 
+          className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-16 pointer-events-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* User Info */}
           <div 
-            className="flex items-center gap-3 cursor-pointer"
+            className="px-4 pb-2 flex items-center gap-3 cursor-pointer"
             onClick={handleProfileClick}
           >
-            <Avatar className="w-10 h-10 border-2 border-border">
+            <Avatar className="w-10 h-10 border-2 border-white/30">
               <AvatarImage src={post.profiles?.avatar_url || ''} />
-              <AvatarFallback className="bg-muted text-foreground">
+              <AvatarFallback className="bg-white/20 text-white">
                 {displayName[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="flex flex-col flex-1">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-foreground text-sm">
+                <span className="font-semibold text-white text-sm">
                   {displayName}
                 </span>
                 {user && post.user_id !== user.id && (
@@ -259,7 +335,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
                     disabled={isFollowLoading}
                     className={cn(
                       "font-bold text-xs transition",
-                      isFollowing ? "text-muted-foreground hover:text-foreground" : "text-pink-500 hover:text-pink-400",
+                      isFollowing ? "text-white/70 hover:text-white" : "text-pink-400 hover:text-pink-300",
                       isFollowLoading && "opacity-50"
                     )}
                   >
@@ -267,7 +343,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+              <div className="flex items-center gap-2 text-white/60 text-xs">
                 <span>@{post.profiles?.username || 'user'}</span>
                 <span>•</span>
                 <span>{postTime}</span>
@@ -289,114 +365,42 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Caption Section - Normal flow, below user info */}
-        {caption && (
-          <div 
-            className="px-4 py-3 border-b border-border"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p 
+          {/* Caption Section - Scrollable when expanded */}
+          {caption && (
+            <div 
               className={cn(
-                "text-foreground text-sm leading-relaxed transition-all duration-300",
-                !showFullCaption && "line-clamp-3"
+                "px-4 pb-3 transition-all duration-300",
+                showFullCaption && "max-h-[40vh] overflow-y-auto"
               )}
             >
-              {caption}
-            </p>
-            {caption.length > 100 && (
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowFullCaption(!showFullCaption);
-                }}
-                className="mt-2 px-2.5 py-0.5 bg-muted text-foreground text-[11px] font-bold uppercase tracking-wide rounded-full hover:bg-muted/80 transition-all"
-                style={{ letterSpacing: '0.05em' }}
+              <p 
+                className={cn(
+                  "text-white text-sm leading-relaxed",
+                  !showFullCaption && "line-clamp-3"
+                )}
               >
-                {showFullCaption ? 'Less' : 'More'}
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Image Section - Normal flow, below caption */}
-        <div className="relative">
-          <motion.div
-            drag={images.length > 1 ? 'x' : false}
-            dragConstraints={{ left: -100, right: 100 }}
-            dragElastic={0.3}
-            onDragEnd={handleDragEnd}
-            onClick={onToggleUI}
-            className="w-full flex items-center justify-center bg-muted/20"
-            style={{ touchAction: 'pan-y' }}
-          >
-            <motion.img
-              key={`${post.id}-${currentImageIndex}`}
-              src={images[currentImageIndex]}
-              alt={`Image ${currentImageIndex + 1}`}
-              initial={false}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.15 }}
-              className="w-full max-h-[60vh] object-contain select-none pointer-events-none will-change-transform"
-              draggable={false}
-              style={{ 
-                transform: 'translate3d(0,0,0)',
-                backfaceVisibility: 'hidden' 
-              }}
-            />
-          </motion.div>
-
-          {/* Image Navigation Arrows */}
-          {images.length > 1 && (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigatePrevImage();
-                }}
-                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-background/80 hover:bg-background rounded-full text-foreground transition-colors shadow-md"
-              >
-                <ChevronLeft size={20} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigateNextImage();
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-background/80 hover:bg-background rounded-full text-foreground transition-colors shadow-md"
-              >
-                <ChevronRight size={20} />
-              </button>
-            </>
+                {caption}
+              </p>
+              {caption.length > 100 && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFullCaption(!showFullCaption);
+                  }}
+                  className="mt-2 px-2.5 py-0.5 bg-white/20 text-white text-[11px] font-bold uppercase tracking-wide rounded-full hover:bg-white/30 transition-all"
+                  style={{ letterSpacing: '0.05em' }}
+                >
+                  {showFullCaption ? 'Less' : 'More'}
+                </button>
+              )}
+            </div>
           )}
         </div>
-
-        {/* Dot Indicators - Below image */}
-        {images.length > 1 && (
-          <div className="flex justify-center gap-2 py-3">
-            {images.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentImageIndex(idx);
-                  onImageIndexChange?.(idx);
-                }}
-                className={cn(
-                  "h-2 rounded-full transition-all duration-200",
-                  idx === currentImageIndex 
-                    ? "w-4 bg-primary" 
-                    : "w-2 bg-muted-foreground/40 hover:bg-muted-foreground/60"
-                )}
-              />
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Social Buttons Bar - Fixed at bottom */}
-      <div className="flex-shrink-0 border-t border-border bg-background px-4 py-3">
+      {/* Fixed Social Buttons Bar */}
+      <div className="flex-shrink-0 bg-black/90 px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Left side: Promote */}
           {user && post.id ? (
@@ -426,8 +430,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Heart className={cn("w-4 h-4 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-foreground")} />
-              <span className="text-foreground text-[10px] font-medium">{formatCount(likesCount)}</span>
+              <Heart className={cn("w-4 h-4 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
+              <span className="text-white text-[10px] font-medium">{formatCount(likesCount)}</span>
             </button>
 
             {/* Comments */}
@@ -439,8 +443,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <MessageCircle className="w-4 h-4 text-foreground" />
-              <span className="text-foreground text-[10px] font-medium">{formatCount(commentsCount)}</span>
+              <MessageCircle className="w-4 h-4 text-white" />
+              <span className="text-white text-[10px] font-medium">{formatCount(commentsCount)}</span>
             </button>
 
             {/* Gift */}
@@ -452,14 +456,14 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Gift className="w-4 h-4 text-foreground" />
-              <span className="text-foreground text-[10px] font-medium">{formatCount(giftsCount)}</span>
+              <Gift className="w-4 h-4 text-white" />
+              <span className="text-white text-[10px] font-medium">{formatCount(giftsCount)}</span>
             </button>
 
             {/* Views */}
             <div className="flex items-center gap-1">
-              <Eye className="w-4 h-4 text-muted-foreground" />
-              <span className="text-muted-foreground text-[10px] font-medium">{formatCount(post.views_count || 0)}</span>
+              <Eye className="w-4 h-4 text-white/60" />
+              <span className="text-white/60 text-[10px] font-medium">{formatCount(post.views_count || 0)}</span>
             </div>
 
             {/* Refeed */}
@@ -471,8 +475,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Repeat className="w-4 h-4 text-foreground" />
-              <span className="text-foreground text-[10px] font-medium">{formatCount(refeedsCount)}</span>
+              <Repeat className="w-4 h-4 text-white" />
+              <span className="text-white text-[10px] font-medium">{formatCount(refeedsCount)}</span>
             </button>
 
             {/* Share */}
@@ -484,7 +488,7 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Share2 className="w-4 h-4 text-foreground" />
+              <Share2 className="w-4 h-4 text-white" />
             </button>
           </div>
         </div>
