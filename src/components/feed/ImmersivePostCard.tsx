@@ -1007,10 +1007,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                         onContextMenu={(e) => e.preventDefault()}
                         draggable={false}
                       />
-                      {/* Image counter indicator at top-right */}
-                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/60 rounded-full text-white text-[10px] font-medium">
-                        {currentMediaIndex + 1}/{mediaUrls.length}
-                      </div>
                     </div>
                     
                     {/* Navigation Arrows - visible on hover (desktop) or always (mobile) */}
@@ -1036,24 +1032,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     </button>
                   </div>
                   
-                  {/* Dot indicators below image */}
-                  <div className="flex justify-center gap-2 mt-3">
-                    {mediaUrls.map((_, idx) => (
-                      <button
-                        key={idx}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentMediaIndex(idx);
-                        }}
-                        className={cn(
-                          "h-2 rounded-full transition-all duration-200",
-                          idx === currentMediaIndex 
-                            ? "w-4 bg-primary" 
-                            : "w-2 bg-muted-foreground/40 hover:bg-muted-foreground/60"
-                        )}
-                      />
-                    ))}
-                  </div>
                 </div>
               ) : isPhotoTextLayout && !hasMultipleMedia && !isImmersiveMode ? (
                 /* Single image in Photo+ within card */
@@ -1264,20 +1242,6 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             </div>
           )}
 
-          {/* Multiple Media Indicator */}
-          {hasMultipleMedia && (
-            <div className="absolute top-4 right-16 flex gap-1.5 z-10">
-              {mediaUrls.map((_, idx) => (
-                <div 
-                  key={idx} 
-                  className={cn(
-                    "w-2 h-2 rounded-full transition-all",
-                    idx === currentMediaIndex ? "bg-white w-4" : "bg-white/50"
-                  )}
-                />
-              ))}
-            </div>
-          )}
 
           {/* Mute/Unmute Button - Only show in immersive mode (normal mode has it in the header) */}
           {hasVideo && isImmersiveMode && showImmersiveUI && (
