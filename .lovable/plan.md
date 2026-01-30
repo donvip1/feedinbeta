@@ -1,68 +1,194 @@
 
-# Plan: Fix Missing `gifts` Table - Allow Admin to Send Gifts
+# Plan: Fix Navigation After Clicking Promote and Back Arrow
 
-## Problem Identified
+## Problem Summary
 
-The error message **"relation 'gifts' does not exist"** is causing gift sending to fail for **everyone**, including the admin.
+When users click the "Promote" button on a video or Photo+ post and then use the back arrow to return, they are redirected to a different post or wrong feed section instead of returning to the original content.
 
-The `send_gift` RPC function is trying to insert into a table called `gifts`:
-
-```sql
-INSERT INTO gifts (sender_id, receiver_id, post_id, gift_type, credit_value, platform_fee, creator_amount)
-VALUES (v_sender_id, v_receiver_id, p_post_id, p_gift_type, p_credit_value, v_platform_fee, v_creator_amount)
-RETURNING id INTO v_gift_id;
+**Current Flow (Broken):**
+```
+Feed (viewing post) → Promote page → Back arrow → PostDetail (different view) → Lost context
 ```
 
-**But this table does not exist!** The existing gift-related tables are:
-- `gift_analytics` (the correct table to use)
-- `live_stream_gifts`
-- `live_space_gifts`
-- `gift_appreciation_options`
+**Expected Flow (Fixed):**
+```
+Feed (viewing post) → Promote page → Back arrow → Feed (same post at same position)
+```
+
+## Root Cause
+
+The Promote page (`src/pages/Promote.tsx`) back arrow handler currently does:
+```javascript
+navigate(`/feed/post/${postId}`, { replace: true });
+```
+
+This always redirects to PostDetail regardless of where the user came from, which:
+1. Replaces history making browser back unpredictable
+2. PostDetail loads ALL posts from that user, not just the one they were viewing
+3. Loses the feed scroll position and tab context (Video vs Photo+)
 
 ## Solution
 
-Update the `send_gift` function to:
-1. **Use `gift_analytics` table** instead of the non-existent `gifts` table
-2. **Include `source_type`** column which is required (NOT NULL) in `gift_analytics`
-3. **Map columns correctly** to match the `gift_analytics` schema
+Implement **referrer-aware back navigation** in the Promote page:
 
-### Current `gift_analytics` Schema
-| Column | Type | Required |
-|--------|------|----------|
-| id | uuid | YES |
-| sender_id | uuid | NO |
-| receiver_id | uuid | YES |
-| gift_type | text | YES |
-| credit_value | integer | YES |
-| source_type | text | YES |
-| source_id | uuid | NO |
-| platform_fee | integer | NO |
-| created_at | timestamptz | NO |
-| is_converted | boolean | NO |
+### Strategy 1: Use `navigate(-1)` with Intelligent Fallback
 
-## Database Changes
+Instead of always going to PostDetail, check if there's valid history to go back to:
 
-### Fix the `send_gift` Function
+```javascript
+const handleBack = () => {
+  // If we have history, go back to the exact previous page (Feed, PostDetail, etc.)
+  if (window.history.length > 2) {
+    navigate(-1);
+  } else {
+    // No history - fallback to post detail
+    navigate(`/feed/post/${postId}`, { replace: true });
+  }
+};
+```
 
-Replace the INSERT statement to use the correct table:
+### Strategy 2: Store Referrer in Navigation State
 
-```sql
--- Change FROM:
-INSERT INTO gifts (sender_id, receiver_id, post_id, gift_type, credit_value, platform_fee, creator_amount)
-VALUES (...)
+Pass the source URL when navigating to Promote:
 
--- Change TO:
-INSERT INTO gift_analytics (sender_id, receiver_id, gift_type, credit_value, source_type, source_id, platform_fee, is_converted)
-VALUES (v_sender_id, v_receiver_id, p_gift_type, p_credit_value, 'post', p_post_id, v_platform_fee, false)
-RETURNING id INTO v_gift_id;
+```javascript
+// In ImmersivePostCard, PostCard, PhotoPostSlide:
+navigate(`/promote/${post.id}`, { 
+  state: { returnTo: location.pathname + location.search } 
+});
+
+// In Promote.tsx back handler:
+const location = useLocation();
+const returnTo = location.state?.returnTo || `/feed/post/${postId}`;
+navigate(returnTo);
 ```
 
 ## Files to Modify
 
-| Change | Description |
-|--------|-------------|
-| Database Migration | Update `send_gift` function to use `gift_analytics` table instead of non-existent `gifts` table |
+| File | Change |
+|------|--------|
+| `src/pages/Promote.tsx` | Update back arrow handler to use `navigate(-1)` with fallback |
+| `src/components/feed/ImmersivePostCard.tsx` | Pass state with returnTo path when navigating to Promote |
+| `src/components/feed/PostCard.tsx` | Pass state with returnTo path when navigating to Promote |
+| `src/components/feed/PhotoPostSlide.tsx` | Pass state with returnTo path when navigating to Promote |
+
+## Implementation Details
+
+### 1. Update Promote.tsx Back Handler (lines 326-329)
+
+**Before:**
+```tsx
+<Button
+  onClick={() => {
+    navigate(`/feed/post/${postId}`, { replace: true });
+  }}
+  ...
+>
+```
+
+**After:**
+```tsx
+const location = useLocation();
+
+// In the onClick handler:
+<Button
+  onClick={() => {
+    // Check for passed return path or use navigate(-1)
+    const returnTo = location.state?.returnTo;
+    if (returnTo) {
+      navigate(returnTo);
+    } else if (window.history.length > 2) {
+      navigate(-1);
+    } else {
+      navigate(`/feed/post/${postId}`, { replace: true });
+    }
+  }}
+  ...
+>
+```
+
+### 2. Update Promote Button in ImmersivePostCard.tsx
+
+There are 4 Promote buttons in this file. Each needs to pass state:
+
+**Before:**
+```tsx
+navigate(`/promote/${post.id}`);
+```
+
+**After:**
+```tsx
+navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
+```
+
+### 3. Update Promote Button in PostCard.tsx
+
+**Before:**
+```tsx
+navigate(`/promote/${post.id}`);
+```
+
+**After:**
+```tsx
+navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
+```
+
+### 4. Update Promote Button in PhotoPostSlide.tsx
+
+**Before:**
+```tsx
+navigate(`/promote/${post.id}`);
+```
+
+**After:**
+```tsx
+navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
+```
+
+## Visual Flow After Fix
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    NAVIGATION FLOW (FIXED)                      │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Feed Page (/feed)                                             │
+│   ┌──────────────────────────────────────────────┐              │
+│   │  Video Tab    │    Photo+ Tab               │              │
+│   │  ┌─────────┐  │    ┌─────────┐              │              │
+│   │  │ Video 1 │  │    │ Photo 1 │              │              │
+│   │  │[Promote]│──┼────│[Promote]│──────┐       │              │
+│   │  └─────────┘  │    └─────────┘      │       │              │
+│   └───────────────┴─────────────────────┼───────┘              │
+│                                         │                       │
+│                                         ▼                       │
+│                            ┌────────────────────┐               │
+│                            │   Promote Page     │               │
+│                            │   /promote/:id     │               │
+│                            │                    │               │
+│                            │   state: {         │               │
+│                            │     returnTo: '/feed'              │
+│                            │   }                │               │
+│                            │                    │               │
+│                            │   [← Back Arrow]   │               │
+│                            └────────┬───────────┘               │
+│                                     │                           │
+│                                     ▼                           │
+│                            Returns to /feed                     │
+│                            (same scroll position,               │
+│                             same tab, same post)                │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+## Edge Cases Handled
+
+1. **Direct link to Promote page** (no history): Falls back to PostDetail
+2. **From PostDetail page**: Returns to PostDetail correctly
+3. **From Feed Video tab**: Returns to Feed at same position
+4. **From Feed Photo+ tab**: Returns to Feed at same position
+5. **From Fullscreen Photo viewer**: Returns to Feed/viewer correctly
 
 ## Summary
 
-The issue is NOT about admin restrictions - it's that the `gifts` table referenced in the function doesn't exist at all. Once we fix this to use `gift_analytics`, both admin and regular users will be able to send gifts (with admin bypassing balance/rate-limit checks as already implemented).
+This fix ensures users are returned to their exact previous location after visiting the Promote page, maintaining scroll position, tab selection, and post context. The solution is backward compatible with existing direct navigation patterns.
