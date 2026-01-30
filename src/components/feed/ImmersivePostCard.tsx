@@ -147,6 +147,8 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [isFollowLoading, setIsFollowLoading] = useState(false); // Loading state for follow action
   const [showLightbox, setShowLightbox] = useState(false); // Lightbox state for Photo+ images
   const [lightboxIndex, setLightboxIndex] = useState(0); // Active image in lightbox
+  const [hasRefeeded, setHasRefeeded] = useState(false); // Has user refeeded this post
+  const [hasGifted, setHasGifted] = useState(false); // Has user gifted this post
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const postRef = useRef<HTMLDivElement>(null);
@@ -261,21 +263,25 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
     handleSwipe();
   };
 
-  // Check if post is liked, saved, and if we're following the poster
+  // Check if post is liked, saved, following, refeeded, and gifted
   useEffect(() => {
     const checkStatus = async () => {
       if (!user) return;
 
       try {
-        const [likeCheck, saveCheck, followCheck] = await Promise.all([
+        const [likeCheck, saveCheck, followCheck, refeedCheck, giftCheck] = await Promise.all([
           supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
           supabase.from('saved_posts').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
-          supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', post.user_id).maybeSingle()
+          supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', post.user_id).maybeSingle(),
+          supabase.from('post_shares').select('id').eq('post_id', post.id).eq('user_id', user.id).in('share_type', ['refeed', 'quote']).maybeSingle(),
+          supabase.from('gift_analytics').select('id').eq('source_id', post.id).eq('sender_id', user.id).eq('source_type', 'post').maybeSingle()
         ]);
 
         setLiked(!!likeCheck.data);
         setSaved(!!saveCheck.data);
         setIsFollowing(!!followCheck.data);
+        setHasRefeeded(!!refeedCheck.data);
+        setHasGifted(!!giftCheck.data);
       } catch (error) {
         // Expected when not liked/saved/following
       }
@@ -1358,7 +1364,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                 {/* Gift - always visible */}
                 <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                  <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                  <div className={cn(
+                    "p-1.5 rounded-full transition-all active:scale-90",
+                    hasGifted ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+                  )}>
                     <Gift className="w-5 h-5 text-white" />
                   </div>
                   <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
@@ -1377,7 +1386,10 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
                     {/* Refeed */}
                     <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex flex-col items-center gap-0.5 group">
-                      <div className="p-1.5 bg-black/40 backdrop-blur-sm rounded-full transition-all active:scale-90">
+                      <div className={cn(
+                        "p-1.5 rounded-full transition-all active:scale-90",
+                        hasRefeeded ? "bg-green-500/90" : "bg-black/40 backdrop-blur-sm"
+                      )}>
                         <Repeat className="w-5 h-5 text-white" />
                       </div>
                       <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
@@ -1739,13 +1751,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 
                 {/* Refeed */}
                 <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Repeat className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
-                  <span className="text-muted-foreground text-xs font-medium">{formatCount(refeedsCount)}</span>
+                  <Repeat className={cn("w-5 h-5 transition-transform group-active:scale-90", hasRefeeded ? "text-green-500" : "text-muted-foreground")} />
+                  <span className={cn("text-xs font-medium", hasRefeeded ? "text-green-500" : "text-muted-foreground")}>{formatCount(refeedsCount)}</span>
                 </button>
 
                 {/* Gift */}
                 <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
-                  <Gift className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
+                  <Gift className={cn("w-5 h-5 transition-transform group-active:scale-90", hasGifted ? "text-pink-500" : "text-muted-foreground")} />
+                  <span className={cn("text-xs font-medium", hasGifted ? "text-pink-500" : "text-muted-foreground")}>{formatCount(giftsCount)}</span>
                 </button>
                 
                 {/* Share */}
@@ -1845,8 +1858,15 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           media_types: post.media_types,
           profiles: post.profiles
         }}
+        hasRefeeded={hasRefeeded}
         onRefeedAdded={() => {
           setRefeedsCount(prev => prev + 1);
+          setHasRefeeded(true);
+          onLikeUpdate?.();
+        }}
+        onUnrefeed={() => {
+          setRefeedsCount(prev => Math.max(0, prev - 1));
+          setHasRefeeded(false);
           onLikeUpdate?.();
         }}
       />
