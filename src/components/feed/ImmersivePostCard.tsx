@@ -1418,7 +1418,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
+                    navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
                   }}
                   className="flex items-center gap-1.5 mt-4 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-lg"
                 >
@@ -1626,7 +1626,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
+                    navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
                   }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-sm"
                 >
@@ -1687,7 +1687,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/promote/${post.id}`);
+                  navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-lg"
               >
@@ -1748,7 +1748,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
-                    navigate(`/promote/${post.id}`);
+                    navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
                   }}
                   className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95"
                 >

@@ -1072,7 +1072,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
           {/* Promote button - visible to all logged-in users */}
           {user && (
             <button 
-              onClick={() => navigate(`/promote/${post.id}`)}
+              onClick={() => navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } })}
               className="mt-2 flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               <TrendingUp className="w-4 h-4" />
