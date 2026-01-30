@@ -7197,6 +7197,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_admin_minted: boolean | null
+          last_gift_sent_at: string | null
           total_earned: number
           total_spent: number
           updated_at: string | null
@@ -7207,6 +7208,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_admin_minted?: boolean | null
+          last_gift_sent_at?: string | null
           total_earned?: number
           total_spent?: number
           updated_at?: string | null
@@ -7217,6 +7219,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_admin_minted?: boolean | null
+          last_gift_sent_at?: string | null
           total_earned?: number
           total_spent?: number
           updated_at?: string | null
