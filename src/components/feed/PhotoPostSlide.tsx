@@ -417,9 +417,82 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
 
       {/* Fixed Social Buttons Bar */}
       <div className="flex-shrink-0 bg-black/90 px-4 py-3">
-        <div className="flex items-center justify-between">
-          {/* Left side: Promote */}
-          {user && post.id ? (
+        {/* Social buttons row */}
+        <div className="flex items-center justify-end gap-4">
+          {/* Like */}
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              e.preventDefault(); 
+              handleLike(e); 
+            }} 
+            className="flex items-center gap-1 group"
+          >
+            <Heart className={cn("w-4 h-4 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
+            <span className="text-white text-[10px] font-medium">{formatCount(likesCount)}</span>
+          </button>
+
+          {/* Comments */}
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              e.preventDefault(); 
+              setCommentsOpen(true); 
+            }} 
+            className="flex items-center gap-1 group"
+          >
+            <MessageCircle className="w-4 h-4 text-white" />
+            <span className="text-white text-[10px] font-medium">{formatCount(commentsCount)}</span>
+          </button>
+
+          {/* Gift */}
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              e.preventDefault(); 
+              setGiftOpen(true); 
+            }} 
+            className="flex items-center gap-1 group"
+          >
+            <Gift className="w-4 h-4 text-white" />
+            <span className="text-white text-[10px] font-medium">{formatCount(giftsCount)}</span>
+          </button>
+
+          {/* Views */}
+          <div className="flex items-center gap-1">
+            <Eye className="w-4 h-4 text-white/60" />
+            <span className="text-white/60 text-[10px] font-medium">{formatCount(post.views_count || 0)}</span>
+          </div>
+
+          {/* Refeed */}
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              e.preventDefault(); 
+              setRefeedOpen(true); 
+            }} 
+            className="flex items-center gap-1 group"
+          >
+            <Repeat className="w-4 h-4 text-white" />
+            <span className="text-white text-[10px] font-medium">{formatCount(refeedsCount)}</span>
+          </button>
+
+          {/* Share */}
+          <button 
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              e.preventDefault(); 
+              setShareOpen(true); 
+            }} 
+            className="flex items-center gap-1 group"
+          >
+            <Share2 className="w-4 h-4 text-white" />
+          </button>
+        </div>
+
+        {/* Promote Button - on its own row below */}
+        {user && post.id && (
+          <div className="flex justify-end mt-2">
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -431,83 +504,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               <TrendingUp className="w-3.5 h-3.5 text-white" />
               <span className="text-white text-[10px] font-semibold">Promote</span>
             </button>
-          ) : (
-            <div />
-          )}
-
-          {/* Right side: Social buttons in horizontal row */}
-          <div className="flex items-center gap-4">
-            {/* Like */}
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                e.preventDefault(); 
-                handleLike(e); 
-              }} 
-              className="flex items-center gap-1 group"
-            >
-              <Heart className={cn("w-4 h-4 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
-              <span className="text-white text-[10px] font-medium">{formatCount(likesCount)}</span>
-            </button>
-
-            {/* Comments */}
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                e.preventDefault(); 
-                setCommentsOpen(true); 
-              }} 
-              className="flex items-center gap-1 group"
-            >
-              <MessageCircle className="w-4 h-4 text-white" />
-              <span className="text-white text-[10px] font-medium">{formatCount(commentsCount)}</span>
-            </button>
-
-            {/* Gift */}
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                e.preventDefault(); 
-                setGiftOpen(true); 
-              }} 
-              className="flex items-center gap-1 group"
-            >
-              <Gift className="w-4 h-4 text-white" />
-              <span className="text-white text-[10px] font-medium">{formatCount(giftsCount)}</span>
-            </button>
-
-            {/* Views */}
-            <div className="flex items-center gap-1">
-              <Eye className="w-4 h-4 text-white/60" />
-              <span className="text-white/60 text-[10px] font-medium">{formatCount(post.views_count || 0)}</span>
-            </div>
-
-            {/* Refeed */}
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                e.preventDefault(); 
-                setRefeedOpen(true); 
-              }} 
-              className="flex items-center gap-1 group"
-            >
-              <Repeat className="w-4 h-4 text-white" />
-              <span className="text-white text-[10px] font-medium">{formatCount(refeedsCount)}</span>
-            </button>
-
-            {/* Share */}
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                e.preventDefault(); 
-                setShareOpen(true); 
-              }} 
-              className="flex items-center gap-1 group"
-            >
-              <Share2 className="w-4 h-4 text-white" />
-            </button>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Comments Modal */}

@@ -657,7 +657,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           // Video layout: full viewport height for TikTok-style
           !isImmersiveMode && layoutType === 'video' && "h-[calc(100dvh-68px)]",
           // Photo+ layout: content-driven height with minimal padding, no fixed height
-          !isImmersiveMode && isPhotoTextLayout && "min-h-fit pb-4"
+          !isImmersiveMode && isPhotoTextLayout && "min-h-fit pb-2"
         )}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -791,7 +791,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
 
         {/* --- Photo+ Facebook-style Card Layout: Header + Caption + Image + Social Buttons --- */}
         {!isImmersiveMode && isPhotoTextLayout && !isEffectivelyPlainText && (
-          <div className="flex-shrink-0 bg-card rounded-t-lg border-x border-t border-border mt-14 mx-2">
+          <div className="flex-shrink-0 bg-card rounded-t-lg border-x border-t border-border mt-6 mx-2">
             {/* Post Header - User info */}
             <div className="flex items-center gap-3 p-4 pb-3">
               <Avatar 
@@ -1736,6 +1736,13 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             
             {/* Social buttons row */}
             <div className="flex items-center justify-between px-3 py-2.5">
+              {/* Views on left */}
+              <div className="flex items-center gap-1">
+                <Eye className="w-4 h-4 text-muted-foreground/60" />
+                <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)}</span>
+              </div>
+
+              {/* Social buttons on right */}
               <div className="flex items-center gap-4">
                 {/* Like */}
                 <button onClick={handleLike} className="flex items-center gap-1.5 group">
@@ -1766,30 +1773,23 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                   <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
                 </button>
               </div>
-
-              {/* Views + Promote */}
-              <div className="flex items-center gap-3">
-                {/* Views */}
-                <div className="flex items-center gap-1">
-                  <Eye className="w-4 h-4 text-muted-foreground/60" />
-                  <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)}</span>
-                </div>
-
-                {/* Promote Button */}
-                {user && isPromoted !== true && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/promote/${post.id}`);
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95"
-                  >
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    <span className="text-[10px] font-semibold">Promote</span>
-                  </button>
-                )}
-              </div>
             </div>
+
+            {/* Promote Button - on its own row below */}
+            {user && isPromoted !== true && (
+              <div className="flex justify-end px-3 pb-2.5">
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/promote/${post.id}`);
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95"
+                >
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span className="text-[10px] font-semibold">Promote</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
         {/* Social buttons for Plain Text are now inline within the text section above */}
