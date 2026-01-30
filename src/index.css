@@ -46,26 +46,26 @@
 }
 @layer base {
   :root {
-    /* Light mode - Feminine pink/magenta palette */
+    /* Light mode - Clean readable theme */
     --background: 0 0% 100%;
-    --foreground: 340 10% 15%;
+    --foreground: 222 47% 11%;
     --card: 0 0% 100%;
-    --card-foreground: 340 10% 15%;
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 340 10% 15%;
+    --popover-foreground: 222 47% 11%;
     --primary: 330 85% 55%;
     --primary-foreground: 0 0% 100%;
     --primary-glow: 340 80% 65%;
-    --secondary: 330 20% 95%;
-    --secondary-foreground: 340 10% 15%;
-    --muted: 330 15% 94%;
-    --muted-foreground: 340 8% 45%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
     --accent: 320 75% 60%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 330 15% 90%;
-    --input: 330 15% 90%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
     --ring: 330 85% 55%;
     --radius: 0.75rem;
     
@@ -77,7 +77,7 @@
     --gradient-primary: linear-gradient(135deg, hsl(330, 85%, 55%), hsl(350, 80%, 60%));
     --gradient-accent: linear-gradient(135deg, hsl(330, 85%, 55%), hsl(280, 70%, 60%));
     --gradient-story: linear-gradient(45deg, hsl(330, 100%, 60%), hsl(350, 90%, 55%), hsl(20, 100%, 60%));
-    --gradient-subtle: linear-gradient(180deg, hsl(0, 0%, 100%), hsl(330, 20%, 98%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0, 0%, 100%), hsl(210, 40%, 98%));
     
     /* Shadows */
     --shadow-elegant: 0 10px 30px -10px hsl(330 85% 55% / 0.25);
