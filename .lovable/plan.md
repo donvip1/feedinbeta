@@ -1,196 +1,224 @@
 
 
-# Plan: Fullscreen Image with Scrollable Text Overlay
+# Plan: Move User Info Above Image in Photo+ Fullscreen
 
-## Understanding the Request
-
-The current implementation makes the fullscreen mode look like the normal card mode (constrained image with `max-h-[60vh]`). Instead, you want:
-
-1. **Image fills the screen** - The image should expand to cover the full viewport, not be constrained
-2. **Text is still viewable** - User info and caption should be accessible, but overlaid or scrollable
-3. **Scroll to view text** - Users can scroll to reveal the caption, but the image stays fullscreen
-4. **True fullscreen experience** - Should feel immersive like TikTok/Instagram stories, not like a card
+## Overview
+This plan moves the user information (avatar, display name, username, timestamp, etc.) from the bottom overlay to a fixed header at the top of the fullscreen view. The caption will remain at the bottom overlaying the image, while the image continues to fill the screen.
 
 ---
 
-## Proposed Solution
-
-Create a **fullscreen image with a scrollable text section that appears over the image**. The structure:
+## Current Layout
 
 ```
 +---------------------------+
 |                           |
 |                           |
-|    [FULLSCREEN IMAGE]     |  <- Image covers entire viewport
-|    (object-cover/contain) |
+|   [FULLSCREEN IMAGE]      |
 |                           |
 |                           |
-+---------------------------+
-| User Info                 |  <- Scrollable overlay section
-| Caption (3 lines + More)  |     that can be scrolled up
-| [Expand reveals full text]|     to reveal more content
-+---------------------------+
-| [Social Buttons Bar]      |  <- Fixed at bottom
-+---------------------------+
-```
-
-When user scrolls up on the bottom section, the full caption is revealed while the image stays in place behind it.
-
----
-
-## Technical Implementation
-
-### File: `src/components/feed/PhotoPostSlide.tsx`
-
-#### A. Make Image Fullscreen (Cover the viewport)
-- Change from `max-h-[60vh] object-contain` to `h-full object-cover` or `object-contain` filling the container
-- Image container takes full available height (minus social bar)
-- Remove the constrained sizing
-
-#### B. Overlay Text Section on Image
-- Position user info and caption as an overlay at the bottom of the image
-- Use semi-transparent gradient background for readability
-- Keep the 3-line truncation with More/Less toggle
-- When expanded, the overlay section becomes scrollable
-
-#### C. Structure Change
-```tsx
-<div className="w-full h-full flex flex-col bg-black">
-  {/* Full-screen Image Container */}
-  <div className="flex-1 relative overflow-hidden">
-    {/* Image - fills container */}
-    <img className="absolute inset-0 w-full h-full object-contain" />
-    
-    {/* Overlay section at bottom */}
-    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
-      {/* User Info */}
-      <div className="px-4 pt-8 pb-2">...</div>
-      
-      {/* Caption - scrollable when expanded */}
-      <div className="px-4 pb-3 max-h-[40vh] overflow-y-auto">
-        <p className={cn(!showFullCaption && "line-clamp-3")}>
-          {caption}
-        </p>
-        {/* More/Less button */}
-      </div>
-    </div>
-    
-    {/* Image Navigation Arrows */}
-    {images.length > 1 && (
-      <>
-        <button className="absolute left-2 top-1/2">...</button>
-        <button className="absolute right-2 top-1/2">...</button>
-      </>
-    )}
-    
-    {/* Dot Indicators - positioned above overlay */}
-    {images.length > 1 && (
-      <div className="absolute bottom-[calc(overlay-height)] left-0 right-0">...</div>
-    )}
-  </div>
-  
-  {/* Fixed Social Buttons Bar */}
-  <div className="flex-shrink-0 px-4 py-3 bg-black">...</div>
-</div>
-```
-
----
-
-## Key Changes
-
-### 1. Image Sizing (Line 341)
-**Current:**
-```tsx
-className="w-full max-h-[60vh] object-contain"
-```
-
-**New:**
-```tsx
-className="absolute inset-0 w-full h-full object-contain"
-// Image fills entire container, centered with object-contain
-```
-
-### 2. Container Structure (Lines 228-396)
-**Current:** Scrollable vertical flow with image in document flow
-**New:** Image as absolute background with overlay text section
-
-### 3. Overlay Text Section
-- Semi-transparent gradient background (`from-black/80`)
-- User info compact at top of overlay
-- Caption with line-clamp-3 and More/Less button
-- When "More" is clicked, the overlay section becomes scrollable with `max-h-[40vh] overflow-y-auto`
-- Text uses white color for visibility on image
-
-### 4. Navigation Elements
-- Arrows remain absolutely positioned on the image
-- Dot indicators positioned above the text overlay
-
----
-
-## Visual Comparison
-
-**Current (Constrained):**
-```
-+---------------------------+
-|  User Info                |  <- Normal flow
-|  Caption section          |  <- Normal flow
-|---------------------------|
-|                           |
-|  [Constrained Image]      |  <- max-h-[60vh]
-|  [60vh max height]        |
-|                           |
-|       ● ○                 |
+|===========================|  <- Gradient overlay at bottom
+|  Avatar + Display Name    |  <- User info in bottom overlay
+|  @username • 2h • Globe   |
+|  Caption (3 lines)        |
+|  [More]                   |
 +---------------------------+
 |  [Social Bar]             |
 +---------------------------+
 ```
 
-**New (Fullscreen):**
+---
+
+## Proposed Layout
+
 ```
 +---------------------------+
+|  Avatar | Display Name    |  <- Fixed header at TOP
+|         | @user • 2h      |
++---------------------------+
+|                           |
+|   [FULLSCREEN IMAGE]      |  <- Image fills remaining space
+|                           |
+|===========================|  <- Gradient overlay at bottom
+|  Caption (3 lines)        |  <- Caption stays at bottom
+|  [More]                   |
++---------------------------+
+|  [Social Bar]             |
++---------------------------+
+```
+
+---
+
+## Technical Changes
+
+### File: `src/components/feed/PhotoPostSlide.tsx`
+
+#### 1. Add Fixed User Info Header at Top (NEW)
+- Create a new section above the image container
+- Contains: Avatar, display name, follow button, @username, timestamp, visibility icon, location
+- Uses semi-transparent black background for visibility
+- Positioned in normal document flow (not absolute)
+
+#### 2. Update Image Container
+- Image container becomes `flex-1` to fill space between header and social bar
+- Image remains fullscreen with `object-contain`
+
+#### 3. Update Bottom Overlay
+- Remove user info from bottom overlay
+- Keep only the caption section with gradient background
+- Caption retains 3-line limit with More/Less toggle
+
+---
+
+## Structure Changes
+
+**Current (Lines 228-400):**
+```tsx
+<div className="w-full h-full flex flex-col bg-black">
+  {/* Fullscreen Image Container */}
+  <div className="flex-1 relative overflow-hidden">
+    {/* Image */}
+    {/* Navigation Arrows */}
+    {/* Dot Indicators */}
+    
+    {/* Bottom Overlay - Contains BOTH user info AND caption */}
+    <div className="absolute bottom-0 ...">
+      {/* User Info */}
+      {/* Caption */}
+    </div>
+  </div>
+  
+  {/* Social Bar */}
+</div>
+```
+
+**New:**
+```tsx
+<div className="w-full h-full flex flex-col bg-black">
+  {/* NEW: Fixed User Info Header at TOP */}
+  <div className="flex-shrink-0 px-4 py-3 bg-black/80">
+    <div className="flex items-center gap-3">
+      <Avatar ... />
+      <div className="flex flex-col">
+        <span>Display Name</span> + Follow button
+        <span>@username • 2h • Globe • Location</span>
+      </div>
+    </div>
+  </div>
+
+  {/* Fullscreen Image Container */}
+  <div className="flex-1 relative overflow-hidden">
+    {/* Image */}
+    {/* Navigation Arrows */}
+    {/* Dot Indicators */}
+    
+    {/* Bottom Overlay - Contains ONLY caption now */}
+    <div className="absolute bottom-0 ...">
+      {/* Caption Section */}
+    </div>
+  </div>
+  
+  {/* Social Bar */}
+</div>
+```
+
+---
+
+## Detailed Implementation
+
+### A. New Header Section (Insert before image container)
+```tsx
+{/* User Info Header - Fixed at top */}
+<div 
+  className="flex-shrink-0 px-4 py-3 bg-black/80 border-b border-white/10"
+  onClick={(e) => e.stopPropagation()}
+>
+  <div 
+    className="flex items-center gap-3 cursor-pointer"
+    onClick={handleProfileClick}
+  >
+    <Avatar className="w-10 h-10 border-2 border-white/30">
+      <AvatarImage src={post.profiles?.avatar_url || ''} />
+      <AvatarFallback className="bg-white/20 text-white">
+        {displayName[0]?.toUpperCase()}
+      </AvatarFallback>
+    </Avatar>
+    <div className="flex flex-col flex-1">
+      <div className="flex items-center gap-2">
+        <span className="font-semibold text-white text-sm">
+          {displayName}
+        </span>
+        {/* Follow button */}
+      </div>
+      <div className="flex items-center gap-2 text-white/60 text-xs">
+        <span>@{post.profiles?.username || 'user'}</span>
+        <span>•</span>
+        <span>{postTime}</span>
+        <span>•</span>
+        {/* Visibility icon */}
+        {/* Location */}
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### B. Update Bottom Overlay (Lines 311-399)
+- Remove the user info section (lines 316-367)
+- Keep only the caption section
+- Adjust padding since user info is gone
+
+```tsx
+{/* Bottom Overlay with Caption Only */}
+<div 
+  className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-8 pointer-events-auto"
+  onClick={(e) => e.stopPropagation()}
+>
+  {/* Caption Section - Scrollable when expanded */}
+  {caption && (
+    <div className={cn(...)}>
+      <p className={cn(...)}>
+        {caption}
+      </p>
+      {/* More/Less button */}
+    </div>
+  )}
+</div>
+```
+
+### C. Update Dot Indicators Position
+- Adjust the `bottom-[180px]` value since the overlay is now shorter
+- New position: `bottom-[100px]` (approximate, will need fine-tuning)
+
+---
+
+## Visual Result
+
+```
++---------------------------+
+| [Avatar] Display Name     |  <- Top header (bg-black/80)
+|          @user • 2h • 🌍  |
++===========================+
 |                           |
 |                           |
-|   [FULLSCREEN IMAGE]      |  <- Fills entire area
-|   [object-contain]        |
+|   [FULLSCREEN IMAGE]      |  <- Fills remaining viewport
+|   (object-contain)        |
 |                           |
-|       ● ○                 |  <- Dot indicators
-|===========================|  <- Gradient overlay starts
-|  User Info                |  <- Over image with gradient bg
-|  Caption (3 lines)        |
+|         ● ○               |  <- Dot indicators
+|===========================|  <- Gradient overlay
+|  Caption text here that   |  <- Caption at bottom
+|  can be expanded...       |
 |  [More]                   |
 +---------------------------+
 |  [Social Bar]             |  <- Fixed at bottom
 +---------------------------+
 ```
 
-**When "More" clicked:**
-```
-+---------------------------+
-|                           |
-|   [FULLSCREEN IMAGE]      |  <- Still visible behind
-|   (partially obscured)    |
-|===========================|
-|  User Info                |  <- Larger overlay, scrollable
-|  Full caption text that   |
-|  extends many lines and   |
-|  can be scrolled within   |  <- max-h-[40vh] scrollable
-|  this overlay section...  |
-|  [Less]                   |
-+---------------------------+
-|  [Social Bar]             |
-+---------------------------+
-```
-
 ---
 
 ## Files to Modify
-1. `src/components/feed/PhotoPostSlide.tsx` - Restructure to fullscreen image with overlay
+1. `src/components/feed/PhotoPostSlide.tsx` - Restructure layout
 
-## Implementation Details
-
-1. **Background**: Change from `bg-background` to `bg-black` for true immersive feel
-2. **Text Colors**: Use `text-white` instead of `text-foreground` since text is over image
-3. **Gradient**: Apply `bg-gradient-to-t from-black/80 via-black/40 to-transparent` for readability
-4. **Scroll Behavior**: Caption section scrollable when expanded, with `max-h-[40vh]` limit
-5. **Image Navigation**: Keep horizontal swipe and arrow navigation on the image layer
+## No Changes Required
+- `src/components/feed/ImmersivePostCard.tsx` - Normal mode already correct
+- Other files unchanged
 
