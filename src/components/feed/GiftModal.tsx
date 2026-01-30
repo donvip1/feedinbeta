@@ -180,7 +180,7 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[80vw] max-w-sm h-auto max-h-[70vh] p-0 overflow-hidden bg-background/95 backdrop-blur-xl border-primary/20 z-[250] rounded-2xl shadow-2xl">
+      <DialogContent className="w-[85vw] max-w-md h-auto max-h-[85vh] p-0 overflow-hidden bg-background backdrop-blur-xl border-primary/20 z-[250] rounded-2xl shadow-2xl flex flex-col">
         {/* Floating Animated Emojis */}
         {floatingEmojis.map(({ id, giftId, x }) => (
           <div
@@ -252,7 +252,7 @@ export default function GiftModal({ isOpen, onClose, postId, recipientId, recipi
 
           {['basic', 'premium', 'exclusive'].map((category) => (
             <TabsContent key={category} value={category} className="mt-0">
-              <ScrollArea className="h-[280px] pr-4">
+              <ScrollArea className="h-[200px] pr-4">
                 <div className="grid grid-cols-3 gap-3">
                   {getGiftsByCategory(category as 'basic' | 'premium' | 'exclusive').map((gift) => (
                     <Button
