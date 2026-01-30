@@ -1,272 +1,220 @@
 
+# Plan: Add Refeed/Gift Status Indicators & Fix Gift Count Display
 
-# Plan: Fix Gift Sending & Implement Gift Collection System
+## Overview
 
-## Problem Summary
+Add visual feedback for Refeed and Gift buttons (similar to how Likes shows a filled heart) and ensure gift counts display properly across all post types.
 
-### Issue 1: Gifts Not Sending Properly
-The `send_gift` database function has **incorrect column names** causing silent failures:
-- Uses `post_id` but table has `source_id` + `source_type`
-- Uses `actor_id` but notifications table has `from_user_id`
-- Function catches all errors and returns JSON, masking the real database errors
+## Current Behavior vs. Desired Behavior
 
-### Issue 2: New Gift Collection System
-Currently, gifts are immediately converted to credits. User wants:
-- Gifts to remain as "gifts" in a collection
-- Users must manually convert/redeem gifts to get credit value
-- Until converted, gifts show as unconverted gift inventory
+| Action | Current | Desired |
+|--------|---------|---------|
+| Like | Heart fills red when liked, tap to unlike | ✓ Working correctly |
+| Refeed | No indication, cannot undo | Show green filled icon when refeeded, tap to un-refeed |
+| Gift | No indication after gifting | Show colored icon when user has gifted this post |
+| Gift Count | Shows in video/text posts, missing in Photo+ footer | Show count in all layouts |
 
----
+## Database Queries for Status Checks
 
-## Part 1: Fix Gift Sending Function
-
-### Database Changes
-
-**Fix the `send_gift(p_post_id, p_gift_type, p_credit_value)` function:**
+The user interaction status will be checked on component mount:
 
 ```sql
--- Correct column names:
--- gift_analytics: use source_id + source_type, not post_id
--- notifications: use from_user_id, not actor_id
+-- Check if user has refeeded this post
+SELECT id FROM post_shares 
+WHERE post_id = :postId 
+  AND user_id = :userId 
+  AND share_type IN ('refeed', 'quote');
 
-INSERT INTO gift_analytics (sender_id, receiver_id, gift_type, credit_value, platform_fee, source_type, source_id)
-VALUES (v_sender_id, v_receiver_id, p_gift_type, p_credit_value, v_platform_fee, 'post', p_post_id);
-
-INSERT INTO notifications (user_id, type, title, message, related_id, related_type, from_user_id)
-VALUES (v_receiver_id, 'gift_received', ...);
+-- Check if user has gifted this post  
+SELECT id FROM gift_analytics 
+WHERE source_id = :postId 
+  AND sender_id = :userId 
+  AND source_type = 'post';
 ```
 
----
+## Changes Required
 
-## Part 2: Gift Collection System
+### 1. ImmersivePostCard.tsx
 
-### New Behavior Flow
-
-```
-Current Flow:
-┌──────────┐    ┌──────────────┐    ┌─────────────┐
-│ Send Gift│ →  │ Credits Added│ →  │ Balance Up  │
-└──────────┘    │ Immediately  │    └─────────────┘
-                └──────────────┘
-
-New Flow:
-┌──────────┐    ┌──────────────┐    ┌─────────────────┐    ┌─────────────┐
-│ Send Gift│ →  │ Gift Stored  │ →  │ User Converts   │ →  │ Balance Up  │
-└──────────┘    │ (Unconverted)│    │ Gift to Credits │    └─────────────┘
-                └──────────────┘    └─────────────────┘
+**Add new state variables:**
+```typescript
+const [hasRefeeded, setHasRefeeded] = useState(false);
+const [hasGifted, setHasGifted] = useState(false);
 ```
 
-### Database Schema Changes
+**Extend the status check useEffect:**
+- Check `post_shares` for refeed/quote by current user
+- Check `gift_analytics` for any gift sent by current user to this post
 
-**1. Add `is_converted` column to `gift_analytics`:**
+**Update Refeed button styling:**
+- When `hasRefeeded=true`: Show filled/colored Repeat icon (green)
+- Clicking when already refeeded: Show un-refeed option or perform un-refeed
 
-| Column | Type | Default | Description |
-|--------|------|---------|-------------|
-| is_converted | boolean | false | Whether gift value has been claimed |
-| converted_at | timestamptz | null | When user converted the gift |
+**Update Gift button styling:**
+- When `hasGifted=true`: Show filled/colored Gift icon (pink/purple gradient)
+- Maintains existing behavior (modal opens), just visual indicator
 
-**2. Create `convert_gift` function:**
-- Takes gift_id
-- Verifies user owns the gift (receiver_id = auth.uid())
-- Verifies gift not already converted
-- Credits user's balance with (credit_value - platform_fee)
-- Marks gift as converted
+**Fix Photo+ footer gift count:**
+- Currently shows `<Gift className="..." />` without count
+- Add `<span>{formatCount(giftsCount)}</span>` like other buttons
 
-**3. Create `convert_all_gifts` function:**
-- Batch converts all unconverted gifts for user
-- Returns total credits added
+### 2. PostCard.tsx
 
-### UI Changes
+**Add same state variables and checks as ImmersivePostCard:**
+- `hasRefeeded` and `hasGifted` states
+- Status check in useEffect
+- Updated button styling
 
-**File: `src/components/wallet/ReceivedGifts.tsx`**
+### 3. RefeedModal.tsx
 
-Current display:
-```
-[Gift emoji] John sent Heart  +9 credits
-```
+**Add un-refeed functionality:**
+When user has already refeeded:
+- Delete from `post_shares` table
+- Delete the refeed post from `posts` table (where `original_post_id = postId` and `user_id = currentUser`)
+- Decrement `refeeds_count` (handled by existing trigger)
 
-New display with convert button:
-```
-[Gift emoji] John sent Heart  
-Value: 9 credits  [Convert] ← Button to claim
-```
+### 4. FullscreenMediaViewer.tsx
 
-Or if converted:
-```
-[Gift emoji] John sent Heart  
-✓ Converted: +9 credits
-```
+Add same status tracking for consistency in fullscreen view.
 
-**File: `src/components/wallet/GiftsTab.tsx`**
+## Visual Design
 
-Add summary section:
-```
-┌─────────────────────────────────────────┐
-│  🎁 Unconverted Gifts                   │
-│  12 gifts worth 450 credits             │
-│  [Convert All to Credits]               │
-└─────────────────────────────────────────┘
+### Refeed Button States
+
+**Default (not refeeded):**
+```jsx
+<Repeat className="w-5 h-5 text-muted-foreground" />
 ```
 
-**File: `src/components/wallet/BalanceCard.tsx`**
-
-Add unconverted gifts indicator:
-```
-Current Balance: 1,000 credits
-+ 450 credits in unconverted gifts
-```
-
----
-
-## Implementation Details
-
-### Step 1: Database Migration
-
-```sql
--- 1. Add conversion tracking columns
-ALTER TABLE gift_analytics 
-ADD COLUMN IF NOT EXISTS is_converted BOOLEAN DEFAULT false,
-ADD COLUMN IF NOT EXISTS converted_at TIMESTAMPTZ;
-
--- 2. Fix send_gift function
-CREATE OR REPLACE FUNCTION public.send_gift(p_post_id uuid, p_gift_type text, p_credit_value integer)
-RETURNS json LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
-AS $$
-DECLARE
-  -- ... existing declarations ...
-BEGIN
-  -- ... existing validation ...
-  
-  -- Deduct from sender ONLY
-  INSERT INTO credit_transactions (user_id, amount, type, description, related_id)
-  VALUES (v_sender_id, -p_credit_value, 'gift_sent', 'Gift sent: ' || p_gift_type, p_post_id);
-  
-  -- DO NOT credit receiver immediately - gift stays unconverted
-  
-  -- Record gift analytics (FIXED column names)
-  INSERT INTO gift_analytics (sender_id, receiver_id, gift_type, credit_value, platform_fee, source_type, source_id, is_converted)
-  VALUES (v_sender_id, v_receiver_id, p_gift_type, p_credit_value, v_platform_fee, 'post', p_post_id, false);
-  
-  -- Notification (FIXED column name)
-  INSERT INTO notifications (user_id, type, title, message, related_id, related_type, from_user_id)
-  VALUES (v_receiver_id, 'gift_received', 'New Gift!', '...', p_post_id, 'post', v_sender_id);
-  
-  RETURN json_build_object('success', true, ...);
-END;
-$$;
-
--- 3. Create convert_gift function
-CREATE OR REPLACE FUNCTION public.convert_gift(p_gift_id uuid)
-RETURNS json LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
-AS $$
-DECLARE
-  v_user_id UUID;
-  v_gift RECORD;
-  v_net_amount INTEGER;
-BEGIN
-  v_user_id := auth.uid();
-  
-  -- Get gift and verify ownership
-  SELECT * INTO v_gift FROM gift_analytics 
-  WHERE id = p_gift_id AND receiver_id = v_user_id;
-  
-  IF NOT FOUND THEN
-    RETURN json_build_object('success', false, 'error', 'Gift not found');
-  END IF;
-  
-  IF v_gift.is_converted THEN
-    RETURN json_build_object('success', false, 'error', 'Gift already converted');
-  END IF;
-  
-  v_net_amount := v_gift.credit_value - COALESCE(v_gift.platform_fee, 0);
-  
-  -- Credit user
-  INSERT INTO credit_transactions (user_id, amount, type, description, related_id)
-  VALUES (v_user_id, v_net_amount, 'gift_converted', 'Converted gift: ' || v_gift.gift_type, p_gift_id);
-  
-  -- Mark as converted
-  UPDATE gift_analytics SET is_converted = true, converted_at = now()
-  WHERE id = p_gift_id;
-  
-  RETURN json_build_object('success', true, 'credits_added', v_net_amount);
-END;
-$$;
-
--- 4. Create convert_all_gifts function
-CREATE OR REPLACE FUNCTION public.convert_all_gifts()
-RETURNS json LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
-AS $$
-DECLARE
-  v_user_id UUID;
-  v_total_credits INTEGER := 0;
-  v_gift_count INTEGER := 0;
-  v_gift RECORD;
-BEGIN
-  v_user_id := auth.uid();
-  
-  FOR v_gift IN 
-    SELECT * FROM gift_analytics 
-    WHERE receiver_id = v_user_id AND is_converted = false
-  LOOP
-    v_total_credits := v_total_credits + (v_gift.credit_value - COALESCE(v_gift.platform_fee, 0));
-    v_gift_count := v_gift_count + 1;
-  END LOOP;
-  
-  IF v_gift_count = 0 THEN
-    RETURN json_build_object('success', false, 'error', 'No gifts to convert');
-  END IF;
-  
-  -- Credit all at once
-  INSERT INTO credit_transactions (user_id, amount, type, description)
-  VALUES (v_user_id, v_total_credits, 'gift_converted', 'Converted ' || v_gift_count || ' gifts');
-  
-  -- Mark all as converted
-  UPDATE gift_analytics SET is_converted = true, converted_at = now()
-  WHERE receiver_id = v_user_id AND is_converted = false;
-  
-  RETURN json_build_object('success', true, 'gifts_converted', v_gift_count, 'credits_added', v_total_credits);
-END;
-$$;
+**Active (has refeeded):**
+```jsx
+<Repeat className="w-5 h-5 text-green-500 fill-green-500" />
+// Note: Repeat icon may need custom styling since Lucide icons don't have fill variant
+// Alternative: Use background highlight or color change
 ```
 
-### Step 2: Update Frontend Components
+### Gift Button States
 
-**File: `src/components/wallet/ReceivedGifts.tsx`**
-- Add "Convert" button for unconverted gifts
-- Show conversion status badge
-- Call `convert_gift` RPC on click
+**Default (not gifted):**
+```jsx
+<Gift className="w-5 h-5 text-muted-foreground" />
+```
 
-**File: `src/components/wallet/GiftsTab.tsx`**
-- Add unconverted gifts summary card at top
-- Show total unconverted count and value
-- Add "Convert All" button
+**Active (has gifted):**
+```jsx
+<Gift className="w-5 h-5 text-pink-500" />
+// Or with gradient background indicator
+```
 
-**File: `src/components/wallet/BalanceCard.tsx`**
-- Fetch unconverted gifts total
-- Display "+ X credits in gifts" indicator
+## Un-Refeed Logic
 
-### Step 3: Handle Real-time Updates
+```typescript
+const handleUnrefeed = async () => {
+  // 1. Delete share record
+  await supabase
+    .from('post_shares')
+    .delete()
+    .eq('post_id', postId)
+    .eq('user_id', user.id)
+    .in('share_type', ['refeed', 'quote']);
 
-- Update real-time subscriptions to refresh on gift conversion
-- Invalidate wallet queries after conversion
+  // 2. Delete the refeed post itself
+  await supabase
+    .from('posts')
+    .delete()
+    .eq('original_post_id', postId)
+    .eq('user_id', user.id)
+    .in('post_type', ['refeed', 'quote']);
 
----
+  // 3. Update local state
+  setHasRefeeded(false);
+  setRefeedsCount(prev => Math.max(0, prev - 1));
+};
+```
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| Database migration | Fix send_gift, add columns, add convert functions |
-| `src/components/wallet/ReceivedGifts.tsx` | Add convert button per gift |
-| `src/components/wallet/GiftsTab.tsx` | Add unconverted gifts summary, Convert All button |
-| `src/components/wallet/BalanceCard.tsx` | Show unconverted gifts indicator |
-| `src/integrations/supabase/types.ts` | Auto-regenerates with new functions |
+| `src/components/feed/ImmersivePostCard.tsx` | Add hasRefeeded/hasGifted states, status checks, button styling, fix Photo+ gift count |
+| `src/components/feed/PostCard.tsx` | Add hasRefeeded/hasGifted states, status checks, button styling |
+| `src/components/feed/RefeedModal.tsx` | Add un-refeed option when already refeeded |
+| `src/components/feed/FullscreenMediaViewer.tsx` | Add hasRefeeded/hasGifted states for consistency |
 
----
+## Technical Details
+
+### Status Check Implementation
+
+```typescript
+// In ImmersivePostCard.tsx useEffect
+useEffect(() => {
+  const checkStatus = async () => {
+    if (!user) return;
+
+    try {
+      const [likeCheck, saveCheck, followCheck, refeedCheck, giftCheck] = await Promise.all([
+        supabase.from('post_likes').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
+        supabase.from('saved_posts').select('id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle(),
+        supabase.from('follows').select('id').eq('follower_id', user.id).eq('following_id', post.user_id).maybeSingle(),
+        supabase.from('post_shares').select('id').eq('post_id', post.id).eq('user_id', user.id).in('share_type', ['refeed', 'quote']).maybeSingle(),
+        supabase.from('gift_analytics').select('id').eq('source_id', post.id).eq('sender_id', user.id).eq('source_type', 'post').maybeSingle()
+      ]);
+
+      setLiked(!!likeCheck.data);
+      setSaved(!!saveCheck.data);
+      setIsFollowing(!!followCheck.data);
+      setHasRefeeded(!!refeedCheck.data);
+      setHasGifted(!!giftCheck.data);
+    } catch (error) {
+      // Handle silently
+    }
+  };
+
+  checkStatus();
+}, [user, post.id, post.user_id]);
+```
+
+### Button Styling Updates
+
+**Refeed Button (Video sidebar):**
+```jsx
+<button onClick={handleRefeedClick} className="flex flex-col items-center gap-0.5 group">
+  <div className={cn(
+    "p-1.5 rounded-full transition-all active:scale-90",
+    hasRefeeded ? "bg-green-500/90" : "bg-black/40 backdrop-blur-sm"
+  )}>
+    <Repeat className={cn("w-5 h-5 transition-transform", hasRefeeded ? "text-white" : "text-white")} />
+  </div>
+  <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(refeedsCount)}</span>
+</button>
+```
+
+**Gift Button (Video sidebar):**
+```jsx
+<button onClick={() => { setGiftOpen(true); }} className="flex flex-col items-center gap-0.5 group">
+  <div className={cn(
+    "p-1.5 rounded-full transition-all active:scale-90",
+    hasGifted ? "bg-pink-500/90" : "bg-black/40 backdrop-blur-sm"
+  )}>
+    <Gift className={cn("w-5 h-5 transition-transform", hasGifted ? "text-white" : "text-white")} />
+  </div>
+  <span className="text-white text-[10px] font-semibold drop-shadow-lg">{formatCount(giftsCount)}</span>
+</button>
+```
+
+**Photo+ Footer Gift Button (currently missing count):**
+```jsx
+{/* Gift - ADD COUNT */}
+<button onClick={() => { setGiftOpen(true); }} className="flex items-center gap-1.5 group">
+  <Gift className={cn("w-5 h-5 transition-transform group-active:scale-90", hasGifted ? "text-pink-500" : "text-muted-foreground")} />
+  <span className="text-muted-foreground text-xs font-medium">{formatCount(giftsCount)}</span>
+</button>
+```
 
 ## Summary
 
-1. **Fix bug**: Correct column names in `send_gift` function so gifts actually record
-2. **New feature**: Gifts stay as "unconverted" until user manually converts them
-3. **UI updates**: Show unconverted gifts, provide convert buttons, update balance display
-
+1. **Add status tracking** for refeed and gift actions in all post card components
+2. **Update button styling** to show filled/colored icons when user has interacted
+3. **Add un-refeed functionality** in RefeedModal when user already refeeded
+4. **Fix Photo+ footer** to show gift count alongside the icon
+5. **Parallel status checks** added to existing useEffect for efficiency
