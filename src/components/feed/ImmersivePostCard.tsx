@@ -617,20 +617,19 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   };
 
   // Parse caption for display - different limits based on media type
-  // Video posts: max 90 characters, Photo+ posts: max 125 words
+  // Video posts: max 90 characters, Photo+ posts: 3-line limit (CSS line-clamp)
   const caption = post.content || '';
-  const wordCount = countWords(caption);
   const isVideoPost = hasVideo;
   
   // For video posts, truncate by character count (90 chars)
-  // For photo/text posts, truncate by word count (125 words)
+  // For photo/text posts, use CSS line-clamp-3 (no word count truncation needed)
   const shouldTruncateCaption = isVideoPost 
     ? caption.length > 90 
-    : wordCount > 125;
+    : caption.length > 100; // Rough threshold for line-clamp display
   
   const truncatedCaption = isVideoPost
     ? (caption.length > 90 ? caption.slice(0, 90).trim() + '...' : caption)
-    : (wordCount > 125 ? caption.trim().split(/\s+/).slice(0, 125).join(' ') + '...' : caption);
+    : caption; // Photo+ uses CSS line-clamp, not text truncation
 
   // Check if we need a footer section (caption, music, or promote button exists)
   const hasFooterContent = !isImmersiveMode && !isTextStyled && !isPlainText && (caption || hasMusic || (user && !isPromoted));
@@ -873,21 +872,31 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               )}
             </div>
             
-            {/* Caption - BEFORE the image */}
+            {/* Caption - BEFORE the image with 3-line limit */}
             {caption && (
               <div className="px-4 pb-3">
-                <p className="text-foreground text-sm leading-relaxed break-words whitespace-pre-wrap">
-                  {showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption)}
+                <p className={cn(
+                  "text-foreground text-sm leading-relaxed break-words whitespace-pre-wrap transition-all duration-300",
+                  !showFullCaption && !isVideoPost && "line-clamp-3"
+                )}>
+                  {isVideoPost 
+                    ? (showFullCaption ? renderCaptionWithHashtags(caption) : renderCaptionWithHashtags(truncatedCaption))
+                    : renderCaptionWithHashtags(caption)
+                  }
                 </p>
-                {shouldTruncateCaption && (
+                {(isVideoPost ? shouldTruncateCaption : caption.length > 100) && (
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowFullCaption(!showFullCaption);
                     }}
-                    className="text-primary text-xs mt-1 font-medium hover:opacity-80 transition"
+                    className="mt-1.5 px-2.5 py-0.5 bg-black/70 text-white text-[11px] font-bold uppercase tracking-wide rounded-full hover:bg-black/90 transition-all"
+                    style={{ 
+                      boxShadow: '0 1px 4px rgba(255,255,255,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
+                      letterSpacing: '0.05em'
+                    }}
                   >
-                    {showFullCaption ? 'less' : 'more'}
+                    {showFullCaption ? 'Less' : 'More'}
                   </button>
                 )}
               </div>
@@ -968,55 +977,77 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           {/* Image - Different layouts for Photo+ vs Video posts */}
           {hasImage && currentMediaUrl && (
             <>
-              {/* Photo+ Layout: Multi-image grid within card */}
+              {/* Photo+ Layout: Single image carousel with navigation */}
               {isPhotoTextLayout && hasMultipleMedia && !isImmersiveMode ? (
                 <div className="w-full bg-card border-x border-border mx-2 px-3 py-2">
-                  {/* Side-by-side grid for 2 images */}
-                  <div className="flex gap-2">
-                    {mediaUrls.slice(0, 2).map((url, idx) => (
-                      <div 
-                        key={idx} 
-                        className="relative flex-1 rounded-lg overflow-hidden border border-border/50 cursor-pointer hover:brightness-95 transition-all"
+                  {/* Single image carousel */}
+                  <div className="relative group">
+                    <div
+                      className="relative rounded-lg overflow-hidden border border-border/50 cursor-pointer hover:brightness-95 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLightboxIndex(currentMediaIndex);
+                        setShowLightbox(true);
+                      }}
+                      onTouchStart={handleTouchStart}
+                      onTouchEnd={handleTouchEnd}
+                    >
+                      <img
+                        src={mediaUrls[currentMediaIndex]}
+                        alt={`Image ${currentMediaIndex + 1}`}
+                        className="w-full object-cover transition-opacity duration-300"
+                        style={{ maxHeight: '50vh' }}
+                        onLoad={() => setIsMediaLoaded(true)}
+                        onContextMenu={(e) => e.preventDefault()}
+                        draggable={false}
+                      />
+                      {/* Image counter indicator at top-right */}
+                      <div className="absolute top-2 right-2 px-2 py-0.5 bg-black/60 rounded-full text-white text-[10px] font-medium">
+                        {currentMediaIndex + 1}/{mediaUrls.length}
+                      </div>
+                    </div>
+                    
+                    {/* Navigation Arrows - visible on hover (desktop) or always (mobile) */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentMediaIndex(prev => prev > 0 ? prev - 1 : mediaUrls.length - 1);
+                      }}
+                      className="absolute left-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-all opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 active:scale-95"
+                      style={{ opacity: 1 }} // Always visible on mobile
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCurrentMediaIndex(prev => prev < mediaUrls.length - 1 ? prev + 1 : 0);
+                      }}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white transition-all opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 active:scale-95"
+                      style={{ opacity: 1 }} // Always visible on mobile
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                  </div>
+                  
+                  {/* Dot indicators below image */}
+                  <div className="flex justify-center gap-2 mt-3">
+                    {mediaUrls.map((_, idx) => (
+                      <button
+                        key={idx}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setLightboxIndex(idx);
-                          setShowLightbox(true);
+                          setCurrentMediaIndex(idx);
                         }}
-                      >
-                        <img
-                          src={url}
-                          alt={`Image ${idx + 1}`}
-                          className="w-full aspect-square object-cover transition-opacity duration-300"
-                          onLoad={() => idx === 0 && setIsMediaLoaded(true)}
-                          onContextMenu={(e) => e.preventDefault()}
-                          draggable={false}
-                        />
-                        {/* Image number indicator at bottom-left */}
-                        <div className="absolute bottom-2 left-2 px-1.5 py-0.5 bg-black/60 rounded text-white text-[10px] font-medium">
-                          {idx + 1}/{Math.min(mediaUrls.length, 2)}
-                        </div>
-                      </div>
+                        className={cn(
+                          "h-2 rounded-full transition-all duration-200",
+                          idx === currentMediaIndex 
+                            ? "w-4 bg-primary" 
+                            : "w-2 bg-muted-foreground/40 hover:bg-muted-foreground/60"
+                        )}
+                      />
                     ))}
                   </div>
-                  {/* Show indicator if more than 2 images */}
-                  {mediaUrls.length > 2 && (
-                    <div className="flex justify-center gap-1.5 mt-2">
-                      {mediaUrls.map((_, idx) => (
-                        <button
-                          key={idx}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setLightboxIndex(idx);
-                            setShowLightbox(true);
-                          }}
-                          className={cn(
-                            "w-1.5 h-1.5 rounded-full transition-all",
-                            idx < 2 ? "bg-primary" : "bg-muted-foreground/40"
-                          )}
-                        />
-                      ))}
-                    </div>
-                  )}
                 </div>
               ) : isPhotoTextLayout && !hasMultipleMedia && !isImmersiveMode ? (
                 /* Single image in Photo+ within card */
