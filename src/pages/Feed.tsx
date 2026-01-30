@@ -406,13 +406,6 @@ const Feed = () => {
           _promoterId: promoterId,
           _promoterName: promoterName || null
         };
-      })
-      // Filter out promoted posts where the current user is NOT the promoter
-      // Only the promoter should see their own promoted posts in their feed
-      .filter(post => {
-        if (!post._isPromoted) return true; // Non-promoted posts pass through
-        // Only show promoted post if current user is the promoter
-        return post._promoterId === user?.id;
       });
 
     // Cache the results

@@ -93,12 +93,6 @@ const TrendingContent = () => {
             ? promoterMap.get(promoterId) || null 
             : null
         };
-      })
-      // Filter out promoted posts where the current user is NOT the promoter
-      // Only the promoter should see their own promoted posts
-      .filter(post => {
-        if (!post._isPromoted) return true;
-        return post._promoterId === user?.id;
       });
       
       // Separate unviewed and viewed (for prioritization, not exclusion)
