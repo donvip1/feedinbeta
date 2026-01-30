@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react';
-import { X, ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Repeat, Gift, Eye, TrendingUp, Globe, Lock, MapPin } from 'lucide-react';
+import { useState, useEffect, useCallback, memo } from 'react';
+import { ChevronLeft, ChevronRight, Heart, MessageCircle, Share2, Repeat, Gift, Eye, TrendingUp, Globe, Lock, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence, PanInfo } from 'framer-motion';
+import { motion, PanInfo } from 'framer-motion';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -227,155 +227,81 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
 
   return (
     <div 
-      className="w-full h-full flex flex-col relative"
+      className="w-full h-full flex flex-col bg-background"
       style={{
         transform: 'translate3d(0,0,0)',
         backfaceVisibility: 'hidden',
         willChange: 'transform'
       }}
     >
-      {/* Image Container - Full height with proper sizing like TikTok */}
-      <div className="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
-        <motion.div
-          drag={images.length > 1 ? 'x' : false}
-          dragConstraints={{ left: -100, right: 100 }}
-          dragElastic={0.3}
-          onDragEnd={handleDragEnd}
-          onClick={onToggleUI}
-          className="w-full h-full flex items-center justify-center"
-          style={{ touchAction: 'pan-y' }}
-        >
-          <motion.img
-            key={`${post.id}-${currentImageIndex}`}
-            src={images[currentImageIndex]}
-            alt={`Image ${currentImageIndex + 1}`}
-            initial={false}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.15 }}
-            className="w-full h-full object-contain select-none pointer-events-none will-change-transform"
-            draggable={false}
-            style={{ 
-              transform: 'translate3d(0,0,0)',
-              backfaceVisibility: 'hidden' 
-            }}
-          />
-        </motion.div>
-
-        {/* Gradient overlays for better UI visibility */}
-        <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/70 to-transparent pointer-events-none" />
-        <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
-
-        {/* Top Bar - Poster Info */}
-        <AnimatePresence>
-          {showUI && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="absolute top-0 left-0 right-0 z-20 p-4"
-            >
-              <div className="flex items-center justify-between">
-                <div 
-                  className="flex items-center gap-3 cursor-pointer"
-                  onClick={handleProfileClick}
-                >
-                  <Avatar className="w-10 h-10 border-2 border-white/30">
-                    <AvatarImage src={post.profiles?.avatar_url || ''} />
-                    <AvatarFallback className="bg-gray-700 text-white">
-                      {displayName[0]?.toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white text-sm drop-shadow-lg">
-                        {displayName}
-                      </span>
-                      {user && post.user_id !== user.id && (
-                        <button 
-                          onClick={handleFollow}
-                          disabled={isFollowLoading}
-                          className={cn(
-                            "font-bold text-xs transition",
-                            isFollowing ? "text-white/60 hover:text-white/80" : "text-pink-500 hover:text-pink-400",
-                            isFollowLoading && "opacity-50"
-                          )}
-                          style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
-                        >
-                          • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
-                        </button>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 text-white/60 text-xs">
-                      <span>@{post.profiles?.username || 'user'}</span>
-                      <span>•</span>
-                      <span>{postTime}</span>
-                      <span>•</span>
-                      {isPublic ? (
-                        <Globe className="w-3 h-3" />
-                      ) : (
-                        <Lock className="w-3 h-3" />
-                      )}
-                      {post.location && (
-                        <>
-                          <span>•</span>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            <span className="truncate max-w-[100px]">{post.location}</span>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Image Navigation Arrows */}
-        <AnimatePresence>
-          {showUI && images.length > 1 && (
-            <>
-              <motion.button
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigatePrevImage();
-                }}
-                className="absolute left-4 top-1/2 -translate-y-1/2 z-20 p-2.5 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
-              >
-                <ChevronLeft size={22} />
-              </motion.button>
-              <motion.button
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigateNextImage();
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 z-20 p-2.5 bg-black/40 hover:bg-black/60 rounded-full text-white transition-colors"
-              >
-                <ChevronRight size={22} />
-              </motion.button>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* Caption - positioned above social buttons with 3-line limit */}
-        {showUI && caption && (
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-y-auto">
+        {/* User Info Header - Normal flow */}
+        <div className="p-4 border-b border-border">
           <div 
-            className="absolute bottom-20 left-4 right-16 z-20 transition-opacity duration-200"
+            className="flex items-center gap-3 cursor-pointer"
+            onClick={handleProfileClick}
+          >
+            <Avatar className="w-10 h-10 border-2 border-border">
+              <AvatarImage src={post.profiles?.avatar_url || ''} />
+              <AvatarFallback className="bg-muted text-foreground">
+                {displayName[0]?.toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col flex-1">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-foreground text-sm">
+                  {displayName}
+                </span>
+                {user && post.user_id !== user.id && (
+                  <button 
+                    onClick={handleFollow}
+                    disabled={isFollowLoading}
+                    className={cn(
+                      "font-bold text-xs transition",
+                      isFollowing ? "text-muted-foreground hover:text-foreground" : "text-pink-500 hover:text-pink-400",
+                      isFollowLoading && "opacity-50"
+                    )}
+                  >
+                    • {isFollowLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+                  </button>
+                )}
+              </div>
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                <span>@{post.profiles?.username || 'user'}</span>
+                <span>•</span>
+                <span>{postTime}</span>
+                <span>•</span>
+                {isPublic ? (
+                  <Globe className="w-3 h-3" />
+                ) : (
+                  <Lock className="w-3 h-3" />
+                )}
+                {post.location && (
+                  <>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      <span className="truncate max-w-[100px]">{post.location}</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Caption Section - Normal flow, below user info */}
+        {caption && (
+          <div 
+            className="px-4 py-3 border-b border-border"
             onClick={(e) => e.stopPropagation()}
           >
             <p 
               className={cn(
-                "text-white text-sm drop-shadow-lg leading-relaxed transition-all duration-300",
+                "text-foreground text-sm leading-relaxed transition-all duration-300",
                 !showFullCaption && "line-clamp-3"
-              )} 
-              style={{ textShadow: '0 1px 2px rgba(0,0,0,0.4)' }}
+              )}
             >
               {caption}
             </p>
@@ -385,11 +311,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
                   e.stopPropagation();
                   setShowFullCaption(!showFullCaption);
                 }}
-                className="mt-1.5 px-2.5 py-0.5 bg-black/70 text-white text-[11px] font-bold uppercase tracking-wide rounded-full hover:bg-black/90 transition-all"
-                style={{ 
-                  boxShadow: '0 1px 4px rgba(255,255,255,0.15), 0 0 0 1px rgba(255,255,255,0.1)',
-                  letterSpacing: '0.05em'
-                }}
+                className="mt-2 px-2.5 py-0.5 bg-muted text-foreground text-[11px] font-bold uppercase tracking-wide rounded-full hover:bg-muted/80 transition-all"
+                style={{ letterSpacing: '0.05em' }}
               >
                 {showFullCaption ? 'Less' : 'More'}
               </button>
@@ -397,11 +320,84 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           </div>
         )}
 
-        {/* --- BOTTOM BAR: Horizontal Social Buttons (matching normal Photo+ view) --- */}
-        <div className={cn(
-          "absolute left-0 right-0 bottom-0 z-50 flex items-center justify-between px-4 py-3 pointer-events-auto transition-opacity duration-200 bg-gradient-to-t from-black/60 to-transparent",
-          showUI ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}>
+        {/* Image Section - Normal flow, below caption */}
+        <div className="relative">
+          <motion.div
+            drag={images.length > 1 ? 'x' : false}
+            dragConstraints={{ left: -100, right: 100 }}
+            dragElastic={0.3}
+            onDragEnd={handleDragEnd}
+            onClick={onToggleUI}
+            className="w-full flex items-center justify-center bg-muted/20"
+            style={{ touchAction: 'pan-y' }}
+          >
+            <motion.img
+              key={`${post.id}-${currentImageIndex}`}
+              src={images[currentImageIndex]}
+              alt={`Image ${currentImageIndex + 1}`}
+              initial={false}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.15 }}
+              className="w-full max-h-[60vh] object-contain select-none pointer-events-none will-change-transform"
+              draggable={false}
+              style={{ 
+                transform: 'translate3d(0,0,0)',
+                backfaceVisibility: 'hidden' 
+              }}
+            />
+          </motion.div>
+
+          {/* Image Navigation Arrows */}
+          {images.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigatePrevImage();
+                }}
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-background/80 hover:bg-background rounded-full text-foreground transition-colors shadow-md"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigateNextImage();
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-20 p-2 bg-background/80 hover:bg-background rounded-full text-foreground transition-colors shadow-md"
+              >
+                <ChevronRight size={20} />
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Dot Indicators - Below image */}
+        {images.length > 1 && (
+          <div className="flex justify-center gap-2 py-3">
+            {images.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(idx);
+                  onImageIndexChange?.(idx);
+                }}
+                className={cn(
+                  "h-2 rounded-full transition-all duration-200",
+                  idx === currentImageIndex 
+                    ? "w-4 bg-primary" 
+                    : "w-2 bg-muted-foreground/40 hover:bg-muted-foreground/60"
+                )}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Social Buttons Bar - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t border-border bg-background px-4 py-3">
+        <div className="flex items-center justify-between">
           {/* Left side: Promote */}
           {user && post.id ? (
             <button 
@@ -430,8 +426,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Heart className={cn("w-4 h-4 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-white")} />
-              <span className="text-white text-[10px] font-medium">{formatCount(likesCount)}</span>
+              <Heart className={cn("w-4 h-4 transition-transform", liked ? "text-pink-500 fill-pink-500" : "text-foreground")} />
+              <span className="text-foreground text-[10px] font-medium">{formatCount(likesCount)}</span>
             </button>
 
             {/* Comments */}
@@ -443,8 +439,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <MessageCircle className="w-4 h-4 text-white" />
-              <span className="text-white text-[10px] font-medium">{formatCount(commentsCount)}</span>
+              <MessageCircle className="w-4 h-4 text-foreground" />
+              <span className="text-foreground text-[10px] font-medium">{formatCount(commentsCount)}</span>
             </button>
 
             {/* Gift */}
@@ -456,14 +452,14 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Gift className="w-4 h-4 text-white" />
-              <span className="text-white text-[10px] font-medium">{formatCount(giftsCount)}</span>
+              <Gift className="w-4 h-4 text-foreground" />
+              <span className="text-foreground text-[10px] font-medium">{formatCount(giftsCount)}</span>
             </button>
 
             {/* Views */}
             <div className="flex items-center gap-1">
-              <Eye className="w-4 h-4 text-white/70" />
-              <span className="text-white/70 text-[10px] font-medium">{formatCount(post.views_count || 0)}</span>
+              <Eye className="w-4 h-4 text-muted-foreground" />
+              <span className="text-muted-foreground text-[10px] font-medium">{formatCount(post.views_count || 0)}</span>
             </div>
 
             {/* Refeed */}
@@ -475,8 +471,8 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Repeat className="w-4 h-4 text-white" />
-              <span className="text-white text-[10px] font-medium">{formatCount(refeedsCount)}</span>
+              <Repeat className="w-4 h-4 text-foreground" />
+              <span className="text-foreground text-[10px] font-medium">{formatCount(refeedsCount)}</span>
             </button>
 
             {/* Share */}
@@ -488,12 +484,12 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
               }} 
               className="flex items-center gap-1 group"
             >
-              <Share2 className="w-4 h-4 text-white" />
+              <Share2 className="w-4 h-4 text-foreground" />
             </button>
           </div>
         </div>
-
       </div>
+
       {/* Comments Modal */}
       <CommentsModal
         isOpen={commentsOpen}
