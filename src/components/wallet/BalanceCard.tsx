@@ -1,8 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Crown, Send, CreditCard, ArrowDownLeft, ArrowUpRight, Globe } from 'lucide-react';
+import { Crown, Send, CreditCard, ArrowDownLeft, ArrowUpRight, Globe, Gift } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface BalanceCardProps {
   balance: number;
@@ -31,6 +34,25 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
   onBuyClick,
 }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  // Fetch unconverted gifts total
+  const { data: unconvertedGifts } = useQuery({
+    queryKey: ['unconverted-gifts-balance', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('gift_analytics')
+        .select('credit_value, platform_fee')
+        .eq('receiver_id', user?.id)
+        .or('is_converted.eq.false,is_converted.is.null');
+
+      if (error) throw error;
+
+      const totalValue = data?.reduce((sum, g) => sum + (g.credit_value - (g.platform_fee || 0)), 0) || 0;
+      return totalValue;
+    },
+    enabled: !!user,
+  });
   
   // Calculate local currency value of credits
   const balanceInLocalCurrency = (balance / CREDITS_PER_USD) * exchangeRate;
@@ -72,6 +94,13 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
           <p className="text-sm text-muted-foreground mt-1">
             ≈ {currencySymbol}{balanceInLocalCurrency.toLocaleString(undefined, { maximumFractionDigits: exchangeRate > 100 ? 0 : 2 })} {currencyCode}
           </p>
+          {/* Show unconverted gifts indicator */}
+          {unconvertedGifts && unconvertedGifts > 0 && (
+            <div className="flex items-center gap-1.5 mt-2 text-sm text-yellow-500">
+              <Gift className="w-3.5 h-3.5" />
+              <span>+ {unconvertedGifts} credits in unconverted gifts</span>
+            </div>
+          )}
         </div>
 
         {/* Stats row */}
