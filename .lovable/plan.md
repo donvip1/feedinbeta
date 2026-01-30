@@ -1,158 +1,95 @@
 
 
-# Plan: Fix Missing `last_gift_sent_at` Column for Gift Sending
-
-## Problem Identified
-
-The gift sending is failing for ALL users (not just those with insufficient credits) because:
-
-**Error**: `column "last_gift_sent_at" does not exist`
-
-The previous migration created `send_gift` and `send_direct_gift` functions that reference a `last_gift_sent_at` column in the `user_credits` table for rate limiting, but this column was never created.
-
-## Root Cause
-
-```text
-┌─────────────────────────────────────────────────────────────────────┐
-│  send_gift / send_direct_gift Functions                             │
-│  ─────────────────────────────────────                              │
-│  Line 36-38:                                                        │
-│    SELECT last_gift_sent_at INTO v_last_gift_at                     │
-│    FROM user_credits WHERE user_id = v_sender_id;                   │
-│                                                                     │
-│  Line 89:                                                           │
-│    UPDATE user_credits SET last_gift_sent_at = now() ...            │
-│                                                                     │
-│  ❌ FAILS: Column does not exist!                                   │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-## Solution
-
-Create a database migration that:
-
-1. **Adds the missing column** - Add `last_gift_sent_at` column to `user_credits` table
-2. **Ensures correct trigger logic** - The `apply_credit_transaction` trigger should properly validate balances before allowing deductions
-3. **Fix data sync** - Ensure user balances are properly synced
-
-## Database Changes
-
-### Step 1: Add Missing Column
-
-```sql
--- Add the missing last_gift_sent_at column
-ALTER TABLE user_credits 
-ADD COLUMN IF NOT EXISTS last_gift_sent_at TIMESTAMPTZ DEFAULT NULL;
-```
-
-### Step 2: Fix the apply_credit_transaction Trigger
-
-The current trigger has a logic bug - it checks balance BEFORE the insert, but then proceeds to INSERT ON CONFLICT which can still try to insert a negative value. We need to fix this:
-
-```sql
-CREATE OR REPLACE FUNCTION public.apply_credit_transaction()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  current_balance INTEGER;
-  user_exists BOOLEAN := false;
-BEGIN
-  -- Check if user exists in user_credits and get their balance
-  SELECT balance, true INTO current_balance, user_exists
-  FROM user_credits
-  WHERE user_id = NEW.user_id;
-  
-  -- If user doesn't exist, they start with 0 balance
-  IF NOT FOUND THEN
-    current_balance := 0;
-    user_exists := false;
-  END IF;
-  
-  -- Validate: prevent balance from going negative (for deductions)
-  IF NEW.amount < 0 AND current_balance + NEW.amount < 0 THEN
-    RAISE EXCEPTION 'Insufficient credits. Current balance: %, attempted deduction: %', 
-      current_balance, ABS(NEW.amount);
-  END IF;
-  
-  -- Handle insert/update based on user existence
-  IF user_exists THEN
-    -- User exists, just update their balance
-    UPDATE user_credits SET
-      balance = balance + NEW.amount,
-      total_earned = total_earned + CASE WHEN NEW.amount > 0 THEN NEW.amount ELSE 0 END,
-      total_spent = total_spent + CASE WHEN NEW.amount < 0 THEN ABS(NEW.amount) ELSE 0 END,
-      updated_at = now()
-    WHERE user_id = NEW.user_id;
-  ELSE
-    -- New user - only allow positive initial balance
-    IF NEW.amount < 0 THEN
-      RAISE EXCEPTION 'Cannot deduct credits from user with no credit record';
-    END IF;
-    
-    INSERT INTO user_credits (user_id, balance, total_earned, total_spent)
-    VALUES (
-      NEW.user_id,
-      NEW.amount,
-      NEW.amount,
-      0
-    );
-  END IF;
-
-  RETURN NEW;
-END;
-$function$;
-```
-
-### Step 3: Sync User Balances
-
-Ensure all non-admin users have correct balances synced from their transaction history:
-
-```sql
--- Sync balances for non-admin users
-UPDATE user_credits uc
-SET balance = GREATEST(0, COALESCE((
-  SELECT SUM(amount) FROM credit_transactions ct WHERE ct.user_id = uc.user_id
-), 0)),
-updated_at = now()
-WHERE (is_admin_minted IS NULL OR is_admin_minted = false);
-```
-
-## Files to Modify
-
-| Change | Description |
-|--------|-------------|
-| Database Migration | Add `last_gift_sent_at` column to `user_credits` table |
-| Database Migration | Fix `apply_credit_transaction` trigger to properly check balance before inserting |
-| Database Migration | Sync user balances |
-
-## Frontend Updates (Optional)
-
-The `ChatGiftButton.tsx` currently fetches credits from `credit_transactions` table (summing them up) instead of reading from `user_credits.balance`. This should be updated to use the source of truth:
-
-```tsx
-// Current (incorrect):
-const { data, error } = await supabase
-  .from('credit_transactions')
-  .select('amount')
-  .eq('user_id', user.id);
-const total = data.reduce((sum, t) => sum + t.amount, 0);
-
-// Should be:
-const { data, error } = await supabase
-  .from('user_credits')
-  .select('balance')
-  .eq('user_id', user.id)
-  .single();
-const total = data?.balance || 0;
-```
+# Plan: Remove Carousel Dot Indicators from Photo+ Posts
 
 ## Summary
 
-1. **Add missing column** - `last_gift_sent_at` to enable rate limiting
-2. **Fix trigger logic** - Properly validate balance BEFORE allowing any operations
-3. **Sync balances** - Ensure `user_credits.balance` matches transaction history
-4. **Update frontend** - Read balance from `user_credits.balance` (source of truth)
+Remove the carousel dot indicators (vertical short lines/dots) that appear in the top-right corner and below images in the Photo+ section of normal mode posts. Users will navigate between multiple images using only the swipe arrow buttons.
+
+## Current Indicators to Remove
+
+There are **3 sets of dot indicators** in the codebase:
+
+### 1. Normal Mode - Image Counter Badge (Top Right)
+**File**: `src/components/feed/ImmersivePostCard.tsx`  
+**Lines 1010-1013**: Shows "1/3" style counter
+```tsx
+{/* Image counter indicator at top-right */}
+<div className="absolute top-2 right-2 px-2 py-0.5 bg-black/60 rounded-full text-white text-[10px] font-medium">
+  {currentMediaIndex + 1}/{mediaUrls.length}
+</div>
+```
+
+### 2. Normal Mode - Dot Indicators Below Image
+**File**: `src/components/feed/ImmersivePostCard.tsx`  
+**Lines 1039-1056**: Horizontal dots below image carousel
+```tsx
+{/* Dot indicators below image */}
+<div className="flex justify-center gap-2 mt-3">
+  {mediaUrls.map((_, idx) => (
+    <button ... />
+  ))}
+</div>
+```
+
+### 3. Immersive/Video Mode - Multiple Media Indicator (Top Right)
+**File**: `src/components/feed/ImmersivePostCard.tsx`  
+**Lines 1267-1280**: Dot indicators at top-right in immersive mode
+```tsx
+{/* Multiple Media Indicator */}
+{hasMultipleMedia && (
+  <div className="absolute top-4 right-16 flex gap-1.5 z-10">
+    {mediaUrls.map((_, idx) => (
+      <div ... />
+    ))}
+  </div>
+)}
+```
+
+### 4. Fullscreen Mode - Dot Indicators (PhotoPostSlide)
+**File**: `src/components/feed/PhotoPostSlide.tsx`  
+**Lines 358-378**: Dot indicators in fullscreen photo view
+```tsx
+{/* Dot Indicators - above caption overlay */}
+{images.length > 1 && (
+  <div className="absolute bottom-[100px] left-0 right-0 flex justify-center gap-2 z-20">
+    ...
+  </div>
+)}
+```
+
+## What Will Remain
+
+The **navigation arrow buttons** will remain intact (lines 1017-1036 in ImmersivePostCard.tsx):
+- Left arrow: Previous image
+- Right arrow: Next image
+
+Users can still swipe/tap the arrows to navigate between images.
+
+## Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/feed/ImmersivePostCard.tsx` | Remove 3 indicator sections (lines 1010-1013, 1039-1056, 1267-1280) |
+| `src/components/feed/PhotoPostSlide.tsx` | Remove dot indicators section (lines 358-378) |
+
+## Visual Before/After
+
+**Before:**
+```
+┌──────────────────────────────────────┐
+│  [Image]                      1/4 ●  │  ← Counter badge & dots at top-right
+│  ◄                            ►      │  ← Arrow buttons
+│  ● ○ ○ ○                             │  ← Dot indicators below
+└──────────────────────────────────────┘
+```
+
+**After:**
+```
+┌──────────────────────────────────────┐
+│  [Image]                             │  ← Clean - no indicators
+│  ◄                            ►      │  ← Arrow buttons remain
+│                                      │  ← No dots below
+└──────────────────────────────────────┘
+```
 
