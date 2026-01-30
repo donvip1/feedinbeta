@@ -82,14 +82,24 @@ const TrendingContent = () => {
 
       if (error) throw error;
       
-      const allPosts = (data || []).map(post => ({
-        ...post,
-        _isPromoted: promotedPostIds.has(post.id),
-        _boostLevel: promotionData[post.id]?.boost_level || null,
-        _promoterName: promotionData[post.id]?.promoter_id 
-          ? promoterMap.get(promotionData[post.id].promoter_id) || null 
-          : null
-      }));
+      const allPosts = (data || []).map(post => {
+        const promoterId = promotionData[post.id]?.promoter_id || null;
+        return {
+          ...post,
+          _isPromoted: promotedPostIds.has(post.id),
+          _boostLevel: promotionData[post.id]?.boost_level || null,
+          _promoterId: promoterId,
+          _promoterName: promoterId 
+            ? promoterMap.get(promoterId) || null 
+            : null
+        };
+      })
+      // Filter out promoted posts where the current user is NOT the promoter
+      // Only the promoter should see their own promoted posts
+      .filter(post => {
+        if (!post._isPromoted) return true;
+        return post._promoterId === user?.id;
+      });
       
       // Separate unviewed and viewed (for prioritization, not exclusion)
       const unviewedPosts = allPosts.filter(p => !viewedPostIds.includes(p.id));
@@ -172,7 +182,7 @@ const TrendingContent = () => {
             key={post.id} 
             post={post}
             isPromoted={post._isPromoted || post._isSponsored || false}
-            promoterName={post._promoterName}
+            promoterName={post._promoterId === user?.id ? 'me' : post._promoterName}
             boostLevel={post._boostLevel}
             onView={() => markAsViewed(post.id)}
           />

@@ -395,15 +395,24 @@ const Feed = () => {
       .filter(Boolean)
       .map(post => {
         const meta = metaMap.get(post!.id);
-        const promoterName = meta?.promoter_id ? promoterMap.get(meta.promoter_id) : null;
+        const promoterId = meta?.promoter_id || null;
+        const promoterName = promoterId ? promoterMap.get(promoterId) : null;
         return {
           ...post!,
           _isPromoted: meta?.is_promoted || false,
           _isNewPost: meta?.is_new_post || false,
           _relevanceScore: meta?.relevance_score || 0,
           _boostLevel: meta?.boost_level || null,
+          _promoterId: promoterId,
           _promoterName: promoterName || null
         };
+      })
+      // Filter out promoted posts where the current user is NOT the promoter
+      // Only the promoter should see their own promoted posts in their feed
+      .filter(post => {
+        if (!post._isPromoted) return true; // Non-promoted posts pass through
+        // Only show promoted post if current user is the promoter
+        return post._promoterId === user?.id;
       });
 
     // Cache the results
@@ -917,7 +926,7 @@ const Feed = () => {
                     <ImmersivePostCard
                       post={post}
                       isPromoted={post._isPromoted || post._isSponsored || false}
-                      promoterName={post._promoterName}
+                      promoterName={post._promoterId === user?.id ? 'me' : post._promoterName}
                       boostLevel={post._boostLevel}
                       onCommentsOpenChange={setIsCommentsOpen}
                       onInteractionStart={handleInteractionStart}
