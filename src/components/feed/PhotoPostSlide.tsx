@@ -355,27 +355,6 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           </>
         )}
 
-        {/* Dot Indicators - above caption overlay */}
-        {images.length > 1 && (
-          <div className="absolute bottom-[100px] left-0 right-0 flex justify-center gap-2 z-20">
-            {images.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setCurrentImageIndex(idx);
-                  onImageIndexChange?.(idx);
-                }}
-                className={cn(
-                  "h-2 rounded-full transition-all duration-200",
-                  idx === currentImageIndex 
-                    ? "w-4 bg-white" 
-                    : "w-2 bg-white/40 hover:bg-white/60"
-                )}
-              />
-            ))}
-          </div>
-        )}
 
         {/* Bottom Overlay with Caption Only */}
         <div 
