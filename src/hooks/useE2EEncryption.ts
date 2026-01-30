@@ -1,45 +1,39 @@
 /**
  * React hook for End-to-End Encryption operations
  * 
- * Provides easy access to E2E encryption for messaging components
+ * Provides easy access to E2E encryption with 8-digit PIN and weekly session persistence
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { E2ECrypto, type EncryptedData } from '@/lib/e2e-crypto';
 import { KeyStorage } from '@/lib/key-storage';
 import { toast } from 'sonner';
 
-interface PublicKeyRecord {
-  user_id: string;
-  public_key_jwk: JsonWebKey;
-  key_version: number;
-}
-
 interface EncryptionState {
   isInitialized: boolean;
   hasKeys: boolean;
   isLoading: boolean;
   error: string | null;
+  sessionExpiry: Date | null;
 }
 
 export function useE2EEncryption() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [state, setState] = useState<EncryptionState>({
     isInitialized: false,
     hasKeys: false,
     isLoading: true,
-    error: null
+    error: null,
+    sessionExpiry: null
   });
-  const [recoveryPhrase, setRecoveryPhrase] = useState<string[] | null>(null);
-  const [sessionPassword, setSessionPassword] = useState<string | null>(null);
+  const [sessionPinCode, setSessionPinCode] = useState<string | null>(null);
 
-  // Check if user has existing keys
+  // Check if user has existing keys and restore session
   useEffect(() => {
-    const checkKeys = async () => {
+    const checkKeysAndRestoreSession = async () => {
       if (!user?.id) {
         setState(prev => ({ ...prev, isLoading: false }));
         return;
@@ -55,11 +49,37 @@ export function useE2EEncryption() {
           .eq('user_id', user.id)
           .single();
 
+        const hasKeys = hasLocalKeys && !!serverKey;
+        let sessionExpiry: Date | null = null;
+
+        // Try to restore session if keys exist
+        if (hasKeys) {
+          const savedPin = await KeyStorage.getValidSession(user.id);
+          
+          if (savedPin) {
+            // Verify the PIN still works by testing decryption
+            try {
+              const privateKey = await KeyStorage.getPrivateKey(user.id, savedPin);
+              if (privateKey) {
+                setSessionPinCode(savedPin);
+                // Extend session on each app open
+                await KeyStorage.extendSession(user.id);
+              }
+            } catch {
+              // Invalid session, clear it
+              await KeyStorage.clearSession(user.id);
+            }
+          }
+          
+          sessionExpiry = await KeyStorage.getSessionExpiry(user.id);
+        }
+
         setState({
           isInitialized: true,
-          hasKeys: hasLocalKeys && !!serverKey,
+          hasKeys,
           isLoading: false,
-          error: null
+          error: null,
+          sessionExpiry
         });
       } catch (error) {
         setState(prev => ({
@@ -70,7 +90,7 @@ export function useE2EEncryption() {
       }
     };
 
-    checkKeys();
+    checkKeysAndRestoreSession();
   }, [user?.id]);
 
   // Fetch recipient's public key
@@ -88,12 +108,16 @@ export function useE2EEncryption() {
 
   // Initialize encryption (generate keys)
   const initializeEncryption = useMutation({
-    mutationFn: async (password: string) => {
+    mutationFn: async (pinCode: string) => {
       if (!user?.id) throw new Error('Not authenticated');
+      
+      // Validate PIN format
+      if (!E2ECrypto.validate8DigitCode(pinCode)) {
+        throw new Error('PIN must be exactly 8 digits');
+      }
 
       // Generate and store key pair
-      const { publicKeyJwk, recoveryPhrase: phrase } = 
-        await KeyStorage.generateAndStoreKeyPair(user.id, password);
+      const { publicKeyJwk } = await KeyStorage.generateAndStoreKeyPair(user.id, pinCode);
 
       // Store public key on server (upsert to handle existing keys)
       const { data: existingKey } = await supabase
@@ -131,28 +155,35 @@ export function useE2EEncryption() {
 
       if (error) throw error;
 
-      setRecoveryPhrase(phrase);
-      setSessionPassword(password);
+      setSessionPinCode(pinCode);
       
-      return { recoveryPhrase: phrase };
+      const sessionExpiry = await KeyStorage.getSessionExpiry(user.id);
+      
+      return { sessionExpiry };
     },
-    onSuccess: () => {
-      setState(prev => ({ ...prev, hasKeys: true }));
-      toast.success('Encryption enabled! Save your recovery phrase.');
+    onSuccess: ({ sessionExpiry }) => {
+      setState(prev => ({ ...prev, hasKeys: true, sessionExpiry }));
+      toast.success('Encryption enabled! Your messages are now protected.');
     },
     onError: (error: Error) => {
       toast.error(error.message || 'Failed to initialize encryption');
     }
   });
 
-  // Unlock keys with password
-  const unlockKeys = useCallback(async (password: string): Promise<boolean> => {
+  // Unlock keys with PIN
+  const unlockKeys = useCallback(async (pinCode: string): Promise<boolean> => {
     if (!user?.id) return false;
 
     try {
-      const privateKey = await KeyStorage.getPrivateKey(user.id, password);
+      const privateKey = await KeyStorage.getPrivateKey(user.id, pinCode);
       if (privateKey) {
-        setSessionPassword(password);
+        setSessionPinCode(pinCode);
+        // Save session for 7 days
+        await KeyStorage.saveSession(user.id, pinCode);
+        
+        const sessionExpiry = await KeyStorage.getSessionExpiry(user.id);
+        setState(prev => ({ ...prev, sessionExpiry }));
+        
         return true;
       }
       return false;
@@ -166,8 +197,8 @@ export function useE2EEncryption() {
     message: string,
     recipientId: string
   ): Promise<EncryptedData | null> => {
-    if (!user?.id || !sessionPassword) {
-      toast.error('Please unlock your encryption keys first');
+    if (!user?.id || !sessionPinCode) {
+      toast.error('Please unlock your encryption first');
       return null;
     }
 
@@ -180,7 +211,7 @@ export function useE2EEncryption() {
       }
 
       // Get my private key
-      const myPrivateKey = await KeyStorage.getPrivateKey(user.id, sessionPassword);
+      const myPrivateKey = await KeyStorage.getPrivateKey(user.id, sessionPinCode);
       if (!myPrivateKey) {
         throw new Error('Failed to retrieve private key');
       }
@@ -198,14 +229,14 @@ export function useE2EEncryption() {
       toast.error('Failed to encrypt message');
       return null;
     }
-  }, [user?.id, sessionPassword, fetchPublicKey]);
+  }, [user?.id, sessionPinCode, fetchPublicKey]);
 
   // Decrypt a message from a sender
   const decryptMessage = useCallback(async (
     encryptedData: EncryptedData,
     senderId: string
   ): Promise<string | null> => {
-    if (!user?.id || !sessionPassword) {
+    if (!user?.id || !sessionPinCode) {
       return null;
     }
 
@@ -217,7 +248,7 @@ export function useE2EEncryption() {
       }
 
       // Get my private key
-      const myPrivateKey = await KeyStorage.getPrivateKey(user.id, sessionPassword);
+      const myPrivateKey = await KeyStorage.getPrivateKey(user.id, sessionPinCode);
       if (!myPrivateKey) {
         return null;
       }
@@ -231,38 +262,29 @@ export function useE2EEncryption() {
       console.error('Decryption failed:', error);
       return null;
     }
-  }, [user?.id, sessionPassword, fetchPublicKey]);
+  }, [user?.id, sessionPinCode, fetchPublicKey]);
 
-  // Recover keys with recovery phrase
-  const recoverKeys = useMutation({
-    mutationFn: async ({ 
-      recoveryPhrase: phrase, 
-      newPassword 
-    }: { 
-      recoveryPhrase: string[]; 
-      newPassword: string;
-    }) => {
+  // Change PIN
+  const changePin = useMutation({
+    mutationFn: async ({ oldPin, newPin }: { oldPin: string; newPin: string }) => {
       if (!user?.id) throw new Error('Not authenticated');
-
-      const result = await KeyStorage.recoverWithPhrase(
-        user.id,
-        phrase,
-        newPassword
-      );
-
-      if (!result) {
-        throw new Error('Recovery failed - invalid phrase');
+      
+      if (!E2ECrypto.validate8DigitCode(newPin)) {
+        throw new Error('New PIN must be exactly 8 digits');
       }
 
-      setSessionPassword(newPassword);
-      return result;
+      await KeyStorage.updatePin(user.id, oldPin, newPin);
+      setSessionPinCode(newPin);
+      
+      const sessionExpiry = await KeyStorage.getSessionExpiry(user.id);
+      return { sessionExpiry };
     },
-    onSuccess: () => {
-      setState(prev => ({ ...prev, hasKeys: true }));
-      toast.success('Keys recovered successfully!');
+    onSuccess: ({ sessionExpiry }) => {
+      setState(prev => ({ ...prev, sessionExpiry }));
+      toast.success('PIN changed successfully!');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to recover keys');
+      toast.error(error.message || 'Failed to change PIN');
     }
   });
 
@@ -272,24 +294,23 @@ export function useE2EEncryption() {
     return publicKey !== null;
   }, [fetchPublicKey]);
 
-  // Clear recovery phrase from memory (after user has saved it)
-  const clearRecoveryPhrase = useCallback(() => {
-    setRecoveryPhrase(null);
-  }, []);
-
-  // Lock keys (clear session password)
-  const lockKeys = useCallback(() => {
-    setSessionPassword(null);
-  }, []);
+  // Lock keys (clear session)
+  const lockKeys = useCallback(async () => {
+    if (user?.id) {
+      await KeyStorage.clearSession(user.id);
+    }
+    setSessionPinCode(null);
+    setState(prev => ({ ...prev, sessionExpiry: null }));
+  }, [user?.id]);
 
   return {
     // State
     isInitialized: state.isInitialized,
     hasKeys: state.hasKeys,
     isLoading: state.isLoading,
-    isUnlocked: sessionPassword !== null,
+    isUnlocked: sessionPinCode !== null,
     error: state.error,
-    recoveryPhrase,
+    sessionExpiry: state.sessionExpiry,
 
     // Actions
     initializeEncryption: initializeEncryption.mutate,
@@ -298,9 +319,8 @@ export function useE2EEncryption() {
     lockKeys,
     encryptMessage,
     decryptMessage,
-    recoverKeys: recoverKeys.mutate,
-    isRecovering: recoverKeys.isPending,
+    changePin: changePin.mutate,
+    isChangingPin: changePin.isPending,
     supportsE2EE,
-    clearRecoveryPhrase
   };
 }

@@ -2,7 +2,8 @@
  * Secure Key Storage Library
  * 
  * Manages encrypted storage of E2E encryption keys using IndexedDB.
- * Private keys are encrypted with a password-derived key before storage.
+ * Private keys are encrypted with a PIN-derived key before storage.
+ * Sessions persist for 7 days before requiring PIN re-entry.
  */
 
 import { E2ECrypto, type KeyPair } from './e2e-crypto';
@@ -15,17 +16,20 @@ interface StoredKeyData {
   createdAt: string;
 }
 
-interface RecoveryData {
-  encryptedPrivateKey: string;
+interface SessionData {
+  encryptedPin: string;      // PIN encrypted with device key
   iv: string;
-  salt: string;
-  publicKeyJwk: JsonWebKey;
-  keyVersion: number;
+  deviceKey: string;         // Device-specific key (stored in IndexedDB)
+  unlockedAt: string;        // ISO timestamp
+  expiresAt: string;         // 7 days from unlockedAt
 }
 
 const DB_NAME = 'feedin_e2e_keys';
 const STORE_NAME = 'encryption_keys';
 const DB_VERSION = 1;
+
+// Session duration: 7 days
+const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class KeyStorage {
   private static db: IDBDatabase | null = null;
@@ -108,22 +112,109 @@ export class KeyStorage {
       request.onsuccess = () => resolve();
     });
   }
+
+  /**
+   * Convert ArrayBuffer to Base64 string
+   */
+  private static arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  /**
+   * Convert Base64 string to ArrayBuffer
+   */
+  private static base64ToArrayBuffer(base64: string): ArrayBuffer {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const buffer = new ArrayBuffer(bytes.length);
+    new Uint8Array(buffer).set(bytes);
+    return buffer;
+  }
+
+  /**
+   * Encrypt data with a device-specific key (for session persistence)
+   */
+  private static async encryptWithDeviceKey(
+    data: string,
+    deviceKey: Uint8Array
+  ): Promise<{ encrypted: string; iv: string }> {
+    // Create a new ArrayBuffer copy to avoid SharedArrayBuffer issues
+    const keyBuffer = new ArrayBuffer(deviceKey.length);
+    new Uint8Array(keyBuffer).set(deviceKey);
+    
+    const key = await window.crypto.subtle.importKey(
+      'raw',
+      keyBuffer,
+      { name: 'AES-GCM' },
+      false,
+      ['encrypt']
+    );
+    
+    const iv = window.crypto.getRandomValues(new Uint8Array(12));
+    const ivBuffer = new ArrayBuffer(iv.length);
+    new Uint8Array(ivBuffer).set(iv);
+    
+    const encoded = new TextEncoder().encode(data);
+    
+    const encrypted = await window.crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: ivBuffer },
+      key,
+      encoded
+    );
+    
+    return {
+      encrypted: this.arrayBufferToBase64(encrypted),
+      iv: this.arrayBufferToBase64(iv.buffer)
+    };
+  }
+
+  /**
+   * Decrypt data with a device-specific key
+   */
+  private static async decryptWithDeviceKey(
+    encryptedData: string,
+    iv: string,
+    deviceKey: ArrayBuffer
+  ): Promise<string> {
+    const key = await window.crypto.subtle.importKey(
+      'raw',
+      deviceKey,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    );
+    
+    const decrypted = await window.crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: this.base64ToArrayBuffer(iv) },
+      key,
+      this.base64ToArrayBuffer(encryptedData)
+    );
+    
+    return new TextDecoder().decode(decrypted);
+  }
   
   /**
-   * Generate and store a new key pair
-   * Returns the public key (to be stored on server) and recovery phrase
+   * Generate and store a new key pair using 8-digit PIN
+   * Returns the public key (to be stored on server)
    */
   static async generateAndStoreKeyPair(
     userId: string,
-    password: string
-  ): Promise<{ publicKeyJwk: JsonWebKey; recoveryPhrase: string[] }> {
+    pinCode: string
+  ): Promise<{ publicKeyJwk: JsonWebKey }> {
     const keyPair = await E2ECrypto.generateKeyPair();
-    const recoveryPhrase = E2ECrypto.generateRecoveryPhrase();
     
-    // Encrypt private key with password
+    // Encrypt private key with PIN
     const encryptedPrivateKey = await E2ECrypto.encryptWithPassword(
       JSON.stringify(keyPair.privateKeyJwk),
-      password
+      pinCode
     );
     
     // Store encrypted private key
@@ -137,24 +228,11 @@ export class KeyStorage {
     
     await this.set(`private_key_${userId}`, storedData);
     
-    // Also store with recovery phrase as backup
-    const recoveryPassword = recoveryPhrase.join(' ');
-    const recoveryEncrypted = await E2ECrypto.encryptWithPassword(
-      JSON.stringify(keyPair.privateKeyJwk),
-      recoveryPassword
-    );
-    
-    await this.set(`recovery_${userId}`, {
-      encryptedPrivateKey: recoveryEncrypted.encrypted,
-      iv: recoveryEncrypted.iv,
-      salt: recoveryEncrypted.salt,
-      publicKeyJwk: keyPair.publicKeyJwk,
-      keyVersion: 1
-    } as RecoveryData);
+    // Save session for 7 days
+    await this.saveSession(userId, pinCode);
     
     return {
-      publicKeyJwk: keyPair.publicKeyJwk,
-      recoveryPhrase
+      publicKeyJwk: keyPair.publicKeyJwk
     };
   }
   
@@ -163,7 +241,7 @@ export class KeyStorage {
    */
   static async getPrivateKey(
     userId: string,
-    password: string
+    pinCode: string
   ): Promise<JsonWebKey | null> {
     const storedData = await this.get<StoredKeyData>(`private_key_${userId}`);
     
@@ -176,12 +254,12 @@ export class KeyStorage {
           iv: storedData.iv,
           salt: storedData.salt
         },
-        password
+        pinCode
       );
       
       return JSON.parse(decrypted);
     } catch {
-      throw new Error('Invalid password or corrupted key');
+      throw new Error('Invalid PIN or corrupted key');
     }
   }
   
@@ -200,77 +278,104 @@ export class KeyStorage {
     const storedData = await this.get<StoredKeyData>(`private_key_${userId}`);
     return storedData?.keyVersion || null;
   }
-  
+
   /**
-   * Recover keys using recovery phrase
+   * Save unlock session (called when user enters PIN)
+   * Session persists for 7 days
    */
-  static async recoverWithPhrase(
-    userId: string,
-    recoveryPhrase: string[],
-    newPassword: string
-  ): Promise<{ publicKeyJwk: JsonWebKey } | null> {
-    const recoveryData = await this.get<RecoveryData>(`recovery_${userId}`);
+  static async saveSession(userId: string, pinCode: string): Promise<void> {
+    // Generate a random device key
+    const deviceKey = window.crypto.getRandomValues(new Uint8Array(32));
     
-    if (!recoveryData) return null;
+    // Encrypt the PIN with device key
+    const encrypted = await this.encryptWithDeviceKey(pinCode, deviceKey);
     
+    const session: SessionData = {
+      encryptedPin: encrypted.encrypted,
+      iv: encrypted.iv,
+      deviceKey: this.arrayBufferToBase64(deviceKey.buffer),
+      unlockedAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + SESSION_DURATION_MS).toISOString()
+    };
+    
+    await this.set(`session_${userId}`, session);
+  }
+
+  /**
+   * Check if session is still valid and return PIN if so
+   */
+  static async getValidSession(userId: string): Promise<string | null> {
+    const session = await this.get<SessionData>(`session_${userId}`);
+    
+    if (!session) return null;
+    
+    // Check if expired
+    if (new Date(session.expiresAt) < new Date()) {
+      await this.delete(`session_${userId}`);
+      return null;
+    }
+    
+    // Decrypt and return PIN
     try {
-      const recoveryPassword = recoveryPhrase.join(' ');
-      
-      // Decrypt private key with recovery phrase
-      const decrypted = await E2ECrypto.decryptWithPassword(
-        {
-          encrypted: recoveryData.encryptedPrivateKey,
-          iv: recoveryData.iv,
-          salt: recoveryData.salt
-        },
-        recoveryPassword
+      const deviceKey = this.base64ToArrayBuffer(session.deviceKey);
+      const pin = await this.decryptWithDeviceKey(
+        session.encryptedPin,
+        session.iv,
+        deviceKey
       );
-      
-      const privateKeyJwk = JSON.parse(decrypted);
-      
-      // Re-encrypt with new password
-      const encryptedPrivateKey = await E2ECrypto.encryptWithPassword(
-        JSON.stringify(privateKeyJwk),
-        newPassword
-      );
-      
-      // Store with new password
-      const storedData: StoredKeyData = {
-        encrypted: encryptedPrivateKey.encrypted,
-        iv: encryptedPrivateKey.iv,
-        salt: encryptedPrivateKey.salt,
-        keyVersion: recoveryData.keyVersion,
-        createdAt: new Date().toISOString()
-      };
-      
-      await this.set(`private_key_${userId}`, storedData);
-      
-      return { publicKeyJwk: recoveryData.publicKeyJwk };
+      return pin;
     } catch {
-      throw new Error('Invalid recovery phrase');
+      return null;
+    }
+  }
+
+  /**
+   * Get session expiry date
+   */
+  static async getSessionExpiry(userId: string): Promise<Date | null> {
+    const session = await this.get<SessionData>(`session_${userId}`);
+    if (!session) return null;
+    return new Date(session.expiresAt);
+  }
+
+  /**
+   * Clear session (manual lock or logout)
+   */
+  static async clearSession(userId: string): Promise<void> {
+    await this.delete(`session_${userId}`);
+  }
+
+  /**
+   * Extend session (refresh the 7 days)
+   */
+  static async extendSession(userId: string): Promise<void> {
+    const session = await this.get<SessionData>(`session_${userId}`);
+    if (session) {
+      session.expiresAt = new Date(Date.now() + SESSION_DURATION_MS).toISOString();
+      await this.set(`session_${userId}`, session);
     }
   }
   
   /**
-   * Update password for existing keys
+   * Update PIN for existing keys
    */
-  static async updatePassword(
+  static async updatePin(
     userId: string,
-    oldPassword: string,
-    newPassword: string
+    oldPin: string,
+    newPin: string
   ): Promise<void> {
-    const privateKey = await this.getPrivateKey(userId, oldPassword);
+    const privateKey = await this.getPrivateKey(userId, oldPin);
     
     if (!privateKey) {
-      throw new Error('No keys found or invalid password');
+      throw new Error('No keys found or invalid PIN');
     }
     
     const storedData = await this.get<StoredKeyData>(`private_key_${userId}`);
     
-    // Re-encrypt with new password
+    // Re-encrypt with new PIN
     const encryptedPrivateKey = await E2ECrypto.encryptWithPassword(
       JSON.stringify(privateKey),
-      newPassword
+      newPin
     );
     
     const newStoredData: StoredKeyData = {
@@ -282,6 +387,9 @@ export class KeyStorage {
     };
     
     await this.set(`private_key_${userId}`, newStoredData);
+    
+    // Update session with new PIN
+    await this.saveSession(userId, newPin);
   }
   
   /**
@@ -289,29 +397,6 @@ export class KeyStorage {
    */
   static async clearKeys(userId: string): Promise<void> {
     await this.delete(`private_key_${userId}`);
-    await this.delete(`recovery_${userId}`);
-  }
-  
-  /**
-   * Export recovery data (for backup)
-   */
-  static async exportRecoveryData(userId: string): Promise<RecoveryData | null> {
-    return this.get<RecoveryData>(`recovery_${userId}`);
-  }
-  
-  /**
-   * Import recovery data (for restore on new device)
-   */
-  static async importRecoveryData(
-    userId: string,
-    recoveryData: RecoveryData,
-    recoveryPhrase: string[],
-    newPassword: string
-  ): Promise<void> {
-    // Store the recovery data
-    await this.set(`recovery_${userId}`, recoveryData);
-    
-    // Recover with the phrase
-    await this.recoverWithPhrase(userId, recoveryPhrase, newPassword);
+    await this.delete(`session_${userId}`);
   }
 }

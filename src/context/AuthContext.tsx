@@ -7,6 +7,7 @@ import { CookieManager } from '@/lib/cookie-manager';
 import { appShellPreloader } from '@/lib/app-shell-preloader';
 import { backgroundSync } from '@/lib/background-sync';
 import { initializeCurrentUserCounts } from '@/hooks/useProfileCounts';
+import { KeyStorage } from '@/lib/key-storage';
 
 interface AuthContextType {
   user: User | null;
@@ -219,6 +220,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       setLoading(true);
       
+      // Clear E2E encryption session
+      if (user?.id) {
+        try {
+          await KeyStorage.clearSession(user.id);
+        } catch (e) {
+          // Continue even if this fails
+        }
+      }
+      
       // Invalidate current session in database
       try {
         await supabase.rpc('invalidate_all_sessions');
@@ -259,6 +269,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOutAllDevices = async () => {
     try {
       setLoading(true);
+      
+      // Clear E2E encryption session
+      if (user?.id) {
+        try {
+          await KeyStorage.clearSession(user.id);
+        } catch (e) {
+          // Continue even if this fails
+        }
+      }
       
       // Invalidate all sessions in database
       try {

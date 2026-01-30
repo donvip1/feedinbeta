@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { ArrowLeft, Shield, Eye, Lock, Users, Moon, Sun, Loader2, MessageCircle, Activity, Trash2, AlertTriangle } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { useTheme } from 'next-themes';
+import { EncryptionSettings } from '@/components/settings/EncryptionSettings';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -269,6 +270,11 @@ const PrivacySettings = () => {
               'Save Privacy Settings'
             )}
           </Button>
+        </Card>
+
+        {/* E2E Encryption Section */}
+        <Card className="bg-card border-border mt-6 p-6">
+          <EncryptionSettings />
         </Card>
 
         {/* Additional Privacy Info */}
