@@ -1877,18 +1877,27 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
           const originalMediaType = p.original_post?.media_type;
           // Exclude video posts
           return pMediaType !== 'video' && originalMediaType !== 'video';
-        }).map(p => ({
-          id: p.id,
-          user_id: p.user_id,
-          content: p.content,
-          media_url: p.media_url,
-          media_urls: p.media_urls,
-          likes_count: p.likes_count,
-          comments_count: p.comments_count,
-          refeeds_count: p.refeeds_count,
-          views_count: p.views_count,
-          profiles: p.profiles
-        })) || [];
+        }).map(p => {
+          // For refeeds/quotes, use media from original_post
+          const isRefeedOrQuote = p.post_type === 'refeed' || p.post_type === 'quote';
+          const sourcePost = isRefeedOrQuote && p.original_post ? p.original_post : p;
+          
+          return {
+            id: p.id,
+            user_id: p.user_id,
+            content: p.content,
+            media_url: sourcePost.media_url,
+            media_urls: sourcePost.media_urls,
+            likes_count: p.likes_count,
+            comments_count: p.comments_count,
+            refeeds_count: p.refeeds_count,
+            views_count: p.views_count,
+            profiles: p.profiles,
+            // Pass original post info for attribution
+            original_post: p.original_post,
+            post_type: p.post_type
+          };
+        }) || [];
         
         const currentPhotoPostIndex = photoPosts.findIndex(p => p.id === post.id);
         
