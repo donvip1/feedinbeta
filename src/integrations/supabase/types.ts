@@ -8814,7 +8814,7 @@ export type Database = {
               p_gift_type: string
               p_recipient_identifier: string
             }
-            Returns: string
+            Returns: Json
           }
       send_gift:
         | {
