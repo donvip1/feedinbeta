@@ -1,49 +1,53 @@
 
 
-# Plan: Fix Credit Balance Constraint for Gift Sending
+# Plan: Fix Missing `last_gift_sent_at` Column for Gift Sending
 
-## Problem Summary
+## Problem Identified
 
-Users are getting "new row for relation 'user_credits' violates check constraint 'user_credits_balance_check'" when trying to send gifts. This happens because:
+The gift sending is failing for ALL users (not just those with insufficient credits) because:
 
-1. The `send_gift` function checks balance from `credit_transactions` table
-2. But when inserting into `credit_transactions`, a trigger (`apply_credit_transaction`) updates `user_credits`
-3. The trigger has a bug: when inserting for a **new user** who doesn't exist in `user_credits`, it sets `balance = NEW.amount`
-4. If `NEW.amount` is negative (gift deduction), it tries to insert `balance = -10`, violating `CHECK (balance >= 0)`
+**Error**: `column "last_gift_sent_at" does not exist`
 
-## Root Cause Analysis
+The previous migration created `send_gift` and `send_direct_gift` functions that reference a `last_gift_sent_at` column in the `user_credits` table for rate limiting, but this column was never created.
+
+## Root Cause
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  send_gift RPC Function                                             │
-│  ───────────────────────                                            │
-│  1. Checks: SUM(credit_transactions) → e.g., returns 500            │
-│  2. Validates: 500 >= 10 (gift cost) → PASS                         │
-│  3. Inserts: credit_transactions (amount = -10)                     │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  apply_credit_transaction TRIGGER                                   │
-│  ────────────────────────────────                                   │
-│  Problem Code:                                                      │
+│  send_gift / send_direct_gift Functions                             │
+│  ─────────────────────────────────────                              │
+│  Line 36-38:                                                        │
+│    SELECT last_gift_sent_at INTO v_last_gift_at                     │
+│    FROM user_credits WHERE user_id = v_sender_id;                   │
 │                                                                     │
-│  INSERT INTO user_credits (balance = NEW.amount)  ← -10!            │
-│  ON CONFLICT DO UPDATE SET balance = balance + NEW.amount           │
+│  Line 89:                                                           │
+│    UPDATE user_credits SET last_gift_sent_at = now() ...            │
 │                                                                     │
-│  For NEW users: balance = -10 → VIOLATES CHECK (balance >= 0)       │
-│  For EXISTING users: balance = 500 + (-10) = 490 → OK               │
+│  ❌ FAILS: Column does not exist!                                   │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Solution
 
-Update the `apply_credit_transaction` trigger function to:
+Create a database migration that:
 
-1. **Prevent new users from having negative initial balance** - If user doesn't exist in `user_credits` and the transaction is negative, reject it
-2. **Better validation** - Use `user_credits.balance` as the source of truth, not just for trigger validation
+1. **Adds the missing column** - Add `last_gift_sent_at` column to `user_credits` table
+2. **Ensures correct trigger logic** - The `apply_credit_transaction` trigger should properly validate balances before allowing deductions
+3. **Fix data sync** - Ensure user balances are properly synced
 
-### Updated Trigger Function
+## Database Changes
+
+### Step 1: Add Missing Column
+
+```sql
+-- Add the missing last_gift_sent_at column
+ALTER TABLE user_credits 
+ADD COLUMN IF NOT EXISTS last_gift_sent_at TIMESTAMPTZ DEFAULT NULL;
+```
+
+### Step 2: Fix the apply_credit_transaction Trigger
+
+The current trigger has a logic bug - it checks balance BEFORE the insert, but then proceeds to INSERT ON CONFLICT which can still try to insert a negative value. We need to fix this:
 
 ```sql
 CREATE OR REPLACE FUNCTION public.apply_credit_transaction()
@@ -54,7 +58,7 @@ SET search_path TO 'public'
 AS $function$
 DECLARE
   current_balance INTEGER;
-  user_exists BOOLEAN;
+  user_exists BOOLEAN := false;
 BEGIN
   -- Check if user exists in user_credits and get their balance
   SELECT balance, true INTO current_balance, user_exists
@@ -67,8 +71,8 @@ BEGIN
     user_exists := false;
   END IF;
   
-  -- Validate: prevent balance from going negative
-  IF current_balance + NEW.amount < 0 THEN
+  -- Validate: prevent balance from going negative (for deductions)
+  IF NEW.amount < 0 AND current_balance + NEW.amount < 0 THEN
     RAISE EXCEPTION 'Insufficient credits. Current balance: %, attempted deduction: %', 
       current_balance, ABS(NEW.amount);
   END IF;
@@ -85,7 +89,7 @@ BEGIN
   ELSE
     -- New user - only allow positive initial balance
     IF NEW.amount < 0 THEN
-      RAISE EXCEPTION 'Cannot deduct credits from user with no credit record. User needs initial credits first.';
+      RAISE EXCEPTION 'Cannot deduct credits from user with no credit record';
     END IF;
     
     INSERT INTO user_credits (user_id, balance, total_earned, total_spent)
@@ -102,48 +106,53 @@ END;
 $function$;
 ```
 
-### Also Update send_gift Function
+### Step 3: Sync User Balances
 
-The `send_gift` function should check `user_credits.balance` instead of summing `credit_transactions`:
+Ensure all non-admin users have correct balances synced from their transaction history:
 
 ```sql
--- Change from:
-SELECT COALESCE(SUM(amount), 0) INTO v_sender_balance 
-FROM credit_transactions WHERE user_id = v_sender_id;
-
--- To:
-SELECT COALESCE(balance, 0) INTO v_sender_balance 
-FROM user_credits WHERE user_id = v_sender_id;
+-- Sync balances for non-admin users
+UPDATE user_credits uc
+SET balance = GREATEST(0, COALESCE((
+  SELECT SUM(amount) FROM credit_transactions ct WHERE ct.user_id = uc.user_id
+), 0)),
+updated_at = now()
+WHERE (is_admin_minted IS NULL OR is_admin_minted = false);
 ```
 
 ## Files to Modify
 
 | Change | Description |
 |--------|-------------|
-| Database Migration | Update `apply_credit_transaction` trigger function to properly handle new users |
-| Database Migration | Update `send_gift` function to check `user_credits.balance` instead of summing transactions |
-| Database Migration | Update `send_direct_gift` function with same fix |
+| Database Migration | Add `last_gift_sent_at` column to `user_credits` table |
+| Database Migration | Fix `apply_credit_transaction` trigger to properly check balance before inserting |
+| Database Migration | Sync user balances |
 
-## Data Sync Fix
+## Frontend Updates (Optional)
 
-Additionally, we should sync existing data where `user_credits.balance` doesn't match `credit_transactions` sum:
+The `ChatGiftButton.tsx` currently fetches credits from `credit_transactions` table (summing them up) instead of reading from `user_credits.balance`. This should be updated to use the source of truth:
 
-```sql
--- Sync balances for users where they differ
-UPDATE user_credits uc
-SET balance = COALESCE((
-  SELECT SUM(amount) FROM credit_transactions ct WHERE ct.user_id = uc.user_id
-), 0)
-WHERE balance != COALESCE((
-  SELECT SUM(amount) FROM credit_transactions ct WHERE ct.user_id = uc.user_id
-), 0)
-AND NOT is_admin_minted; -- Don't touch admin accounts
+```tsx
+// Current (incorrect):
+const { data, error } = await supabase
+  .from('credit_transactions')
+  .select('amount')
+  .eq('user_id', user.id);
+const total = data.reduce((sum, t) => sum + t.amount, 0);
+
+// Should be:
+const { data, error } = await supabase
+  .from('user_credits')
+  .select('balance')
+  .eq('user_id', user.id)
+  .single();
+const total = data?.balance || 0;
 ```
 
 ## Summary
 
-1. **Fix trigger function** - Properly handle new users trying to make negative transactions
-2. **Fix send_gift/send_direct_gift** - Check `user_credits.balance` instead of summing transactions
-3. **Sync existing data** - Ensure `user_credits.balance` matches `credit_transactions` totals
-4. **Preserve admin bypass** - Admin accounts with `is_admin_minted = true` keep unlimited credits
+1. **Add missing column** - `last_gift_sent_at` to enable rate limiting
+2. **Fix trigger logic** - Properly validate balance BEFORE allowing any operations
+3. **Sync balances** - Ensure `user_credits.balance` matches transaction history
+4. **Update frontend** - Read balance from `user_credits.balance` (source of truth)
 
