@@ -11,6 +11,7 @@ import { backgroundAudioManager } from './background-audio-manager';
 import { pushNotificationManager } from './push-notification-manager';
 import { indexedDBCache } from './indexed-db-cache';
 import { memoryCache } from './memory-cache';
+import { setUser as setSentryUser, clearUser as clearSentryUser } from './sentry';
 
 interface NativeAppConfig {
   queryClient: QueryClient;
@@ -143,20 +144,46 @@ class NativeAppManager {
   }
 
   /**
-   * Save push token to database
+   * Save push token to database for FCM notifications
    */
   private async savePushToken(token: string): Promise<void> {
-    if (!this.userId) return;
-
-    try {
-      // Store in a generic cache key since push_subscriptions table may have different schema
-      await indexedDBCache.set(`push_token:${this.userId}`, { 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.log('[NativeAppManager] No authenticated user, caching token locally');
+      await indexedDBCache.set(`push_token_pending`, { 
         token, 
         platform: this.platform 
       }, 24 * 60 * 60 * 1000);
-      console.log('[NativeAppManager] Push token saved to cache');
+      return;
+    }
+
+    try {
+      // Store FCM token in push_subscriptions table
+      const { error } = await supabase.from('push_subscriptions').upsert({
+        user_id: user.id,
+        device_token: token,
+        platform: this.platform,
+        endpoint: `fcm:${token}`, // Unique identifier
+        p256dh: '',
+        auth: '',
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id,endpoint' });
+
+      if (error) throw error;
+      console.log('[NativeAppManager] FCM token saved to database');
+      
+      // Also cache locally for quick access
+      await indexedDBCache.set(`push_token:${user.id}`, { 
+        token, 
+        platform: this.platform 
+      }, 24 * 60 * 60 * 1000);
     } catch (error) {
-      console.warn('[NativeAppManager] Failed to save push token:', error);
+      console.warn('[NativeAppManager] Failed to save FCM token:', error);
+      // Fallback to local cache
+      await indexedDBCache.set(`push_token:${user.id}`, { 
+        token, 
+        platform: this.platform 
+      }, 24 * 60 * 60 * 1000);
     }
   }
 
@@ -387,9 +414,19 @@ class NativeAppManager {
   /**
    * Update user ID (call after login)
    */
-  setUserId(userId: string): void {
+  async setUserId(userId: string, email?: string, username?: string): Promise<void> {
     this.userId = userId;
     localStorage.setItem('currentUserId', userId);
+    
+    // Set user context in Sentry for crash tracking
+    setSentryUser(userId, email, username);
+    
+    // Check for pending push token and save it
+    const pendingToken = await indexedDBCache.get<{ token: string; platform: string }>('push_token_pending');
+    if (pendingToken?.token && this.isNativePlatform) {
+      await this.savePushToken(pendingToken.token);
+      await indexedDBCache.delete('push_token_pending');
+    }
     
     // Refresh preloaded data for new user
     appShellPreloader.reset();
@@ -404,6 +441,9 @@ class NativeAppManager {
   async clearUserData(): Promise<void> {
     this.userId = null;
     localStorage.removeItem('currentUserId');
+    
+    // Clear Sentry user context
+    clearSentryUser();
     
     // Clear user-specific caches
     await indexedDBCache.cleanupExpired();

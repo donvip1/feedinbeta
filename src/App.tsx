@@ -24,6 +24,7 @@ import { appDataSync } from "@/lib/app-data-sync";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { LoadingScreen } from "@/components/shared/LoadingScreen";
 import { nativeAppManager } from "@/lib/native-app-manager";
+import { initSentry } from "@/lib/sentry";
 
 // Core pages - static imports
 import Index from "./pages/Index";
@@ -181,8 +182,11 @@ const LazyFallback = () => <LoadingScreen />;
 const App = () => {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
 
-  // Initialize offline manager, auto-updater, and native app manager
+  // Initialize offline manager, auto-updater, native app manager, and Sentry
   useEffect(() => {
+    // Initialize Sentry for crash reporting (production only)
+    initSentry();
+    
     // Initialize native app manager for SDK-like experience (must be inside React lifecycle)
     nativeAppManager.initialize({ queryClient });
 
