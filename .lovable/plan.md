@@ -1,194 +1,297 @@
 
-# Plan: Fix Navigation After Clicking Promote and Back Arrow
+# Plan: Add Sentry Crash Reporting & FCM Push Notifications for Android
 
-## Problem Summary
+## Overview
 
-When users click the "Promote" button on a video or Photo+ post and then use the back arrow to return, they are redirected to a different post or wrong feed section instead of returning to the original content.
+This plan implements two critical production features for the Android app:
+1. **Sentry** - Real-time crash reporting and error tracking
+2. **FCM** - Firebase Cloud Messaging for native push notifications
 
-**Current Flow (Broken):**
+Both features integrate with the existing Lovable Cloud backend without requiring Firebase as a database.
+
+---
+
+## Part 1: Sentry Integration
+
+### Files to Create/Modify
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/lib/sentry.ts` | Create | Sentry configuration and initialization |
+| `src/App.tsx` | Modify | Initialize Sentry on app startup |
+| `src/components/shared/ErrorBoundary.tsx` | Modify | Report caught errors to Sentry |
+| `package.json` | Modify | Add @sentry/react dependency |
+
+### Implementation
+
+#### 1.1 Install Sentry SDK
+Add to package.json:
+```json
+"@sentry/react": "^8.0.0"
 ```
-Feed (viewing post) → Promote page → Back arrow → PostDetail (different view) → Lost context
-```
 
-**Expected Flow (Fixed):**
-```
-Feed (viewing post) → Promote page → Back arrow → Feed (same post at same position)
-```
+#### 1.2 Create Sentry Configuration (`src/lib/sentry.ts`)
+```typescript
+import * as Sentry from '@sentry/react';
 
-## Root Cause
-
-The Promote page (`src/pages/Promote.tsx`) back arrow handler currently does:
-```javascript
-navigate(`/feed/post/${postId}`, { replace: true });
-```
-
-This always redirects to PostDetail regardless of where the user came from, which:
-1. Replaces history making browser back unpredictable
-2. PostDetail loads ALL posts from that user, not just the one they were viewing
-3. Loses the feed scroll position and tab context (Video vs Photo+)
-
-## Solution
-
-Implement **referrer-aware back navigation** in the Promote page:
-
-### Strategy 1: Use `navigate(-1)` with Intelligent Fallback
-
-Instead of always going to PostDetail, check if there's valid history to go back to:
-
-```javascript
-const handleBack = () => {
-  // If we have history, go back to the exact previous page (Feed, PostDetail, etc.)
-  if (window.history.length > 2) {
-    navigate(-1);
-  } else {
-    // No history - fallback to post detail
-    navigate(`/feed/post/${postId}`, { replace: true });
+export function initSentry() {
+  // Only initialize in production
+  if (import.meta.env.PROD) {
+    Sentry.init({
+      dsn: import.meta.env.VITE_SENTRY_DSN,
+      environment: import.meta.env.MODE,
+      tracesSampleRate: 0.1, // 10% of transactions for performance
+      replaysSessionSampleRate: 0.1,
+      replaysOnErrorSampleRate: 1.0,
+      integrations: [
+        Sentry.browserTracingIntegration(),
+        Sentry.replayIntegration(),
+      ],
+    });
   }
-};
+}
+
+export function captureException(error: Error, context?: Record<string, any>) {
+  console.error('[Sentry] Capturing exception:', error.message);
+  Sentry.captureException(error, { extra: context });
+}
+
+export function setUser(userId: string, email?: string, username?: string) {
+  Sentry.setUser({ id: userId, email, username });
+}
+
+export function clearUser() {
+  Sentry.setUser(null);
+}
 ```
 
-### Strategy 2: Store Referrer in Navigation State
+#### 1.3 Modify App.tsx
+Add Sentry initialization in the useEffect:
+```typescript
+import { initSentry } from '@/lib/sentry';
 
-Pass the source URL when navigating to Promote:
+// Inside App component, at the start of useEffect:
+useEffect(() => {
+  // Initialize Sentry for crash reporting
+  initSentry();
+  
+  // ... rest of existing code
+}, []);
+```
 
-```javascript
-// In ImmersivePostCard, PostCard, PhotoPostSlide:
-navigate(`/promote/${post.id}`, { 
-  state: { returnTo: location.pathname + location.search } 
+#### 1.4 Update ErrorBoundary
+Report caught errors to Sentry:
+```typescript
+import { captureException } from '@/lib/sentry';
+
+// In componentDidCatch:
+componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  captureException(error, { componentStack: errorInfo.componentStack });
+}
+```
+
+#### 1.5 User Needs to Provide
+- Sentry DSN (from sentry.io project settings)
+- Store as `VITE_SENTRY_DSN` in environment
+
+---
+
+## Part 2: FCM Push Notifications
+
+### Current State
+- `@capacitor/push-notifications` already installed
+- `NativeAppManager` already registers tokens
+- VAPID keys configured for web push
+- `push_subscriptions` table exists
+
+### What Needs to Be Added
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/lib/native-app-manager.ts` | Modify | Save FCM tokens to database |
+| `supabase/functions/send-fcm-push/index.ts` | Create | Edge function to send FCM notifications |
+| Database | Modify | Add `device_token` and `platform` columns to push_subscriptions |
+
+### Implementation
+
+#### 2.1 Database Migration
+Add columns for native device tokens:
+```sql
+ALTER TABLE push_subscriptions 
+ADD COLUMN IF NOT EXISTS device_token TEXT,
+ADD COLUMN IF NOT EXISTS platform TEXT DEFAULT 'web';
+```
+
+#### 2.2 Modify NativeAppManager Token Saving
+Update `savePushToken` to store in database:
+```typescript
+private async savePushToken(token: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  try {
+    // Store FCM token in push_subscriptions table
+    const { error } = await supabase.from('push_subscriptions').upsert({
+      user_id: user.id,
+      device_token: token,
+      platform: this.platform,
+      endpoint: `fcm:${token}`, // Unique identifier
+      p256dh: '',
+      auth: '',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,endpoint' });
+
+    if (error) throw error;
+    console.log('[NativeAppManager] FCM token saved to database');
+  } catch (error) {
+    console.warn('[NativeAppManager] Failed to save FCM token:', error);
+  }
+}
+```
+
+#### 2.3 Create FCM Edge Function
+```typescript
+// supabase/functions/send-fcm-push/index.ts
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+const FCM_SERVER_KEY = Deno.env.get('FCM_SERVER_KEY');
+
+Deno.serve(async (req) => {
+  const { user_id, title, body, data } = await req.json();
+  
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+
+  // Get device tokens for user
+  const { data: subscriptions } = await supabase
+    .from('push_subscriptions')
+    .select('device_token, platform')
+    .eq('user_id', user_id)
+    .in('platform', ['android', 'ios']);
+
+  if (!subscriptions?.length) {
+    return new Response(JSON.stringify({ error: 'No device tokens' }), { status: 404 });
+  }
+
+  // Send to each device
+  for (const sub of subscriptions) {
+    await fetch('https://fcm.googleapis.com/fcm/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `key=${FCM_SERVER_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: sub.device_token,
+        notification: { title, body },
+        data,
+      }),
+    });
+  }
+
+  return new Response(JSON.stringify({ success: true }));
 });
-
-// In Promote.tsx back handler:
-const location = useLocation();
-const returnTo = location.state?.returnTo || `/feed/post/${postId}`;
-navigate(returnTo);
 ```
 
-## Files to Modify
+#### 2.4 User Needs to Provide
+- Firebase project `google-services.json` (place in `android/app/`)
+- FCM Server Key (store as `FCM_SERVER_KEY` secret in Lovable Cloud)
+
+---
+
+## Part 3: Android Build Configuration
+
+### Files to Modify for Production
 
 | File | Change |
 |------|--------|
-| `src/pages/Promote.tsx` | Update back arrow handler to use `navigate(-1)` with fallback |
-| `src/components/feed/ImmersivePostCard.tsx` | Pass state with returnTo path when navigating to Promote |
-| `src/components/feed/PostCard.tsx` | Pass state with returnTo path when navigating to Promote |
-| `src/components/feed/PhotoPostSlide.tsx` | Pass state with returnTo path when navigating to Promote |
+| `capacitor.config.ts` | Comment out `server` block for production |
+| `android/app/google-services.json` | Add Firebase config (after export to GitHub) |
 
-## Implementation Details
-
-### 1. Update Promote.tsx Back Handler (lines 326-329)
-
-**Before:**
-```tsx
-<Button
-  onClick={() => {
-    navigate(`/feed/post/${postId}`, { replace: true });
-  }}
-  ...
->
+### Production capacitor.config.ts
+```typescript
+const config: CapacitorConfig = {
+  appId: 'app.lovable.f7064a339a9346e59524cff96641637c',
+  appName: 'feedinbeta',
+  webDir: 'dist',
+  // PRODUCTION: Comment out server block
+  // server: {
+  //   url: 'https://f7064a33-9a93-46e5-9524-cff96641637c.lovableproject.com?forceHideBadge=true',
+  //   cleartext: true
+  // },
+  plugins: {
+    // ... existing config
+  },
+};
 ```
 
-**After:**
-```tsx
-const location = useLocation();
+---
 
-// In the onClick handler:
-<Button
-  onClick={() => {
-    // Check for passed return path or use navigate(-1)
-    const returnTo = location.state?.returnTo;
-    if (returnTo) {
-      navigate(returnTo);
-    } else if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      navigate(`/feed/post/${postId}`, { replace: true });
-    }
-  }}
-  ...
->
+## Summary of User Actions Required
+
+### Sentry Setup:
+1. Create account at sentry.io (free tier available)
+2. Create a React project
+3. Copy the DSN from project settings
+4. Add `VITE_SENTRY_DSN` to environment (can be public)
+
+### FCM Setup:
+1. Create Firebase project at console.firebase.google.com
+2. Add Android app with package ID: `app.lovable.f7064a339a9346e59524cff96641637c`
+3. Download `google-services.json`
+4. After GitHub export, place in `android/app/` folder
+5. Get FCM Server Key from Firebase Console
+6. Add `FCM_SERVER_KEY` as secret in Lovable Cloud
+
+### Build Commands:
+```bash
+git pull
+npm install
+npm run build
+npx cap sync android
+npx cap open android
+# In Android Studio: Build → Generate Signed Bundle/APK
 ```
 
-### 2. Update Promote Button in ImmersivePostCard.tsx
+---
 
-There are 4 Promote buttons in this file. Each needs to pass state:
+## Architecture Diagram
 
-**Before:**
-```tsx
-navigate(`/promote/${post.id}`);
-```
-
-**After:**
-```tsx
-navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
-```
-
-### 3. Update Promote Button in PostCard.tsx
-
-**Before:**
-```tsx
-navigate(`/promote/${post.id}`);
-```
-
-**After:**
-```tsx
-navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
-```
-
-### 4. Update Promote Button in PhotoPostSlide.tsx
-
-**Before:**
-```tsx
-navigate(`/promote/${post.id}`);
-```
-
-**After:**
-```tsx
-navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
-```
-
-## Visual Flow After Fix
-
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    NAVIGATION FLOW (FIXED)                      │
+│                    FeedIn Production Stack                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│   Feed Page (/feed)                                             │
-│   ┌──────────────────────────────────────────────┐              │
-│   │  Video Tab    │    Photo+ Tab               │              │
-│   │  ┌─────────┐  │    ┌─────────┐              │              │
-│   │  │ Video 1 │  │    │ Photo 1 │              │              │
-│   │  │[Promote]│──┼────│[Promote]│──────┐       │              │
-│   │  └─────────┘  │    └─────────┘      │       │              │
-│   └───────────────┴─────────────────────┼───────┘              │
-│                                         │                       │
-│                                         ▼                       │
-│                            ┌────────────────────┐               │
-│                            │   Promote Page     │               │
-│                            │   /promote/:id     │               │
-│                            │                    │               │
-│                            │   state: {         │               │
-│                            │     returnTo: '/feed'              │
-│                            │   }                │               │
-│                            │                    │               │
-│                            │   [← Back Arrow]   │               │
-│                            └────────┬───────────┘               │
-│                                     │                           │
-│                                     ▼                           │
-│                            Returns to /feed                     │
-│                            (same scroll position,               │
-│                             same tab, same post)                │
+│  ┌──────────────────┐     ┌──────────────────┐                  │
+│  │   Android App    │     │     Sentry.io    │                  │
+│  │  (Capacitor)     │────▶│  Crash Reports   │                  │
+│  │                  │     │  Error Tracking  │                  │
+│  └────────┬─────────┘     └──────────────────┘                  │
+│           │                                                     │
+│           │ FCM Token                                           │
+│           ▼                                                     │
+│  ┌──────────────────┐                                           │
+│  │  Lovable Cloud   │                                           │
+│  │  (Supabase)      │                                           │
+│  │                  │                                           │
+│  │  ┌────────────┐  │     ┌──────────────────┐                  │
+│  │  │push_subs   │  │     │   Firebase FCM   │                  │
+│  │  │table       │  │────▶│  Push Gateway    │                  │
+│  │  └────────────┘  │     │  (HTTP API only) │                  │
+│  │                  │     └────────┬─────────┘                  │
+│  │  ┌────────────┐  │              │                            │
+│  │  │send-fcm-   │  │              │                            │
+│  │  │push func   │──┼──────────────┘                            │
+│  │  └────────────┘  │                                           │
+│  └──────────────────┘              │                            │
+│                                    ▼                            │
+│                           Push Notification                     │
+│                           to Android Device                     │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-## Edge Cases Handled
-
-1. **Direct link to Promote page** (no history): Falls back to PostDetail
-2. **From PostDetail page**: Returns to PostDetail correctly
-3. **From Feed Video tab**: Returns to Feed at same position
-4. **From Feed Photo+ tab**: Returns to Feed at same position
-5. **From Fullscreen Photo viewer**: Returns to Feed/viewer correctly
-
-## Summary
-
-This fix ensures users are returned to their exact previous location after visiting the Promote page, maintaining scroll position, tab selection, and post context. The solution is backward compatible with existing direct navigation patterns.
+Note: Firebase is used ONLY for its push notification gateway (FCM). 
+All data, auth, and business logic remain in Lovable Cloud.
