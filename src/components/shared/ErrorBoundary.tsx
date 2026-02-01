@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
+import { captureException } from '@/lib/sentry';
 
 interface Props {
   children: React.ReactNode;
@@ -28,6 +29,11 @@ export class ErrorBoundary extends React.Component<Props, State> {
     console.error('Error caught by boundary:', error, errorInfo);
     this.setState({ errorInfo });
     this.props.onError?.(error, errorInfo);
+    
+    // Report to Sentry for crash tracking
+    captureException(error, { 
+      componentStack: errorInfo.componentStack || undefined 
+    });
   }
 
   handleRefresh = () => {
