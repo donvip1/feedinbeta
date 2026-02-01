@@ -144,6 +144,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
   const [isSeeking, setIsSeeking] = useState(false); // Is user dragging timeline
   const [isFollowing, setIsFollowing] = useState(false); // Follow state
   const [showMoreActions, setShowMoreActions] = useState(false); // Toggle for expanded social buttons when caption is long
+  const [showPostMenu, setShowPostMenu] = useState(false); // Three-dots dropdown menu (separate from social buttons)
   const [isFollowLoading, setIsFollowLoading] = useState(false); // Loading state for follow action
   const [showLightbox, setShowLightbox] = useState(false); // Lightbox state for Photo+ images
   const [lightboxIndex, setLightboxIndex] = useState(0); // Active image in lightbox
@@ -734,21 +735,24 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               {canDeletePost && (
                 <div className="relative">
                   <button 
-                    onClick={() => setShowMoreActions(!showMoreActions)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPostMenu(!showPostMenu);
+                    }}
                     className="p-2 rounded-full transition-all active:scale-95 hover:bg-white/10"
                   >
                     <MoreVertical className="w-5 h-5 text-white" />
                   </button>
-                  {showMoreActions && (
+                  {showPostMenu && (
                     <>
                       <div 
                         className="fixed inset-0 z-40"
-                        onClick={() => setShowMoreActions(false)}
+                        onClick={() => setShowPostMenu(false)}
                       />
                       <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 min-w-[120px] overflow-hidden">
                         <button
                           onClick={() => {
-                            setShowMoreActions(false);
+                            setShowPostMenu(false);
                             setShowDeleteDialog(true);
                           }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
@@ -852,21 +856,24 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               {canDeletePost && (
                 <div className="relative">
                   <button 
-                    onClick={() => setShowMoreActions(!showMoreActions)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPostMenu(!showPostMenu);
+                    }}
                     className="p-2 rounded-full transition-all active:scale-95 hover:bg-muted"
                   >
                     <MoreVertical className="w-5 h-5 text-muted-foreground" />
                   </button>
-                  {showMoreActions && (
+                  {showPostMenu && (
                     <>
                       <div 
                         className="fixed inset-0 z-40"
-                        onClick={() => setShowMoreActions(false)}
+                        onClick={() => setShowPostMenu(false)}
                       />
                       <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 min-w-[120px] overflow-hidden">
                         <button
                           onClick={() => {
-                            setShowMoreActions(false);
+                            setShowPostMenu(false);
                             setShowDeleteDialog(true);
                           }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
@@ -1552,21 +1559,24 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               {canDeletePost && (
                 <div className="relative">
                   <button 
-                    onClick={() => setShowMoreActions(!showMoreActions)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowPostMenu(!showPostMenu);
+                    }}
                     className="p-2 rounded-full transition-all active:scale-95 hover:bg-muted"
                   >
                     <MoreVertical className="w-5 h-5 text-muted-foreground" />
                   </button>
-                  {showMoreActions && (
+                  {showPostMenu && (
                     <>
                       <div 
                         className="fixed inset-0 z-40"
-                        onClick={() => setShowMoreActions(false)}
+                        onClick={() => setShowPostMenu(false)}
                       />
                       <div className="absolute right-0 top-full mt-1 bg-background border border-border rounded-lg shadow-lg z-50 min-w-[120px] overflow-hidden">
                         <button
                           onClick={() => {
-                            setShowMoreActions(false);
+                            setShowPostMenu(false);
                             setShowDeleteDialog(true);
                           }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
