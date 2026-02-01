@@ -1,122 +1,119 @@
 
+# Plan: Fix Gift Count Persistence Bug
 
-# Plan: Upgrade to FCM HTTP v1 API
+## Problem Summary
 
-## Background
+When a user sends a gift to a post, the gift count increments instantly in the UI but resets to the previous value after page refresh. This happens because:
 
-Firebase has fully deprecated the Legacy FCM API for new projects. The current `send-fcm-push` edge function uses the legacy endpoint (`https://fcm.googleapis.com/fcm/send`) which won't work with new Firebase projects.
+1. The gift is recorded correctly in the database
+2. The UI optimistically shows the new count
+3. **But the post's gift counter is never actually updated in the database**
+4. On refresh, the old (incorrect) count is loaded
 
-**FCM HTTP v1** requires:
-- A **service account JSON** file (not a simple server key)
-- **OAuth2 authentication** to get a short-lived access token
-- A different API endpoint and payload structure
+## Root Cause
 
-## Changes Required
+The database function that processes gift sending (`send_gift`) correctly:
+- Deducts credits from sender
+- Records the gift transaction
+- Tracks platform earnings
 
-### 1. Update Edge Function for FCM v1
+But it **never updates the `gifts_count` on the post itself**.
 
-Replace the legacy API calls with FCM HTTP v1:
+## Solution
 
-| Aspect | Legacy (Current) | HTTP v1 (New) |
-|--------|------------------|---------------|
-| **Auth** | `key=SERVER_KEY` header | OAuth2 Bearer token from service account |
-| **Endpoint** | `fcm.googleapis.com/fcm/send` | `fcm.googleapis.com/v1/projects/{project}/messages:send` |
-| **Payload** | `to: device_token` | `message.token: device_token` |
-| **Secret** | `FCM_SERVER_KEY` (string) | `GOOGLE_SERVICE_ACCOUNT` (JSON) |
+Add a database trigger that automatically increments/decrements `gifts_count` on posts whenever gifts are added or removed, following the same pattern used for comments count.
 
-### 2. Implementation Details
+## Database Changes
 
-The updated edge function will:
+### 1. Create Trigger Function
 
-1. **Parse the service account JSON** from environment variable
-2. **Generate a JWT** signed with the service account private key
-3. **Exchange JWT for access token** via Google OAuth2
-4. **Call FCM v1 API** with the access token
+Create a function that updates `gifts_count` on the posts table whenever a record is inserted or deleted from `gift_analytics`:
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    FCM v1 Authentication Flow                   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. Service Account JSON (stored as secret)                     │
-│     └── Contains: project_id, private_key, client_email         │
-│                                                                 │
-│  2. Create JWT                                                  │
-│     └── Sign with private_key, include scope for FCM            │
-│                                                                 │
-│  3. Exchange JWT → Access Token                                 │
-│     └── POST to oauth2.googleapis.com/token                     │
-│                                                                 │
-│  4. Send Push via FCM v1                                        │
-│     └── POST to fcm.googleapis.com/v1/projects/{id}/messages    │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+```sql
+CREATE OR REPLACE FUNCTION update_post_gift_count()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    -- Only update if this is a post gift (not live stream, etc.)
+    IF NEW.source_type = 'post' AND NEW.source_id IS NOT NULL THEN
+      UPDATE posts 
+      SET gifts_count = COALESCE(gifts_count, 0) + 1
+      WHERE id = NEW.source_id;
+    END IF;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    IF OLD.source_type = 'post' AND OLD.source_id IS NOT NULL THEN
+      UPDATE posts 
+      SET gifts_count = GREATEST(COALESCE(gifts_count, 0) - 1, 0)
+      WHERE id = OLD.source_id;
+    END IF;
+    RETURN OLD;
+  END IF;
+  RETURN NULL;
+END;
+$$;
 ```
 
-### 3. New FCM v1 Payload Structure
+### 2. Create Trigger
 
-```typescript
-// FCM v1 format (per device)
-{
-  message: {
-    token: "device_fcm_token",
-    notification: {
-      title: "New message",
-      body: "You have a new notification"
-    },
-    data: {
-      // Custom data
-    },
-    android: {
-      priority: "high",
-      notification: {
-        channel_id: "feedin_default",
-        sound: "default"
-      }
-    },
-    apns: {
-      payload: {
-        aps: {
-          sound: "default",
-          badge: 1
-        }
-      }
-    }
-  }
-}
+Attach the trigger to the `gift_analytics` table:
+
+```sql
+CREATE TRIGGER trigger_update_post_gift_count
+  AFTER INSERT OR DELETE ON public.gift_analytics
+  FOR EACH ROW
+  EXECUTE FUNCTION update_post_gift_count();
 ```
+
+### 3. Fix Existing Data
+
+Sync existing gift counts for posts that already received gifts:
+
+```sql
+UPDATE posts p
+SET gifts_count = (
+  SELECT COUNT(*) 
+  FROM gift_analytics ga 
+  WHERE ga.source_id = p.id 
+  AND ga.source_type = 'post'
+)
+WHERE EXISTS (
+  SELECT 1 FROM gift_analytics ga 
+  WHERE ga.source_id = p.id 
+  AND ga.source_type = 'post'
+);
+```
+
+## Why This Fixes the Bug
+
+| Step | Before Fix | After Fix |
+|------|------------|-----------|
+| User sends gift | Recorded in gift_analytics | Same + triggers count update |
+| `gifts_count` column | Never updated (stays 0) | Incremented by trigger |
+| Page refresh | Shows 0 | Shows correct count |
+| Real-time update | No change detected | Posts table UPDATE triggers subscription |
+
+## No Frontend Changes Required
+
+The existing frontend code is already correct:
+- Optimistic updates work properly
+- Real-time subscription listens for posts updates
+- The trigger will cause the posts table to update, triggering the real-time callback
 
 ## Files to Modify
 
-| File | Action |
+| File | Change |
 |------|--------|
-| `supabase/functions/send-fcm-push/index.ts` | Complete rewrite for FCM v1 API |
+| New migration | Add trigger function and trigger for `gift_analytics` |
+| No frontend changes | Existing code handles this correctly |
 
-## What You Need to Provide
+## Testing After Implementation
 
-### Getting the Service Account JSON:
-
-1. Go to [Firebase Console](https://console.firebase.google.com)
-2. Select your project
-3. Click the gear icon → **Project Settings**
-4. Go to **Service Accounts** tab
-5. Click **Generate New Private Key**
-6. Download the JSON file
-
-### Adding as a Secret:
-
-Once you have the JSON file, I'll help you add it as a secret called `GOOGLE_SERVICE_ACCOUNT`. The entire JSON content will be stored securely and used by the edge function to authenticate with Google.
-
-## Technical Implementation
-
-The edge function will include:
-
-1. **JWT generation** using Deno's crypto APIs to sign with RS256
-2. **Token caching** - Access tokens are valid for 1 hour, so we can cache them
-3. **Error handling** for token expiration, invalid tokens, and API errors
-4. **Automatic cleanup** of unregistered device tokens
-
-## Summary
-
-This upgrade ensures compatibility with new Firebase projects while maintaining all existing functionality. The only difference from the user's perspective is providing a service account JSON file instead of a server key.
-
+1. Send a gift to a post
+2. Verify count increases
+3. Refresh the page
+4. Verify count persists
+5. Check another user's view to confirm real-time sync
