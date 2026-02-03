@@ -108,7 +108,7 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
 
       roomRef.current = room;
 
-      // Handle connection state changes
+      // Handle connection state changes - stay in reconnecting state longer
       room.on(RoomEvent.ConnectionStateChanged, (state) => {
         console.log('[LiveKitViewer] Connection state:', state);
         if (state === ConnectionState.Connected) {
@@ -117,7 +117,9 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
         } else if (state === ConnectionState.Reconnecting) {
           setConnectionStatus('reconnecting');
         } else if (state === ConnectionState.Disconnected) {
-          setConnectionStatus('error');
+          // Stay in reconnecting state - don't immediately go to error
+          // Auto-reconnect will handle this
+          setConnectionStatus('reconnecting');
         }
       });
 
@@ -250,6 +252,35 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
       connectToRoom();
     }
   }, [currentUser, stream, connectToRoom]);
+
+  // Auto-reconnect on network restoration
+  useEffect(() => {
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleOnline = async () => {
+      if (connectionStatus === 'error' || connectionStatus === 'reconnecting') {
+        console.log('[LiveKitViewer] Network restored, auto-reconnecting...');
+        // Small delay to ensure network is stable
+        reconnectTimer = setTimeout(() => {
+          connectToRoom();
+        }, 1500);
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('[LiveKitViewer] Network offline');
+      setConnectionStatus('reconnecting');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, [connectionStatus, connectToRoom]);
 
   // Join as viewer in database
   useEffect(() => {
@@ -487,7 +518,7 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
 
         {/* Connection states */}
         {connectionStatus === 'connecting' && (
-          <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-40">
             <div className="text-center">
               <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
               <p className="text-white">Connecting to stream...</p>
@@ -496,16 +527,17 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
         )}
 
         {connectionStatus === 'reconnecting' && (
-          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-black/60 flex items-center justify-center z-40">
             <div className="text-center">
               <Loader2 className="w-10 h-10 animate-spin text-yellow-400 mx-auto mb-2" />
               <p className="text-yellow-400">Reconnecting...</p>
+              <p className="text-white/60 text-sm mt-2">Please wait...</p>
             </div>
           </div>
         )}
 
         {connectionStatus === 'error' && (
-          <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+          <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-40">
             <div className="text-center">
               <div className="text-5xl mb-4">📡</div>
               <h3 className="text-xl font-bold text-white mb-2">Connection Failed</h3>
@@ -574,7 +606,8 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
           profiles: c.profiles,
         }))} 
         gifts={flyingGifts} 
-        hostId={stream?.user_id} 
+        hostId={stream?.user_id}
+        bottomOffset={160}
       />
 
       {/* TOP HEADER */}
