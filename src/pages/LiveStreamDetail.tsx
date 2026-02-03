@@ -5,7 +5,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Radio } from 'lucide-react';
-import { SimpleViewer } from '@/components/live/SimpleViewer';
+import { UnifiedRoom } from '@/components/live/unified';
+import { useOptionalLiveStreamContext } from '@/context/LiveStreamContext';
 
 const LiveStreamDetail = () => {
   const { user, loading: authLoading } = useAuth();
@@ -13,6 +14,7 @@ const LiveStreamDetail = () => {
   const { streamId } = useParams<{ streamId: string }>();
   const [stream, setStream] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const streamContext = useOptionalLiveStreamContext();
 
   useEffect(() => {
     // Wait for auth to finish loading before redirecting
@@ -111,10 +113,43 @@ const LiveStreamDetail = () => {
     );
   }
 
+  // Check if user is the host
+  const isHost = user?.id === stream.user_id;
+
+  // Build room data for UnifiedRoom
+  const roomData = {
+    id: stream.id,
+    host: {
+      id: stream.user_id,
+      name: stream.profiles?.display_name || stream.profiles?.username || 'Host',
+      handle: stream.profiles?.username ? `@${stream.profiles.username}` : undefined,
+      avatar: stream.profiles?.avatar_url || '',
+      level: 42, // Could be fetched from user data
+    },
+    type: (stream.room_type || 'video_broadcast') as 'video_broadcast' | 'audio_space' | 'pk_battle',
+    title: stream.title || 'Live Stream',
+    description: stream.description,
+    viewers: stream.viewer_count || 0,
+    status: stream.status as 'scheduled' | 'live' | 'ended',
+    startedAt: stream.started_at,
+  };
+
   return (
-    <SimpleViewer
-      streamId={streamId!}
+    <UnifiedRoom
+      room={roomData}
+      isHost={isHost}
       onClose={() => navigate('/live')}
+      onMinimize={() => {
+        if (streamContext) {
+          streamContext.minimizeStream();
+        }
+        navigate('/live');
+      }}
+      onMaximize={() => {
+        if (streamContext) {
+          streamContext.maximizeStream();
+        }
+      }}
     />
   );
 };

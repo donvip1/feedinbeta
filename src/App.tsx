@@ -8,10 +8,12 @@ import { RefreshProvider } from "@/context/RefreshContext";
 import { NavigationProvider } from "@/context/NavigationContext";
 import { CallProvider } from "@/context/CallContext";
 import { SpaceProvider } from "@/context/SpaceContext";
+import { LiveStreamProvider } from "@/context/LiveStreamContext";
 import { ThemeProvider } from "next-themes";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
 import { FloatingSpacePlayer } from "@/components/live/FloatingSpacePlayer";
+import { FloatingStreamPlayer } from "@/components/live/FloatingStreamPlayer";
 import { LiveInviteNotification } from "@/components/live/LiveInviteNotification";
 import { SpaceInviteNotification } from "@/components/live/SpaceInviteNotification";
 import { RealtimeProvider } from "@/components/shared/RealtimeProvider";
@@ -249,12 +251,14 @@ const App = () => {
                   <CurrencyProvider>
                   <CallProvider>
                     <SpaceProvider>
-                      <RealtimeProvider>
-                    <Toaster />
-                  <IncomingCallListener />
-                  <FloatingCallWidget />
-                  <FloatingSpacePlayer />
-                  <ActiveCallIndicator />
+                      <LiveStreamProvider>
+                        <RealtimeProvider>
+                          <Toaster />
+                          <IncomingCallListener />
+                          <FloatingCallWidget />
+                          <FloatingSpacePlayer />
+                          <FloatingStreamPlayer />
+                          <ActiveCallIndicator />
                   <LiveInviteNotification />
                   <SpaceInviteNotification />
                   <MobileInstallModal />
@@ -419,7 +423,8 @@ const App = () => {
               <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>
-                      </RealtimeProvider>
+                        </RealtimeProvider>
+                      </LiveStreamProvider>
                     </SpaceProvider>
                   </CallProvider>
                   </CurrencyProvider>
