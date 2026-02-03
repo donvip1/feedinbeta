@@ -27,7 +27,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
   const location = useLocation();
   const { user } = useAuth();
   const { haptic } = useNativeFeatures();
-  const { isSubPage, hideBottomNav } = useNavigation();
+  const { isSubPage, hideBottomNav, isLiveStreamPage } = useNavigation();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pressedId, setPressedId] = useState<string | null>(null);
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
@@ -35,8 +35,8 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
   // Use distributed notifications for categorized badge counts
   const { counts: notificationCounts, markCategoryAsRead } = useDistributedNotifications();
 
-  // Should hide: manual hidden prop, context hideBottomNav, or on sub-pages
-  const shouldHide = hidden || hideBottomNav || isSubPage;
+  // Should hide: manual hidden prop, context hideBottomNav, sub-pages, or livestream pages
+  const shouldHide = hidden || hideBottomNav || isSubPage || isLiveStreamPage;
 
   useEffect(() => {
     if (user) {
