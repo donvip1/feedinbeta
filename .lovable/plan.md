@@ -1,427 +1,284 @@
 
-# Plan: Background Broadcasting & Modern Live UI Overhaul
+# Plan: Modern Live Dashboard with Hidden Navigation
 
 ## Overview
 
-This plan addresses two key requirements:
-1. **Background Broadcasting** - Allow hosts to navigate away while streaming continues (like TikTok/Instagram Live)
-2. **Modern UI Overhaul** - Match the exact TikTok/Tango-style interface from your reference code
+This plan modernizes the Live page (`/live`) with a TikTok/Tango-style interface based on your reference code, while ensuring the bottom navigation bar (Home, Messages, Wallet, etc.) is completely hidden. A back button will be added for easy navigation back to the feed.
 
-## Current Architecture Analysis
+## Current Issues Identified
 
-| Component | Current Behavior | Issue |
-|-----------|-----------------|-------|
-| `UnifiedRoom.tsx` | Closes when navigating away | Stream/space ends on navigation |
-| `LiveKitBroadcaster.tsx` | Full-screen only | No background mode |
-| `SpaceContext.tsx` | Has minimize support | Works for audio, not video |
-| `FloatingSpacePlayer.tsx` | Audio-only PiP | Needs video PiP support |
+| Issue | Current Behavior | Required |
+|-------|-----------------|----------|
+| Navigation Bar | Shows on `/live` route | Should be hidden |
+| Live Page Design | Traditional card-based layout | Modern TikTok-style dashboard |
+| Back Navigation | No back button | Need back arrow to return to feed |
+| Live Room Navigation | BottomNav still visible | Fullscreen immersive experience |
 
-## Solution Architecture
+## Solution Overview
 
 ```text
-┌─────────────────────────────────────────────────────────────────┐
-│                 NEW: LiveStreamContext                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Similar to SpaceContext, but for VIDEO streaming:             │
-│                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
-│  │  isActive   │  │ isMinimized │  │  roomRef    │             │
-│  │  (boolean)  │  │  (boolean)  │  │  (LiveKit)  │             │
-│  └─────────────┘  └─────────────┘  └─────────────┘             │
-│                                                                 │
-│  Host clicks Back → Minimize to FloatingStreamPlayer            │
-│  Stream continues in background (PiP mode)                      │
-│  Host can browse app while face is captured                     │
-│  Stream ONLY ends when host explicitly clicks "End Stream"      │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+LIVE PAGE (/live)
+┌─────────────────────────────────────────────┐
+│ ← Back    Discover    🔔 + ⋮              │  ← Header with back button
+├─────────────────────────────────────────────┤
+│  All  Popular  Music  Gaming  Chat          │  ← Filter tabs
+├─────────────────────────────────────────────┤
+│ ┌───────────────────────────────────────┐  │
+│ │    [Your Profile Avatar]              │  │
+│ │    Ready to broadcast                 │  │
+│ │    Start your Live Journey            │  │
+│ │    [Go Live Button]                   │  │
+│ └───────────────────────────────────────┘  │
+│                                             │
+│ Trending Now                       View All │
+│ ┌─────────┐  ┌─────────┐                   │
+│ │  LIVE   │  │  LIVE   │                   │
+│ │ Stream  │  │ Space   │                   │
+│ │ Preview │  │ Preview │                   │
+│ └─────────┘  └─────────┘                   │
+│                                             │
+│ Recommended For You                         │
+│ [Creator 1] [Creator 2] [Creator 3]        │
+└─────────────────────────────────────────────┘
+                NO BOTTOM NAV
 ```
 
-## Phase 1: Create LiveStreamContext (New Context for Video Streaming)
+## Phase 1: Hide Navigation on Live Page
 
-### 1.1 New Context: `src/context/LiveStreamContext.tsx`
+### 1.1 Update NavigationContext
+
+Add `/live` (exact match) to the hidden nav routes:
 
 ```typescript
-interface StreamInfo {
-  id: string;
-  title: string;
-  hostId: string;
-  hostName: string;
-  hostAvatar: string;
-  type: 'video_broadcast' | 'pk_battle';
-  startedAt: string;
-}
+// Current HIDDEN_NAV_ROUTES
+const HIDDEN_NAV_ROUTES = [
+  '/live/stream/',
+  '/live/space/',
+  '/space/'
+];
 
-interface LiveStreamState {
-  isActive: boolean;
-  isMinimized: boolean;
-  streamInfo: StreamInfo | null;
-  isMuted: boolean;
-  isCameraOn: boolean;
-  isHost: boolean;
-  viewerCount: number;
-  connectionStatus: ConnectionStatus;
-}
-
-interface LiveStreamContextType {
-  streamState: LiveStreamState;
-  startStream: (streamInfo: StreamInfo) => Promise<void>;
-  endStream: () => Promise<void>;
-  minimizeStream: () => void;
-  maximizeStream: () => void;
-  toggleMute: () => void;
-  toggleCamera: () => void;
-  // LiveKit refs
-  roomRef: Room | null;
-  videoTrackRef: LocalVideoTrack | null;
-  audioTrackRef: LocalAudioTrack | null;
-}
+// NEW - Add exact /live path detection
+const isLiveStreamPage = useMemo(() => {
+  const pathname = location.pathname;
+  // Hide on exact /live AND on live stream/space detail pages
+  return pathname === '/live' || 
+         HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
+}, [location.pathname]);
 ```
 
-**Key Difference from Current Implementation:**
-- LiveKit Room and tracks are stored in Context, not component
-- Navigation away triggers `minimizeStream()`, not stream end
-- Stream persists across route changes
+### 1.2 Remove BottomNav from Live.tsx
 
-### 1.2 Add FloatingStreamPlayer: `src/components/live/FloatingStreamPlayer.tsx`
+The current Live.tsx explicitly renders `<BottomNav />` at line 885. This will be removed since the NavigationContext will handle hiding it.
 
-Similar to `FloatingSpacePlayer.tsx` but for video:
-- Shows host's camera in a draggable 9:16 PiP window
-- Live badge, viewer count, duration timer
-- Mute/Camera toggle buttons
-- Maximize button to return to full view
-- End Stream button (RED - the ONLY way to end)
+## Phase 2: Create Modern Live Dashboard Component
 
-```text
-┌─────────────────────────────┐
-│ 🔴 LIVE        24      0:45 │  ← Live badge, viewers, duration
-├─────────────────────────────┤
-│                             │
-│      [Video Preview]        │  ← Host's camera (9:16)
-│                             │
-├─────────────────────────────┤
-│  🎤  📹  [Maximize]  [END]  │  ← Controls
-└─────────────────────────────┘
-```
+### 2.1 New Component: `src/components/live/LiveDashboard.tsx`
 
-## Phase 2: Modernize UnifiedRoom UI (Match Reference Code)
+A new modern dashboard component based on your reference code:
 
-### 2.1 Update Layout Structure
+**Key Features:**
+- Glassmorphism header with back button
+- Modern filter tabs (All, Popular, Music, Gaming, Chat)
+- "Go Live" CTA card with user avatar and decorative circles
+- Trending section with 4:5 aspect ratio preview cards
+- Recommended creators section
+- No external navigation elements
 
-Your reference code has this exact structure that we need to implement:
-
+**Header Structure:**
 ```typescript
-// Header with host info + follow button
-<div className="absolute top-0 flex items-center justify-between">
-  <div className="flex items-center gap-2">
-    <Avatar with level badge />
-    <div>
-      <p>Host Name</p>
-      <p>Viewer count</p>
-    </div>
-    <Button>Follow</Button>
+<div className="flex items-center justify-between">
+  <button onClick={() => navigate('/feed')}>
+    <ArrowLeft className="w-5 h-5" />
+  </button>
+  <div>
+    <h1>Discover</h1>
+    <p>Watch active streams</p>
   </div>
-  <Button onClick={onClose}>X</Button>
+  <div className="flex gap-2">
+    <button><Search /></button>
+    <button><Bell /></button>
+    <button><Plus /></button>
+  </div>
 </div>
-
-// PK Battle Bar (when type === 'pk_battle')
-<PKBattleBar />
-
-// Main Stage with conditional content
-<div className="flex-1">
-  {type === 'pk_battle' ? <SplitScreen /> :
-   type === 'audio_space' ? <AudioVisualizer /> :
-   <VideoStream />}
-</div>
-
-// TikTok-style floating interactions (right side)
-<div className="absolute right-4 bottom-32">
-  <HeartButton />
-  <CommentButton />
-  <GiftButton />
-</div>
-
-// Flying chat overlay (left side, max 55% width)
-<FlyingChat />
-
-// Unified Control Bar (bottom)
-<UnifiedControlBar />
 ```
 
-### 2.2 Key UI Changes
+### 2.2 Modern Feed Item Component
 
-| Element | Current | New (Reference) |
-|---------|---------|-----------------|
-| Header | Arrow + X button | Avatar with level + Follow + X |
-| Host Level | Not visible | Yellow/Orange gradient badge |
-| Follow Button | External | Inline red button |
-| Interactions | Right side vertical | Right side with animated icons |
-| Chat | Full FlyingChat | Left 55% width overlay |
-| Control Bar | Icons only | Toggle states with labels |
-| PiP Player | Basic | Styled with live badge + duration |
+Update `LiveFeedItem.tsx` with the reference design:
+- 4:5 aspect ratio cards
+- Gradient overlays
+- Live badge + room type badge
+- Host avatar with level indicator
+- Viewer count and quality badge
 
-### 2.3 Audio Space Visual Update (Green Theme)
+## Phase 3: Restructure Live.tsx
 
-Match reference:
-- Background: `from-green-900 via-emerald-800 to-teal-900`
-- Pulsing circles behind host avatar
-- Audio visualizer bars (5 bars, animated)
-- "LIVE AUDIO" badge with Radio icon
+### 3.1 New Page Structure
 
-### 2.4 PK Battle Visual Update
+Replace the current Live.tsx layout with a cleaner structure:
 
-Match reference:
-- Blue gradient left (host) / Red gradient right (challenger)
-- Center divider with lightning bolt
-- HP-style progress bar
-- Timer in center circle
-- Score labels: "Blue Team" / "Red Team"
-
-## Phase 3: Navigation Logic Updates
-
-### 3.1 Back Button Behavior Change
-
-**Current:** Clicking back calls `onClose()` which ends everything
-
-**New Logic:**
 ```typescript
-const handleBack = () => {
-  if (isHost && streamState.isActive) {
-    // Host is streaming - minimize instead of close
-    minimizeStream();
-    navigate(-1); // Go back but keep stream running
-  } else {
-    // Viewer can just leave
-    onClose();
-  }
+const Live = () => {
+  // ... existing queries and state ...
+  
+  // Render modals/overlays (keep existing logic)
+  if (selectedStreamId) return <LiveKitViewer ... />;
+  if (isBroadcasting) return <LiveKitBroadcaster ... />;
+  if (selectedSpaceId) return <LiveSpaceRoom ... />;
+  
+  return (
+    <div className="min-h-screen bg-black">
+      {/* Modern Dashboard - NO BottomNav */}
+      <LiveDashboard 
+        liveStreams={liveStreams}
+        liveSpaces={liveSpaces}
+        scheduledStreams={scheduledStreams}
+        scheduledSpaces={scheduledSpaces}
+        myStreams={myStreams}
+        mySpaces={mySpaces}
+        user={user}
+        onStreamClick={handleStreamClick}
+        onSpaceClick={handleSpaceClick}
+        onGoLive={() => setShowGoLiveModal(true)}
+        onVideoStream={() => setCreateStreamModalOpen(true)}
+        onAudioSpace={() => setCreateSpaceModalOpen(true)}
+      />
+      
+      {/* Modals */}
+      <CreateLiveStreamModal ... />
+      <CreateSpaceModal ... />
+      <GoLiveModal open={showGoLiveModal} onClose={() => setShowGoLiveModal(false)} />
+    </div>
+  );
 };
 ```
 
-### 3.2 Route-Aware Stream Persistence
+## Phase 4: Go Live Modal
 
-When host navigates to any page:
-- Stream continues in background
-- FloatingStreamPlayer shows as PiP
-- Host can browse Feed, Messages, Wallet, etc.
-- Camera continues capturing
+### 4.1 New Component: `src/components/live/GoLiveModal.tsx`
 
-When host explicitly ends stream:
-- Click "End Stream" button in PiP or full view
-- Confirmation dialog
-- LiveKit disconnects
-- Database updated to `status: 'ended'`
+Modern bottom sheet modal for selecting stream type:
 
-## Phase 4: File Changes Summary
+```text
+┌─────────────────────────────────────────────┐
+│ Start Broadcasting                      [X] │
+├─────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────┐ │
+│ │  📹  Video Stream                       │ │
+│ │      Standard broadcast with camera     │ │
+│ └─────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────┐ │
+│ │  🎙️  Audio Space                        │ │
+│ │      Voice-only conversation room       │ │
+│ └─────────────────────────────────────────┘ │
+│                                             │
+│ [Schedule for later →]                      │
+└─────────────────────────────────────────────┘
+```
 
-### New Files to Create
+## Phase 5: File Changes Summary
+
+### Files to Create
 
 | File | Purpose |
 |------|---------|
-| `src/context/LiveStreamContext.tsx` | Global video stream state management |
-| `src/components/live/FloatingStreamPlayer.tsx` | PiP video player for background streaming |
+| `src/components/live/LiveDashboard.tsx` | Modern TikTok-style dashboard |
+| `src/components/live/GoLiveModal.tsx` | Bottom sheet for stream type selection |
+| `src/components/live/LiveDiscoverCard.tsx` | Modern feed item card component |
 
 ### Files to Update
 
 | File | Changes |
 |------|---------|
-| `src/components/live/unified/UnifiedRoom.tsx` | Match reference UI, integrate with context |
-| `src/components/live/unified/AudioVisualizer.tsx` | Green theme matching reference |
-| `src/components/live/unified/PKBattleBar.tsx` | Tango-style HP bar with teams |
-| `src/components/live/unified/UnifiedControlBar.tsx` | Toggle states + labels |
-| `src/pages/Live.tsx` | Use UnifiedRoom via context |
-| `src/App.tsx` | Add LiveStreamProvider |
+| `src/context/NavigationContext.tsx` | Add `/live` to hidden nav routes |
+| `src/pages/Live.tsx` | Use new LiveDashboard, remove BottomNav import |
+| `src/components/live/unified/LiveFeedItem.tsx` | Minor styling updates to match reference |
 
-## Phase 5: Detailed Component Updates
+## Phase 6: Detailed Implementation
 
-### 5.1 UnifiedRoom.tsx - Modern UI Matching Reference
+### 6.1 LiveDashboard.tsx Key Sections
 
-**Header Section:**
+**My Status CTA Card:**
 ```typescript
-<div className="flex items-center gap-2">
-  {/* Avatar with Level Badge */}
-  <div className="relative">
-    <Avatar className="w-10 h-10 border-2 border-red-500" />
-    <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-yellow-500 to-orange-500 
-                    text-[10px] font-bold px-1.5 rounded-full text-white">
-      {host.level}
-    </div>
-  </div>
+<div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800/50 to-slate-900/50 p-6">
+  {/* Decorative circles */}
+  <div className="absolute top-4 left-4 w-16 h-16 bg-purple-500/20 rounded-full blur-xl" />
+  <div className="absolute bottom-4 right-4 w-24 h-24 bg-pink-500/20 rounded-full blur-xl" />
   
-  {/* Host Info */}
-  <div>
-    <p className="font-medium text-white">{host.name}</p>
-    <div className="flex items-center gap-1 text-xs text-white/70">
-      <Users className="w-3 h-3" />
-      <span>{viewers}</span>
+  <div className="relative flex items-center gap-4">
+    <Avatar className="w-16 h-16 border-2 border-primary/50">
+      <AvatarImage src={user?.avatar_url} />
+    </Avatar>
+    <div className="flex-1">
+      <p className="text-sm text-white/60">Ready to broadcast</p>
+      <p className="text-xl font-bold">Start your Live Journey</p>
+      <p className="text-sm text-white/60">{followerCount} followers waiting</p>
     </div>
-  </div>
-  
-  {/* Follow Button */}
-  {!isHost && (
-    <Button size="sm" className="bg-red-500 hover:bg-red-600 h-7">
-      Follow
+    <Button onClick={onGoLive} className="bg-gradient-to-r from-pink-500 to-violet-600">
+      <Play className="w-4 h-4 mr-2" />
+      Go Live
     </Button>
-  )}
-</div>
-```
-
-**Audio Space Mode (Green Theme):**
-```typescript
-<div className="bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900">
-  {/* Animated background orbs */}
-  <motion.div animate={{ scale: [1, 1.2, 1] }} 
-              className="absolute w-64 h-64 rounded-full bg-green-500/20 blur-3xl" />
-  
-  {/* Center host avatar with pulse rings */}
-  <motion.div animate={{ scale: [1, 1.05, 1] }}>
-    <Avatar className="w-28 h-28 border-4 border-green-400/50" />
-    <motion.div className="absolute -inset-2 border-2 border-green-400/40" />
-  </motion.div>
-  
-  {/* Audio Visualizer */}
-  <AudioVisualizer active={connected} barCount={5} color="bg-white" />
-  
-  {/* Live Badge */}
-  <div className="flex items-center gap-2 bg-black/30 px-4 py-2 rounded-full">
-    <Radio className="w-4 h-4 text-green-400" />
-    <span className="text-green-400">LIVE AUDIO</span>
   </div>
 </div>
 ```
 
-### 5.2 FloatingStreamPlayer.tsx (New - Video PiP)
-
+**Trending Section:**
 ```typescript
-export const FloatingStreamPlayer: React.FC = () => {
-  const { streamState, minimizeStream, maximizeStream, endStream, toggleMute, toggleCamera } = useLiveStreamContext();
+<div className="mt-8">
+  <div className="flex items-center justify-between mb-4">
+    <div className="flex items-center gap-2">
+      <Flame className="w-5 h-5 text-orange-500" />
+      <span className="font-bold">Trending Now</span>
+    </div>
+    <button className="text-sm text-white/60 flex items-center gap-1">
+      View All <ChevronRight className="w-4 h-4" />
+    </button>
+  </div>
   
-  if (!streamState.isActive || !streamState.isMinimized) return null;
-  
-  return (
-    <motion.div 
-      drag
-      className="fixed bottom-24 right-4 z-50 w-32 aspect-[9/16] rounded-xl overflow-hidden shadow-2xl"
-    >
-      {/* Video Preview */}
-      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-      
-      {/* Gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-      
-      {/* Live indicator + viewer count */}
-      <div className="absolute top-2 left-2 flex items-center gap-1">
-        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-        <span className="text-[10px] text-white font-medium">LIVE</span>
-        <span className="text-[10px] text-white">{viewerCount}</span>
-      </div>
-      
-      {/* Duration */}
-      <div className="absolute top-2 right-2 text-[10px] text-white">{duration}</div>
-      
-      {/* Controls */}
-      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-        <div className="flex gap-1">
-          <button onClick={toggleMute}>{isMuted ? <MicOff /> : <Mic />}</button>
-          <button onClick={toggleCamera}>{isCameraOn ? <Video /> : <VideoOff />}</button>
-        </div>
-        <button onClick={maximizeStream}><Maximize2 /></button>
-        <button onClick={endStream} className="bg-red-600"><PhoneOff /></button>
-      </div>
-    </motion.div>
-  );
-};
+  <div className="grid grid-cols-2 gap-4">
+    {liveStreams?.slice(0, 2).map(stream => (
+      <LiveDiscoverCard 
+        key={stream.id}
+        stream={stream}
+        onClick={() => onStreamClick(stream)}
+      />
+    ))}
+  </div>
+</div>
 ```
 
-### 5.3 LiveStreamContext.tsx (New - Core State Management)
+### 6.2 Navigation Context Update
 
 ```typescript
-export const LiveStreamProvider = ({ children }) => {
-  const [streamState, setStreamState] = useState<LiveStreamState>(defaultState);
-  
-  // LiveKit refs - persist across navigation
-  const roomRef = useRef<Room | null>(null);
-  const videoTrackRef = useRef<LocalVideoTrack | null>(null);
-  const audioTrackRef = useRef<LocalAudioTrack | null>(null);
-  
-  const startStream = async (streamInfo: StreamInfo) => {
-    // Initialize LiveKit, create tracks, connect to room
-    // Store in refs (not component state)
-    // Set streamState.isActive = true
-  };
-  
-  const minimizeStream = () => {
-    // Just hide the UI, stream continues
-    setStreamState(prev => ({ ...prev, isMinimized: true }));
-  };
-  
-  const maximizeStream = () => {
-    // Show full UI again
-    setStreamState(prev => ({ ...prev, isMinimized: false }));
-    // Navigate to stream page
-  };
-  
-  const endStream = async () => {
-    // Disconnect LiveKit
-    // Stop tracks
-    // Update database
-    // Reset state
-  };
-  
-  return (
-    <LiveStreamContext.Provider value={{
-      streamState,
-      startStream,
-      endStream,
-      minimizeStream,
-      maximizeStream,
-      roomRef: roomRef.current,
-      videoTrackRef: videoTrackRef.current,
-      audioTrackRef: audioTrackRef.current,
-    }}>
-      {children}
-    </LiveStreamContext.Provider>
-  );
-};
+const isLiveStreamPage = useMemo(() => {
+  const pathname = location.pathname;
+  // Exact match for /live dashboard OR startsWith for detail pages
+  const isLiveDashboard = pathname === '/live';
+  const isLiveDetail = HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
+  return isLiveDashboard || isLiveDetail;
+}, [location.pathname]);
 ```
 
-## Phase 6: Integration with App.tsx
+## Visual Design Specifications
 
-Add the new provider and floating player:
-
-```typescript
-// App.tsx
-<SpaceProvider>
-  <LiveStreamProvider>  {/* NEW */}
-    <CallProvider>
-      {/* ... routes ... */}
-      <FloatingSpacePlayer />
-      <FloatingStreamPlayer />  {/* NEW */}
-      <FloatingCallWidget />
-    </CallProvider>
-  </LiveStreamProvider>
-</SpaceProvider>
-```
+| Element | Style |
+|---------|-------|
+| Background | `bg-black` or `bg-gradient-to-b from-black to-slate-900` |
+| Cards | Rounded 2xl-3xl with gradient overlays |
+| Live Badge | Red with pulse animation |
+| Buttons | Gradient pink-to-violet with glow |
+| Text | White with opacity variations |
+| Filters | Underline indicator (not pill shapes) |
 
 ## Testing Checklist
 
 | Test Case | Expected Behavior |
 |-----------|-------------------|
-| Host starts video stream | Camera captures, LiveKit connects |
-| Host clicks back button | Stream minimizes to PiP, continues broadcasting |
-| Host navigates to Feed | PiP shows, stream still live |
-| Host maximizes from PiP | Returns to full stream view |
-| Host clicks End Stream | Confirmation → Stream ends properly |
-| Viewer watches stream | Normal viewing experience unchanged |
-| Audio space host minimizes | Audio continues in background |
-| PK Battle display | Split screen with HP bar and timer |
-
-## Summary
-
-This implementation provides:
-1. **Background Broadcasting** - Hosts can browse the app while streaming
-2. **Modern UI** - Exact match to your TikTok/Tango reference code
-3. **Proper Navigation** - Back button minimizes, doesn't end
-4. **Stream Persistence** - Only explicit "End Stream" stops broadcasting
-5. **PiP Player** - Draggable floating video preview for hosts
-6. **Unified Experience** - Works for video streams, audio spaces, and PK battles
+| Navigate to /live | Bottom nav hidden, back button visible |
+| Click back button | Navigate to /feed |
+| Click stream card | Open stream viewer, nav still hidden |
+| Click "Go Live" | Open modal with options |
+| Select Video Stream | Open create stream modal |
+| Select Audio Space | Open create space modal |
+| Navigate to /live/stream/:id | Bottom nav hidden |
+| Navigate to /live/space/:id | Bottom nav hidden |
