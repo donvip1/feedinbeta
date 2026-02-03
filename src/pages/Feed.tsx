@@ -217,7 +217,7 @@ const Feed = () => {
         }))
       ].slice(0, 3); // Max 3 inline items
     },
-    enabled: activeTab !== 'live', // Only when not on live tab
+    enabled: activeTab === 'videos', // Only fetch for Videos tab where we render them
     refetchInterval: 5000,
     staleTime: 0,
   });
@@ -925,12 +925,16 @@ const Feed = () => {
             {displayPosts.map((post, index) => {
               const uniqueKey = post._cycleKey || post.id;
               
+              // Calculate the target live item index with fallback for periodic injection
+              const targetLiveIndex = index === 4 ? 1 : (inlineLiveContent?.[2] ? 2 : 1);
+              const liveItemForInjection = inlineLiveContent?.[targetLiveIndex];
+              
               // Insert another live card after every 5 posts ONLY on Videos tab
               const showInlineLive = activeTab === 'videos' && 
                 inlineLiveContent && 
                 inlineLiveContent.length > 1 && 
                 (index === 4 || index === 9) &&
-                inlineLiveContent[index === 4 ? 1 : (inlineLiveContent[2] ? 2 : 1)];
+                liveItemForInjection;
 
               // Handle view tracking - for ads, track impression
               const handlePostView = () => {
@@ -967,20 +971,19 @@ const Feed = () => {
                       isGlobalImmersive={isImmersiveMode}
                     />
                   </div>
-                  {showInlineLive && (
+                  {showInlineLive && liveItemForInjection && (
                     <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
                       <InlineLiveCard
                         item={{
-                          ...inlineLiveContent[index === 4 ? 1 : 2],
-                          status: inlineLiveContent[index === 4 ? 1 : 2].status as string,
-                          type: inlineLiveContent[index === 4 ? 1 : 2].type
+                          ...liveItemForInjection,
+                          status: liveItemForInjection.status as string,
+                          type: liveItemForInjection.type
                         }}
                         onClick={() => {
-                          const liveItem = inlineLiveContent[index === 4 ? 1 : 2];
-                          if (liveItem.type === 'video') {
-                            navigate(`/live/stream/${liveItem.id}`);
+                          if (liveItemForInjection.type === 'video') {
+                            navigate(`/live/stream/${liveItemForInjection.id}`);
                           } else {
-                            navigate(`/live/space/${liveItem.id}`);
+                            navigate(`/live/space/${liveItemForInjection.id}`);
                           }
                         }}
                       />
