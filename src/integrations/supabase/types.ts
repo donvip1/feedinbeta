@@ -3844,6 +3844,38 @@ export type Database = {
           },
         ]
       }
+      live_stream_chat_reactions: {
+        Row: {
+          comment_id: string | null
+          created_at: string | null
+          id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          reaction_type: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string | null
+          created_at?: string | null
+          id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_stream_chat_reactions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "live_stream_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_stream_comments: {
         Row: {
           content: string
@@ -8164,6 +8196,10 @@ export type Database = {
       convert_all_gifts: { Args: never; Returns: Json }
       convert_gift: { Args: { p_gift_id: string }; Returns: Json }
       create_conversation: { Args: { other_user_id: string }; Returns: string }
+      decrement_viewer_count: {
+        Args: { p_stream_id: string }
+        Returns: undefined
+      }
       deduct_credits_safe: {
         Args: { p_amount: number; p_description?: string; p_user_id: string }
         Returns: boolean
@@ -8684,6 +8720,10 @@ export type Database = {
       }
       increment_referral_count: {
         Args: { referrer_id: string }
+        Returns: undefined
+      }
+      increment_viewer_count: {
+        Args: { p_stream_id: string }
         Returns: undefined
       }
       insert_ads: {

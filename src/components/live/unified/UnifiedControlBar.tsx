@@ -2,9 +2,10 @@ import { motion } from "framer-motion";
 import { 
   Mic, MicOff, Video, VideoOff, 
   MessageCircle, Gift, Share2, 
-  MoreHorizontal, PhoneOff, Settings
+  PhoneOff, Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StreamOptionsMenu } from "../StreamOptionsMenu";
 
 type RoomType = 'video_broadcast' | 'audio_space' | 'pk_battle';
 
@@ -13,6 +14,9 @@ interface UnifiedControlBarProps {
   isHost: boolean;
   isMuted: boolean;
   isCameraOn: boolean;
+  streamId?: string;
+  hostId?: string;
+  streamTitle?: string;
   onMicToggle: () => void;
   onCameraToggle: () => void;
   onChatToggle: () => void;
@@ -29,6 +33,9 @@ export const UnifiedControlBar = ({
   isHost,
   isMuted,
   isCameraOn,
+  streamId = '',
+  hostId = '',
+  streamTitle = 'Live Stream',
   onMicToggle,
   onCameraToggle,
   onChatToggle,
@@ -114,9 +121,12 @@ export const UnifiedControlBar = ({
             icon={<Share2 className="w-5 h-5" />}
             onClick={onShareClick}
           />
-          <ControlButton
-            icon={<MoreHorizontal className="w-5 h-5" />}
-            onClick={() => {}}
+          <StreamOptionsMenu
+            isHost={isHost}
+            streamId={streamId}
+            hostId={hostId}
+            streamTitle={streamTitle}
+            onEndStream={onEndStream}
           />
         </div>
       </div>

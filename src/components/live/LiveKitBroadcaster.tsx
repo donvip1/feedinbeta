@@ -562,9 +562,15 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
         senderName: r.senderName,
       }))} />
 
-      {/* Flying Gifts */}
+      {/* Flying Chat & Gifts */}
       <FlyingChat 
-        messages={[]} 
+        messages={comments.map(c => ({
+          id: c.id,
+          content: c.content,
+          user_id: c.user_id,
+          created_at: c.created_at,
+          profiles: c.profiles,
+        }))} 
         gifts={flyingGifts}
         hostId={user?.id}
       />

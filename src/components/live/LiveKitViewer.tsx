@@ -6,11 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
-  Users, Send, Heart, Gift, 
-  Volume2, VolumeX, Flame, 
-  PartyPopper, ThumbsUp, Star, Sparkles, 
-  MessageCircle, Loader2, RefreshCw, ArrowLeft, X
+  Users, Send, Gift, 
+  Volume2, VolumeX, 
+  MessageCircle, Loader2, ArrowLeft, RefreshCw
 } from "lucide-react";
+import { LiveReactionBar } from '@/components/shared/AnimatedEmojiButton';
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useNavigate } from 'react-router-dom';
@@ -35,14 +35,7 @@ interface LiveKitViewerProps {
   onClose: () => void;
 }
 
-const REACTIONS = [
-  { type: 'heart', emoji: '❤️', icon: Heart, color: 'text-red-500' },
-  { type: 'fire', emoji: '🔥', icon: Flame, color: 'text-orange-500' },
-  { type: 'star', emoji: '⭐', icon: Star, color: 'text-yellow-500' },
-  { type: 'clap', emoji: '👏', icon: PartyPopper, color: 'text-purple-500' },
-  { type: 'like', emoji: '👍', icon: ThumbsUp, color: 'text-blue-500' },
-  { type: 'love', emoji: '😍', icon: Sparkles, color: 'text-pink-500' },
-];
+// Using LiveReactionBar from AnimatedEmojiButton instead of manual REACTIONS
 
 const GIFT_EMOJIS: Record<string, string> = {
   heart: '❤️', star: '⭐', fire: '🔥', lightning: '⚡', 
@@ -571,8 +564,18 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
       {/* Floating Reactions */}
       <FloatingReactions reactions={reactions.map(r => ({ ...r, emoji: REACTION_EMOJIS[r.type] || '❤️' }))} />
 
-      {/* Flying Gifts */}
-      <FlyingChat messages={[]} gifts={flyingGifts} hostId={stream?.user_id} />
+      {/* Flying Chat & Gifts */}
+      <FlyingChat 
+        messages={comments.map(c => ({
+          id: c.id,
+          content: c.content,
+          user_id: c.user_id,
+          created_at: c.created_at,
+          profiles: c.profiles,
+        }))} 
+        gifts={flyingGifts} 
+        hostId={stream?.user_id} 
+      />
 
       {/* TOP HEADER */}
       <div className="absolute top-0 left-0 right-0 z-20 p-4">
@@ -616,27 +619,19 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
         </div>
       </div>
 
-      {/* REACTIONS BAR */}
+      {/* REACTIONS BAR - TikTok Style */}
       <div className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 flex flex-col gap-3">
-        {REACTIONS.map((reaction) => (
-          <Button
-            key={reaction.type}
-            size="icon"
-            variant="ghost"
-            onClick={() => sendReaction(reaction.type)}
-            className="h-12 w-12 rounded-full bg-black/30 backdrop-blur-sm hover:scale-110 transition-transform"
-          >
-            <span className="text-2xl">{reaction.emoji}</span>
-          </Button>
-        ))}
-        <Button
-          size="icon"
-          variant="ghost"
+        <LiveReactionBar 
+          onReact={(reactionType) => sendReaction(reactionType)} 
+          className="flex-col !gap-3 !bg-transparent !px-0"
+        />
+        <motion.button
+          whileTap={{ scale: 0.9 }}
           onClick={() => setShowGiftModal(true)}
-          className="h-12 w-12 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:scale-110 transition-transform"
+          className="p-3 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:scale-110 transition-transform"
         >
           <Gift className="h-6 w-6 text-white" />
-        </Button>
+        </motion.button>
       </div>
 
       {/* CHAT */}
