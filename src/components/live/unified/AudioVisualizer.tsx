@@ -12,25 +12,27 @@ export const AudioVisualizer = ({
   active, 
   barCount = 5, 
   className,
-  color = "bg-primary"
+  color = "bg-white"
 }: AudioVisualizerProps) => {
   return (
-    <div className={cn("flex items-end justify-center gap-1 h-16", className)}>
+    <div className={cn("flex items-end justify-center gap-1 h-8", className)}>
       {Array.from({ length: barCount }).map((_, i) => (
         <motion.div
           key={i}
-          className={cn("w-2 rounded-full", color)}
+          className={cn("w-1 rounded-full", color)}
           animate={{
-            height: active ? [16, 48, 24, 56, 32] : 16,
+            height: active 
+              ? [8, 32, 16, 24, 12, 28, 8] 
+              : 8,
           }}
           transition={{
-            duration: 0.8,
+            duration: 1.2,
             repeat: active ? Infinity : 0,
-            repeatType: "reverse",
-            delay: i * 0.1,
+            repeatType: "loop",
+            delay: i * 0.15,
             ease: "easeInOut",
           }}
-          style={{ minHeight: 16 }}
+          style={{ minHeight: 8 }}
         />
       ))}
     </div>

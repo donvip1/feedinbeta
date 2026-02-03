@@ -507,39 +507,44 @@ export const UnifiedRoom = ({
         {room.type === 'pk_battle' && pkState ? (
           // Split Screen for PK Battle
           <div className="flex h-full">
-            {/* Host Side */}
-            <div className="flex-1 relative border-r border-blue-500/50">
+            {/* Host Side (Blue) */}
+            <div className="flex-1 relative bg-gradient-to-br from-blue-900 to-blue-600">
               <video
                 ref={videoRef}
                 autoPlay
                 playsInline
                 muted={!isHost && isMuted}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover opacity-80"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent" />
-              <div className="absolute bottom-4 left-4 bg-blue-500/80 px-3 py-1 rounded-full text-sm font-bold text-white">
-                HOST
+              <div className="absolute inset-0 bg-gradient-to-t from-blue-900/80 via-transparent to-transparent" />
+              <div className="absolute bottom-4 left-4">
+                <p className="text-white font-bold text-lg">HOST</p>
+                <p className="text-white/80 text-sm">{room.host.name}</p>
               </div>
             </div>
             
-            {/* Challenger Side */}
-            <div className="flex-1 relative border-l border-red-500/50">
+            {/* Center Divider */}
+            <div className="w-1 bg-gradient-to-b from-yellow-400 via-white to-yellow-400 z-10" />
+            
+            {/* Challenger Side (Red) */}
+            <div className="flex-1 relative bg-gradient-to-br from-red-600 to-red-900">
               <video
                 ref={challengerVideoRef}
                 autoPlay
                 playsInline
                 muted={isMuted}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover opacity-80"
               />
-              <div className="absolute inset-0 bg-gradient-to-l from-red-500/10 to-transparent" />
-              <div className="absolute bottom-4 right-4 bg-red-500/80 px-3 py-1 rounded-full text-sm font-bold text-white">
-                CHALLENGER
+              <div className="absolute inset-0 bg-gradient-to-t from-red-900/80 via-transparent to-transparent" />
+              <div className="absolute bottom-4 right-4 text-right">
+                <p className="text-white font-bold text-lg">CHALLENGER</p>
+                <p className="text-white/80 text-sm">{pkState.challenger.name}</p>
               </div>
             </div>
           </div>
         ) : room.type === 'audio_space' ? (
-          // Audio Space with Visualizer
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-900/50 via-black to-indigo-900/50">
+          // Audio Space with Visualizer (Green Theme)
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900">
             {/* Animated Background */}
             <div className="absolute inset-0 overflow-hidden">
               <motion.div
@@ -548,44 +553,49 @@ export const UnifiedRoom = ({
                   opacity: [0.3, 0.5, 0.3],
                 }}
                 transition={{ duration: 4, repeat: Infinity }}
-                className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full bg-purple-500/20 blur-3xl"
+                className="absolute top-1/4 left-1/4 w-64 h-64 rounded-full bg-green-500/20 blur-3xl"
               />
               <motion.div
                 animate={{ 
                   scale: [1.2, 1, 1.2],
-                  opacity: [0.5, 0.3, 0.5],
+                  opacity: [0.4, 0.2, 0.4],
                 }}
-                transition={{ duration: 4, repeat: Infinity, delay: 1 }}
-                className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full bg-indigo-500/20 blur-3xl"
+                transition={{ duration: 5, repeat: Infinity }}
+                className="absolute bottom-1/4 right-1/4 w-48 h-48 rounded-full bg-emerald-500/20 blur-3xl"
               />
             </div>
             
             {/* Center Content */}
             <div className="relative z-10 flex flex-col items-center">
-              {/* Host Avatar */}
+              {/* Host Avatar with Pulse Effect */}
               <motion.div
                 animate={{ scale: [1, 1.05, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
                 className="relative"
               >
-                <Avatar className="w-32 h-32 border-4 border-primary/50">
+                <Avatar className="w-28 h-28 border-4 border-green-400/50">
                   <AvatarImage src={room.host.avatar} alt={room.host.name} />
-                  <AvatarFallback className="text-4xl">{room.host.name.charAt(0)}</AvatarFallback>
+                  <AvatarFallback className="text-4xl bg-green-800">{room.host.name.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <motion.div
-                  animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                  animate={{ scale: [1, 1.2, 1], opacity: [0.6, 0, 0.6] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
-                  className="absolute inset-0 rounded-full border-4 border-primary"
+                  className="absolute -inset-2 rounded-full border-2 border-green-400/40"
+                />
+                <motion.div
+                  animate={{ scale: [1, 1.35, 1], opacity: [0.3, 0, 0.3] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: 0.2 }}
+                  className="absolute -inset-4 rounded-full border border-green-400/20"
                 />
               </motion.div>
               
               {/* Visualizer */}
               <div className="mt-8">
-                <AudioVisualizer active={connectionStatus === 'connected'} barCount={7} />
+                <AudioVisualizer active={connectionStatus === 'connected'} barCount={5} color="bg-white" />
               </div>
               
               {/* Title */}
-              <h2 className="mt-6 text-xl font-bold text-white text-center px-4">
+              <h2 className="mt-6 text-xl font-bold text-white text-center px-8">
                 {room.title}
               </h2>
               
@@ -593,10 +603,10 @@ export const UnifiedRoom = ({
               <motion.div
                 animate={{ opacity: [1, 0.6, 1] }}
                 transition={{ duration: 1.5, repeat: Infinity }}
-                className="mt-4 flex items-center gap-2 bg-red-500/20 px-4 py-2 rounded-full"
+                className="mt-4 flex items-center gap-2 bg-black/30 backdrop-blur-sm px-4 py-2 rounded-full"
               >
-                <Radio className="w-4 h-4 text-red-500" />
-                <span className="text-sm font-semibold text-red-400">LIVE AUDIO</span>
+                <Radio className="w-4 h-4 text-green-400" />
+                <span className="text-sm font-semibold text-green-400">LIVE AUDIO</span>
               </motion.div>
             </div>
           </div>
@@ -611,11 +621,14 @@ export const UnifiedRoom = ({
               className="w-full h-full object-cover"
             />
             
+            {/* Gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+            
             {/* Loading State */}
             {connectionStatus === 'connecting' && (
               <div className="absolute inset-0 bg-black/80 flex items-center justify-center">
                 <div className="text-center">
-                  <Loader2 className="w-12 h-12 animate-spin text-primary mx-auto mb-4" />
+                  <Loader2 className="w-12 h-12 animate-spin text-white mx-auto mb-4" />
                   <p className="text-white">Connecting...</p>
                 </div>
               </div>
@@ -623,9 +636,9 @@ export const UnifiedRoom = ({
             
             {/* No Video Fallback */}
             {!hasVideo && connectionStatus === 'connected' && !isHost && (
-              <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center">
+              <div className="absolute inset-0 bg-gradient-to-br from-pink-900/80 to-red-900/80 flex items-center justify-center">
                 <div className="text-center">
-                  <Avatar className="w-24 h-24 mx-auto mb-4">
+                  <Avatar className="w-24 h-24 mx-auto mb-4 border-2 border-white/30">
                     <AvatarImage src={room.host.avatar} alt={room.host.name} />
                     <AvatarFallback>{room.host.name.charAt(0)}</AvatarFallback>
                   </Avatar>
