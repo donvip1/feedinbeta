@@ -151,11 +151,10 @@ export const LiveDashboard = ({
 
             <Button
               onClick={onGoLive}
-              size="sm"
-              className="bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700 text-white shadow-lg shadow-pink-500/25 shrink-0 px-3 sm:px-4"
+              className="bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700 text-white shadow-lg shadow-pink-500/25 shrink-0 h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm rounded-full"
             >
-              <Play className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-2" />
-              <span className="hidden sm:inline">Go Live</span>
+              <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              Go Live
             </Button>
           </div>
         </motion.div>
