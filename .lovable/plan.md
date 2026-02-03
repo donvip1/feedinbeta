@@ -1,284 +1,315 @@
 
-# Plan: Modern Live Dashboard with Hidden Navigation
+# Plan: Fix Live Streaming Chat, Reactions, Likes Count & Menu Features
 
-## Overview
+## Issues Identified
 
-This plan modernizes the Live page (`/live`) with a TikTok/Tango-style interface based on your reference code, while ensuring the bottom navigation bar (Home, Messages, Wallet, etc.) is completely hidden. A back button will be added for easy navigation back to the feed.
+| Issue | Root Cause | Solution |
+|-------|------------|----------|
+| **Chat not working** | `FlyingChat` in `LiveKitViewer.tsx` receives `messages={[]}` (empty array) instead of actual comments | Pass `comments` state to `FlyingChat` |
+| **12K likes is mocked** | Hardcoded `12K` in `UnifiedRoom.tsx` line 726 | Replace with real-time reaction count from database |
+| **Viewer count mismatch** | Viewer count on host avatar shows ~42 but database shows 0 | Sync with `live_stream_viewers` table and LiveKit room participants |
+| **Three-dot menu empty** | `UnifiedControlBar.tsx` has `onClick={() => {}}` for MoreHorizontal | Implement proper options menu with relevant features |
+| **No animated emoji reactions** | Missing `LiveReactionBar` component in viewer interface | Add animated emoji bar using `AnimatedEmojiButton` system |
+| **No chat reactions** | Missing reaction feature in chat messages | Add reaction support to chat messages |
 
-## Current Issues Identified
+---
 
-| Issue | Current Behavior | Required |
-|-------|-----------------|----------|
-| Navigation Bar | Shows on `/live` route | Should be hidden |
-| Live Page Design | Traditional card-based layout | Modern TikTok-style dashboard |
-| Back Navigation | No back button | Need back arrow to return to feed |
-| Live Room Navigation | BottomNav still visible | Fullscreen immersive experience |
+## Phase 1: Fix Chat Overlay in LiveKitViewer
 
-## Solution Overview
-
-```text
-LIVE PAGE (/live)
-┌─────────────────────────────────────────────┐
-│ ← Back    Discover    🔔 + ⋮              │  ← Header with back button
-├─────────────────────────────────────────────┤
-│  All  Popular  Music  Gaming  Chat          │  ← Filter tabs
-├─────────────────────────────────────────────┤
-│ ┌───────────────────────────────────────┐  │
-│ │    [Your Profile Avatar]              │  │
-│ │    Ready to broadcast                 │  │
-│ │    Start your Live Journey            │  │
-│ │    [Go Live Button]                   │  │
-│ └───────────────────────────────────────┘  │
-│                                             │
-│ Trending Now                       View All │
-│ ┌─────────┐  ┌─────────┐                   │
-│ │  LIVE   │  │  LIVE   │                   │
-│ │ Stream  │  │ Space   │                   │
-│ │ Preview │  │ Preview │                   │
-│ └─────────┘  └─────────┘                   │
-│                                             │
-│ Recommended For You                         │
-│ [Creator 1] [Creator 2] [Creator 3]        │
-└─────────────────────────────────────────────┘
-                NO BOTTOM NAV
+### Problem
+The `FlyingChat` component in `LiveKitViewer.tsx` (line 575) is receiving an empty array:
+```typescript
+<FlyingChat messages={[]} gifts={flyingGifts} hostId={stream?.user_id} />
 ```
 
-## Phase 1: Hide Navigation on Live Page
-
-### 1.1 Update NavigationContext
-
-Add `/live` (exact match) to the hidden nav routes:
-
+### Solution
+Pass the actual `comments` state to `FlyingChat`:
 ```typescript
-// Current HIDDEN_NAV_ROUTES
-const HIDDEN_NAV_ROUTES = [
-  '/live/stream/',
-  '/live/space/',
-  '/space/'
-];
-
-// NEW - Add exact /live path detection
-const isLiveStreamPage = useMemo(() => {
-  const pathname = location.pathname;
-  // Hide on exact /live AND on live stream/space detail pages
-  return pathname === '/live' || 
-         HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
-}, [location.pathname]);
+<FlyingChat 
+  messages={comments.map(c => ({
+    id: c.id,
+    content: c.content,
+    user_id: c.user_id,
+    created_at: c.created_at,
+    profiles: c.profiles,
+  }))} 
+  gifts={flyingGifts} 
+  hostId={stream?.user_id} 
+/>
 ```
 
-### 1.2 Remove BottomNav from Live.tsx
+Similarly update `LiveKitBroadcaster.tsx` where the same pattern exists.
 
-The current Live.tsx explicitly renders `<BottomNav />` at line 885. This will be removed since the NavigationContext will handle hiding it.
+---
 
-## Phase 2: Create Modern Live Dashboard Component
+## Phase 2: Replace Mocked 12K Likes with Real Data
 
-### 2.1 New Component: `src/components/live/LiveDashboard.tsx`
-
-A new modern dashboard component based on your reference code:
-
-**Key Features:**
-- Glassmorphism header with back button
-- Modern filter tabs (All, Popular, Music, Gaming, Chat)
-- "Go Live" CTA card with user avatar and decorative circles
-- Trending section with 4:5 aspect ratio preview cards
-- Recommended creators section
-- No external navigation elements
-
-**Header Structure:**
+### Problem
+In `UnifiedRoom.tsx` (line 726), likes are hardcoded:
 ```typescript
-<div className="flex items-center justify-between">
-  <button onClick={() => navigate('/feed')}>
-    <ArrowLeft className="w-5 h-5" />
-  </button>
-  <div>
-    <h1>Discover</h1>
-    <p>Watch active streams</p>
-  </div>
-  <div className="flex gap-2">
-    <button><Search /></button>
-    <button><Bell /></button>
-    <button><Plus /></button>
-  </div>
-</div>
+<span className="text-xs text-white mt-1">12K</span>
 ```
 
-### 2.2 Modern Feed Item Component
+### Solution
+1. Add state to track reaction count:
+```typescript
+const [reactionCount, setReactionCount] = useState(0);
+```
 
-Update `LiveFeedItem.tsx` with the reference design:
-- 4:5 aspect ratio cards
-- Gradient overlays
-- Live badge + room type badge
-- Host avatar with level indicator
-- Viewer count and quality badge
+2. Fetch initial count on mount:
+```typescript
+const { count } = await supabase
+  .from("live_stream_reactions")
+  .select("*", { count: 'exact', head: true })
+  .eq("stream_id", room.id);
+setReactionCount(count || 0);
+```
 
-## Phase 3: Restructure Live.tsx
+3. Update count on each new reaction via realtime subscription
 
-### 3.1 New Page Structure
+4. Display formatted count:
+```typescript
+<span className="text-xs text-white mt-1">
+  {reactionCount >= 1000 ? `${(reactionCount/1000).toFixed(1)}K` : reactionCount}
+</span>
+```
 
-Replace the current Live.tsx layout with a cleaner structure:
+Also apply same fix in `LiveKitViewer.tsx` reactions sidebar.
+
+---
+
+## Phase 3: Add Three-Dot Menu with Stream Options
+
+### Current State
+```typescript
+<ControlButton
+  icon={<MoreHorizontal className="w-5 h-5" />}
+  onClick={() => {}} // Empty handler
+/>
+```
+
+### Solution
+Create a `StreamOptionsMenu` component with relevant features:
+
+**For Viewers:**
+- Report Stream
+- Share Stream
+- Copy Link
+- Block Host
+- Turn on/off Notifications
+- Picture-in-Picture mode
+
+**For Host:**
+- Stream Settings
+- Viewer Management
+- Lock/Unlock Chat
+- End Stream
+- Go to Picture-in-Picture
+
+Implementation using Radix DropdownMenu:
+```typescript
+<DropdownMenu>
+  <DropdownMenuTrigger asChild>
+    <ControlButton icon={<MoreHorizontal />} onClick={() => {}} />
+  </DropdownMenuTrigger>
+  <DropdownMenuContent>
+    <DropdownMenuItem onClick={handleShare}>
+      <Share2 className="mr-2" /> Share
+    </DropdownMenuItem>
+    <DropdownMenuItem onClick={handleReport}>
+      <Flag className="mr-2" /> Report
+    </DropdownMenuItem>
+    // ... more options
+  </DropdownMenuContent>
+</DropdownMenu>
+```
+
+---
+
+## Phase 4: Add Animated Emoji Reactions Bar
+
+### Current State
+Reactions in `LiveKitViewer.tsx` use basic button UI:
+```typescript
+{REACTIONS.map((reaction) => (
+  <Button ... onClick={() => sendReaction(reaction.type)}>
+    <span className="text-2xl">{reaction.emoji}</span>
+  </Button>
+))}
+```
+
+### Solution
+Replace with the existing `LiveReactionBar` component from `AnimatedEmojiButton.tsx`:
 
 ```typescript
-const Live = () => {
-  // ... existing queries and state ...
+import { LiveReactionBar, LIVE_REACTIONS } from '@/components/shared/AnimatedEmojiButton';
+
+// In component:
+<LiveReactionBar 
+  onReact={(reactionType) => sendReaction(reactionType)}
+  className="flex-col"
+/>
+```
+
+This provides:
+- Animated particle burst effects on tap
+- Scaling hover animations
+- Consistent design across app
+- 6 reaction types: Heart, Fire, Star, Clap, Like, Love
+
+---
+
+## Phase 5: Add Chat Message Reactions
+
+### Feature Description
+Allow users to react to individual chat messages with emojis (like Twitch/YouTube Live).
+
+### Database Changes
+Create new table `live_stream_chat_reactions`:
+```sql
+CREATE TABLE public.live_stream_chat_reactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  comment_id UUID REFERENCES live_stream_comments(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  reaction_type TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(comment_id, user_id)
+);
+
+-- Enable RLS
+ALTER TABLE public.live_stream_chat_reactions ENABLE ROW LEVEL SECURITY;
+
+-- Policies
+CREATE POLICY "Users can view all chat reactions"
+  ON public.live_stream_chat_reactions FOR SELECT USING (true);
   
-  // Render modals/overlays (keep existing logic)
-  if (selectedStreamId) return <LiveKitViewer ... />;
-  if (isBroadcasting) return <LiveKitBroadcaster ... />;
-  if (selectedSpaceId) return <LiveSpaceRoom ... />;
+CREATE POLICY "Authenticated users can react"
+  ON public.live_stream_chat_reactions FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
   
-  return (
-    <div className="min-h-screen bg-black">
-      {/* Modern Dashboard - NO BottomNav */}
-      <LiveDashboard 
-        liveStreams={liveStreams}
-        liveSpaces={liveSpaces}
-        scheduledStreams={scheduledStreams}
-        scheduledSpaces={scheduledSpaces}
-        myStreams={myStreams}
-        mySpaces={mySpaces}
-        user={user}
-        onStreamClick={handleStreamClick}
-        onSpaceClick={handleSpaceClick}
-        onGoLive={() => setShowGoLiveModal(true)}
-        onVideoStream={() => setCreateStreamModalOpen(true)}
-        onAudioSpace={() => setCreateSpaceModalOpen(true)}
-      />
-      
-      {/* Modals */}
-      <CreateLiveStreamModal ... />
-      <CreateSpaceModal ... />
-      <GoLiveModal open={showGoLiveModal} onClose={() => setShowGoLiveModal(false)} />
-    </div>
-  );
-};
+CREATE POLICY "Users can remove own reactions"
+  ON public.live_stream_chat_reactions FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Enable realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.live_stream_chat_reactions;
 ```
 
-## Phase 4: Go Live Modal
+### UI Implementation
+Add long-press/tap handler to chat messages that shows quick reaction picker.
 
-### 4.1 New Component: `src/components/live/GoLiveModal.tsx`
+---
 
-Modern bottom sheet modal for selecting stream type:
+## Phase 6: Sync Real Viewer Count
 
-```text
-┌─────────────────────────────────────────────┐
-│ Start Broadcasting                      [X] │
-├─────────────────────────────────────────────┤
-│ ┌─────────────────────────────────────────┐ │
-│ │  📹  Video Stream                       │ │
-│ │      Standard broadcast with camera     │ │
-│ └─────────────────────────────────────────┘ │
-│ ┌─────────────────────────────────────────┐ │
-│ │  🎙️  Audio Space                        │ │
-│ │      Voice-only conversation room       │ │
-│ └─────────────────────────────────────────┘ │
-│                                             │
-│ [Schedule for later →]                      │
-└─────────────────────────────────────────────┘
+### Problem
+Database shows `viewer_count: 0` even when viewers are connected.
+
+### Solution
+1. Update `live_stream_viewers` table on join/leave
+2. Use LiveKit room participant count as ground truth
+3. Periodically sync to database (every 30s)
+
+```typescript
+// In LiveKitViewer - when joining
+useEffect(() => {
+  const updateViewerCount = async () => {
+    await supabase.rpc('increment_viewer_count', { stream_id: streamId });
+  };
+  updateViewerCount();
+  
+  return () => {
+    supabase.rpc('decrement_viewer_count', { stream_id: streamId });
+  };
+}, [streamId]);
 ```
 
-## Phase 5: File Changes Summary
+---
 
-### Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/live/LiveDashboard.tsx` | Modern TikTok-style dashboard |
-| `src/components/live/GoLiveModal.tsx` | Bottom sheet for stream type selection |
-| `src/components/live/LiveDiscoverCard.tsx` | Modern feed item card component |
-
-### Files to Update
+## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/context/NavigationContext.tsx` | Add `/live` to hidden nav routes |
-| `src/pages/Live.tsx` | Use new LiveDashboard, remove BottomNav import |
-| `src/components/live/unified/LiveFeedItem.tsx` | Minor styling updates to match reference |
+| `src/components/live/LiveKitViewer.tsx` | Pass comments to FlyingChat, add real reaction count, use LiveReactionBar |
+| `src/components/live/LiveKitBroadcaster.tsx` | Pass comments to FlyingChat, use LiveReactionBar |
+| `src/components/live/unified/UnifiedRoom.tsx` | Replace 12K with real count, add reactions fetch |
+| `src/components/live/unified/UnifiedControlBar.tsx` | Implement MoreHorizontal menu |
 
-## Phase 6: Detailed Implementation
+## Files to Create
 
-### 6.1 LiveDashboard.tsx Key Sections
+| File | Purpose |
+|------|---------|
+| `src/components/live/StreamOptionsMenu.tsx` | Dropdown menu for stream options |
 
-**My Status CTA Card:**
-```typescript
-<div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800/50 to-slate-900/50 p-6">
-  {/* Decorative circles */}
-  <div className="absolute top-4 left-4 w-16 h-16 bg-purple-500/20 rounded-full blur-xl" />
-  <div className="absolute bottom-4 right-4 w-24 h-24 bg-pink-500/20 rounded-full blur-xl" />
-  
-  <div className="relative flex items-center gap-4">
-    <Avatar className="w-16 h-16 border-2 border-primary/50">
-      <AvatarImage src={user?.avatar_url} />
-    </Avatar>
-    <div className="flex-1">
-      <p className="text-sm text-white/60">Ready to broadcast</p>
-      <p className="text-xl font-bold">Start your Live Journey</p>
-      <p className="text-sm text-white/60">{followerCount} followers waiting</p>
-    </div>
-    <Button onClick={onGoLive} className="bg-gradient-to-r from-pink-500 to-violet-600">
-      <Play className="w-4 h-4 mr-2" />
-      Go Live
-    </Button>
-  </div>
-</div>
+## Database Migration
+
+```sql
+-- 1. Add viewer count sync function
+CREATE OR REPLACE FUNCTION increment_viewer_count(stream_id UUID)
+RETURNS void AS $$
+BEGIN
+  UPDATE live_streams 
+  SET viewer_count = viewer_count + 1 
+  WHERE id = stream_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION decrement_viewer_count(stream_id UUID)
+RETURNS void AS $$
+BEGIN
+  UPDATE live_streams 
+  SET viewer_count = GREATEST(viewer_count - 1, 0) 
+  WHERE id = stream_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 2. Create chat reactions table (for Phase 5)
+CREATE TABLE IF NOT EXISTS public.live_stream_chat_reactions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  comment_id UUID REFERENCES public.live_stream_comments(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL,
+  reaction_type TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(comment_id, user_id)
+);
+
+ALTER TABLE public.live_stream_chat_reactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view chat reactions" ON public.live_stream_chat_reactions
+  FOR SELECT USING (true);
+
+CREATE POLICY "Users can add reactions" ON public.live_stream_chat_reactions
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can remove own reactions" ON public.live_stream_chat_reactions
+  FOR DELETE USING (auth.uid() = user_id);
 ```
 
-**Trending Section:**
-```typescript
-<div className="mt-8">
-  <div className="flex items-center justify-between mb-4">
-    <div className="flex items-center gap-2">
-      <Flame className="w-5 h-5 text-orange-500" />
-      <span className="font-bold">Trending Now</span>
-    </div>
-    <button className="text-sm text-white/60 flex items-center gap-1">
-      View All <ChevronRight className="w-4 h-4" />
-    </button>
-  </div>
-  
-  <div className="grid grid-cols-2 gap-4">
-    {liveStreams?.slice(0, 2).map(stream => (
-      <LiveDiscoverCard 
-        key={stream.id}
-        stream={stream}
-        onClick={() => onStreamClick(stream)}
-      />
-    ))}
-  </div>
-</div>
+---
+
+## Visual Summary
+
+```text
+BEFORE                          AFTER
+┌─────────────────────┐        ┌─────────────────────┐
+│ Chat: Empty         │   →    │ Chat: Real messages │
+│ Likes: 12K (fake)   │   →    │ Likes: 47 (real)    │
+│ Menu: Nothing       │   →    │ Menu: Options popup │
+│ Reactions: Basic    │   →    │ Reactions: Animated │
+│ Chat msgs: No react │   →    │ Chat msgs: Reactable│
+└─────────────────────┘        └─────────────────────┘
 ```
 
-### 6.2 Navigation Context Update
-
-```typescript
-const isLiveStreamPage = useMemo(() => {
-  const pathname = location.pathname;
-  // Exact match for /live dashboard OR startsWith for detail pages
-  const isLiveDashboard = pathname === '/live';
-  const isLiveDetail = HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
-  return isLiveDashboard || isLiveDetail;
-}, [location.pathname]);
-```
-
-## Visual Design Specifications
-
-| Element | Style |
-|---------|-------|
-| Background | `bg-black` or `bg-gradient-to-b from-black to-slate-900` |
-| Cards | Rounded 2xl-3xl with gradient overlays |
-| Live Badge | Red with pulse animation |
-| Buttons | Gradient pink-to-violet with glow |
-| Text | White with opacity variations |
-| Filters | Underline indicator (not pill shapes) |
+---
 
 ## Testing Checklist
 
-| Test Case | Expected Behavior |
-|-----------|-------------------|
-| Navigate to /live | Bottom nav hidden, back button visible |
-| Click back button | Navigate to /feed |
-| Click stream card | Open stream viewer, nav still hidden |
-| Click "Go Live" | Open modal with options |
-| Select Video Stream | Open create stream modal |
-| Select Audio Space | Open create space modal |
-| Navigate to /live/stream/:id | Bottom nav hidden |
-| Navigate to /live/space/:id | Bottom nav hidden |
+| Test | Expected Result |
+|------|-----------------|
+| Send chat as viewer | Message appears in flying chat overlay |
+| Send chat as host | Message appears for all viewers |
+| Tap heart reaction | Count increases, animation plays |
+| Tap three-dot menu | Options dropdown appears |
+| Long-press chat message | Reaction picker shows |
+| Join as viewer | Viewer count increments |
+| Leave stream | Viewer count decrements |
