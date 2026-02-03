@@ -4132,6 +4132,7 @@ export type Database = {
           is_premium: boolean | null
           last_health_check: string | null
           peak_viewers: number | null
+          room_type: string | null
           scheduled_start: string | null
           sfu_track_name: string | null
           started_at: string | null
@@ -4163,6 +4164,7 @@ export type Database = {
           is_premium?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
+          room_type?: string | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
           started_at?: string | null
@@ -4194,6 +4196,7 @@ export type Database = {
           is_premium?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
+          room_type?: string | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
           started_at?: string | null
@@ -5477,6 +5480,69 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      pk_battles: {
+        Row: {
+          challenger_id: string | null
+          challenger_score: number | null
+          created_at: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          host_id: string
+          host_score: number | null
+          id: string
+          started_at: string | null
+          status: string | null
+          stream_id: string | null
+          updated_at: string | null
+          winner_id: string | null
+        }
+        Insert: {
+          challenger_id?: string | null
+          challenger_score?: number | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          host_id: string
+          host_score?: number | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          stream_id?: string | null
+          updated_at?: string | null
+          winner_id?: string | null
+        }
+        Update: {
+          challenger_id?: string | null
+          challenger_score?: number | null
+          created_at?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          host_id?: string
+          host_score?: number | null
+          id?: string
+          started_at?: string | null
+          status?: string | null
+          stream_id?: string | null
+          updated_at?: string | null
+          winner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pk_battles_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pk_battles_stream_id_fkey"
+            columns: ["stream_id"]
+            isOneToOne: false
+            referencedRelation: "live_streams_public"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_transactions: {
         Row: {
