@@ -267,16 +267,24 @@ const Feed = () => {
     initialViewedRef.current = [...viewedPostIds];
   }, [activeTab]);
 
-  // Handle navigation state from post creators (e.g., PhotoPlusPostCreator)
+  // Handle navigation state from post creators and sub-pages
   useEffect(() => {
-    const state = location.state as { activeTab?: 'videos' | 'photosText' | 'live'; scrollToTop?: boolean } | null;
+    const state = location.state as { 
+      activeTab?: 'videos' | 'photosText' | 'live'; 
+      scrollToTop?: boolean;
+      preserveFeed?: boolean;
+    } | null;
+    
     if (state?.activeTab) {
       setActiveTab(state.activeTab);
-      // Clear the state to prevent re-triggering on subsequent renders
-      window.history.replaceState({}, document.title);
     }
     if (state?.scrollToTop && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+    // Note: preserveFeed is handled in the session key useEffect
+    // Clear state after processing to prevent re-triggering
+    if (state?.activeTab || state?.scrollToTop) {
+      window.history.replaceState({}, document.title);
     }
   }, [location.state]);
 
@@ -431,9 +439,19 @@ const Feed = () => {
   const [feedSessionKey, setFeedSessionKey] = useState(() => Date.now());
   const mountTimeRef = useRef(Date.now());
   
-  // Generate new session key on EVERY mount (component remount = new random order)
-  // This ensures navigating away and back produces different posts order
+  // Generate new session key on mount UNLESS returning from a sub-page (e.g., Promote)
+  // This preserves feed position when navigating back from post actions
   useEffect(() => {
+    const state = location.state as { preserveFeed?: boolean } | null;
+    
+    // Skip session reset if we're returning from a sub-page that wants to preserve feed
+    if (state?.preserveFeed) {
+      console.log('[Feed] Preserving feed session - returning from sub-page');
+      // Clear the state to prevent affecting future navigations
+      window.history.replaceState({}, document.title);
+      return;
+    }
+    
     const newSessionKey = Date.now();
     console.log('[Feed] Component mounted - new session key:', newSessionKey);
     feedCache.clear();
