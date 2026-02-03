@@ -267,6 +267,19 @@ const Feed = () => {
     initialViewedRef.current = [...viewedPostIds];
   }, [activeTab]);
 
+  // Handle navigation state from post creators (e.g., PhotoPlusPostCreator)
+  useEffect(() => {
+    const state = location.state as { activeTab?: 'videos' | 'photosText' | 'live'; scrollToTop?: boolean } | null;
+    if (state?.activeTab) {
+      setActiveTab(state.activeTab);
+      // Clear the state to prevent re-triggering on subsequent renders
+      window.history.replaceState({}, document.title);
+    }
+    if (state?.scrollToTop && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [location.state]);
+
   // Helper function to fetch posts directly as fallback
   const fetchFallbackPosts = async (excludeUserId?: string) => {
     const query = supabase

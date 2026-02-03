@@ -283,8 +283,10 @@ export default function PhotoPlusPostCreator({ open, onClose, onSuccess }: Photo
       
       onSuccess?.();
       onClose();
-      // Navigate directly to the created post for instant visibility
-      navigate(`/feed/post/${newPost.id}`);
+      // Navigate to feed with Photos+ tab active so user sees their new post
+      navigate('/feed', { 
+        state: { activeTab: 'photosText', scrollToTop: true }
+      });
     } catch (error: any) {
       console.error('Post creation error:', error);
       toast({
