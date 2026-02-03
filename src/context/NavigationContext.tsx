@@ -5,6 +5,7 @@ interface NavigationContextType {
   isSubPage: boolean;
   hideBottomNav: boolean;
   setHideBottomNav: (hide: boolean) => void;
+  isLiveStreamPage: boolean;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -20,9 +21,21 @@ const MAIN_ROUTES = [
   '/settings'
 ];
 
+// Routes where BottomNav should be completely hidden
+const HIDDEN_NAV_ROUTES = [
+  '/live/stream/',
+  '/live/space/'
+];
+
 export const NavigationProvider = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const [hideBottomNav, setHideBottomNav] = useState(false);
+
+  // Check if current page is a livestream/space detail page
+  const isLiveStreamPage = useMemo(() => {
+    const pathname = location.pathname;
+    return HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
+  }, [location.pathname]);
 
   const isSubPage = useMemo(() => {
     const pathname = location.pathname;
@@ -47,8 +60,9 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
   const value = useMemo(() => ({
     isSubPage,
     hideBottomNav,
-    setHideBottomNav
-  }), [isSubPage, hideBottomNav]);
+    setHideBottomNav,
+    isLiveStreamPage
+  }), [isSubPage, hideBottomNav, isLiveStreamPage]);
 
   return (
     <NavigationContext.Provider value={value}>
@@ -64,7 +78,8 @@ export const useNavigation = () => {
     return {
       isSubPage: false,
       hideBottomNav: false,
-      setHideBottomNav: () => {}
+      setHideBottomNav: () => {},
+      isLiveStreamPage: false
     };
   }
   return context;
