@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   Mic, MicOff, Video, VideoOff, 
   MessageCircle, Gift, Share2, 
-  MoreHorizontal, PhoneOff, 
-  Settings, LayoutGrid, Minimize2
+  MoreHorizontal, PhoneOff, Settings
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type RoomType = 'video_broadcast' | 'audio_space' | 'pk_battle';
@@ -58,16 +55,14 @@ export const UnifiedControlBar = ({
       <div className="flex items-center justify-between max-w-lg mx-auto">
         {/* Left Side - Viewer Actions */}
         {!isHost && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <ControlButton
               icon={<MessageCircle className="w-5 h-5" />}
               onClick={onChatToggle}
-              label="Chat"
             />
             <ControlButton
               icon={<Gift className="w-5 h-5" />}
               onClick={onGiftClick}
-              label="Gift"
               highlight
             />
           </div>
@@ -75,7 +70,7 @@ export const UnifiedControlBar = ({
 
         {/* Center - Host Controls */}
         {isHost && (
-          <div className="flex items-center gap-3 mx-auto">
+          <div className="flex items-center gap-4 mx-auto">
             {/* Mic Toggle */}
             <ControlButton
               icon={isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -88,7 +83,7 @@ export const UnifiedControlBar = ({
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={onEndStream}
-              className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center shadow-lg shadow-red-500/30"
+              className="w-14 h-14 rounded-full bg-red-600 hover:bg-red-700 flex items-center justify-center shadow-lg shadow-red-500/30 transition-colors"
             >
               <PhoneOff className="w-6 h-6 text-white" />
             </motion.button>
@@ -103,7 +98,7 @@ export const UnifiedControlBar = ({
               />
             )}
 
-            {/* Audio Space - Extra mic control */}
+            {/* Audio Space - Settings */}
             {roomType === 'audio_space' && (
               <ControlButton
                 icon={<Settings className="w-5 h-5" />}
@@ -114,17 +109,11 @@ export const UnifiedControlBar = ({
         )}
 
         {/* Right Side - Common Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <ControlButton
             icon={<Share2 className="w-5 h-5" />}
             onClick={onShareClick}
           />
-          {onMinimize && (
-            <ControlButton
-              icon={<Minimize2 className="w-5 h-5" />}
-              onClick={onMinimize}
-            />
-          )}
           <ControlButton
             icon={<MoreHorizontal className="w-5 h-5" />}
             onClick={() => {}}
@@ -141,7 +130,6 @@ interface ControlButtonProps {
   active?: boolean;
   danger?: boolean;
   highlight?: boolean;
-  label?: string;
 }
 
 const ControlButton = ({ 
@@ -150,7 +138,6 @@ const ControlButton = ({
   active, 
   danger,
   highlight,
-  label 
 }: ControlButtonProps) => {
   return (
     <motion.button
@@ -159,7 +146,7 @@ const ControlButton = ({
       className={cn(
         "p-3 rounded-full flex items-center justify-center transition-colors",
         active && "bg-white text-black",
-        danger && "bg-red-500/20 text-red-400",
+        danger && "bg-slate-800 text-white",
         highlight && "bg-gradient-to-r from-pink-500 to-orange-500 text-white",
         !active && !danger && !highlight && "bg-white/10 text-white hover:bg-white/20"
       )}
