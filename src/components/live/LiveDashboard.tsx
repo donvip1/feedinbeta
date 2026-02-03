@@ -135,25 +135,27 @@ export const LiveDashboard = ({
           <div className="absolute top-4 left-4 w-10 h-10 bg-purple-500/20 rounded-full blur-xl" />
           <div className="absolute bottom-4 right-4 w-16 h-16 bg-pink-500/20 rounded-full blur-xl" />
 
-          <div className="relative flex items-center gap-3 sm:gap-4">
-            <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-primary/50 shrink-0">
-              <AvatarImage src={user?.avatar_url} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-violet-600 text-white text-sm sm:text-base">
-                {user?.display_name?.[0] || user?.username?.[0] || "?"}
-              </AvatarFallback>
-            </Avatar>
+          <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-primary/50 shrink-0">
+                <AvatarImage src={user?.avatar_url} />
+                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-violet-600 text-white text-sm sm:text-base">
+                  {user?.display_name?.[0] || user?.username?.[0] || "?"}
+                </AvatarFallback>
+              </Avatar>
 
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm text-white/60">Ready to broadcast</p>
-              <p className="text-base sm:text-xl font-bold whitespace-nowrap">Start your Live Journey</p>
-              <p className="text-xs sm:text-sm text-white/60">{followerCount} followers waiting</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-white/60">Ready to broadcast</p>
+                <p className="text-base sm:text-xl font-bold">Start your Live Journey</p>
+                <p className="text-xs sm:text-sm text-white/60">{followerCount} followers waiting</p>
+              </div>
             </div>
 
             <Button
               onClick={onGoLive}
-              className="bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700 text-white shadow-lg shadow-pink-500/25 shrink-0 h-8 sm:h-9 px-3 sm:px-4 text-xs sm:text-sm rounded-full"
+              className="bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700 text-white shadow-lg shadow-pink-500/25 h-9 px-4 text-sm rounded-full w-full sm:w-auto sm:shrink-0"
             >
-              <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <Play className="w-4 h-4 mr-2" />
               Go Live
             </Button>
           </div>
