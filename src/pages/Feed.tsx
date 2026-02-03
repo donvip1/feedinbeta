@@ -217,7 +217,7 @@ const Feed = () => {
         }))
       ].slice(0, 3); // Max 3 inline items
     },
-    enabled: activeTab === 'videos', // Only fetch for Videos tab where we render them
+    enabled: false, // Inline live content disabled - users access live content via Live tab only
     refetchInterval: 5000,
     staleTime: 0,
   });
@@ -902,40 +902,11 @@ const Feed = () => {
           <FeedSkeleton />
         ) : displayPosts && displayPosts.length > 0 ? (
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
-            {/* Show inline live content at the top ONLY on Videos tab (TikTok-style snap scrolling) */}
-            {activeTab === 'videos' && inlineLiveContent && inlineLiveContent.length > 0 && (
-              <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
-                <InlineLiveCard
-                  item={{
-                    ...inlineLiveContent[0],
-                    status: inlineLiveContent[0].status as string,
-                    type: inlineLiveContent[0].type
-                  }}
-                  onClick={() => {
-                    if (inlineLiveContent[0].type === 'video') {
-                      navigate(`/live/stream/${inlineLiveContent[0].id}`);
-                    } else {
-                      navigate(`/live/space/${inlineLiveContent[0].id}`);
-                    }
-                  }}
-                />
-              </div>
-            )}
+            {/* Live content only appears when user explicitly taps the Live tab */}
 
             {displayPosts.map((post, index) => {
               const uniqueKey = post._cycleKey || post.id;
               
-              // Calculate the target live item index with fallback for periodic injection
-              const targetLiveIndex = index === 4 ? 1 : (inlineLiveContent?.[2] ? 2 : 1);
-              const liveItemForInjection = inlineLiveContent?.[targetLiveIndex];
-              
-              // Insert another live card after every 5 posts ONLY on Videos tab
-              const showInlineLive = activeTab === 'videos' && 
-                inlineLiveContent && 
-                inlineLiveContent.length > 1 && 
-                (index === 4 || index === 9) &&
-                liveItemForInjection;
-
               // Handle view tracking - for ads, track impression
               const handlePostView = () => {
                 if (post._isAd && post._adData && user) {
@@ -971,24 +942,6 @@ const Feed = () => {
                       isGlobalImmersive={isImmersiveMode}
                     />
                   </div>
-                  {showInlineLive && liveItemForInjection && (
-                    <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
-                      <InlineLiveCard
-                        item={{
-                          ...liveItemForInjection,
-                          status: liveItemForInjection.status as string,
-                          type: liveItemForInjection.type
-                        }}
-                        onClick={() => {
-                          if (liveItemForInjection.type === 'video') {
-                            navigate(`/live/stream/${liveItemForInjection.id}`);
-                          } else {
-                            navigate(`/live/space/${liveItemForInjection.id}`);
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
                 </Fragment>
               );
             })}
