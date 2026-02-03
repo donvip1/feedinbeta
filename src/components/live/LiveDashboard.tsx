@@ -36,6 +36,8 @@ interface LiveDashboardProps {
   onVideoStream: () => void;
   onAudioSpace: () => void;
   isLoading?: boolean;
+  myActiveStream?: any; // User's currently active stream
+  myActiveSpace?: any;  // User's currently active space
 }
 
 const filters = ["All", "Popular", "Music", "Gaming", "Chat"];
@@ -55,6 +57,8 @@ export const LiveDashboard = ({
   onVideoStream,
   onAudioSpace,
   isLoading,
+  myActiveStream,
+  myActiveSpace,
 }: LiveDashboardProps) => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("All");
@@ -125,39 +129,100 @@ export const LiveDashboard = ({
 
       {/* Main Content Area */}
       <div className="px-4 pb-8 space-y-8">
-        {/* "My Status" Area - Go Live CTA */}
+        {/* "My Status" Area - Go Live CTA or Return to Stream */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-white/10 p-4 sm:p-6"
+          className={cn(
+            "relative rounded-3xl overflow-hidden border p-4 sm:p-6",
+            myActiveStream || myActiveSpace
+              ? "bg-gradient-to-br from-green-900/50 to-emerald-900/50 border-green-500/30"
+              : "bg-gradient-to-br from-slate-800/50 to-slate-900/50 border-white/10"
+          )}
         >
           {/* Decorative circles */}
-          <div className="absolute top-4 left-4 w-10 h-10 bg-purple-500/20 rounded-full blur-xl" />
-          <div className="absolute bottom-4 right-4 w-16 h-16 bg-pink-500/20 rounded-full blur-xl" />
+          <div className={cn(
+            "absolute top-4 left-4 w-10 h-10 rounded-full blur-xl",
+            myActiveStream || myActiveSpace ? "bg-green-500/20" : "bg-purple-500/20"
+          )} />
+          <div className={cn(
+            "absolute bottom-4 right-4 w-16 h-16 rounded-full blur-xl",
+            myActiveStream || myActiveSpace ? "bg-emerald-500/20" : "bg-pink-500/20"
+          )} />
 
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <div className="flex items-center gap-3 sm:gap-4">
-              <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-primary/50 shrink-0">
-                <AvatarImage src={user?.avatar_url} />
-                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-violet-600 text-white text-sm sm:text-base">
-                  {user?.display_name?.[0] || user?.username?.[0] || "?"}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative">
+                <Avatar className={cn(
+                  "w-10 h-10 sm:w-12 sm:h-12 border-2 shrink-0",
+                  myActiveStream || myActiveSpace ? "border-green-500" : "border-primary/50"
+                )}>
+                  <AvatarImage src={user?.avatar_url} />
+                  <AvatarFallback className="bg-gradient-to-br from-pink-500 to-violet-600 text-white text-sm sm:text-base">
+                    {user?.display_name?.[0] || user?.username?.[0] || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                {(myActiveStream || myActiveSpace) && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-black animate-pulse" />
+                )}
+              </div>
 
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm text-white/60">Ready to broadcast</p>
-                <p className="text-base sm:text-xl font-bold">Start your Live Journey</p>
-                <p className="text-xs sm:text-sm text-white/60">{followerCount} followers waiting</p>
+                {myActiveStream ? (
+                  <>
+                    <p className="text-xs sm:text-sm text-green-400 font-medium flex items-center gap-1">
+                      <Radio className="w-3 h-3 animate-pulse" /> You're Live
+                    </p>
+                    <p className="text-base sm:text-xl font-bold truncate">{myActiveStream.title}</p>
+                    <p className="text-xs sm:text-sm text-white/60">
+                      {myActiveStream.viewer_count || 0} watching now
+                    </p>
+                  </>
+                ) : myActiveSpace ? (
+                  <>
+                    <p className="text-xs sm:text-sm text-green-400 font-medium flex items-center gap-1">
+                      <Mic className="w-3 h-3 animate-pulse" /> Space Active
+                    </p>
+                    <p className="text-base sm:text-xl font-bold truncate">{myActiveSpace.title}</p>
+                    <p className="text-xs sm:text-sm text-white/60">
+                      {myActiveSpace.viewer_count || myActiveSpace.active_listeners || 0} listening
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-xs sm:text-sm text-white/60">Ready to broadcast</p>
+                    <p className="text-base sm:text-xl font-bold">Start your Live Journey</p>
+                    <p className="text-xs sm:text-sm text-white/60">{followerCount} followers waiting</p>
+                  </>
+                )}
               </div>
             </div>
 
-            <Button
-              onClick={onGoLive}
-              className="bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700 text-white shadow-lg shadow-pink-500/25 h-9 px-4 text-sm rounded-full w-full sm:w-auto sm:shrink-0"
-            >
-              <Play className="w-4 h-4 mr-2" />
-              Go Live
-            </Button>
+            {myActiveStream ? (
+              <Button
+                onClick={() => onStreamClick(myActiveStream)}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/25 h-9 px-4 text-sm rounded-full w-full sm:w-auto sm:shrink-0"
+              >
+                <Video className="w-4 h-4 mr-2" />
+                Return to Stream
+              </Button>
+            ) : myActiveSpace ? (
+              <Button
+                onClick={() => onSpaceClick(myActiveSpace)}
+                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-lg shadow-green-500/25 h-9 px-4 text-sm rounded-full w-full sm:w-auto sm:shrink-0"
+              >
+                <Mic className="w-4 h-4 mr-2" />
+                Return to Space
+              </Button>
+            ) : (
+              <Button
+                onClick={onGoLive}
+                className="bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700 text-white shadow-lg shadow-pink-500/25 h-9 px-4 text-sm rounded-full w-full sm:w-auto sm:shrink-0"
+              >
+                <Play className="w-4 h-4 mr-2" />
+                Go Live
+              </Button>
+            )}
           </div>
         </motion.div>
 
