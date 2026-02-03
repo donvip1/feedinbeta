@@ -59,6 +59,8 @@ export class CloudflareCallManager {
   private peerDiscoveryInterval: NodeJS.Timeout | null = null;
   private trackBroadcastInterval: NodeJS.Timeout | null = null;
   private connectionTimeout: NodeJS.Timeout | null = null;
+  private pendingRenegotiation: Promise<void> | null = null;
+  private operationQueue: Promise<any> = Promise.resolve();
 
   constructor(
     callId: string,
@@ -75,6 +77,29 @@ export class CloudflareCallManager {
   private updateStatus(status: ConnectionStatus, message: string) {
     console.log(`[CloudflareCall] Status: ${status} - ${message}`);
     this.callbacks.onDetailedStatusChange?.(status, message);
+  }
+
+  /**
+   * Serialize SFU operations to prevent signaling state conflicts
+   */
+  private async enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const currentQueue = this.operationQueue;
+    const newOperation = currentQueue.then(() => operation()).catch((e) => {
+      console.error('[CloudflareCall] Queued operation failed:', e);
+      throw e;
+    });
+    this.operationQueue = newOperation.catch(() => {});
+    return newOperation;
+  }
+
+  /**
+   * Wait for any pending renegotiation before proceeding
+   */
+  private async waitForRenegotiation(): Promise<void> {
+    if (this.pendingRenegotiation) {
+      console.log('[CloudflareCall] Waiting for pending renegotiation...');
+      await this.pendingRenegotiation;
+    }
   }
 
   /**
@@ -266,9 +291,16 @@ export class CloudflareCallManager {
   }
 
   /**
-   * Publish local tracks to SFU
+   * Publish local tracks to SFU - serialized through operation queue
    */
   private async publishTracks(): Promise<void> {
+    return this.enqueueOperation(() => this._publishTracksInternal());
+  }
+
+  private async _publishTracksInternal(): Promise<void> {
+    // Wait for any pending renegotiation
+    await this.waitForRenegotiation();
+    
     if (!this.peerConnection || !this.localStream || !this.sessionId) {
       throw new Error('Not initialized');
     }
@@ -324,15 +356,22 @@ export class CloudflareCallManager {
         });
         console.log('[CloudflareCall] ✅ Local tracks published successfully');
       } else if (data.sessionDescription.type === 'offer') {
-        await this.peerConnection.setRemoteDescription({
-          type: 'offer',
-          sdp: data.sessionDescription.sdp,
-        });
-        const answer = await this.peerConnection.createAnswer();
-        await this.peerConnection.setLocalDescription(answer);
-        await this.waitForIceGathering(this.peerConnection);
+        // Track renegotiation as pending
+        const renegotiatePromise = (async () => {
+          await this.peerConnection!.setRemoteDescription({
+            type: 'offer',
+            sdp: data.sessionDescription.sdp,
+          });
+          const answer = await this.peerConnection!.createAnswer();
+          await this.peerConnection!.setLocalDescription(answer);
+          await this.waitForIceGathering(this.peerConnection!);
+          
+          await this.renegotiate(this.peerConnection!.localDescription?.sdp || answer.sdp);
+        })();
         
-        await this.renegotiate(this.peerConnection.localDescription?.sdp || answer.sdp);
+        this.pendingRenegotiation = renegotiatePromise;
+        await renegotiatePromise;
+        this.pendingRenegotiation = null;
       }
     }
 
@@ -359,7 +398,7 @@ export class CloudflareCallManager {
   private async renegotiate(sdp: string): Promise<void> {
     if (!this.sessionId) return;
 
-    console.log('[CloudflareCall] Renegotiating with SFU...');
+    console.log('[CloudflareCall] 🔄 Sending renegotiation answer...');
     const { data, error } = await supabase.functions.invoke('cloudflare-sfu', {
       body: {
         action: 'renegotiate',
@@ -368,8 +407,11 @@ export class CloudflareCallManager {
       },
     });
 
-    if (error) console.error('[CloudflareCall] Renegotiate error:', error);
-    else console.log('[CloudflareCall] Renegotiation complete');
+    if (error) {
+      console.error('[CloudflareCall] ❌ Renegotiate error:', error);
+      throw error;
+    }
+    console.log('[CloudflareCall] ✅ Renegotiation complete');
   }
 
   /**
@@ -574,9 +616,16 @@ export class CloudflareCallManager {
   }
 
   /**
-   * Subscribe to remote peer's tracks
+   * Subscribe to remote peer's tracks - serialized through operation queue
    */
   private async subscribeToRemote(remoteSessionId: string, remoteTrackName: string): Promise<void> {
+    return this.enqueueOperation(() => this._subscribeToRemoteInternal(remoteSessionId, remoteTrackName));
+  }
+
+  private async _subscribeToRemoteInternal(remoteSessionId: string, remoteTrackName: string): Promise<void> {
+    // Wait for any pending renegotiation
+    await this.waitForRenegotiation();
+    
     if (!this.peerConnection || !this.sessionId) {
       console.log('[CloudflareCall] Cannot subscribe - not initialized');
       return;
@@ -629,16 +678,24 @@ export class CloudflareCallManager {
 
       // Handle SFU response (usually an offer)
       if (data.sessionDescription?.type === 'offer') {
-        await this.peerConnection.setRemoteDescription({
-          type: 'offer',
-          sdp: data.sessionDescription.sdp,
-        });
+        // Track renegotiation as pending
+        const renegotiatePromise = (async () => {
+          await this.peerConnection!.setRemoteDescription({
+            type: 'offer',
+            sdp: data.sessionDescription.sdp,
+          });
 
-        const answer = await this.peerConnection.createAnswer();
-        await this.peerConnection.setLocalDescription(answer);
-        await this.waitForIceGathering(this.peerConnection);
+          const answer = await this.peerConnection!.createAnswer();
+          await this.peerConnection!.setLocalDescription(answer);
+          await this.waitForIceGathering(this.peerConnection!);
 
-        await this.renegotiate(this.peerConnection.localDescription?.sdp || answer.sdp);
+          await this.renegotiate(this.peerConnection!.localDescription?.sdp || answer.sdp);
+        })();
+        
+        this.pendingRenegotiation = renegotiatePromise;
+        await renegotiatePromise;
+        this.pendingRenegotiation = null;
+        
         console.log('[CloudflareCall] ✅ Successfully subscribed to remote tracks');
         
         // Clear timeouts and stop polling

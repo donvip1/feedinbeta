@@ -59,9 +59,24 @@ export class UnifiedSFUClient {
   private isDestroyed = false;
   private reconnectAttempts = 0;
   private role: 'publisher' | 'subscriber' | null = null;
+  private pendingRenegotiation: Promise<void> | null = null;
+  private operationQueue: Promise<any> = Promise.resolve();
 
   constructor(private readonly clientId: string = `sfu-${Date.now()}`) {
     console.log(`[UnifiedSFU:${this.clientId}] Initialized`);
+  }
+
+  /**
+   * Ensure operations are serialized to prevent signaling state conflicts
+   */
+  private async enqueueOperation<T>(operation: () => Promise<T>): Promise<T> {
+    const currentQueue = this.operationQueue;
+    const newOperation = currentQueue.then(() => operation()).catch((e) => {
+      console.error(`[UnifiedSFU:${this.clientId}] Operation failed:`, e);
+      throw e;
+    });
+    this.operationQueue = newOperation.catch(() => {}); // Prevent unhandled rejection
+    return newOperation;
   }
 
   // ============= Session Management =============
@@ -193,13 +208,27 @@ export class UnifiedSFUClient {
   // ============= Publishing =============
 
   /**
-   * Publish media track (audio or video)
+   * Publish media track (audio or video) - serialized through operation queue
    */
   async publishTrack(
     stream: MediaStream,
     trackName: string,
     kind: 'audio' | 'video' = 'audio'
   ): Promise<SFUTrackResult> {
+    return this.enqueueOperation(() => this._publishTrackInternal(stream, trackName, kind));
+  }
+
+  private async _publishTrackInternal(
+    stream: MediaStream,
+    trackName: string,
+    kind: 'audio' | 'video'
+  ): Promise<SFUTrackResult> {
+    // Wait for any pending renegotiation to complete
+    if (this.pendingRenegotiation) {
+      console.log(`[UnifiedSFU:${this.clientId}] Waiting for pending renegotiation before publish...`);
+      await this.pendingRenegotiation;
+    }
+
     if (!this.sessionId) {
       const result = await this.createSession();
       if (!result.success) return result as SFUTrackResult;
@@ -249,7 +278,7 @@ export class UnifiedSFUClient {
         throw new Error(data?.error || 'Failed to push track');
       }
 
-      // Handle response
+      // Handle response (this may set pendingRenegotiation)
       await this.handleSdpResponse(pc, data.sessionDescription);
 
       console.log(`[UnifiedSFU:${this.clientId}] ✅ Track published successfully`);
@@ -264,10 +293,20 @@ export class UnifiedSFUClient {
   // ============= Subscribing =============
 
   /**
-   * Subscribe to remote tracks with retry logic
+   * Subscribe to remote tracks with retry logic - serialized through operation queue
    */
   async pullTracks(remoteTracks: PullTrackRequest[], retryCount = 0): Promise<SFUTrackResult> {
+    return this.enqueueOperation(() => this._pullTracksInternal(remoteTracks, retryCount));
+  }
+
+  private async _pullTracksInternal(remoteTracks: PullTrackRequest[], retryCount: number): Promise<SFUTrackResult> {
     const maxRetries = 3;
+    
+    // Wait for any pending renegotiation to complete
+    if (this.pendingRenegotiation) {
+      console.log(`[UnifiedSFU:${this.clientId}] Waiting for pending renegotiation before pull...`);
+      await this.pendingRenegotiation;
+    }
     
     if (!this.sessionId) {
       const result = await this.createSession();
@@ -316,7 +355,7 @@ export class UnifiedSFUClient {
         throw new Error(data?.error || error?.message || 'Failed to pull tracks');
       }
 
-      // Handle response
+      // Handle response (this may set pendingRenegotiation)
       await this.handleSdpResponse(pc, data.sessionDescription);
 
       console.log(`[UnifiedSFU:${this.clientId}] ✅ Tracks pulled successfully, connection state:`, pc.connectionState);
@@ -325,12 +364,12 @@ export class UnifiedSFUClient {
     } catch (error) {
       console.error(`[UnifiedSFU:${this.clientId}] ❌ Pull failed (attempt ${retryCount + 1}):`, error);
       
-      // Retry with exponential backoff
+      // Retry with exponential backoff - call internal directly to stay in queue
       if (retryCount < maxRetries) {
         const delay = Math.pow(2, retryCount) * 500; // 500ms, 1s, 2s
         console.log(`[UnifiedSFU:${this.clientId}] Retrying in ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
-        return this.pullTracks(remoteTracks, retryCount + 1);
+        return this._pullTracksInternal(remoteTracks, retryCount + 1);
       }
       
       return { success: false, error: error instanceof Error ? error.message : 'Failed to pull tracks' };
@@ -355,27 +394,37 @@ export class UnifiedSFUClient {
         await pc.setRemoteDescription(sessionDescription);
       }
     } else if (sessionDescription.type === 'offer') {
-      if (signalingState === 'have-local-offer') {
-        await pc.setLocalDescription({ type: 'rollback' });
-      }
+      // This is a server-initiated offer, we need to answer and renegotiate
+      // Track this as a pending operation to prevent race conditions
+      const renegotiatePromise = (async () => {
+        if (signalingState === 'have-local-offer') {
+          await pc.setLocalDescription({ type: 'rollback' });
+        }
+        
+        await pc.setRemoteDescription(sessionDescription);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await this.waitForIceGathering(pc);
+        
+        // Send answer back to complete renegotiation
+        await this.renegotiateInternal(pc.localDescription?.sdp!);
+      })();
       
-      await pc.setRemoteDescription(sessionDescription);
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      await this.waitForIceGathering(pc);
-      
-      // Send answer back
-      await this.renegotiate(pc.localDescription?.sdp!);
+      this.pendingRenegotiation = renegotiatePromise;
+      await renegotiatePromise;
+      this.pendingRenegotiation = null;
     }
   }
 
   /**
-   * Renegotiate session
+   * Renegotiate session - internal implementation
    */
-  private async renegotiate(sdp: string): Promise<void> {
+  private async renegotiateInternal(sdp: string): Promise<void> {
     if (!this.sessionId) return;
 
-    const { error } = await supabase.functions.invoke('cloudflare-sfu', {
+    console.log(`[UnifiedSFU:${this.clientId}] 🔄 Sending renegotiation answer...`);
+    
+    const { error, data } = await supabase.functions.invoke('cloudflare-sfu', {
       body: {
         action: 'renegotiate',
         sessionId: this.sessionId,
@@ -384,8 +433,18 @@ export class UnifiedSFUClient {
     });
 
     if (error) {
-      console.warn(`[UnifiedSFU:${this.clientId}] Renegotiate warning:`, error);
+      console.error(`[UnifiedSFU:${this.clientId}] ❌ Renegotiate failed:`, error);
+      throw error;
     }
+    
+    console.log(`[UnifiedSFU:${this.clientId}] ✅ Renegotiation complete`);
+  }
+
+  /**
+   * Public renegotiate method (deprecated - use internal flow)
+   */
+  private async renegotiate(sdp: string): Promise<void> {
+    return this.renegotiateInternal(sdp);
   }
 
   // ============= ICE Handling =============
