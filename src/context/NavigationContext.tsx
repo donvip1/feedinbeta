@@ -24,7 +24,8 @@ const MAIN_ROUTES = [
 // Routes where BottomNav should be completely hidden
 const HIDDEN_NAV_ROUTES = [
   '/live/stream/',
-  '/live/space/'
+  '/live/space/',
+  '/space/'
 ];
 
 export const NavigationProvider = ({ children }: { children: React.ReactNode }) => {
