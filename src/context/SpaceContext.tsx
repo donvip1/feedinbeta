@@ -3,19 +3,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
-import type { SpaceRoomManager } from '@/lib/space-room-manager';
-
-// Lazy loaded to avoid circular dependencies - using ESM dynamic import
-let spaceRoomManagerInstance: SpaceRoomManager | null = null;
-
-const getSpaceRoomManager = async (): Promise<SpaceRoomManager> => {
-  if (!spaceRoomManagerInstance) {
-    // Dynamic ESM import to break circular dependency (works in Vite/browser)
-    const module = await import('@/lib/space-room-manager');
-    spaceRoomManagerInstance = module.spaceRoomManager;
-  }
-  return spaceRoomManagerInstance;
-};
+import {
+  Room,
+  RoomEvent,
+  Track,
+  RemoteTrack,
+  RemoteParticipant,
+  LocalAudioTrack,
+  createLocalAudioTrack,
+  ConnectionState,
+  AudioPresets,
+  DisconnectReason,
+} from 'livekit-client';
 
 interface SpaceInfo {
   id: string;
@@ -88,7 +87,10 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
   // Refs for state management
-  const localStreamRef = useRef<MediaStream | null>(null);
+  const roomRef = useRef<Room | null>(null);
+  const localTrackRef = useRef<LocalAudioTrack | null>(null);
+  const audioElementsRef = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const audioLevelIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const roleRef = useRef<string>('listener');
   const spaceInfoRef = useRef<SpaceInfo | null>(null);
   const isConnectingRef = useRef(false);
@@ -109,76 +111,92 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     spaceInfoRef.current = spaceState.spaceInfo;
   }, [spaceState.spaceInfo]);
 
-  // Derived: can this user broadcast? 
-  // CRITICAL: All roles can broadcast now (like Telegram/Zoom)
-  // Listeners just start muted but can unmute anytime
-  const getCanBroadcast = useCallback((overrideRole?: string) => {
-    const role = overrideRole || roleRef.current;
-    // Everyone can broadcast - listeners included (they just need to unmute)
-    return role === 'host' || role === 'co_host' || role === 'speaker' || role === 'listener';
+  // Play remote audio track
+  const playRemoteAudio = useCallback((track: RemoteTrack, participantId: string) => {
+    // Remove existing audio element if any
+    const existingEl = audioElementsRef.current.get(participantId);
+    if (existingEl) {
+      existingEl.remove();
+      audioElementsRef.current.delete(participantId);
+    }
+
+    const audioEl = document.createElement('audio');
+    audioEl.id = `space-lk-audio-${participantId}`;
+    audioEl.autoplay = true;
+    audioEl.setAttribute('playsinline', 'true');
+    
+    track.attach(audioEl);
+    document.body.appendChild(audioEl);
+    audioElementsRef.current.set(participantId, audioEl);
+
+    // Try to play
+    audioEl.play().catch((err) => {
+      console.warn('[SpaceContext-LK] Audio autoplay blocked:', err);
+      audioPlaybackManager.enableAudioPlayback();
+    });
+
+    console.log(`[SpaceContext-LK] ✅ Playing audio from ${participantId}`);
   }, []);
 
-  // Get local audio stream
-  const getLocalStream = useCallback(async (overrideRole?: string) => {
-    const canBroadcast = getCanBroadcast(overrideRole);
-    console.log('[SpaceContext-SFU] getLocalStream called, canBroadcast:', canBroadcast, 'role:', overrideRole || roleRef.current);
-    
-    if (localStreamRef.current) {
-      console.log('[SpaceContext-SFU] Using existing local stream');
-      return localStreamRef.current;
+  // Remove remote audio element
+  const removeRemoteAudio = useCallback((participantId: string) => {
+    const audioEl = audioElementsRef.current.get(participantId);
+    if (audioEl) {
+      audioEl.pause();
+      audioEl.srcObject = null;
+      audioEl.remove();
+      audioElementsRef.current.delete(participantId);
     }
+  }, []);
 
-    if (!canBroadcast) {
-      console.log('[SpaceContext-SFU] Listener mode - no local stream needed');
-      return null;
-    }
+  // Monitor audio levels from LiveKit
+  const startAudioLevelMonitoring = useCallback(() => {
+    if (audioLevelIntervalRef.current) return;
 
-    try {
-      console.log('[SpaceContext-SFU] Requesting microphone access...');
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-        },
-        video: false,
-      });
+    audioLevelIntervalRef.current = setInterval(() => {
+      const room = roomRef.current;
+      if (!room) return;
 
-      console.log('[SpaceContext-SFU] ✅ Got microphone access, tracks:', stream.getAudioTracks().length);
-      localStreamRef.current = stream;
-      setLocalStream(stream);
+      const levels: AudioLevels = {};
 
-      // Set initial mute state - hosts start unmuted
-      const isMuted = overrideRole === 'host' ? false : spaceState.isMuted;
-      stream.getAudioTracks().forEach(track => {
-        track.enabled = !isMuted;
-      });
-
-      return stream;
-    } catch (error: any) {
-      console.error('[SpaceContext-SFU] ❌ Error accessing microphone:', error);
-      if (error.name === 'NotAllowedError') {
-        toast.error('Microphone access denied. Please allow microphone access.');
-      } else if (error.name === 'NotFoundError') {
-        toast.error('No microphone found. Please connect a microphone.');
-      } else {
-        toast.error('Could not access microphone.');
+      // Local participant audio level
+      if (room.localParticipant && localTrackRef.current) {
+        const localLevel = room.localParticipant.audioLevel || 0;
+        levels[room.localParticipant.identity] = localLevel * 100;
       }
-      return null;
-    }
-  }, [getCanBroadcast, spaceState.isMuted]);
 
-  // Connect to space audio using Cloudflare SFU
+      // Remote participants audio levels
+      room.remoteParticipants.forEach((participant) => {
+        levels[participant.identity] = (participant.audioLevel || 0) * 100;
+      });
+
+      setSpaceState(prev => ({ ...prev, audioLevels: levels }));
+    }, 100);
+  }, []);
+
+  const stopAudioLevelMonitoring = useCallback(() => {
+    if (audioLevelIntervalRef.current) {
+      clearInterval(audioLevelIntervalRef.current);
+      audioLevelIntervalRef.current = null;
+    }
+  }, []);
+
+  // Connect to space audio using LiveKit
   const connectAudio = useCallback(async (overrideRole?: string) => {
     const currentUser = userRef.current;
     if (!currentUser || !spaceInfoRef.current) {
-      console.log('[SpaceContext-SFU] Cannot connect - no user or space', { user: !!currentUser, space: !!spaceInfoRef.current });
+      console.log('[SpaceContext-LK] Cannot connect - no user or space', { user: !!currentUser, space: !!spaceInfoRef.current });
       return;
     }
     
     if (isConnectingRef.current) {
-      console.log('[SpaceContext-SFU] Already connecting, skipping...');
+      console.log('[SpaceContext-LK] Already connecting, skipping...');
+      return;
+    }
+
+    // Check if already connected
+    if (roomRef.current?.state === ConnectionState.Connected) {
+      console.log('[SpaceContext-LK] Already connected to room');
       return;
     }
     
@@ -189,8 +207,21 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const effectiveRole = overrideRole || roleRef.current;
     const canBroadcast = effectiveRole === 'host' || effectiveRole === 'co_host' || effectiveRole === 'speaker';
     const isHost = effectiveRole === 'host' || effectiveRole === 'co_host';
+
+    // Get display name from profile
+    let displayName = 'Listener';
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', currentUser.id)
+        .single();
+      displayName = profile?.display_name || profile?.username || 'Listener';
+    } catch (e) {
+      console.warn('[SpaceContext-LK] Could not fetch profile for display name');
+    }
     
-    console.log(`[SpaceContext-SFU] Connecting to space audio...`, {
+    console.log(`[SpaceContext-LK] Connecting to space audio...`, {
       role: effectiveRole,
       canBroadcast,
       isHost,
@@ -199,69 +230,139 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     try {
-      // CRITICAL: Both hosts AND listeners need to initialize the room manager
-      // Each participant gets their own SFU session to receive tracks from others
-      const roomManager = await getSpaceRoomManager();
-      const result = await roomManager.initialize(
-        spaceInfoRef.current.id,
-        currentUser.id,
-        isHost,
-        // State change callback
-        (state) => {
-          console.log('[SpaceContext-SFU] Room state changed:', state);
+      // Get token from livekit-token edge function
+      const { data, error } = await supabase.functions.invoke('livekit-token', {
+        body: {
+          roomName: `space-${spaceInfoRef.current.id}`,
+          participantName: displayName,
+          participantIdentity: currentUser.id,
+          isHost,
         },
-        // Audio levels callback
-        (levels) => {
-          setSpaceState(prev => ({ ...prev, audioLevels: levels }));
-        },
-        // Connection state callback
-        (connectionState) => {
-          console.log('[SpaceContext-SFU] Connection state:', connectionState);
-          if (connectionState === 'connected') {
-            setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
-          } else if (connectionState === 'failed') {
-            setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
-          } else if (connectionState === 'connecting') {
-            setSpaceState(prev => ({ ...prev, connectionStatus: 'connecting' }));
-          }
-        }
-      );
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to initialize room');
-      }
-      
-      console.log('[SpaceContext-SFU] ✅ Room manager initialized with session:', result.sessionId?.slice(0, 8));
-
-      // If we can broadcast (host/speaker), start broadcasting FIRST
-      // This ensures our track is published before we try to subscribe to others
-      if (canBroadcast) {
-        console.log('[SpaceContext-SFU] 🎤 Starting broadcast as', effectiveRole);
-        const stream = await getLocalStream(effectiveRole);
-        if (stream) {
-          const broadcastResult = await roomManager.startBroadcasting(stream);
-          if (!broadcastResult) {
-            console.warn('[SpaceContext-SFU] Failed to start broadcasting');
-          } else {
-            console.log('[SpaceContext-SFU] ✅ Broadcasting started successfully - no delay');
-          }
-        } else {
-          console.warn('[SpaceContext-SFU] ⚠️ No stream obtained, cannot broadcast');
-        }
-      }
-      
-      // CRITICAL: ALWAYS subscribe to all speakers (for both hosts and listeners)
-      // This ensures listeners hear the host, and hosts hear other speakers
-      console.log('[SpaceContext-SFU] 🎧 Subscribing to all active speakers...');
-      
-      // Start subscription in background - don't block connection
-      roomManager.subscribeToAllSpeakers().then(() => {
-        console.log('[SpaceContext-SFU] ✅ Subscription to speakers complete');
-      }).catch(err => {
-        console.error('[SpaceContext-SFU] Error subscribing to speakers:', err);
       });
 
-      // Set up presence channel for coordination (separate from SFU)
+      if (error || !data?.token) {
+        throw new Error(data?.error || 'Failed to get LiveKit token');
+      }
+
+      console.log('[SpaceContext-LK] Token received, connecting to room...');
+
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+        publishDefaults: {
+          audioPreset: AudioPresets.speech,
+        },
+      });
+
+      roomRef.current = room;
+
+      // Handle connection state changes
+      room.on(RoomEvent.ConnectionStateChanged, (state) => {
+        console.log('[SpaceContext-LK] Connection state:', state);
+        if (state === ConnectionState.Connected) {
+          setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
+        } else if (state === ConnectionState.Reconnecting) {
+          setSpaceState(prev => ({ ...prev, connectionStatus: 'reconnecting' }));
+        } else if (state === ConnectionState.Disconnected) {
+          setSpaceState(prev => ({ ...prev, connectionStatus: 'disconnected' }));
+        }
+      });
+
+      // Handle incoming audio tracks - CRITICAL for receiving audio
+      room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
+        console.log(`[SpaceContext-LK] 🎧 Track subscribed from ${participant.identity}:`, track.kind);
+        
+        if (track.kind === Track.Kind.Audio) {
+          playRemoteAudio(track, participant.identity);
+        }
+      });
+
+      room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
+        console.log(`[SpaceContext-LK] Track unsubscribed from ${participant.identity}`);
+        if (track.kind === Track.Kind.Audio) {
+          removeRemoteAudio(participant.identity);
+        }
+      });
+
+      // Handle participant events
+      room.on(RoomEvent.ParticipantConnected, (participant: RemoteParticipant) => {
+        console.log(`[SpaceContext-LK] 👋 Participant joined: ${participant.identity}`);
+      });
+
+      room.on(RoomEvent.ParticipantDisconnected, (participant: RemoteParticipant) => {
+        console.log(`[SpaceContext-LK] 👋 Participant left: ${participant.identity}`);
+        removeRemoteAudio(participant.identity);
+      });
+
+      // Handle active speakers for visual indicators
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        // This is called frequently - no need to log every time
+      });
+
+      // Handle disconnection
+      room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
+        console.log('[SpaceContext-LK] Disconnected, reason:', reason);
+        if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
+          toast.error('You are connected from another device');
+        }
+      });
+
+      // Connect to the room
+      await room.connect(data.url, data.token);
+
+      console.log('[SpaceContext-LK] ✅ Connected to room, participants:', room.remoteParticipants.size);
+
+      // Subscribe to any existing tracks
+      room.remoteParticipants.forEach((participant) => {
+        participant.audioTrackPublications.forEach((publication) => {
+          if (publication.track && publication.isSubscribed) {
+            console.log(`[SpaceContext-LK] Attaching existing track from ${participant.identity}`);
+            playRemoteAudio(publication.track as RemoteTrack, participant.identity);
+          }
+        });
+      });
+
+      // If we can broadcast (host/speaker), start publishing audio
+      if (canBroadcast) {
+        console.log('[SpaceContext-LK] 🎤 Starting broadcast as', effectiveRole);
+        try {
+          const localTrack = await createLocalAudioTrack({
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+            sampleRate: 48000,
+          });
+
+          localTrackRef.current = localTrack;
+
+          // Apply initial mute state - hosts start unmuted
+          if (effectiveRole !== 'host') {
+            await localTrack.mute();
+          }
+
+          // Publish to room
+          await room.localParticipant.publishTrack(localTrack);
+          console.log('[SpaceContext-LK] ✅ Broadcasting started');
+
+          // Store the stream for reference
+          const stream = new MediaStream([localTrack.mediaStreamTrack]);
+          setLocalStream(stream);
+
+        } catch (micError: any) {
+          console.error('[SpaceContext-LK] Failed to get microphone:', micError);
+          if (micError.name === 'NotAllowedError') {
+            toast.error('Microphone access denied. Please allow microphone access.');
+          } else if (micError.name === 'NotFoundError') {
+            toast.error('No microphone found.');
+          }
+          // Continue - user can still listen even without mic
+        }
+      }
+
+      // Start monitoring audio levels
+      startAudioLevelMonitoring();
+
+      // Set up presence channel for coordination
       const presenceChannel = supabase.channel(`space-presence-${spaceInfoRef.current.id}`, {
         config: {
           presence: { key: currentUser.id },
@@ -271,20 +372,19 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       presenceChannel
         .on('presence', { event: 'join' }, ({ key, newPresences }) => {
           if (key !== currentUser.id) {
-            console.log(`[SpaceContext-SFU] 👋 Peer joined: ${key}`, newPresences);
+            console.log(`[SpaceContext-LK] 👋 Peer joined presence: ${key}`);
           }
         })
         .on('presence', { event: 'leave' }, ({ key }) => {
-          console.log(`[SpaceContext-SFU] 👋 Peer left: ${key}`);
+          console.log(`[SpaceContext-LK] 👋 Peer left presence: ${key}`);
         })
         .on('presence', { event: 'sync' }, () => {
           const state = presenceChannel.presenceState();
           const peerCount = Object.keys(state).length;
-          console.log(`[SpaceContext-SFU] 🔄 Presence sync, ${peerCount} peers online`);
+          console.log(`[SpaceContext-LK] 🔄 Presence sync, ${peerCount} peers online`);
         });
 
       await presenceChannel.subscribe(async (status) => {
-        console.log(`[SpaceContext-SFU] Presence channel status: ${status}`);
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({
             user_id: currentUser.id,
@@ -298,30 +398,39 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       
       setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
       isConnectingRef.current = false;
-      console.log('[SpaceContext-SFU] ✅ Audio connection complete');
+      console.log('[SpaceContext-LK] ✅ Audio connection complete');
 
     } catch (error) {
-      console.error('[SpaceContext-SFU] Error connecting to audio:', error);
+      console.error('[SpaceContext-LK] Error connecting to audio:', error);
       setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
       isConnectingRef.current = false;
       toast.error('Failed to connect to audio');
     }
-  }, [getCanBroadcast, getLocalStream]);
+  }, [playRemoteAudio, removeRemoteAudio, startAudioLevelMonitoring]);
 
   // Disconnect from space audio
   const disconnectAudio = useCallback(async () => {
-    console.log('[SpaceContext-SFU] Disconnecting from space audio...');
+    console.log('[SpaceContext-LK] Disconnecting from space audio...');
     
-    // Cleanup room manager (handles SFU cleanup internally)
-    const roomManager = await getSpaceRoomManager();
-    await roomManager.cleanup();
+    stopAudioLevelMonitoring();
 
-    // Stop local stream
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop());
-      localStreamRef.current = null;
-      setLocalStream(null);
+    // Stop local track
+    if (localTrackRef.current) {
+      localTrackRef.current.stop();
+      localTrackRef.current = null;
     }
+
+    // Disconnect room
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+      roomRef.current = null;
+    }
+
+    // Remove all audio elements
+    audioElementsRef.current.forEach((el) => {
+      el.remove();
+    });
+    audioElementsRef.current.clear();
 
     // Cleanup presence channel
     if (presenceChannelRef.current) {
@@ -329,13 +438,14 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       presenceChannelRef.current = null;
     }
 
+    setLocalStream(null);
     isConnectingRef.current = false;
     setSpaceState(prev => ({ ...prev, connectionStatus: 'disconnected', audioLevels: {} }));
-  }, []);
+  }, [stopAudioLevelMonitoring]);
 
   // Join a space - just set state, don't connect audio yet
   const joinSpace = useCallback((spaceInfo: SpaceInfo, role: string) => {
-    console.log('[SpaceContext-SFU] Joining space:', spaceInfo.id, 'as', role);
+    console.log('[SpaceContext-LK] Joining space:', spaceInfo.id, 'as', role);
     roleRef.current = role;
     spaceInfoRef.current = spaceInfo;
     setSpaceState({
@@ -351,7 +461,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   // Leave space - ONLY called on explicit user action
   const leaveSpace = useCallback(async () => {
-    console.log('[SpaceContext-SFU] Leaving space explicitly');
+    console.log('[SpaceContext-LK] Leaving space explicitly');
     const currentUser = userRef.current;
     
     if (spaceInfoRef.current && currentUser) {
@@ -369,7 +479,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     audioPlaybackManager.cleanup();
     
     // Remove any remaining audio elements
-    document.querySelectorAll('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]').forEach(el => el.remove());
+    document.querySelectorAll('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"], [id^="space-lk-audio-"]').forEach(el => el.remove());
     
     roleRef.current = 'listener';
     spaceInfoRef.current = null;
@@ -377,7 +487,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [disconnectAudio]);
 
   const minimizeSpace = useCallback(() => {
-    console.log('[SpaceContext-SFU] Minimizing space - audio continues');
+    console.log('[SpaceContext-LK] Minimizing space - audio continues');
     setSpaceState(prev => ({
       ...prev,
       isMinimized: true,
@@ -385,7 +495,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const maximizeSpace = useCallback(() => {
-    console.log('[SpaceContext-SFU] Maximizing space');
+    console.log('[SpaceContext-LK] Maximizing space');
     setSpaceState(prev => ({
       ...prev,
       isMinimized: false,
@@ -393,21 +503,20 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const setMuted = useCallback((muted: boolean) => {
-    console.log('[SpaceContext-SFU] Setting muted:', muted);
+    console.log('[SpaceContext-LK] Setting muted:', muted);
     setSpaceState(prev => ({
       ...prev,
       isMuted: muted,
     }));
     
-    // Toggle actual audio track
-    if (localStreamRef.current) {
-      localStreamRef.current.getAudioTracks().forEach(track => {
-        track.enabled = !muted;
-      });
+    // Toggle local track mute
+    if (localTrackRef.current) {
+      if (muted) {
+        localTrackRef.current.mute();
+      } else {
+        localTrackRef.current.unmute();
+      }
     }
-
-    // Also update room manager
-    getSpaceRoomManager().then(rm => rm.setMuted(muted));
   }, []);
 
   const setConnectionStatus = useCallback((status: ConnectionStatus) => {
@@ -418,7 +527,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const updateRole = useCallback(async (role: string) => {
-    console.log('[SpaceContext-SFU] Updating role to:', role);
+    console.log('[SpaceContext-LK] Updating role to:', role);
     const previousRole = roleRef.current;
     roleRef.current = role;
     setSpaceState(prev => ({
@@ -430,68 +539,59 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const canNowBroadcast = role === 'host' || role === 'co_host' || role === 'speaker';
     const couldBroadcast = previousRole === 'host' || previousRole === 'co_host' || previousRole === 'speaker';
 
-    if (canNowBroadcast && !couldBroadcast && spaceInfoRef.current) {
-      console.log('[SpaceContext-SFU] Role upgraded to broadcaster, starting audio...');
-      // Get microphone and start broadcasting
-      const stream = await getLocalStream(role);
-      if (stream) {
-        const roomManager = await getSpaceRoomManager();
-        const success = await roomManager.startBroadcasting(stream);
-        if (success) {
-          console.log('[SpaceContext-SFU] ✅ Started broadcasting after role upgrade');
-        }
+    if (canNowBroadcast && !couldBroadcast && spaceInfoRef.current && roomRef.current) {
+      console.log('[SpaceContext-LK] Role upgraded to broadcaster, starting audio...');
+      try {
+        const localTrack = await createLocalAudioTrack({
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        });
+
+        localTrackRef.current = localTrack;
+        await roomRef.current.localParticipant.publishTrack(localTrack);
+        
+        const stream = new MediaStream([localTrack.mediaStreamTrack]);
+        setLocalStream(stream);
+        
+        console.log('[SpaceContext-LK] ✅ Started broadcasting after role upgrade');
+      } catch (error) {
+        console.error('[SpaceContext-LK] Failed to start broadcasting:', error);
       }
     }
-  }, [getLocalStream]);
+  }, []);
 
   // Start broadcasting for a listener with permission
   const startListenerBroadcast = useCallback(async () => {
     const currentUser = userRef.current;
     if (!spaceInfoRef.current || !currentUser) return false;
     
-    console.log('[SpaceContext-SFU] Starting listener broadcast with permission...');
-    
-    // Check if we have a session - if not, we need to connect first
-    const roomManager = await getSpaceRoomManager();
-    const sessionId = roomManager.getSessionId?.();
-    if (!sessionId) {
-      console.log('[SpaceContext-SFU] No session found, initializing first...');
-      // Re-initialize as a broadcasting user
-      const result = await roomManager.initialize(
-        spaceInfoRef.current.id,
-        currentUser.id,
-        false,
-        undefined,
-        (levels) => setSpaceState(prev => ({ ...prev, audioLevels: levels })),
-        undefined
-      );
-      if (!result.success) {
-        console.error('[SpaceContext-SFU] Failed to initialize for listener broadcast');
-        return false;
-      }
+    console.log('[SpaceContext-LK] Starting listener broadcast with permission...');
+
+    const room = roomRef.current;
+    if (!room || room.state !== ConnectionState.Connected) {
+      console.log('[SpaceContext-LK] Not connected to room, cannot broadcast');
+      return false;
     }
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 48000,
-        },
-        video: false,
+      const localTrack = await createLocalAudioTrack({
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 48000,
       });
 
-      localStreamRef.current = stream;
+      localTrackRef.current = localTrack;
+      await room.localParticipant.publishTrack(localTrack);
+      
+      const stream = new MediaStream([localTrack.mediaStreamTrack]);
       setLocalStream(stream);
 
-      const success = await roomManager.startBroadcasting(stream);
-      if (success) {
-        console.log('[SpaceContext-SFU] ✅ Listener started broadcasting');
-      }
-      return success;
+      console.log('[SpaceContext-LK] ✅ Listener started broadcasting');
+      return true;
     } catch (error: any) {
-      console.error('[SpaceContext-SFU] Failed to start listener broadcast:', error);
+      console.error('[SpaceContext-LK] Failed to start listener broadcast:', error);
       if (error.name === 'NotAllowedError') {
         toast.error('Microphone access denied');
       }
@@ -522,13 +622,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        // App is minimized or screen is off - keep connection alive
-        console.log('[SpaceContext] App hidden - maintaining connection');
+        console.log('[SpaceContext-LK] App hidden - maintaining connection');
       } else if (document.visibilityState === 'visible') {
-        // App is visible again - check and reconnect if needed
-        console.log('[SpaceContext] App visible - checking connection');
+        console.log('[SpaceContext-LK] App visible - checking connection');
         if (spaceState.isActive && spaceState.connectionStatus !== 'connected') {
-          console.log('[SpaceContext] Reconnecting after visibility change...');
+          console.log('[SpaceContext-LK] Reconnecting after visibility change...');
           connectAudio(roleRef.current);
         }
       }
@@ -536,10 +634,9 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Also handle page focus
     const handleFocus = () => {
       if (spaceState.isActive && spaceState.connectionStatus !== 'connected' && spaceState.connectionStatus !== 'connecting') {
-        console.log('[SpaceContext] Page focused - reconnecting...');
+        console.log('[SpaceContext-LK] Page focused - reconnecting...');
         connectAudio(roleRef.current);
       }
     };
@@ -557,32 +654,32 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     let reconnectTimer: NodeJS.Timeout | null = null;
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 10;
-    const baseDelay = 2000; // Start with 2 seconds
+    const baseDelay = 2000;
 
     if (spaceState.isActive && spaceState.connectionStatus === 'failed') {
       const attemptReconnect = () => {
         if (reconnectAttempts >= maxReconnectAttempts) {
-          console.log('[SpaceContext] Max reconnect attempts reached');
+          console.log('[SpaceContext-LK] Max reconnect attempts reached');
           toast.error('Connection failed. Please rejoin the space.');
           return;
         }
 
         reconnectAttempts++;
-        const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts - 1), 30000); // Max 30s
+        const delay = Math.min(baseDelay * Math.pow(1.5, reconnectAttempts - 1), 30000);
         
-        console.log(`[SpaceContext] Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`);
+        console.log(`[SpaceContext-LK] Scheduling reconnect attempt ${reconnectAttempts} in ${delay}ms`);
         setSpaceState(prev => ({ ...prev, connectionStatus: 'reconnecting' }));
         
         reconnectTimer = setTimeout(async () => {
           if (!spaceState.isActive) return;
           
-          console.log(`[SpaceContext] Reconnect attempt ${reconnectAttempts}...`);
+          console.log(`[SpaceContext-LK] Reconnect attempt ${reconnectAttempts}...`);
           try {
             await connectAudio(roleRef.current);
-            reconnectAttempts = 0; // Reset on success
+            reconnectAttempts = 0;
           } catch (error) {
-            console.error('[SpaceContext] Reconnect failed:', error);
-            attemptReconnect(); // Try again
+            console.error('[SpaceContext-LK] Reconnect failed:', error);
+            attemptReconnect();
           }
         }, delay);
       };
@@ -592,7 +689,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Handle network online/offline events
     const handleOnline = () => {
-      console.log('[SpaceContext] Network online - attempting reconnect');
+      console.log('[SpaceContext-LK] Network online - attempting reconnect');
       if (spaceState.isActive && spaceState.connectionStatus !== 'connected' && spaceState.connectionStatus !== 'connecting') {
         toast.info('Network restored. Reconnecting...');
         reconnectAttempts = 0;
@@ -601,7 +698,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const handleOffline = () => {
-      console.log('[SpaceContext] Network offline');
+      console.log('[SpaceContext-LK] Network offline');
       if (spaceState.isActive) {
         toast.warning('Network disconnected. Will reconnect when online.');
         setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
