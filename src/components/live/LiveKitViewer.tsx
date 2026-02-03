@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getFriendlyError, isTemporaryError } from "@/lib/error-messages";
 import { 
   Users, Send, Gift, 
   Volume2, VolumeX, 
@@ -182,7 +183,14 @@ export const LiveKitViewer = ({ streamId, onClose }: LiveKitViewerProps) => {
     } catch (error: any) {
       console.error('[LiveKitViewer] Connection error:', error);
       setConnectionStatus('error');
-      setErrorMessage(error.message || 'Failed to connect');
+      
+      // Show user-friendly error message
+      const friendly = getFriendlyError(error?.message || 'connection');
+      setErrorMessage(friendly.description);
+      
+      if (!isTemporaryError(error?.message || '')) {
+        toast.error(friendly.title, { description: friendly.description });
+      }
     }
   }, [currentUser, stream, streamId, isMuted]);
 

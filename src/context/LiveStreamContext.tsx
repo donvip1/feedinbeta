@@ -4,6 +4,7 @@ import { Room, RoomEvent, LocalVideoTrack, LocalAudioTrack, createLocalTracks, V
 import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/context/AuthContext';
 import { toast } from 'sonner';
+import { getFriendlyError, isTemporaryError } from '@/lib/error-messages';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error' | 'ended';
 
@@ -217,7 +218,12 @@ export const LiveStreamProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     } catch (error: any) {
       console.error('[LiveStreamContext] Error starting stream:', error);
-      toast.error(error.message || 'Failed to start stream');
+      const friendly = getFriendlyError(error?.message || 'stream');
+      if (isTemporaryError(error?.message || '')) {
+        toast(friendly.title, { description: friendly.description });
+      } else {
+        toast.error(friendly.title, { description: friendly.description });
+      }
       setStreamState(prev => ({ ...prev, connectionStatus: 'error' }));
       return false;
     }

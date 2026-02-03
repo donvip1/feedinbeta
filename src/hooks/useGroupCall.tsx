@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Room, RoomEvent, RemoteParticipant, LocalParticipant, Track, Participant } from 'livekit-client';
 import { toast } from 'sonner';
+import { getFriendlyError, isTemporaryError } from '@/lib/error-messages';
 
 export interface GroupCallParticipant {
   id: string;
@@ -203,9 +204,10 @@ export function useGroupCall(groupId: string): UseGroupCallResult {
       // Join the call
       await joinCall(callData.id);
       return callData.id;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting call:', error);
-      toast.error('Failed to start call');
+      const friendly = getFriendlyError(error?.message || 'connection');
+      toast.error(friendly.title, { description: friendly.description });
       setIsConnecting(false);
       return null;
     }
@@ -287,9 +289,14 @@ export function useGroupCall(groupId: string): UseGroupCallResult {
       await checkActiveCall();
 
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error joining call:', error);
-      toast.error('Failed to join call');
+      const friendly = getFriendlyError(error?.message || 'connection');
+      if (isTemporaryError(error?.message || '')) {
+        toast(friendly.title, { description: friendly.description });
+      } else {
+        toast.error(friendly.title, { description: friendly.description });
+      }
       return false;
     } finally {
       setIsConnecting(false);

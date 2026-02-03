@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { getFriendlyError, isTemporaryError } from "@/lib/error-messages";
 import { 
   Video, VideoOff, Mic, MicOff, FlipHorizontal,
   Users, Send, X, Gift, Radio, 
@@ -110,9 +111,10 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
       }
 
       console.log('[LiveKitBroadcaster] Camera preview started');
-    } catch (error) {
+    } catch (error: any) {
       console.error('[LiveKitBroadcaster] Camera access error:', error);
-      toast.error("Could not access camera/microphone");
+      const friendly = getFriendlyError(error?.message || error?.name || 'camera');
+      toast.error(friendly.title, { description: friendly.description });
       throw error;
     }
   }, [isFrontCamera]);
@@ -228,8 +230,13 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
     } catch (error: any) {
       console.error('[LiveKitBroadcaster] Broadcast error:', error);
       setBroadcastState('error');
-      setErrorMessage(error.message || 'Failed to start broadcast');
-      toast.error(error.message || 'Failed to start broadcast');
+      const friendly = getFriendlyError(error?.message || 'stream');
+      setErrorMessage(friendly.description);
+      if (isTemporaryError(error?.message || '')) {
+        toast(friendly.title, { description: friendly.description });
+      } else {
+        toast.error(friendly.title, { description: friendly.description });
+      }
     }
   }, [streamId, user, initializePreview]);
 
