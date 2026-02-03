@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
+import { getFriendlyError, isTemporaryError } from '@/lib/error-messages';
 
 export type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'failed' | 'reconnecting';
 
@@ -236,7 +237,10 @@ export const useSpaceLiveKit = ({
       room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         console.log('[SpaceLiveKit] Disconnected, reason:', reason);
         if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
-          toast.error('You are connected from another device');
+          toast.error('Connected from another device');
+        } else if (reason !== DisconnectReason.CLIENT_INITIATED) {
+          // Show friendly reconnecting message for unexpected disconnects
+          toast('Reconnecting...', { description: 'Please wait a moment' });
         }
       });
 
@@ -266,7 +270,14 @@ export const useSpaceLiveKit = ({
       console.error('[SpaceLiveKit] ❌ Connection failed:', error);
       updateStatus('failed');
       isConnectingRef.current = false;
-      toast.error('Failed to connect to space audio');
+      
+      // Show user-friendly error message
+      const friendly = getFriendlyError(error?.message || 'connection');
+      if (isTemporaryError(error?.message || '')) {
+        toast(friendly.title, { description: friendly.description });
+      } else {
+        toast.error(friendly.title, { description: friendly.description });
+      }
       return false;
     }
   }, [user, spaceId, displayName, isHost, updateStatus, playRemoteAudio, removeRemoteAudio, startAudioLevelMonitoring]);
@@ -336,13 +347,8 @@ export const useSpaceLiveKit = ({
 
     } catch (error: any) {
       console.error('[SpaceLiveKit] ❌ Failed to start broadcasting:', error);
-      if (error.name === 'NotAllowedError') {
-        toast.error('Microphone access denied');
-      } else if (error.name === 'NotFoundError') {
-        toast.error('No microphone found');
-      } else {
-        toast.error('Failed to start broadcasting');
-      }
+      const friendly = getFriendlyError(error?.message || error?.name || 'microphone');
+      toast.error(friendly.title, { description: friendly.description });
       return false;
     }
   }, [isMuted]);

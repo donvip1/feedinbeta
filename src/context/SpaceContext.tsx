@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
+import { getFriendlyError, isTemporaryError } from '@/lib/error-messages';
 import {
   Room,
   RoomEvent,
@@ -303,7 +304,12 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
         console.log('[SpaceContext-LK] Disconnected, reason:', reason);
         if (reason === DisconnectReason.DUPLICATE_IDENTITY) {
-          toast.error('You are connected from another device');
+          toast.error('Connected from another device');
+        } else if (reason === DisconnectReason.CLIENT_INITIATED) {
+          // User intentionally left - no message needed
+        } else {
+          // Show friendly reconnecting message
+          toast('Reconnecting to space...', { description: 'Please wait a moment' });
         }
       });
 
@@ -350,11 +356,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
         } catch (micError: any) {
           console.error('[SpaceContext-LK] Failed to get microphone:', micError);
-          if (micError.name === 'NotAllowedError') {
-            toast.error('Microphone access denied. Please allow microphone access.');
-          } else if (micError.name === 'NotFoundError') {
-            toast.error('No microphone found.');
-          }
+          const friendly = getFriendlyError(micError.message || micError.name || 'microphone');
+          toast.error(friendly.title, { description: friendly.description });
           // Continue - user can still listen even without mic
         }
       }
@@ -400,11 +403,18 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isConnectingRef.current = false;
       console.log('[SpaceContext-LK] ✅ Audio connection complete');
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('[SpaceContext-LK] Error connecting to audio:', error);
       setSpaceState(prev => ({ ...prev, connectionStatus: 'failed' }));
       isConnectingRef.current = false;
-      toast.error('Failed to connect to audio');
+      
+      // Show user-friendly error message
+      const friendly = getFriendlyError(error?.message || 'connection');
+      if (isTemporaryError(error?.message || '')) {
+        toast(friendly.title, { description: friendly.description });
+      } else {
+        toast.error(friendly.title, { description: friendly.description });
+      }
     }
   }, [playRemoteAudio, removeRemoteAudio, startAudioLevelMonitoring]);
 
