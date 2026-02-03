@@ -364,6 +364,8 @@ const Live = () => {
         onVideoStream={() => setCreateStreamModalOpen(true)}
         onAudioSpace={() => setCreateSpaceModalOpen(true)}
         isLoading={loadingLiveStreams || loadingLiveSpaces}
+        myActiveStream={myStreams?.find(s => s.status === 'live')}
+        myActiveSpace={mySpaces?.find(s => s.status === 'live')}
       />
 
       {/* Go Live Modal */}
