@@ -723,7 +723,9 @@ export const UnifiedRoom = ({
               <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
                 <Heart className="w-6 h-6 text-white" />
               </div>
-              <span className="text-xs text-white mt-1">12K</span>
+              <span className="text-xs text-white mt-1">
+                {reactions.length >= 1000 ? `${(reactions.length / 1000).toFixed(1)}K` : reactions.length || 0}
+              </span>
             </motion.button>
             
             <motion.button
@@ -757,6 +759,9 @@ export const UnifiedRoom = ({
         isHost={isHost}
         isMuted={isMuted}
         isCameraOn={isCameraOn}
+        streamId={room.id}
+        hostId={room.host.id}
+        streamTitle={room.title}
         onMicToggle={handleMicToggle}
         onCameraToggle={handleCameraToggle}
         onChatToggle={() => setShowChat(!showChat)}
