@@ -1,110 +1,156 @@
 
-# Plan: Fix Photo+ Post Navigation to Stay on Feed
+# Plan: Fix Live Content Interfering with Video and Photo+ Feeds
 
 ## Problem Summary
 
-After publishing a Photo+ post, users are redirected to their Timeline instead of staying on the Photos+ tab of the feed. This happens because:
+When there's a livestream, it interferes with both the Videos and Photo+ feeds, causing posts to not display properly and only showing streaming backgrounds instead of the actual content.
 
-1. `PhotoPlusPostCreator.tsx` navigates to `/feed/post/${newPost.id}` after creating a post
-2. The `PostDetail.tsx` page fetches **all posts by that user** (Timeline view)
-3. This contradicts user expectations - they want to stay on the Photos+ tab with their new post visible
+## Root Cause Analysis
 
-## Current vs Expected Behavior
+After thorough investigation, I found two critical issues:
 
-| Action | Current | Expected |
-|--------|---------|----------|
-| Create Photo+ post | Navigates to `/feed/post/id` (Timeline) | Returns to `/feed` (Photos+ tab) |
-| Post visibility | Shows all user's posts | Shows feed with new post at top |
-| Tab state | Loses tab context | Stays on Photos+ tab |
+### Issue 1: Index Out of Bounds Bug in Periodic Live Card Injection
 
-## Root Cause
+There's a mismatch between the **condition check** and the **render code**:
 
-In `PhotoPlusPostCreator.tsx` (line 287):
-```typescript
-navigate(`/feed/post/${newPost.id}`);
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                    Index Access Mismatch                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  CONDITION (line 933):                                          │
+│    inlineLiveContent[index === 4 ? 1 : (inlineLiveContent[2]    │
+│                       ? 2 : 1)]                                 │
+│    → Falls back to index 1 if index 2 doesn't exist            │
+│                                                                 │
+│  RENDER (line 974):                                             │
+│    inlineLiveContent[index === 4 ? 1 : 2]                       │
+│    → ALWAYS tries index 2 when index === 9 (no fallback!)      │
+│                                                                 │
+│  Result: undefined access → Component crash → Feed breaks      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-This navigation goes to PostDetail which shows all user posts (Timeline), not just the single post.
+When there are only 2 live items (indexes 0 and 1), and we're at post index 9:
+- The condition passes (using fallback to index 1)
+- The render fails (trying to access index 2 which is undefined)
+
+### Issue 2: Query Still Fetches for Photo+ Tab
+
+The inline live content query on line 220 is enabled when `activeTab !== 'live'`, meaning it still fetches for the Photo+ tab even though we don't render there. While not directly causing the visual issue, this is wasteful.
 
 ## Solution
 
-Align PhotoPlusPostCreator behavior with the Video post creator (PostDetails.tsx):
-1. Navigate to `/feed` instead of post detail
-2. Switch the active tab to `photosText` (Photos+ tab)
-3. Trigger refetch so the new post appears
+### Fix 1: Correct the Periodic Injection Logic
 
-## Implementation
+Update the render code to use the same fallback logic as the condition:
 
-### File: `src/components/post/PhotoPlusPostCreator.tsx`
-
-**Change 1**: Use navigate with state to indicate which tab should be active
-
-Replace the navigation logic after successful post creation:
-
+**Current Code (lines 974-976):**
 ```typescript
-// Before (line 287):
-navigate(`/feed/post/${newPost.id}`);
-
-// After:
-navigate('/feed', { 
-  state: { activeTab: 'photosText', scrollToTop: true }
-});
+inlineLiveContent[index === 4 ? 1 : 2]
 ```
+
+**Fixed Code:**
+```typescript
+// Calculate the correct index with fallback
+const liveItemIndex = index === 4 ? 1 : (inlineLiveContent[2] ? 2 : 1);
+// Use liveItemIndex consistently for both condition and render
+```
+
+### Fix 2: Optimize Query Enabling
+
+Update the inline live content query to only fetch when on the Videos tab:
+
+**Current (line 220):**
+```typescript
+enabled: activeTab !== 'live'
+```
+
+**Fixed:**
+```typescript
+enabled: activeTab === 'videos'
+```
+
+### Fix 3: Add Null Safety Guards
+
+Add defensive checks before rendering inline live cards to prevent crashes when data is unexpectedly undefined.
+
+## Technical Changes
 
 ### File: `src/pages/Feed.tsx`
 
-**Change 2**: Read navigation state and set active tab on mount
+| Line Range | Change |
+|------------|--------|
+| 220 | Change query enabled condition from `activeTab !== 'live'` to `activeTab === 'videos'` |
+| 929-933 | Extract the live item index calculation into a variable |
+| 970-988 | Use the extracted variable and add null safety check |
 
-Add logic to check for the `activeTab` state from navigation:
+### Detailed Code Changes
 
+**1. Query Optimization (line 220)**
+
+Change the enabled condition to only fetch inline content for Videos tab:
 ```typescript
-// Add useLocation to read state
-const location = useLocation();
-
-// In useEffect or initialization, check for state
-useEffect(() => {
-  if (location.state?.activeTab) {
-    setActiveTab(location.state.activeTab);
-    // Clear the state after using it
-    window.history.replaceState({}, document.title);
-  }
-  if (location.state?.scrollToTop && scrollContainerRef.current) {
-    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
-  }
-}, [location.state]);
+enabled: activeTab === 'videos'
 ```
 
-## Technical Details
+**2. Extract Index Calculation (around line 928)**
 
-### Files to Modify
-
-| File | Change |
-|------|--------|
-| `src/components/post/PhotoPlusPostCreator.tsx` | Navigate to `/feed` with state instead of `/feed/post/:id` |
-| `src/pages/Feed.tsx` | Read navigation state to set active tab and scroll position |
-
-### Navigation State Structure
-
+Before the `showInlineLive` condition, calculate the target index:
 ```typescript
-interface FeedNavigationState {
-  activeTab?: 'videos' | 'photosText' | 'live';
-  scrollToTop?: boolean;
-}
+const targetLiveIndex = index === 4 ? 1 : (inlineLiveContent?.[2] ? 2 : 1);
+const liveItemForInjection = inlineLiveContent?.[targetLiveIndex];
 ```
 
-## Why This Works
+**3. Simplify Condition (lines 929-933)**
 
-1. User stays on the Feed page (no context switch)
-2. Photos+ tab is automatically selected
-3. The `onSuccess` callback already triggers `refetch()` which fetches fresh posts
-4. New post appears at top of feed (ordered by created_at DESC)
-5. Consistent with how Video post creation works
+Use the pre-calculated values:
+```typescript
+const showInlineLive = activeTab === 'videos' && 
+  inlineLiveContent && 
+  inlineLiveContent.length > 1 && 
+  (index === 4 || index === 9) &&
+  liveItemForInjection;
+```
 
-## Testing
+**4. Update Render (lines 970-988)**
 
-1. Go to Feed → Photos+ tab
-2. Create a new Photo+ post
-3. Verify you stay on the Feed page
-4. Verify the Photos+ tab is still active
-5. Verify your new post appears at the top
-6. Repeat test from Videos tab - should switch to Photos+ tab after posting
+Use the pre-calculated live item instead of recalculating:
+```typescript
+{showInlineLive && liveItemForInjection && (
+  <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
+    <InlineLiveCard
+      item={{
+        ...liveItemForInjection,
+        status: liveItemForInjection.status as string,
+        type: liveItemForInjection.type
+      }}
+      onClick={() => {
+        if (liveItemForInjection.type === 'video') {
+          navigate(`/live/stream/${liveItemForInjection.id}`);
+        } else {
+          navigate(`/live/space/${liveItemForInjection.id}`);
+        }
+      }}
+    />
+  </div>
+)}
+```
+
+## Expected Behavior After Fix
+
+| Tab | Behavior |
+|-----|----------|
+| Videos | Live cards appear at top and after posts 5 & 10 (when live content exists) |
+| Photo+ | No live cards appear, only Photo+ posts display normally |
+| Live | Shows full live content list (unchanged) |
+
+## Testing Checklist
+
+1. Start a livestream/space in another account
+2. Switch to Videos tab → verify live card appears at top and between posts
+3. Switch to Photo+ tab → verify NO live cards appear, only photos/text posts
+4. Verify no console errors when only 2 live items exist
+5. Verify posts display correctly in both tabs when livestream is active
+6. End the livestream → verify both tabs continue working normally
