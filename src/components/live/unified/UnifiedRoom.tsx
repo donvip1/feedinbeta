@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, Users, Heart, Gift, Share2, 
   Maximize2, Radio, Crown, Loader2, 
-  ArrowLeft, MessageCircle
+  ArrowLeft, MessageCircle, ChevronLeft, Minimize2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigation } from "@/context/NavigationContext";
+import { useOptionalLiveStreamContext } from "@/context/LiveStreamContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -46,7 +48,9 @@ export const UnifiedRoom = ({
   onMaximize 
 }: UnifiedRoomProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { setHideBottomNav } = useNavigation();
+  const streamContext = useOptionalLiveStreamContext();
   
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -449,8 +453,19 @@ export const UnifiedRoom = ({
         <div className="flex items-center justify-between">
           {/* Host Info */}
           <div className="flex items-center gap-3">
-            <button onClick={onClose} className="p-2 -ml-2">
-              <ArrowLeft className="w-5 h-5 text-white" />
+            <button 
+              onClick={() => {
+                // For hosts: minimize and navigate back, stream continues
+                if (isHost && streamContext?.streamState.isActive) {
+                  streamContext.minimizeStream();
+                  navigate(-1);
+                } else {
+                  onClose();
+                }
+              }} 
+              className="p-2 -ml-2"
+            >
+              <ChevronLeft className="w-5 h-5 text-white" />
             </button>
             <div className="relative">
               <Avatar className="w-10 h-10 border-2 border-red-500">
@@ -477,13 +492,28 @@ export const UnifiedRoom = ({
             )}
           </div>
           
-          {/* Close Button */}
-          <button 
-            onClick={onClose}
-            className="p-2 rounded-full bg-white/10 hover:bg-white/20"
-          >
-            <X className="w-5 h-5 text-white" />
-          </button>
+          {/* Minimize/Close Buttons */}
+          <div className="flex items-center gap-2">
+            {onMinimize && isHost && (
+              <button 
+                onClick={() => {
+                  if (streamContext) {
+                    streamContext.minimizeStream();
+                  }
+                  onMinimize();
+                }}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20"
+              >
+                <Minimize2 className="w-4 h-4 text-white" />
+              </button>
+            )}
+            <button 
+              onClick={onClose}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20"
+            >
+              <X className="w-5 h-5 text-white" />
+            </button>
+          </div>
         </div>
       </motion.div>
       
