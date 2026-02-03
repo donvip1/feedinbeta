@@ -902,8 +902,8 @@ const Feed = () => {
           <FeedSkeleton />
         ) : displayPosts && displayPosts.length > 0 ? (
           <SectionErrorBoundary sectionName="Feed Posts" onRetry={() => refetch()}>
-            {/* Show inline live content at the top if available (only on following/forYou tabs) */}
-            {inlineLiveContent && inlineLiveContent.length > 0 && (
+            {/* Show inline live content at the top ONLY on Videos tab (TikTok-style snap scrolling) */}
+            {activeTab === 'videos' && inlineLiveContent && inlineLiveContent.length > 0 && (
               <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
                 <InlineLiveCard
                   item={{
@@ -925,8 +925,9 @@ const Feed = () => {
             {displayPosts.map((post, index) => {
               const uniqueKey = post._cycleKey || post.id;
               
-              // Insert another live card after every 5 posts if we have more live content
-              const showInlineLive = inlineLiveContent && 
+              // Insert another live card after every 5 posts ONLY on Videos tab
+              const showInlineLive = activeTab === 'videos' && 
+                inlineLiveContent && 
                 inlineLiveContent.length > 1 && 
                 (index === 4 || index === 9) &&
                 inlineLiveContent[index === 4 ? 1 : (inlineLiveContent[2] ? 2 : 1)];
