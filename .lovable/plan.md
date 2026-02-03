@@ -1,97 +1,110 @@
 
-# Plan: Fix Three-Dots Menu and Social Buttons State Collision
+# Plan: Fix Photo+ Post Navigation to Stay on Feed
 
 ## Problem Summary
 
-The three-dots menu button (⋮) and the social buttons expand toggle (⋯) are incorrectly linked because they share the same state variable `showMoreActions`. This causes:
+After publishing a Photo+ post, users are redirected to their Timeline instead of staying on the Photos+ tab of the feed. This happens because:
 
-1. Clicking the three-dots menu → shows both the Delete dropdown AND expands hidden social buttons
-2. Clicking expand social buttons → may trigger the delete dropdown overlay
-3. Confusing UX where unrelated UI elements respond to clicks
+1. `PhotoPlusPostCreator.tsx` navigates to `/feed/post/${newPost.id}` after creating a post
+2. The `PostDetail.tsx` page fetches **all posts by that user** (Timeline view)
+3. This contradicts user expectations - they want to stay on the Photos+ tab with their new post visible
+
+## Current vs Expected Behavior
+
+| Action | Current | Expected |
+|--------|---------|----------|
+| Create Photo+ post | Navigates to `/feed/post/id` (Timeline) | Returns to `/feed` (Photos+ tab) |
+| Post visibility | Shows all user's posts | Shows feed with new post at top |
+| Tab state | Loses tab context | Stays on Photos+ tab |
 
 ## Root Cause
 
-Single state variable controlling two unrelated features:
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                    Current State Collision                      │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  showMoreActions = true                                         │
-│       ├── Shows Delete dropdown (three-dots menu)               │
-│       └── Shows Views/Refeed/Share buttons (social expand)      │
-│                                                                 │
-│  These are UNRELATED features sharing ONE boolean state!        │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+In `PhotoPlusPostCreator.tsx` (line 287):
+```typescript
+navigate(`/feed/post/${newPost.id}`);
 ```
+
+This navigation goes to PostDetail which shows all user posts (Timeline), not just the single post.
 
 ## Solution
 
-Split into two separate state variables with clear purposes:
+Align PhotoPlusPostCreator behavior with the Video post creator (PostDetails.tsx):
+1. Navigate to `/feed` instead of post detail
+2. Switch the active tab to `photosText` (Photos+ tab)
+3. Trigger refetch so the new post appears
 
-| State Variable | Purpose | Used By |
-|----------------|---------|---------|
-| `showPostMenu` (NEW) | Controls three-dots dropdown with Delete option | Three-dots button (⋮) |
-| `showMoreActions` (KEEP) | Controls expanded social buttons visibility | More button (⋯) |
+## Implementation
 
-## Technical Changes
+### File: `src/components/post/PhotoPlusPostCreator.tsx`
 
-### 1. Add New State Variable
+**Change 1**: Use navigate with state to indicate which tab should be active
 
-Add a new state specifically for the post menu dropdown:
-
-```typescript
-const [showPostMenu, setShowPostMenu] = useState(false); // Three-dots menu dropdown
-```
-
-### 2. Update Three-Dots Menu Buttons (3 locations)
-
-Change all three-dots menu instances to use the new state:
-
-**Location 1: Immersive mode header (around line 735)**
-**Location 2: Photo+ card header (around line 853)**  
-**Location 3: Plain text post header (around line 1553)**
-
-Each needs:
-- Button onClick: `setShowPostMenu(!showPostMenu)` instead of `setShowMoreActions(!showMoreActions)`
-- Overlay onClick: `setShowPostMenu(false)`
-- Conditional render: `{showPostMenu && (...)}` 
-- Delete button: `setShowPostMenu(false); setShowDeleteDialog(true);`
-
-### 3. Add Event Propagation Stoppage
-
-All three-dots buttons should prevent event bubbling:
+Replace the navigation logic after successful post creation:
 
 ```typescript
-<button 
-  onClick={(e) => {
-    e.stopPropagation();
-    setShowPostMenu(!showPostMenu);
-  }}
-  // ...
->
+// Before (line 287):
+navigate(`/feed/post/${newPost.id}`);
+
+// After:
+navigate('/feed', { 
+  state: { activeTab: 'photosText', scrollToTop: true }
+});
 ```
 
-## Files to Modify
+### File: `src/pages/Feed.tsx`
 
-| File | Changes |
-|------|---------|
-| `src/components/feed/ImmersivePostCard.tsx` | Add `showPostMenu` state, update 3 three-dots menu instances |
+**Change 2**: Read navigation state and set active tab on mount
 
-## Expected Behavior After Fix
+Add logic to check for the `activeTab` state from navigation:
 
-| Action | Result |
-|--------|--------|
-| Click three-dots (⋮) | Only shows Delete dropdown, social buttons unchanged |
-| Click more (⋯) on social sidebar | Only expands Views/Refeed/Share buttons |
-| Click outside menu | Only closes the menu that's open |
+```typescript
+// Add useLocation to read state
+const location = useLocation();
 
-## Testing Checklist
+// In useEffect or initialization, check for state
+useEffect(() => {
+  if (location.state?.activeTab) {
+    setActiveTab(location.state.activeTab);
+    // Clear the state after using it
+    window.history.replaceState({}, document.title);
+  }
+  if (location.state?.scrollToTop && scrollContainerRef.current) {
+    scrollContainerRef.current.scrollTo({ top: 0, behavior: 'instant' });
+  }
+}, [location.state]);
+```
 
-1. Click three-dots menu → verify only Delete dropdown appears
-2. Click outside → verify dropdown closes
-3. Click Delete → verify delete dialog opens
-4. Click expand social buttons → verify only extra buttons appear
-5. Verify no cross-interaction between the two features
+## Technical Details
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/post/PhotoPlusPostCreator.tsx` | Navigate to `/feed` with state instead of `/feed/post/:id` |
+| `src/pages/Feed.tsx` | Read navigation state to set active tab and scroll position |
+
+### Navigation State Structure
+
+```typescript
+interface FeedNavigationState {
+  activeTab?: 'videos' | 'photosText' | 'live';
+  scrollToTop?: boolean;
+}
+```
+
+## Why This Works
+
+1. User stays on the Feed page (no context switch)
+2. Photos+ tab is automatically selected
+3. The `onSuccess` callback already triggers `refetch()` which fetches fresh posts
+4. New post appears at top of feed (ordered by created_at DESC)
+5. Consistent with how Video post creation works
+
+## Testing
+
+1. Go to Feed → Photos+ tab
+2. Create a new Photo+ post
+3. Verify you stay on the Feed page
+4. Verify the Photos+ tab is still active
+5. Verify your new post appears at the top
+6. Repeat test from Videos tab - should switch to Photos+ tab after posting
