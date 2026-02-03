@@ -1,227 +1,240 @@
 
-# Plan: Fix Live Streaming Chat, Reactions, Likes Count & Menu Features
+# Plan: Fix Live Streaming Connection, Chat Layout & Mocked Data
 
-## Issues Identified
+## Executive Summary
 
-| Issue | Root Cause | Solution |
-|-------|------------|----------|
-| **Chat not working** | `FlyingChat` in `LiveKitViewer.tsx` receives `messages={[]}` (empty array) instead of actual comments | Pass `comments` state to `FlyingChat` |
-| **12K likes is mocked** | Hardcoded `12K` in `UnifiedRoom.tsx` line 726 | Replace with real-time reaction count from database |
-| **Viewer count mismatch** | Viewer count on host avatar shows ~42 but database shows 0 | Sync with `live_stream_viewers` table and LiveKit room participants |
-| **Three-dot menu empty** | `UnifiedControlBar.tsx` has `onClick={() => {}}` for MoreHorizontal | Implement proper options menu with relevant features |
-| **No animated emoji reactions** | Missing `LiveReactionBar` component in viewer interface | Add animated emoji bar using `AnimatedEmojiButton` system |
-| **No chat reactions** | Missing reaction feature in chat messages | Add reaction support to chat messages |
+This plan addresses three main issues:
+1. **Auto-reconnection**: Seamless stream reconnection when network is restored
+2. **Chat/UI Layout**: Fix host chat overlapping controls, chat formatting, and connection popup visibility
+3. **Mocked Data**: Replace hardcoded data with real database content
 
 ---
 
-## Phase 1: Fix Chat Overlay in LiveKitViewer
+## Issue 1: Seamless Auto-Reconnection
 
 ### Problem
-The `FlyingChat` component in `LiveKitViewer.tsx` (line 575) is receiving an empty array:
-```typescript
-<FlyingChat messages={[]} gifts={flyingGifts} hostId={stream?.user_id} />
-```
+When network drops and reconnects, users must manually click "Return to Stream" and "Go Live" again. The host and viewers should stay connected automatically.
+
+### Current Behavior
+- LiveKit has reconnection handling but UI shows "error" state requiring manual action
+- `LiveKitBroadcaster.tsx` line 186-193: On `ConnectionState.Reconnecting`, it shows warning but on `Disconnected` goes to error state
+- `LiveKitViewer.tsx` line 117-121: Same pattern - shows reconnecting, then error on disconnect
 
 ### Solution
-Pass the actual `comments` state to `FlyingChat`:
-```typescript
-<FlyingChat 
-  messages={comments.map(c => ({
-    id: c.id,
-    content: c.content,
-    user_id: c.user_id,
-    created_at: c.created_at,
-    profiles: c.profiles,
-  }))} 
-  gifts={flyingGifts} 
-  hostId={stream?.user_id} 
-/>
+
+**A. Improve LiveKit Connection Handling**
+
+Update both `LiveKitViewer.tsx` and `LiveKitBroadcaster.tsx` to:
+1. Add auto-reconnect on network restoration using `navigator.onLine` events
+2. Keep stream in "reconnecting" state longer (not immediately "error")
+3. Automatically attempt reconnection without user action
+
+```text
+BEFORE                              AFTER
+┌─────────────────────────┐        ┌─────────────────────────┐
+│ Network drops           │        │ Network drops           │
+│ → Show "reconnecting"   │        │ → Show "reconnecting"   │
+│ → Show "error" state    │        │ → Wait for network      │
+│ → User clicks "Retry"   │        │ → Auto-reconnect        │
+│ → User clicks "Go Live" │        │ → Resume seamlessly     │
+└─────────────────────────┘        └─────────────────────────┘
 ```
 
-Similarly update `LiveKitBroadcaster.tsx` where the same pattern exists.
-
----
-
-## Phase 2: Replace Mocked 12K Likes with Real Data
-
-### Problem
-In `UnifiedRoom.tsx` (line 726), likes are hardcoded:
-```typescript
-<span className="text-xs text-white mt-1">12K</span>
-```
-
-### Solution
-1. Add state to track reaction count:
-```typescript
-const [reactionCount, setReactionCount] = useState(0);
-```
-
-2. Fetch initial count on mount:
-```typescript
-const { count } = await supabase
-  .from("live_stream_reactions")
-  .select("*", { count: 'exact', head: true })
-  .eq("stream_id", room.id);
-setReactionCount(count || 0);
-```
-
-3. Update count on each new reaction via realtime subscription
-
-4. Display formatted count:
-```typescript
-<span className="text-xs text-white mt-1">
-  {reactionCount >= 1000 ? `${(reactionCount/1000).toFixed(1)}K` : reactionCount}
-</span>
-```
-
-Also apply same fix in `LiveKitViewer.tsx` reactions sidebar.
-
----
-
-## Phase 3: Add Three-Dot Menu with Stream Options
-
-### Current State
-```typescript
-<ControlButton
-  icon={<MoreHorizontal className="w-5 h-5" />}
-  onClick={() => {}} // Empty handler
-/>
-```
-
-### Solution
-Create a `StreamOptionsMenu` component with relevant features:
-
-**For Viewers:**
-- Report Stream
-- Share Stream
-- Copy Link
-- Block Host
-- Turn on/off Notifications
-- Picture-in-Picture mode
-
-**For Host:**
-- Stream Settings
-- Viewer Management
-- Lock/Unlock Chat
-- End Stream
-- Go to Picture-in-Picture
-
-Implementation using Radix DropdownMenu:
-```typescript
-<DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <ControlButton icon={<MoreHorizontal />} onClick={() => {}} />
-  </DropdownMenuTrigger>
-  <DropdownMenuContent>
-    <DropdownMenuItem onClick={handleShare}>
-      <Share2 className="mr-2" /> Share
-    </DropdownMenuItem>
-    <DropdownMenuItem onClick={handleReport}>
-      <Flag className="mr-2" /> Report
-    </DropdownMenuItem>
-    // ... more options
-  </DropdownMenuContent>
-</DropdownMenu>
-```
-
----
-
-## Phase 4: Add Animated Emoji Reactions Bar
-
-### Current State
-Reactions in `LiveKitViewer.tsx` use basic button UI:
-```typescript
-{REACTIONS.map((reaction) => (
-  <Button ... onClick={() => sendReaction(reaction.type)}>
-    <span className="text-2xl">{reaction.emoji}</span>
-  </Button>
-))}
-```
-
-### Solution
-Replace with the existing `LiveReactionBar` component from `AnimatedEmojiButton.tsx`:
+**B. Add Network Status Listener**
 
 ```typescript
-import { LiveReactionBar, LIVE_REACTIONS } from '@/components/shared/AnimatedEmojiButton';
-
-// In component:
-<LiveReactionBar 
-  onReact={(reactionType) => sendReaction(reactionType)}
-  className="flex-col"
-/>
-```
-
-This provides:
-- Animated particle burst effects on tap
-- Scaling hover animations
-- Consistent design across app
-- 6 reaction types: Heart, Fire, Star, Clap, Like, Love
-
----
-
-## Phase 5: Add Chat Message Reactions
-
-### Feature Description
-Allow users to react to individual chat messages with emojis (like Twitch/YouTube Live).
-
-### Database Changes
-Create new table `live_stream_chat_reactions`:
-```sql
-CREATE TABLE public.live_stream_chat_reactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  comment_id UUID REFERENCES live_stream_comments(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  reaction_type TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(comment_id, user_id)
-);
-
--- Enable RLS
-ALTER TABLE public.live_stream_chat_reactions ENABLE ROW LEVEL SECURITY;
-
--- Policies
-CREATE POLICY "Users can view all chat reactions"
-  ON public.live_stream_chat_reactions FOR SELECT USING (true);
-  
-CREATE POLICY "Authenticated users can react"
-  ON public.live_stream_chat_reactions FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-  
-CREATE POLICY "Users can remove own reactions"
-  ON public.live_stream_chat_reactions FOR DELETE
-  USING (auth.uid() = user_id);
-
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.live_stream_chat_reactions;
-```
-
-### UI Implementation
-Add long-press/tap handler to chat messages that shows quick reaction picker.
-
----
-
-## Phase 6: Sync Real Viewer Count
-
-### Problem
-Database shows `viewer_count: 0` even when viewers are connected.
-
-### Solution
-1. Update `live_stream_viewers` table on join/leave
-2. Use LiveKit room participant count as ground truth
-3. Periodically sync to database (every 30s)
-
-```typescript
-// In LiveKitViewer - when joining
+// Add to both LiveKitViewer and LiveKitBroadcaster
 useEffect(() => {
-  const updateViewerCount = async () => {
-    await supabase.rpc('increment_viewer_count', { stream_id: streamId });
+  let reconnectTimer: NodeJS.Timeout | null = null;
+
+  const handleOnline = async () => {
+    if (connectionStatus === 'error' || connectionStatus === 'reconnecting') {
+      console.log('[LiveKit] Network restored, auto-reconnecting...');
+      // Small delay to ensure network is stable
+      reconnectTimer = setTimeout(() => {
+        connectToRoom(); // or startBroadcast for host
+      }, 1500);
+    }
   };
-  updateViewerCount();
-  
+
+  const handleOffline = () => {
+    setConnectionStatus('reconnecting');
+  };
+
+  window.addEventListener('online', handleOnline);
+  window.addEventListener('offline', handleOffline);
+
   return () => {
-    supabase.rpc('decrement_viewer_count', { stream_id: streamId });
+    window.removeEventListener('online', handleOnline);
+    window.removeEventListener('offline', handleOffline);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
   };
-}, [streamId]);
+}, [connectionStatus]);
+```
+
+**C. Update Connection State Handler**
+
+```typescript
+// Instead of immediately going to 'error', stay in 'reconnecting' with exponential backoff
+room.on(RoomEvent.ConnectionStateChanged, (state) => {
+  if (state === ConnectionState.Disconnected) {
+    // Don't immediately show error - attempt reconnect
+    setConnectionStatus('reconnecting');
+    
+    // Only show error after multiple failed attempts
+    if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      setConnectionStatus('error');
+    }
+  }
+});
+```
+
+---
+
+## Issue 2: Chat/UI Layout Fixes
+
+### Problems Identified from Screenshot
+1. Host message "philip • Host hello" overlaps with mic/video/mirror buttons
+2. Chat messages extend too low, overlapping with "say something" input
+3. Connection popup is behind chat, users can't tap retry
+
+### Solution
+
+**A. Fix Chat Overlay Position in `LiveKitBroadcaster.tsx`**
+
+The chat area currently uses `bottom: 200` (line 648) which causes overlap with controls.
+
+```typescript
+// BEFORE (line 643-650)
+<div 
+  className="absolute left-0 right-0 z-10 px-4"
+  style={{ 
+    bottom: isKeyboardOpen ? keyboardHeight + 80 : 200,
+    maxHeight: '40%',
+  }}
+>
+
+// AFTER - Increase bottom offset to avoid control buttons
+<div 
+  className="absolute left-0 px-4 z-10"
+  style={{ 
+    bottom: isKeyboardOpen ? keyboardHeight + 180 : 280, // Increased clearance
+    maxHeight: '30vh', // Reduced height
+    maxWidth: '60%', // Restrict to left side only
+  }}
+>
+```
+
+**B. Fix FlyingChat Bottom Offset**
+
+In `FlyingChat.tsx`, the `bottomOffset` prop default is 112px which is too low:
+
+```typescript
+// Update FlyingChat usage in LiveKitBroadcaster.tsx
+<FlyingChat 
+  messages={...}
+  gifts={flyingGifts}
+  hostId={user?.id}
+  bottomOffset={280} // Increase from default to clear controls
+/>
+```
+
+**C. Make Connection Popup Higher Z-Index**
+
+Connection/reconnecting overlays need to be above chat:
+
+```typescript
+// BEFORE (LiveKitViewer.tsx line 489)
+<div className="absolute inset-0 bg-black/80 flex items-center justify-center z-10">
+
+// AFTER - Higher z-index than chat overlay
+<div className="absolute inset-0 bg-black/80 flex items-center justify-center z-40">
+```
+
+**D. Host Messages - Broadcast Style**
+
+In `FlyingChat.tsx`, host messages already have special styling (amber gradient). Enhance:
+
+```typescript
+// Add a broadcast icon/animation for host messages
+{isHost && (
+  <div className="absolute -left-2 -top-2 animate-pulse">
+    <Radio className="w-4 h-4 text-amber-400" />
+  </div>
+)}
+```
+
+---
+
+## Issue 3: Remove Mocked Data
+
+### Problems
+1. "Recommended For You" shows hardcoded fake users (lines 365-389 in `LiveDashboard.tsx`)
+2. Filter tabs (Popular, Music, Gaming, Chat) don't filter anything
+3. Search button in header doesn't navigate to search
+
+### Solution
+
+**A. Replace "Recommended For You" with Real Data**
+
+```typescript
+// Add query for recommended creators (users with most followers who went live recently)
+const { data: recommendedCreators } = useQuery({
+  queryKey: ['recommended-live-creators'],
+  queryFn: async () => {
+    // Get creators who have streamed in the last 30 days
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const { data } = await supabase
+      .from('live_streams')
+      .select(`
+        user_id,
+        profiles:user_id (id, display_name, username, avatar_url)
+      `)
+      .gte('created_at', thirtyDaysAgo.toISOString())
+      .eq('status', 'ended')
+      .order('viewer_count', { ascending: false })
+      .limit(10);
+    
+    // Deduplicate by user_id
+    const uniqueCreators = new Map();
+    data?.forEach(s => {
+      if (s.profiles && !uniqueCreators.has(s.user_id)) {
+        uniqueCreators.set(s.user_id, s.profiles);
+      }
+    });
+    
+    return Array.from(uniqueCreators.values());
+  },
+});
+```
+
+**B. Make Filter Tabs Functional**
+
+```typescript
+// Filter live content based on active filter
+const filteredContent = useMemo(() => {
+  if (activeFilter === 'All') return allLiveContent;
+  
+  // Filter by category tag stored in stream/space
+  return allLiveContent.filter(item => 
+    item.category?.toLowerCase() === activeFilter.toLowerCase() ||
+    item.tags?.includes(activeFilter.toLowerCase())
+  );
+}, [allLiveContent, activeFilter]);
+```
+
+**C. Wire Up Search Button**
+
+```typescript
+// Update search button in header (line 93-95)
+<button 
+  onClick={() => navigate('/search?context=live')}
+  className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+>
+  <Search className="w-5 h-5" />
+</button>
 ```
 
 ---
@@ -230,74 +243,57 @@ useEffect(() => {
 
 | File | Changes |
 |------|---------|
-| `src/components/live/LiveKitViewer.tsx` | Pass comments to FlyingChat, add real reaction count, use LiveReactionBar |
-| `src/components/live/LiveKitBroadcaster.tsx` | Pass comments to FlyingChat, use LiveReactionBar |
-| `src/components/live/unified/UnifiedRoom.tsx` | Replace 12K with real count, add reactions fetch |
-| `src/components/live/unified/UnifiedControlBar.tsx` | Implement MoreHorizontal menu |
-
-## Files to Create
-
-| File | Purpose |
-|------|---------|
-| `src/components/live/StreamOptionsMenu.tsx` | Dropdown menu for stream options |
-
-## Database Migration
-
-```sql
--- 1. Add viewer count sync function
-CREATE OR REPLACE FUNCTION increment_viewer_count(stream_id UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE live_streams 
-  SET viewer_count = viewer_count + 1 
-  WHERE id = stream_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION decrement_viewer_count(stream_id UUID)
-RETURNS void AS $$
-BEGIN
-  UPDATE live_streams 
-  SET viewer_count = GREATEST(viewer_count - 1, 0) 
-  WHERE id = stream_id;
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
--- 2. Create chat reactions table (for Phase 5)
-CREATE TABLE IF NOT EXISTS public.live_stream_chat_reactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  comment_id UUID REFERENCES public.live_stream_comments(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL,
-  reaction_type TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  UNIQUE(comment_id, user_id)
-);
-
-ALTER TABLE public.live_stream_chat_reactions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Anyone can view chat reactions" ON public.live_stream_chat_reactions
-  FOR SELECT USING (true);
-
-CREATE POLICY "Users can add reactions" ON public.live_stream_chat_reactions
-  FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-CREATE POLICY "Users can remove own reactions" ON public.live_stream_chat_reactions
-  FOR DELETE USING (auth.uid() = user_id);
-```
+| `src/components/live/LiveKitViewer.tsx` | Add network listener, auto-reconnect, increase popup z-index |
+| `src/components/live/LiveKitBroadcaster.tsx` | Add network listener, auto-reconnect, fix chat position |
+| `src/components/live/FlyingChat.tsx` | Adjust default bottom offset |
+| `src/components/live/LiveDashboard.tsx` | Replace mocked data, add filter logic, wire search |
 
 ---
 
-## Visual Summary
+## Technical Details
+
+### Network State Machine
 
 ```text
-BEFORE                          AFTER
-┌─────────────────────┐        ┌─────────────────────┐
-│ Chat: Empty         │   →    │ Chat: Real messages │
-│ Likes: 12K (fake)   │   →    │ Likes: 47 (real)    │
-│ Menu: Nothing       │   →    │ Menu: Options popup │
-│ Reactions: Basic    │   →    │ Reactions: Animated │
-│ Chat msgs: No react │   →    │ Chat msgs: Reactable│
-└─────────────────────┘        └─────────────────────┘
+┌──────────┐    network drops    ┌─────────────────┐
+│ CONNECTED├────────────────────►│  RECONNECTING   │
+└──────────┘                     └────────┬────────┘
+     ▲                                    │
+     │   auto-reconnect                   │ max attempts
+     │   (network back)                   ▼
+     │                           ┌─────────────────┐
+     └───────────────────────────┤     ERROR       │
+              user retry         └─────────────────┘
+```
+
+### Chat Layout Spacing
+
+```text
+┌────────────────────────────────┐
+│        HEADER (z-20)           │
+├────────────────────────────────┤
+│                                │
+│   CHAT OVERLAY (z-10)          │◄─ Max 60% width
+│   maxHeight: 30vh              │
+│   bottom: 280px                │
+│                                │
+├────────────────────────────────┤◄─ Gap for controls
+│   CONTROLS (z-20)              │   Mic, Video, Flip, Chat
+│   Mic │ Video │ Flip │ Screen  │
+├────────────────────────────────┤
+│   INPUT / GO LIVE (z-20)       │
+└────────────────────────────────┘
+```
+
+### Connection Popup Z-Index Hierarchy
+
+```text
+z-50: Gift modals, invite modals
+z-40: Connection popups (connecting/reconnecting/error)
+z-30: Top header
+z-20: Control buttons, bottom input
+z-10: Chat overlay, flying chat
+z-0:  Video feed
 ```
 
 ---
@@ -306,10 +302,13 @@ BEFORE                          AFTER
 
 | Test | Expected Result |
 |------|-----------------|
-| Send chat as viewer | Message appears in flying chat overlay |
-| Send chat as host | Message appears for all viewers |
-| Tap heart reaction | Count increases, animation plays |
-| Tap three-dot menu | Options dropdown appears |
-| Long-press chat message | Reaction picker shows |
-| Join as viewer | Viewer count increments |
-| Leave stream | Viewer count decrements |
+| Host goes live, network drops | Shows "Reconnecting..." - not error |
+| Network restored (host) | Auto-reconnects without user action |
+| Viewer watching, network drops | Shows "Reconnecting..." overlay |
+| Network restored (viewer) | Auto-reconnects to stream |
+| Host sends chat message | Message appears clearly above controls |
+| Connection popup visible | Can tap "Retry" - not blocked by chat |
+| Click search button | Navigates to `/search` page |
+| Filter by "Music" | Only music-tagged streams shown |
+| "Recommended For You" | Shows real users who recently streamed |
+
