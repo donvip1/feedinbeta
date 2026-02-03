@@ -1,156 +1,369 @@
 
-# Plan: Fix Live Content Interfering with Video and Photo+ Feeds
+# Plan: Rebuild Live Streaming & Spaces with Unified Interface
 
-## Problem Summary
+## Overview
 
-When there's a livestream, it interferes with both the Videos and Photo+ feeds, causing posts to not display properly and only showing streaming backgrounds instead of the actual content.
+This plan will integrate the new unified TikTok/Tango-style live interface you provided, including:
+- **Video Broadcast Mode** - LiveKit-powered video streaming
+- **Audio Space Mode** - Cloudflare SFU-powered audio rooms with visualizer
+- **PK Battle Mode** - Split-screen competitive battles between hosts
 
-## Root Cause Analysis
+The architecture will maintain your existing LiveKit integration for video, Cloudflare SFU for audio, and add the new unified UI components with PK Battle functionality.
 
-After thorough investigation, I found two critical issues:
+## Current Architecture Analysis
 
-### Issue 1: Index Out of Bounds Bug in Periodic Live Card Injection
+| Feature | Current Tech | Status |
+|---------|--------------|--------|
+| Video Streams | LiveKit (livekit-token edge function) | Working |
+| Audio Spaces | Cloudflare SFU (SpaceContext, spaceRoomManager) | Working |
+| Chat | FlyingChat, TikTok-style overlays | Working |
+| Gifts | Full-screen animations, credit system | Working |
+| Mini Player | FloatingSpacePlayer, draggable PiP | Working |
 
-There's a mismatch between the **condition check** and the **render code**:
+## New Features to Implement
 
+### 1. Unified Room Types
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Index Access Mismatch                        │
+│                    UNIFIED ROOM SYSTEM                         │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  CONDITION (line 933):                                          │
-│    inlineLiveContent[index === 4 ? 1 : (inlineLiveContent[2]    │
-│                       ? 2 : 1)]                                 │
-│    → Falls back to index 1 if index 2 doesn't exist            │
+│  room_type: 'video_broadcast' | 'audio_space' | 'pk_battle'    │
 │                                                                 │
-│  RENDER (line 974):                                             │
-│    inlineLiveContent[index === 4 ? 1 : 2]                       │
-│    → ALWAYS tries index 2 when index === 9 (no fallback!)      │
-│                                                                 │
-│  Result: undefined access → Component crash → Feed breaks      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │   VIDEO     │  │   AUDIO     │  │      PK BATTLE          │ │
+│  │  BROADCAST  │  │   SPACE     │  │   (Split Screen)        │ │
+│  │             │  │             │  │                         │ │
+│  │  LiveKit    │  │ Cloudflare  │  │  Host    vs  Challenger │
+│  │  Video      │  │ SFU Audio   │  │  LiveKit    LiveKit     │ │
+│  │  Tracks     │  │ Visualizer  │  │  Score Tracking         │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-When there are only 2 live items (indexes 0 and 1), and we're at post index 9:
-- The condition passes (using fallback to index 1)
-- The render fails (trying to access index 2 which is undefined)
+### 2. PK Battle System (New)
+- Real-time score tracking via gifts
+- Split-screen dual video display
+- Animated HP-style progress bar
+- Countdown timer
+- Host vs Challenger mechanics
 
-### Issue 2: Query Still Fetches for Photo+ Tab
+## New Components to Create
 
-The inline live content query on line 220 is enabled when `activeTab !== 'live'`, meaning it still fetches for the Photo+ tab even though we don't render there. While not directly causing the visual issue, this is wasteful.
+### Core Components
 
-## Solution
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| `UnifiedRoom.tsx` | Single room component for all types | `src/components/live/` |
+| `PKBattleBar.tsx` | Animated score bar for battles | `src/components/live/` |
+| `AudioVisualizer.tsx` | Pulsing visualizer for audio spaces | `src/components/live/` |
+| `LiveFeedItem.tsx` | Preview card for feed scrolling | `src/components/live/` |
+| `UnifiedControlBar.tsx` | Mic/Video/Chat controls | `src/components/live/` |
 
-### Fix 1: Correct the Periodic Injection Logic
+### Updated Components
 
-Update the render code to use the same fallback logic as the condition:
+| Component | Changes |
+|-----------|---------|
+| `CreateLiveStreamModal.tsx` | Add room type selection (video/audio/pk_battle) |
+| `Live.tsx` | Integrate unified feed layout |
+| `LiveSpaceRoom.tsx` | Merge into UnifiedRoom |
+| `LiveKitBroadcaster.tsx` | Merge into UnifiedRoom |
 
-**Current Code (lines 974-976):**
-```typescript
-inlineLiveContent[index === 4 ? 1 : 2]
+## Database Schema Changes
+
+### New Table: `pk_battles`
+
+```sql
+CREATE TABLE public.pk_battles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stream_id UUID REFERENCES live_streams(id),
+  host_id UUID REFERENCES auth.users(id) NOT NULL,
+  challenger_id UUID REFERENCES auth.users(id),
+  host_score INTEGER DEFAULT 0,
+  challenger_score INTEGER DEFAULT 0,
+  status TEXT DEFAULT 'waiting', -- waiting, active, completed
+  duration_seconds INTEGER DEFAULT 300, -- 5 minute default
+  started_at TIMESTAMPTZ,
+  ended_at TIMESTAMPTZ,
+  winner_id UUID,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Enable realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.pk_battles;
 ```
 
-**Fixed Code:**
-```typescript
-// Calculate the correct index with fallback
-const liveItemIndex = index === 4 ? 1 : (inlineLiveContent[2] ? 2 : 1);
-// Use liveItemIndex consistently for both condition and render
+### Update `live_streams` Table
+
+```sql
+ALTER TABLE public.live_streams 
+ADD COLUMN IF NOT EXISTS room_type TEXT DEFAULT 'video_broadcast';
+-- Values: 'video_broadcast', 'audio_space', 'pk_battle'
 ```
 
-### Fix 2: Optimize Query Enabling
+## Implementation Details
 
-Update the inline live content query to only fetch when on the Videos tab:
+### Phase 1: Core Unified Components
 
-**Current (line 220):**
+#### 1.1 AudioVisualizer Component
+Animated bars that pulse based on audio activity:
+
 ```typescript
-enabled: activeTab !== 'live'
+// src/components/live/AudioVisualizer.tsx
+interface AudioVisualizerProps {
+  active: boolean;
+  barCount?: number;
+  className?: string;
+}
+
+// Creates 5 animated bars with staggered delays
+// Uses Framer Motion for smooth spring animations
 ```
 
-**Fixed:**
+#### 1.2 PKBattleBar Component
+Tango-style animated score bar:
+
 ```typescript
-enabled: activeTab === 'videos'
+// src/components/live/PKBattleBar.tsx
+interface PKBattleBarProps {
+  hostScore: number;
+  challengerScore: number;
+  timeLeft: number; // seconds
+  hostName?: string;
+  challengerName?: string;
+}
+
+// Features:
+// - Gradient HP bar (blue left, red right)
+// - Center lightning bolt divider
+// - Real-time score updates
+// - Countdown timer display
 ```
 
-### Fix 3: Add Null Safety Guards
+#### 1.3 UnifiedRoom Component
+Main room component that handles all three modes:
 
-Add defensive checks before rendering inline live cards to prevent crashes when data is unexpectedly undefined.
-
-## Technical Changes
-
-### File: `src/pages/Feed.tsx`
-
-| Line Range | Change |
-|------------|--------|
-| 220 | Change query enabled condition from `activeTab !== 'live'` to `activeTab === 'videos'` |
-| 929-933 | Extract the live item index calculation into a variable |
-| 970-988 | Use the extracted variable and add null safety check |
-
-### Detailed Code Changes
-
-**1. Query Optimization (line 220)**
-
-Change the enabled condition to only fetch inline content for Videos tab:
 ```typescript
-enabled: activeTab === 'videos'
+// src/components/live/UnifiedRoom.tsx
+interface UnifiedRoomProps {
+  room: {
+    id: string;
+    type: 'video_broadcast' | 'audio_space' | 'pk_battle';
+    host: User;
+    title: string;
+    viewers: number;
+    pkData?: PKBattleData;
+  };
+  isMinimized: boolean;
+  onClose: () => void;
+  onMinimize: () => void;
+}
+
+// Renders different layouts based on room.type:
+// - video_broadcast: Full video with LiveKit
+// - audio_space: AudioVisualizer with speaker grid
+// - pk_battle: Split screen with PKBattleBar
 ```
 
-**2. Extract Index Calculation (around line 928)**
+### Phase 2: LiveKit Integration
 
-Before the `showInlineLive` condition, calculate the target index:
+#### 2.1 Video Broadcast Mode
+Uses existing LiveKit infrastructure:
+
 ```typescript
-const targetLiveIndex = index === 4 ? 1 : (inlineLiveContent?.[2] ? 2 : 1);
-const liveItemForInjection = inlineLiveContent?.[targetLiveIndex];
+// Inside UnifiedRoom for video_broadcast type:
+const room = new Room({
+  adaptiveStream: true,
+  dynacast: true,
+  videoCaptureDefaults: {
+    resolution: VideoPresets.h720,
+  },
+});
+
+// Token from livekit-token edge function
+const { data } = await supabase.functions.invoke('livekit-token', {
+  body: {
+    roomName: `stream-${streamId}`,
+    participantName: user.name,
+    participantIdentity: user.id,
+    isHost: true,
+  },
+});
 ```
 
-**3. Simplify Condition (lines 929-933)**
+#### 2.2 PK Battle Mode
+Dual LiveKit rooms for split screen:
 
-Use the pre-calculated values:
 ```typescript
-const showInlineLive = activeTab === 'videos' && 
-  inlineLiveContent && 
-  inlineLiveContent.length > 1 && 
-  (index === 4 || index === 9) &&
-  liveItemForInjection;
+// Host connects to: `pk-${battleId}-host`
+// Challenger connects to: `pk-${battleId}-challenger`
+// Both are displayed in split-screen layout
 ```
 
-**4. Update Render (lines 970-988)**
+### Phase 3: Audio Space Integration
 
-Use the pre-calculated live item instead of recalculating:
+Uses existing Cloudflare SFU via SpaceContext:
+
 ```typescript
-{showInlineLive && liveItemForInjection && (
-  <div className="snap-start snap-always h-[calc(100dvh-68px)] flex items-center justify-center pt-16">
-    <InlineLiveCard
-      item={{
-        ...liveItemForInjection,
-        status: liveItemForInjection.status as string,
-        type: liveItemForInjection.type
-      }}
-      onClick={() => {
-        if (liveItemForInjection.type === 'video') {
-          navigate(`/live/stream/${liveItemForInjection.id}`);
-        } else {
-          navigate(`/live/space/${liveItemForInjection.id}`);
-        }
-      }}
-    />
-  </div>
-)}
+// Inside UnifiedRoom for audio_space type:
+const spaceContext = useOptionalSpaceContext();
+
+// Connect to audio
+await spaceContext.connectAudio(myRole);
+
+// Display AudioVisualizer with audio levels
+<AudioVisualizer 
+  active={spaceContext.spaceState.connectionStatus === 'connected'}
+/>
 ```
 
-## Expected Behavior After Fix
+### Phase 4: PK Battle Logic
 
-| Tab | Behavior |
-|-----|----------|
-| Videos | Live cards appear at top and after posts 5 & 10 (when live content exists) |
-| Photo+ | No live cards appear, only Photo+ posts display normally |
-| Live | Shows full live content list (unchanged) |
+#### 4.1 Create PK Battle Edge Function
+
+```typescript
+// supabase/functions/pk-battle-manager/index.ts
+// Handles:
+// - Creating new battles
+// - Sending challenges
+// - Accepting/declining
+// - Score updates from gifts
+// - Timer management
+// - Winner determination
+```
+
+#### 4.2 Gift-to-Score Conversion
+
+```typescript
+// When a gift is sent during PK battle:
+// 1. Record gift in live_stream_gifts
+// 2. Update pk_battles score based on recipient
+// 3. Broadcast score update via realtime
+```
+
+### Phase 5: UI/UX Updates
+
+#### 5.1 Room Header
+- Host avatar with level badge
+- Viewer count with pulsing indicator
+- Follow button
+- Close/minimize controls
+
+#### 5.2 Floating Interactions (TikTok-style)
+- Right-side vertical button stack
+- Heart, comment, gift buttons
+- Animated reaction counts
+
+#### 5.3 Unified Control Bar
+- Mic toggle (mute/unmute)
+- Camera toggle (for video modes)
+- Screen share button
+- Chat toggle
+- End stream button
+
+### Phase 6: Feed Integration
+
+#### 6.1 LiveFeedItem Component
+Preview cards for scrolling feed:
+
+```typescript
+// src/components/live/LiveFeedItem.tsx
+interface LiveFeedItemProps {
+  room: Room;
+  onClick: () => void;
+}
+
+// Shows:
+// - Thumbnail/preview
+// - Status badges (LIVE, PK BATTLE, AUDIO SPACE)
+// - Host info
+// - Viewer count
+```
+
+#### 6.2 Updated Live.tsx
+- Vertical scroll feed of live rooms
+- Auto-play preview on scroll
+- Tap to enter full room view
+
+## File Structure
+
+```text
+src/components/live/
+├── unified/
+│   ├── UnifiedRoom.tsx           (NEW - Main room component)
+│   ├── UnifiedControlBar.tsx     (NEW - Bottom controls)
+│   ├── AudioVisualizer.tsx       (NEW - Audio space visualizer)
+│   ├── PKBattleBar.tsx          (NEW - Battle score bar)
+│   ├── PKBattleChallenge.tsx    (NEW - Challenge modal)
+│   └── LiveFeedItem.tsx         (NEW - Feed preview card)
+├── FloatingSpacePlayer.tsx       (UPDATE - Add PK support)
+├── CreateLiveStreamModal.tsx     (UPDATE - Room type selection)
+└── ... (existing components)
+
+supabase/functions/
+├── livekit-token/                (EXISTING - Token generation)
+├── cloudflare-sfu/               (EXISTING - Audio SFU)
+└── pk-battle-manager/           (NEW - Battle logic)
+```
+
+## Migration Strategy
+
+1. **Phase 1**: Create new unified components alongside existing ones
+2. **Phase 2**: Add database migrations for PK battles
+3. **Phase 3**: Integrate UnifiedRoom into Live.tsx with feature flag
+4. **Phase 4**: Gradually migrate from old components
+5. **Phase 5**: Remove deprecated components
+
+## Technical Considerations
+
+### Performance
+- Lazy load UnifiedRoom component
+- Use virtualized list for feed items
+- Preload video thumbnails
+- Debounce score updates
+
+### Compatibility
+- Maintain backwards compatibility with existing streams/spaces
+- Support both old and new room formats during migration
+
+### Realtime
+- Use Supabase broadcast for instant score updates
+- PostgreSQL changes for persistent data
+- WebSocket for LiveKit/Cloudflare SFU
 
 ## Testing Checklist
 
-1. Start a livestream/space in another account
-2. Switch to Videos tab → verify live card appears at top and between posts
-3. Switch to Photo+ tab → verify NO live cards appear, only photos/text posts
-4. Verify no console errors when only 2 live items exist
-5. Verify posts display correctly in both tabs when livestream is active
-6. End the livestream → verify both tabs continue working normally
+| Test | Description |
+|------|-------------|
+| Video broadcast | Start, view, end video stream |
+| Audio space | Join as host, speaker, listener |
+| PK battle | Challenge, accept, gift-to-score, timer |
+| Minimize/maximize | PiP player functionality |
+| Cross-device | Mobile and desktop layouts |
+| Reconnection | Handle network interruptions |
+
+## Estimated Components
+
+| Component | Lines of Code (Est.) |
+|-----------|---------------------|
+| UnifiedRoom.tsx | ~600 |
+| PKBattleBar.tsx | ~120 |
+| AudioVisualizer.tsx | ~80 |
+| UnifiedControlBar.tsx | ~150 |
+| LiveFeedItem.tsx | ~100 |
+| PKBattleChallenge.tsx | ~200 |
+| pk-battle-manager edge function | ~300 |
+| Database migrations | ~50 |
+
+**Total: ~1,600 lines of new/modified code**
+
+## Summary
+
+This rebuild will create a unified, modern live streaming experience that:
+1. Combines video, audio, and PK battles in one interface
+2. Uses your existing LiveKit and Cloudflare SFU infrastructure
+3. Adds the exciting PK Battle feature with real-time scoring
+4. Maintains the TikTok-style UI with flying chat and gifts
+5. Supports minimization to floating player for background listening
+6. Is fully integrated with your existing gift/credit economy
