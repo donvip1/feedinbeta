@@ -1,369 +1,427 @@
 
-# Plan: Rebuild Live Streaming & Spaces with Unified Interface
+# Plan: Background Broadcasting & Modern Live UI Overhaul
 
 ## Overview
 
-This plan will integrate the new unified TikTok/Tango-style live interface you provided, including:
-- **Video Broadcast Mode** - LiveKit-powered video streaming
-- **Audio Space Mode** - Cloudflare SFU-powered audio rooms with visualizer
-- **PK Battle Mode** - Split-screen competitive battles between hosts
-
-The architecture will maintain your existing LiveKit integration for video, Cloudflare SFU for audio, and add the new unified UI components with PK Battle functionality.
+This plan addresses two key requirements:
+1. **Background Broadcasting** - Allow hosts to navigate away while streaming continues (like TikTok/Instagram Live)
+2. **Modern UI Overhaul** - Match the exact TikTok/Tango-style interface from your reference code
 
 ## Current Architecture Analysis
 
-| Feature | Current Tech | Status |
-|---------|--------------|--------|
-| Video Streams | LiveKit (livekit-token edge function) | Working |
-| Audio Spaces | Cloudflare SFU (SpaceContext, spaceRoomManager) | Working |
-| Chat | FlyingChat, TikTok-style overlays | Working |
-| Gifts | Full-screen animations, credit system | Working |
-| Mini Player | FloatingSpacePlayer, draggable PiP | Working |
+| Component | Current Behavior | Issue |
+|-----------|-----------------|-------|
+| `UnifiedRoom.tsx` | Closes when navigating away | Stream/space ends on navigation |
+| `LiveKitBroadcaster.tsx` | Full-screen only | No background mode |
+| `SpaceContext.tsx` | Has minimize support | Works for audio, not video |
+| `FloatingSpacePlayer.tsx` | Audio-only PiP | Needs video PiP support |
 
-## New Features to Implement
+## Solution Architecture
 
-### 1. Unified Room Types
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                    UNIFIED ROOM SYSTEM                         │
+│                 NEW: LiveStreamContext                          │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  room_type: 'video_broadcast' | 'audio_space' | 'pk_battle'    │
+│  Similar to SpaceContext, but for VIDEO streaming:             │
 │                                                                 │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
-│  │   VIDEO     │  │   AUDIO     │  │      PK BATTLE          │ │
-│  │  BROADCAST  │  │   SPACE     │  │   (Split Screen)        │ │
-│  │             │  │             │  │                         │ │
-│  │  LiveKit    │  │ Cloudflare  │  │  Host    vs  Challenger │
-│  │  Video      │  │ SFU Audio   │  │  LiveKit    LiveKit     │ │
-│  │  Tracks     │  │ Visualizer  │  │  Score Tracking         │ │
-│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐             │
+│  │  isActive   │  │ isMinimized │  │  roomRef    │             │
+│  │  (boolean)  │  │  (boolean)  │  │  (LiveKit)  │             │
+│  └─────────────┘  └─────────────┘  └─────────────┘             │
+│                                                                 │
+│  Host clicks Back → Minimize to FloatingStreamPlayer            │
+│  Stream continues in background (PiP mode)                      │
+│  Host can browse app while face is captured                     │
+│  Stream ONLY ends when host explicitly clicks "End Stream"      │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### 2. PK Battle System (New)
-- Real-time score tracking via gifts
-- Split-screen dual video display
-- Animated HP-style progress bar
-- Countdown timer
-- Host vs Challenger mechanics
+## Phase 1: Create LiveStreamContext (New Context for Video Streaming)
 
-## New Components to Create
-
-### Core Components
-
-| Component | Purpose | Location |
-|-----------|---------|----------|
-| `UnifiedRoom.tsx` | Single room component for all types | `src/components/live/` |
-| `PKBattleBar.tsx` | Animated score bar for battles | `src/components/live/` |
-| `AudioVisualizer.tsx` | Pulsing visualizer for audio spaces | `src/components/live/` |
-| `LiveFeedItem.tsx` | Preview card for feed scrolling | `src/components/live/` |
-| `UnifiedControlBar.tsx` | Mic/Video/Chat controls | `src/components/live/` |
-
-### Updated Components
-
-| Component | Changes |
-|-----------|---------|
-| `CreateLiveStreamModal.tsx` | Add room type selection (video/audio/pk_battle) |
-| `Live.tsx` | Integrate unified feed layout |
-| `LiveSpaceRoom.tsx` | Merge into UnifiedRoom |
-| `LiveKitBroadcaster.tsx` | Merge into UnifiedRoom |
-
-## Database Schema Changes
-
-### New Table: `pk_battles`
-
-```sql
-CREATE TABLE public.pk_battles (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  stream_id UUID REFERENCES live_streams(id),
-  host_id UUID REFERENCES auth.users(id) NOT NULL,
-  challenger_id UUID REFERENCES auth.users(id),
-  host_score INTEGER DEFAULT 0,
-  challenger_score INTEGER DEFAULT 0,
-  status TEXT DEFAULT 'waiting', -- waiting, active, completed
-  duration_seconds INTEGER DEFAULT 300, -- 5 minute default
-  started_at TIMESTAMPTZ,
-  ended_at TIMESTAMPTZ,
-  winner_id UUID,
-  created_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Enable realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.pk_battles;
-```
-
-### Update `live_streams` Table
-
-```sql
-ALTER TABLE public.live_streams 
-ADD COLUMN IF NOT EXISTS room_type TEXT DEFAULT 'video_broadcast';
--- Values: 'video_broadcast', 'audio_space', 'pk_battle'
-```
-
-## Implementation Details
-
-### Phase 1: Core Unified Components
-
-#### 1.1 AudioVisualizer Component
-Animated bars that pulse based on audio activity:
+### 1.1 New Context: `src/context/LiveStreamContext.tsx`
 
 ```typescript
-// src/components/live/AudioVisualizer.tsx
-interface AudioVisualizerProps {
-  active: boolean;
-  barCount?: number;
-  className?: string;
+interface StreamInfo {
+  id: string;
+  title: string;
+  hostId: string;
+  hostName: string;
+  hostAvatar: string;
+  type: 'video_broadcast' | 'pk_battle';
+  startedAt: string;
 }
 
-// Creates 5 animated bars with staggered delays
-// Uses Framer Motion for smooth spring animations
-```
-
-#### 1.2 PKBattleBar Component
-Tango-style animated score bar:
-
-```typescript
-// src/components/live/PKBattleBar.tsx
-interface PKBattleBarProps {
-  hostScore: number;
-  challengerScore: number;
-  timeLeft: number; // seconds
-  hostName?: string;
-  challengerName?: string;
-}
-
-// Features:
-// - Gradient HP bar (blue left, red right)
-// - Center lightning bolt divider
-// - Real-time score updates
-// - Countdown timer display
-```
-
-#### 1.3 UnifiedRoom Component
-Main room component that handles all three modes:
-
-```typescript
-// src/components/live/UnifiedRoom.tsx
-interface UnifiedRoomProps {
-  room: {
-    id: string;
-    type: 'video_broadcast' | 'audio_space' | 'pk_battle';
-    host: User;
-    title: string;
-    viewers: number;
-    pkData?: PKBattleData;
-  };
+interface LiveStreamState {
+  isActive: boolean;
   isMinimized: boolean;
-  onClose: () => void;
-  onMinimize: () => void;
+  streamInfo: StreamInfo | null;
+  isMuted: boolean;
+  isCameraOn: boolean;
+  isHost: boolean;
+  viewerCount: number;
+  connectionStatus: ConnectionStatus;
 }
 
-// Renders different layouts based on room.type:
-// - video_broadcast: Full video with LiveKit
-// - audio_space: AudioVisualizer with speaker grid
-// - pk_battle: Split screen with PKBattleBar
-```
-
-### Phase 2: LiveKit Integration
-
-#### 2.1 Video Broadcast Mode
-Uses existing LiveKit infrastructure:
-
-```typescript
-// Inside UnifiedRoom for video_broadcast type:
-const room = new Room({
-  adaptiveStream: true,
-  dynacast: true,
-  videoCaptureDefaults: {
-    resolution: VideoPresets.h720,
-  },
-});
-
-// Token from livekit-token edge function
-const { data } = await supabase.functions.invoke('livekit-token', {
-  body: {
-    roomName: `stream-${streamId}`,
-    participantName: user.name,
-    participantIdentity: user.id,
-    isHost: true,
-  },
-});
-```
-
-#### 2.2 PK Battle Mode
-Dual LiveKit rooms for split screen:
-
-```typescript
-// Host connects to: `pk-${battleId}-host`
-// Challenger connects to: `pk-${battleId}-challenger`
-// Both are displayed in split-screen layout
-```
-
-### Phase 3: Audio Space Integration
-
-Uses existing Cloudflare SFU via SpaceContext:
-
-```typescript
-// Inside UnifiedRoom for audio_space type:
-const spaceContext = useOptionalSpaceContext();
-
-// Connect to audio
-await spaceContext.connectAudio(myRole);
-
-// Display AudioVisualizer with audio levels
-<AudioVisualizer 
-  active={spaceContext.spaceState.connectionStatus === 'connected'}
-/>
-```
-
-### Phase 4: PK Battle Logic
-
-#### 4.1 Create PK Battle Edge Function
-
-```typescript
-// supabase/functions/pk-battle-manager/index.ts
-// Handles:
-// - Creating new battles
-// - Sending challenges
-// - Accepting/declining
-// - Score updates from gifts
-// - Timer management
-// - Winner determination
-```
-
-#### 4.2 Gift-to-Score Conversion
-
-```typescript
-// When a gift is sent during PK battle:
-// 1. Record gift in live_stream_gifts
-// 2. Update pk_battles score based on recipient
-// 3. Broadcast score update via realtime
-```
-
-### Phase 5: UI/UX Updates
-
-#### 5.1 Room Header
-- Host avatar with level badge
-- Viewer count with pulsing indicator
-- Follow button
-- Close/minimize controls
-
-#### 5.2 Floating Interactions (TikTok-style)
-- Right-side vertical button stack
-- Heart, comment, gift buttons
-- Animated reaction counts
-
-#### 5.3 Unified Control Bar
-- Mic toggle (mute/unmute)
-- Camera toggle (for video modes)
-- Screen share button
-- Chat toggle
-- End stream button
-
-### Phase 6: Feed Integration
-
-#### 6.1 LiveFeedItem Component
-Preview cards for scrolling feed:
-
-```typescript
-// src/components/live/LiveFeedItem.tsx
-interface LiveFeedItemProps {
-  room: Room;
-  onClick: () => void;
+interface LiveStreamContextType {
+  streamState: LiveStreamState;
+  startStream: (streamInfo: StreamInfo) => Promise<void>;
+  endStream: () => Promise<void>;
+  minimizeStream: () => void;
+  maximizeStream: () => void;
+  toggleMute: () => void;
+  toggleCamera: () => void;
+  // LiveKit refs
+  roomRef: Room | null;
+  videoTrackRef: LocalVideoTrack | null;
+  audioTrackRef: LocalAudioTrack | null;
 }
-
-// Shows:
-// - Thumbnail/preview
-// - Status badges (LIVE, PK BATTLE, AUDIO SPACE)
-// - Host info
-// - Viewer count
 ```
 
-#### 6.2 Updated Live.tsx
-- Vertical scroll feed of live rooms
-- Auto-play preview on scroll
-- Tap to enter full room view
+**Key Difference from Current Implementation:**
+- LiveKit Room and tracks are stored in Context, not component
+- Navigation away triggers `minimizeStream()`, not stream end
+- Stream persists across route changes
 
-## File Structure
+### 1.2 Add FloatingStreamPlayer: `src/components/live/FloatingStreamPlayer.tsx`
+
+Similar to `FloatingSpacePlayer.tsx` but for video:
+- Shows host's camera in a draggable 9:16 PiP window
+- Live badge, viewer count, duration timer
+- Mute/Camera toggle buttons
+- Maximize button to return to full view
+- End Stream button (RED - the ONLY way to end)
 
 ```text
-src/components/live/
-├── unified/
-│   ├── UnifiedRoom.tsx           (NEW - Main room component)
-│   ├── UnifiedControlBar.tsx     (NEW - Bottom controls)
-│   ├── AudioVisualizer.tsx       (NEW - Audio space visualizer)
-│   ├── PKBattleBar.tsx          (NEW - Battle score bar)
-│   ├── PKBattleChallenge.tsx    (NEW - Challenge modal)
-│   └── LiveFeedItem.tsx         (NEW - Feed preview card)
-├── FloatingSpacePlayer.tsx       (UPDATE - Add PK support)
-├── CreateLiveStreamModal.tsx     (UPDATE - Room type selection)
-└── ... (existing components)
-
-supabase/functions/
-├── livekit-token/                (EXISTING - Token generation)
-├── cloudflare-sfu/               (EXISTING - Audio SFU)
-└── pk-battle-manager/           (NEW - Battle logic)
+┌─────────────────────────────┐
+│ 🔴 LIVE        24      0:45 │  ← Live badge, viewers, duration
+├─────────────────────────────┤
+│                             │
+│      [Video Preview]        │  ← Host's camera (9:16)
+│                             │
+├─────────────────────────────┤
+│  🎤  📹  [Maximize]  [END]  │  ← Controls
+└─────────────────────────────┘
 ```
 
-## Migration Strategy
+## Phase 2: Modernize UnifiedRoom UI (Match Reference Code)
 
-1. **Phase 1**: Create new unified components alongside existing ones
-2. **Phase 2**: Add database migrations for PK battles
-3. **Phase 3**: Integrate UnifiedRoom into Live.tsx with feature flag
-4. **Phase 4**: Gradually migrate from old components
-5. **Phase 5**: Remove deprecated components
+### 2.1 Update Layout Structure
 
-## Technical Considerations
+Your reference code has this exact structure that we need to implement:
 
-### Performance
-- Lazy load UnifiedRoom component
-- Use virtualized list for feed items
-- Preload video thumbnails
-- Debounce score updates
+```typescript
+// Header with host info + follow button
+<div className="absolute top-0 flex items-center justify-between">
+  <div className="flex items-center gap-2">
+    <Avatar with level badge />
+    <div>
+      <p>Host Name</p>
+      <p>Viewer count</p>
+    </div>
+    <Button>Follow</Button>
+  </div>
+  <Button onClick={onClose}>X</Button>
+</div>
 
-### Compatibility
-- Maintain backwards compatibility with existing streams/spaces
-- Support both old and new room formats during migration
+// PK Battle Bar (when type === 'pk_battle')
+<PKBattleBar />
 
-### Realtime
-- Use Supabase broadcast for instant score updates
-- PostgreSQL changes for persistent data
-- WebSocket for LiveKit/Cloudflare SFU
+// Main Stage with conditional content
+<div className="flex-1">
+  {type === 'pk_battle' ? <SplitScreen /> :
+   type === 'audio_space' ? <AudioVisualizer /> :
+   <VideoStream />}
+</div>
+
+// TikTok-style floating interactions (right side)
+<div className="absolute right-4 bottom-32">
+  <HeartButton />
+  <CommentButton />
+  <GiftButton />
+</div>
+
+// Flying chat overlay (left side, max 55% width)
+<FlyingChat />
+
+// Unified Control Bar (bottom)
+<UnifiedControlBar />
+```
+
+### 2.2 Key UI Changes
+
+| Element | Current | New (Reference) |
+|---------|---------|-----------------|
+| Header | Arrow + X button | Avatar with level + Follow + X |
+| Host Level | Not visible | Yellow/Orange gradient badge |
+| Follow Button | External | Inline red button |
+| Interactions | Right side vertical | Right side with animated icons |
+| Chat | Full FlyingChat | Left 55% width overlay |
+| Control Bar | Icons only | Toggle states with labels |
+| PiP Player | Basic | Styled with live badge + duration |
+
+### 2.3 Audio Space Visual Update (Green Theme)
+
+Match reference:
+- Background: `from-green-900 via-emerald-800 to-teal-900`
+- Pulsing circles behind host avatar
+- Audio visualizer bars (5 bars, animated)
+- "LIVE AUDIO" badge with Radio icon
+
+### 2.4 PK Battle Visual Update
+
+Match reference:
+- Blue gradient left (host) / Red gradient right (challenger)
+- Center divider with lightning bolt
+- HP-style progress bar
+- Timer in center circle
+- Score labels: "Blue Team" / "Red Team"
+
+## Phase 3: Navigation Logic Updates
+
+### 3.1 Back Button Behavior Change
+
+**Current:** Clicking back calls `onClose()` which ends everything
+
+**New Logic:**
+```typescript
+const handleBack = () => {
+  if (isHost && streamState.isActive) {
+    // Host is streaming - minimize instead of close
+    minimizeStream();
+    navigate(-1); // Go back but keep stream running
+  } else {
+    // Viewer can just leave
+    onClose();
+  }
+};
+```
+
+### 3.2 Route-Aware Stream Persistence
+
+When host navigates to any page:
+- Stream continues in background
+- FloatingStreamPlayer shows as PiP
+- Host can browse Feed, Messages, Wallet, etc.
+- Camera continues capturing
+
+When host explicitly ends stream:
+- Click "End Stream" button in PiP or full view
+- Confirmation dialog
+- LiveKit disconnects
+- Database updated to `status: 'ended'`
+
+## Phase 4: File Changes Summary
+
+### New Files to Create
+
+| File | Purpose |
+|------|---------|
+| `src/context/LiveStreamContext.tsx` | Global video stream state management |
+| `src/components/live/FloatingStreamPlayer.tsx` | PiP video player for background streaming |
+
+### Files to Update
+
+| File | Changes |
+|------|---------|
+| `src/components/live/unified/UnifiedRoom.tsx` | Match reference UI, integrate with context |
+| `src/components/live/unified/AudioVisualizer.tsx` | Green theme matching reference |
+| `src/components/live/unified/PKBattleBar.tsx` | Tango-style HP bar with teams |
+| `src/components/live/unified/UnifiedControlBar.tsx` | Toggle states + labels |
+| `src/pages/Live.tsx` | Use UnifiedRoom via context |
+| `src/App.tsx` | Add LiveStreamProvider |
+
+## Phase 5: Detailed Component Updates
+
+### 5.1 UnifiedRoom.tsx - Modern UI Matching Reference
+
+**Header Section:**
+```typescript
+<div className="flex items-center gap-2">
+  {/* Avatar with Level Badge */}
+  <div className="relative">
+    <Avatar className="w-10 h-10 border-2 border-red-500" />
+    <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-yellow-500 to-orange-500 
+                    text-[10px] font-bold px-1.5 rounded-full text-white">
+      {host.level}
+    </div>
+  </div>
+  
+  {/* Host Info */}
+  <div>
+    <p className="font-medium text-white">{host.name}</p>
+    <div className="flex items-center gap-1 text-xs text-white/70">
+      <Users className="w-3 h-3" />
+      <span>{viewers}</span>
+    </div>
+  </div>
+  
+  {/* Follow Button */}
+  {!isHost && (
+    <Button size="sm" className="bg-red-500 hover:bg-red-600 h-7">
+      Follow
+    </Button>
+  )}
+</div>
+```
+
+**Audio Space Mode (Green Theme):**
+```typescript
+<div className="bg-gradient-to-br from-green-900 via-emerald-800 to-teal-900">
+  {/* Animated background orbs */}
+  <motion.div animate={{ scale: [1, 1.2, 1] }} 
+              className="absolute w-64 h-64 rounded-full bg-green-500/20 blur-3xl" />
+  
+  {/* Center host avatar with pulse rings */}
+  <motion.div animate={{ scale: [1, 1.05, 1] }}>
+    <Avatar className="w-28 h-28 border-4 border-green-400/50" />
+    <motion.div className="absolute -inset-2 border-2 border-green-400/40" />
+  </motion.div>
+  
+  {/* Audio Visualizer */}
+  <AudioVisualizer active={connected} barCount={5} color="bg-white" />
+  
+  {/* Live Badge */}
+  <div className="flex items-center gap-2 bg-black/30 px-4 py-2 rounded-full">
+    <Radio className="w-4 h-4 text-green-400" />
+    <span className="text-green-400">LIVE AUDIO</span>
+  </div>
+</div>
+```
+
+### 5.2 FloatingStreamPlayer.tsx (New - Video PiP)
+
+```typescript
+export const FloatingStreamPlayer: React.FC = () => {
+  const { streamState, minimizeStream, maximizeStream, endStream, toggleMute, toggleCamera } = useLiveStreamContext();
+  
+  if (!streamState.isActive || !streamState.isMinimized) return null;
+  
+  return (
+    <motion.div 
+      drag
+      className="fixed bottom-24 right-4 z-50 w-32 aspect-[9/16] rounded-xl overflow-hidden shadow-2xl"
+    >
+      {/* Video Preview */}
+      <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+      
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+      
+      {/* Live indicator + viewer count */}
+      <div className="absolute top-2 left-2 flex items-center gap-1">
+        <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+        <span className="text-[10px] text-white font-medium">LIVE</span>
+        <span className="text-[10px] text-white">{viewerCount}</span>
+      </div>
+      
+      {/* Duration */}
+      <div className="absolute top-2 right-2 text-[10px] text-white">{duration}</div>
+      
+      {/* Controls */}
+      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
+        <div className="flex gap-1">
+          <button onClick={toggleMute}>{isMuted ? <MicOff /> : <Mic />}</button>
+          <button onClick={toggleCamera}>{isCameraOn ? <Video /> : <VideoOff />}</button>
+        </div>
+        <button onClick={maximizeStream}><Maximize2 /></button>
+        <button onClick={endStream} className="bg-red-600"><PhoneOff /></button>
+      </div>
+    </motion.div>
+  );
+};
+```
+
+### 5.3 LiveStreamContext.tsx (New - Core State Management)
+
+```typescript
+export const LiveStreamProvider = ({ children }) => {
+  const [streamState, setStreamState] = useState<LiveStreamState>(defaultState);
+  
+  // LiveKit refs - persist across navigation
+  const roomRef = useRef<Room | null>(null);
+  const videoTrackRef = useRef<LocalVideoTrack | null>(null);
+  const audioTrackRef = useRef<LocalAudioTrack | null>(null);
+  
+  const startStream = async (streamInfo: StreamInfo) => {
+    // Initialize LiveKit, create tracks, connect to room
+    // Store in refs (not component state)
+    // Set streamState.isActive = true
+  };
+  
+  const minimizeStream = () => {
+    // Just hide the UI, stream continues
+    setStreamState(prev => ({ ...prev, isMinimized: true }));
+  };
+  
+  const maximizeStream = () => {
+    // Show full UI again
+    setStreamState(prev => ({ ...prev, isMinimized: false }));
+    // Navigate to stream page
+  };
+  
+  const endStream = async () => {
+    // Disconnect LiveKit
+    // Stop tracks
+    // Update database
+    // Reset state
+  };
+  
+  return (
+    <LiveStreamContext.Provider value={{
+      streamState,
+      startStream,
+      endStream,
+      minimizeStream,
+      maximizeStream,
+      roomRef: roomRef.current,
+      videoTrackRef: videoTrackRef.current,
+      audioTrackRef: audioTrackRef.current,
+    }}>
+      {children}
+    </LiveStreamContext.Provider>
+  );
+};
+```
+
+## Phase 6: Integration with App.tsx
+
+Add the new provider and floating player:
+
+```typescript
+// App.tsx
+<SpaceProvider>
+  <LiveStreamProvider>  {/* NEW */}
+    <CallProvider>
+      {/* ... routes ... */}
+      <FloatingSpacePlayer />
+      <FloatingStreamPlayer />  {/* NEW */}
+      <FloatingCallWidget />
+    </CallProvider>
+  </LiveStreamProvider>
+</SpaceProvider>
+```
 
 ## Testing Checklist
 
-| Test | Description |
-|------|-------------|
-| Video broadcast | Start, view, end video stream |
-| Audio space | Join as host, speaker, listener |
-| PK battle | Challenge, accept, gift-to-score, timer |
-| Minimize/maximize | PiP player functionality |
-| Cross-device | Mobile and desktop layouts |
-| Reconnection | Handle network interruptions |
-
-## Estimated Components
-
-| Component | Lines of Code (Est.) |
-|-----------|---------------------|
-| UnifiedRoom.tsx | ~600 |
-| PKBattleBar.tsx | ~120 |
-| AudioVisualizer.tsx | ~80 |
-| UnifiedControlBar.tsx | ~150 |
-| LiveFeedItem.tsx | ~100 |
-| PKBattleChallenge.tsx | ~200 |
-| pk-battle-manager edge function | ~300 |
-| Database migrations | ~50 |
-
-**Total: ~1,600 lines of new/modified code**
+| Test Case | Expected Behavior |
+|-----------|-------------------|
+| Host starts video stream | Camera captures, LiveKit connects |
+| Host clicks back button | Stream minimizes to PiP, continues broadcasting |
+| Host navigates to Feed | PiP shows, stream still live |
+| Host maximizes from PiP | Returns to full stream view |
+| Host clicks End Stream | Confirmation → Stream ends properly |
+| Viewer watches stream | Normal viewing experience unchanged |
+| Audio space host minimizes | Audio continues in background |
+| PK Battle display | Split screen with HP bar and timer |
 
 ## Summary
 
-This rebuild will create a unified, modern live streaming experience that:
-1. Combines video, audio, and PK battles in one interface
-2. Uses your existing LiveKit and Cloudflare SFU infrastructure
-3. Adds the exciting PK Battle feature with real-time scoring
-4. Maintains the TikTok-style UI with flying chat and gifts
-5. Supports minimization to floating player for background listening
-6. Is fully integrated with your existing gift/credit economy
+This implementation provides:
+1. **Background Broadcasting** - Hosts can browse the app while streaming
+2. **Modern UI** - Exact match to your TikTok/Tango reference code
+3. **Proper Navigation** - Back button minimizes, doesn't end
+4. **Stream Persistence** - Only explicit "End Stream" stops broadcasting
+5. **PiP Player** - Draggable floating video preview for hosts
+6. **Unified Experience** - Works for video streams, audio spaces, and PK battles
