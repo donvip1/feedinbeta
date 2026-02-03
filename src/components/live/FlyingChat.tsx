@@ -58,7 +58,7 @@ export const FlyingChat = ({
   hostId,
   maxMessages = 12,
   className,
-  bottomOffset = 112,
+  bottomOffset = 200,
   onMentionClick
 }: FlyingChatProps) => {
   const navigate = useNavigate();

@@ -188,7 +188,8 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
           setConnectionQuality('poor');
           toast.warning("Reconnecting...");
         } else if (state === ConnectionState.Disconnected) {
-          setBroadcastState('error');
+          // Stay in reconnecting state - auto-reconnect will handle
+          setBroadcastState('reconnecting');
           setConnectionQuality('poor');
         }
       });
@@ -375,6 +376,37 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
       screenTrackRef.current?.stop();
     };
   }, []);
+
+  // Auto-reconnect on network restoration
+  useEffect(() => {
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleOnline = async () => {
+      if (broadcastState === 'error' || broadcastState === 'reconnecting') {
+        console.log('[LiveKitBroadcaster] Network restored, auto-reconnecting...');
+        // Small delay to ensure network is stable
+        reconnectTimer = setTimeout(() => {
+          startBroadcast();
+        }, 1500);
+      }
+    };
+
+    const handleOffline = () => {
+      console.log('[LiveKitBroadcaster] Network offline');
+      if (broadcastState === 'live') {
+        setBroadcastState('reconnecting');
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+    };
+  }, [broadcastState, startBroadcast]);
 
   // Fetch stream details
   useEffect(() => {
@@ -573,6 +605,7 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
         }))} 
         gifts={flyingGifts}
         hostId={user?.id}
+        bottomOffset={280}
       />
 
       {/* TOP HEADER */}
@@ -640,13 +673,14 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
         </div>
       </div>
 
-      {/* CHAT OVERLAY */}
+      {/* CHAT OVERLAY - positioned to avoid control buttons */}
       {showChat && (
         <div 
-          className="absolute left-0 right-0 z-10 px-4"
+          className="absolute left-0 z-10 px-4"
           style={{ 
-            bottom: isKeyboardOpen ? keyboardHeight + 80 : 200,
-            maxHeight: '40%',
+            bottom: isKeyboardOpen ? keyboardHeight + 180 : 280,
+            maxHeight: '30vh',
+            maxWidth: '60%',
           }}
         >
           <div 

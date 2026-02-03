@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -20,6 +20,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LiveDiscoverCard } from "./LiveDiscoverCard";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LiveDashboardProps {
   liveStreams: any[] | undefined;
@@ -67,10 +69,61 @@ export const LiveDashboard = ({
   const hasContent = liveCount > 0 || (scheduledStreams?.length || 0) > 0 || (scheduledSpaces?.length || 0) > 0;
 
   // Combine all live content for display
-  const allLiveContent = [
+  const allLiveContent = useMemo(() => [
     ...(liveStreams || []).map((s) => ({ ...s, contentType: "stream" as const })),
     ...(liveSpaces || []).map((s) => ({ ...s, contentType: "space" as const })),
-  ];
+  ], [liveStreams, liveSpaces]);
+
+  // Filter content based on active filter
+  const filteredContent = useMemo(() => {
+    if (activeFilter === 'All') return allLiveContent;
+    
+    // Filter by category/tags
+    return allLiveContent.filter(item => {
+      const itemCategory = (item as any).category?.toLowerCase() || '';
+      const itemTags = (item as any).tags || [];
+      const filter = activeFilter.toLowerCase();
+      
+      return itemCategory === filter || 
+             itemTags.some((tag: string) => tag.toLowerCase() === filter);
+    });
+  }, [allLiveContent, activeFilter]);
+
+  // Fetch recommended creators (real users who streamed recently)
+  const { data: recommendedCreators } = useQuery({
+    queryKey: ['recommended-live-creators'],
+    queryFn: async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data } = await supabase
+        .from('live_streams')
+        .select(`
+          user_id,
+          viewer_count,
+          profiles:user_id (id, display_name, username, avatar_url)
+        `)
+        .gte('created_at', thirtyDaysAgo.toISOString())
+        .eq('status', 'ended')
+        .order('viewer_count', { ascending: false })
+        .limit(20);
+      
+      // Deduplicate by user_id and get unique creators
+      const uniqueCreators = new Map<string, any>();
+      data?.forEach((s: any) => {
+        if (s.profiles && !uniqueCreators.has(s.user_id)) {
+          uniqueCreators.set(s.user_id, {
+            id: s.user_id,
+            ...s.profiles,
+            lastViewerCount: s.viewer_count || 0,
+          });
+        }
+      });
+      
+      return Array.from(uniqueCreators.values()).slice(0, 5);
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -90,7 +143,10 @@ export const LiveDashboard = ({
           </div>
 
           <div className="flex items-center gap-2">
-            <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+            <button 
+              onClick={() => navigate('/search?context=live')}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+            >
               <Search className="w-5 h-5" />
             </button>
             <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors relative">
@@ -226,13 +282,15 @@ export const LiveDashboard = ({
           </div>
         </motion.div>
 
-        {/* Trending Now Section */}
-        {allLiveContent.length > 0 && (
+        {/* Trending Now Section - uses filtered content */}
+        {filteredContent.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Flame className="w-5 h-5 text-orange-500" />
-                <span className="font-bold">Trending Now</span>
+                <span className="font-bold">
+                  {activeFilter === 'All' ? 'Trending Now' : `${activeFilter} Streams`}
+                </span>
               </div>
               <button className="text-sm text-white/60 flex items-center gap-1 hover:text-white transition-colors">
                 View All <ChevronRight className="w-4 h-4" />
@@ -240,7 +298,7 @@ export const LiveDashboard = ({
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {allLiveContent.slice(0, 4).map((item, index) => (
+              {filteredContent.slice(0, 4).map((item, index) => (
                 <motion.div
                   key={item.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -342,11 +400,11 @@ export const LiveDashboard = ({
           </div>
         )}
 
-        {/* Recommended For You / Empty State */}
+        {/* Recommended For You / Empty State - Real Data */}
         <div>
           <p className="font-bold mb-4">Recommended For You</p>
 
-          {!hasContent ? (
+          {!hasContent && (!recommendedCreators || recommendedCreators.length === 0) ? (
             <div className="flex flex-col items-center gap-4 py-12">
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
                 <Radio className="w-10 h-10 text-slate-500" />
@@ -362,29 +420,51 @@ export const LiveDashboard = ({
             </div>
           ) : (
             <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
+              {(recommendedCreators || []).map((creator) => (
                 <div
-                  key={i}
+                  key={creator.id}
+                  onClick={() => navigate(`/profile/${creator.id}`)}
                   className="flex items-center gap-4 p-3 rounded-2xl hover:bg-slate-800/50 transition-colors cursor-pointer"
                 >
                   <div className="relative">
                     <Avatar className="w-12 h-12">
-                      <AvatarImage src={`https://i.pravatar.cc/150?u=rec${i}`} />
-                      <AvatarFallback>C{i}</AvatarFallback>
+                      <AvatarImage src={creator.avatar_url} />
+                      <AvatarFallback>
+                        {creator.display_name?.[0] || creator.username?.[0] || '?'}
+                      </AvatarFallback>
                     </Avatar>
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-slate-600 rounded-full text-[8px] font-bold flex items-center justify-center border-2 border-black">
-                      {i * 10}
-                    </span>
+                    {creator.lastViewerCount > 0 && (
+                      <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-gradient-to-r from-pink-500 to-violet-500 rounded-full text-[8px] font-bold flex items-center justify-center border-2 border-black">
+                        {creator.lastViewerCount > 99 ? '99+' : creator.lastViewerCount}
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold">Creative Space {i}</p>
-                    <p className="text-sm text-white/60">Offline • Last seen 2h ago</p>
+                    <p className="font-semibold truncate">
+                      {creator.display_name || creator.username || 'Creator'}
+                    </p>
+                    <p className="text-sm text-white/60">Streamed recently</p>
                   </div>
-                  <Button variant="outline" size="sm" className="border-white/20 text-white/80">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="border-white/20 text-white/80"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // TODO: Enable notifications for this creator
+                    }}
+                  >
                     <Bell className="w-4 h-4" />
                   </Button>
                 </div>
               ))}
+              
+              {/* Show empty state if no recommended but has live content */}
+              {(!recommendedCreators || recommendedCreators.length === 0) && hasContent && (
+                <p className="text-white/40 text-center py-4 text-sm">
+                  More creators will appear here as they go live
+                </p>
+              )}
             </div>
           )}
         </div>
