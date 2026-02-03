@@ -13,6 +13,48 @@ const errorPatterns: Array<{
   pattern: RegExp | string;
   friendly: FriendlyError;
 }> = [
+  // RLS/Permission errors (database)
+  {
+    pattern: /row.level security|rls|policy|new row violates/i,
+    friendly: {
+      title: "Access restricted",
+      description: "This action requires different permissions. Try signing in again.",
+      action: "login"
+    }
+  },
+  {
+    pattern: /permission denied|access denied|not authorized/i,
+    friendly: {
+      title: "Permission needed",
+      description: "You don't have access to this content right now.",
+      action: "login"
+    }
+  },
+  // Database/Query errors
+  {
+    pattern: /PGRST|postgrest|relation.*does not exist/i,
+    friendly: {
+      title: "Content unavailable",
+      description: "This content couldn't be loaded. Please try again.",
+      action: "retry"
+    }
+  },
+  {
+    pattern: /duplicate key|unique constraint|already exists/i,
+    friendly: {
+      title: "Already exists",
+      description: "This item already exists. Try a different option.",
+      action: "none"
+    }
+  },
+  {
+    pattern: /foreign key|referenced.*not found/i,
+    friendly: {
+      title: "Item not found",
+      description: "The related content is no longer available.",
+      action: "retry"
+    }
+  },
   // Signal/WebRTC connection errors
   {
     pattern: /signal connection|abort handler|signaling|could not establish/i,
@@ -85,15 +127,6 @@ const errorPatterns: Array<{
       action: "retry"
     }
   },
-  // Permission errors
-  {
-    pattern: /permission|denied|not allowed|blocked/i,
-    friendly: {
-      title: "Permission needed",
-      description: "Please allow access to continue. Check your browser settings.",
-      action: "settings"
-    }
-  },
   // Server errors (5xx)
   {
     pattern: /500|502|503|504|server error|internal error/i,
@@ -114,11 +147,19 @@ const errorPatterns: Array<{
   },
   // Authentication errors
   {
-    pattern: /401|403|unauthorized|forbidden|auth/i,
+    pattern: /401|unauthorized|unauthenticated|jwt|token expired/i,
     friendly: {
       title: "Session expired",
       description: "Please sign in again to continue.",
       action: "login"
+    }
+  },
+  {
+    pattern: /403|forbidden/i,
+    friendly: {
+      title: "Access denied",
+      description: "You don't have permission for this action.",
+      action: "none"
     }
   },
   // SFU/Cloudflare specific
@@ -127,6 +168,15 @@ const errorPatterns: Array<{
     friendly: {
       title: "Syncing connection",
       description: "Optimizing your connection for the best experience.",
+      action: "retry"
+    }
+  },
+  // Generic data loading
+  {
+    pattern: /failed to load|load error|loading failed/i,
+    friendly: {
+      title: "Couldn't load content",
+      description: "Something went wrong loading this. Give it another try.",
       action: "retry"
     }
   }
