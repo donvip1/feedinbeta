@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock } from "lucide-react";
+import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock, Mic, Swords } from "lucide-react";
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import { useNavigation } from "@/context/NavigationContext";
 import { cn } from "@/lib/utils";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 // ADMIN CONFIG: Set to true to restrict live streaming to premium users only
 // When false, all users can create live streams (current default for launch)
 const REQUIRE_PREMIUM_FOR_STREAMING = false;
+
+type RoomType = 'video_broadcast' | 'audio_space' | 'pk_battle';
 
 interface CreateLiveStreamModalProps {
   isOpen: boolean;
@@ -32,6 +34,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [loading, setLoading] = useState(false);
+  const [roomType, setRoomType] = useState<RoomType>('video_broadcast');
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
 
   // Hide bottom navigation when modal is open
@@ -99,10 +102,11 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           category: category.trim() || null,
           is_premium: isPremium,
           stream_key: streamKeyData || `stream_${Date.now()}`,
-          status: isScheduled ? 'scheduled' : 'live', // Instant streams start as 'live' - broadcaster will set stream_ready when connected
+          status: isScheduled ? 'scheduled' : 'live',
           scheduled_start: scheduledStart,
           started_at: isScheduled ? null : new Date().toISOString(),
           connection_state: 'idle',
+          room_type: roomType,
         })
         .select()
         .single();
@@ -121,6 +125,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       setIsScheduled(false);
       setScheduledDate("");
       setScheduledTime("");
+      setRoomType('video_broadcast');
     } catch (error: any) {
       console.error("Error creating stream:", error);
       toast.error(error.message || "Failed to create stream");
@@ -185,7 +190,53 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
         </DialogHeader>
         
         <div className="space-y-4">
-          {/* Stream Type Toggle */}
+          {/* Room Type Selection */}
+          <div>
+            <Label className="text-xs text-muted-foreground mb-2 block">Stream Type</Label>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setRoomType('video_broadcast')}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
+                  roomType === 'video_broadcast' 
+                    ? "border-primary bg-primary/10 text-primary" 
+                    : "border-muted hover:border-muted-foreground/50"
+                )}
+              >
+                <Video className="w-5 h-5" />
+                <span className="font-medium text-xs">Video</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRoomType('audio_space')}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
+                  roomType === 'audio_space' 
+                    ? "border-green-500 bg-green-500/10 text-green-500" 
+                    : "border-muted hover:border-muted-foreground/50"
+                )}
+              >
+                <Mic className="w-5 h-5" />
+                <span className="font-medium text-xs">Audio</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setRoomType('pk_battle')}
+                className={cn(
+                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
+                  roomType === 'pk_battle' 
+                    ? "border-purple-500 bg-purple-500/10 text-purple-500" 
+                    : "border-muted hover:border-muted-foreground/50"
+                )}
+              >
+                <Swords className="w-5 h-5" />
+                <span className="font-medium text-xs">PK Battle</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Stream Schedule Toggle */}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
