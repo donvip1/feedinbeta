@@ -328,7 +328,8 @@ const Promote = () => {
                 // Check for passed return path, use navigate(-1), or fallback to post detail
                 const returnTo = (location.state as any)?.returnTo;
                 if (returnTo) {
-                  navigate(returnTo);
+                  // Navigate back with preserveFeed to prevent feed randomization
+                  navigate(returnTo, { state: { preserveFeed: true } });
                 } else if (window.history.length > 2) {
                   navigate(-1);
                 } else {
