@@ -32,10 +32,13 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
   const location = useLocation();
   const [hideBottomNav, setHideBottomNav] = useState(false);
 
-  // Check if current page is a livestream/space detail page
+// Check if current page is a livestream/space detail page OR the main /live dashboard
   const isLiveStreamPage = useMemo(() => {
     const pathname = location.pathname;
-    return HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
+    // Hide on exact /live dashboard AND on live stream/space detail pages
+    const isLiveDashboard = pathname === '/live';
+    const isLiveDetail = HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
+    return isLiveDashboard || isLiveDetail;
   }, [location.pathname]);
 
   const isSubPage = useMemo(() => {
