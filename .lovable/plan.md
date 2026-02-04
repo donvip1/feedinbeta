@@ -1,275 +1,376 @@
 
-# Plan: Fix Audio Spaces by Migrating to LiveKit
+# Live Streaming System Consolidation and Modernization
 
-## Problem Analysis
+## Overview
 
-The audio spaces feature is broken - users can't hear each other. After investigating:
+This plan consolidates 45+ separate live streaming files into a unified, maintainable architecture inspired by your prototype. The new system will maintain real LiveKit/Supabase integrations while dramatically simplifying the codebase.
 
-1. **Current Architecture**: Audio spaces use a custom Cloudflare SFU implementation (`space-room-manager.ts` + `unified-sfu-client.ts`)
-2. **Root Cause**: Cloudflare SFU requires strict signaling order. The 406 error shows:
-   ```
-   "invalid_session_description": "renegotiation is expected before pulling or pushing tracks. API requests were possibly made out-of-order"
-   ```
-3. **Working Alternative**: LiveKit is already configured and working perfectly for:
-   - Video streaming (LiveKitViewer, LiveKitBroadcaster)
-   - Group calls (useGroupCall hook)
-   - Has API keys configured (LIVEKIT_API_KEY, LIVEKIT_API_SECRET, LIVEKIT_URL)
+## Current State Analysis
 
-**Solution**: Replace Cloudflare SFU with LiveKit for audio spaces, matching the proven pattern used by video streaming.
+**Problem: File Sprawl**
+- 45+ files in `src/components/live/` 
+- 2 separate contexts (`LiveStreamContext`, `SpaceContext`) with overlapping functionality
+- Duplicate components: `LiveKitBroadcaster` (843 lines), `LiveKitViewer` (754 lines), `LiveSpaceRoom` (2111 lines)
+- Multiple versions of the same components (e.g., `LiveBroadcaster`, `LiveBroadcasterV2`, `SimpleBroadcaster`)
+
+**What Works Well (Preserve)**
+- `livekit-token` edge function - solid JWT generation
+- Database schema and RLS policies
+- Real-time Supabase subscriptions for chat/reactions
+- LiveKit track management and room connection logic
+- Floating PiP player pattern
+- FlyingChat TikTok-style overlay
 
 ---
 
-## Architecture Change
+## Architecture: Unified Live System
+
+### Phase 1: Create Unified Context (Replace Two with One)
+
+**New File: `src/context/UnifiedLiveContext.tsx`**
+
+Combines `LiveStreamContext` + `SpaceContext` into a single polymorphic context that handles all room types:
 
 ```text
-BEFORE (Cloudflare SFU - broken)              AFTER (LiveKit - proven)
-┌─────────────────────────────┐              ┌─────────────────────────┐
-│ LiveSpaceRoom.tsx           │              │ LiveSpaceRoom.tsx       │
-│         ↓                   │              │         ↓               │
-│ SpaceContext.tsx            │              │ SpaceContext.tsx        │
-│         ↓                   │              │         ↓               │
-│ space-room-manager.ts       │              │ NEW: LiveKit Room       │
-│         ↓                   │              │         ↓               │
-│ unified-sfu-client.ts       │              │ livekit-token edge fn   │
-│         ↓                   │              │ (already working)       │
-│ cloudflare-sfu edge fn      │              └─────────────────────────┘
-│ (406 signaling errors)      │              
-└─────────────────────────────┘              
+UnifiedLiveContext
+├── State
+│   ├── isActive: boolean
+│   ├── isMinimized: boolean
+│   ├── currentRoom: UnifiedRoom | null (video/audio/pk_battle)
+│   ├── connectionStatus: ConnectionStatus
+│   ├── isMuted: boolean
+│   ├── isCameraOn: boolean (video only)
+│   ├── isHost: boolean
+│   ├── viewerCount: number
+│   └── audioLevels: Record<string, number> (spaces only)
+│
+├── Actions
+│   ├── joinRoom(room, role) - Unified entry point
+│   ├── leaveRoom() - Cleanup all tracks/channels
+│   ├── minimize() / maximize()
+│   ├── toggleMic() / toggleCamera()
+│   └── switchRoomType() (for PK battles)
+│
+└── Refs
+    ├── roomRef: LiveKit Room
+    ├── videoTrackRef / audioTrackRef
+    └── realtimeChannelRefs
+```
+
+**Key Changes:**
+- Single room type enum: `'video_broadcast' | 'audio_space' | 'pk_battle'`
+- Polymorphic behavior based on `room.type`
+- Camera only initialized for video modes
+- Audio levels only monitored for audio spaces
+
+### Phase 2: Create Unified Room Component
+
+**New File: `src/components/live/UnifiedLiveRoom.tsx`**
+
+One component that morphs between all three modes (replacing `LiveKitBroadcaster`, `LiveKitViewer`, `LiveSpaceRoom`, and `UnifiedRoom.tsx`):
+
+```text
+UnifiedLiveRoom
+├── Mode Detection
+│   ├── video_broadcast → Full video with camera preview
+│   ├── audio_space → Audio visualizer with speaker grid
+│   └── pk_battle → Split-screen with battle bar
+│
+├── Shared Features
+│   ├── FlyingChat (left 55%, TikTok-style)
+│   ├── FloatingReactions (right side)
+│   ├── Connection status overlay
+│   ├── Host header with follow button
+│   └── Bottom control bar
+│
+├── Mode-Specific Rendering
+│   ├── VideoStage → Camera/screen share
+│   ├── AudioStage → Visualizer + speaker avatars
+│   └── PKStage → Split video + battle bar + scores
+│
+└── Minimized PiP View
+    └── Compact draggable player with controls
+```
+
+### Phase 3: Consolidate Sub-Components
+
+**Keep These (Move to `src/components/live/shared/`):**
+- `FlyingChat.tsx` - Already excellent, minor tweaks
+- `FloatingReactions.tsx` - Works well
+- `LiveGiftModal.tsx` - Complete gift system
+- `AudioVisualizer.tsx` - From unified folder
+- `PKBattleBar.tsx` - From unified folder
+
+**Remove/Merge These:**
+| Remove | Merged Into |
+|--------|------------|
+| `LiveKitBroadcaster.tsx` (843 lines) | `UnifiedLiveRoom.tsx` |
+| `LiveKitViewer.tsx` (754 lines) | `UnifiedLiveRoom.tsx` |
+| `LiveSpaceRoom.tsx` (2111 lines) | `UnifiedLiveRoom.tsx` |
+| `LiveBroadcaster.tsx` | Delete (legacy) |
+| `LiveBroadcasterV2.tsx` | Delete (legacy) |
+| `SimpleBroadcaster.tsx` | Delete (legacy) |
+| `SimpleViewer.tsx` | Delete (legacy) |
+| `LiveStreamViewer.tsx` | Delete (legacy) |
+| `LiveStreamViewerWebRTC.tsx` | Delete (legacy) |
+| `LiveStreamPlayerV2.tsx` | Delete (legacy) |
+| `FloatingStreamPlayer.tsx` | Unified PiP in context |
+| `FloatingSpacePlayer.tsx` | Unified PiP in context |
+
+**Estimated Reduction:** ~6000 lines of duplicate code removed
+
+### Phase 4: Unified Floating Player
+
+**New File: `src/components/live/FloatingLivePlayer.tsx`**
+
+Single PiP component for all room types:
+
+```text
+FloatingLivePlayer
+├── Draggable container (framer-motion)
+├── Content based on room type
+│   ├── Video → Live video preview
+│   ├── Audio → Visualizer + host avatar
+│   └── PK → Mini battle indicator
+├── Controls
+│   ├── Mic toggle
+│   ├── Camera toggle (video only)
+│   ├── Maximize button
+│   └── End/Leave button
+└── Status indicators
+    ├── LIVE badge
+    ├── Duration
+    └── Viewer count
+```
+
+### Phase 5: Simplified Live Page
+
+**Update: `src/pages/Live.tsx`**
+
+Simplified to ~150 lines:
+
+```text
+Live Page
+├── Queries (unchanged)
+│   ├── liveStreams, liveSpaces
+│   ├── scheduledStreams, scheduledSpaces
+│   └── myStreams, mySpaces
+│
+├── State
+│   └── selectedRoom: { id, type } | null
+│
+├── Render Logic
+│   ├── If selectedRoom → <UnifiedLiveRoom room={...} />
+│   ├── Else → <LiveDashboard ... />
+│
+└── Modals
+    ├── CreateLiveStreamModal (keep)
+    ├── CreateSpaceModal (keep)
+    └── GoLiveModal (keep)
 ```
 
 ---
 
-## Phase 1: Create LiveKit-Based Space Audio Hook
+## File Structure After Consolidation
 
-Create a new hook `useSpaceLiveKit.ts` that mirrors LiveKitViewer's pattern:
+```text
+src/
+├── context/
+│   └── UnifiedLiveContext.tsx (NEW - replaces 2 files)
+│
+├── components/live/
+│   ├── UnifiedLiveRoom.tsx (NEW - main component ~800 lines)
+│   ├── FloatingLivePlayer.tsx (NEW - unified PiP)
+│   ├── LiveDashboard.tsx (KEEP - minimal changes)
+│   │
+│   ├── shared/
+│   │   ├── FlyingChat.tsx (MOVE)
+│   │   ├── FloatingReactions.tsx (MOVE)
+│   │   ├── AudioVisualizer.tsx (MOVE)
+│   │   ├── PKBattleBar.tsx (MOVE)
+│   │   ├── ConnectionOverlay.tsx (NEW)
+│   │   └── LiveControlBar.tsx (NEW)
+│   │
+│   ├── modals/
+│   │   ├── CreateLiveStreamModal.tsx (KEEP)
+│   │   ├── CreateSpaceModal.tsx (KEEP)
+│   │   ├── LiveGiftModal.tsx (KEEP)
+│   │   └── GoLiveModal.tsx (KEEP)
+│   │
+│   └── cards/
+│       ├── LiveDiscoverCard.tsx (KEEP)
+│       └── SpaceCard.tsx (KEEP)
+│
+└── pages/
+    └── Live.tsx (SIMPLIFIED)
+```
+
+**Files to Delete (25+):**
+- `LiveStreamContext.tsx`, `SpaceContext.tsx`
+- All legacy broadcasters and viewers
+- Duplicate floating players
+- Unused V2 components
+
+---
+
+## Technical Implementation Details
+
+### UnifiedLiveContext Core Logic
 
 ```typescript
-// src/hooks/useSpaceLiveKit.ts
-import { Room, RoomEvent, Track, LocalAudioTrack } from 'livekit-client';
-import { supabase } from '@/integrations/supabase/client';
-
-export const useSpaceLiveKit = ({ spaceId, isMuted, isHost }) => {
-  const roomRef = useRef<Room | null>(null);
-  const localTrackRef = useRef<LocalAudioTrack | null>(null);
+// Polymorphic room joining
+const joinRoom = async (room: LiveRoom, role: string) => {
+  setState(prev => ({ ...prev, connectionStatus: 'connecting' }));
   
-  const connect = useCallback(async () => {
-    // Get token from existing livekit-token edge function
-    const { data } = await supabase.functions.invoke('livekit-token', {
-      body: {
-        roomName: `space-${spaceId}`,
-        participantName: displayName,
-        participantIdentity: user.id,
-        isHost,
-      },
-    });
+  // Get LiveKit token
+  const { data } = await supabase.functions.invoke('livekit-token', {
+    body: {
+      roomName: room.type === 'audio_space' ? `space-${room.id}` : `stream-${room.id}`,
+      participantIdentity: user.id,
+      isHost: role === 'host',
+    },
+  });
+  
+  // Create room with type-specific settings
+  const lkRoom = new Room({
+    adaptiveStream: true,
+    dynacast: true,
+    videoCaptureDefaults: room.type !== 'audio_space' ? { resolution: VideoPresets.h720 } : undefined,
+  });
+  
+  // Connect and publish tracks based on room type
+  await lkRoom.connect(data.url, data.token);
+  
+  if (role === 'host' || role === 'speaker') {
+    const audioTrack = await createLocalAudioTrack({ ... });
+    await lkRoom.localParticipant.publishTrack(audioTrack);
     
-    const room = new Room({
-      adaptiveStream: true,
-      dynacast: true,
-      publishDefaults: {
-        audioPreset: AudioPresets.speech,
-      },
-    });
-    
-    // Handle remote tracks - auto-play audio
-    room.on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
-      if (track.kind === Track.Kind.Audio) {
-        const audioEl = document.createElement('audio');
-        audioEl.autoplay = true;
-        track.attach(audioEl);
-        document.body.appendChild(audioEl);
-      }
-    });
-    
-    await room.connect(data.url, data.token);
-    
-    // Publish local audio if host/speaker
-    if (isHost || isSpeaker) {
-      const localTrack = await createLocalAudioTrack();
-      await room.localParticipant.publishTrack(localTrack);
+    if (room.type !== 'audio_space') {
+      const videoTrack = await createLocalVideoTrack({ ... });
+      await lkRoom.localParticipant.publishTrack(videoTrack);
     }
-  }, [spaceId, user, isHost]);
+  }
   
-  return { connect, disconnect, toggleMute, audioLevels, isConnected };
+  setState({ isActive: true, currentRoom: room, connectionStatus: 'connected' });
+};
+```
+
+### UnifiedLiveRoom Rendering Logic
+
+```tsx
+const UnifiedLiveRoom = () => {
+  const { state, actions } = useUnifiedLive();
+  const { currentRoom, isMinimized } = state;
+  
+  if (isMinimized) return <FloatingLivePlayer />;
+  
+  return (
+    <div className="fixed inset-0 z-50 bg-black">
+      {/* Header - same for all types */}
+      <RoomHeader room={currentRoom} onClose={actions.leaveRoom} />
+      
+      {/* Stage - polymorphic based on room type */}
+      {currentRoom.type === 'pk_battle' && currentRoom.pkData ? (
+        <PKBattleStage pkData={currentRoom.pkData} />
+      ) : currentRoom.type === 'audio_space' ? (
+        <AudioSpaceStage speakers={speakers} audioLevels={state.audioLevels} />
+      ) : (
+        <VideoStage videoRef={videoRef} hasVideo={hasVideo} />
+      )}
+      
+      {/* Overlays - same for all types */}
+      <FlyingChat messages={comments} gifts={flyingGifts} />
+      <FloatingReactions reactions={reactions} />
+      
+      {/* Controls - adapts to room type */}
+      <LiveControlBar 
+        roomType={currentRoom.type}
+        isMuted={state.isMuted}
+        isCameraOn={state.isCameraOn}
+        onToggleMic={actions.toggleMic}
+        onToggleCamera={actions.toggleCamera}
+      />
+    </div>
+  );
 };
 ```
 
 ---
 
-## Phase 2: Update SpaceContext.tsx
+## Implementation Order
 
-Replace Cloudflare SFU integration with LiveKit:
+### Step 1: Create UnifiedLiveContext (~400 lines)
+- Merge state from both existing contexts
+- Implement polymorphic `joinRoom`, `leaveRoom`
+- Keep existing LiveKit connection logic
+- Add network auto-reconnection
+- Provide at App.tsx level (replacing both providers)
 
-**Remove**:
-- `import { SpaceRoomManager } from '@/lib/space-room-manager'`
-- All `getSpaceRoomManager()` calls
-- `sfuClient` related code
+### Step 2: Create UnifiedLiveRoom (~800 lines)
+- Port host/viewer logic from LiveKitBroadcaster/LiveKitViewer
+- Port audio space logic from LiveSpaceRoom
+- Implement mode-switching rendering
+- Add PK Battle mode support
+- Integrate existing FlyingChat and FloatingReactions
 
-**Add**:
-- LiveKit Room management (same pattern as LiveStreamContext.tsx)
-- Use `livekit-token` edge function (already exists)
+### Step 3: Create FloatingLivePlayer (~200 lines)
+- Merge FloatingStreamPlayer + FloatingSpacePlayer
+- Polymorphic display based on room type
+- Draggable with edge snapping
+- Controls adapt to room type
 
-**Key changes**:
-```typescript
-// SpaceContext.tsx
-import { Room, RoomEvent, createLocalAudioTrack, AudioPresets } from 'livekit-client';
+### Step 4: Update Live.tsx (~150 lines)
+- Remove direct component imports for broadcasters/viewers
+- Use UnifiedLiveRoom for all room types
+- Keep dashboard and modal logic
 
-const roomRef = useRef<Room | null>(null);
+### Step 5: Move shared components to organized folders
+- Create `shared/`, `modals/`, `cards/` directories
+- Move and clean up imports
 
-const connectAudio = useCallback(async (overrideRole?: string) => {
-  // Get LiveKit token (reuse existing edge function)
-  const { data } = await supabase.functions.invoke('livekit-token', {
-    body: {
-      roomName: `space-${spaceInfoRef.current.id}`,
-      participantName: displayName,
-      participantIdentity: currentUser.id,
-      isHost: effectiveRole === 'host',
-    },
-  });
-  
-  const room = new Room({
-    adaptiveStream: true,
-    publishDefaults: { audioPreset: AudioPresets.speech },
-  });
-  
-  // Handle incoming audio tracks (everyone receives)
-  room.on(RoomEvent.TrackSubscribed, (track, pub, participant) => {
-    if (track.kind === Track.Kind.Audio) {
-      playRemoteAudio(track, participant.identity);
-    }
-  });
-  
-  await room.connect(data.url, data.token);
-  roomRef.current = room;
-  
-  // Publish if host/speaker
-  if (canBroadcast) {
-    const localTrack = await createLocalAudioTrack({
-      echoCancellation: true,
-      noiseSuppression: true,
-    });
-    await room.localParticipant.publishTrack(localTrack);
-  }
-  
-  setSpaceState(prev => ({ ...prev, connectionStatus: 'connected' }));
-}, []);
-```
+### Step 6: Delete legacy files
+- Remove all replaced files
+- Update imports across the app
 
 ---
 
-## Phase 3: Update LiveSpaceRoom.tsx Integration
+## Benefits After Implementation
 
-Simplify to use LiveKit through SpaceContext:
+| Metric | Before | After |
+|--------|--------|-------|
+| Live component files | 45+ | ~15 |
+| Context files | 2 | 1 |
+| Total lines of code | ~8000+ | ~2500 |
+| Room-specific components | 6+ | 1 |
+| Floating players | 2 | 1 |
+| Duplicate LiveKit logic | 4 places | 1 place |
 
-1. Remove references to `cloudflare_session_id` and `cloudflare_track_id`
-2. Audio connection now works through standard LiveKit room events
-3. Speaking indicators come from LiveKit's built-in audio level detection
-
----
-
-## Phase 4: Add Audio Level Monitoring
-
-LiveKit provides built-in audio levels via `participant.audioLevel`. Update the speaking indicators:
-
-```typescript
-// Monitor audio levels
-room.on(RoomEvent.AudioPlaybackStatusChanged, () => {
-  const levels: Record<string, number> = {};
-  room.remoteParticipants.forEach((p, id) => {
-    levels[id] = (p.audioLevel || 0) * 100; // 0-100 scale
-  });
-  // Local participant
-  if (room.localParticipant) {
-    levels[room.localParticipant.identity] = 
-      (room.localParticipant.audioLevel || 0) * 100;
-  }
-  setAudioLevels(levels);
-});
-
-// Or use ActiveSpeakersChanged for simpler implementation
-room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
-  // speakers array contains active speakers
-});
-```
+**Additional Benefits:**
+- Single source of truth for live state
+- Easier to add new room types (e.g., watch parties)
+- Consistent UI/UX across all modes
+- Simpler debugging - one component to trace
+- Better performance - shared connection logic
+- Easier testing - one context to mock
 
 ---
 
-## Files to Modify
+## Risk Mitigation
 
-| File | Changes |
-|------|---------|
-| `src/context/SpaceContext.tsx` | Replace Cloudflare SFU with LiveKit Room |
-| `src/components/live/LiveSpaceRoom.tsx` | Simplify - remove SFU track management |
-| `src/hooks/useSpaceAudio.tsx` | Update to use LiveKit (or deprecate) |
+1. **Preserve Working Features:** Keep existing database queries, RLS policies, and realtime subscriptions unchanged
 
-## Files to Create
+2. **Incremental Migration:** Create new files alongside old ones, switch over gradually
 
-| File | Purpose |
-|------|---------|
-| `src/hooks/useSpaceLiveKit.ts` | LiveKit-based audio for spaces |
+3. **Feature Parity Checklist:**
+   - Video broadcasting with camera/screen share
+   - Audio spaces with speaker management
+   - PK Battles with score tracking
+   - Flying chat with @mentions
+   - Gift animations
+   - Floating reactions
+   - Minimizable PiP
+   - Auto-reconnection
+   - Host end detection
 
-## Files Potentially Deprecated
+4. **Rollback Plan:** Old files remain until new system is verified working
 
-| File | Reason |
-|------|--------|
-| `src/lib/space-room-manager.ts` | Replaced by LiveKit |
-| `src/lib/unified-sfu-client.ts` | Replaced by LiveKit |
-| `supabase/functions/cloudflare-sfu/` | No longer needed for spaces |
-
----
-
-## Technical Details
-
-### Why LiveKit Solves This Problem
-
-1. **Automatic Signaling**: LiveKit handles all WebRTC signaling internally - no 406 errors
-2. **Proven in This Project**: Already works for video streaming and group calls
-3. **Better Track Management**: Automatic subscription to all room participants
-4. **Built-in Audio Levels**: `participant.audioLevel` for speaking indicators
-5. **Reconnection Handling**: Automatic reconnection with exponential backoff
-
-### Room Naming Convention
-
-```typescript
-// Consistent room naming
-const roomName = `space-${spaceId}`;  // For audio spaces
-const roomName = `stream-${streamId}`; // For video streams (existing)
-const roomName = `call-${callId}`;     // For calls (existing)
-```
-
-### Audio Settings for Speech
-
-```typescript
-const localTrack = await createLocalAudioTrack({
-  echoCancellation: true,
-  noiseSuppression: true,
-  autoGainControl: true,
-  sampleRate: 48000,
-});
-```
-
----
-
-## Testing Checklist
-
-| Test | Expected Result |
-|------|-----------------|
-| Host creates and joins space | Audio publishes, shows as connected |
-| Listener joins space | Hears host audio immediately |
-| Second host/speaker joins | All participants hear each other |
-| Listener unmutes to speak | Audio publishes, others hear them |
-| Network disconnect/reconnect | Auto-reconnects without user action |
-| Host ends space | All participants disconnect cleanly |
-| Speaking indicator | Shows who is currently talking |
-| Mute/unmute toggle | Works for self, host can mute others |
-
----
-
-## Migration Safety
-
-The Cloudflare SFU code can remain in the codebase initially as a fallback. The migration:
-1. Updates SpaceContext to use LiveKit
-2. Existing SFU code stays but is no longer called
-3. Once verified working, SFU code can be removed in a future cleanup
-
-This approach ensures zero disruption to other features (calls, video streaming) while fixing audio spaces.
