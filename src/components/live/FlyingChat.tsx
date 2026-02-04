@@ -255,20 +255,22 @@ export const FlyingChat = ({
                 transition={{ duration: 0.25 }}
                 className="pointer-events-auto"
               >
-                <p className="text-sm leading-relaxed drop-shadow-lg">
-                  {/* Clickable Username - inline */}
+                <p className="text-sm leading-relaxed">
+                  {/* Clickable Username - inline with shadow */}
                   <span 
                     className={cn(
                       "font-bold cursor-pointer hover:underline mr-2",
-                      isHost ? "text-amber-400" : "text-primary"
+                      isHost 
+                        ? "text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" 
+                        : "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
                     )}
                     onClick={(e) => handleProfileClick(message.user_id, e)}
                   >
                     {isHost && <Crown className="w-3 h-3 inline-block mr-1 text-amber-400" />}
                     {displayName}
                   </span>
-                  {/* Message content - inline */}
-                  <span className="text-white/95">
+                  {/* Message content - bold with shadow */}
+                  <span className="text-white font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
                     {renderContent(message.content)}
                   </span>
                 </p>
