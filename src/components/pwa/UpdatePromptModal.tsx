@@ -20,9 +20,9 @@ interface UpdatePromptModalProps {
 
 // Latest update changelog - update this with each deployment
 const LATEST_UPDATES = [
-  { icon: Zap, text: 'Instant real-time updates - no more delays!' },
-  { icon: Sparkles, text: 'Faster page loading with improved caching' },
-  { icon: Bug, text: 'Fixed audio issues in Live Spaces' },
+  { icon: Zap, text: 'Gift sending now works smoothly for all users!' },
+  { icon: Sparkles, text: 'Hosts can now gift viewers directly' },
+  { icon: Bug, text: 'Fixed navigation history when topping up credits' },
   { icon: Shield, text: 'Enhanced security and performance' },
 ];
 

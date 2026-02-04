@@ -1,5 +1,5 @@
 // Cache version - increment this to force cache refresh on new deployments
-const CACHE_VERSION = 'v34';
+const CACHE_VERSION = 'v35';
 const CACHE_NAME = `feedin-${CACHE_VERSION}`;
 const CACHE_STATIC = `${CACHE_NAME}-static`;
 const CACHE_DYNAMIC = `${CACHE_NAME}-dynamic`;
