@@ -18,13 +18,14 @@ interface QuickGiftBarProps {
   onCreditsChange?: (newBalance: number) => void;
 }
 
+// Updated gift packs with colors matching reference design
 const QUICK_GIFTS = [
-  { type: 'rose', name: 'Rose', value: 10, emoji: '🌹' },
-  { type: 'heart', name: 'Heart', value: 25, emoji: '❤️' },
-  { type: 'coffee', name: 'Coffee', value: 50, emoji: '☕' },
-  { type: 'diamond', name: 'Diamond', value: 100, emoji: '💎' },
-  { type: 'rocket', name: 'Rocket', value: 500, emoji: '🚀' },
-  { type: 'castle', name: 'Castle', value: 1000, emoji: '🏰' },
+  { type: 'rose', name: 'Rose', value: 10, emoji: '🌹', color: 'from-red-500/20 to-red-900/20 border-red-500/50' },
+  { type: 'coffee', name: 'Coffee', value: 20, emoji: '☕', color: 'from-amber-700/20 to-amber-900/20 border-amber-700/50' },
+  { type: 'heart', name: 'Love', value: 50, emoji: '❤️', color: 'from-pink-500/20 to-pink-900/20 border-pink-500/50' },
+  { type: 'diamond', name: 'Diamond', value: 100, emoji: '💎', color: 'from-cyan-400/20 to-cyan-900/20 border-cyan-400/50' },
+  { type: 'rocket', name: 'Rocket', value: 500, emoji: '🚀', color: 'from-purple-600/20 to-purple-900/20 border-purple-600/50' },
+  { type: 'castle', name: 'Castle', value: 1000, emoji: '🏰', color: 'from-yellow-500/20 to-yellow-900/20 border-yellow-500/50' },
 ];
 
 export const QuickGiftBar = ({
@@ -143,8 +144,8 @@ export const QuickGiftBar = ({
               </div>
             </div>
 
-            {/* Gift Grid */}
-            <div className="grid grid-cols-6 gap-2">
+            {/* Gift Grid - Enhanced styling */}
+            <div className="grid grid-cols-3 gap-3">
               {QUICK_GIFTS.map((gift) => {
                 const canAfford = hasUnlimitedCredits || userCredits >= gift.value;
                 const isSending = sending === gift.type;
@@ -152,19 +153,30 @@ export const QuickGiftBar = ({
                 return (
                   <motion.button
                     key={gift.type}
-                    whileTap={{ scale: canAfford ? 0.9 : 1 }}
+                    whileHover={{ scale: canAfford ? 1.05 : 1 }}
+                    whileTap={{ scale: canAfford ? 0.95 : 1 }}
                     onClick={() => canAfford && handleSendGift(gift)}
                     disabled={!canAfford || !!sending}
                     className={cn(
-                      "flex flex-col items-center gap-1 p-2 rounded-xl transition-all",
+                      "relative flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300",
                       canAfford 
-                        ? "bg-white/5 hover:bg-white/10 active:bg-white/20" 
-                        : "opacity-40 cursor-not-allowed",
-                      isSending && "animate-pulse"
+                        ? `bg-gradient-to-br ${gift.color} hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]` 
+                        : "bg-slate-900/50 border-white/5 opacity-40 cursor-not-allowed",
+                      isSending && "animate-pulse scale-110"
                     )}
                   >
-                    <span className="text-2xl">{gift.emoji}</span>
-                    <span className="text-[10px] text-white/70">{gift.value}</span>
+                    <motion.span 
+                      className="text-3xl mb-1"
+                      animate={isSending ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : {}}
+                      transition={{ duration: 0.5 }}
+                    >
+                      {gift.emoji}
+                    </motion.span>
+                    <span className="text-[11px] text-white/80 font-medium">{gift.name}</span>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Coins className="w-3 h-3 text-amber-400" />
+                      <span className="text-[10px] text-amber-400 font-semibold">{gift.value}</span>
+                    </div>
                   </motion.button>
                 );
               })}

@@ -25,16 +25,16 @@ interface LiveGiftModalProps {
   isSpace?: boolean; // If true, inserts into live_space_gifts instead of live_stream_gifts
 }
 
-// Premium 3D animated gift types
+// Premium animated gift types with colors matching reference design
 const GIFTS = [
-  { type: "heart", label: "Heart", value: 10, emoji: "❤️", color: "from-red-400 to-pink-500", icon: Heart },
-  { type: "star", label: "Star", value: 25, emoji: "⭐", color: "from-yellow-400 to-amber-500", icon: Star },
-  { type: "fire", label: "Fire", value: 50, emoji: "🔥", color: "from-orange-400 to-red-500", icon: Flame },
-  { type: "lightning", label: "Lightning", value: 100, emoji: "⚡", color: "from-blue-400 to-indigo-500", icon: Zap },
-  { type: "crown", label: "Crown", value: 250, emoji: "👑", color: "from-amber-400 to-yellow-500", icon: Crown },
-  { type: "diamond", label: "Diamond", value: 500, emoji: "💎", color: "from-cyan-400 to-blue-500", icon: Gem },
-  { type: "rocket", label: "Rocket", value: 1000, emoji: "🚀", color: "from-purple-400 to-pink-500", icon: Rocket },
-  { type: "universe", label: "Universe", value: 2500, emoji: "🌌", color: "from-indigo-500 to-purple-600", icon: Sparkles },
+  { type: "rose", label: "Rose", value: 10, emoji: "🌹", color: "from-red-500/20 to-red-900/20 border-red-500/50", icon: Heart },
+  { type: "coffee", label: "Coffee", value: 20, emoji: "☕", color: "from-amber-700/20 to-amber-900/20 border-amber-700/50", icon: Star },
+  { type: "heart", label: "Love", value: 50, emoji: "❤️", color: "from-pink-500/20 to-pink-900/20 border-pink-500/50", icon: Heart },
+  { type: "diamond", label: "Diamond", value: 100, emoji: "💎", color: "from-cyan-400/20 to-cyan-900/20 border-cyan-400/50", icon: Gem },
+  { type: "rocket", label: "Rocket", value: 500, emoji: "🚀", color: "from-purple-600/20 to-purple-900/20 border-purple-600/50", icon: Rocket },
+  { type: "castle", label: "Castle", value: 1000, emoji: "🏰", color: "from-yellow-500/20 to-yellow-900/20 border-yellow-500/50", icon: Crown },
+  { type: "crown", label: "Crown", value: 250, emoji: "👑", color: "from-amber-400/20 to-yellow-500/20 border-amber-500/50", icon: Crown },
+  { type: "universe", label: "Universe", value: 2500, emoji: "🌌", color: "from-indigo-500/20 to-purple-600/20 border-indigo-500/50", icon: Sparkles },
 ];
 
 const QUICK_AMOUNTS = [50, 100, 250, 500, 1000];
@@ -278,41 +278,41 @@ export const LiveGiftModal = ({
               </div>
             )}
 
-            {/* Gift Grid */}
+            {/* Gift Grid - Enhanced with hover animations */}
             <div className="grid grid-cols-4 gap-2">
               {GIFTS.map((gift) => {
-                const Icon = gift.icon;
                 const canAfford = userCredits >= gift.value;
+                const effectiveCanAfford = hasUnlimitedCredits || canAfford;
                 
-                  const effectiveCanAfford = hasUnlimitedCredits || canAfford;
-                  return (
-                    <motion.button
-                      key={gift.type}
-                      whileHover={{ scale: effectiveCanAfford ? 1.05 : 1 }}
-                      whileTap={{ scale: effectiveCanAfford ? 0.95 : 1 }}
-                      className={cn(
-                        "relative flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all",
-                        effectiveCanAfford 
-                          ? "hover:border-primary cursor-pointer" 
-                          : "opacity-50 cursor-not-allowed",
-                        sending && "pointer-events-none"
-                      )}
-                      onClick={() => effectiveCanAfford && handleSendGift(gift.type, gift.value)}
-                      disabled={!effectiveCanAfford || sending || (isHost && !selectedRecipient)}
+                return (
+                  <motion.button
+                    key={gift.type}
+                    whileHover={{ scale: effectiveCanAfford ? 1.08 : 1, y: effectiveCanAfford ? -2 : 0 }}
+                    whileTap={{ scale: effectiveCanAfford ? 0.95 : 1 }}
+                    className={cn(
+                      "relative flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all duration-300",
+                      effectiveCanAfford 
+                        ? `bg-gradient-to-br ${gift.color} hover:shadow-[0_0_20px_rgba(255,255,255,0.15)] cursor-pointer` 
+                        : "bg-slate-900/50 border-white/5 opacity-50 cursor-not-allowed",
+                      sending && "pointer-events-none"
+                    )}
+                    onClick={() => effectiveCanAfford && handleSendGift(gift.type, gift.value)}
+                    disabled={!effectiveCanAfford || sending || (isHost && !selectedRecipient)}
+                  >
+                    <motion.span 
+                      className="text-2xl relative z-10"
+                      animate={effectiveCanAfford ? { scale: [1, 1.1, 1] } : {}}
+                      transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
                     >
-                    <div className={cn(
-                      "absolute inset-0 rounded-2xl bg-gradient-to-br opacity-10",
-                      gift.color
-                    )} />
-                    
-                    <span className="text-2xl relative z-10">{gift.emoji}</span>
-                    <span className="text-[10px] font-medium relative z-10">{gift.label}</span>
-                      <Badge 
-                        variant="secondary" 
-                        className={cn(
-                          "text-[10px] h-5 relative z-10",
-                          effectiveCanAfford ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
-                        )}
+                      {gift.emoji}
+                    </motion.span>
+                    <span className="text-[10px] font-medium relative z-10 text-white/80">{gift.label}</span>
+                    <Badge 
+                      variant="secondary" 
+                      className={cn(
+                        "text-[10px] h-5 relative z-10 mt-0.5",
+                        effectiveCanAfford ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                      )}
                     >
                       {gift.value}
                     </Badge>

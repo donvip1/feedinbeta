@@ -1,13 +1,11 @@
 /**
  * Physics-based Floating Reactions Component
- * TikTok/Tango inspired floating hearts and emojis
+ * TikTok/Tango inspired floating emojis and gifts
  * Uses framer-motion for smooth, organic animations
- * Now uses unified LIVE_REACTIONS from AnimatedEmojiButton
  */
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { LIVE_REACTIONS } from '@/components/shared/AnimatedEmojiButton';
 
 interface FloatingReaction {
   id: string | number;
@@ -24,23 +22,33 @@ interface FloatingReactionsProps {
     id: string | number;
     type: string;
     senderName?: string;
+    emoji?: string;
   }>;
   className?: string;
 }
 
-// Create emoji map from unified reactions
-const REACTION_EMOJIS: Record<string, string> = LIVE_REACTIONS.reduce((acc, r) => {
-  acc[r.id] = r.emoji;
-  return acc;
-}, {} as Record<string, string>);
-
-// Add additional emojis for backward compatibility
-const EXTENDED_EMOJIS: Record<string, string> = {
-  ...REACTION_EMOJIS,
+// Unified emoji mapping for all reaction types
+const REACTION_EMOJIS: Record<string, string> = {
+  // Live reactions
+  heart: '❤️',
+  like: '👍',
+  fire: '🔥',
+  clap: '👏',
+  star: '⭐',
+  love: '😍',
   wow: '😮',
   laugh: '😂',
   cry: '😢',
   angry: '😠',
+  // Gift emojis
+  rose: '🌹',
+  coffee: '☕',
+  diamond: '💎',
+  rocket: '🚀',
+  castle: '🏰',
+  crown: '👑',
+  lightning: '⚡',
+  universe: '🌌',
 };
 
 export const FloatingReactions = ({ reactions, className }: FloatingReactionsProps) => {
@@ -52,12 +60,15 @@ export const FloatingReactions = ({ reactions, className }: FloatingReactionsPro
 
     const latestReaction = reactions[reactions.length - 1];
     
+    // Use provided emoji or look up from type
+    const emoji = latestReaction.emoji || REACTION_EMOJIS[latestReaction.type] || '❤️';
+    
     // Create floating reaction with random physics properties
     const newFloating: FloatingReaction = {
       id: `${latestReaction.id}-${Date.now()}-${Math.random()}`,
-      emoji: EXTENDED_EMOJIS[latestReaction.type] || REACTION_EMOJIS[latestReaction.type] || '❤️',
+      emoji,
       senderName: latestReaction.senderName,
-      x: 10 + Math.random() * 30, // Left-center of screen (10-40%) to be fully visible
+      x: 50 + Math.random() * 40 - 20, // 30-70% of screen width
       size: 1 + Math.random() * 0.5, // 1x to 1.5x scale
       rotation: -15 + Math.random() * 30, // -15 to 15 degrees
       duration: 2.5 + Math.random() * 1.5, // 2.5 to 4 seconds
@@ -84,9 +95,6 @@ export const FloatingReactions = ({ reactions, className }: FloatingReactionsPro
 
 // Individual reaction with physics-based animation
 const PhysicsReaction = ({ reaction }: { reaction: FloatingReaction }) => {
-  // Spring physics for organic movement
-  const springConfig = { stiffness: 80, damping: 15, mass: 1 };
-  
   // Random horizontal drift
   const xDrift = Math.random() * 40 - 20;
   
