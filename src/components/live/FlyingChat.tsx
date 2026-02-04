@@ -27,6 +27,7 @@ interface FlyingGift {
   sender_name: string;
   credit_value: number;
   sender_id?: string;
+  sender_avatar?: string;
 }
 
 interface FlyingChatProps {
@@ -53,6 +54,24 @@ const GIFT_EMOJIS: Record<string, string> = {
   kiss: '💋',
   cake: '🎂',
   money: '💰',
+  coffee: '☕',
+  castle: '🏰',
+};
+
+// Get display name for gift type
+const getGiftDisplayName = (type: string): string => {
+  const names: Record<string, string> = {
+    rose: 'rose',
+    coffee: 'coffee',
+    heart: 'love',
+    diamond: 'diamond',
+    rocket: 'rocket',
+    castle: 'castle',
+    crown: 'crown',
+    fire: 'fire',
+    star: 'star',
+  };
+  return names[type] || type;
 };
 
 export const FlyingChat = ({ 
@@ -103,7 +122,7 @@ export const FlyingChat = ({
     }
   }, [messages, maxMessages]);
 
-  // Handle flying gifts - TikTok style prominent display
+  // Handle flying gifts - TikTok style prominent display + add to chat as message
   useEffect(() => {
     if (gifts.length > 0) {
       const latestGift = gifts[gifts.length - 1];
@@ -112,6 +131,23 @@ export const FlyingChat = ({
       if (!existingIds.has(latestGift.id)) {
         const animKey = `${latestGift.id}-${Date.now()}`;
         setFlyingGifts(prev => [...prev, { ...latestGift, _animKey: animKey }]);
+        
+        // Add gift as a chat message with special styling
+        messageCountRef.current++;
+        const giftMessage: ChatMessage & { _key: string } = {
+          id: `gift-${latestGift.id}`,
+          content: `Sent ${getGiftDisplayName(latestGift.gift_type)}!`,
+          user_id: latestGift.sender_id || '',
+          created_at: new Date().toISOString(),
+          is_gift: true,
+          gift_value: latestGift.credit_value,
+          profiles: {
+            display_name: latestGift.sender_name,
+            avatar_url: latestGift.sender_avatar,
+          },
+          _key: `gift-msg-${animKey}`
+        };
+        setDisplayedMessages(prev => [...prev, giftMessage].slice(-maxMessages));
         
         // Trigger full-screen effect for all gifts
         const newEffect = {
@@ -122,14 +158,14 @@ export const FlyingChat = ({
         };
         setFullScreenEffects(prev => [...prev, newEffect]);
         
-        // Remove after animation
+        // Remove flying gift after animation (but keep chat message)
         setTimeout(() => {
           setFlyingGifts(prev => prev.filter(g => g._animKey !== animKey));
           setFullScreenEffects(prev => prev.filter(e => e.id !== animKey));
         }, 5000);
       }
     }
-  }, [gifts]);
+  }, [gifts, maxMessages]);
 
   // Navigate to user profile
   const handleProfileClick = (userId: string, e: React.MouseEvent) => {
@@ -270,17 +306,25 @@ export const FlyingChat = ({
                     </p>
                   </div>
                 ) : isGiftMessage ? (
-                  /* Gift Message - Gradient styled */
-                  <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500/30 to-orange-500/20 backdrop-blur-sm px-3 py-2 rounded-full">
-                    <Gift className="w-4 h-4 text-amber-400 shrink-0" />
-                    <p className="text-sm">
-                      <span className="text-amber-300 font-bold">{displayName}</span>
-                      <span className="text-white ml-1">{message.content}</span>
-                      {message.gift_value && (
-                        <span className="text-amber-400 ml-1 font-semibold">+{message.gift_value}</span>
-                      )}
+                  /* Gift Message - TikTok/Tango style gradient pill with avatar */
+                  <motion.div 
+                    initial={{ scale: 0.9 }}
+                    animate={{ scale: 1 }}
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-500 via-fuchsia-500 to-purple-500 px-3 py-2 rounded-full shadow-lg shadow-pink-500/30"
+                  >
+                    {/* Sender Avatar */}
+                    <Avatar className="w-7 h-7 border-2 border-white/30 shrink-0">
+                      <AvatarImage src={message.profiles?.avatar_url} />
+                      <AvatarFallback className="bg-white/20 text-white text-xs">
+                        {displayName[0]?.toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {/* Text Content */}
+                    <p className="text-sm font-semibold whitespace-nowrap">
+                      <span className="text-white/90">{displayName === 'Anonymous' ? 'Me' : displayName}</span>
+                      <span className="text-yellow-300 ml-1 font-bold">{message.content}</span>
                     </p>
-                  </div>
+                  </motion.div>
                 ) : (
                   /* Regular Message */
                   <p className="text-sm leading-relaxed">

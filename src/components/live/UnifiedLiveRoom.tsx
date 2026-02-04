@@ -44,6 +44,7 @@ interface FlyingGift {
   sender_name: string;
   credit_value: number;
   sender_id?: string;
+  sender_avatar?: string;
 }
 
 interface UnifiedLiveRoomProps {
@@ -120,7 +121,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     fetchCredits();
   }, [user]);
 
-  // Subscribe to realtime reactions so they show on all screens (including host)
+  // Subscribe to realtime reactions and gifts so they show on all screens (including host)
   useEffect(() => {
     if (connectionStatus !== 'connected') return;
 
@@ -132,12 +133,32 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           setReactionTrigger(prev => prev + 1);
         }
       })
+      .on('broadcast', { event: 'gift' }, ({ payload }) => {
+        // Show gift from other users (don't duplicate for sender)
+        if (payload?.senderId && payload.senderId !== user?.id) {
+          const newGift: FlyingGift = {
+            id: `broadcast-${Date.now()}`,
+            gift_type: payload.giftType,
+            sender_name: payload.senderName,
+            credit_value: payload.credits,
+            sender_id: payload.senderId,
+            sender_avatar: payload.senderAvatar,
+          };
+          setFlyingGifts(prev => [...prev, newGift]);
+          setReactionIcon(payload.giftType);
+          setReactionTrigger(prev => prev + 1);
+          
+          setTimeout(() => {
+            setFlyingGifts(prev => prev.filter(g => g.id !== newGift.id));
+          }, 5000);
+        }
+      })
       .subscribe();
 
     return () => {
       supabase.removeChannel(reactionChannel);
     };
-  }, [roomInfo.id, connectionStatus]);
+  }, [roomInfo.id, connectionStatus, user?.id]);
 
   // Attach video track
   useEffect(() => {
@@ -355,23 +376,31 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   }, [roomInfo.id, user?.id]);
 
   // Handle gift sent
-  const handleGiftSent = (gift: { type: string; credits: number; senderName: string }) => {
+  const handleGiftSent = (gift: { type: string; credits: number; senderName: string; senderAvatar?: string }) => {
     const newGift: FlyingGift = {
       id: Date.now().toString(),
       gift_type: gift.type,
       sender_name: gift.senderName,
       credit_value: gift.credits,
+      sender_id: user?.id,
+      sender_avatar: gift.senderAvatar || user?.user_metadata?.avatar_url,
     };
     setFlyingGifts(prev => [...prev, newGift]);
     
-    // Broadcast gift reaction to all viewers
+    // Broadcast gift to all viewers (so host sees it too)
     supabase.channel(`live-reactions-${roomInfo.id}`).send({
       type: 'broadcast',
-      event: 'reaction',
-      payload: { emoji: gift.type, userId: user?.id }
+      event: 'gift',
+      payload: { 
+        giftType: gift.type, 
+        credits: gift.credits, 
+        senderName: gift.senderName,
+        senderAvatar: gift.senderAvatar || user?.user_metadata?.avatar_url,
+        senderId: user?.id
+      }
     });
     
-    // Local trigger
+    // Local trigger for reaction animation
     setReactionIcon(gift.type);
     setReactionTrigger(prev => prev + 1);
     
@@ -382,8 +411,9 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 
   // Handle quick gift
   const handleQuickGift = (gift: { type: string; value: number; emoji: string }) => {
-    const senderName = user?.user_metadata?.display_name || 'Someone';
-    handleGiftSent({ type: gift.emoji, credits: gift.value, senderName });
+    const senderName = user?.user_metadata?.display_name || user?.user_metadata?.username || 'Me';
+    const senderAvatar = user?.user_metadata?.avatar_url;
+    handleGiftSent({ type: gift.type, credits: gift.value, senderName, senderAvatar });
     setShowQuickGifts(false);
   };
 
