@@ -167,14 +167,14 @@ export const FlyingChat = ({
       
       <div 
         className={cn(
-          "absolute left-0 pointer-events-none overflow-hidden z-20",
+          "absolute left-0 pointer-events-none z-20",
           className
         )}
         style={{ 
           bottom: `${bottomOffset}px`, 
-          maxHeight: '40vh',
-          maxWidth: '55%',  // Constrain to left side only
-          width: '55%'
+          maxHeight: '45vh',
+          maxWidth: '70%',
+          width: '70%'
         }}
       >
         {/* TikTok-Style Flying Gifts - Center screen, prominent */}
@@ -239,8 +239,8 @@ export const FlyingChat = ({
         ))}
       </AnimatePresence>
 
-      {/* Chat Messages */}
-      <div className="flex flex-col gap-2 px-3">
+      {/* Plain Chat Messages - TikTok/Tango Style */}
+      <div className="flex flex-col gap-2.5 px-4 overflow-y-auto max-h-full scrollbar-hide">
         <AnimatePresence mode="popLayout">
           {displayedMessages.map((message) => {
             const isHost = hostId && message.user_id === hostId;
@@ -249,57 +249,29 @@ export const FlyingChat = ({
             return (
               <motion.div
                 key={message._key}
-                initial={{ x: -50, opacity: 0, scale: 0.9 }}
-                animate={{ x: 0, opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, y: -20, scale: 0.8 }}
-                transition={{ 
-                  duration: 0.3,
-                  delay: 0.05
-                }}
-                className="flex items-start gap-2 max-w-[90%] pointer-events-auto"
+                initial={{ x: -30, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.25 }}
+                className="pointer-events-auto"
               >
-                {/* Clickable Avatar */}
-                <Avatar 
-                  className={cn(
-                    "w-8 h-8 shrink-0 ring-2 cursor-pointer hover:scale-110 transition-transform",
-                    isHost ? "ring-amber-400" : "ring-white/20"
-                  )}
-                  onClick={(e) => handleProfileClick(message.user_id, e)}
-                >
-                  <AvatarImage src={message.profiles?.avatar_url} />
-                  <AvatarFallback className={cn(
-                    "text-xs",
-                    isHost ? "bg-amber-500/50 text-amber-100" : "bg-primary/20 text-primary"
-                  )}>
-                    {displayName[0]?.toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className={cn(
-                  "backdrop-blur-sm rounded-2xl px-3 py-2 shadow-lg",
-                  isHost 
-                    ? "bg-gradient-to-r from-amber-500/30 to-orange-500/30 border border-amber-400/30" 
-                    : "bg-black/70"
-                )}>
-                  <div className="flex items-center gap-1.5">
-                    {isHost && (
-                      <Crown className="w-3 h-3 text-amber-400 shrink-0" />
+                <p className="text-sm leading-relaxed drop-shadow-lg">
+                  {/* Clickable Username - inline */}
+                  <span 
+                    className={cn(
+                      "font-bold cursor-pointer hover:underline mr-2",
+                      isHost ? "text-amber-400" : "text-primary"
                     )}
-                    {/* Clickable Username */}
-                    <span 
-                      className={cn(
-                        "text-sm font-bold mr-2 cursor-pointer hover:underline",
-                        isHost ? "text-amber-400" : "text-primary"
-                      )}
-                      onClick={(e) => handleProfileClick(message.user_id, e)}
-                    >
-                      {displayName}
-                      {isHost && <span className="text-[10px] text-amber-300/80 ml-1">• Host</span>}
-                    </span>
-                  </div>
-                  <span className="text-white text-sm break-words">
+                    onClick={(e) => handleProfileClick(message.user_id, e)}
+                  >
+                    {isHost && <Crown className="w-3 h-3 inline-block mr-1 text-amber-400" />}
+                    {displayName}
+                  </span>
+                  {/* Message content - inline */}
+                  <span className="text-white/95">
                     {renderContent(message.content)}
                   </span>
-                </div>
+                </p>
               </motion.div>
             );
           })}
