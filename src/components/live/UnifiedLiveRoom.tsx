@@ -649,18 +649,38 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 
         {/* Right Side Actions */}
         <div className="absolute right-4 bottom-56 flex flex-col gap-4 z-20">
+          {/* Heart Reaction */}
           <ActionButton
             icon={<Heart className="w-6 h-6" />}
             onClick={() => { setReactionIcon("❤️"); setReactionTrigger(prev => prev + 1); }}
             className="text-red-400"
           />
+          
+          {/* Share Button */}
+          <ActionButton
+            icon={<Share2 className="w-6 h-6" />}
+            onClick={handleShare}
+            className="text-white"
+          />
+          
+          {/* Animated Gift Button (Non-hosts) */}
           {!isHost && (
             <>
-              <ActionButton
-                icon={<Gift className="w-6 h-6" />}
+              <motion.button
+                animate={{ 
+                  y: [0, -5, 0],
+                  scale: [1, 1.05, 1],
+                }}
+                transition={{ 
+                  duration: 1.5, 
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
                 onClick={() => setShowQuickGifts(true)}
-                className="text-amber-400 bg-gradient-to-br from-amber-500/30 to-orange-500/30"
-              />
+                className="p-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/50 hover:scale-110 transition-transform"
+              >
+                <Gift className="w-6 h-6 text-white" />
+              </motion.button>
               <ActionButton
                 icon={<Plus className="w-6 h-6" />}
                 onClick={() => setShowGiftModal(true)}
@@ -689,6 +709,13 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           isHost={isHost}
           onSendMessage={handleSendMessage}
           placeholder="Say something..."
+          isMicOn={!isMuted}
+          onMicToggle={toggleMute}
+          isScreenSharing={isScreenSharing}
+          onScreenShareToggle={toggleScreenShare}
+          onPKBattleStart={handleStartPK}
+          showPKButton={roomInfo.type === 'video_broadcast'}
+          canSpeak={true}
         />
       </div>
 
