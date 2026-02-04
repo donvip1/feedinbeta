@@ -409,14 +409,8 @@ export const LiveDashboard = ({
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
                 <Radio className="w-10 h-10 text-slate-500" />
               </div>
-              <p className="text-white/60 text-center">That's all for now!</p>
-              <Button
-                onClick={onGoLive}
-                className="bg-gradient-to-r from-pink-500 to-violet-600 hover:from-pink-600 hover:to-violet-700"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Start your own stream
-              </Button>
+              <p className="text-white/60 text-center">No streams live right now</p>
+              <p className="text-sm text-white/40 text-center">Check back soon or follow your favorite creators</p>
             </div>
           ) : (
             <div className="space-y-3">
