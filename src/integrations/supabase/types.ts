@@ -8721,6 +8721,14 @@ export type Database = {
           }
         | { Args: { _role: string; _user_id: string }; Returns: boolean }
       has_unlimited_access: { Args: never; Returns: boolean }
+      increment_music_track_play: {
+        Args: { track_id: string }
+        Returns: undefined
+      }
+      increment_music_track_usage: {
+        Args: { track_id: string }
+        Returns: undefined
+      }
       increment_post_comments_count: {
         Args: { post_id: string }
         Returns: undefined
