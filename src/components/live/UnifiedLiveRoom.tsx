@@ -92,10 +92,10 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showQuickGifts, setShowQuickGifts] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
-  const [heartTrigger, setHeartTrigger] = useState(0);
+  const [reactionTrigger, setReactionTrigger] = useState(0);
+  const [reactionIcon, setReactionIcon] = useState("❤️");
   const [pkTimeLeft, setPkTimeLeft] = useState(0);
   const [localCredits, setLocalCredits] = useState(userCredits);
-
   const isHost = role === 'host' || role === 'co_host';
 
   // Join room on mount
@@ -307,9 +307,10 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     }
   };
 
-  // Handle double tap for hearts
+  // Handle double tap for reactions
   const handleDoubleTap = useCallback(() => {
-    setHeartTrigger(prev => prev + 1);
+    setReactionIcon("❤️");
+    setReactionTrigger(prev => prev + 1);
   }, []);
 
   // Handle gift sent
@@ -321,6 +322,11 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
       credit_value: gift.credits,
     };
     setFlyingGifts(prev => [...prev, newGift]);
+    
+    // Trigger floating animation with the gift emoji
+    setReactionIcon(gift.type);
+    setReactionTrigger(prev => prev + 1);
+    
     setTimeout(() => {
       setFlyingGifts(prev => prev.filter(g => g.id !== newGift.id));
     }, 5000);
@@ -331,7 +337,6 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     const senderName = user?.user_metadata?.display_name || 'Someone';
     handleGiftSent({ type: gift.emoji, credits: gift.value, senderName });
     setShowQuickGifts(false);
-    setHeartTrigger(prev => prev + 20);
   };
 
   // Share
@@ -639,14 +644,14 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           bottomOffset={isHost ? 200 : 180}
         />
 
-        {/* Floating Hearts Animation */}
-        <FloatingHearts trigger={heartTrigger} />
+        {/* Floating Reactions Animation */}
+        <FloatingReactionsSimple trigger={reactionTrigger} icon={reactionIcon} />
 
         {/* Right Side Actions */}
         <div className="absolute right-4 bottom-56 flex flex-col gap-4 z-20">
           <ActionButton
             icon={<Heart className="w-6 h-6" />}
-            onClick={() => setHeartTrigger(prev => prev + 1)}
+            onClick={() => { setReactionIcon("❤️"); setReactionTrigger(prev => prev + 1); }}
             className="text-red-400"
           />
           {!isHost && (
@@ -754,38 +759,43 @@ const ActionButton = ({
   </motion.button>
 );
 
-// Floating Hearts Animation
-const FloatingHearts = ({ trigger }: { trigger: number }) => {
-  const [hearts, setHearts] = useState<{ id: number; left: number; color: string }[]>([]);
+// Floating Reactions Animation - Matches reference design
+const FloatingReactionsSimple = ({ trigger, icon }: { trigger: number; icon: string }) => {
+  const [items, setItems] = useState<{ id: number; left: number }[]>([]);
 
   useEffect(() => {
     if (trigger === 0) return;
-    const colors = ['text-red-500', 'text-pink-500', 'text-purple-500', 'text-orange-400'];
-    const newHeart = {
-      id: Date.now(),
-      left: 70 + (Math.random() * 20 - 10),
-      color: colors[Math.floor(Math.random() * colors.length)],
-    };
-    setHearts(prev => [...prev, newHeart]);
-    setTimeout(() => setHearts(prev => prev.filter(h => h.id !== newHeart.id)), 2000);
+    const newItem = { id: Date.now(), left: 50 + (Math.random() * 40 - 20) };
+    setItems(prev => [...prev, newItem]);
+    setTimeout(() => setItems(prev => prev.filter(h => h.id !== newItem.id)), 2500);
   }, [trigger]);
 
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden z-30">
-      {hearts.map(heart => (
-        <motion.div
-          key={heart.id}
-          initial={{ y: 0, scale: 0.5, opacity: 0 }}
-          animate={{ y: -300, scale: 1.2, opacity: [0, 1, 1, 0] }}
-          transition={{ duration: 2, ease: 'easeOut' }}
-          className={cn("absolute bottom-40", heart.color)}
-          style={{ left: `${heart.left}%` }}
+      {items.map(item => (
+        <div
+          key={item.id}
+          className="absolute bottom-40 text-4xl animate-float-up"
+          style={{ left: `${item.left}%` }}
         >
-          <Heart className="w-8 h-8" fill="currentColor" />
-        </motion.div>
+          {icon}
+        </div>
       ))}
+      <style>{`
+        @keyframes floatUp {
+          0% { transform: translateY(0) scale(0.5); opacity: 0; }
+          10% { opacity: 1; transform: translateY(-40px) scale(1.1); }
+          100% { transform: translateY(-400px) scale(0.8); opacity: 0; }
+        }
+        .animate-float-up { animation: floatUp 2.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+      `}</style>
     </div>
   );
+};
+
+// Legacy FloatingHearts for backwards compatibility
+const FloatingHearts = ({ trigger }: { trigger: number }) => {
+  return <FloatingReactionsSimple trigger={trigger} icon="❤️" />
 };
 
 export default UnifiedLiveRoom;
