@@ -216,8 +216,8 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Video className="w-5 h-5 text-primary" />
             Create Live Stream
@@ -230,7 +230,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           )}
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
           {/* Room Type Selection */}
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Stream Type</Label>
@@ -436,7 +436,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
             </p>
           )}
 
-          <div className="flex gap-2 pt-4">
+          <div className="flex gap-2 pt-4 flex-shrink-0 sticky bottom-0 bg-background pb-1">
             <Button variant="outline" onClick={onClose} className="flex-1">
               Cancel
             </Button>
