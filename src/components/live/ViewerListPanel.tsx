@@ -6,7 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Users, Megaphone, UserPlus, Crown } from "lucide-react";
+import { Users, Megaphone, UserPlus, Crown, Gift } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface Viewer {
@@ -23,6 +23,7 @@ interface ViewerListPanelProps {
   onInviteToSpeak: (userId: string) => void;
   coHosts: string[];
   maxCoHosts?: number;
+  onGiftViewer?: (viewer: Viewer) => void;
 }
 
 export const ViewerListPanel = ({
@@ -32,6 +33,7 @@ export const ViewerListPanel = ({
   onInviteToSpeak,
   coHosts,
   maxCoHosts = 4,
+  onGiftViewer,
 }: ViewerListPanelProps) => {
   const [shoutingOut, setShoutingOut] = useState<string | null>(null);
 
@@ -157,6 +159,19 @@ export const ViewerListPanel = ({
                       </div>
 
                       <div className="flex items-center gap-1">
+                        {/* Gift button */}
+                        {onGiftViewer && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8"
+                            onClick={() => onGiftViewer(viewer)}
+                            title="Send gift"
+                          >
+                            <Gift className="w-4 h-4 text-amber-500" />
+                          </Button>
+                        )}
+
                         {/* Shout out button */}
                         <Button
                           size="icon"

@@ -18,6 +18,7 @@ import { FloatingLivePlayer } from '@/components/live/FloatingLivePlayer';
 import { LiveGiftModal } from '@/components/live/LiveGiftModal';
 import { ParticipantsList } from '@/components/live/shared/ParticipantsList';
 import { QuickGiftBar } from '@/components/live/shared/QuickGiftBar';
+import { HostGiftPanel } from '@/components/live/shared/HostGiftPanel';
 import { BroadcastInput } from '@/components/live/shared/BroadcastInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -92,6 +93,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   const [isFollowing, setIsFollowing] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showQuickGifts, setShowQuickGifts] = useState(false);
+  const [showHostGiftPanel, setShowHostGiftPanel] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [reactionTrigger, setReactionTrigger] = useState(0);
   const [reactionIcon, setReactionIcon] = useState("❤️");
@@ -732,23 +734,45 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             <Heart className="w-6 h-6 text-white" />
           </motion.button>
           
-          {/* Animated Gift Button */}
-          <motion.button
-            animate={{ 
-              y: [0, -4, 0],
-              scale: [1, 1.05, 1],
-            }}
-            transition={{ 
-              duration: 1.5, 
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setShowQuickGifts(true)}
-            className="p-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/40"
-          >
-            <Gift className="w-6 h-6 text-white" />
-          </motion.button>
+          {/* Animated Gift Button - For viewers to gift host */}
+          {!isHost && (
+            <motion.button
+              animate={{ 
+                y: [0, -4, 0],
+                scale: [1, 1.05, 1],
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowQuickGifts(true)}
+              className="p-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/40"
+            >
+              <Gift className="w-6 h-6 text-white" />
+            </motion.button>
+          )}
+
+          {/* Host Gift Button - For hosts to gift viewers */}
+          {isHost && (
+            <motion.button
+              animate={{ 
+                y: [0, -4, 0],
+                scale: [1, 1.05, 1],
+              }}
+              transition={{ 
+                duration: 1.5, 
+                repeat: Infinity,
+                ease: "easeInOut"
+              }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowHostGiftPanel(true)}
+              className="p-3 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 shadow-lg shadow-teal-500/40"
+            >
+              <Gift className="w-6 h-6 text-white" />
+            </motion.button>
+          )}
           
           {/* Share Button - White outline style */}
           <motion.button
@@ -781,7 +805,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           )}
         </div>
 
-        {/* Quick Gift Bar */}
+        {/* Quick Gift Bar - For viewers to gift host */}
         <QuickGiftBar
           isOpen={showQuickGifts}
           onClose={() => setShowQuickGifts(false)}
@@ -791,6 +815,25 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           onGiftSent={handleQuickGift}
           userCredits={localCredits}
           onCreditsChange={setLocalCredits}
+          hostId={roomInfo.hostId}
+        />
+
+        {/* Host Gift Panel - For hosts to gift viewers */}
+        <HostGiftPanel
+          isOpen={showHostGiftPanel}
+          onClose={() => setShowHostGiftPanel(false)}
+          roomId={roomInfo.id}
+          isSpace={roomInfo.type === 'audio_space'}
+          participants={participants.map(p => ({
+            id: p.user_id,
+            display_name: p.profile?.display_name || 'User',
+            username: p.profile?.username || '',
+            avatar_url: p.profile?.avatar_url || '',
+          }))}
+          onGiftSent={(gift) => {
+            const senderName = user?.user_metadata?.display_name || user?.user_metadata?.username || 'Host';
+            handleGiftSent({ type: gift.type, credits: gift.value, senderName });
+          }}
         />
       </div>
 
