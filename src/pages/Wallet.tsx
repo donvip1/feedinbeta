@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,6 +25,7 @@ import { useCurrency } from '@/context/CurrencyContext';
 
 const Wallet = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -355,7 +356,15 @@ const Wallet = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
-                onClick={() => navigate(-1)}
+                onClick={() => {
+                  // Check for returnTo state from navigating pages (e.g., live stream gift bar)
+                  const returnTo = (location.state as { returnTo?: string })?.returnTo;
+                  if (returnTo) {
+                    navigate(returnTo);
+                  } else {
+                    navigate(-1);
+                  }
+                }}
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9"

@@ -6,8 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
-
+import { useNavigate, useLocation } from 'react-router-dom';
 interface QuickGiftBarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -44,6 +43,7 @@ export const QuickGiftBar = ({
   const { user } = useAuth();
   const { permissions } = useAdminRole();
   const navigate = useNavigate();
+  const location = useLocation();
   const hasUnlimitedCredits = permissions.isDeveloper;
   const [sending, setSending] = useState<string | null>(null);
   const [localCredits, setLocalCredits] = useState<number>(propCredits ?? 0);
@@ -125,7 +125,10 @@ export const QuickGiftBar = ({
 
   const handleTopUp = () => {
     onClose();
-    navigate('/wallet?tab=buy');
+    // Navigate to wallet with returnTo state to come back to exact location
+    navigate('/wallet?tab=buy', { 
+      state: { returnTo: location.pathname }
+    });
   };
 
   return (
