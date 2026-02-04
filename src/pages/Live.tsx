@@ -1,24 +1,25 @@
 import { useState, useEffect } from "react";
 import { CreateLiveStreamModal } from "@/components/live/CreateLiveStreamModal";
 import { CreateSpaceModal } from "@/components/live/CreateSpaceModal";
-import { LiveKitViewer } from "@/components/live/LiveKitViewer";
-import { LiveKitBroadcaster } from "@/components/live/LiveKitBroadcaster";
-import { LiveSpaceRoom } from "@/components/live/LiveSpaceRoom";
+import { UnifiedLiveRoom } from "@/components/live/UnifiedLiveRoom";
 import { LiveDashboard } from "@/components/live/LiveDashboard";
 import { GoLiveModal } from "@/components/live/GoLiveModal";
 import { SpaceContentManager } from "@/components/live/SpaceContentManager";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
+import { RoomInfo, ParticipantRole } from "@/context/UnifiedLiveContext";
+
+interface SelectedRoom {
+  roomInfo: RoomInfo;
+  role: ParticipantRole;
+}
 
 const Live = () => {
   const { user } = useAuth();
   const [createStreamModalOpen, setCreateStreamModalOpen] = useState(false);
   const [createSpaceModalOpen, setCreateSpaceModalOpen] = useState(false);
-  const [selectedStreamId, setSelectedStreamId] = useState<string | null>(null);
-  const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(null);
-  const [isBroadcasting, setIsBroadcasting] = useState(false);
-  const [broadcastStreamId, setBroadcastStreamId] = useState<string | null>(null);
+  const [selectedRoom, setSelectedRoom] = useState<SelectedRoom | null>(null);
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const [showContentManager, setShowContentManager] = useState(false);
 
@@ -26,7 +27,6 @@ const Live = () => {
   const { data: liveStreams, refetch: refetchLiveStreams, isLoading: loadingLiveStreams } = useQuery({
     queryKey: ["live-streams", "live"],
     queryFn: async () => {
-      console.log('[Live] Fetching live video streams...');
       const { data, error } = await supabase
         .from("live_streams")
         .select("*")
@@ -34,8 +34,6 @@ const Live = () => {
         .order("viewer_count", { ascending: false });
       
       if (error) throw error;
-      
-      console.log('[Live] Found live streams:', data?.length || 0);
       
       if (data && data.length > 0) {
         const userIds = [...new Set(data.map(s => s.user_id))];
@@ -90,7 +88,6 @@ const Live = () => {
   const { data: myStreams, refetch: refetchMyStreams } = useQuery({
     queryKey: ["live-streams", "my-streams"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
       const { data, error } = await supabase
@@ -116,25 +113,20 @@ const Live = () => {
       }
       return data || [];
     },
+    enabled: !!user,
   });
 
   // ===== AUDIO SPACES QUERIES =====
   const { data: liveSpaces, refetch: refetchLiveSpaces, isLoading: loadingLiveSpaces } = useQuery({
     queryKey: ["live-spaces", "live"],
     queryFn: async () => {
-      console.log('[Live] Fetching live spaces...');
       const { data, error } = await supabase
         .from("live_spaces")
         .select("*")
         .eq("status", "live")
         .order("viewer_count", { ascending: false });
       
-      if (error) {
-        console.error('[Live] Error fetching live spaces:', error);
-        throw error;
-      }
-      
-      console.log('[Live] Found live spaces:', data?.length || 0, data);
+      if (error) throw error;
       
       if (data && data.length > 0) {
         const userIds = [...new Set(data.map(s => s.user_id))];
@@ -219,7 +211,6 @@ const Live = () => {
   const { data: mySpaces, refetch: refetchMySpaces } = useQuery({
     queryKey: ["live-spaces", "my-spaces"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return [];
 
       const { data, error } = await supabase
@@ -245,6 +236,7 @@ const Live = () => {
       }
       return data || [];
     },
+    enabled: !!user,
   });
 
   // ===== REALTIME SUBSCRIPTIONS =====
@@ -284,72 +276,68 @@ const Live = () => {
       supabase.removeChannel(streamsChannel);
       supabase.removeChannel(spacesChannel);
     };
-  }, []);
+  }, [refetchLiveStreams, refetchMyStreams, refetchLiveSpaces, refetchMySpaces]);
 
   // ===== HANDLERS =====
   const handleStreamCreated = (streamId: string) => {
-    setBroadcastStreamId(streamId);
-    setIsBroadcasting(true);
-    refetchMyStreams();
+    // Find the newly created stream and open it
+    refetchMyStreams().then(({ data }) => {
+      const stream = data?.find((s: any) => s.id === streamId);
+      if (stream) {
+        openRoom(stream, 'video_broadcast', 'host');
+      }
+    });
   };
 
   const handleSpaceCreated = (spaceId: string) => {
-    setSelectedSpaceId(spaceId);
-    refetchMySpaces();
+    refetchMySpaces().then(({ data }) => {
+      const space = data?.find((s: any) => s.id === spaceId);
+      if (space) {
+        openRoom(space, 'audio_space', 'host');
+      }
+    });
+  };
+
+  const openRoom = (item: any, type: 'video_broadcast' | 'audio_space', role: ParticipantRole) => {
+    const roomInfo: RoomInfo = {
+      id: item.id,
+      title: item.title,
+      type,
+      hostId: item.user_id,
+      hostName: item.profiles?.display_name || item.profiles?.username || 'Host',
+      hostAvatar: item.profiles?.avatar_url || '',
+      startedAt: item.started_at,
+    };
+    setSelectedRoom({ roomInfo, role });
   };
 
   const handleStreamClick = (stream: any) => {
-    if (stream.user_id === user?.id && stream.status !== 'live') {
-      setBroadcastStreamId(stream.id);
-      setIsBroadcasting(true);
-    } else if (stream.user_id === user?.id && stream.status === 'live') {
-      setBroadcastStreamId(stream.id);
-      setIsBroadcasting(true);
-    } else {
-      setSelectedStreamId(stream.id);
-    }
+    const isMyStream = stream.user_id === user?.id;
+    openRoom(stream, 'video_broadcast', isMyStream ? 'host' : 'viewer');
   };
 
   const handleSpaceClick = (space: any) => {
     if (space.status === 'live' || space.status === 'ended') {
-      setSelectedSpaceId(space.id);
+      const isMySpace = space.user_id === user?.id;
+      const isJoined = joinedSpaceIds?.includes(space.id);
+      openRoom(space, 'audio_space', isMySpace ? 'host' : (isJoined ? 'listener' : 'listener'));
     }
   };
 
-  // Render modals/overlays
-  if (selectedStreamId) {
+  // Render unified room if selected
+  if (selectedRoom) {
     return (
-      <LiveKitViewer
-        streamId={selectedStreamId}
-        onClose={() => setSelectedStreamId(null)}
-      />
-    );
-  }
-
-  if (isBroadcasting && broadcastStreamId) {
-    return (
-      <LiveKitBroadcaster
-        streamId={broadcastStreamId}
-        onClose={() => {
-          setIsBroadcasting(false);
-          setBroadcastStreamId(null);
-        }}
-      />
-    );
-  }
-
-  if (selectedSpaceId) {
-    return (
-      <LiveSpaceRoom
-        spaceId={selectedSpaceId}
-        onClose={() => setSelectedSpaceId(null)}
+      <UnifiedLiveRoom
+        roomInfo={selectedRoom.roomInfo}
+        role={selectedRoom.role}
+        onClose={() => setSelectedRoom(null)}
       />
     );
   }
 
   return (
     <>
-      {/* Modern Live Dashboard - No BottomNav */}
+      {/* Modern Live Dashboard */}
       <LiveDashboard
         liveStreams={liveStreams}
         liveSpaces={liveSpaces}
@@ -364,8 +352,8 @@ const Live = () => {
         onVideoStream={() => setCreateStreamModalOpen(true)}
         onAudioSpace={() => setCreateSpaceModalOpen(true)}
         isLoading={loadingLiveStreams || loadingLiveSpaces}
-        myActiveStream={myStreams?.find(s => s.status === 'live')}
-        myActiveSpace={mySpaces?.find(s => s.status === 'live')}
+        myActiveStream={myStreams?.find((s: any) => s.status === 'live')}
+        myActiveSpace={mySpaces?.find((s: any) => s.status === 'live')}
       />
 
       {/* Go Live Modal */}

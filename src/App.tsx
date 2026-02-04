@@ -9,11 +9,13 @@ import { NavigationProvider } from "@/context/NavigationContext";
 import { CallProvider } from "@/context/CallContext";
 import { SpaceProvider } from "@/context/SpaceContext";
 import { LiveStreamProvider } from "@/context/LiveStreamContext";
+import { UnifiedLiveProvider } from "@/context/UnifiedLiveContext";
 import { ThemeProvider } from "next-themes";
 import { IncomingCallListener } from "@/components/calls/IncomingCallListener";
 import { FloatingCallWidget } from "@/components/calls/FloatingCallWidget";
 import { FloatingSpacePlayer } from "@/components/live/FloatingSpacePlayer";
 import { FloatingStreamPlayer } from "@/components/live/FloatingStreamPlayer";
+import { FloatingLivePlayer } from "@/components/live/FloatingLivePlayer";
 import { LiveInviteNotification } from "@/components/live/LiveInviteNotification";
 import { SpaceInviteNotification } from "@/components/live/SpaceInviteNotification";
 import { RealtimeProvider } from "@/components/shared/RealtimeProvider";
@@ -252,13 +254,15 @@ const App = () => {
                   <CallProvider>
                     <SpaceProvider>
                       <LiveStreamProvider>
-                        <RealtimeProvider>
-                          <Toaster />
-                          <IncomingCallListener />
-                          <FloatingCallWidget />
-                          <FloatingSpacePlayer />
-                          <FloatingStreamPlayer />
-                          <ActiveCallIndicator />
+                        <UnifiedLiveProvider>
+                          <RealtimeProvider>
+                            <Toaster />
+                            <IncomingCallListener />
+                            <FloatingCallWidget />
+                            <FloatingSpacePlayer />
+                            <FloatingStreamPlayer />
+                            <FloatingLivePlayer />
+                            <ActiveCallIndicator />
                   <LiveInviteNotification />
                   <SpaceInviteNotification />
                   <MobileInstallModal />
@@ -423,7 +427,8 @@ const App = () => {
               <Route path="*" element={<NotFound />} />
               </Routes>
               </Suspense>
-                        </RealtimeProvider>
+                          </RealtimeProvider>
+                        </UnifiedLiveProvider>
                       </LiveStreamProvider>
                     </SpaceProvider>
                   </CallProvider>
