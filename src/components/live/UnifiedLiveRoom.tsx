@@ -663,11 +663,6 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               />
             </>
           )}
-          <ActionButton
-            icon={<Share2 className="w-6 h-6" />}
-            onClick={handleShare}
-            className="text-white/70"
-          />
         </div>
 
         {/* Quick Gift Bar */}
