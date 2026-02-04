@@ -1,19 +1,30 @@
+import { memo } from 'react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
-export const LoadingScreen = () => {
+// Memoized to prevent unnecessary re-renders
+export const LoadingScreen = memo(() => {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="flex flex-col items-center space-y-4">
-        <div className="animate-pulse">
-          <img src={feedinLogo} alt="feedin" className="w-40 h-40" />
+    <div className="flex min-h-screen items-center justify-center bg-background will-change-transform">
+      <div className="flex flex-col items-center space-y-3">
+        {/* Optimized logo with hardware acceleration */}
+        <div className="transform-gpu">
+          <img 
+            src={feedinLogo} 
+            alt="feedin" 
+            className="w-32 h-32 animate-pulse"
+            loading="eager"
+            decoding="async"
+          />
         </div>
-        <div className="flex space-x-2">
-          <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-          <div className="w-2 h-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]"></div>
-          <div className="w-2 h-2 bg-primary rounded-full animate-bounce"></div>
+        {/* Simplified loading indicator */}
+        <div className="flex space-x-1.5">
+          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
+          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
+          <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
         </div>
-        <p className="text-muted-foreground text-sm animate-pulse">Loading...</p>
       </div>
     </div>
   );
-};
+});
+
+LoadingScreen.displayName = 'LoadingScreen';
