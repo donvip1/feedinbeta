@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Radio, Mic, Zap } from "lucide-react";
+import { Users, Radio, Mic, Zap, Hash } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type RoomType = "video_broadcast" | "audio_space" | "pk_battle";
@@ -14,6 +14,8 @@ interface LiveDiscoverCardProps {
   viewerCount: number;
   thumbnailUrl?: string;
   isPremium?: boolean;
+  category?: string;
+  hashtags?: string[];
   onClick: () => void;
   className?: string;
 }
@@ -28,6 +30,8 @@ export const LiveDiscoverCard = ({
   viewerCount,
   thumbnailUrl,
   isPremium,
+  category,
+  hashtags,
   onClick,
   className,
 }: LiveDiscoverCardProps) => {
@@ -128,6 +132,22 @@ export const LiveDiscoverCard = ({
             <p className="text-sm text-white/70 truncate">{title}</p>
           </div>
         </div>
+
+        {/* Category & Hashtags */}
+        {(category || (hashtags && hashtags.length > 0)) && (
+          <div className="flex items-center gap-1.5 mb-2 overflow-hidden">
+            {category && (
+              <span className="text-xs bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full text-white/80 capitalize whitespace-nowrap">
+                {category.replace(/_/g, ' ')}
+              </span>
+            )}
+            {hashtags && hashtags.slice(0, 2).map((tag) => (
+              <span key={tag} className="text-xs text-primary/80 whitespace-nowrap">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Viewer Count */}
         <div className="flex items-center justify-between">

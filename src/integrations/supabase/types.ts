@@ -3731,6 +3731,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           ended_at: string | null
+          hashtags: string[] | null
           id: string
           is_private: boolean | null
           is_recording_enabled: boolean | null
@@ -3752,6 +3753,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
+          hashtags?: string[] | null
           id?: string
           is_private?: boolean | null
           is_recording_enabled?: boolean | null
@@ -3773,6 +3775,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
+          hashtags?: string[] | null
           id?: string
           is_private?: boolean | null
           is_recording_enabled?: boolean | null
@@ -4159,6 +4162,7 @@ export type Database = {
           description: string | null
           duration: number | null
           ended_at: string | null
+          hashtags: string[] | null
           id: string
           is_chat_locked: boolean | null
           is_premium: boolean | null
@@ -4191,6 +4195,7 @@ export type Database = {
           description?: string | null
           duration?: number | null
           ended_at?: string | null
+          hashtags?: string[] | null
           id?: string
           is_chat_locked?: boolean | null
           is_premium?: boolean | null
@@ -4223,6 +4228,7 @@ export type Database = {
           description?: string | null
           duration?: number | null
           ended_at?: string | null
+          hashtags?: string[] | null
           id?: string
           is_chat_locked?: boolean | null
           is_premium?: boolean | null
