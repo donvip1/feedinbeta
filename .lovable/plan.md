@@ -1,139 +1,156 @@
 
-# UI Enhancement Plan: Modern TikTok/Tango-Style Live Stream Interface
+
+# UI Refinement Plan: Live Stream Room Layout
 
 ## Overview
-Refactor the live stream room UI to match the reference design with a cleaner, more modern layout featuring separated controls, a floating vertical panel, and proper visual hierarchy.
+Refine the live stream room interface to match the reference design by reorganizing the right-side actions, simplifying the floating panel, and improving footer control alignment.
 
-## Key Changes from Current Implementation
+## Changes Summary
 
-### 1. Header Redesign
-**Current**: Host avatar + info on left, action buttons on right
-**Target**: Minimize button + pill-shaped host container (avatar + name + viewer count) on left, participants + close on right
+### 1. Right-Side Actions Reorganization
+**Current**: Actions (Heart, Gift, Share) are above a separate floating control panel with LayoutGrid, Sparkles, and Minimize2.
+**Target**: Single vertical stack with Heart, Gift, Share, then Minimize at the bottom.
 
-Changes to `UnifiedLiveRoom.tsx`:
-- Add a minimize/pin button as the first element in header
-- Wrap host info in a pill-shaped container with `bg-black/60 backdrop-blur-md rounded-full px-3 py-1.5`
-- Move the "Follow" button inside the pill container
-- Keep participants button (with red badge) and close button on right
+- Remove the separate floating control panel (`bg-slate-800/80` container)
+- Remove LayoutGrid and Sparkles icons completely
+- Add Minimize2 button at the bottom of the right-side action stack
+- All buttons should be in a single vertical column
 
-### 2. Right-Side Action Buttons
-**Current**: Heart, Share, Gift, Plus buttons stacked vertically
-**Target**: Heart (white outline circle), Gift (bouncing orange), Share (white outline) - cleaner spacing
+### 2. Replace X Close Button with "End" Button
+**Current**: X icon button in header for closing/leaving
+**Target**: Replace with a red "End" text button
 
-Changes:
-- Style Heart button with white outline (`border-2 border-white bg-transparent`)
-- Gift button with bouncing animation and gradient background
-- Share button with white outline style
-- Remove the Plus button (gift modal accessed via Gift button)
+- Change from `<X className="..." />` to text "End"
+- Style as red/destructive button to indicate ending stream
+- Keep the same `handleLeave` functionality
 
-### 3. Add Floating Vertical Control Panel
-**New Feature**: A vertical panel on the right side (between actions and footer) with:
-- Grid/Layout icon
-- Effects/Sparkle icon  
-- Minimize/Compress icon
+### 3. Footer Control Bar Alignment
+**Current**: Controls are inline but may wrap on smaller screens
+**Target**: Straight horizontal line with all controls properly aligned
 
-This provides quick access to stream controls/settings without cluttering the main UI.
-
-### 4. Footer Redesign
-**Current**: BroadcastInput contains all controls inline
-**Target**: Separate the layout into:
-- Left: Megaphone toggle (outside input)
-- Center: Input field with send button
-- Right: Control buttons (Mic, Monitor, Camera) as separate circles
-
-Changes to `BroadcastInput.tsx`:
-- Remove control buttons from inside the input container
-- Make input container narrower with just input + send button
-
-Changes to `UnifiedLiveRoom.tsx` footer area:
-- Create a new footer layout with:
-  - Megaphone button on far left
-  - Input container in center (flexible width)
-  - Mic button (white bg when active)
-  - Monitor button (screen share)
-  - Camera off button (red/pink when off)
-
-### 5. Visual Styling Updates
-- Send button: Use pink/magenta gradient (`from-pink-500 to-rose-500`)
-- Active mic: White background (`bg-white text-black`)
-- Inactive/off camera: Red/pink background with VideoOff icon
-- Maintain dark/transparent backgrounds throughout
+- Ensure flexbox with `flex-nowrap` to prevent wrapping
+- Use `shrink-0` on all control buttons to maintain size
+- Input container gets `flex-1 min-w-0` for flexible sizing
+- Remove extra padding/margins that cause misalignment
 
 ## Technical Implementation
 
-### Files to Modify:
+### File: `src/components/live/UnifiedLiveRoom.tsx`
 
-**1. `src/components/live/UnifiedLiveRoom.tsx`**
-- Header: Add minimize button, create pill container for host info
-- Remove duplicate control bar at bottom (LiveControlBar)
-- Create new footer layout with separated controls
-- Add floating vertical control panel component
-
-**2. `src/components/live/shared/BroadcastInput.tsx`** 
-- Simplify to only contain: input field + send button
-- Remove mic, screen share, PK battle buttons (moved to footer)
-- Keep megaphone toggle as optional prop
-
-**3. `src/components/live/shared/LiveControlBar.tsx`**
-- This component may become redundant - footer controls are now inline
-- Keep for backwards compatibility but mark for potential removal
-
-### New Sub-Components (inline in UnifiedLiveRoom):
+**Change 1: Header - Replace X with End Button (Lines 449-455)**
 ```tsx
-// Floating Control Panel
-const FloatingControlPanel = () => (
-  <div className="flex flex-col gap-2 bg-slate-800/80 backdrop-blur-md rounded-2xl p-2">
-    <button className="p-2.5 text-white/60 hover:text-white">
-      <LayoutGrid className="w-5 h-5" />
-    </button>
-    <button className="p-2.5 text-white/60 hover:text-white">
-      <Sparkles className="w-5 h-5" />
-    </button>
-    <button className="p-2.5 text-white/60 hover:text-white">
-      <Minimize2 className="w-5 h-5" />
-    </button>
-  </div>
-);
+// Before
+<button onClick={handleLeave} className="p-2 rounded-full bg-black/40...">
+  <X className="w-5 h-5 text-white" />
+</button>
+
+// After
+<button onClick={handleLeave} className="px-4 py-1.5 rounded-full bg-destructive text-white text-sm font-semibold hover:bg-destructive/80">
+  End
+</button>
 ```
 
-### Footer Layout Structure:
+**Change 2: Right-Side Actions - Add Minimize, Remove Floating Panel (Lines 646-699)**
 ```tsx
-<div className="flex items-center gap-3 px-4 pb-8">
-  {/* Megaphone toggle - Host only */}
-  {isHost && <MegaphoneButton />}
+// Combined single stack
+<div className="absolute right-4 bottom-52 flex flex-col gap-3 z-20">
+  {/* Heart */}
+  <motion.button ... className="p-3 rounded-full border-2 border-white bg-transparent">
+    <Heart />
+  </motion.button>
   
-  {/* Input Container - flexible */}
-  <div className="flex-1 flex items-center gap-2 bg-black/40 rounded-full px-4 py-2">
-    <input placeholder="Say something..." />
-    <SendButton />
+  {/* Gift - Bouncing */}
+  <motion.button ... className="p-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500">
+    <Gift />
+  </motion.button>
+  
+  {/* Share */}
+  <motion.button ... className="p-3 rounded-full border-2 border-white bg-transparent">
+    <Share2 />
+  </motion.button>
+  
+  {/* Minimize - At bottom */}
+  <motion.button onClick={minimize} className="p-3 rounded-full bg-slate-800/80 backdrop-blur-md">
+    <Minimize2 />
+  </motion.button>
+</div>
+
+// DELETE the separate floating control panel (lines 685-699)
+```
+
+**Change 3: Footer - Straight Horizontal Line (Lines 786-875)**
+```tsx
+<div className="flex items-center gap-3 flex-nowrap">
+  {/* Megaphone - shrink-0 */}
+  {isHost && (
+    <motion.button className="p-3 rounded-full shrink-0 ...">
+      <Megaphone />
+    </motion.button>
+  )}
+  
+  {/* Input - flex-1 min-w-0 */}
+  <div className="flex-1 min-w-0">
+    <BroadcastInput ... />
   </div>
   
-  {/* Control Buttons */}
-  <MicButton active={!isMuted} />
-  <ScreenShareButton />
-  <CameraButton active={isCameraOn} />
+  {/* Mic - shrink-0 */}
+  <motion.button className="p-3 rounded-full shrink-0 ...">
+    {isMuted ? <MicOff /> : <Mic />}
+  </motion.button>
+  
+  {/* Screen Share - shrink-0 */}
+  {isHost && (
+    <motion.button className="p-3 rounded-full shrink-0 ...">
+      <Monitor />
+    </motion.button>
+  )}
+  
+  {/* Camera - shrink-0 (Video Only) */}
+  {roomType !== 'audio_space' && (
+    <motion.button className="p-3 rounded-full shrink-0 ...">
+      {isCameraOn ? <Video /> : <VideoOff />}
+    </motion.button>
+  )}
+  
+  {/* PK Battle - shrink-0 */}
+  {isHost && roomType === 'video_broadcast' && (
+    <motion.button className="p-3 rounded-full shrink-0 ...">
+      <Sword />
+    </motion.button>
+  )}
 </div>
 ```
 
-## Visual Reference Mapping
+## Visual Layout
 
-| Reference Element | Current State | Target Change |
-|-------------------|---------------|---------------|
-| Header minimize | Missing | Add Pin/Minimize button before host info |
-| Host info pill | Plain layout | Wrap in dark pill container |
-| Participants badge | Has badge | Change to red badge (notification style) |
-| Heart button | Filled style | White outline circle |
-| Gift button | Bouncing | Keep bouncing, ensure gradient |
-| Share button | Present | White outline style |
-| Vertical panel | Missing | Add floating control panel |
-| Footer layout | All inline | Separate input from controls |
-| Mic button | Colored bg | White bg when active |
-| Camera off | Standard | Red/pink bg when camera off |
+### Right Side Actions (Top to Bottom):
+```
+[ ❤️ Heart  ] - White outline
+[ 🎁 Gift   ] - Orange gradient, bouncing
+[ 📤 Share  ] - White outline
+[ ⊟ Minimize] - Dark background
+```
 
-## Implementation Order
-1. Update header layout with minimize button and pill container
-2. Simplify BroadcastInput to just input + send
-3. Create new footer layout in UnifiedLiveRoom
-4. Add floating vertical control panel
-5. Update right-side action button styling
-6. Remove redundant LiveControlBar usage
+### Footer (Left to Right):
+```
+[📢] [_______ Input _______ ⬆️] [🎤] [🖥️] [📹] [⚔️]
+ ^              ^                ^     ^     ^     ^
+ |              |                |     |     |     PK Battle
+ |              |                |     |     Camera
+ |              |                |     Screen Share
+ |              |                Mic
+ |              Chat Input + Send Button
+ Megaphone (Host only)
+```
+
+## Files to Modify
+1. `src/components/live/UnifiedLiveRoom.tsx` - All changes in this single file
+
+## Reference Code Integration
+The user's reference code patterns will be applied:
+- Gift modal with animated emojis and credit validation
+- Floating reactions that trigger for both hearts and gifts
+- Broadcast message highlighting in chat
+- Participant moderation features (already implemented)
+- PK Battle triggering (already implemented)
+
