@@ -776,36 +776,32 @@ const Feed = () => {
               >
                 Photo+
               </button>
-              {/* Live Indicator - Opens fullscreen live viewer when active */}
-              <div 
-                className={cn(
-                  "transition-all p-1.5 rounded-full flex items-center gap-1.5 drop-shadow-lg",
-                  (liveCount || 0) > 0 
-                    ? "cursor-pointer bg-destructive/20 hover:bg-destructive/30" 
-                    : ""
-                )}
-                title={`${liveCount || 0} live now`}
+              {/* Live Tab - Navigate to Live page */}
+              <button
                 onClick={() => {
-                  if ((liveCount || 0) > 0 && liveContent && liveContent.length > 0) {
-                    haptic('selection');
-                    setShowLiveViewer(true);
-                  }
+                  haptic('selection');
+                  navigate('/live');
                 }}
-              >
-                {(liveCount || 0) > 0 && (
-                  <span className="text-xs font-bold text-destructive">{liveCount}</span>
+                className={cn(
+                  "text-sm font-semibold transition-all drop-shadow-lg flex items-center gap-1.5",
+                  "text-white/60 hover:text-white"
                 )}
-                <span className="relative flex h-3 w-3">
+              >
+                <span className="relative flex h-2.5 w-2.5">
                   {(liveCount || 0) > 0 ? (
                     <>
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive"></span>
                     </>
                   ) : (
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-white/40"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white/40"></span>
                   )}
                 </span>
-              </div>
+                Live
+                {(liveCount || 0) > 0 && (
+                  <span className="text-xs font-bold text-destructive">({liveCount})</span>
+                )}
+              </button>
               {/* Sliding tab indicator - only for Videos and Photo+ */}
               <div 
                 className="absolute -bottom-1 h-0.5 bg-white transition-all duration-200 ease-out"
