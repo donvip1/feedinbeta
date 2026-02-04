@@ -6158,8 +6158,15 @@ export type Database = {
           id: string
           profile_visible: boolean | null
           show_activity_status: boolean | null
+          show_date_of_birth: boolean | null
+          show_email: boolean | null
+          show_location: boolean | null
+          show_marital_status: boolean | null
+          show_occupation: boolean | null
           show_online_status: boolean | null
+          show_phone_number: boolean | null
           show_read_receipts: boolean | null
+          show_social_links: boolean | null
           updated_at: string | null
           user_id: string
         }
@@ -6170,8 +6177,15 @@ export type Database = {
           id?: string
           profile_visible?: boolean | null
           show_activity_status?: boolean | null
+          show_date_of_birth?: boolean | null
+          show_email?: boolean | null
+          show_location?: boolean | null
+          show_marital_status?: boolean | null
+          show_occupation?: boolean | null
           show_online_status?: boolean | null
+          show_phone_number?: boolean | null
           show_read_receipts?: boolean | null
+          show_social_links?: boolean | null
           updated_at?: string | null
           user_id: string
         }
@@ -6182,8 +6196,15 @@ export type Database = {
           id?: string
           profile_visible?: boolean | null
           show_activity_status?: boolean | null
+          show_date_of_birth?: boolean | null
+          show_email?: boolean | null
+          show_location?: boolean | null
+          show_marital_status?: boolean | null
+          show_occupation?: boolean | null
           show_online_status?: boolean | null
+          show_phone_number?: boolean | null
           show_read_receipts?: boolean | null
+          show_social_links?: boolean | null
           updated_at?: string | null
           user_id?: string
         }
@@ -8065,55 +8086,37 @@ export type Database = {
       }
       public_profiles: {
         Row: {
-          account_status: string | null
+          about: string | null
+          about_visibility: string | null
           avatar_url: string | null
           bio: string | null
           city: string | null
           country: string | null
           cover_url: string | null
           created_at: string | null
-          detected_country_code: string | null
+          date_of_birth: string | null
           display_name: string | null
+          facebook_url: string | null
           followers_count: number | null
           following_count: number | null
           id: string | null
+          instagram_url: string | null
+          interests: string[] | null
           is_premium: boolean | null
-          occupation: string | null
+          linkedin_url: string | null
+          location: string | null
+          marital_status: string | null
+          phone_number: string | null
+          purpose: string[] | null
+          referral_code: string | null
+          status: string | null
+          status_visibility: string | null
+          tiktok_url: string | null
+          total_views: number | null
+          twitter_url: string | null
           username: string | null
-        }
-        Insert: {
-          account_status?: string | null
-          avatar_url?: string | null
-          bio?: string | null
-          city?: string | null
-          country?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          detected_country_code?: string | null
-          display_name?: string | null
-          followers_count?: number | null
-          following_count?: number | null
-          id?: string | null
-          is_premium?: boolean | null
-          occupation?: string | null
-          username?: string | null
-        }
-        Update: {
-          account_status?: string | null
-          avatar_url?: string | null
-          bio?: string | null
-          city?: string | null
-          country?: string | null
-          cover_url?: string | null
-          created_at?: string | null
-          detected_country_code?: string | null
-          display_name?: string | null
-          followers_count?: number | null
-          following_count?: number | null
-          id?: string | null
-          is_premium?: boolean | null
-          occupation?: string | null
-          username?: string | null
+          website_url: string | null
+          youtube_url: string | null
         }
         Relationships: []
       }
@@ -8190,6 +8193,10 @@ export type Database = {
         Returns: boolean
       }
       can_view_profile: { Args: { target_user_id: string }; Returns: boolean }
+      can_view_profile_field: {
+        Args: { field_name: string; target_user_id: string }
+        Returns: boolean
+      }
       check_all_posts_viewed: { Args: never; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       cleanup_old_view_history: { Args: never; Returns: undefined }

@@ -9,6 +9,14 @@ export interface PrivacySettings {
   allow_messages_from_strangers: boolean;
   show_read_receipts: boolean;
   show_activity_status: boolean;
+  // Field-level visibility controls
+  show_phone_number: boolean;
+  show_email: boolean;
+  show_date_of_birth: boolean;
+  show_location: boolean;
+  show_marital_status: boolean;
+  show_occupation: boolean;
+  show_social_links: boolean;
 }
 
 const DEFAULT_SETTINGS: PrivacySettings = {
@@ -18,6 +26,14 @@ const DEFAULT_SETTINGS: PrivacySettings = {
   allow_messages_from_strangers: false,
   show_read_receipts: true,
   show_activity_status: true,
+  // Default: sensitive fields hidden, general fields visible
+  show_phone_number: false,
+  show_email: false,
+  show_date_of_birth: false,
+  show_location: true,
+  show_marital_status: false,
+  show_occupation: true,
+  show_social_links: true,
 };
 
 // Cache for other users' privacy settings
@@ -57,6 +73,14 @@ export const usePrivacySettings = () => {
             allow_messages_from_strangers: data.allow_messages_from_strangers ?? false,
             show_read_receipts: data.show_read_receipts ?? true,
             show_activity_status: data.show_activity_status ?? true,
+            // Field-level visibility
+            show_phone_number: data.show_phone_number ?? false,
+            show_email: data.show_email ?? false,
+            show_date_of_birth: data.show_date_of_birth ?? false,
+            show_location: data.show_location ?? true,
+            show_marital_status: data.show_marital_status ?? false,
+            show_occupation: data.show_occupation ?? true,
+            show_social_links: data.show_social_links ?? true,
           });
         }
       } catch (error) {
@@ -112,6 +136,13 @@ export const useOtherUserPrivacySettings = (targetUserId: string | null) => {
           allow_messages_from_strangers: data.allow_messages_from_strangers ?? false,
           show_read_receipts: data.show_read_receipts ?? true,
           show_activity_status: data.show_activity_status ?? true,
+          show_phone_number: data.show_phone_number ?? false,
+          show_email: data.show_email ?? false,
+          show_date_of_birth: data.show_date_of_birth ?? false,
+          show_location: data.show_location ?? true,
+          show_marital_status: data.show_marital_status ?? false,
+          show_occupation: data.show_occupation ?? true,
+          show_social_links: data.show_social_links ?? true,
         } : DEFAULT_SETTINGS;
 
         // Cache the result
