@@ -9,7 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Download, RefreshCw, Sparkles, Zap, Bug, Shield } from 'lucide-react';
+import { Download, RefreshCw, Sparkles, Zap, Bug, Shield, Rocket, HardDrive } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface UpdatePromptModalProps {
@@ -20,10 +20,12 @@ interface UpdatePromptModalProps {
 
 // Latest update changelog - update this with each deployment
 const LATEST_UPDATES = [
-  { icon: Zap, text: 'Gift sending now works smoothly for all users!' },
-  { icon: Sparkles, text: 'Hosts can now gift viewers directly' },
-  { icon: Bug, text: 'Fixed navigation history when topping up credits' },
-  { icon: Shield, text: 'Enhanced security and performance' },
+  { icon: Rocket, text: 'Ultra-fast app startup' },
+  { icon: Zap, text: 'Optimized mobile loading' },
+  { icon: HardDrive, text: 'Smarter cache management' },
+  { icon: Sparkles, text: 'Gift sending works smoothly' },
+  { icon: Bug, text: 'Fixed navigation history' },
+  { icon: Shield, text: 'Enhanced performance' },
 ];
 
 export const UpdatePromptModal: React.FC<UpdatePromptModalProps> = ({

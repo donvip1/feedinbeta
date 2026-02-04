@@ -2,37 +2,27 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { CacheManager } from "./lib/cache-manager";
-import { indexedDBCache } from "./lib/indexed-db-cache";
-import { memoryCache } from "./lib/memory-cache";
-import { appShellPreloader } from "./lib/app-shell-preloader";
+import { fastBoot } from "./lib/fast-boot";
 
-// PHASE 1: Load cache to memory BEFORE React renders (instant feel)
+/**
+ * Ultra-fast app initialization optimized for mobile APK
+ * 
+ * Boot sequence:
+ * 1. Critical boot (< 100ms) - Load essential cached data
+ * 2. Render React immediately
+ * 3. Secondary boot - Load additional cached data
+ * 4. Deferred boot - Load remaining data in idle time
+ * 5. Background refresh - Fetch fresh data from server
+ */
 const initializeApp = async () => {
-  const startTime = Date.now();
+  const startTime = performance.now();
   
-  // Check if user is likely authenticated
-  if (appShellPreloader.isLikelyAuthenticated()) {
-    // Load cached data into memory for instant access
-    await appShellPreloader.loadCacheToMemory();
-    console.log(`[Main] App shell preloaded in ${Date.now() - startTime}ms`);
+  // PHASE 1: Critical boot - only essential data
+  if (fastBoot.isAuthenticated()) {
+    await fastBoot.criticalBoot();
   }
 
-  // Register service worker for PWA functionality
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      CacheManager.register();
-    });
-  }
-
-  // Cleanup expired cache entries periodically
-  indexedDBCache.cleanupExpired();
-  setInterval(() => {
-    indexedDBCache.cleanupExpired();
-    memoryCache.cleanup();
-  }, 5 * 60 * 1000); // Every 5 minutes
-
-  // Now render React
+  // PHASE 2: Render React immediately (don't wait for more data)
   const rootElement = document.getElementById("root");
   if (!rootElement) throw new Error("Root element not found");
 
@@ -42,20 +32,49 @@ const initializeApp = async () => {
     </React.StrictMode>
   );
 
-  // PHASE 2: Refresh data in background AFTER React mounts
-  if (appShellPreloader.isLikelyAuthenticated()) {
-    // Use requestIdleCallback for non-blocking background refresh
+  console.log(`[Main] First paint in ${(performance.now() - startTime).toFixed(1)}ms`);
+
+  // PHASE 3: Post-render initialization (non-blocking)
+  if (fastBoot.isAuthenticated()) {
+    // Secondary boot - load more cached data
+    requestAnimationFrame(() => {
+      fastBoot.secondaryBoot().then(() => {
+        // Deferred boot - load remaining data in idle time
+        fastBoot.deferredBoot();
+      });
+    });
+
+    // Background refresh - fetch fresh data from server
     if ('requestIdleCallback' in window) {
       requestIdleCallback(() => {
-        appShellPreloader.refreshInBackground();
+        fastBoot.backgroundRefresh();
       }, { timeout: 3000 });
     } else {
-      setTimeout(() => {
-        appShellPreloader.refreshInBackground();
-      }, 100);
+      setTimeout(() => fastBoot.backgroundRefresh(), 500);
     }
   }
+
+  // PHASE 4: Register service worker (deferred)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      const { CacheManager } = await import('./lib/cache-manager');
+      CacheManager.register();
+    });
+  }
+
+  // PHASE 5: Periodic cleanup (very low priority)
+  setTimeout(async () => {
+    const { indexedDBCache } = await import('./lib/indexed-db-cache');
+    const { memoryCache } = await import('./lib/memory-cache');
+    
+    indexedDBCache.cleanupExpired();
+    
+    setInterval(() => {
+      indexedDBCache.cleanupExpired();
+      memoryCache.cleanup();
+    }, 5 * 60 * 1000);
+  }, 10000);
 };
 
-// Start initialization
+// Start immediately
 initializeApp();
