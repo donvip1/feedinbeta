@@ -5617,33 +5617,42 @@ export type Database = {
       }
       platform_wallet: {
         Row: {
+          ai_feature_revenue: number | null
           balance: number
           created_at: string | null
+          creator_payouts_total: number | null
           gift_revenue: number | null
           id: string
           p2p_fee_revenue: number | null
+          platform_profit: number | null
           promotion_revenue: number | null
           subscription_revenue: number | null
           total_earned: number
           updated_at: string | null
         }
         Insert: {
+          ai_feature_revenue?: number | null
           balance?: number
           created_at?: string | null
+          creator_payouts_total?: number | null
           gift_revenue?: number | null
           id?: string
           p2p_fee_revenue?: number | null
+          platform_profit?: number | null
           promotion_revenue?: number | null
           subscription_revenue?: number | null
           total_earned?: number
           updated_at?: string | null
         }
         Update: {
+          ai_feature_revenue?: number | null
           balance?: number
           created_at?: string | null
+          creator_payouts_total?: number | null
           gift_revenue?: number | null
           id?: string
           p2p_fee_revenue?: number | null
+          platform_profit?: number | null
           promotion_revenue?: number | null
           subscription_revenue?: number | null
           total_earned?: number
