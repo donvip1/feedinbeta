@@ -17,6 +17,7 @@ interface QuickGiftBarProps {
   onGiftSent?: (gift: { type: string; value: number; emoji: string }) => void;
   userCredits?: number;
   onCreditsChange?: (newBalance: number) => void;
+  hostId?: string; // Add hostId to detect self-gifting
 }
 
 // Updated gift packs with colors matching reference design
@@ -38,6 +39,7 @@ export const QuickGiftBar = ({
   onGiftSent,
   userCredits: propCredits,
   onCreditsChange,
+  hostId,
 }: QuickGiftBarProps) => {
   const { user } = useAuth();
   const { permissions } = useAdminRole();
@@ -47,6 +49,9 @@ export const QuickGiftBar = ({
   const [localCredits, setLocalCredits] = useState<number>(propCredits ?? 0);
   const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  
+  // Check if user is the host (prevent self-gifting)
+  const isHost = user?.id === hostId;
 
   // Fetch real credits from user_credits table
   useEffect(() => {
@@ -79,6 +84,12 @@ export const QuickGiftBar = ({
   const handleSendGift = async (gift: typeof QUICK_GIFTS[0]) => {
     if (!user) {
       toast.error('Please sign in to send gifts');
+      return;
+    }
+
+    // Prevent hosts from gifting themselves
+    if (isHost) {
+      toast.error("Hosts can't send gifts to themselves. Use the Gift Viewers button instead!");
       return;
     }
 
