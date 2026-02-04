@@ -3,11 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Users, Heart, Wifi, WifiOff, Crown, 
-  Plus, Radio, Zap 
+  Plus, Radio, Zap, Sword, Monitor, Megaphone,
+  Share2, Gift
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { useUnifiedLive, RoomInfo, ParticipantRole } from '@/context/UnifiedLiveContext';
+import { useUnifiedLive, RoomInfo, ParticipantRole, Participant } from '@/context/UnifiedLiveContext';
 import { FlyingChat } from '@/components/live/FlyingChat';
 import { AudioVisualizer } from '@/components/live/unified/AudioVisualizer';
 import { PKBattleBar } from '@/components/live/unified/PKBattleBar';
@@ -15,8 +16,12 @@ import { ConnectionOverlay } from '@/components/live/shared/ConnectionOverlay';
 import { LiveControlBar } from '@/components/live/shared/LiveControlBar';
 import { FloatingLivePlayer } from '@/components/live/FloatingLivePlayer';
 import { LiveGiftModal } from '@/components/live/LiveGiftModal';
+import { ParticipantsList } from '@/components/live/shared/ParticipantsList';
+import { QuickGiftBar } from '@/components/live/shared/QuickGiftBar';
+import { BroadcastInput } from '@/components/live/shared/BroadcastInput';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +30,7 @@ interface ChatMessage {
   content: string;
   user_id: string;
   created_at: string;
+  is_broadcast?: boolean;
   profiles?: {
     display_name?: string;
     username?: string;
@@ -48,6 +54,7 @@ interface UnifiedLiveRoomProps {
 
 export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProps) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { 
     state, 
     joinRoom, 
@@ -55,18 +62,39 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     minimize, 
     toggleMute, 
     toggleCamera,
+    toggleScreenShare,
+    muteParticipant,
+    unmuteParticipant,
+    muteAll,
+    inviteToSpeak,
+    removeFromSpeakers,
+    sendBroadcastMessage,
+    startPKBattle,
     videoTrack 
   } = useUnifiedLive();
   
-  const { connectionStatus, isMuted, isCameraOn, isMinimized, viewerCount, audioLevels } = state;
+  const { 
+    connectionStatus, 
+    isMuted, 
+    isCameraOn, 
+    isMinimized, 
+    viewerCount, 
+    audioLevels,
+    participants,
+    isScreenSharing,
+    userCredits
+  } = state;
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [flyingGifts, setFlyingGifts] = useState<FlyingGift[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
+  const [showQuickGifts, setShowQuickGifts] = useState(false);
+  const [showParticipants, setShowParticipants] = useState(false);
   const [heartTrigger, setHeartTrigger] = useState(0);
   const [pkTimeLeft, setPkTimeLeft] = useState(0);
+  const [localCredits, setLocalCredits] = useState(userCredits);
 
   const isHost = role === 'host' || role === 'co_host';
 
@@ -74,6 +102,20 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   useEffect(() => {
     joinRoom(roomInfo, role);
   }, []);
+
+  // Fetch user credits
+  useEffect(() => {
+    const fetchCredits = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('credit_transactions')
+        .select('amount')
+        .eq('user_id', user.id);
+      const balance = data?.reduce((sum, t) => sum + t.amount, 0) || 0;
+      setLocalCredits(balance);
+    };
+    fetchCredits();
+  }, [user]);
 
   // Attach video track
   useEffect(() => {
@@ -85,12 +127,11 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     }
   }, [videoTrack, roomInfo.type]);
 
-  // Fetch chat messages for video streams only (simpler query)
+  // Fetch chat messages
   const { data: chatMessages } = useQuery({
     queryKey: ['live-chat', roomInfo.id, roomInfo.type],
     queryFn: async () => {
       if (roomInfo.type === 'audio_space') {
-        // For spaces, fetch messages without join
         const { data, error } = await supabase
           .from('live_space_messages')
           .select('id, content, user_id, created_at')
@@ -100,7 +141,6 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         
         if (error) throw error;
         
-        // Fetch profiles separately
         if (data && data.length > 0) {
           const userIds = [...new Set(data.map(m => m.user_id))];
           const { data: profiles } = await supabase
@@ -116,7 +156,6 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         }
         return data || [];
       } else {
-        // For streams
         const { data, error } = await supabase
           .from('live_stream_comments')
           .select('id, content, user_id, created_at')
@@ -154,6 +193,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         user_id: m.user_id,
         created_at: m.created_at,
         profiles: m.profiles,
+        is_broadcast: m.content?.startsWith('📢'),
       })));
     }
   }, [chatMessages]);
@@ -186,6 +226,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           user_id: payload.new.user_id,
           created_at: payload.new.created_at,
           profiles: profile || undefined,
+          is_broadcast: payload.new.content?.startsWith('📢'),
         };
         setMessages(prev => [...prev.slice(-49), newMessage]);
       })
@@ -208,6 +249,33 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     }
   }, [roomInfo.pkData?.endTime, roomInfo.type]);
 
+  // Handle send message
+  const handleSendMessage = async (message: string, isBroadcast: boolean) => {
+    if (!user) return;
+
+    if (isBroadcast && isHost) {
+      await sendBroadcastMessage(message);
+    } else {
+      try {
+        if (roomInfo.type === 'audio_space') {
+          await supabase.from('live_space_messages').insert({
+            space_id: roomInfo.id,
+            user_id: user.id,
+            content: message,
+          });
+        } else {
+          await supabase.from('live_stream_comments').insert({
+            stream_id: roomInfo.id,
+            user_id: user.id,
+            content: message,
+          });
+        }
+      } catch (error) {
+        toast.error('Failed to send message');
+      }
+    }
+  };
+
   // Handle leave
   const handleLeave = async () => {
     await leaveRoom();
@@ -217,7 +285,6 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   // Handle follow
   const handleFollow = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast.error('Please sign in to follow');
         return;
@@ -259,6 +326,14 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     }, 5000);
   };
 
+  // Handle quick gift
+  const handleQuickGift = (gift: { type: string; value: number; emoji: string }) => {
+    const senderName = user?.user_metadata?.display_name || 'Someone';
+    handleGiftSent({ type: gift.emoji, credits: gift.value, senderName });
+    setShowQuickGifts(false);
+    setHeartTrigger(prev => prev + 20);
+  };
+
   // Share
   const handleShare = async () => {
     const url = `${window.location.origin}/live/${roomInfo.type === 'audio_space' ? 'space' : 'stream'}/${roomInfo.id}`;
@@ -272,6 +347,12 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     } catch (e) {
       console.error('Share error:', e);
     }
+  };
+
+  // Handle start PK
+  const handleStartPK = () => {
+    // For demo, use a random challenger
+    toast('PK Battle feature coming soon!');
   };
 
   // If minimized, show floating player
@@ -299,7 +380,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                 <AvatarFallback>{roomInfo.hostName[0]}</AvatarFallback>
               </Avatar>
               {connectionStatus === 'connected' && (
-                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center">
                   <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
                 </span>
               )}
@@ -312,7 +393,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               <div className="flex items-center gap-2 text-xs text-white/70">
                 <Users className="w-3 h-3" />
                 <span>{viewerCount}</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
                 <span>LIVE</span>
               </div>
             </div>
@@ -328,14 +409,43 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             )}
           </div>
 
-          {/* Connection Status & Close */}
+          {/* Right Actions */}
           <div className="flex items-center gap-3">
+            {/* Participants Button (Host) */}
+            {isHost && (
+              <button
+                onClick={() => setShowParticipants(true)}
+                className="relative p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                <Users className="w-5 h-5 text-white" />
+                {participants.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                    {participants.length}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* PK Battle Button (Host, Video Only) */}
+            {isHost && roomInfo.type === 'video_broadcast' && (
+              <button
+                onClick={handleStartPK}
+                className="p-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 transition-opacity"
+                title="Start PK Battle"
+              >
+                <Sword className="w-5 h-5 text-white" />
+              </button>
+            )}
+
+            {/* Connection Status */}
             {connectionStatus === 'reconnecting' && (
               <div className="flex items-center gap-1.5 bg-amber-500/20 px-2 py-1 rounded-full">
                 <WifiOff className="w-3 h-3 text-amber-400" />
                 <span className="text-xs text-amber-400">Reconnecting...</span>
               </div>
             )}
+
+            {/* Close Button */}
             <button
               onClick={handleLeave}
               className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
@@ -390,7 +500,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                   alt={roomInfo.pkData.challengerName}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute bottom-4 right-4 text-white text-sm font-semibold bg-red-500/50 px-2 py-1 rounded">
+                <div className="absolute bottom-4 right-4 text-white text-sm font-semibold bg-destructive/50 px-2 py-1 rounded">
                   {roomInfo.pkData.challengerName}
                 </div>
               </div>
@@ -463,24 +573,60 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               <Radio className="w-4 h-4 text-emerald-400" />
               <span className="text-sm text-emerald-300 font-medium">Live Audio</span>
             </div>
+
+            {/* Speaker Grid */}
+            {participants.filter(p => p.role !== 'listener').length > 0 && (
+              <div className="mt-8 flex flex-wrap justify-center gap-4 z-10 px-4">
+                {participants.filter(p => p.role !== 'listener').map(p => (
+                  <div key={p.id} className="flex flex-col items-center gap-1">
+                    <div className="relative">
+                      <Avatar className={cn(
+                        "w-14 h-14",
+                        p.is_speaking && "ring-2 ring-emerald-400"
+                      )}>
+                        <AvatarImage src={p.profile?.avatar_url} />
+                        <AvatarFallback>{p.profile?.display_name?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      {p.is_muted && (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center">
+                          <span className="text-[8px] text-white">🔇</span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs text-white/70">{p.profile?.display_name || 'User'}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           // Video Broadcast Mode
           <div className="h-full relative">
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-cover"
-            />
-            {!isCameraOn && (
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={roomInfo.hostAvatar} />
-                  <AvatarFallback className="text-3xl">{roomInfo.hostName[0]}</AvatarFallback>
-                </Avatar>
+            {isScreenSharing ? (
+              <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+                <div className="text-center">
+                  <Monitor className="w-16 h-16 text-primary mx-auto mb-4" />
+                  <p className="text-white font-semibold">Screen Sharing Active</p>
+                </div>
               </div>
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover"
+                />
+                {!isCameraOn && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+                    <Avatar className="w-24 h-24">
+                      <AvatarImage src={roomInfo.hostAvatar} />
+                      <AvatarFallback className="text-3xl">{roomInfo.hostName[0]}</AvatarFallback>
+                    </Avatar>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}
@@ -490,27 +636,60 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           messages={messages}
           gifts={flyingGifts}
           hostId={roomInfo.hostId}
-          bottomOffset={isHost ? 180 : 160}
+          bottomOffset={isHost ? 200 : 180}
         />
 
         {/* Floating Hearts Animation */}
         <FloatingHearts trigger={heartTrigger} />
 
         {/* Right Side Actions */}
-        <div className="absolute right-4 bottom-48 flex flex-col gap-4 z-20">
+        <div className="absolute right-4 bottom-56 flex flex-col gap-4 z-20">
           <ActionButton
             icon={<Heart className="w-6 h-6" />}
             onClick={() => setHeartTrigger(prev => prev + 1)}
             className="text-red-400"
           />
           {!isHost && (
-            <ActionButton
-              icon={<Plus className="w-6 h-6" />}
-              onClick={() => setShowGiftModal(true)}
-              className="text-amber-400 bg-amber-500/20"
-            />
+            <>
+              <ActionButton
+                icon={<Gift className="w-6 h-6" />}
+                onClick={() => setShowQuickGifts(true)}
+                className="text-amber-400 bg-gradient-to-br from-amber-500/30 to-orange-500/30"
+              />
+              <ActionButton
+                icon={<Plus className="w-6 h-6" />}
+                onClick={() => setShowGiftModal(true)}
+                className="text-primary"
+              />
+            </>
           )}
+          <ActionButton
+            icon={<Share2 className="w-6 h-6" />}
+            onClick={handleShare}
+            className="text-white/70"
+          />
         </div>
+
+        {/* Quick Gift Bar */}
+        <QuickGiftBar
+          isOpen={showQuickGifts}
+          onClose={() => setShowQuickGifts(false)}
+          recipientId={roomInfo.hostId}
+          roomId={roomInfo.id}
+          isSpace={roomInfo.type === 'audio_space'}
+          onGiftSent={handleQuickGift}
+          userCredits={localCredits}
+          onCreditsChange={setLocalCredits}
+        />
+      </div>
+
+      {/* Chat Input Area */}
+      <div className="absolute bottom-24 left-0 right-0 px-4 z-20">
+        <BroadcastInput
+          isHost={isHost}
+          onSendMessage={handleSendMessage}
+          placeholder="Say something..."
+        />
       </div>
 
       {/* Control Bar */}
@@ -526,6 +705,22 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         onShareClick={handleShare}
         onEndStream={handleLeave}
         onMinimize={minimize}
+      />
+
+      {/* Participants Modal */}
+      <ParticipantsList
+        isOpen={showParticipants}
+        onClose={() => setShowParticipants(false)}
+        roomId={roomInfo.id}
+        roomType={roomInfo.type}
+        isHost={isHost}
+        participants={participants}
+        onMuteParticipant={muteParticipant}
+        onUnmuteParticipant={unmuteParticipant}
+        onMuteAll={muteAll}
+        onInviteUser={() => toast('Invite feature coming soon!')}
+        onPromoteToSpeaker={inviteToSpeak}
+        onDemoteToListener={removeFromSpeakers}
       />
 
       {/* Gift Modal */}

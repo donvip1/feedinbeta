@@ -48,6 +48,23 @@ export interface AudioLevels {
   [participantId: string]: number;
 }
 
+export interface Participant {
+  id: string;
+  user_id: string;
+  role: ParticipantRole;
+  is_muted: boolean;
+  is_hard_muted: boolean; // Host forced mute - cannot unmute
+  is_speaking: boolean;
+  joined_at: string;
+  profile?: {
+    id: string;
+    display_name: string;
+    username: string;
+    avatar_url: string;
+    level?: number;
+  };
+}
+
 export interface UnifiedLiveState {
   isActive: boolean;
   isMinimized: boolean;
@@ -55,26 +72,14 @@ export interface UnifiedLiveState {
   role: ParticipantRole;
   isMuted: boolean;
   isCameraOn: boolean;
+  isScreenSharing: boolean;
+  isHardMuted: boolean; // Host forced mute on current user
+  canSpeak: boolean;
   connectionStatus: ConnectionStatus;
   viewerCount: number;
   audioLevels: AudioLevels;
-}
-
-export interface UnifiedLiveContextType {
-  state: UnifiedLiveState;
-  // Actions
-  joinRoom: (roomInfo: RoomInfo, role: ParticipantRole) => Promise<boolean>;
-  leaveRoom: () => Promise<void>;
-  minimize: () => void;
-  maximize: () => void;
-  toggleMute: () => void;
-  toggleCamera: () => void;
-  updateRole: (role: ParticipantRole) => Promise<void>;
-  // LiveKit refs
-  room: Room | null;
-  videoTrack: LocalVideoTrack | null;
-  audioTrack: LocalAudioTrack | null;
-  localStream: MediaStream | null;
+  participants: Participant[];
+  userCredits: number;
 }
 
 const defaultState: UnifiedLiveState = {
@@ -84,10 +89,44 @@ const defaultState: UnifiedLiveState = {
   role: 'viewer',
   isMuted: true,
   isCameraOn: false,
+  isScreenSharing: false,
+  isHardMuted: false,
+  canSpeak: true,
   connectionStatus: 'idle',
   viewerCount: 0,
   audioLevels: {},
+  participants: [],
+  userCredits: 0,
 };
+
+// ============= CONTEXT TYPE =============
+
+export interface UnifiedLiveContextType {
+  state: UnifiedLiveState;
+  // Core Actions
+  joinRoom: (roomInfo: RoomInfo, role: ParticipantRole) => Promise<boolean>;
+  leaveRoom: () => Promise<void>;
+  minimize: () => void;
+  maximize: () => void;
+  toggleMute: () => void;
+  toggleCamera: () => void;
+  toggleScreenShare: () => void;
+  updateRole: (role: ParticipantRole) => Promise<void>;
+  // Moderation Actions (Host Only)
+  muteParticipant: (userId: string) => void;
+  unmuteParticipant: (userId: string) => void;
+  muteAll: () => void;
+  inviteToSpeak: (userId: string) => void;
+  removeFromSpeakers: (userId: string) => void;
+  // Feature Actions
+  sendBroadcastMessage: (message: string) => Promise<void>;
+  startPKBattle: (challengerId: string) => Promise<void>;
+  // LiveKit refs
+  room: Room | null;
+  videoTrack: LocalVideoTrack | null;
+  audioTrack: LocalAudioTrack | null;
+  localStream: MediaStream | null;
+}
 
 // ============= CONTEXT =============
 
@@ -577,7 +616,203 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, []);
 
-  // ============= AUTO-RECONNECT =============
+  // ============= SCREEN SHARE =============
+
+  const toggleScreenShare = useCallback(() => {
+    // Screen share requires video broadcast mode and host/speaker role
+    const roomInfo = roomInfoRef.current;
+    if (!roomInfo) return;
+    
+    if (roomInfo.type === 'audio_space') {
+      toast.error('Screen sharing not available in audio spaces');
+      return;
+    }
+    
+    if (!state.role || !['host', 'co_host', 'speaker'].includes(state.role)) {
+      toast.error('Only hosts and speakers can share screen');
+      return;
+    }
+
+    // TODO: Implement screen share track logic
+    setState(prev => ({ ...prev, isScreenSharing: !prev.isScreenSharing }));
+    toast(state.isScreenSharing ? 'Screen share stopped' : 'Screen sharing started');
+  }, [state.role, state.isScreenSharing]);
+
+  // ============= MODERATION ACTIONS =============
+
+  const muteParticipant = useCallback((userId: string) => {
+    if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
+      toast.error('Only hosts can mute participants');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      participants: prev.participants.map(p =>
+        p.user_id === userId ? { ...p, is_muted: true, is_hard_muted: true } : p
+      ),
+    }));
+
+    // TODO: Send mute command via LiveKit data channel
+    toast.success('Participant muted');
+  }, []);
+
+  const unmuteParticipant = useCallback((userId: string) => {
+    if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
+      toast.error('Only hosts can unmute participants');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      participants: prev.participants.map(p =>
+        p.user_id === userId ? { ...p, is_muted: false, is_hard_muted: false } : p
+      ),
+    }));
+
+    toast.success('Participant can now speak');
+  }, []);
+
+  const muteAll = useCallback(() => {
+    if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
+      toast.error('Only hosts can mute all participants');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      participants: prev.participants.map(p => 
+        p.role !== 'host' && p.role !== 'co_host' 
+          ? { ...p, is_muted: true, is_hard_muted: true } 
+          : p
+      ),
+    }));
+
+    toast.success('All participants muted');
+  }, []);
+
+  const inviteToSpeak = useCallback(async (userId: string) => {
+    if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
+      toast.error('Only hosts can invite speakers');
+      return;
+    }
+
+    const roomInfo = roomInfoRef.current;
+    if (!roomInfo) return;
+
+    // Update participant role
+    setState(prev => ({
+      ...prev,
+      participants: prev.participants.map(p =>
+        p.user_id === userId ? { ...p, role: 'speaker' as ParticipantRole, is_hard_muted: false } : p
+      ),
+    }));
+
+    // Send notification to the user
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      from_user_id: userRef.current?.id,
+      type: 'live_invite',
+      title: 'Invited to speak!',
+      message: `You've been invited to speak in "${roomInfo.title}"`,
+      related_id: roomInfo.id,
+      related_type: roomInfo.type === 'audio_space' ? 'space' : 'live_stream',
+    });
+
+    toast.success('Invitation sent');
+  }, []);
+
+  const removeFromSpeakers = useCallback((userId: string) => {
+    if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
+      toast.error('Only hosts can remove speakers');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      participants: prev.participants.map(p =>
+        p.user_id === userId ? { ...p, role: 'listener' as ParticipantRole, is_muted: true, is_hard_muted: true } : p
+      ),
+    }));
+
+    toast.success('Removed from speakers');
+  }, []);
+
+  // ============= FEATURE ACTIONS =============
+
+  const sendBroadcastMessage = useCallback(async (message: string) => {
+    if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
+      toast.error('Only hosts can send broadcast messages');
+      return;
+    }
+
+    const roomInfo = roomInfoRef.current;
+    const currentUser = userRef.current;
+    if (!roomInfo || !currentUser) return;
+
+    try {
+      if (roomInfo.type === 'audio_space') {
+        await supabase.from('live_space_messages').insert({
+          space_id: roomInfo.id,
+          user_id: currentUser.id,
+          content: `📢 ${message}`,
+          is_broadcast: true,
+        });
+      } else {
+        await supabase.from('live_stream_comments').insert({
+          stream_id: roomInfo.id,
+          user_id: currentUser.id,
+          content: `📢 ${message}`,
+        });
+      }
+    } catch (error) {
+      console.error('[UnifiedLive] Failed to send broadcast message:', error);
+      toast.error('Failed to send message');
+    }
+  }, []);
+
+  const startPKBattle = useCallback(async (challengerId: string) => {
+    if (roleRef.current !== 'host') {
+      toast.error('Only hosts can start PK battles');
+      return;
+    }
+
+    const roomInfo = roomInfoRef.current;
+    if (!roomInfo || roomInfo.type !== 'video_broadcast') {
+      toast.error('PK battles only available in video broadcasts');
+      return;
+    }
+
+    // Get challenger profile
+    const { data: challengerProfile } = await supabase
+      .from('profiles')
+      .select('id, display_name, username, avatar_url')
+      .eq('id', challengerId)
+      .single();
+
+    if (!challengerProfile) {
+      toast.error('Challenger not found');
+      return;
+    }
+
+    // Update room to PK mode
+    const updatedRoom: RoomInfo = {
+      ...roomInfo,
+      type: 'pk_battle',
+      pkData: {
+        challengerId,
+        challengerName: challengerProfile.display_name || challengerProfile.username || 'Challenger',
+        challengerAvatar: challengerProfile.avatar_url || '',
+        hostScore: 0,
+        challengerScore: 0,
+        endTime: new Date(Date.now() + 300000).toISOString(), // 5 min battle
+      },
+    };
+
+    roomInfoRef.current = updatedRoom;
+    setState(prev => ({ ...prev, roomInfo: updatedRoom }));
+    toast.success('PK Battle started!');
+  }, []);
 
   useEffect(() => {
     let reconnectTimer: NodeJS.Timeout | null = null;
@@ -655,7 +890,18 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
         maximize,
         toggleMute,
         toggleCamera,
+        toggleScreenShare,
         updateRole,
+        // Moderation
+        muteParticipant,
+        unmuteParticipant,
+        muteAll,
+        inviteToSpeak,
+        removeFromSpeakers,
+        // Features
+        sendBroadcastMessage,
+        startPKBattle,
+        // LiveKit refs
         room: roomRef.current,
         videoTrack: videoTrackRef.current,
         audioTrack: audioTrackRef.current,
