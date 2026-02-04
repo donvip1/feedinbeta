@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   X, Users, Heart, Wifi, WifiOff, Crown, 
   Plus, Radio, Zap, Sword, Monitor, Megaphone,
-  Share2, Gift
+  Share2, Gift, Pin, LayoutGrid, Sparkles, Minimize2,
+  Mic, MicOff, Video, VideoOff
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,6 @@ import { FlyingChat } from '@/components/live/FlyingChat';
 import { AudioVisualizer } from '@/components/live/unified/AudioVisualizer';
 import { PKBattleBar } from '@/components/live/unified/PKBattleBar';
 import { ConnectionOverlay } from '@/components/live/shared/ConnectionOverlay';
-import { LiveControlBar } from '@/components/live/shared/LiveControlBar';
 import { FloatingLivePlayer } from '@/components/live/FloatingLivePlayer';
 import { LiveGiftModal } from '@/components/live/LiveGiftModal';
 import { ParticipantsList } from '@/components/live/shared/ParticipantsList';
@@ -367,84 +367,80 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header */}
+      {/* Header - Modern TikTok/Tango Style */}
       <motion.div 
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/80 to-transparent"
       >
         <div className="flex items-center justify-between">
-          {/* Host Info */}
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Avatar 
-                className="w-12 h-12 ring-2 ring-primary cursor-pointer"
-                onClick={() => navigate(`/profile/${roomInfo.hostId}`)}
-              >
-                <AvatarImage src={roomInfo.hostAvatar} />
-                <AvatarFallback>{roomInfo.hostName[0]}</AvatarFallback>
-              </Avatar>
-              {connectionStatus === 'connected' && (
-                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-destructive rounded-full flex items-center justify-center">
-                  <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
-                </span>
+          {/* Left: Minimize + Host Info Pill */}
+          <div className="flex items-center gap-2">
+            {/* Minimize/Pin Button */}
+            <button
+              onClick={minimize}
+              className="p-2 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
+            >
+              <Pin className="w-4 h-4 text-white/80" />
+            </button>
+            
+            {/* Host Info Pill */}
+            <div className="flex items-center gap-2 bg-black/60 backdrop-blur-md rounded-full px-3 py-1.5">
+              <div className="relative">
+                <Avatar 
+                  className="w-8 h-8 cursor-pointer"
+                  onClick={() => navigate(`/profile/${roomInfo.hostId}`)}
+                >
+                  <AvatarImage src={roomInfo.hostAvatar} />
+                  <AvatarFallback>{roomInfo.hostName[0]}</AvatarFallback>
+                </Avatar>
+                {connectionStatus === 'connected' && (
+                  <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-destructive rounded-full border border-black" />
+                )}
+              </div>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-white text-sm font-medium">{roomInfo.hostName}</span>
+                  {isHost && <Crown className="w-3 h-3 text-amber-400" />}
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-white/60">
+                  <Users className="w-2.5 h-2.5" />
+                  <span>{viewerCount}</span>
+                </div>
+              </div>
+              {!isHost && (
+                <Button
+                  size="sm"
+                  variant={isFollowing ? "secondary" : "default"}
+                  onClick={handleFollow}
+                  className="h-6 px-2 text-xs rounded-full ml-1"
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </Button>
               )}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-white font-semibold">{roomInfo.hostName}</span>
-                {isHost && <Crown className="w-4 h-4 text-amber-400" />}
-              </div>
-              <div className="flex items-center gap-2 text-xs text-white/70">
-                <Users className="w-3 h-3" />
-                <span>{viewerCount}</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
-                <span>LIVE</span>
-              </div>
-            </div>
-            {!isHost && (
-              <Button
-                size="sm"
-                variant={isFollowing ? "secondary" : "default"}
-                onClick={handleFollow}
-                className="ml-2"
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </Button>
-            )}
           </div>
 
           {/* Right Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {/* Participants Button (Host) */}
             {isHost && (
               <button
                 onClick={() => setShowParticipants(true)}
-                className="relative p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                className="relative p-2 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
               >
                 <Users className="w-5 h-5 text-white" />
                 {participants.length > 0 && (
-                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-[10px] font-bold text-white">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
                     {participants.length}
                   </span>
                 )}
               </button>
             )}
 
-            {/* PK Battle Button (Host, Video Only) */}
-            {isHost && roomInfo.type === 'video_broadcast' && (
-              <button
-                onClick={handleStartPK}
-                className="p-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 transition-opacity"
-                title="Start PK Battle"
-              >
-                <Sword className="w-5 h-5 text-white" />
-              </button>
-            )}
-
             {/* Connection Status */}
             {connectionStatus === 'reconnecting' && (
-              <div className="flex items-center gap-1.5 bg-amber-500/20 px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1.5 bg-amber-500/20 backdrop-blur-md px-2 py-1 rounded-full">
                 <WifiOff className="w-3 h-3 text-amber-400" />
                 <span className="text-xs text-amber-400">Reconnecting...</span>
               </div>
@@ -453,7 +449,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             {/* Close Button */}
             <button
               onClick={handleLeave}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              className="p-2 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
             >
               <X className="w-5 h-5 text-white" />
             </button>
@@ -647,47 +643,59 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         {/* Floating Reactions Animation */}
         <FloatingReactionsSimple trigger={reactionTrigger} icon={reactionIcon} />
 
-        {/* Right Side Actions */}
-        <div className="absolute right-4 bottom-56 flex flex-col gap-4 z-20">
-          {/* Heart Reaction */}
-          <ActionButton
-            icon={<Heart className="w-6 h-6" />}
+        {/* Right Side Actions - Modern Style */}
+        <div className="absolute right-4 bottom-64 flex flex-col gap-3 z-20">
+          {/* Heart Reaction - White outline style */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={() => { setReactionIcon("❤️"); setReactionTrigger(prev => prev + 1); }}
-            className="text-red-400"
-          />
+            className="p-3 rounded-full border-2 border-white bg-transparent backdrop-blur-sm"
+          >
+            <Heart className="w-6 h-6 text-white" />
+          </motion.button>
           
-          {/* Share Button */}
-          <ActionButton
-            icon={<Share2 className="w-6 h-6" />}
+          {/* Animated Gift Button */}
+          <motion.button
+            animate={{ 
+              y: [0, -4, 0],
+              scale: [1, 1.05, 1],
+            }}
+            transition={{ 
+              duration: 1.5, 
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowQuickGifts(true)}
+            className="p-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/40"
+          >
+            <Gift className="w-6 h-6 text-white" />
+          </motion.button>
+          
+          {/* Share Button - White outline style */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={handleShare}
-            className="text-white"
-          />
-          
-          {/* Animated Gift Button (Non-hosts) */}
-          {!isHost && (
-            <>
-              <motion.button
-                animate={{ 
-                  y: [0, -5, 0],
-                  scale: [1, 1.05, 1],
-                }}
-                transition={{ 
-                  duration: 1.5, 
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-                onClick={() => setShowQuickGifts(true)}
-                className="p-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/50 hover:scale-110 transition-transform"
-              >
-                <Gift className="w-6 h-6 text-white" />
-              </motion.button>
-              <ActionButton
-                icon={<Plus className="w-6 h-6" />}
-                onClick={() => setShowGiftModal(true)}
-                className="text-primary"
-              />
-            </>
-          )}
+            className="p-3 rounded-full border-2 border-white bg-transparent backdrop-blur-sm"
+          >
+            <Share2 className="w-6 h-6 text-white" />
+          </motion.button>
+        </div>
+
+        {/* Floating Vertical Control Panel */}
+        <div className="absolute right-4 bottom-44 flex flex-col gap-2 bg-slate-800/80 backdrop-blur-md rounded-2xl p-2 z-20">
+          <button className="p-2.5 text-white/60 hover:text-white transition-colors">
+            <LayoutGrid className="w-5 h-5" />
+          </button>
+          <button className="p-2.5 text-white/60 hover:text-white transition-colors">
+            <Sparkles className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={minimize}
+            className="p-2.5 text-white/60 hover:text-white transition-colors"
+          >
+            <Minimize2 className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Quick Gift Bar */}
@@ -703,35 +711,18 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         />
       </div>
 
-      {/* Chat Input Area */}
-      <div className="absolute bottom-24 left-0 right-0 px-4 z-20">
-        <BroadcastInput
-          isHost={isHost}
-          onSendMessage={handleSendMessage}
-          placeholder="Say something..."
-          isMicOn={!isMuted}
-          onMicToggle={toggleMute}
-          isScreenSharing={isScreenSharing}
-          onScreenShareToggle={toggleScreenShare}
-          onPKBattleStart={handleStartPK}
-          showPKButton={roomInfo.type === 'video_broadcast'}
-          canSpeak={true}
-        />
-      </div>
-
-      {/* Control Bar */}
-      <LiveControlBar
-        roomType={roomInfo.type}
+      {/* Footer Control Bar - Modern Separated Layout */}
+      <FooterControlBar
         isHost={isHost}
         isMuted={isMuted}
         isCameraOn={isCameraOn}
+        isScreenSharing={isScreenSharing}
+        roomType={roomInfo.type}
+        onSendMessage={handleSendMessage}
         onMicToggle={toggleMute}
         onCameraToggle={toggleCamera}
-        onChatToggle={() => {}}
-        onGiftClick={() => setShowGiftModal(true)}
-        onShareClick={handleShare}
-        onEndStream={handleLeave}
-        onMinimize={minimize}
+        onScreenShareToggle={toggleScreenShare}
+        onPKBattleStart={handleStartPK}
       />
 
       {/* Participants Modal */}
@@ -761,6 +752,127 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         isSpace={roomInfo.type === 'audio_space'}
       />
     </div>
+  );
+};
+
+// Footer Control Bar - Modern TikTok/Tango Style
+interface FooterControlBarProps {
+  isHost: boolean;
+  isMuted: boolean;
+  isCameraOn: boolean;
+  isScreenSharing: boolean;
+  roomType: 'video_broadcast' | 'audio_space' | 'pk_battle';
+  onSendMessage: (message: string, isBroadcast: boolean) => void;
+  onMicToggle: () => void;
+  onCameraToggle: () => void;
+  onScreenShareToggle: () => void;
+  onPKBattleStart: () => void;
+}
+
+const FooterControlBar = ({
+  isHost,
+  isMuted,
+  isCameraOn,
+  isScreenSharing,
+  roomType,
+  onSendMessage,
+  onMicToggle,
+  onCameraToggle,
+  onScreenShareToggle,
+  onPKBattleStart,
+}: FooterControlBarProps) => {
+  const [isBroadcastMode, setIsBroadcastMode] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ y: 100, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      className="absolute bottom-0 left-0 right-0 z-30 px-4 pb-8 pt-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent"
+    >
+      <div className="flex items-center gap-3">
+        {/* Megaphone Toggle - Host Only */}
+        {isHost && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setIsBroadcastMode(!isBroadcastMode)}
+            className={cn(
+              "p-3 rounded-full transition-all shrink-0",
+              isBroadcastMode 
+                ? "bg-destructive text-white" 
+                : "bg-white/10 text-white/60 hover:text-white"
+            )}
+          >
+            <Megaphone className="w-5 h-5" />
+          </motion.button>
+        )}
+
+        {/* Input Container - Flexible */}
+        <div className="flex-1">
+          <BroadcastInput
+            onSendMessage={onSendMessage}
+            placeholder="Say something..."
+            isBroadcastMode={isBroadcastMode}
+          />
+        </div>
+
+        {/* Mic Button - White when active */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onMicToggle}
+          className={cn(
+            "p-3 rounded-full transition-all shrink-0",
+            !isMuted 
+              ? "bg-white text-black" 
+              : "bg-white/10 text-white/60"
+          )}
+        >
+          {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+        </motion.button>
+
+        {/* Screen Share Button - Host Only */}
+        {isHost && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={onScreenShareToggle}
+            className={cn(
+              "p-3 rounded-full transition-all shrink-0",
+              isScreenSharing 
+                ? "bg-emerald-500 text-white" 
+                : "bg-white/10 text-white/60 hover:text-white"
+            )}
+          >
+            <Monitor className="w-5 h-5" />
+          </motion.button>
+        )}
+
+        {/* Camera Button - Red/Pink when off (Video Only) */}
+        {roomType !== 'audio_space' && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={onCameraToggle}
+            className={cn(
+              "p-3 rounded-full transition-all shrink-0",
+              isCameraOn 
+                ? "bg-white/10 text-white/60 hover:text-white" 
+                : "bg-rose-500 text-white"
+            )}
+          >
+            {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+          </motion.button>
+        )}
+
+        {/* PK Battle Button - Host, Video Only */}
+        {isHost && roomType === 'video_broadcast' && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={onPKBattleStart}
+            className="p-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0"
+          >
+            <Sword className="w-5 h-5" />
+          </motion.button>
+        )}
+      </div>
+    </motion.div>
   );
 };
 
