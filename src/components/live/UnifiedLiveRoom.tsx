@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Heart, Wifi, WifiOff, Crown, 
   Plus, Radio, Zap, Sword, Monitor, Megaphone,
-  Share2, Gift, Pin, Minimize2,
+  Share2, Gift, Pin, Minimize2, MoreVertical,
   Mic, MicOff, Video, VideoOff
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -644,7 +644,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         <FloatingReactionsSimple trigger={reactionTrigger} icon={reactionIcon} />
 
         {/* Right Side Actions - Single Vertical Stack */}
-        <div className="absolute right-4 bottom-52 flex flex-col gap-3 z-20">
+        <div className="absolute right-4 bottom-44 flex flex-col gap-3 z-20">
           {/* Heart Reaction - White outline style */}
           <motion.button
             whileTap={{ scale: 0.9 }}
@@ -681,7 +681,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             <Share2 className="w-6 h-6 text-white" />
           </motion.button>
 
-          {/* Minimize Button - At bottom of stack */}
+          {/* Minimize Button */}
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={minimize}
@@ -689,6 +689,18 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           >
             <Minimize2 className="w-5 h-5 text-white/80" />
           </motion.button>
+
+          {/* More Options Menu - Screen Share, Camera, PK Battle */}
+          {isHost && (
+            <RightSideMenu
+              roomType={roomInfo.type}
+              isCameraOn={isCameraOn}
+              isScreenSharing={isScreenSharing}
+              onCameraToggle={toggleCamera}
+              onScreenShareToggle={toggleScreenShare}
+              onPKBattleStart={handleStartPK}
+            />
+          )}
         </div>
 
         {/* Quick Gift Bar */}
@@ -780,26 +792,26 @@ const FooterControlBar = ({
     <motion.div
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="absolute bottom-0 left-0 right-0 z-30 px-4 pb-8 pt-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent"
+      className="absolute bottom-0 left-0 right-0 z-30 px-4 pb-6 pt-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent"
     >
-      <div className="flex items-center gap-3 flex-nowrap">
-        {/* Megaphone Toggle - Host Only */}
+      <div className="flex items-center gap-2 flex-nowrap">
+        {/* Megaphone Toggle - Host Only, Smaller */}
         {isHost && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => setIsBroadcastMode(!isBroadcastMode)}
             className={cn(
-              "p-3 rounded-full transition-all shrink-0",
+              "p-2 rounded-full transition-all shrink-0",
               isBroadcastMode 
                 ? "bg-destructive text-white" 
                 : "bg-white/10 text-white/60 hover:text-white"
             )}
           >
-            <Megaphone className="w-5 h-5" />
+            <Megaphone className="w-4 h-4" />
           </motion.button>
         )}
 
-        {/* Input Container - Flexible with min-width */}
+        {/* Input Container - Takes remaining space */}
         <div className="flex-1 min-w-0">
           <BroadcastInput
             onSendMessage={onSendMessage}
@@ -808,64 +820,155 @@ const FooterControlBar = ({
           />
         </div>
 
-        {/* Mic Button - White when active */}
+        {/* Mic Button - Right after send, White when active */}
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={onMicToggle}
           className={cn(
-            "p-3 rounded-full transition-all shrink-0",
+            "p-2.5 rounded-full transition-all shrink-0",
             !isMuted 
               ? "bg-white text-black" 
               : "bg-white/10 text-white/60"
           )}
         >
-          {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
         </motion.button>
 
-        {/* Screen Share Button - Host Only */}
-        {isHost && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={onScreenShareToggle}
-            className={cn(
-              "p-3 rounded-full transition-all shrink-0",
-              isScreenSharing 
-                ? "bg-emerald-500 text-white" 
-                : "bg-white/10 text-white/60 hover:text-white"
-            )}
-          >
-            <Monitor className="w-5 h-5" />
-          </motion.button>
-        )}
+        {/* Desktop Only: Show extra controls inline on wider screens */}
+        <div className="hidden md:flex items-center gap-2">
+          {/* Screen Share Button - Host Only */}
+          {isHost && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={onScreenShareToggle}
+              className={cn(
+                "p-2.5 rounded-full transition-all shrink-0",
+                isScreenSharing 
+                  ? "bg-emerald-500 text-white" 
+                  : "bg-white/10 text-white/60 hover:text-white"
+              )}
+            >
+              <Monitor className="w-4 h-4" />
+            </motion.button>
+          )}
 
-        {/* Camera Button - Red/Pink when off (Video Only) */}
-        {roomType !== 'audio_space' && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={onCameraToggle}
-            className={cn(
-              "p-3 rounded-full transition-all shrink-0",
-              isCameraOn 
-                ? "bg-white/10 text-white/60 hover:text-white" 
-                : "bg-rose-500 text-white"
-            )}
-          >
-            {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-          </motion.button>
-        )}
+          {/* Camera Button - Video Only */}
+          {roomType !== 'audio_space' && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={onCameraToggle}
+              className={cn(
+                "p-2.5 rounded-full transition-all shrink-0",
+                isCameraOn 
+                  ? "bg-white/10 text-white/60 hover:text-white" 
+                  : "bg-rose-500 text-white"
+              )}
+            >
+              {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+            </motion.button>
+          )}
 
-        {/* PK Battle Button - Host, Video Only */}
-        {isHost && roomType === 'video_broadcast' && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={onPKBattleStart}
-            className="p-3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0"
-          >
-            <Sword className="w-5 h-5" />
-          </motion.button>
-        )}
+          {/* PK Battle Button - Host, Video Only */}
+          {isHost && roomType === 'video_broadcast' && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={onPKBattleStart}
+              className="p-2.5 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white shrink-0"
+            >
+              <Sword className="w-4 h-4" />
+            </motion.button>
+          )}
+        </div>
       </div>
     </motion.div>
+  );
+};
+
+// Right Side Menu Component - For Screen Share, Camera, PK Battle on mobile
+const RightSideMenu = ({
+  roomType,
+  isCameraOn,
+  isScreenSharing,
+  onCameraToggle,
+  onScreenShareToggle,
+  onPKBattleStart,
+}: {
+  roomType: 'video_broadcast' | 'audio_space' | 'pk_battle';
+  isCameraOn: boolean;
+  isScreenSharing: boolean;
+  onCameraToggle: () => void;
+  onScreenShareToggle: () => void;
+  onPKBattleStart: () => void;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      {/* 3-dot menu trigger */}
+      <motion.button
+        whileTap={{ scale: 0.9 }}
+        onClick={() => setIsOpen(!isOpen)}
+        className="p-3 rounded-full bg-slate-800/80 backdrop-blur-md"
+      >
+        <MoreVertical className="w-5 h-5 text-white/80" />
+      </motion.button>
+
+      {/* Dropdown Menu */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: 10, scale: 0.9 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 10, scale: 0.9 }}
+            className="absolute right-12 bottom-0 flex flex-col gap-2 bg-slate-900/95 backdrop-blur-md rounded-xl p-2 border border-white/10"
+          >
+            {/* Screen Share */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => { onScreenShareToggle(); setIsOpen(false); }}
+              className={cn(
+                "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                isScreenSharing 
+                  ? "bg-emerald-500/20 text-emerald-400" 
+                  : "text-white/80 hover:bg-white/10"
+              )}
+            >
+              <Monitor className="w-4 h-4" />
+              <span>{isScreenSharing ? 'Stop Sharing' : 'Share Screen'}</span>
+            </motion.button>
+
+            {/* Camera Toggle - Video Only */}
+            {roomType !== 'audio_space' && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { onCameraToggle(); setIsOpen(false); }}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  !isCameraOn 
+                    ? "bg-rose-500/20 text-rose-400" 
+                    : "text-white/80 hover:bg-white/10"
+                )}
+              >
+                {isCameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+                <span>{isCameraOn ? 'Turn Off Camera' : 'Turn On Camera'}</span>
+              </motion.button>
+            )}
+
+            {/* PK Battle - Video Only */}
+            {roomType === 'video_broadcast' && (
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={() => { onPKBattleStart(); setIsOpen(false); }}
+                className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-amber-400 hover:bg-amber-500/10 transition-colors"
+              >
+                <Sword className="w-4 h-4" />
+                <span>Start PK Battle</span>
+              </motion.button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 };
 
