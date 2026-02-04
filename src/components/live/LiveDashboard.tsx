@@ -42,7 +42,7 @@ interface LiveDashboardProps {
   myActiveSpace?: any;  // User's currently active space
 }
 
-const filters = ["All", "Popular", "Music", "Gaming", "Chat"];
+const filters = ["All", "Popular", "Music", "Gaming", "Chat", "Talk Show", "Education", "Tech"];
 
 export const LiveDashboard = ({
   liveStreams,
@@ -77,15 +77,24 @@ export const LiveDashboard = ({
   // Filter content based on active filter
   const filteredContent = useMemo(() => {
     if (activeFilter === 'All') return allLiveContent;
+    if (activeFilter === 'Popular') {
+      return [...allLiveContent].sort((a, b) => 
+        (b.viewer_count || 0) - (a.viewer_count || 0)
+      );
+    }
     
-    // Filter by category/tags
+    // Filter by category/tags/hashtags
+    const filter = activeFilter.toLowerCase().replace(/\s+/g, '_');
     return allLiveContent.filter(item => {
       const itemCategory = (item as any).category?.toLowerCase() || '';
+      const itemTopicCategory = (item as any).topic_category?.toLowerCase() || '';
       const itemTags = (item as any).tags || [];
-      const filter = activeFilter.toLowerCase();
+      const itemHashtags = (item as any).hashtags || [];
       
       return itemCategory === filter || 
-             itemTags.some((tag: string) => tag.toLowerCase() === filter);
+             itemTopicCategory === filter ||
+             itemTags.some((tag: string) => tag.toLowerCase() === filter) ||
+             itemHashtags.some((tag: string) => tag.toLowerCase() === filter);
     });
   }, [allLiveContent, activeFilter]);
 
@@ -313,6 +322,8 @@ export const LiveDashboard = ({
                     roomType={item.contentType === "space" ? "audio_space" : "video_broadcast"}
                     viewerCount={item.viewer_count || item.active_listeners || 0}
                     thumbnailUrl={item.thumbnail_url}
+                    category={item.category || item.topic_category}
+                    hashtags={item.hashtags}
                     onClick={() =>
                       item.contentType === "space" ? onSpaceClick(item) : onStreamClick(item)
                     }
@@ -351,6 +362,8 @@ export const LiveDashboard = ({
                     hostAvatar={space.profiles?.avatar_url}
                     roomType="audio_space"
                     viewerCount={space.active_listeners || space.viewer_count || 0}
+                    category={space.topic_category}
+                    hashtags={space.hashtags}
                     onClick={() => onSpaceClick(space)}
                   />
                 </motion.div>

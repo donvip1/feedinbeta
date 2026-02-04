@@ -5,9 +5,26 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock, Mic, Swords } from "lucide-react";
+import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock, Mic, Swords, Hash, X } from "lucide-react";
+
+// Categories available for streams
+const STREAM_CATEGORIES = [
+  { value: 'music', label: 'Music', icon: '🎵' },
+  { value: 'gaming', label: 'Gaming', icon: '🎮' },
+  { value: 'chat', label: 'Chat', icon: '💬' },
+  { value: 'talk_show', label: 'Talk Show', icon: '🎙️' },
+  { value: 'education', label: 'Education', icon: '📚' },
+  { value: 'sports', label: 'Sports', icon: '⚽' },
+  { value: 'cooking', label: 'Cooking', icon: '🍳' },
+  { value: 'art', label: 'Art & Creative', icon: '🎨' },
+  { value: 'fitness', label: 'Fitness', icon: '💪' },
+  { value: 'tech', label: 'Tech', icon: '💻' },
+  { value: 'news', label: 'News', icon: '📰' },
+  { value: 'other', label: 'Other', icon: '✨' },
+];
 import { usePremiumStatus } from "@/hooks/usePremiumStatus";
 import { useNavigation } from "@/context/NavigationContext";
 import { cn } from "@/lib/utils";
@@ -29,6 +46,8 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [hashtagInput, setHashtagInput] = useState("");
   const [isPremium, setIsPremium] = useState(false);
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledDate, setScheduledDate] = useState("");
@@ -36,6 +55,25 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [loading, setLoading] = useState(false);
   const [roomType, setRoomType] = useState<RoomType>('video_broadcast');
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
+
+  const MAX_HASHTAGS = 5;
+
+  const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === ' ' || e.key === 'Enter') && hashtagInput.trim()) {
+      e.preventDefault();
+      const tag = hashtagInput.trim().replace(/^#/, '').toLowerCase();
+      if (tag && !hashtags.includes(tag) && hashtags.length < MAX_HASHTAGS) {
+        setHashtags([...hashtags, tag]);
+        setHashtagInput("");
+      }
+    } else if (e.key === 'Backspace' && !hashtagInput && hashtags.length > 0) {
+      setHashtags(hashtags.slice(0, -1));
+    }
+  };
+
+  const removeHashtag = (tagToRemove: string) => {
+    setHashtags(hashtags.filter(tag => tag !== tagToRemove));
+  };
 
   // Hide bottom navigation when modal is open
   useEffect(() => {
@@ -99,7 +137,8 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           user_id: user.id,
           title: title.trim(),
           description: description.trim() || null,
-          category: category.trim() || null,
+          category: category || null,
+          hashtags: hashtags.length > 0 ? hashtags : null,
           is_premium: isPremium,
           stream_key: streamKeyData || `stream_${Date.now()}`,
           status: isScheduled ? 'scheduled' : 'live',
@@ -121,6 +160,8 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       setTitle("");
       setDescription("");
       setCategory("");
+      setHashtags([]);
+      setHashtagInput("");
       setIsPremium(false);
       setIsScheduled(false);
       setScheduledDate("");
@@ -290,14 +331,61 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           </div>
 
           <div>
-            <Label htmlFor="category">Category</Label>
-            <Input
-              id="category"
-              placeholder="e.g., Gaming, Music, Talk Show"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              maxLength={50}
-            />
+            <Label>Category</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent className="bg-background border border-border z-50">
+                {STREAM_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    <span className="flex items-center gap-2">
+                      <span>{cat.icon}</span>
+                      <span>{cat.label}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Hashtags Input */}
+          <div>
+            <Label className="flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <Hash className="w-3 h-3" />
+                Hashtags
+              </span>
+              <span className="text-xs text-muted-foreground">{hashtags.length}/{MAX_HASHTAGS}</span>
+            </Label>
+            <div className="mt-1.5 flex flex-wrap gap-1.5 p-2 border border-input rounded-md bg-background min-h-[42px]">
+              {hashtags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-sm rounded-full"
+                >
+                  #{tag}
+                  <button
+                    type="button"
+                    onClick={() => removeHashtag(tag)}
+                    className="hover:bg-primary/20 rounded-full p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              {hashtags.length < MAX_HASHTAGS && (
+                <input
+                  type="text"
+                  value={hashtagInput}
+                  onChange={(e) => setHashtagInput(e.target.value.replace(/\s/g, ''))}
+                  onKeyDown={handleHashtagKeyDown}
+                  placeholder={hashtags.length === 0 ? "Add hashtags..." : ""}
+                  className="flex-1 min-w-[80px] bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+                />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Press space or enter to add</p>
           </div>
 
           {/* Schedule Date/Time */}

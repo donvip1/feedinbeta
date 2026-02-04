@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Mic, Users, Lock, Globe, Calendar } from 'lucide-react';
+import { Mic, Lock, Globe, Calendar, Hash, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
@@ -18,9 +18,19 @@ interface CreateSpaceModalProps {
   onSpaceCreated: (spaceId: string) => void;
 }
 
-const TOPIC_CATEGORIES = [
-  'Music', 'Tech', 'Business', 'Entertainment', 'Sports', 
-  'Education', 'News', 'Lifestyle', 'Gaming', 'Other'
+const SPACE_CATEGORIES = [
+  { value: 'music', label: 'Music', icon: '🎵' },
+  { value: 'gaming', label: 'Gaming', icon: '🎮' },
+  { value: 'chat', label: 'Chat', icon: '💬' },
+  { value: 'talk_show', label: 'Talk Show', icon: '🎙️' },
+  { value: 'education', label: 'Education', icon: '📚' },
+  { value: 'sports', label: 'Sports', icon: '⚽' },
+  { value: 'business', label: 'Business', icon: '💼' },
+  { value: 'tech', label: 'Tech', icon: '💻' },
+  { value: 'news', label: 'News', icon: '📰' },
+  { value: 'lifestyle', label: 'Lifestyle', icon: '🌟' },
+  { value: 'entertainment', label: 'Entertainment', icon: '🎬' },
+  { value: 'other', label: 'Other', icon: '✨' },
 ];
 
 export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpaceModalProps) => {
@@ -29,11 +39,32 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [topicCategory, setTopicCategory] = useState('');
+  const [hashtags, setHashtags] = useState<string[]>([]);
+  const [hashtagInput, setHashtagInput] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledStart, setScheduledStart] = useState('');
   const [isRecordingEnabled, setIsRecordingEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
+
+  const MAX_HASHTAGS = 5;
+
+  const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ((e.key === ' ' || e.key === 'Enter') && hashtagInput.trim()) {
+      e.preventDefault();
+      const tag = hashtagInput.trim().replace(/^#/, '').toLowerCase();
+      if (tag && !hashtags.includes(tag) && hashtags.length < MAX_HASHTAGS) {
+        setHashtags([...hashtags, tag]);
+        setHashtagInput('');
+      }
+    } else if (e.key === 'Backspace' && !hashtagInput && hashtags.length > 0) {
+      setHashtags(hashtags.slice(0, -1));
+    }
+  };
+
+  const removeHashtag = (tagToRemove: string) => {
+    setHashtags(hashtags.filter(tag => tag !== tagToRemove));
+  };
 
   // Hide bottom navigation when modal is open
   useEffect(() => {
@@ -70,13 +101,13 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
           title: title.trim(),
           description: description.trim() || null,
           topic_category: topicCategory || null,
+          hashtags: hashtags.length > 0 ? hashtags : null,
           is_private: isPrivate,
           is_recording_enabled: isRecordingEnabled,
           status: isScheduled ? 'scheduled' : 'live',
           scheduled_start: isScheduled && scheduledStart ? new Date(scheduledStart).toISOString() : null,
           started_at: isScheduled ? null : new Date().toISOString(),
           share_link: shareLink,
-          // CRITICAL: Default to allowing everyone to talk (like Telegram/Zoom)
           allow_mic_for_all: true,
         })
         .select()
@@ -116,6 +147,8 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
       setTitle('');
       setDescription('');
       setTopicCategory('');
+      setHashtags([]);
+      setHashtagInput('');
       setIsPrivate(false);
       setIsScheduled(false);
       setScheduledStart('');
@@ -165,14 +198,58 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
             <Label>Topic Category</Label>
             <Select value={topicCategory} onValueChange={setTopicCategory}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a topic" />
+                <SelectValue placeholder="Select a category" />
               </SelectTrigger>
-              <SelectContent>
-                {TOPIC_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              <SelectContent className="bg-background border border-border z-50">
+                {SPACE_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    <span className="flex items-center gap-2">
+                      <span>{cat.icon}</span>
+                      <span>{cat.label}</span>
+                    </span>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Hashtags Input */}
+          <div className="space-y-2">
+            <Label className="flex items-center justify-between">
+              <span className="flex items-center gap-1">
+                <Hash className="w-3 h-3" />
+                Hashtags
+              </span>
+              <span className="text-xs text-muted-foreground">{hashtags.length}/{MAX_HASHTAGS}</span>
+            </Label>
+            <div className="flex flex-wrap gap-1.5 p-2 border border-input rounded-md bg-background min-h-[42px]">
+              {hashtags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-sm rounded-full"
+                >
+                  #{tag}
+                  <button
+                    type="button"
+                    onClick={() => removeHashtag(tag)}
+                    className="hover:bg-primary/20 rounded-full p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+              {hashtags.length < MAX_HASHTAGS && (
+                <input
+                  type="text"
+                  value={hashtagInput}
+                  onChange={(e) => setHashtagInput(e.target.value.replace(/\s/g, ''))}
+                  onKeyDown={handleHashtagKeyDown}
+                  placeholder={hashtags.length === 0 ? "Add hashtags..." : ""}
+                  className="flex-1 min-w-[80px] bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+                />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Press space or enter to add</p>
           </div>
 
           <div className="flex items-center justify-between py-2">
