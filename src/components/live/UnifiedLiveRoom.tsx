@@ -103,19 +103,41 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     joinRoom(roomInfo, role);
   }, []);
 
-  // Fetch user credits
+  // Fetch user credits from user_credits table (source of truth)
   useEffect(() => {
     const fetchCredits = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from('credit_transactions')
-        .select('amount')
-        .eq('user_id', user.id);
-      const balance = data?.reduce((sum, t) => sum + t.amount, 0) || 0;
-      setLocalCredits(balance);
+      const { data, error } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!error && data) {
+        setLocalCredits(data.balance || 0);
+      }
     };
     fetchCredits();
   }, [user]);
+
+  // Subscribe to realtime reactions so they show on all screens (including host)
+  useEffect(() => {
+    if (connectionStatus !== 'connected') return;
+
+    const reactionChannel = supabase
+      .channel(`live-reactions-${roomInfo.id}`)
+      .on('broadcast', { event: 'reaction' }, ({ payload }) => {
+        if (payload?.emoji) {
+          setReactionIcon(payload.emoji);
+          setReactionTrigger(prev => prev + 1);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(reactionChannel);
+    };
+  }, [roomInfo.id, connectionStatus]);
 
   // Attach video track
   useEffect(() => {
@@ -307,11 +329,30 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     }
   };
 
-  // Handle double tap for reactions
+  // Handle double tap for reactions - broadcasts to all viewers
   const handleDoubleTap = useCallback(() => {
+    // Broadcast reaction to all viewers
+    supabase.channel(`live-reactions-${roomInfo.id}`).send({
+      type: 'broadcast',
+      event: 'reaction',
+      payload: { emoji: '❤️', userId: user?.id }
+    });
+    // Local trigger for sender
     setReactionIcon("❤️");
     setReactionTrigger(prev => prev + 1);
-  }, []);
+  }, [roomInfo.id, user?.id]);
+
+  // Handle heart button click - broadcasts to all viewers
+  const handleHeartReaction = useCallback(() => {
+    supabase.channel(`live-reactions-${roomInfo.id}`).send({
+      type: 'broadcast',
+      event: 'reaction',
+      payload: { emoji: '❤️', userId: user?.id }
+    });
+    // Local trigger for sender
+    setReactionIcon("❤️");
+    setReactionTrigger(prev => prev + 1);
+  }, [roomInfo.id, user?.id]);
 
   // Handle gift sent
   const handleGiftSent = (gift: { type: string; credits: number; senderName: string }) => {
@@ -323,7 +364,14 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     };
     setFlyingGifts(prev => [...prev, newGift]);
     
-    // Trigger floating animation with the gift emoji
+    // Broadcast gift reaction to all viewers
+    supabase.channel(`live-reactions-${roomInfo.id}`).send({
+      type: 'broadcast',
+      event: 'reaction',
+      payload: { emoji: gift.type, userId: user?.id }
+    });
+    
+    // Local trigger
     setReactionIcon(gift.type);
     setReactionTrigger(prev => prev + 1);
     
@@ -645,10 +693,10 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 
         {/* Right Side Actions - Single Vertical Stack */}
         <div className="absolute right-4 bottom-44 flex flex-col gap-3 z-20">
-          {/* Heart Reaction - White outline style */}
+          {/* Heart Reaction - White outline style - broadcasts to all */}
           <motion.button
             whileTap={{ scale: 0.9 }}
-            onClick={() => { setReactionIcon("❤️"); setReactionTrigger(prev => prev + 1); }}
+            onClick={handleHeartReaction}
             className="p-3 rounded-full border-2 border-white bg-transparent backdrop-blur-sm"
           >
             <Heart className="w-6 h-6 text-white" />

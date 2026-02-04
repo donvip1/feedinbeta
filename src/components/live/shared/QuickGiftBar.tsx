@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Coins, Gift } from 'lucide-react';
+import { Coins, Gift, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdminRole } from '@/hooks/useAdminRole';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface QuickGiftBarProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ interface QuickGiftBarProps {
   roomId: string;
   isSpace?: boolean;
   onGiftSent?: (gift: { type: string; value: number; emoji: string }) => void;
-  userCredits: number;
+  userCredits?: number;
   onCreditsChange?: (newBalance: number) => void;
 }
 
@@ -35,13 +36,45 @@ export const QuickGiftBar = ({
   roomId,
   isSpace = false,
   onGiftSent,
-  userCredits,
+  userCredits: propCredits,
   onCreditsChange,
 }: QuickGiftBarProps) => {
   const { user } = useAuth();
   const { permissions } = useAdminRole();
+  const navigate = useNavigate();
   const hasUnlimitedCredits = permissions.isDeveloper;
   const [sending, setSending] = useState<string | null>(null);
+  const [localCredits, setLocalCredits] = useState<number>(propCredits ?? 0);
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  // Fetch real credits from user_credits table
+  useEffect(() => {
+    if (isOpen && user) {
+      fetchCredits();
+    }
+  }, [isOpen, user]);
+
+  const fetchCredits = async () => {
+    if (!user) return;
+    setIsLoadingCredits(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      
+      if (!error && data) {
+        setLocalCredits(data.balance || 0);
+        onCreditsChange?.(data.balance || 0);
+      }
+    } catch (e) {
+      console.error('Failed to fetch credits:', e);
+    } finally {
+      setIsLoadingCredits(false);
+    }
+  };
 
   const handleSendGift = async (gift: typeof QUICK_GIFTS[0]) => {
     if (!user) {
@@ -49,7 +82,7 @@ export const QuickGiftBar = ({
       return;
     }
 
-    if (!hasUnlimitedCredits && userCredits < gift.value) {
+    if (!hasUnlimitedCredits && localCredits < gift.value) {
       toast.error('Insufficient credits! Top up to send gifts.');
       return;
     }
@@ -57,70 +90,32 @@ export const QuickGiftBar = ({
     setSending(gift.type);
 
     try {
-      // Deduct credits from sender
-      await supabase.from('credit_transactions').insert({
-        user_id: user.id,
-        amount: -gift.value,
-        type: 'gift_sent',
-        description: `Sent ${gift.name} gift in live`,
-        related_id: roomId,
+      // Use the secure send_live_gift RPC for proper credit handling
+      const { data, error } = await supabase.rpc('send_live_gift', {
+        p_credit_value: gift.value,
+        p_gift_type: gift.type,
+        p_stream_id: roomId,
       });
 
-      // Add credits to recipient (85% - 15% platform fee)
-      const recipientAmount = Math.floor(gift.value * 0.85);
-      await supabase.from('credit_transactions').insert({
-        user_id: recipientId,
-        amount: recipientAmount,
-        type: 'gift_received',
-        description: `Received ${gift.name} gift in live`,
-        related_id: roomId,
-      });
+      if (error) throw error;
 
-      // Record the gift
-      if (isSpace) {
-        await supabase.from('live_space_gifts').insert({
-          space_id: roomId,
-          sender_id: user.id,
-          receiver_id: recipientId,
-          gift_type: gift.type,
-          credit_value: gift.value,
-        });
-      } else {
-        await supabase.from('live_stream_gifts').insert({
-          stream_id: roomId,
-          sender_id: user.id,
-          receiver_id: recipientId,
-          gift_type: gift.type,
-          credit_value: gift.value,
-        });
-      }
-
-      // Notify
-      await supabase.from('notifications').insert({
-        user_id: recipientId,
-        from_user_id: user.id,
-        type: 'live_gift',
-        title: 'Gift received!',
-        message: `Someone sent you ${gift.emoji} ${gift.name}`,
-        related_id: roomId,
-        related_type: isSpace ? 'space' : 'live_stream',
-      });
-
-      // Update local credits
-      if (!hasUnlimitedCredits) {
-        onCreditsChange?.(userCredits - gift.value);
-      }
+      // Refresh credits after successful gift
+      await fetchCredits();
 
       onGiftSent?.({ type: gift.type, value: gift.value, emoji: gift.emoji });
       toast.success(`${gift.emoji} ${gift.name} sent!`);
     } catch (error: any) {
+      console.error('Gift error:', error);
       toast.error(error.message || 'Failed to send gift');
     } finally {
       setSending(null);
     }
   };
 
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const handleTopUp = () => {
+    onClose();
+    navigate('/wallet?tab=buy');
+  };
 
   return (
     <AnimatePresence>
@@ -140,16 +135,20 @@ export const QuickGiftBar = ({
               </div>
               <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
                 <Coins className="w-4 h-4 text-amber-400" />
-                <span className="text-white text-sm font-medium">
-                  {hasUnlimitedCredits ? '∞' : userCredits}
-                </span>
+                {isLoadingCredits ? (
+                  <Loader2 className="w-4 h-4 text-white animate-spin" />
+                ) : (
+                  <span className="text-white text-sm font-medium">
+                    {hasUnlimitedCredits ? '∞' : localCredits.toLocaleString()}
+                  </span>
+                )}
               </div>
             </div>
 
             {/* Gift Grid - Enhanced styling with hover effects */}
             <div className="grid grid-cols-3 gap-3">
               {QUICK_GIFTS.map((gift) => {
-                const canAfford = hasUnlimitedCredits || userCredits >= gift.value;
+                const canAfford = hasUnlimitedCredits || localCredits >= gift.value;
                 const isSending = sending === gift.type;
                 const isHovered = hoveredId === gift.type;
 
@@ -191,7 +190,10 @@ export const QuickGiftBar = ({
 
             {/* Footer with Top-up and Close */}
             <div className="flex items-center gap-3 mt-4">
-              <button className="flex-1 bg-gradient-to-r from-amber-400 to-orange-500 text-black py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-1 hover:opacity-90">
+              <button 
+                onClick={handleTopUp}
+                className="flex-1 bg-gradient-to-r from-amber-400 to-orange-500 text-black py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-1 hover:opacity-90"
+              >
                 <Coins className="w-4 h-4" />
                 Top-up Credits
               </button>
