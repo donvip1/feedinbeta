@@ -120,6 +120,8 @@ export const QuickGiftBar = ({
     }
   };
 
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -134,7 +136,7 @@ export const QuickGiftBar = ({
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Gift className="w-5 h-5 text-amber-400" />
-                <span className="text-white font-semibold">Send Gift</span>
+                <span className="text-white font-semibold">Gift Shop</span>
               </div>
               <div className="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full">
                 <Coins className="w-4 h-4 text-amber-400" />
@@ -144,30 +146,35 @@ export const QuickGiftBar = ({
               </div>
             </div>
 
-            {/* Gift Grid - Enhanced styling */}
+            {/* Gift Grid - Enhanced styling with hover effects */}
             <div className="grid grid-cols-3 gap-3">
               {QUICK_GIFTS.map((gift) => {
                 const canAfford = hasUnlimitedCredits || userCredits >= gift.value;
                 const isSending = sending === gift.type;
+                const isHovered = hoveredId === gift.type;
 
                 return (
                   <motion.button
                     key={gift.type}
                     whileHover={{ scale: canAfford ? 1.05 : 1 }}
                     whileTap={{ scale: canAfford ? 0.95 : 1 }}
+                    onMouseEnter={() => setHoveredId(gift.type)}
+                    onMouseLeave={() => setHoveredId(null)}
                     onClick={() => canAfford && handleSendGift(gift)}
                     disabled={!canAfford || !!sending}
                     className={cn(
-                      "relative flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300",
+                      "relative flex flex-col items-center justify-center p-3 rounded-2xl border transition-all duration-300 group",
                       canAfford 
-                        ? `bg-gradient-to-br ${gift.color} hover:scale-105 hover:-translate-y-0.5 hover:shadow-[0_0_20px_rgba(255,255,255,0.1)]` 
+                        ? isHovered
+                          ? `bg-gradient-to-br ${gift.color} scale-110 -translate-y-1 shadow-[0_0_20px_rgba(255,255,255,0.1)] z-10`
+                          : `bg-gradient-to-br ${gift.color}`
                         : "bg-slate-900/50 border-white/5 opacity-40 cursor-not-allowed",
                       isSending && "animate-pulse scale-110"
                     )}
                   >
                     <motion.span 
-                      className="text-3xl mb-1"
-                      animate={isSending ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : {}}
+                      className="text-3xl mb-1 relative z-10"
+                      animate={isSending ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : isHovered && canAfford ? { scale: [1, 1.15, 1] } : {}}
                       transition={{ duration: 0.5 }}
                     >
                       {gift.emoji}
@@ -182,13 +189,19 @@ export const QuickGiftBar = ({
               })}
             </div>
 
-            {/* Close hint */}
-            <button
-              onClick={onClose}
-              className="w-full mt-3 text-center text-xs text-white/40 hover:text-white/60"
-            >
-              Tap to close
-            </button>
+            {/* Footer with Top-up and Close */}
+            <div className="flex items-center gap-3 mt-4">
+              <button className="flex-1 bg-gradient-to-r from-amber-400 to-orange-500 text-black py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-1 hover:opacity-90">
+                <Coins className="w-4 h-4" />
+                Top-up Credits
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 bg-white/10 text-white py-2 rounded-xl text-sm font-medium hover:bg-white/20"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </motion.div>
       )}
