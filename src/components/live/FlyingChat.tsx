@@ -4,13 +4,16 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { AnimatedGiftEmoji } from '@/components/shared/AnimatedGiftEmoji';
-import { Coins, Crown } from 'lucide-react';
+import { Coins, Crown, Gift, Megaphone } from 'lucide-react';
 import { FullScreenGiftEffect } from './FullScreenGiftEffect';
 interface ChatMessage {
   id: string;
   content: string;
   user_id: string;
   created_at: string;
+  is_broadcast?: boolean;
+  is_gift?: boolean;
+  gift_value?: number;
   profiles?: {
     display_name?: string;
     username?: string;
@@ -243,8 +246,10 @@ export const FlyingChat = ({
       <div className="flex flex-col gap-2.5 px-4 overflow-y-auto max-h-full scrollbar-hide">
         <AnimatePresence mode="popLayout">
           {displayedMessages.map((message) => {
-            const isHost = hostId && message.user_id === hostId;
+            const isHostUser = hostId && message.user_id === hostId;
             const displayName = message.profiles?.display_name || message.profiles?.username || 'Anonymous';
+            const isBroadcast = message.is_broadcast || message.content?.startsWith('📢');
+            const isGiftMessage = message.is_gift;
             
             return (
               <motion.div
@@ -255,25 +260,49 @@ export const FlyingChat = ({
                 transition={{ duration: 0.25 }}
                 className="pointer-events-auto"
               >
-                <p className="text-sm leading-relaxed">
-                  {/* Clickable Username - inline with shadow */}
-                  <span 
-                    className={cn(
-                      "font-bold cursor-pointer hover:underline mr-2",
-                      isHost 
-                        ? "text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" 
-                        : "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
-                    )}
-                    onClick={(e) => handleProfileClick(message.user_id, e)}
-                  >
-                    {isHost && <Crown className="w-3 h-3 inline-block mr-1 text-amber-400" />}
-                    {displayName}
-                  </span>
-                  {/* Message content - bold with shadow */}
-                  <span className="text-white font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
-                    {renderContent(message.content)}
-                  </span>
-                </p>
+                {/* Broadcast Message - Highlighted with red background */}
+                {isBroadcast ? (
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-red-600/80 to-red-500/60 backdrop-blur-sm px-3 py-2 rounded-full">
+                    <Megaphone className="w-4 h-4 text-white shrink-0" />
+                    <p className="text-white font-bold text-sm">
+                      <span className="text-yellow-300 mr-1">Broadcast</span>
+                      {message.content.replace('📢', '').trim()}
+                    </p>
+                  </div>
+                ) : isGiftMessage ? (
+                  /* Gift Message - Gradient styled */
+                  <div className="flex items-center gap-2 bg-gradient-to-r from-amber-500/30 to-orange-500/20 backdrop-blur-sm px-3 py-2 rounded-full">
+                    <Gift className="w-4 h-4 text-amber-400 shrink-0" />
+                    <p className="text-sm">
+                      <span className="text-amber-300 font-bold">{displayName}</span>
+                      <span className="text-white ml-1">{message.content}</span>
+                      {message.gift_value && (
+                        <span className="text-amber-400 ml-1 font-semibold">+{message.gift_value}</span>
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  /* Regular Message */
+                  <p className="text-sm leading-relaxed">
+                    {/* Clickable Username - inline with shadow */}
+                    <span 
+                      className={cn(
+                        "font-bold cursor-pointer hover:underline mr-2",
+                        isHostUser 
+                          ? "text-amber-400 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" 
+                          : "text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]"
+                      )}
+                      onClick={(e) => handleProfileClick(message.user_id, e)}
+                    >
+                      {isHostUser && <Crown className="w-3 h-3 inline-block mr-1 text-amber-400" />}
+                      {displayName}
+                    </span>
+                    {/* Message content - bold with shadow */}
+                    <span className="text-white font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.7)]">
+                      {renderContent(message.content)}
+                    </span>
+                  </p>
+                )}
               </motion.div>
             );
           })}
