@@ -2,9 +2,9 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  X, Users, Heart, Wifi, WifiOff, Crown, 
+  Users, Heart, Wifi, WifiOff, Crown, 
   Plus, Radio, Zap, Sword, Monitor, Megaphone,
-  Share2, Gift, Pin, LayoutGrid, Sparkles, Minimize2,
+  Share2, Gift, Pin, Minimize2,
   Mic, MicOff, Video, VideoOff
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -446,12 +446,12 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               </div>
             )}
 
-            {/* Close Button */}
+            {/* End Button */}
             <button
               onClick={handleLeave}
-              className="p-2 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
+              className="px-4 py-1.5 rounded-full bg-destructive text-white text-sm font-semibold hover:bg-destructive/80 transition-colors"
             >
-              <X className="w-5 h-5 text-white" />
+              End
             </button>
           </div>
         </div>
@@ -643,8 +643,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         {/* Floating Reactions Animation */}
         <FloatingReactionsSimple trigger={reactionTrigger} icon={reactionIcon} />
 
-        {/* Right Side Actions - Modern Style */}
-        <div className="absolute right-4 bottom-64 flex flex-col gap-3 z-20">
+        {/* Right Side Actions - Single Vertical Stack */}
+        <div className="absolute right-4 bottom-52 flex flex-col gap-3 z-20">
           {/* Heart Reaction - White outline style */}
           <motion.button
             whileTap={{ scale: 0.9 }}
@@ -680,22 +680,15 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
           >
             <Share2 className="w-6 h-6 text-white" />
           </motion.button>
-        </div>
 
-        {/* Floating Vertical Control Panel */}
-        <div className="absolute right-4 bottom-44 flex flex-col gap-2 bg-slate-800/80 backdrop-blur-md rounded-2xl p-2 z-20">
-          <button className="p-2.5 text-white/60 hover:text-white transition-colors">
-            <LayoutGrid className="w-5 h-5" />
-          </button>
-          <button className="p-2.5 text-white/60 hover:text-white transition-colors">
-            <Sparkles className="w-5 h-5" />
-          </button>
-          <button 
+          {/* Minimize Button - At bottom of stack */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={minimize}
-            className="p-2.5 text-white/60 hover:text-white transition-colors"
+            className="p-3 rounded-full bg-slate-800/80 backdrop-blur-md"
           >
-            <Minimize2 className="w-5 h-5" />
-          </button>
+            <Minimize2 className="w-5 h-5 text-white/80" />
+          </motion.button>
         </div>
 
         {/* Quick Gift Bar */}
@@ -789,7 +782,7 @@ const FooterControlBar = ({
       animate={{ y: 0, opacity: 1 }}
       className="absolute bottom-0 left-0 right-0 z-30 px-4 pb-8 pt-4 bg-gradient-to-t from-black/90 via-black/60 to-transparent"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-nowrap">
         {/* Megaphone Toggle - Host Only */}
         {isHost && (
           <motion.button
@@ -806,8 +799,8 @@ const FooterControlBar = ({
           </motion.button>
         )}
 
-        {/* Input Container - Flexible */}
-        <div className="flex-1">
+        {/* Input Container - Flexible with min-width */}
+        <div className="flex-1 min-w-0">
           <BroadcastInput
             onSendMessage={onSendMessage}
             placeholder="Say something..."
