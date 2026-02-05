@@ -1,156 +1,134 @@
 
+# Live Streaming & Audio Spaces UI/UX Improvements
 
-# UI Refinement Plan: Live Stream Room Layout
+## Summary
+This plan addresses 7 key issues in the live streaming and audio spaces experience:
+1. Send button spacing from mic icon
+2. "Return to Stream" showing after host ends
+3. Live spaces not ending properly in database
+4. End button should show "Leave" for viewers
+5. Viewer count position near mute button
+6. Mute All toggle functionality
+7. Self mute/unmute for all users (unless hard-muted)
 
-## Overview
-Refine the live stream room interface to match the reference design by reorganizing the right-side actions, simplifying the floating panel, and improving footer control alignment.
+---
 
-## Changes Summary
+## Changes Overview
 
-### 1. Right-Side Actions Reorganization
-**Current**: Actions (Heart, Gift, Share) are above a separate floating control panel with LayoutGrid, Sparkles, and Minimize2.
-**Target**: Single vertical stack with Heart, Gift, Share, then Minimize at the bottom.
+### 1. Send Button Spacing in Footer
+**File:** `src/components/live/shared/BroadcastInput.tsx`
 
-- Remove the separate floating control panel (`bg-slate-800/80` container)
-- Remove LayoutGrid and Sparkles icons completely
-- Add Minimize2 button at the bottom of the right-side action stack
-- All buttons should be in a single vertical column
+Add left margin to the send button to create visual separation from the mic icon:
+- Change `gap-2` to `gap-3` in the input container
+- Add `ml-2` margin to the send button wrapper
 
-### 2. Replace X Close Button with "End" Button
-**Current**: X icon button in header for closing/leaving
-**Target**: Replace with a red "End" text button
+### 2. Fix "Return to Stream" After Host Ends
+**File:** `src/components/live/LiveDashboard.tsx`
 
-- Change from `<X className="..." />` to text "End"
-- Style as red/destructive button to indicate ending stream
-- Keep the same `handleLeave` functionality
+The "Return to Stream" button shows for hosts who have active streams. The issue is that when a host ends their stream, the `myActiveStream` query still returns data briefly.
 
-### 3. Footer Control Bar Alignment
-**Current**: Controls are inline but may wrap on smaller screens
-**Target**: Straight horizontal line with all controls properly aligned
+**Solution:**
+- Add a check that the stream status is still "live" before showing "Return to Stream"
+- Query should already filter by `status: 'live'` - verify this is happening
 
-- Ensure flexbox with `flex-nowrap` to prevent wrapping
-- Use `shrink-0` on all control buttons to maintain size
-- Input container gets `flex-1 min-w-0` for flexible sizing
-- Remove extra padding/margins that cause misalignment
+**File:** `src/context/UnifiedLiveContext.tsx`
 
-## Technical Implementation
+When host ends, broadcast an event to all participants to force-leave:
+- Add Supabase broadcast event `{ event: 'room_ended' }` when host leaves
+- All participants subscribe to this event and auto-navigate away
 
-### File: `src/components/live/UnifiedLiveRoom.tsx`
+### 3. Fix Live Spaces Not Ending in Database
+**File:** `src/context/UnifiedLiveContext.tsx` (Lines 526-540)
 
-**Change 1: Header - Replace X with End Button (Lines 449-455)**
+**Current Issue:** When a host ends an audio space, only the `live_space_speakers` table is updated - the `live_spaces` table status is NOT updated to "ended".
+
+**Fix:** Add update to `live_spaces` table when host leaves:
+```typescript
+if (roomInfo.type === 'audio_space' && roleRef.current === 'host') {
+  await supabase
+    .from('live_spaces')
+    .update({ status: 'ended', ended_at: new Date().toISOString() })
+    .eq('id', roomInfo.id);
+}
+```
+
+### 4. Change "End" to "Leave" for Non-Hosts
+**File:** `src/components/live/UnifiedLiveRoom.tsx` (Lines 529-535)
+
+**Current:** Everyone sees "End" button
+**Fix:** Show "Leave" for viewers/listeners, "End" for hosts
+
 ```tsx
-// Before
-<button onClick={handleLeave} className="p-2 rounded-full bg-black/40...">
-  <X className="w-5 h-5 text-white" />
+<button onClick={handleLeave} className="px-4 py-1.5 rounded-full bg-destructive text-white...">
+  {isHost ? 'End' : 'Leave'}
 </button>
-
-// After
-<button onClick={handleLeave} className="px-4 py-1.5 rounded-full bg-destructive text-white text-sm font-semibold hover:bg-destructive/80">
-  End
-</button>
 ```
 
-**Change 2: Right-Side Actions - Add Minimize, Remove Floating Panel (Lines 646-699)**
+### 5. Move Viewer Count Closer to Mute Button
+**File:** `src/components/live/UnifiedLiveRoom.tsx` (Audio Space Stage section, Lines 658-680)
+
+Move the viewer count badge to be positioned near the participant avatars/mute controls instead of in the header. This will be done by:
+- Adding a viewer count badge near the speaker grid
+- Positioning it closer to the mute controls
+
+### 6. Convert "Mute All" to Toggle Button with Mic Icon
+**File:** `src/components/live/shared/ParticipantsList.tsx` (Lines 110-131)
+
+**Current:** Static "Mute All" button with MicOff icon
+**Fix:** 
+- Track muted state with `isMutedAll` state
+- Toggle between "Mute All" (Mic icon) and "Unmute All" (MicOff icon)
+- Add `onUnmuteAll` callback prop
+
+**File:** `src/context/UnifiedLiveContext.tsx`
+- Add `unmuteAll` function to unmute all participants
+
+### 7. Allow Self Mute/Unmute (Unless Hard-Muted)
+**File:** `src/components/live/UnifiedLiveRoom.tsx`
+
+**Current:** Only hosts see mic toggle in footer
+**Fix:** Show mic toggle for ALL participants who can speak (speaker, co_host, host) - but respect `isHardMuted` state
+
 ```tsx
-// Combined single stack
-<div className="absolute right-4 bottom-52 flex flex-col gap-3 z-20">
-  {/* Heart */}
-  <motion.button ... className="p-3 rounded-full border-2 border-white bg-transparent">
-    <Heart />
-  </motion.button>
-  
-  {/* Gift - Bouncing */}
-  <motion.button ... className="p-3 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500">
-    <Gift />
-  </motion.button>
-  
-  {/* Share */}
-  <motion.button ... className="p-3 rounded-full border-2 border-white bg-transparent">
-    <Share2 />
-  </motion.button>
-  
-  {/* Minimize - At bottom */}
-  <motion.button onClick={minimize} className="p-3 rounded-full bg-slate-800/80 backdrop-blur-md">
-    <Minimize2 />
-  </motion.button>
-</div>
-
-// DELETE the separate floating control panel (lines 685-699)
+// In FooterControlBar, show mic button for all who can speak
+{(isHost || state.role === 'speaker' || state.role === 'co_host') && !state.isHardMuted && (
+  <MicToggleButton ... />
+)}
 ```
 
-**Change 3: Footer - Straight Horizontal Line (Lines 786-875)**
-```tsx
-<div className="flex items-center gap-3 flex-nowrap">
-  {/* Megaphone - shrink-0 */}
-  {isHost && (
-    <motion.button className="p-3 rounded-full shrink-0 ...">
-      <Megaphone />
-    </motion.button>
-  )}
-  
-  {/* Input - flex-1 min-w-0 */}
-  <div className="flex-1 min-w-0">
-    <BroadcastInput ... />
-  </div>
-  
-  {/* Mic - shrink-0 */}
-  <motion.button className="p-3 rounded-full shrink-0 ...">
-    {isMuted ? <MicOff /> : <Mic />}
-  </motion.button>
-  
-  {/* Screen Share - shrink-0 */}
-  {isHost && (
-    <motion.button className="p-3 rounded-full shrink-0 ...">
-      <Monitor />
-    </motion.button>
-  )}
-  
-  {/* Camera - shrink-0 (Video Only) */}
-  {roomType !== 'audio_space' && (
-    <motion.button className="p-3 rounded-full shrink-0 ...">
-      {isCameraOn ? <Video /> : <VideoOff />}
-    </motion.button>
-  )}
-  
-  {/* PK Battle - shrink-0 */}
-  {isHost && roomType === 'video_broadcast' && (
-    <motion.button className="p-3 rounded-full shrink-0 ...">
-      <Sword />
-    </motion.button>
-  )}
-</div>
+**File:** `src/context/UnifiedLiveContext.tsx` (toggleMute function, Lines 564-574)
+- Add check: if user is hard-muted by host, show toast and prevent unmuting
+
+```typescript
+const toggleMute = useCallback(() => {
+  if (state.isHardMuted && state.isMuted) {
+    toast.error('You have been muted by the host');
+    return;
+  }
+  // ... existing logic
+}, [state.isMuted, state.isHardMuted]);
 ```
 
-## Visual Layout
+---
 
-### Right Side Actions (Top to Bottom):
-```
-[ ❤️ Heart  ] - White outline
-[ 🎁 Gift   ] - Orange gradient, bouncing
-[ 📤 Share  ] - White outline
-[ ⊟ Minimize] - Dark background
-```
+## Technical Details
 
-### Footer (Left to Right):
-```
-[📢] [_______ Input _______ ⬆️] [🎤] [🖥️] [📹] [⚔️]
- ^              ^                ^     ^     ^     ^
- |              |                |     |     |     PK Battle
- |              |                |     |     Camera
- |              |                |     Screen Share
- |              |                Mic
- |              Chat Input + Send Button
- Megaphone (Host only)
-```
+### Files to Modify
 
-## Files to Modify
-1. `src/components/live/UnifiedLiveRoom.tsx` - All changes in this single file
+| File | Changes |
+|------|---------|
+| `src/components/live/shared/BroadcastInput.tsx` | Add spacing between send and mic buttons |
+| `src/components/live/UnifiedLiveRoom.tsx` | End/Leave button text, mic toggle for speakers, viewer count position |
+| `src/context/UnifiedLiveContext.tsx` | Fix audio space ending, add room_ended broadcast, hard-mute check, unmuteAll function |
+| `src/components/live/shared/ParticipantsList.tsx` | Mute All toggle button with Mic icon |
+| `src/components/live/LiveDashboard.tsx` | Listen for room_ended events to clear active stream state |
 
-## Reference Code Integration
-The user's reference code patterns will be applied:
-- Gift modal with animated emojis and credit validation
-- Floating reactions that trigger for both hearts and gifts
-- Broadcast message highlighting in chat
-- Participant moderation features (already implemented)
-- PK Battle triggering (already implemented)
+### Auto-Logout Flow for Participants
+When host ends:
+1. Host calls `leaveRoom()` which updates database and broadcasts `room_ended` event
+2. All participants receive `room_ended` event via Supabase broadcast channel
+3. Each participant shows toast "Host ended the stream/space"
+4. After 2 second delay, participants are navigated to `/live`
 
+### Database Updates Required
+None - using existing tables. The fix is ensuring `live_spaces.status` gets updated to "ended" when host leaves (currently only `live_streams` is being updated).
