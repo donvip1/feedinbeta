@@ -447,16 +447,7 @@ const Profile = () => {
 
       if (error) throw error;
 
-      // Create notification for sender
-      await supabase.from('notifications').insert({
-        user_id: senderId,
-        from_user_id: user.id,
-        type: 'friend_accepted',
-        title: 'Friend request accepted',
-        message: `${profile?.display_name || profile?.username || 'Someone'} accepted your friend request`,
-        related_id: user.id,
-        related_type: 'profile'
-      });
+      // Notification is created automatically by database trigger
 
       toast({
         title: 'Friend request accepted!',

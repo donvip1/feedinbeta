@@ -140,18 +140,7 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
 
         if (error) throw error;
 
-        // Notify the other user
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: userId,
-            from_user_id: user.id,
-            type: 'friend_request_accepted',
-            title: 'Friend request accepted',
-            message: 'You can now start chatting!',
-            related_id: user.id,
-            related_type: 'profile'
-          });
+        // Notification is created automatically by database trigger
 
         setFriendshipStatus('accepted');
         toast({ title: 'Friend request accepted!' });
@@ -192,18 +181,7 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
         throw error;
       }
 
-      // Create notification
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          from_user_id: user.id,
-          type: 'friend_request',
-          title: 'New friend request',
-          message: `${profile?.display_name || 'Someone'} sent you a friend request`,
-          related_id: user.id,
-          related_type: 'profile'
-        });
+      // Notification is created automatically by database trigger
 
       setFriendshipStatus('pending_sent');
       toast({ title: 'Friend request sent' });
