@@ -315,25 +315,7 @@ const Friends = () => {
         throw error;
       }
 
-      // Get sender profile for notification
-      const { data: senderProfile } = await supabase
-        .from('profiles')
-        .select('display_name, username')
-        .eq('id', user.id)
-        .single();
-
-      // Create notification for the receiver
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: receiverId,
-          from_user_id: user.id,
-          type: 'friend_request',
-          title: 'New friend request',
-          message: `${senderProfile?.display_name || senderProfile?.username || 'Someone'} sent you a friend request`,
-          related_id: user.id,
-          related_type: 'profile'
-        });
+      // Notification is created automatically by database trigger
 
       // Update local status
       setFriendshipStatuses(prev => ({ ...prev, [receiverId]: 'pending_sent' }));
@@ -390,19 +372,7 @@ const Friends = () => {
 
       if (error) throw error;
 
-      if (status === 'accepted' && request?.sender_id) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: request.sender_id,
-            from_user_id: user?.id,
-            type: 'friend_request_accepted',
-            title: 'Friend request accepted',
-            message: 'You can now start chatting!',
-            related_id: user?.id,
-            related_type: 'profile'
-          });
-      }
+      // Notification is created automatically by database trigger
 
       toast({
         title: status === 'accepted' ? 'Friend request accepted' : 'Friend request rejected',

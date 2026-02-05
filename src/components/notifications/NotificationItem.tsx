@@ -72,20 +72,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
 
       if (updateError) throw updateError;
 
-      // If accepted, notify the sender
-      if (accept) {
-        await supabase
-          .from('notifications')
-          .insert({
-            user_id: notification.related_id,
-            from_user_id: user.id,
-            type: 'friend_request_accepted',
-            title: 'Friend request accepted',
-            message: 'You can now start chatting!',
-            related_id: user.id,
-            related_type: 'profile'
-          });
-      }
+      // Notification is created automatically by database trigger
 
       // Mark this notification as read
       await supabase
