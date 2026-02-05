@@ -80,6 +80,7 @@ export interface UnifiedLiveState {
   audioLevels: AudioLevels;
   participants: Participant[];
   userCredits: number;
+  hasRaisedHand: boolean; // For listeners to request speaking permission
 }
 
 const defaultState: UnifiedLiveState = {
@@ -97,6 +98,7 @@ const defaultState: UnifiedLiveState = {
   audioLevels: {},
   participants: [],
   userCredits: 0,
+  hasRaisedHand: false,
 };
 
 // ============= CONTEXT TYPE =============
@@ -112,6 +114,7 @@ export interface UnifiedLiveContextType {
   toggleCamera: () => void;
   toggleScreenShare: () => void;
   updateRole: (role: ParticipantRole) => Promise<void>;
+  toggleRaiseHand: () => Promise<void>;
   // Moderation Actions (Host Only)
   muteParticipant: (userId: string) => void;
   unmuteParticipant: (userId: string) => void;
@@ -173,8 +176,13 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
   // ============= AUDIO HELPERS =============
 
   const playRemoteAudio = useCallback((track: RemoteTrack, participantId: string) => {
+    console.log('[UnifiedLive] Playing audio for:', participantId);
+    
+    // Clean up existing audio element for this participant
     const existingEl = audioElementsRef.current.get(participantId);
     if (existingEl) {
+      existingEl.pause();
+      existingEl.srcObject = null;
       existingEl.remove();
       audioElementsRef.current.delete(participantId);
     }
@@ -182,15 +190,22 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const audioEl = document.createElement('audio');
     audioEl.id = `unified-audio-${participantId}`;
     audioEl.autoplay = true;
+    audioEl.volume = 1.0;
     audioEl.setAttribute('playsinline', 'true');
     
+    // Attach LiveKit track to audio element
     track.attach(audioEl);
     document.body.appendChild(audioEl);
     audioElementsRef.current.set(participantId, audioEl);
 
+    // Force play with autoplay fallback
     audioEl.play().catch((err) => {
-      console.warn('[UnifiedLive] Audio autoplay blocked:', err);
+      console.warn('[UnifiedLive] Audio autoplay blocked, enabling playback manager:', err);
       audioPlaybackManager.enableAudioPlayback();
+      // Retry play after enabling
+      setTimeout(() => {
+        audioEl.play().catch(e => console.warn('[UnifiedLive] Retry play failed:', e));
+      }, 100);
     });
   }, []);
 
@@ -679,6 +694,38 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     toast(state.isScreenSharing ? 'Screen share stopped' : 'Screen sharing started');
   }, [state.role, state.isScreenSharing]);
 
+  // ============= HAND RAISE (Listeners only in audio spaces) =============
+
+  const toggleRaiseHand = useCallback(async () => {
+    const currentUser = userRef.current;
+    const roomInfo = roomInfoRef.current;
+    if (!currentUser || !roomInfo || roomInfo.type !== 'audio_space') return;
+    if (state.role !== 'listener') {
+      toast.info('Only listeners can raise their hand');
+      return;
+    }
+
+    const newState = !state.hasRaisedHand;
+    setState(prev => ({ ...prev, hasRaisedHand: newState }));
+
+    try {
+      await supabase
+        .from('live_space_speakers')
+        .update({ 
+          has_raised_hand: newState,
+          hand_raised_at: newState ? new Date().toISOString() : null
+        })
+        .eq('space_id', roomInfo.id)
+        .eq('user_id', currentUser.id);
+
+      toast.success(newState ? '✋ Hand raised!' : 'Hand lowered');
+    } catch (error) {
+      console.error('[UnifiedLive] Failed to toggle hand raise:', error);
+      // Revert state on error
+      setState(prev => ({ ...prev, hasRaisedHand: !newState }));
+    }
+  }, [state.role, state.hasRaisedHand]);
+
   // ============= MODERATION ACTIONS =============
 
   const muteParticipant = useCallback((userId: string) => {
@@ -951,6 +998,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
         toggleCamera,
         toggleScreenShare,
         updateRole,
+        toggleRaiseHand,
         // Moderation
         muteParticipant,
         unmuteParticipant,

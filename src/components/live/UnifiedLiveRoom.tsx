@@ -5,7 +5,7 @@ import {
   Users, Heart, Wifi, WifiOff, Crown, 
   Plus, Radio, Zap, Sword, Monitor, Megaphone,
   Share2, Gift, Pin, Minimize2, MoreVertical,
-  Mic, MicOff, Video, VideoOff
+  Mic, MicOff, Video, VideoOff, Hand
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -65,6 +65,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     toggleMute, 
     toggleCamera,
     toggleScreenShare,
+    toggleRaiseHand,
     muteParticipant,
     unmuteParticipant,
     muteAll,
@@ -85,7 +86,9 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     audioLevels,
     participants,
     isScreenSharing,
-    userCredits
+    userCredits,
+    hasRaisedHand,
+    role: currentRole
   } = state;
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -847,11 +850,14 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         isCameraOn={isCameraOn}
         isScreenSharing={isScreenSharing}
         roomType={roomInfo.type}
+        role={currentRole}
+        hasRaisedHand={hasRaisedHand}
         onSendMessage={handleSendMessage}
         onMicToggle={toggleMute}
         onCameraToggle={toggleCamera}
         onScreenShareToggle={toggleScreenShare}
         onPKBattleStart={handleStartPK}
+        onRaiseHand={toggleRaiseHand}
       />
 
       {/* Participants Modal */}
@@ -894,11 +900,14 @@ interface FooterControlBarProps {
   isCameraOn: boolean;
   isScreenSharing: boolean;
   roomType: 'video_broadcast' | 'audio_space' | 'pk_battle';
+  role: ParticipantRole;
+  hasRaisedHand: boolean;
   onSendMessage: (message: string, isBroadcast: boolean) => void;
   onMicToggle: () => void;
   onCameraToggle: () => void;
   onScreenShareToggle: () => void;
   onPKBattleStart: () => void;
+  onRaiseHand: () => void;
 }
 
 const FooterControlBar = ({
@@ -909,11 +918,14 @@ const FooterControlBar = ({
   isCameraOn,
   isScreenSharing,
   roomType,
+  role,
+  hasRaisedHand,
   onSendMessage,
   onMicToggle,
   onCameraToggle,
   onScreenShareToggle,
   onPKBattleStart,
+  onRaiseHand,
 }: FooterControlBarProps) => {
   const [isBroadcastMode, setIsBroadcastMode] = useState(false);
 
@@ -962,6 +974,22 @@ const FooterControlBar = ({
             )}
           >
             {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </motion.button>
+        )}
+
+        {/* Raise Hand Button - For listeners only in audio spaces */}
+        {role === 'listener' && roomType === 'audio_space' && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={onRaiseHand}
+            className={cn(
+              "p-2.5 rounded-full transition-all shrink-0",
+              hasRaisedHand 
+                ? "bg-amber-500 text-white" 
+                : "bg-white/10 text-white/60"
+            )}
+          >
+            <Hand className="w-4 h-4" />
           </motion.button>
         )}
 

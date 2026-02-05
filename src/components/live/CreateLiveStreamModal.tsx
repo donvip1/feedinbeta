@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock, Mic, Swords, Hash, X } from "lucide-react";
+import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock, Swords, Hash, X } from "lucide-react";
 
 // Categories available for streams
 const STREAM_CATEGORIES = [
@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 // When false, all users can create live streams (current default for launch)
 const REQUIRE_PREMIUM_FOR_STREAMING = false;
 
-type RoomType = 'video_broadcast' | 'audio_space' | 'pk_battle';
+type RoomType = 'video_broadcast' | 'pk_battle';
 
 interface CreateLiveStreamModalProps {
   isOpen: boolean;
@@ -234,7 +234,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           {/* Room Type Selection */}
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Stream Type</Label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setRoomType('video_broadcast')}
@@ -247,19 +247,6 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
               >
                 <Video className="w-5 h-5" />
                 <span className="font-medium text-xs">Video</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setRoomType('audio_space')}
-                className={cn(
-                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
-                  roomType === 'audio_space' 
-                    ? "border-green-500 bg-green-500/10 text-green-500" 
-                    : "border-muted hover:border-muted-foreground/50"
-                )}
-              >
-                <Mic className="w-5 h-5" />
-                <span className="font-medium text-xs">Audio</span>
               </button>
               <button
                 type="button"
