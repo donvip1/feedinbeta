@@ -68,6 +68,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     muteParticipant,
     unmuteParticipant,
     muteAll,
+    unmuteAll,
     inviteToSpeak,
     removeFromSpeakers,
     sendBroadcastMessage,
@@ -526,12 +527,12 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               </div>
             )}
 
-            {/* End Button */}
+            {/* End/Leave Button */}
             <button
               onClick={handleLeave}
               className="px-4 py-1.5 rounded-full bg-destructive text-white text-sm font-semibold hover:bg-destructive/80 transition-colors"
             >
-              End
+              {isHost ? 'End' : 'Leave'}
             </button>
           </div>
         </div>
@@ -840,6 +841,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
       {/* Footer Control Bar - Modern Separated Layout */}
       <FooterControlBar
         isHost={isHost}
+        canSpeak={isHost || state.role === 'speaker' || state.role === 'co_host'}
+        isHardMuted={state.isHardMuted}
         isMuted={isMuted}
         isCameraOn={isCameraOn}
         isScreenSharing={isScreenSharing}
@@ -862,6 +865,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         onMuteParticipant={muteParticipant}
         onUnmuteParticipant={unmuteParticipant}
         onMuteAll={muteAll}
+        onUnmuteAll={unmuteAll}
         onInviteUser={() => toast('Invite feature coming soon!')}
         onPromoteToSpeaker={inviteToSpeak}
         onDemoteToListener={removeFromSpeakers}
@@ -884,6 +888,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 // Footer Control Bar - Modern TikTok/Tango Style
 interface FooterControlBarProps {
   isHost: boolean;
+  canSpeak: boolean;
+  isHardMuted: boolean;
   isMuted: boolean;
   isCameraOn: boolean;
   isScreenSharing: boolean;
@@ -897,6 +903,8 @@ interface FooterControlBarProps {
 
 const FooterControlBar = ({
   isHost,
+  canSpeak,
+  isHardMuted,
   isMuted,
   isCameraOn,
   isScreenSharing,
@@ -941,19 +949,21 @@ const FooterControlBar = ({
           />
         </div>
 
-        {/* Mic Button - Right after send, White when active */}
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={onMicToggle}
-          className={cn(
-            "p-2.5 rounded-full transition-all shrink-0",
-            !isMuted 
-              ? "bg-white text-black" 
-              : "bg-white/10 text-white/60"
-          )}
-        >
-          {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-        </motion.button>
+        {/* Mic Button - Show for all who can speak (host, co_host, speaker) and not hard-muted */}
+        {canSpeak && !isHardMuted && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={onMicToggle}
+            className={cn(
+              "p-2.5 rounded-full transition-all shrink-0",
+              !isMuted 
+                ? "bg-white text-black" 
+                : "bg-white/10 text-white/60"
+            )}
+          >
+            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </motion.button>
+        )}
 
         {/* Desktop Only: Show extra controls inline on wider screens */}
         <div className="hidden md:flex items-center gap-2">
