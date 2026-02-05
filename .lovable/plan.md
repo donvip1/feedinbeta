@@ -1,134 +1,92 @@
 
-# Live Streaming & Audio Spaces UI/UX Improvements
+# Fix Duplicate Friend Request Notifications
 
-## Summary
-This plan addresses 7 key issues in the live streaming and audio spaces experience:
-1. Send button spacing from mic icon
-2. "Return to Stream" showing after host ends
-3. Live spaces not ending properly in database
-4. End button should show "Leave" for viewers
-5. Viewer count position near mute button
-6. Mute All toggle functionality
-7. Self mute/unmute for all users (unless hard-muted)
+The issue of duplicate notifications for friend requests is caused by redundant logic: both the database (via a trigger) and the frontend code (manually) are creating notifications for the same event. Additionally, one of the manual notification versions was incorrectly using the recipient's name instead of the sender's.
 
----
+## Proposed Changes
 
-## Changes Overview
+### 1. Database Logic Consolidation
+I will update the existing database trigger function `create_friend_request_notification` to be the single source of truth for friend request notifications.
 
-### 1. Send Button Spacing in Footer
-**File:** `src/components/live/shared/BroadcastInput.tsx`
+- **Improve Name Handling**: Use `COALESCE(display_name, username, 'Someone')` to ensure a name is always shown, even if a user hasn't set their display name.
+- **Fix Deep Linking**: Update the `related_id` and `related_type` for accepted requests so they correctly point to the user's profile, allowing for proper navigation.
+- **Support Declined Status**: Add logic to handle 'declined' notifications centrally.
 
-Add left margin to the send button to create visual separation from the mic icon:
-- Change `gap-2` to `gap-3` in the input container
-- Add `ml-2` margin to the send button wrapper
+### 2. Frontend Cleanup
+I will remove all manual `supabase.from('notifications').insert()` calls related to friend requests and their acceptance/rejection from the following files:
 
-### 2. Fix "Return to Stream" After Host Ends
-**File:** `src/components/live/LiveDashboard.tsx`
+- **`src/pages/Profile.tsx`**: Remove manual notifications in `requestChat` and `handleAcceptFriendRequest`.
+- **`src/pages/Friends.tsx`**: Remove manual notifications in `sendFriendRequest` and `respondToRequest`.
+- **`src/components/messages/NewConversationModal.tsx`**: Remove manual notifications in `sendFriendRequest`, `acceptFriendRequest`, and `declineFriendRequest`.
+- **`src/components/profile/ProfilePreviewModal.tsx`**: Remove manual notifications in `handleAddFriend`.
+- **`src/components/notifications/NotificationItem.tsx`**: Remove manual notification in `handleFriendRequestResponse`.
 
-The "Return to Stream" button shows for hosts who have active streams. The issue is that when a host ends their stream, the `myActiveStream` query still returns data briefly.
-
-**Solution:**
-- Add a check that the stream status is still "live" before showing "Return to Stream"
-- Query should already filter by `status: 'live'` - verify this is happening
-
-**File:** `src/context/UnifiedLiveContext.tsx`
-
-When host ends, broadcast an event to all participants to force-leave:
-- Add Supabase broadcast event `{ event: 'room_ended' }` when host leaves
-- All participants subscribe to this event and auto-navigate away
-
-### 3. Fix Live Spaces Not Ending in Database
-**File:** `src/context/UnifiedLiveContext.tsx` (Lines 526-540)
-
-**Current Issue:** When a host ends an audio space, only the `live_space_speakers` table is updated - the `live_spaces` table status is NOT updated to "ended".
-
-**Fix:** Add update to `live_spaces` table when host leaves:
-```typescript
-if (roomInfo.type === 'audio_space' && roleRef.current === 'host') {
-  await supabase
-    .from('live_spaces')
-    .update({ status: 'ended', ended_at: new Date().toISOString() })
-    .eq('id', roomInfo.id);
-}
-```
-
-### 4. Change "End" to "Leave" for Non-Hosts
-**File:** `src/components/live/UnifiedLiveRoom.tsx` (Lines 529-535)
-
-**Current:** Everyone sees "End" button
-**Fix:** Show "Leave" for viewers/listeners, "End" for hosts
-
-```tsx
-<button onClick={handleLeave} className="px-4 py-1.5 rounded-full bg-destructive text-white...">
-  {isHost ? 'End' : 'Leave'}
-</button>
-```
-
-### 5. Move Viewer Count Closer to Mute Button
-**File:** `src/components/live/UnifiedLiveRoom.tsx` (Audio Space Stage section, Lines 658-680)
-
-Move the viewer count badge to be positioned near the participant avatars/mute controls instead of in the header. This will be done by:
-- Adding a viewer count badge near the speaker grid
-- Positioning it closer to the mute controls
-
-### 6. Convert "Mute All" to Toggle Button with Mic Icon
-**File:** `src/components/live/shared/ParticipantsList.tsx` (Lines 110-131)
-
-**Current:** Static "Mute All" button with MicOff icon
-**Fix:** 
-- Track muted state with `isMutedAll` state
-- Toggle between "Mute All" (Mic icon) and "Unmute All" (MicOff icon)
-- Add `onUnmuteAll` callback prop
-
-**File:** `src/context/UnifiedLiveContext.tsx`
-- Add `unmuteAll` function to unmute all participants
-
-### 7. Allow Self Mute/Unmute (Unless Hard-Muted)
-**File:** `src/components/live/UnifiedLiveRoom.tsx`
-
-**Current:** Only hosts see mic toggle in footer
-**Fix:** Show mic toggle for ALL participants who can speak (speaker, co_host, host) - but respect `isHardMuted` state
-
-```tsx
-// In FooterControlBar, show mic button for all who can speak
-{(isHost || state.role === 'speaker' || state.role === 'co_host') && !state.isHardMuted && (
-  <MicToggleButton ... />
-)}
-```
-
-**File:** `src/context/UnifiedLiveContext.tsx` (toggleMute function, Lines 564-574)
-- Add check: if user is hard-muted by host, show toast and prevent unmuting
-
-```typescript
-const toggleMute = useCallback(() => {
-  if (state.isHardMuted && state.isMuted) {
-    toast.error('You have been muted by the host');
-    return;
-  }
-  // ... existing logic
-}, [state.isMuted, state.isHardMuted]);
-```
-
----
+### 3. Unified Notification Branding
+I will align the notification titles and messages across the platform to use the standard "Friend Request" and "Friend Request Accepted" titles used by the database trigger.
 
 ## Technical Details
 
-### Files to Modify
+### Database Migration
+The updated trigger function will look like this:
+```sql
+CREATE OR REPLACE FUNCTION public.create_friend_request_notification()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+AS $function$
+DECLARE
+  sender_name TEXT;
+  receiver_name TEXT;
+BEGIN
+  -- Get sender name
+  SELECT COALESCE(display_name, username, 'Someone') INTO sender_name 
+  FROM profiles WHERE id = NEW.sender_id;
+  
+  -- Get receiver name
+  SELECT COALESCE(display_name, username, 'Someone') INTO receiver_name 
+  FROM profiles WHERE id = NEW.receiver_id;
 
-| File | Changes |
-|------|---------|
-| `src/components/live/shared/BroadcastInput.tsx` | Add spacing between send and mic buttons |
-| `src/components/live/UnifiedLiveRoom.tsx` | End/Leave button text, mic toggle for speakers, viewer count position |
-| `src/context/UnifiedLiveContext.tsx` | Fix audio space ending, add room_ended broadcast, hard-mute check, unmuteAll function |
-| `src/components/live/shared/ParticipantsList.tsx` | Mute All toggle button with Mic icon |
-| `src/components/live/LiveDashboard.tsx` | Listen for room_ended events to clear active stream state |
+  IF TG_OP = 'INSERT' AND NEW.status = 'pending' THEN
+    INSERT INTO public.notifications (user_id, type, title, message, related_id, related_type, from_user_id)
+    VALUES (
+      NEW.receiver_id,
+      'friend_request',
+      'Friend Request',
+      sender_name || ' sent you a friend request',
+      NEW.id,
+      'friend_request',
+      NEW.sender_id
+    );
+  ELSIF TG_OP = 'UPDATE' AND NEW.status = 'accepted' AND OLD.status = 'pending' THEN
+    INSERT INTO public.notifications (user_id, type, title, message, related_id, related_type, from_user_id)
+    VALUES (
+      NEW.sender_id,
+      'friend_request_accepted',
+      'Friend Request Accepted',
+      receiver_name || ' accepted your friend request',
+      NEW.receiver_id, -- Use user ID for profile deep-linking
+      'profile',
+      NEW.receiver_id
+    );
+  ELSIF TG_OP = 'UPDATE' AND NEW.status = 'declined' AND OLD.status = 'pending' THEN
+    INSERT INTO public.notifications (user_id, type, title, message, related_id, related_type, from_user_id)
+    VALUES (
+      NEW.sender_id,
+      'friend_request_declined',
+      'Friend Request Declined',
+      receiver_name || ' declined your friend request',
+      NEW.receiver_id,
+      'profile',
+      NEW.receiver_id
+    );
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+```
 
-### Auto-Logout Flow for Participants
-When host ends:
-1. Host calls `leaveRoom()` which updates database and broadcasts `room_ended` event
-2. All participants receive `room_ended` event via Supabase broadcast channel
-3. Each participant shows toast "Host ended the stream/space"
-4. After 2 second delay, participants are navigated to `/live`
-
-### Database Updates Required
-None - using existing tables. The fix is ensuring `live_spaces.status` gets updated to "ended" when host leaves (currently only `live_streams` is being updated).
+### Verification Plan
+- Send a friend request from User A to User B and verify only one notification appears for User B with User A's name.
+- Accept a friend request and verify only one notification appears for the original sender.
+- Verify that clicking the "Accepted" notification correctly navigates to the other user's profile.
+- Verify that the "Declined" notification (if enabled) appears correctly with a single entry.
