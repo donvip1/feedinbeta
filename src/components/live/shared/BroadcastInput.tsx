@@ -42,7 +42,7 @@ export const BroadcastInput = ({
 
   return (
     <div className={cn(
-      "relative flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-4 py-2",
+      "relative flex items-center gap-3 bg-black/40 backdrop-blur-md rounded-full px-4 py-2",
       className
     )}>
       {/* Emoji Picker Popup */}
@@ -106,7 +106,7 @@ export const BroadcastInput = ({
         onClick={handleSend}
         disabled={!message.trim()}
         className={cn(
-          "p-2 rounded-full transition-all",
+          "p-2 rounded-full transition-all ml-1",
           message.trim() 
             ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white" 
             : "bg-white/10 text-white/40"

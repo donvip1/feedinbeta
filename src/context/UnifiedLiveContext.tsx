@@ -116,6 +116,7 @@ export interface UnifiedLiveContextType {
   muteParticipant: (userId: string) => void;
   unmuteParticipant: (userId: string) => void;
   muteAll: () => void;
+  unmuteAll: () => void;
   inviteToSpeak: (userId: string) => void;
   removeFromSpeakers: (userId: string) => void;
   // Feature Actions
@@ -450,7 +451,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
           .eq('id', roomInfo.id);
       }
 
-      // Set up presence channel
+      // Set up presence channel with room_ended listener
       const presenceChannel = supabase.channel(`room-presence-${roomInfo.id}`, {
         config: { presence: { key: currentUser.id } },
       });
@@ -460,6 +461,17 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
           const presenceState = presenceChannel.presenceState();
           const count = Object.keys(presenceState).length;
           setState(prev => ({ ...prev, viewerCount: Math.max(count, room.remoteParticipants.size) }));
+        })
+        .on('broadcast', { event: 'room_ended' }, async (payload) => {
+          // Host ended the room - auto-leave for all participants
+          console.log('[UnifiedLive] Room ended by host:', payload);
+          const roomType = roomInfoRef.current?.type;
+          toast(roomType === 'audio_space' ? 'Host ended the space' : 'Host ended the stream');
+          
+          // Delay slightly then leave
+          setTimeout(async () => {
+            await leaveRoom();
+          }, 1500);
         })
         .subscribe(async (status) => {
           if (status === 'SUBSCRIBED') {
@@ -526,16 +538,39 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // Update database
     if (roomInfo && currentUser) {
       if (roomInfo.type === 'audio_space') {
+        // Update speaker record
         await supabase
           .from('live_space_speakers')
           .update({ left_at: new Date().toISOString() })
           .eq('space_id', roomInfo.id)
           .eq('user_id', currentUser.id);
+        
+        // If host, also end the space in database
+        if (roleRef.current === 'host') {
+          await supabase
+            .from('live_spaces')
+            .update({ status: 'ended', ended_at: new Date().toISOString() })
+            .eq('id', roomInfo.id);
+          
+          // Broadcast room_ended event to all participants
+          await supabase.channel(`room-presence-${roomInfo.id}`).send({
+            type: 'broadcast',
+            event: 'room_ended',
+            payload: { roomId: roomInfo.id, hostId: currentUser.id }
+          });
+        }
       } else if (roleRef.current === 'host') {
         await supabase
           .from('live_streams')
           .update({ status: 'ended', ended_at: new Date().toISOString() })
           .eq('id', roomInfo.id);
+        
+        // Broadcast room_ended event to all participants
+        await supabase.channel(`room-presence-${roomInfo.id}`).send({
+          type: 'broadcast',
+          event: 'room_ended',
+          payload: { roomId: roomInfo.id, hostId: currentUser.id }
+        });
       }
     }
 
@@ -562,6 +597,12 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, []);
 
   const toggleMute = useCallback(() => {
+    // Prevent unmuting if hard-muted by host
+    if (state.isHardMuted && state.isMuted) {
+      toast.error('You have been muted by the host');
+      return;
+    }
+    
     if (audioTrackRef.current) {
       const newMuted = !state.isMuted;
       if (newMuted) {
@@ -571,7 +612,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       setState(prev => ({ ...prev, isMuted: newMuted }));
     }
-  }, [state.isMuted]);
+  }, [state.isMuted, state.isHardMuted]);
 
   const toggleCamera = useCallback(() => {
     if (videoTrackRef.current) {
@@ -689,6 +730,24 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }));
 
     toast.success('All participants muted');
+  }, []);
+
+  const unmuteAll = useCallback(() => {
+    if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
+      toast.error('Only hosts can unmute all participants');
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      participants: prev.participants.map(p => 
+        p.role !== 'host' && p.role !== 'co_host' 
+          ? { ...p, is_muted: false, is_hard_muted: false } 
+          : p
+      ),
+    }));
+
+    toast.success('All participants can now speak');
   }, []);
 
   const inviteToSpeak = useCallback(async (userId: string) => {
@@ -896,6 +955,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
         muteParticipant,
         unmuteParticipant,
         muteAll,
+        unmuteAll,
         inviteToSpeak,
         removeFromSpeakers,
         // Features

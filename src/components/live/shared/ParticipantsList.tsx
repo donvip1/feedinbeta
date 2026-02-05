@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, MicOff, Mic, Lock, Unlock, UserPlus, Users, Shield, Crown } from 'lucide-react';
+import { X, MicOff, Mic, Lock, Unlock, UserPlus, Users, Shield, Crown, Volume2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -24,6 +24,7 @@ interface ParticipantsListProps {
   onMuteParticipant?: (userId: string) => void;
   onUnmuteParticipant?: (userId: string) => void;
   onMuteAll?: () => void;
+  onUnmuteAll?: () => void;
   onInviteUser?: () => void;
   onPromoteToSpeaker?: (userId: string) => void;
   onDemoteToListener?: (userId: string) => void;
@@ -39,16 +40,27 @@ export const ParticipantsList = ({
   onMuteParticipant,
   onUnmuteParticipant,
   onMuteAll,
+  onUnmuteAll,
   onInviteUser,
   onPromoteToSpeaker,
   onDemoteToListener,
 }: ParticipantsListProps) => {
   const { user } = useAuth();
+  const [isAllMuted, setIsAllMuted] = useState(false);
 
   if (!isOpen) return null;
 
   const speakers = participants.filter(p => p.role !== 'listener');
   const listeners = participants.filter(p => p.role === 'listener');
+  
+  const handleMuteAllToggle = () => {
+    if (isAllMuted) {
+      onUnmuteAll?.();
+    } else {
+      onMuteAll?.();
+    }
+    setIsAllMuted(!isAllMuted);
+  };
 
   const handleMuteToggle = (participant: Participant) => {
     if (participant.is_hard_muted) {
@@ -110,13 +122,22 @@ export const ParticipantsList = ({
           {isHost && (
             <div className="flex gap-2 px-4 py-3 border-b bg-muted/30">
               <Button 
-                variant="destructive" 
+                variant={isAllMuted ? "default" : "destructive"}
                 size="sm"
-                onClick={onMuteAll}
+                onClick={handleMuteAllToggle}
                 className="flex-1"
               >
-                <MicOff className="w-4 h-4 mr-2" />
-                Mute All
+                {isAllMuted ? (
+                  <>
+                    <Volume2 className="w-4 h-4 mr-2" />
+                    Unmute All
+                  </>
+                ) : (
+                  <>
+                    <Mic className="w-4 h-4 mr-2" />
+                    Mute All
+                  </>
+                )}
               </Button>
               <Button 
                 variant="default" 
