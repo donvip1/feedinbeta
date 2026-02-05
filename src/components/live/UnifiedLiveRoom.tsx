@@ -74,8 +74,10 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     removeFromSpeakers,
     sendBroadcastMessage,
     startPKBattle,
-    videoTrack 
+    videoTrack,
   } = useUnifiedLive();
+  
+  const { remoteVideoTrack } = state;
   
   const { 
     connectionStatus, 
@@ -166,15 +168,28 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     };
   }, [roomInfo.id, connectionStatus, user?.id]);
 
-  // Attach video track
+  // Attach video track - use local track for host, remote track for viewers
   useEffect(() => {
-    if (videoRef.current && videoTrack && roomInfo.type !== 'audio_space') {
+    if (!videoRef.current || roomInfo.type === 'audio_space') return;
+    
+    // Host uses their own local video track
+    if (isHost && videoTrack) {
+      console.log('[UnifiedLiveRoom] Attaching local video track (host)');
       videoTrack.attach(videoRef.current);
       return () => {
         if (videoRef.current) videoTrack.detach(videoRef.current);
       };
     }
-  }, [videoTrack, roomInfo.type]);
+    
+    // Viewers use remote video track from host
+    if (!isHost && remoteVideoTrack) {
+      console.log('[UnifiedLiveRoom] Attaching remote video track (viewer)');
+      remoteVideoTrack.attach(videoRef.current);
+      return () => {
+        if (videoRef.current) remoteVideoTrack.detach(videoRef.current);
+      };
+    }
+  }, [videoTrack, remoteVideoTrack, roomInfo.type, isHost]);
 
   // Fetch chat messages
   const { data: chatMessages } = useQuery({
@@ -703,14 +718,20 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                   muted
                   className="w-full h-full object-cover"
                 />
-                {!isCameraOn && (
+                {/* Show avatar fallback when camera is off (host) or no remote video yet (viewer) */}
+                {(isHost && !isCameraOn) || (!isHost && !remoteVideoTrack) ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-                    <Avatar className="w-24 h-24">
-                      <AvatarImage src={roomInfo.hostAvatar} />
-                      <AvatarFallback className="text-3xl">{roomInfo.hostName[0]}</AvatarFallback>
-                    </Avatar>
+                    <div className="flex flex-col items-center gap-4">
+                      <Avatar className="w-24 h-24">
+                        <AvatarImage src={roomInfo.hostAvatar} />
+                        <AvatarFallback className="text-3xl">{roomInfo.hostName[0]}</AvatarFallback>
+                      </Avatar>
+                      {!isHost && !remoteVideoTrack && connectionStatus === 'connected' && (
+                        <p className="text-white/60 text-sm">Waiting for host video...</p>
+                      )}
+                    </div>
                   </div>
-                )}
+                ) : null}
               </>
             )}
           </div>

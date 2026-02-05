@@ -81,6 +81,7 @@ export interface UnifiedLiveState {
   participants: Participant[];
   userCredits: number;
   hasRaisedHand: boolean; // For listeners to request speaking permission
+  remoteVideoTrack: RemoteTrack | null; // Host's video track for viewers
 }
 
 const defaultState: UnifiedLiveState = {
@@ -99,6 +100,7 @@ const defaultState: UnifiedLiveState = {
   participants: [],
   userCredits: 0,
   hasRaisedHand: false,
+  remoteVideoTrack: null,
 };
 
 // ============= CONTEXT TYPE =============
@@ -346,12 +348,20 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
         if (track.kind === Track.Kind.Audio) {
           playRemoteAudio(track, participant.identity);
         }
-        // Video tracks are handled by livekit-react components or manual attachment
+        // Store remote video track for viewers to display
+        if (track.kind === Track.Kind.Video) {
+          console.log('[UnifiedLive] Storing remote video track from:', participant.identity);
+          setState(prev => ({ ...prev, remoteVideoTrack: track }));
+        }
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track: RemoteTrack, publication, participant: RemoteParticipant) => {
         if (track.kind === Track.Kind.Audio) {
           removeRemoteAudio(participant.identity);
+        }
+        if (track.kind === Track.Kind.Video) {
+          console.log('[UnifiedLive] Remote video track unsubscribed');
+          setState(prev => ({ ...prev, remoteVideoTrack: null }));
         }
       });
 
@@ -379,11 +389,18 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       await room.connect(tokenData.url, tokenData.token);
       console.log('[UnifiedLive] Connected to room');
 
-      // Handle existing remote tracks
+      // Handle existing remote tracks (for viewers joining after host started)
       room.remoteParticipants.forEach((participant) => {
         participant.audioTrackPublications.forEach((pub) => {
           if (pub.track && pub.isSubscribed) {
             playRemoteAudio(pub.track as RemoteTrack, participant.identity);
+          }
+        });
+        // Also handle existing video tracks
+        participant.videoTrackPublications.forEach((pub) => {
+          if (pub.track && pub.isSubscribed) {
+            console.log('[UnifiedLive] Found existing video track from:', participant.identity);
+            setState(prev => ({ ...prev, remoteVideoTrack: pub.track as RemoteTrack }));
           }
         });
       });
