@@ -220,7 +220,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Video className="w-5 h-5 text-primary" />
@@ -234,7 +234,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           )}
         </DialogHeader>
         
-        <div className="space-y-4 overflow-y-auto flex-1 pr-1">
+        <div className="space-y-4 overflow-y-auto flex-1 pr-1 py-2">
           {/* Room Type Selection */}
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Stream Type</Label>
@@ -431,21 +431,22 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
             </p>
           )}
 
-          <div className="flex gap-2 pt-4 flex-shrink-0 sticky bottom-0 bg-background pb-1">
-            <Button variant="outline" onClick={onClose} className="flex-1">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreate} 
-              disabled={loading || premiumLoading} 
-              className={cn(
-                "flex-1",
-                !isScheduled && "bg-red-600 hover:bg-red-700"
-              )}
-            >
-              {loading ? "Creating..." : isScheduled ? "Schedule Stream" : "Go Live"}
-            </Button>
-          </div>
+        </div>
+
+        <div className="flex gap-2 flex-shrink-0 pt-2 border-t">
+          <Button variant="outline" onClick={onClose} className="flex-1">
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleCreate} 
+            disabled={loading || premiumLoading} 
+            className={cn(
+              "flex-1",
+              !isScheduled && "bg-red-600 hover:bg-red-700"
+            )}
+          >
+            {loading ? "Creating..." : isScheduled ? "Schedule Stream" : "Go Live"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

@@ -166,15 +166,15 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Mic className="w-5 h-5 text-primary" />
             Start a Space
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
+        <div className="space-y-4 py-2 overflow-y-auto flex-1 pr-1">
           <div className="space-y-2">
             <Label htmlFor="title">Space Title *</Label>
             <Input
@@ -309,7 +309,7 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-shrink-0 pt-2 border-t">
           <Button variant="outline" onClick={onClose} className="flex-1">
             Cancel
           </Button>
