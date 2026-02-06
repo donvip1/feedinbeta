@@ -881,7 +881,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <ArrowLeft className="w-5 h-5 text-white" />
         </button>
         <h1 className="text-white font-bold text-base flex-1 text-center truncate px-2">{space?.title}</h1>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {isHost && raisedHandsCount > 0 && (
             <button 
               onClick={() => setShowSpeakerQueue(true)}
@@ -893,6 +893,14 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </span>
             </button>
           )}
+          {/* End/Leave button */}
+          <button
+            onClick={handleLeave}
+            className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-full transition-colors"
+          >
+            {isHost ? 'End' : 'Leave'}
+          </button>
+          {/* Settings button */}
           <button onClick={() => setShowSettings(true)} className="p-2">
             <Settings className="w-5 h-5 text-white" />
           </button>
