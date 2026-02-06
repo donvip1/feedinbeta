@@ -20,6 +20,7 @@ import { ParticipantsList } from '@/components/live/shared/ParticipantsList';
 import { QuickGiftBar } from '@/components/live/shared/QuickGiftBar';
 import { HostGiftPanel } from '@/components/live/shared/HostGiftPanel';
 import { BroadcastInput } from '@/components/live/shared/BroadcastInput';
+import { SpeakerQueuePanel } from '@/components/live/SpeakerQueuePanel';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -101,6 +102,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   const [showQuickGifts, setShowQuickGifts] = useState(false);
   const [showHostGiftPanel, setShowHostGiftPanel] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showRaisedHands, setShowRaisedHands] = useState(false);
+  const [raisedHandsCount, setRaisedHandsCount] = useState(0);
   const [reactionTrigger, setReactionTrigger] = useState(0);
   const [reactionIcon, setReactionIcon] = useState("❤️");
   const [pkTimeLeft, setPkTimeLeft] = useState(0);
@@ -128,6 +131,39 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     };
     fetchCredits();
   }, [user]);
+
+  // Subscribe to raised hands count for host in audio spaces
+  useEffect(() => {
+    if (!isHost || roomInfo.type !== 'audio_space' || connectionStatus !== 'connected') return;
+
+    const fetchRaisedHands = async () => {
+      const { count } = await supabase
+        .from('live_space_speakers')
+        .select('*', { count: 'exact', head: true })
+        .eq('space_id', roomInfo.id)
+        .eq('has_raised_hand', true)
+        .is('left_at', null);
+      
+      setRaisedHandsCount(count || 0);
+    };
+
+    fetchRaisedHands();
+
+    // Subscribe to changes
+    const channel = supabase
+      .channel(`raised-hands-${roomInfo.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_space_speakers',
+        filter: `space_id=eq.${roomInfo.id}`,
+      }, () => fetchRaisedHands())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isHost, roomInfo.id, roomInfo.type, connectionStatus]);
 
   // Subscribe to realtime reactions and gifts so they show on all screens (including host)
   useEffect(() => {
@@ -438,18 +474,32 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     setShowQuickGifts(false);
   };
 
-  // Share
+  // Share - with proper URL and full share options
   const handleShare = async () => {
-    const url = `${window.location.origin}/live/${roomInfo.type === 'audio_space' ? 'space' : 'stream'}/${roomInfo.id}`;
+    const pathType = roomInfo.type === 'audio_space' ? 'space' : 'stream';
+    const url = `${window.location.origin}/live/${pathType}/${roomInfo.id}`;
+    const shareTitle = roomInfo.title || (roomInfo.type === 'audio_space' ? 'Live Space' : 'Live Stream');
+    const shareText = roomInfo.type === 'audio_space' 
+      ? `Join this live audio space: ${shareTitle}` 
+      : `Watch this live stream: ${shareTitle}`;
+    
     try {
       if (navigator.share) {
-        await navigator.share({ title: roomInfo.title, url });
+        await navigator.share({ 
+          title: shareTitle, 
+          text: shareText,
+          url 
+        });
       } else {
+        await navigator.clipboard.writeText(url);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (e: any) {
+      // User cancelled share - fallback to copy
+      if (e.name !== 'AbortError') {
         await navigator.clipboard.writeText(url);
         toast.success('Link copied!');
       }
-    } catch (e) {
-      console.error('Share error:', e);
     }
   };
 
@@ -522,6 +572,21 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 
           {/* Right Actions */}
           <div className="flex items-center gap-2">
+            {/* Raised Hands Button (Host in Audio Spaces) */}
+            {isHost && roomInfo.type === 'audio_space' && (
+              <button
+                onClick={() => setShowRaisedHands(true)}
+                className="relative p-2 rounded-full bg-amber-500/20 backdrop-blur-md hover:bg-amber-500/40 transition-colors"
+              >
+                <Hand className="w-5 h-5 text-amber-400" />
+                {raisedHandsCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-amber-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1 animate-pulse">
+                    {raisedHandsCount}
+                  </span>
+                )}
+              </button>
+            )}
+            
             {/* Participants Button (Host) */}
             {isHost && (
               <button
@@ -898,6 +963,15 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         onDemoteToListener={removeFromSpeakers}
       />
 
+      {/* Raised Hands Panel for Host in Audio Spaces */}
+      {showRaisedHands && isHost && roomInfo.type === 'audio_space' && (
+        <SpeakerQueuePanel
+          spaceId={roomInfo.id}
+          isHost={isHost}
+          onClose={() => setShowRaisedHands(false)}
+        />
+      )}
+
       {/* Gift Modal */}
       <LiveGiftModal
         isOpen={showGiftModal}
@@ -982,8 +1056,9 @@ const FooterControlBar = ({
           />
         </div>
 
-        {/* Mic Button - Show for all who can speak (host, co_host, speaker) and not hard-muted */}
-        {canSpeak && !isHardMuted && (
+        {/* Mic Button - Show for all in audio spaces, or speakers/hosts in video */}
+        {/* In audio spaces everyone can speak; in video only hosts/speakers */}
+        {((roomType === 'audio_space') || canSpeak) && !isHardMuted && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={onMicToggle}
@@ -998,7 +1073,7 @@ const FooterControlBar = ({
           </motion.button>
         )}
 
-        {/* Raise Hand Button - For listeners only in audio spaces */}
+        {/* Raise Hand Button - For listeners only in audio spaces (to request co-host/speaker promotion) */}
         {role === 'listener' && roomType === 'audio_space' && (
           <motion.button
             whileTap={{ scale: 0.9 }}
@@ -1009,6 +1084,7 @@ const FooterControlBar = ({
                 ? "bg-amber-500 text-white" 
                 : "bg-white/10 text-white/60"
             )}
+            title="Raise hand to request speaker role"
           >
             <Hand className="w-4 h-4" />
           </motion.button>

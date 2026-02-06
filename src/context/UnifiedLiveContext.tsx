@@ -406,9 +406,12 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
 
       // Publish tracks based on role and room type
-      if (canBroadcast) {
+      // For audio spaces, ALL participants should be able to talk (like Telegram spaces)
+      const shouldPublishAudio = roomInfo.type === 'audio_space' || canBroadcast;
+      
+      if (shouldPublishAudio || (canBroadcast && needsVideo)) {
         try {
-          if (needsVideo) {
+          if (needsVideo && canBroadcast) {
             // Video mode - create both video and audio
             const tracks = await createLocalTracks({
               audio: {
@@ -442,7 +445,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
               isMuted: role !== 'host' 
             }));
           } else {
-            // Audio-only mode
+            // Audio-only mode (audio spaces - everyone gets a mic)
             const audioTrack = await createLocalAudioTrack({
               echoCancellation: true,
               noiseSuppression: true,
@@ -451,6 +454,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
             });
 
             audioTrackRef.current = audioTrack;
+            // Start muted unless host
             if (role !== 'host') await audioTrack.mute();
             await room.localParticipant.publishTrack(audioTrack);
 
@@ -461,6 +465,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
               ...prev, 
               isMuted: role !== 'host',
               isCameraOn: false,
+              canSpeak: true, // All audio space participants can speak
             }));
           }
           console.log('[UnifiedLive] Tracks published');
