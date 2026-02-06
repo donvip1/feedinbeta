@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { AuthContext } from '@/context/AuthContext';
 import { toast } from 'sonner';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
+import { backgroundServiceManager } from '@/lib/background-service-manager';
 import { getFriendlyError, isTemporaryError } from '@/lib/error-messages';
 import {
   Room,
@@ -454,10 +455,19 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [stopAudioLevelMonitoring]);
 
   // Join a space - just set state, don't connect audio yet
-  const joinSpace = useCallback((spaceInfo: SpaceInfo, role: string) => {
+  const joinSpace = useCallback(async (spaceInfo: SpaceInfo, role: string) => {
     console.log('[SpaceContext-LK] Joining space:', spaceInfo.id, 'as', role);
     roleRef.current = role;
     spaceInfoRef.current = spaceInfo;
+    
+    // Start background service for this space
+    await backgroundServiceManager.startService(
+      spaceInfo.id,
+      'live_space',
+      spaceInfo.title,
+      []
+    );
+    
     setSpaceState({
       isActive: true,
       isMinimized: false,
@@ -473,6 +483,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const leaveSpace = useCallback(async () => {
     console.log('[SpaceContext-LK] Leaving space explicitly');
     const currentUser = userRef.current;
+    const spaceId = spaceInfoRef.current?.id;
     
     if (spaceInfoRef.current && currentUser) {
       await supabase
@@ -480,6 +491,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         .update({ left_at: new Date().toISOString() })
         .eq('space_id', spaceInfoRef.current.id)
         .eq('user_id', currentUser.id);
+    }
+    
+    // Stop background service
+    if (spaceId) {
+      await backgroundServiceManager.stopService(spaceId);
     }
     
     // Cleanup audio
@@ -497,7 +513,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [disconnectAudio]);
 
   const minimizeSpace = useCallback(() => {
-    console.log('[SpaceContext-LK] Minimizing space - audio continues');
+    console.log('[SpaceContext-LK] Minimizing space - audio continues in background');
     setSpaceState(prev => ({
       ...prev,
       isMinimized: true,

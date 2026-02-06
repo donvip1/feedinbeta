@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { appDataSync } from './app-data-sync';
 import { appShellPreloader } from './app-shell-preloader';
 import { backgroundAudioManager } from './background-audio-manager';
+import { backgroundServiceManager } from './background-service-manager';
 import { pushNotificationManager } from './push-notification-manager';
 import { indexedDBCache } from './indexed-db-cache';
 import { memoryCache } from './memory-cache';
@@ -56,6 +57,7 @@ class NativeAppManager {
         this.initializeNativePlugins(),
         this.initializeBackgroundHandling(),
         this.initializeCacheSystem(),
+        backgroundServiceManager.initialize(),
       ]);
 
       this.isInitialized = true;
