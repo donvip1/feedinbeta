@@ -19,6 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LiveDiscoverCard } from "./LiveDiscoverCard";
+import { LiveNotificationsPanel } from "./LiveNotificationsPanel";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,6 +65,7 @@ export const LiveDashboard = ({
 }: LiveDashboardProps) => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("All");
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const liveCount = (liveStreams?.length || 0) + (liveSpaces?.length || 0);
   const hasContent = liveCount > 0 || (scheduledStreams?.length || 0) > 0 || (scheduledSpaces?.length || 0) > 0;
@@ -158,10 +160,13 @@ export const LiveDashboard = ({
             >
               <Search className="w-5 h-5" />
             </button>
-            <button className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors relative">
+            <button 
+              onClick={() => setShowNotifications(true)}
+              className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors relative"
+            >
               <Bell className="w-5 h-5" />
               {liveCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-destructive rounded-full text-[10px] font-bold flex items-center justify-center">
                   {liveCount}
                 </span>
               )}
@@ -476,6 +481,26 @@ export const LiveDashboard = ({
           )}
         </div>
       </div>
+
+      {/* Live Notifications Panel */}
+      <LiveNotificationsPanel
+        isOpen={showNotifications}
+        onClose={() => setShowNotifications(false)}
+        liveStreams={liveStreams}
+        liveSpaces={liveSpaces}
+        onRoomClick={(roomId, roomType) => {
+          const item = roomType === 'stream' 
+            ? liveStreams?.find(s => s.id === roomId)
+            : liveSpaces?.find(s => s.id === roomId);
+          if (item) {
+            if (roomType === 'stream') {
+              onStreamClick(item);
+            } else {
+              onSpaceClick(item);
+            }
+          }
+        }}
+      />
     </div>
   );
 };
