@@ -116,6 +116,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   const [showRecordingModal, setShowRecordingModal] = useState(false);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const isHost = role === 'host' || role === 'co_host';
+  const isListener = role === 'listener';
 
   // Join room on mount
   useEffect(() => {
@@ -979,6 +980,23 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               ) : (
                 <Monitor className="w-5 h-5 text-white" />
               )}
+            </motion.button>
+          )}
+
+          {/* Hand Raise Button (Listeners Only) - 20% smaller */}
+          {isListener && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={toggleRaiseHand}
+              className={cn(
+                "p-2 rounded-full transition-colors",
+                hasRaisedHand 
+                  ? "bg-amber-500 border-2 border-amber-500" 
+                  : "border-2 border-white bg-transparent backdrop-blur-sm"
+              )}
+              title={hasRaisedHand ? "Lower Hand" : "Raise Hand"}
+            >
+              <Hand className={cn("w-4 h-4", hasRaisedHand ? "text-white" : "text-white")} />
             </motion.button>
           )}
         </div>
