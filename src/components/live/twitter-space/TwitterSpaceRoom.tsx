@@ -2,20 +2,34 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContext';
+import { useOptionalSpaceContext } from '@/context/SpaceContext';
 import { useNavigation } from '@/context/NavigationContext';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mic,
+  MicOff,
+  MessageSquare,
+  Users,
+  Share2,
+  Settings,
+  Heart,
+  X,
+  ChevronDown,
+  Search,
+  MoreHorizontal,
+  Link as LinkIcon,
+  Send,
+  Flag,
+  MessageCircle,
+  CheckCircle2,
+  FileText,
+  Type,
+  ArrowLeft,
+  Camera,
+} from 'lucide-react';
 
-import { TwitterSpaceHeader } from './TwitterSpaceHeader';
-import { TwitterSpaceUserGrid } from './TwitterSpaceUserGrid';
-import { TwitterSpaceControls } from './TwitterSpaceControls';
-import { TwitterSpaceChat } from './TwitterSpaceChat';
-import { TwitterSpaceGuests } from './TwitterSpaceGuests';
-import { TwitterSpaceReactionPicker } from './TwitterSpaceReactionPicker';
-import { TwitterSpaceShareMenu } from './TwitterSpaceShareMenu';
-import { TwitterSpaceSettingsMenu } from './TwitterSpaceSettingsMenu';
 import { LiveGiftModal } from '../LiveGiftModal';
 import { SpeakerQueuePanel } from '../SpeakerQueuePanel';
 
@@ -63,6 +77,20 @@ interface FloatingReaction {
   left: number;
 }
 
+interface Reply {
+  id: number;
+  user: string;
+  handle: string;
+  time: string;
+  text: string;
+  avatar: string;
+}
+
+const REACTION_EMOJIS = [
+  '😂', '😮', '😢', '💜', '💯',
+  '👏', '✊', '👍', '👎', '👋'
+];
+
 export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -84,13 +112,17 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [raisedHandsCount, setRaisedHandsCount] = useState(0);
+  const [activeGuestTab, setActiveGuestTab] = useState('All');
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [replyText, setReplyText] = useState('');
   
   // User states
   const [isMuted, setIsMuted] = useState(true);
+  const [isMicOn, setIsMicOn] = useState(false);
   const [hasRaisedHand, setHasRaisedHand] = useState(false);
   const [myRole, setMyRole] = useState<string>('listener');
   const [myHostMuted, setMyHostMuted] = useState(false);
-  
+
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
@@ -99,7 +131,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   // Connection status from SpaceContext
   const connectionStatus = spaceContext?.spaceState.connectionStatus || 'disconnected';
   const audioLevels = spaceContext?.spaceState.audioLevels || {};
-  const isConnected = connectionStatus === 'connected';
 
   // Hide bottom nav
   useEffect(() => {
@@ -232,6 +263,41 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     setRaisedHandsCount(count);
   }, [speakers]);
 
+  // Fetch replies
+  useEffect(() => {
+    const fetchReplies = async () => {
+      const { data } = await supabase
+        .from('live_space_messages')
+        .select('*')
+        .eq('space_id', spaceId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (data && data.length > 0) {
+        const userIds = data.map(m => m.user_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .in('id', userIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+        setReplies(
+          data.reverse().map((msg, idx) => ({
+            id: idx,
+            user: profileMap.get(msg.user_id)?.display_name || 'User',
+            handle: '@' + (profileMap.get(msg.user_id)?.username || 'user'),
+            time: new Date(msg.created_at).toLocaleTimeString(),
+            text: msg.content,
+            avatar: profileMap.get(msg.user_id)?.avatar_url || '',
+          }))
+        );
+      }
+    };
+
+    fetchReplies();
+  }, [spaceId]);
+
   const fetchSpaceData = async () => {
     const { data, error } = await supabase
       .from('live_spaces')
@@ -363,20 +429,21 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const handleToggleMute = async () => {
     if (!user) return;
     
-    if (myHostMuted && isMuted) {
+    if (myHostMuted && isMicOn) {
       toast.error('Host has muted you. Wait for host to allow you to unmute.');
       return;
     }
 
-    const newMuteState = !isMuted;
-    setIsMuted(newMuteState);
+    const newMicState = !isMicOn;
+    setIsMicOn(newMicState);
+    setIsMuted(!newMicState);
     
     if (spaceContext) {
-      spaceContext.setMuted(newMuteState);
+      spaceContext.setMuted(!newMicState);
     }
     
     // If unmuting, need to start broadcasting
-    if (!newMuteState && spaceContext) {
+    if (newMicState && spaceContext) {
       const success = await spaceContext.startListenerBroadcast();
       if (success) {
         toast.success('You are now speaking');
@@ -385,7 +452,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
     await supabase
       .from('live_space_speakers')
-      .update({ is_muted: newMuteState })
+      .update({ is_muted: !newMicState })
       .eq('space_id', spaceId)
       .eq('user_id', user.id);
   };
@@ -430,10 +497,45 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     onClose();
   };
 
-  const closeAllMenus = () => {
-    setShowReactions(false);
-    setShowShare(false);
-    setShowSettings(false);
+  const handleReplySubmit = async () => {
+    if (!user || !replyText.trim()) return;
+
+    await supabase.from('live_space_messages').insert({
+      space_id: spaceId,
+      user_id: user.id,
+      content: replyText,
+    });
+
+    setReplyText('');
+    
+    // Refetch replies
+    const { data } = await supabase
+      .from('live_space_messages')
+      .select('*')
+      .eq('space_id', spaceId)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (data) {
+      const userIds = data.map(m => m.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      setReplies(
+        data.reverse().map((msg, idx) => ({
+          id: idx,
+          user: profileMap.get(msg.user_id)?.display_name || 'User',
+          handle: '@' + (profileMap.get(msg.user_id)?.username || 'user'),
+          time: new Date(msg.created_at).toLocaleTimeString(),
+          text: msg.content,
+          avatar: profileMap.get(msg.user_id)?.avatar_url || '',
+        }))
+      );
+    }
   };
 
   if (!space) {
@@ -446,43 +548,218 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
   // Guests overlay
   if (view === 'guests') {
+    const filteredSpeakers = speakers.filter(s => {
+      if (activeGuestTab === 'All') return true;
+      if (activeGuestTab === 'Co-hosts') return s.role === 'co_host';
+      if (activeGuestTab === 'Speakers') return s.role === 'speaker';
+      if (activeGuestTab === 'Listening') return s.role === 'listener';
+      return true;
+    });
+
     return (
-      <TwitterSpaceGuests
-        speakers={speakers}
-        spaceId={spaceId}
-        isHost={isHost}
-        onClose={() => setView('main')}
-        audioLevels={audioLevels}
-      />
+      <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col">
+        {/* Guest Header */}
+        <div className="px-4 py-4 border-b border-zinc-800 flex items-center justify-between">
+          <button onClick={() => setView('main')} className="p-2">
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </button>
+          <h2 className="text-white font-bold text-lg">Guests</h2>
+          <div className="w-9" />
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-3">
+          <div className="flex items-center bg-zinc-800 rounded-full px-3 py-2">
+            <Search className="w-4 h-4 text-zinc-500" />
+            <input
+              type="text"
+              placeholder="Search guests"
+              className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none ml-2"
+            />
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-4 py-3 flex gap-2 overflow-x-auto scrollbar-hide">
+          {['All', 'Co-hosts', 'Speakers', 'Listening'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveGuestTab(tab)}
+              className={`px-5 py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-colors ${
+                activeGuestTab === tab
+                  ? 'bg-purple-600 border-transparent'
+                  : 'border-zinc-700 text-zinc-300'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Guest List */}
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          {/* Host Section */}
+          <div className="px-4 py-3">
+            <h3 className="text-zinc-400 text-sm font-semibold mb-3">Host</h3>
+            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer">
+              <img
+                src={speakers.find(s => s.user_id === space.user_id)?.profile?.avatar_url || ''}
+                alt="host"
+                className="w-12 h-12 rounded-full"
+              />
+              <div className="flex-1">
+                <p className="text-white font-medium">
+                  {speakers.find(s => s.user_id === space.user_id)?.profile?.display_name}
+                </p>
+                <p className="text-zinc-500 text-sm">
+                  @{speakers.find(s => s.user_id === space.user_id)?.profile?.username}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Speakers Section */}
+          {filteredSpeakers.filter(s => s.role === 'speaker').length > 0 && (
+            <div className="px-4 py-3">
+              <h3 className="text-zinc-400 text-sm font-semibold mb-3">
+                Speakers ({filteredSpeakers.filter(s => s.role === 'speaker').length})
+              </h3>
+              <div className="space-y-2">
+                {filteredSpeakers
+                  .filter(s => s.role === 'speaker')
+                  .map(speaker => (
+                    <div
+                      key={speaker.id}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer"
+                    >
+                      <img
+                        src={speaker.profile?.avatar_url || ''}
+                        alt={speaker.profile?.display_name}
+                        className="w-12 h-12 rounded-full"
+                      />
+                      <div className="flex-1">
+                        <p className="text-white font-medium">{speaker.profile?.display_name}</p>
+                        <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
+          {/* Listeners Section */}
+          {filteredSpeakers.filter(s => s.role === 'listener').length > 0 && (
+            <div className="px-4 py-3">
+              <h3 className="text-zinc-400 text-sm font-semibold mb-3">
+                Listeners ({filteredSpeakers.filter(s => s.role === 'listener').length})
+              </h3>
+              <div className="space-y-2">
+                {filteredSpeakers
+                  .filter(s => s.role === 'listener')
+                  .map(speaker => (
+                    <div
+                      key={speaker.id}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer"
+                    >
+                      <img
+                        src={speaker.profile?.avatar_url || ''}
+                        alt={speaker.profile?.display_name}
+                        className="w-12 h-12 rounded-full"
+                      />
+                      <div className="flex-1">
+                        <p className="text-white font-medium">{speaker.profile?.display_name}</p>
+                        <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col overflow-hidden">
       {/* Header */}
-      <TwitterSpaceHeader
-        onBack={handleMinimize}
-        onSettings={() => setShowSettings(true)}
-        onLeave={handleLeave}
-        isHost={isHost}
-        raisedHandsCount={raisedHandsCount}
-        onViewQueue={() => setShowSpeakerQueue(true)}
-      />
+      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+        <button onClick={handleMinimize} className="p-2">
+          <ArrowLeft className="w-5 h-5 text-white" />
+        </button>
+        <h1 className="text-white font-bold text-base flex-1 text-center truncate">{space?.title}</h1>
+        <button onClick={() => setShowSettings(true)} className="p-2">
+          <Settings className="w-5 h-5 text-white" />
+        </button>
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
-        <h1 className="text-white text-xl font-bold text-center mb-8 max-w-[300px]">
-          {space.title}
-        </h1>
-        
-        <TwitterSpaceUserGrid
-          speakers={speakers}
-          audioLevels={audioLevels}
-          hostId={space.user_id}
-          onUserClick={(userId) => {
-            // Could open user profile or gift modal
-          }}
-        />
+        <h2 className="text-white text-2xl font-bold text-center mb-8">
+          {space?.title}
+        </h2>
+
+        {/* User Grid */}
+        <div className="grid grid-cols-3 gap-4 max-w-[320px]">
+          {speakers.slice(0, 12).map((speaker) => {
+            const speaking = (audioLevels[speaker.user_id] || 0) > 10;
+            const isHostUser = speaker.user_id === space.user_id;
+            
+            return (
+              <button
+                key={speaker.id}
+                onClick={() => {
+                  // Could open user profile or gift modal
+                }}
+                className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-zinc-900/50 transition-colors"
+              >
+                <div className="relative">
+                  {/* Speaking ring */}
+                  {speaking && (
+                    <div className="absolute inset-0 rounded-full ring-2 ring-green-500 ring-offset-2 ring-offset-zinc-950 animate-pulse" />
+                  )}
+                  
+                  {/* Avatar */}
+                  <div className="w-16 h-16 rounded-full overflow-hidden bg-zinc-800 border-2 border-zinc-700">
+                    {speaker.profile?.avatar_url ? (
+                      <img 
+                        src={speaker.profile.avatar_url} 
+                        alt={speaker.profile.display_name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xl font-semibold">
+                        {speaker.profile?.display_name?.[0] || 'U'}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Muted indicator */}
+                  {speaker.is_muted && (
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-zinc-800 rounded-full flex items-center justify-center border-2 border-zinc-950">
+                      <MicOff className="w-3 h-3 text-zinc-400" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Name and role */}
+                <div className="text-center max-w-full">
+                  <div className="flex items-center justify-center gap-1 max-w-full">
+                    <span className="text-white text-xs font-medium truncate max-w-[60px]">
+                      {speaker.profile?.display_name?.split(' ')[0] || 'User'}
+                    </span>
+                    {speaker.profile?.is_verified && (
+                      <CheckCircle2 className="w-3 h-3 text-blue-400 flex-shrink-0" />
+                    )}
+                  </div>
+                  <span className={`text-[10px] ${isHostUser ? 'text-purple-400' : 'text-zinc-500'}`}>
+                    {isHostUser ? 'Host' : speaker.role === 'co_host' ? 'Co-host' : speaker.role === 'speaker' ? 'Speaker' : 'Listener'}
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Floating Reactions */}
@@ -504,82 +781,328 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         </AnimatePresence>
       </div>
 
-      {/* Bottom Controls */}
-      <TwitterSpaceControls
-        isMicOn={!isMuted}
-        onMicToggle={canSpeak ? handleToggleMute : handleRaiseHand}
-        onGuestsClick={() => setView('guests')}
-        onReactionsClick={() => setShowReactions(true)}
-        onShareClick={() => setShowShare(true)}
-        onChatClick={() => setShowChat(true)}
-        unreadCount={unreadMessages}
-        canSpeak={canSpeak}
-        hasRaisedHand={hasRaisedHand}
-        onGiftClick={() => setShowGiftModal(true)}
-        isHost={isHost}
-      />
+      {/* BOTTOM CONTROLS */}
+      <div className="px-4 py-4 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          {/* Mic / Request Button */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={handleToggleMute}
+              className={`w-14 h-14 rounded-full border border-zinc-800 flex items-center justify-center transition-all ${
+                isMicOn ? 'bg-purple-600 border-transparent' : 'bg-transparent'
+              }`}
+            >
+              {isMicOn ? (
+                <Mic className="w-6 h-6 text-white" />
+              ) : (
+                <MicOff className="w-6 h-6 text-zinc-400" />
+              )}
+            </button>
+            <span className="text-xs text-zinc-500">
+              {isMicOn ? 'Mute' : canSpeak ? 'Unmute' : 'Request'}
+            </span>
+          </div>
 
-      {/* Reaction Picker Overlay */}
-      <TwitterSpaceReactionPicker
-        isOpen={showReactions}
-        onClose={() => setShowReactions(false)}
-        onReaction={handleReaction}
-      />
+          {/* Center Icons */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setView('guests')}
+              className="p-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <Users className="w-6 h-6" />
+            </button>
 
-      {/* Share Menu */}
-      <TwitterSpaceShareMenu
-        isOpen={showShare}
-        onClose={() => setShowShare(false)}
-        spaceId={spaceId}
-        shareLink={space.share_link}
-        spaceTitle={space.title}
-      />
+            <button
+              onClick={() => setShowReactions(true)}
+              className="p-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <Heart className="w-6 h-6" />
+            </button>
 
-      {/* Settings Menu */}
-      <TwitterSpaceSettingsMenu
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
-        isHost={isHost}
-        spaceId={spaceId}
-      />
+            <button
+              onClick={() => setShowShare(true)}
+              className="p-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <Share2 className="w-6 h-6" />
+            </button>
+          </div>
 
-      {/* Chat Sidebar */}
-      <TwitterSpaceChat
-        isOpen={showChat}
-        onClose={() => setShowChat(false)}
-        spaceId={spaceId}
-        spaceTitle={space.title}
-        hostName={speakers.find(s => s.user_id === space.user_id)?.profile?.display_name || 'Host'}
-        startedAt={space.started_at}
-        viewerCount={space.viewer_count}
-      />
+          {/* Chat Button with Badge */}
+          <button
+            onClick={() => setShowChat(true)}
+            className="relative px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center gap-2 transition-colors"
+          >
+            <MessageCircle className="w-5 h-5 text-white" />
+            {unreadMessages > 0 && (
+              <span className="bg-white text-purple-600 text-xs px-1.5 py-0.5 font-bold rounded-full">
+                {unreadMessages}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
 
-      {/* Gift Modal */}
-      <LiveGiftModal
-        isOpen={showGiftModal}
-        onClose={() => setShowGiftModal(false)}
-        streamId={spaceId}
-        hostId={space.user_id}
-        viewers={speakers
-          .filter(s => s.user_id !== user?.id)
-          .map(s => ({
+      {/* Overlays */}
+
+      {/* REACTION PICKER */}
+      {showReactions && (
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowReactions(false)}>
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="grid grid-cols-5 gap-4">
+              {REACTION_EMOJIS.map(emoji => (
+                <button
+                  key={emoji}
+                  onClick={() => {
+                    handleReaction(emoji);
+                  }}
+                  className="text-4xl aspect-square flex items-center justify-center hover:scale-125 transition-transform active:scale-90"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SHARE MENU */}
+      {showShare && (
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowShare(false)}>
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  toast.success('Space link copied!');
+                  navigator.clipboard.writeText(window.location.href);
+                  setShowShare(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Copy Link</span>
+                <LinkIcon className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: space?.title,
+                      url: window.location.href,
+                    });
+                  }
+                  setShowShare(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Share via...</span>
+                <Share2 className="w-5 h-5 text-zinc-400" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SETTINGS MENU */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowSettings(false)}>
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="space-y-1">
+              <button
+                onClick={() => {
+                  toast.info('Audio settings coming soon');
+                  setShowSettings(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Adjust settings</span>
+                <Settings className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  toast.info('Thank you for your feedback!');
+                  setShowSettings(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Share feedback</span>
+                <MessageSquare className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  toast.info('Be respectful, no spam, keep it civil.');
+                  setShowSettings(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">View rules</span>
+                <FileText className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  toast.info('Space reported. We will review it.');
+                  setShowSettings(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-red-500 font-medium">Report this Space</span>
+                <Flag className="w-5 h-5 text-red-500" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHAT SIDEBAR */}
+      {showChat && (
+        <motion.div
+          initial={{ opacity: 0, x: 300 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 300 }}
+          className="fixed inset-0 z-50 bg-black/60 flex justify-end"
+          onClick={() => setShowChat(false)}
+        >
+          <motion.div
+            className="w-full max-w-md bg-zinc-900 flex flex-col h-full overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Chat Header */}
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+              <h2 className="text-white font-bold">Space</h2>
+              <button onClick={() => setShowChat(false)} className="p-2">
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Space Info */}
+            <div className="px-4 py-4 border-b border-zinc-800">
+              <div className="space-y-2">
+                <p className="text-sm text-white font-medium">
+                  {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name} • LIVE
+                </p>
+                <p className="text-lg text-white font-bold">{space?.title}</p>
+                <div className="flex gap-2 text-xs text-zinc-400">
+                  <span>🔴 Live</span>
+                  <span>👥 {speakers.length} listening</span>
+                </div>
+              </div>
+              <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400">
+                <p>Just now • {speakers.length} Views</p>
+              </div>
+              <div className="mt-2 text-xs text-zinc-400">
+                <p>5 Reposts • 10 Likes</p>
+              </div>
+            </div>
+
+            {/* Replies Feed */}
+            <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4">
+              <h3 className="text-zinc-400 text-sm font-semibold mb-4">Most relevant replies</h3>
+              <div className="space-y-4">
+                {replies.map(reply => (
+                  <div key={reply.id} className="pb-4 border-b border-zinc-800">
+                    <div className="flex gap-3">
+                      <img
+                        src={reply.avatar}
+                        alt={reply.user}
+                        className="w-10 h-10 rounded-full"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-1">
+                          <span className="text-white font-semibold">{reply.user}</span>
+                          <span className="text-zinc-500 text-sm">{reply.handle}</span>
+                          <span className="text-zinc-500 text-sm">· {reply.time}</span>
+                        </div>
+                        <p className="text-zinc-300 text-sm mt-2">{reply.text}</p>
+                        <div className="flex gap-4 mt-3 text-zinc-500 text-xs">
+                          <button className="hover:text-purple-400">💬 Reply</button>
+                          <button className="hover:text-purple-400">❤️ Like</button>
+                          <button className="hover:text-purple-400">🔄 Repost</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Reply Input */}
+            <div className="px-4 py-4 border-t border-zinc-800">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  placeholder="Reply..."
+                  className="flex-1 bg-zinc-800 text-white placeholder-zinc-500 rounded-full px-4 py-2 outline-none"
+                />
+                <button
+                  onClick={handleReplySubmit}
+                  className="p-2 text-purple-600 hover:text-purple-500"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {showGiftModal && (
+        <LiveGiftModal
+          isOpen={showGiftModal}
+          onClose={() => setShowGiftModal(false)}
+          streamId={spaceId}
+          hostId={space?.user_id || ''}
+          viewers={speakers.map(s => ({
             id: s.user_id,
             display_name: s.profile?.display_name || 'User',
-            username: s.profile?.username || '',
+            username: s.profile?.username || 'user',
             avatar_url: s.profile?.avatar_url || '',
           }))}
-        isHost={isHost}
-        isSpace={true}
-      />
+          isHost={isHost}
+        />
+      )}
 
-      {/* Speaker Queue Panel */}
       {showSpeakerQueue && (
         <SpeakerQueuePanel
           spaceId={spaceId}
-          isHost={isHost}
           onClose={() => setShowSpeakerQueue(false)}
+          isHost={isHost}
         />
       )}
+
+      <style>{`
+        @keyframes space-float {
+          0% { transform: translateY(0) scale(1); opacity: 0; }
+          10% { opacity: 1; transform: translateY(-20px) scale(1.5); }
+          100% { transform: translateY(-500px) scale(0.8); opacity: 0; }
+        }
+        .animate-space-float {
+          animation: space-float 4s ease-out forwards;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .pb-safe {
+          padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+      `}</style>
     </div>
   );
 };
+
+export default TwitterSpaceRoom;
