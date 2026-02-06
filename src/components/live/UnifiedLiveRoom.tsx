@@ -622,20 +622,47 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             </div>
           </div>
 
-          {/* Right Actions - Simplified: Only connection status and End/Leave */}
-          <div className="flex items-center gap-2">
+          {/* Right Actions - Manage viewers, Speaker Queue, End/Leave */}
+          <div className="flex items-center gap-1">
             {/* Connection Status */}
             {connectionStatus === 'reconnecting' && (
-              <div className="flex items-center gap-1.5 bg-amber-500/20 backdrop-blur-md px-2 py-1 rounded-full">
+              <div className="flex items-center gap-1.5 bg-amber-500/20 backdrop-blur-md px-2 py-1 rounded-full mr-1">
                 <WifiOff className="w-3 h-3 text-amber-400" />
                 <span className="text-xs text-amber-400">Reconnecting...</span>
               </div>
             )}
 
+            {/* Manage Viewers - plain icon, no background (Host only) */}
+            {isHost && (
+              <button 
+                onClick={() => setShowParticipants(true)}
+                title="Manage Viewers"
+                className="p-2"
+              >
+                <Users className="w-5 h-5 text-white/80" />
+              </button>
+            )}
+            
+            {/* Speaker Queue - plain icon, no background (Host in Audio Spaces) */}
+            {isHost && roomInfo.type === 'audio_space' && (
+              <button 
+                onClick={() => setShowRaisedHands(true)}
+                title="Speaker Queue"
+                className="p-2 relative"
+              >
+                <Hand className="w-5 h-5 text-white/80" />
+                {raisedHandsCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold">
+                    {raisedHandsCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* End/Leave Button */}
             <button
               onClick={handleLeave}
-              className="px-4 py-1.5 rounded-full bg-destructive text-white text-sm font-semibold hover:bg-destructive/80 transition-colors"
+              className="px-4 py-1.5 rounded-full bg-destructive text-white text-sm font-semibold hover:bg-destructive/80 transition-colors ml-1"
             >
               {isHost ? 'End' : 'Leave'}
             </button>
@@ -915,62 +942,44 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             <Share2 className="w-6 h-6 text-white" />
           </motion.button>
 
-          {/* Recording Button (Host Only) - Moved from header */}
+          {/* Recording Button (Host Only) - RED style */}
           {isHost && (
             <motion.button
               whileTap={{ scale: 0.9 }}
               onClick={() => toggleRecording()}
               className={cn(
-                "p-3 rounded-full bg-background border border-border transition-colors",
-                isRecording && "bg-red-500/20 border-red-500"
+                "p-3 rounded-full transition-colors relative",
+                isRecording 
+                  ? "bg-red-500 border-2 border-red-500" 
+                  : "bg-red-500/20 border-2 border-red-500"
               )}
             >
               <Circle className={cn(
                 "w-5 h-5",
-                isRecording ? "text-red-500 fill-red-500 animate-pulse" : "text-foreground"
+                isRecording ? "text-white fill-white animate-pulse" : "text-red-500 fill-red-500"
               )} />
-              {isRecording && (
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-              )}
             </motion.button>
           )}
 
-          {/* Raised Hands Button (Host in Audio Spaces) - Moved from header */}
-          {isHost && roomInfo.type === 'audio_space' && (
+          {/* Screen Share Button (Host Only) - replaces 3-dot menu */}
+          {isHost && (
             <motion.button
               whileTap={{ scale: 0.9 }}
-              onClick={() => setShowRaisedHands(true)}
-              className="relative p-3 rounded-full bg-background border border-border hover:bg-muted transition-colors"
+              onClick={toggleScreenShare}
+              className={cn(
+                "p-3 rounded-full transition-colors",
+                isScreenSharing 
+                  ? "bg-primary border-2 border-primary" 
+                  : "border-2 border-white bg-transparent backdrop-blur-sm"
+              )}
+              title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
             >
-              <Hand className="w-5 h-5 text-foreground" />
-              {raisedHandsCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-amber-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1 animate-pulse">
-                  {raisedHandsCount}
-                </span>
+              {isScreenSharing ? (
+                <Monitor className="w-5 h-5 text-white" />
+              ) : (
+                <Monitor className="w-5 h-5 text-white" />
               )}
             </motion.button>
-          )}
-
-          {/* 3-Dot Options Menu - All controls consolidated here */}
-          <StreamOptionsMenu
-            isHost={isHost}
-            streamId={roomInfo.id}
-            hostId={roomInfo.hostId}
-            streamTitle={roomInfo.title || (roomInfo.type === 'audio_space' ? 'Live Space' : 'Live Stream')}
-            onEndStream={handleLeave}
-            className="!bg-background !border !border-border !text-foreground"
-          />
-
-          {/* More Options Menu - Screen Share, Camera, PK Battle (Host only) */}
-          {isHost && (
-            <RightSideMenu
-              roomType={roomInfo.type}
-              isCameraOn={isCameraOn}
-              isScreenSharing={isScreenSharing}
-              onCameraToggle={toggleCamera}
-              onScreenShareToggle={toggleScreenShare}
-              onPKBattleStart={handleStartPK}
-            />
           )}
         </div>
 

@@ -20,21 +20,20 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Initialize all real-time subscriptions
   useRealtimeSubscriptions();
 
-  // Handle app visibility changes for mobile
+  // Handle app visibility changes for mobile - DISABLED to prevent auto-refresh kicking users off screens
+  // Manual refresh via pull-to-refresh is still available
   const handleVisibilityChange = useCallback(() => {
     if (document.visibilityState === 'visible') {
       const timeInBackground = Date.now() - lastVisibleTime.current;
       
       console.log('[RealtimeProvider] App visible, time in background:', timeInBackground, 'ms');
       
-      // If app was in background for more than threshold, refresh all data
-      if (timeInBackground > STALE_THRESHOLD) {
-        console.log('[RealtimeProvider] Data stale, refreshing all queries...');
+      // Only reconnect realtime channels if offline for a long time (5+ minutes)
+      // Do NOT invalidate queries - this causes page refreshes that kick users off
+      if (timeInBackground > 5 * 60 * 1000) {
+        console.log('[RealtimeProvider] Long background period, reconnecting realtime only...');
         
-        // Invalidate all queries to force fresh fetch
-        queryClient.invalidateQueries();
-        
-        // Reconnect Supabase realtime channels
+        // Reconnect Supabase realtime channels only
         try {
           supabase.realtime.disconnect();
           setTimeout(() => {
@@ -44,22 +43,18 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } catch (e) {
           console.error('[RealtimeProvider] Reconnect error:', e);
         }
-      } else {
-        // Just refresh critical live data
-        queryClient.invalidateQueries({ queryKey: ['live-streams'] });
-        queryClient.invalidateQueries({ queryKey: ['live-spaces'] });
       }
+      // Do NOT invalidate queries here - this causes the refresh issue
     } else {
       lastVisibleTime.current = Date.now();
     }
-  }, [queryClient]);
+  }, []);
 
-  // Handle online/offline transitions
+  // Handle online/offline transitions - only reconnect realtime, don't refresh queries
   const handleOnline = useCallback(() => {
-    console.log('[RealtimeProvider] Network online, refreshing data...');
-    queryClient.invalidateQueries();
+    console.log('[RealtimeProvider] Network online, reconnecting realtime...');
     
-    // Reconnect Supabase realtime
+    // Only reconnect Supabase realtime - do NOT invalidate queries
     try {
       supabase.realtime.disconnect();
       setTimeout(() => {
@@ -68,7 +63,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (e) {
       console.error('[RealtimeProvider] Reconnect error:', e);
     }
-  }, [queryClient]);
+  }, []);
 
   useEffect(() => {
     document.addEventListener('visibilitychange', handleVisibilityChange);

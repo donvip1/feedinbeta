@@ -160,15 +160,15 @@ const HumanizeAI = lazy(() => import("./pages/tools/HumanizeAI"));
 // Custom event for update available - defined locally to avoid mixed import
 const UPDATE_AVAILABLE_EVENT = 'feedin-update-available';
 
-// Create QueryClient with aggressive refetch settings for mobile
+// Create QueryClient with stable settings - NO auto-refresh to prevent kicking users off screens
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Shorter stale time for fresher data
-      staleTime: 5 * 1000, // 5 seconds
-      // Refetch on window focus (critical for mobile app switching)
-      refetchOnWindowFocus: true,
-      // Refetch when reconnecting
+      // Extended stale time for stability - prevents auto-refetch
+      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh longer
+      // CRITICAL: Disable refetch on window focus to prevent screen resets
+      refetchOnWindowFocus: false,
+      // Refetch when reconnecting (only after network recovery)
       refetchOnReconnect: true,
       // Retry failed requests
       retry: 2,

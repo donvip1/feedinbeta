@@ -111,15 +111,16 @@ class AppDataSyncManager {
   };
 
   /**
-   * Handle network reconnection
+   * Handle network reconnection - only log, don't refresh
    */
   private handleOnline = (): void => {
-    console.log('[AppDataSync] Network reconnected - Refreshing all data');
-    this.refreshAllCriticalData();
+    console.log('[AppDataSync] Network reconnected - NOT auto-refreshing to maintain stability');
+    // DISABLED: Do NOT refresh all data - this kicks users off screens
   };
 
   /**
    * Called when app comes to foreground
+   * DISABLED aggressive refresh to prevent kicking users off screens
    */
   private onAppForeground(): void {
     const now = Date.now();
@@ -130,15 +131,10 @@ class AppDataSyncManager {
     }
     
     this.lastFocusTime = now;
-    console.log('[AppDataSync] App came to foreground - Refreshing data');
+    console.log('[AppDataSync] App came to foreground - NOT refreshing to maintain stability');
     
-    // Immediately invalidate instant refresh queries (like live streams)
-    this.refreshInstantData();
-    
-    // Then refresh all critical data
-    setTimeout(() => {
-      this.refreshAllCriticalData();
-    }, 100);
+    // DISABLED: Do NOT refresh data automatically - this kicks users off screens
+    // Users can manually refresh via pull-to-refresh if they want fresh data
   }
 
   /**
@@ -189,25 +185,12 @@ class AppDataSyncManager {
   }
 
   /**
-   * Start periodic background sync (when app is visible)
+   * Start periodic background sync - DISABLED to prevent auto-refresh issues
    */
   private startBackgroundSync(): void {
-    if (this.focusRefreshInterval) {
-      clearInterval(this.focusRefreshInterval);
-    }
-
-    this.focusRefreshInterval = window.setInterval(() => {
-      if (document.visibilityState === 'visible' && navigator.onLine) {
-        // Only refresh instant data during background sync
-        // Full refresh happens on focus
-        INSTANT_REFRESH_QUERIES.forEach(queryKey => {
-          this.queryClient?.invalidateQueries({ 
-            queryKey: [queryKey],
-            refetchType: 'active',
-          });
-        });
-      }
-    }, this.BACKGROUND_SYNC_INTERVAL);
+    // DISABLED: Background sync causes page refreshes that kick users off screens
+    // Users can manually refresh via pull-to-refresh if they want fresh data
+    console.log('[AppDataSync] Background sync disabled to maintain stability');
   }
 
   /**
