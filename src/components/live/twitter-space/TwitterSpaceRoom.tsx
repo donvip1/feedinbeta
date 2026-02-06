@@ -78,12 +78,15 @@ interface FloatingReaction {
 }
 
 interface Reply {
-  id: number;
+  id: string;
+  user_id: string;
   user: string;
   handle: string;
   time: string;
   text: string;
   avatar: string;
+  likes: number;
+  liked_by_me: boolean;
 }
 
 const REACTION_EMOJIS = [
@@ -115,6 +118,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [activeGuestTab, setActiveGuestTab] = useState('All');
   const [replies, setReplies] = useState<Reply[]>([]);
   const [replyText, setReplyText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<{ id: string; user: string; handle: string } | null>(null);
   
   // User states
   const [isMuted, setIsMuted] = useState(true);
@@ -271,7 +275,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         .select('*')
         .eq('space_id', spaceId)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (data && data.length > 0) {
         const userIds = data.map(m => m.user_id);
@@ -283,20 +287,56 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
         setReplies(
-          data.reverse().map((msg, idx) => ({
-            id: idx,
+          data.reverse().map((msg) => ({
+            id: msg.id,
+            user_id: msg.user_id,
             user: profileMap.get(msg.user_id)?.display_name || 'User',
             handle: '@' + (profileMap.get(msg.user_id)?.username || 'user'),
-            time: new Date(msg.created_at).toLocaleTimeString(),
+            time: getRelativeTime(msg.created_at),
             text: msg.content,
             avatar: profileMap.get(msg.user_id)?.avatar_url || '',
+            likes: 0,
+            liked_by_me: false,
           }))
         );
       }
     };
 
     fetchReplies();
-  }, [spaceId]);
+    
+    // Subscribe to new messages
+    const channel = supabase
+      .channel(`space-messages-${spaceId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'live_space_messages',
+        filter: `space_id=eq.${spaceId}`,
+      }, () => {
+        fetchReplies();
+        if (!showChat) {
+          setUnreadMessages(prev => prev + 1);
+        }
+      })
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [spaceId, showChat]);
+  
+  // Helper to get relative time
+  const getRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${Math.floor(diffHours / 24)}d`;
+  };
 
   const fetchSpaceData = async () => {
     const { data, error } = await supabase
@@ -500,42 +540,43 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const handleReplySubmit = async () => {
     if (!user || !replyText.trim()) return;
 
+    const content = replyingTo 
+      ? `@${replyingTo.handle.replace('@', '')} ${replyText}` 
+      : replyText;
+
     await supabase.from('live_space_messages').insert({
       space_id: spaceId,
       user_id: user.id,
-      content: replyText,
+      content,
     });
 
     setReplyText('');
-    
-    // Refetch replies
-    const { data } = await supabase
-      .from('live_space_messages')
-      .select('*')
-      .eq('space_id', spaceId)
-      .order('created_at', { ascending: false })
-      .limit(10);
-
-    if (data) {
-      const userIds = data.map(m => m.user_id);
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('id, display_name, username, avatar_url')
-        .in('id', userIds);
-
-      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
-
-      setReplies(
-        data.reverse().map((msg, idx) => ({
-          id: idx,
-          user: profileMap.get(msg.user_id)?.display_name || 'User',
-          handle: '@' + (profileMap.get(msg.user_id)?.username || 'user'),
-          time: new Date(msg.created_at).toLocaleTimeString(),
-          text: msg.content,
-          avatar: profileMap.get(msg.user_id)?.avatar_url || '',
-        }))
-      );
-    }
+    setReplyingTo(null);
+    toast.success('Reply sent!');
+  };
+  
+  // Handle like toggle
+  const handleLikeMessage = (messageId: string) => {
+    setReplies(prev => prev.map(reply => {
+      if (reply.id === messageId) {
+        return {
+          ...reply,
+          liked_by_me: !reply.liked_by_me,
+          likes: reply.liked_by_me ? reply.likes - 1 : reply.likes + 1,
+        };
+      }
+      return reply;
+    }));
+  };
+  
+  // Handle reply to specific message
+  const handleReplyToMessage = (reply: Reply) => {
+    setReplyingTo({ id: reply.id, user: reply.user, handle: reply.handle });
+  };
+  
+  // Navigate to user profile
+  const navigateToProfile = (userId: string) => {
+    navigate(`/profile/${userId}`);
   };
 
   if (!space) {
@@ -601,11 +642,14 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           {/* Host Section */}
           <div className="px-4 py-3">
             <h3 className="text-zinc-400 text-sm font-semibold mb-3">Host</h3>
-            <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer">
+            <button 
+              onClick={() => navigateToProfile(space.user_id)}
+              className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
+            >
               <img
                 src={speakers.find(s => s.user_id === space.user_id)?.profile?.avatar_url || ''}
                 alt="host"
-                className="w-12 h-12 rounded-full"
+                className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
               />
               <div className="flex-1">
                 <p className="text-white font-medium">
@@ -615,7 +659,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                   @{speakers.find(s => s.user_id === space.user_id)?.profile?.username}
                 </p>
               </div>
-            </div>
+            </button>
           </div>
 
           {/* Speakers Section */}
@@ -628,20 +672,21 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 {filteredSpeakers
                   .filter(s => s.role === 'speaker')
                   .map(speaker => (
-                    <div
+                    <button
                       key={speaker.id}
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer"
+                      onClick={() => navigateToProfile(speaker.user_id)}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
                     >
                       <img
                         src={speaker.profile?.avatar_url || ''}
                         alt={speaker.profile?.display_name}
-                        className="w-12 h-12 rounded-full"
+                        className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
                       />
                       <div className="flex-1">
                         <p className="text-white font-medium">{speaker.profile?.display_name}</p>
                         <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
                       </div>
-                    </div>
+                    </button>
                   ))}
               </div>
             </div>
@@ -657,20 +702,21 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 {filteredSpeakers
                   .filter(s => s.role === 'listener')
                   .map(speaker => (
-                    <div
+                    <button
                       key={speaker.id}
-                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer"
+                      onClick={() => navigateToProfile(speaker.user_id)}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
                     >
                       <img
                         src={speaker.profile?.avatar_url || ''}
                         alt={speaker.profile?.display_name}
-                        className="w-12 h-12 rounded-full"
+                        className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
                       />
                       <div className="flex-1">
                         <p className="text-white font-medium">{speaker.profile?.display_name}</p>
                         <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
                       </div>
-                    </div>
+                    </button>
                   ))}
               </div>
             </div>
@@ -708,9 +754,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             return (
               <button
                 key={speaker.id}
-                onClick={() => {
-                  // Could open user profile or gift modal
-                }}
+                onClick={() => navigateToProfile(speaker.user_id)}
                 className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-zinc-900/50 transition-colors"
               >
                 <div className="relative">
@@ -999,34 +1043,68 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400">
                 <p>Just now • {speakers.length} Views</p>
               </div>
-              <div className="mt-2 text-xs text-zinc-400">
-                <p>5 Reposts • 10 Likes</p>
-              </div>
             </div>
 
             {/* Replies Feed */}
             <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4">
-              <h3 className="text-zinc-400 text-sm font-semibold mb-4">Most relevant replies</h3>
+              <h3 className="text-zinc-400 text-sm font-semibold mb-4">
+                {replies.length > 0 ? `${replies.length} replies` : 'No replies yet'}
+              </h3>
               <div className="space-y-4">
                 {replies.map(reply => (
                   <div key={reply.id} className="pb-4 border-b border-zinc-800">
                     <div className="flex gap-3">
-                      <img
-                        src={reply.avatar}
-                        alt={reply.user}
-                        className="w-10 h-10 rounded-full"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-1">
-                          <span className="text-white font-semibold">{reply.user}</span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigateToProfile(reply.user_id);
+                        }}
+                        className="flex-shrink-0"
+                      >
+                        <img
+                          src={reply.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${reply.user}`}
+                          alt={reply.user}
+                          className="w-10 h-10 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                        />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToProfile(reply.user_id);
+                            }}
+                            className="text-white font-semibold hover:underline"
+                          >
+                            {reply.user}
+                          </button>
                           <span className="text-zinc-500 text-sm">{reply.handle}</span>
                           <span className="text-zinc-500 text-sm">· {reply.time}</span>
                         </div>
-                        <p className="text-zinc-300 text-sm mt-2">{reply.text}</p>
-                        <div className="flex gap-4 mt-3 text-zinc-500 text-xs">
-                          <button className="hover:text-purple-400">💬 Reply</button>
-                          <button className="hover:text-purple-400">❤️ Like</button>
-                          <button className="hover:text-purple-400">🔄 Repost</button>
+                        <p className="text-zinc-300 text-sm mt-2 break-words">{reply.text}</p>
+                        <div className="flex gap-6 mt-3 text-zinc-500 text-xs">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReplyToMessage(reply);
+                            }}
+                            className="flex items-center gap-1 hover:text-purple-400 transition-colors"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Reply</span>
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLikeMessage(reply.id);
+                            }}
+                            className={`flex items-center gap-1 transition-colors ${
+                              reply.liked_by_me ? 'text-red-500' : 'hover:text-red-400'
+                            }`}
+                          >
+                            <Heart className={`w-4 h-4 ${reply.liked_by_me ? 'fill-current' : ''}`} />
+                            <span>{reply.likes > 0 ? reply.likes : 'Like'}</span>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1036,18 +1114,38 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </div>
 
             {/* Reply Input */}
-            <div className="px-4 py-4 border-t border-zinc-800">
+            <div className="px-4 py-4 border-t border-zinc-800 pb-safe">
+              {replyingTo && (
+                <div className="flex items-center justify-between mb-2 px-2">
+                  <span className="text-xs text-zinc-400">
+                    Replying to <span className="text-purple-400">{replyingTo.handle}</span>
+                  </span>
+                  <button 
+                    onClick={() => setReplyingTo(null)}
+                    className="text-zinc-500 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               <div className="flex items-center gap-2">
                 <input
                   type="text"
                   value={replyText}
                   onChange={e => setReplyText(e.target.value)}
-                  placeholder="Reply..."
-                  className="flex-1 bg-zinc-800 text-white placeholder-zinc-500 rounded-full px-4 py-2 outline-none"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleReplySubmit();
+                    }
+                  }}
+                  placeholder={replyingTo ? `Reply to ${replyingTo.user}...` : "Say something..."}
+                  className="flex-1 bg-zinc-800 text-white placeholder-zinc-500 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-purple-500"
                 />
                 <button
                   onClick={handleReplySubmit}
-                  className="p-2 text-purple-600 hover:text-purple-500"
+                  disabled={!replyText.trim()}
+                  className="p-2 text-purple-600 hover:text-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-5 h-5" />
                 </button>
