@@ -4108,6 +4108,9 @@ export type Database = {
       }
       live_stream_viewers: {
         Row: {
+          hand_raised_at: string | null
+          has_raised_hand: boolean | null
+          host_muted: boolean | null
           id: string
           is_active: boolean | null
           joined_at: string | null
@@ -4117,6 +4120,9 @@ export type Database = {
           watch_duration: number | null
         }
         Insert: {
+          hand_raised_at?: string | null
+          has_raised_hand?: boolean | null
+          host_muted?: boolean | null
           id?: string
           is_active?: boolean | null
           joined_at?: string | null
@@ -4126,6 +4132,9 @@ export type Database = {
           watch_duration?: number | null
         }
         Update: {
+          hand_raised_at?: string | null
+          has_raised_hand?: boolean | null
+          host_muted?: boolean | null
           id?: string
           is_active?: boolean | null
           joined_at?: string | null

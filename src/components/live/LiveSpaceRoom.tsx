@@ -268,6 +268,25 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         if (payload.new.left_at && !payload.old?.left_at) {
           setSpace(prev => prev ? { ...prev, viewer_count: Math.max(0, (prev.viewer_count || 1) - 1) } : null);
         }
+        
+        // Notify host when someone raises their hand
+        if (isHost && payload.new.has_raised_hand && !payload.old?.has_raised_hand) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('display_name, avatar_url')
+            .eq('id', payload.new.user_id)
+            .single();
+          
+          toast(`${profile?.display_name || 'Someone'} raised their hand!`, {
+            icon: '✋',
+            duration: 5000,
+            action: {
+              label: 'View Queue',
+              onClick: () => setShowSpeakerQueue(true)
+            }
+          });
+        }
+        
         // Immediately refetch speakers for UI update
         fetchSpeakers();
       })

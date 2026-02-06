@@ -140,31 +140,75 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     fetchCredits();
   }, [user]);
 
-  // Subscribe to raised hands count for host in audio spaces
+  // Subscribe to raised hands count for host (all room types)
   useEffect(() => {
-    if (!isHost || roomInfo.type !== 'audio_space' || connectionStatus !== 'connected') return;
+    if (!isHost || connectionStatus !== 'connected') return;
+
+    const tableName = roomInfo.type === 'audio_space' 
+      ? 'live_space_speakers' 
+      : 'live_stream_viewers';
+    const filterField = roomInfo.type === 'audio_space' ? 'space_id' : 'stream_id';
 
     const fetchRaisedHands = async () => {
-      const { count } = await supabase
-        .from('live_space_speakers')
-        .select('*', { count: 'exact', head: true })
-        .eq('space_id', roomInfo.id)
-        .eq('has_raised_hand', true)
-        .is('left_at', null);
-      
-      setRaisedHandsCount(count || 0);
+      if (roomInfo.type === 'audio_space') {
+        const { count } = await supabase
+          .from('live_space_speakers')
+          .select('*', { count: 'exact', head: true })
+          .eq('space_id', roomInfo.id)
+          .eq('has_raised_hand', true)
+          .is('left_at', null);
+        setRaisedHandsCount(count || 0);
+      } else {
+        const { count } = await supabase
+          .from('live_stream_viewers')
+          .select('*', { count: 'exact', head: true })
+          .eq('stream_id', roomInfo.id)
+          .eq('has_raised_hand', true)
+          .eq('is_active', true);
+        setRaisedHandsCount(count || 0);
+      }
+    };
+
+    const handleRaisedHandChange = async (payload: any) => {
+      // Check if hand was just raised (new.has_raised_hand = true, old was false)
+      if (payload.new?.has_raised_hand && !payload.old?.has_raised_hand) {
+        // Fetch user profile to show in toast
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('display_name, avatar_url')
+          .eq('id', payload.new.user_id)
+          .single();
+        
+        // Show toast notification with View Queue action
+        toast(`${profile?.display_name || 'Someone'} raised their hand!`, {
+          icon: '✋',
+          duration: 5000,
+          action: {
+            label: 'View Queue',
+            onClick: () => setShowRaisedHands(true)
+          }
+        });
+      }
+      // Always update count
+      fetchRaisedHands();
     };
 
     fetchRaisedHands();
 
-    // Subscribe to changes
+    // Subscribe to changes with notification for new hand raises
     const channel = supabase
       .channel(`raised-hands-${roomInfo.id}`)
       .on('postgres_changes', {
-        event: '*',
+        event: 'UPDATE',
         schema: 'public',
-        table: 'live_space_speakers',
-        filter: `space_id=eq.${roomInfo.id}`,
+        table: tableName,
+        filter: `${filterField}=eq.${roomInfo.id}`,
+      }, handleRaisedHandChange)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: tableName,
+        filter: `${filterField}=eq.${roomInfo.id}`,
       }, () => fetchRaisedHands())
       .subscribe();
 
@@ -211,6 +255,31 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
       supabase.removeChannel(reactionChannel);
     };
   }, [roomInfo.id, connectionStatus, user?.id]);
+
+  // Subscribe to host control broadcasts (mute all, etc.) for non-host participants
+  useEffect(() => {
+    if (isHost || connectionStatus !== 'connected') return;
+
+    const controlChannel = supabase
+      .channel(`space-control-listener-${roomInfo.id}`)
+      .on('broadcast', { event: 'mute_all' }, (payload: any) => {
+        if (payload.payload?.by !== user?.id) {
+          // Mute local audio via context
+          toggleMute();
+          toast.info('You have been muted by the host');
+        }
+      })
+      .on('broadcast', { event: 'allow_unmute' }, (payload: any) => {
+        if (payload.payload?.by !== user?.id) {
+          toast.info('You can now unmute');
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(controlChannel);
+    };
+  }, [isHost, roomInfo.id, connectionStatus, user?.id, toggleMute]);
 
   // Attach video track - use local track for host, remote track for viewers
   useEffect(() => {
@@ -644,8 +713,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
               </button>
             )}
             
-            {/* Speaker Queue - plain icon, no background (Host in Audio Spaces) */}
-            {isHost && roomInfo.type === 'audio_space' && (
+            {/* Speaker Queue - plain icon, no background (Host for all room types) */}
+            {isHost && (
               <button 
                 onClick={() => setShowRaisedHands(true)}
                 title="Speaker Queue"
