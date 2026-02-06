@@ -34,6 +34,7 @@ export interface RoomInfo {
   hostName: string;
   hostAvatar: string;
   startedAt?: string;
+  coverImageUrl?: string | null;
   pkData?: {
     challengerId: string;
     challengerName: string;

@@ -7,24 +7,26 @@ interface ConnectionOverlayProps {
   status: ConnectionStatus;
   onRetry?: () => void;
   className?: string;
+  /** If true, renders inline/minimal style instead of fullscreen overlay */
+  inline?: boolean;
 }
 
-export const ConnectionOverlay = ({ status, onRetry, className }: ConnectionOverlayProps) => {
+export const ConnectionOverlay = ({ status, onRetry, className, inline = false }: ConnectionOverlayProps) => {
   if (status === 'connected' || status === 'idle') return null;
 
   const getContent = () => {
     switch (status) {
       case 'connecting':
         return {
-          icon: <Loader2 className="w-8 h-8 animate-spin" />,
+          icon: <Loader2 className={cn(inline ? "w-3 h-3" : "w-8 h-8", "animate-spin")} />,
           title: 'Connecting...',
           description: 'Setting up your stream',
-          color: 'text-primary',
+          color: 'text-white/60',
           bgColor: 'bg-primary/10',
         };
       case 'reconnecting':
         return {
-          icon: <RefreshCw className="w-8 h-8 animate-spin" />,
+          icon: <RefreshCw className={cn(inline ? "w-3 h-3" : "w-8 h-8", "animate-spin")} />,
           title: 'Reconnecting...',
           description: 'Please wait a moment',
           color: 'text-amber-400',
@@ -32,8 +34,8 @@ export const ConnectionOverlay = ({ status, onRetry, className }: ConnectionOver
         };
       case 'error':
         return {
-          icon: <WifiOff className="w-8 h-8" />,
-          title: 'Connection Lost',
+          icon: <WifiOff className={cn(inline ? "w-3 h-3" : "w-8 h-8")} />,
+          title: 'Connection lost',
           description: 'Tap to retry',
           color: 'text-red-400',
           bgColor: 'bg-red-500/10',
@@ -41,8 +43,8 @@ export const ConnectionOverlay = ({ status, onRetry, className }: ConnectionOver
         };
       case 'ended':
         return {
-          icon: <AlertCircle className="w-8 h-8" />,
-          title: 'Stream Ended',
+          icon: <AlertCircle className={cn(inline ? "w-3 h-3" : "w-8 h-8")} />,
+          title: 'Stream ended',
           description: 'The host has ended this session',
           color: 'text-muted-foreground',
           bgColor: 'bg-muted/20',
@@ -55,6 +57,28 @@ export const ConnectionOverlay = ({ status, onRetry, className }: ConnectionOver
   const content = getContent();
   if (!content) return null;
 
+  // Inline mode - small, subtle status below title
+  if (inline) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -5 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -5 }}
+        className={cn(
+          "flex items-center justify-center gap-1.5 py-1",
+          className
+        )}
+        onClick={content.showRetry ? onRetry : undefined}
+      >
+        <span className={content.color}>{content.icon}</span>
+        <span className={cn("text-xs font-normal", content.color)}>
+          {content.title.toLowerCase()}
+        </span>
+      </motion.div>
+    );
+  }
+
+  // Full overlay mode (original)
   return (
     <motion.div
       initial={{ opacity: 0 }}
