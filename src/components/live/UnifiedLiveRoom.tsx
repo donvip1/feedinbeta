@@ -7,6 +7,7 @@ import {
   Share2, Gift, Pin, Minimize2, MoreVertical,
   Mic, MicOff, Video, VideoOff, Hand
 } from 'lucide-react';
+import { StreamOptionsMenu } from '@/components/live/StreamOptionsMenu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useUnifiedLive, RoomInfo, ParticipantRole, Participant } from '@/context/UnifiedLiveContext';
@@ -609,6 +610,15 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                 <span className="text-xs text-amber-400">Reconnecting...</span>
               </div>
             )}
+
+            {/* 3-Dot Options Menu */}
+            <StreamOptionsMenu
+              isHost={isHost}
+              streamId={roomInfo.id}
+              hostId={roomInfo.hostId}
+              streamTitle={roomInfo.title || (roomInfo.type === 'audio_space' ? 'Live Space' : 'Live Stream')}
+              onEndStream={handleLeave}
+            />
 
             {/* End/Leave Button */}
             <button
