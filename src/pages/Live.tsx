@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { CreateLiveStreamModal } from "@/components/live/CreateLiveStreamModal";
 import { CreateSpaceModal } from "@/components/live/CreateSpaceModal";
 import { UnifiedLiveRoom } from "@/components/live/UnifiedLiveRoom";
@@ -17,6 +18,7 @@ interface SelectedRoom {
 
 const Live = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [createStreamModalOpen, setCreateStreamModalOpen] = useState(false);
   const [createSpaceModalOpen, setCreateSpaceModalOpen] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<SelectedRoom | null>(null);
@@ -318,9 +320,8 @@ const Live = () => {
 
   const handleSpaceClick = (space: any) => {
     if (space.status === 'live' || space.status === 'ended') {
-      const isMySpace = space.user_id === user?.id;
-      const isJoined = joinedSpaceIds?.includes(space.id);
-      openRoom(space, 'audio_space', isMySpace ? 'host' : (isJoined ? 'listener' : 'listener'));
+      // Navigate to SpaceDetail which uses the new TwitterSpaceRoom UI
+      navigate(`/live/space/${space.id}`);
     }
   };
 
