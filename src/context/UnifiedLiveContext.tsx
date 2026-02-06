@@ -73,6 +73,7 @@ export interface UnifiedLiveState {
   isMuted: boolean;
   isCameraOn: boolean;
   isScreenSharing: boolean;
+  isRecording: boolean; // Cloud recording enabled
   isHardMuted: boolean; // Host forced mute on current user
   canSpeak: boolean;
   connectionStatus: ConnectionStatus;
@@ -82,6 +83,7 @@ export interface UnifiedLiveState {
   userCredits: number;
   hasRaisedHand: boolean; // For listeners to request speaking permission
   remoteVideoTrack: RemoteTrack | null; // Host's video track for viewers
+  screenShareTrack: LocalVideoTrack | null; // Screen share track
 }
 
 const defaultState: UnifiedLiveState = {
@@ -92,6 +94,7 @@ const defaultState: UnifiedLiveState = {
   isMuted: true,
   isCameraOn: false,
   isScreenSharing: false,
+  isRecording: false,
   isHardMuted: false,
   canSpeak: true,
   connectionStatus: 'idle',
@@ -101,6 +104,7 @@ const defaultState: UnifiedLiveState = {
   userCredits: 0,
   hasRaisedHand: false,
   remoteVideoTrack: null,
+  screenShareTrack: null,
 };
 
 // ============= CONTEXT TYPE =============
@@ -114,7 +118,8 @@ export interface UnifiedLiveContextType {
   maximize: () => void;
   toggleMute: () => void;
   toggleCamera: () => void;
-  toggleScreenShare: () => void;
+  toggleScreenShare: () => Promise<void>;
+  toggleRecording: () => Promise<void>;
   updateRole: (role: ParticipantRole) => Promise<void>;
   toggleRaiseHand: () => Promise<void>;
   // Moderation Actions (Host Only)
@@ -696,10 +701,11 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // ============= SCREEN SHARE =============
 
-  const toggleScreenShare = useCallback(() => {
-    // Screen share requires video broadcast mode and host/speaker role
+  const toggleScreenShare = useCallback(async () => {
     const roomInfo = roomInfoRef.current;
-    if (!roomInfo) return;
+    const room = roomRef.current;
+    
+    if (!roomInfo || !room) return;
     
     if (roomInfo.type === 'audio_space') {
       toast.error('Screen sharing not available in audio spaces');
@@ -711,10 +717,76 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return;
     }
 
-    // TODO: Implement screen share track logic
-    setState(prev => ({ ...prev, isScreenSharing: !prev.isScreenSharing }));
-    toast(state.isScreenSharing ? 'Screen share stopped' : 'Screen sharing started');
+    try {
+      if (state.isScreenSharing) {
+        // Stop screen sharing
+        await room.localParticipant.setScreenShareEnabled(false);
+        setState(prev => ({ ...prev, isScreenSharing: false, screenShareTrack: null }));
+        toast.success('Screen share stopped');
+      } else {
+      // Start screen sharing
+        await room.localParticipant.setScreenShareEnabled(true);
+        setState(prev => ({ 
+          ...prev, 
+          isScreenSharing: true,
+        }));
+        toast.success('Screen sharing started');
+      }
+    } catch (error: any) {
+      console.error('[UnifiedLive] Screen share error:', error);
+      // User likely cancelled the screen picker
+      if (error.name !== 'NotAllowedError') {
+        toast.error('Failed to share screen');
+      }
+    }
   }, [state.role, state.isScreenSharing]);
+
+  // ============= RECORDING =============
+
+  const toggleRecording = useCallback(async () => {
+    const roomInfo = roomInfoRef.current;
+    const currentUser = userRef.current;
+    
+    if (!roomInfo || !currentUser) return;
+    
+    if (state.role !== 'host') {
+      toast.error('Only the host can control recording');
+      return;
+    }
+
+    const roomType = roomInfo.type === 'audio_space' ? 'live_spaces' : 'live_streams';
+    const action = state.isRecording ? 'stop' : 'start';
+
+    try {
+      setState(prev => ({ ...prev, isRecording: action === 'start' }));
+      
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+
+      const response = await supabase.functions.invoke('livekit-recording', {
+        body: { action, roomId: roomInfo.id, roomType },
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Recording failed');
+      }
+
+      if (action === 'start') {
+        toast.success('🔴 Recording started');
+      } else {
+        toast.success('Recording saved');
+        if (response.data?.recordingUrl) {
+          toast.info('Recording will be available shortly');
+        }
+      }
+    } catch (error: any) {
+      console.error('[UnifiedLive] Recording error:', error);
+      // Revert state on error
+      setState(prev => ({ ...prev, isRecording: action !== 'start' }));
+      toast.error(error.message || 'Recording failed');
+    }
+  }, [state.role, state.isRecording]);
 
   // ============= HAND RAISE (Listeners only in audio spaces) =============
 
@@ -1019,6 +1091,7 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
         toggleMute,
         toggleCamera,
         toggleScreenShare,
+        toggleRecording,
         updateRole,
         toggleRaiseHand,
         // Moderation

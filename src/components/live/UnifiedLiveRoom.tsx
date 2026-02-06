@@ -5,7 +5,7 @@ import {
   Users, Heart, Wifi, WifiOff, Crown, 
   Plus, Radio, Zap, Sword, Monitor, Megaphone,
   Share2, Gift, Pin, Minimize2, MoreVertical,
-  Mic, MicOff, Video, VideoOff, Hand
+  Mic, MicOff, Video, VideoOff, Hand, Circle
 } from 'lucide-react';
 import { StreamOptionsMenu } from '@/components/live/StreamOptionsMenu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,6 +22,7 @@ import { QuickGiftBar } from '@/components/live/shared/QuickGiftBar';
 import { HostGiftPanel } from '@/components/live/shared/HostGiftPanel';
 import { BroadcastInput } from '@/components/live/shared/BroadcastInput';
 import { SpeakerQueuePanel } from '@/components/live/SpeakerQueuePanel';
+import { PostRecordingModal } from '@/components/live/PostRecordingModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -67,6 +68,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     toggleMute, 
     toggleCamera,
     toggleScreenShare,
+    toggleRecording,
     toggleRaiseHand,
     muteParticipant,
     unmuteParticipant,
@@ -90,6 +92,7 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
     audioLevels,
     participants,
     isScreenSharing,
+    isRecording,
     userCredits,
     hasRaisedHand,
     role: currentRole
@@ -109,6 +112,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
   const [reactionIcon, setReactionIcon] = useState("❤️");
   const [pkTimeLeft, setPkTimeLeft] = useState(0);
   const [localCredits, setLocalCredits] = useState(userCredits);
+  const [showRecordingModal, setShowRecordingModal] = useState(false);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const isHost = role === 'host' || role === 'co_host';
 
   // Join room on mount
@@ -379,7 +384,51 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 
   // Handle leave
   const handleLeave = async () => {
+    // Check for recording URL if host is ending the stream
+    if (isHost && isRecording) {
+      try {
+        // For live_streams (video), check recording_url
+        if (roomInfo.type !== 'audio_space') {
+          const { data } = await supabase
+            .from('live_streams')
+            .select('cf_recording_uid')
+            .eq('id', roomInfo.id)
+            .single();
+          
+          if (data?.cf_recording_uid) {
+            // Recording was made - show modal
+            setRecordingUrl(data.cf_recording_uid);
+            setShowRecordingModal(true);
+            await leaveRoom();
+            return;
+          }
+        } else {
+          // For audio spaces
+          const { data } = await supabase
+            .from('live_spaces')
+            .select('recording_url')
+            .eq('id', roomInfo.id)
+            .single();
+          
+          if (data?.recording_url) {
+            setRecordingUrl(data.recording_url);
+            setShowRecordingModal(true);
+            await leaveRoom();
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking recording:', error);
+      }
+    }
+    
     await leaveRoom();
+    onClose();
+  };
+
+  // Handle close after recording modal
+  const handleCloseRecordingModal = () => {
+    setShowRecordingModal(false);
     onClose();
   };
 
@@ -584,6 +633,27 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-amber-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1 animate-pulse">
                     {raisedHandsCount}
                   </span>
+                )}
+              </button>
+            )}
+            
+            {/* Recording Button (Host Only) */}
+            {isHost && (
+              <button
+                onClick={() => toggleRecording()}
+                className={cn(
+                  "relative p-2 rounded-full backdrop-blur-md transition-colors",
+                  isRecording 
+                    ? "bg-red-500/30 hover:bg-red-500/50" 
+                    : "bg-black/40 hover:bg-black/60"
+                )}
+              >
+                <Circle className={cn(
+                  "w-5 h-5",
+                  isRecording ? "text-red-500 fill-red-500 animate-pulse" : "text-white"
+                )} />
+                {isRecording && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
                 )}
               </button>
             )}
@@ -992,6 +1062,20 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         isHost={isHost}
         isSpace={roomInfo.type === 'audio_space'}
       />
+
+      {/* Post Recording Modal */}
+      {recordingUrl && (
+        <PostRecordingModal
+          isOpen={showRecordingModal}
+          onClose={handleCloseRecordingModal}
+          recordingUrl={recordingUrl}
+          roomType={roomInfo.type === 'audio_space' ? 'audio_space' : 'video_broadcast'}
+          title={roomInfo.title}
+          hostName={roomInfo.hostName}
+          hostAvatar={roomInfo.hostAvatar}
+          viewerCount={viewerCount}
+        />
+      )}
     </div>
   );
 };
