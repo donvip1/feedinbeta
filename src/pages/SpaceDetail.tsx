@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useOptionalSpaceContext } from '@/context/SpaceContext';
-import { LiveSpaceRoom } from '@/components/live/LiveSpaceRoom';
+import { TwitterSpaceRoom } from '@/components/live/twitter-space';
 import { SpaceReplayPlayer } from '@/components/live/SpaceReplayPlayer';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -152,10 +152,10 @@ const SpaceDetail = () => {
     );
   }
 
-  // Show live room
+  // Show live room with new Twitter-style UI
   if (showRoom && space) {
     return (
-      <LiveSpaceRoom 
+      <TwitterSpaceRoom 
         spaceId={space.id} 
         onClose={() => {
           setShowRoom(false);
