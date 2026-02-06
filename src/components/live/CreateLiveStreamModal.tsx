@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock, Swords, Hash, X } from "lucide-react";
+import { CoverImageUpload } from "@/components/live/shared/CoverImageUpload";
 
 // Categories available for streams
 const STREAM_CATEGORIES = [
@@ -54,6 +55,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [scheduledTime, setScheduledTime] = useState("");
   const [loading, setLoading] = useState(false);
   const [roomType, setRoomType] = useState<RoomType>('video_broadcast');
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
 
   const MAX_HASHTAGS = 5;
@@ -146,6 +148,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
           started_at: isScheduled ? null : new Date().toISOString(),
           connection_state: 'idle',
           room_type: roomType,
+          cover_image_url: coverImageUrl,
         })
         .select()
         .single();
@@ -167,6 +170,7 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       setScheduledDate("");
       setScheduledTime("");
       setRoomType('video_broadcast');
+      setCoverImageUrl(null);
     } catch (error: any) {
       console.error("Error creating stream:", error);
       toast.error(error.message || "Failed to create stream");
@@ -375,7 +379,11 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
             <p className="text-xs text-muted-foreground mt-1">Press space or enter to add</p>
           </div>
 
-          {/* Schedule Date/Time */}
+          {/* Cover Image Upload */}
+          <CoverImageUpload
+            value={coverImageUrl}
+            onChange={setCoverImageUrl}
+          />
           {isScheduled && (
             <div className="space-y-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
               <div className="flex items-center gap-2 text-blue-500">

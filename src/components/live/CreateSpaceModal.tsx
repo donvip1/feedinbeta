@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useNavigation } from '@/context/NavigationContext';
+import { CoverImageUpload } from '@/components/live/shared/CoverImageUpload';
 
 interface CreateSpaceModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
   const [scheduledStart, setScheduledStart] = useState('');
   const [isRecordingEnabled, setIsRecordingEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
 
   const MAX_HASHTAGS = 5;
 
@@ -109,6 +111,7 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
           started_at: isScheduled ? null : new Date().toISOString(),
           share_link: shareLink,
           allow_mic_for_all: true,
+          cover_image_url: coverImageUrl,
         })
         .select()
         .single();
@@ -152,6 +155,7 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
       setIsPrivate(false);
       setIsScheduled(false);
       setScheduledStart('');
+      setCoverImageUrl(null);
     } catch (error: any) {
       console.error('Error creating space:', error);
       toast.error(error.message || 'Failed to create space');
@@ -251,6 +255,12 @@ export const CreateSpaceModal = ({ isOpen, onClose, onSpaceCreated }: CreateSpac
             </div>
             <p className="text-xs text-muted-foreground">Press space or enter to add</p>
           </div>
+
+          {/* Cover Image Upload */}
+          <CoverImageUpload
+            value={coverImageUrl}
+            onChange={setCoverImageUrl}
+          />
 
           <div className="flex items-center justify-between py-2">
             <div className="flex items-center gap-2">

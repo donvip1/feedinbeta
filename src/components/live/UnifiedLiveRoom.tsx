@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -23,6 +23,7 @@ import { HostGiftPanel } from '@/components/live/shared/HostGiftPanel';
 import { BroadcastInput } from '@/components/live/shared/BroadcastInput';
 import { SpeakerQueuePanel } from '@/components/live/SpeakerQueuePanel';
 import { PostRecordingModal } from '@/components/live/PostRecordingModal';
+import { EventCoverDisplay } from '@/components/live/shared/EventCoverDisplay';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
@@ -706,15 +707,37 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         className="flex-1 relative"
         onDoubleClick={handleDoubleTap}
       >
-        {/* Connection Overlay */}
+        {/* Inline Connection Status - below header, subtle */}
         <AnimatePresence>
-          {(connectionStatus === 'connecting' || connectionStatus === 'reconnecting' || connectionStatus === 'error') && (
+          {(connectionStatus === 'connecting' || connectionStatus === 'reconnecting') && (
+            <div className="absolute top-16 left-0 right-0 z-30">
+              <ConnectionOverlay 
+                status={connectionStatus} 
+                inline={true}
+              />
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Full Connection Overlay - only for error state */}
+        <AnimatePresence>
+          {connectionStatus === 'error' && (
             <ConnectionOverlay 
               status={connectionStatus} 
               onRetry={() => joinRoom(roomInfo, role)}
             />
           )}
         </AnimatePresence>
+
+        {/* Event Cover Image - Top Left */}
+        {roomInfo.coverImageUrl && (
+          <div className="absolute top-20 left-4 z-20">
+            <EventCoverDisplay
+              coverUrl={roomInfo.coverImageUrl}
+              title={roomInfo.title}
+            />
+          </div>
+        )}
 
         {/* Stage Content - Based on Room Type */}
         {roomInfo.type === 'pk_battle' && roomInfo.pkData ? (
@@ -752,106 +775,103 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             </div>
           </div>
         ) : roomInfo.type === 'audio_space' ? (
-          // Audio Space Mode
-          <div className="h-full flex flex-col items-center justify-center bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900">
-            {/* Animated Background */}
-            <div className="absolute inset-0 overflow-hidden">
-              {[...Array(5)].map((_, i) => (
+          // Audio Space Mode - Clean center for messages/gifts
+          <div className="h-full flex flex-col bg-gradient-to-br from-emerald-900 via-teal-900 to-cyan-900">
+            {/* Animated Background - Subtle rings */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              {[...Array(3)].map((_, i) => (
                 <motion.div
                   key={i}
-                  className="absolute rounded-full bg-emerald-500/10"
+                  className="absolute rounded-full bg-emerald-500/5"
                   style={{
-                    width: 200 + i * 100,
-                    height: 200 + i * 100,
+                    width: 300 + i * 150,
+                    height: 300 + i * 150,
                     left: '50%',
                     top: '50%',
                     x: '-50%',
                     y: '-50%',
                   }}
                   animate={{
-                    scale: [1, 1.2, 1],
-                    opacity: [0.3, 0.1, 0.3],
+                    scale: [1, 1.1, 1],
+                    opacity: [0.2, 0.05, 0.2],
                   }}
                   transition={{
-                    duration: 3 + i * 0.5,
+                    duration: 4 + i * 0.5,
                     repeat: Infinity,
-                    delay: i * 0.3,
+                    delay: i * 0.5,
                   }}
                 />
               ))}
             </div>
 
-            {/* Host Avatar with Visualizer */}
-            <div className="relative z-10">
-              <motion.div
-                animate={{
-                  boxShadow: [
-                    '0 0 20px rgba(16, 185, 129, 0.3)',
-                    '0 0 60px rgba(16, 185, 129, 0.6)',
-                    '0 0 20px rgba(16, 185, 129, 0.3)',
-                  ],
-                }}
-                transition={{ duration: 2, repeat: Infinity }}
-                className="rounded-full"
-              >
-                <Avatar className="w-32 h-32 ring-4 ring-emerald-400">
-                  <AvatarImage src={roomInfo.hostAvatar} />
-                  <AvatarFallback className="text-4xl">{roomInfo.hostName[0]}</AvatarFallback>
-                </Avatar>
-              </motion.div>
-              <div className="absolute -bottom-4 left-1/2 -translate-x-1/2">
-                <AudioVisualizer 
-                  active={connectionStatus === 'connected' && !isMuted}
-                  barCount={5}
-                  color="bg-emerald-400"
-                />
+            {/* Top Section - Title & Live Badge */}
+            <div className="pt-20 pb-4 px-6 z-10">
+              <h2 className="text-xl font-bold text-white text-center">
+                {roomInfo.title}
+              </h2>
+              <div className="mt-2 flex items-center justify-center gap-2">
+                <div className="flex items-center gap-1.5 bg-emerald-500/20 px-3 py-1 rounded-full">
+                  <Radio className="w-3 h-3 text-emerald-400" />
+                  <span className="text-xs text-emerald-300 font-medium">Live Audio</span>
+                </div>
               </div>
             </div>
 
-            {/* Title */}
-            <h2 className="mt-8 text-2xl font-bold text-white text-center px-8 z-10">
-              {roomInfo.title}
-            </h2>
-
-            {/* Live Badge */}
-            <div className="mt-4 flex items-center gap-2 bg-emerald-500/20 px-4 py-2 rounded-full z-10">
-              <Radio className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm text-emerald-300 font-medium">Live Audio</span>
-            </div>
-
-            {/* Speaker Grid */}
-            {participants.filter(p => p.role !== 'listener').length > 0 && (
-              <div className="mt-8 flex flex-wrap justify-center gap-4 z-10 px-4">
-                {participants.filter(p => p.role !== 'listener').map(p => (
-                  <div key={p.id} className="flex flex-col items-center gap-1">
-                    <div className="relative">
-                      <Avatar className={cn(
-                        "w-14 h-14",
-                        p.is_speaking && "ring-2 ring-emerald-400"
-                      )}>
-                        <AvatarImage src={p.profile?.avatar_url} />
-                        <AvatarFallback>{p.profile?.display_name?.[0] || 'U'}</AvatarFallback>
-                      </Avatar>
-                      {p.is_muted && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-destructive rounded-full flex items-center justify-center">
-                          <span className="text-[8px] text-white">🔇</span>
-                        </div>
-                      )}
+            {/* Center Area - Empty for messages/gifts/emojis to display */}
+            <div className="flex-1 relative">
+              {/* Speaker Avatars - Small row at top of center area */}
+              {participants.filter(p => p.role !== 'listener').length > 0 && (
+                <div className="absolute top-4 left-0 right-0 flex justify-center gap-3 z-10 px-4">
+                  {participants.filter(p => p.role !== 'listener').slice(0, 6).map(p => (
+                    <motion.div 
+                      key={p.id} 
+                      className="flex flex-col items-center gap-0.5"
+                      animate={p.is_speaking ? { scale: [1, 1.05, 1] } : {}}
+                      transition={{ duration: 0.5, repeat: p.is_speaking ? Infinity : 0 }}
+                    >
+                      <div className="relative">
+                        <Avatar className={cn(
+                          "w-10 h-10 border-2",
+                          p.is_speaking ? "border-emerald-400" : "border-white/20"
+                        )}>
+                          <AvatarImage src={p.profile?.avatar_url} />
+                          <AvatarFallback className="text-xs">{p.profile?.display_name?.[0] || 'U'}</AvatarFallback>
+                        </Avatar>
+                        {p.is_muted && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-destructive rounded-full flex items-center justify-center">
+                            <MicOff className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )}
+                        {p.is_speaking && !p.is_muted && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center">
+                            <AudioVisualizer active={true} barCount={3} color="bg-white" className="scale-50" />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-white/60 max-w-[48px] truncate">
+                        {p.profile?.display_name?.split(' ')[0] || 'User'}
+                      </span>
+                    </motion.div>
+                  ))}
+                  {participants.filter(p => p.role !== 'listener').length > 6 && (
+                    <div className="flex flex-col items-center gap-0.5">
+                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                        <span className="text-xs text-white/70">+{participants.filter(p => p.role !== 'listener').length - 6}</span>
+                      </div>
                     </div>
-                    <span className="text-xs text-white/70">{p.profile?.display_name || 'User'}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
-          // Video Broadcast Mode
-          <div className="h-full relative">
+          // Video Broadcast Mode - Clean, no center avatar blocking view
+          <div className="h-full relative bg-black">
             {isScreenSharing ? (
               <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
                 <div className="text-center">
-                  <Monitor className="w-16 h-16 text-primary mx-auto mb-4" />
-                  <p className="text-white font-semibold">Screen Sharing Active</p>
+                  <Monitor className="w-12 h-12 text-primary mx-auto mb-2" />
+                  <p className="text-white/80 text-sm">Screen Sharing</p>
                 </div>
               </div>
             ) : (
@@ -863,17 +883,18 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                   muted
                   className="w-full h-full object-cover"
                 />
-                {/* Show avatar fallback when camera is off (host) or no remote video yet (viewer) */}
+                {/* Show subtle loading state when no video - no avatar blocking */}
                 {(isHost && !isCameraOn) || (!isHost && !remoteVideoTrack) ? (
                   <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
-                    <div className="flex flex-col items-center gap-4">
-                      <Avatar className="w-24 h-24">
-                        <AvatarImage src={roomInfo.hostAvatar} />
-                        <AvatarFallback className="text-3xl">{roomInfo.hostName[0]}</AvatarFallback>
-                      </Avatar>
-                      {!isHost && !remoteVideoTrack && connectionStatus === 'connected' && (
-                        <p className="text-white/60 text-sm">Waiting for host video...</p>
-                      )}
+                    <div className="flex flex-col items-center gap-2">
+                      {isHost && !isCameraOn ? (
+                        <>
+                          <VideoOff className="w-10 h-10 text-white/40" />
+                          <p className="text-white/50 text-sm">Camera off</p>
+                        </>
+                      ) : !isHost && connectionStatus === 'connected' ? (
+                        <p className="text-white/50 text-xs">Waiting for video...</p>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}

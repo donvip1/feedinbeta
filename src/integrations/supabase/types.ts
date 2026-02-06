@@ -3728,6 +3728,7 @@ export type Database = {
         Row: {
           allow_mic_for_all: boolean | null
           cloudflare_session_id: string | null
+          cover_image_url: string | null
           created_at: string | null
           description: string | null
           ended_at: string | null
@@ -3750,6 +3751,7 @@ export type Database = {
         Insert: {
           allow_mic_for_all?: boolean | null
           cloudflare_session_id?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
@@ -3772,6 +3774,7 @@ export type Database = {
         Update: {
           allow_mic_for_all?: boolean | null
           cloudflare_session_id?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
           description?: string | null
           ended_at?: string | null
@@ -4158,6 +4161,7 @@ export type Database = {
           cf_webrtc_url: string | null
           cloudflare_session_id: string | null
           connection_state: string | null
+          cover_image_url: string | null
           created_at: string | null
           description: string | null
           duration: number | null
@@ -4191,6 +4195,7 @@ export type Database = {
           cf_webrtc_url?: string | null
           cloudflare_session_id?: string | null
           connection_state?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
           description?: string | null
           duration?: number | null
@@ -4224,6 +4229,7 @@ export type Database = {
           cf_webrtc_url?: string | null
           cloudflare_session_id?: string | null
           connection_state?: string | null
+          cover_image_url?: string | null
           created_at?: string | null
           description?: string | null
           duration?: number | null
