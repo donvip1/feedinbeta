@@ -789,12 +789,12 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [state.role, state.isRecording]);
 
-  // ============= HAND RAISE (Listeners only in audio spaces) =============
+  // ============= HAND RAISE (Listeners in all room types) =============
 
   const toggleRaiseHand = useCallback(async () => {
     const currentUser = userRef.current;
     const roomInfo = roomInfoRef.current;
-    if (!currentUser || !roomInfo || roomInfo.type !== 'audio_space') return;
+    if (!currentUser || !roomInfo) return;
     if (state.role !== 'listener') {
       toast.info('Only listeners can raise their hand');
       return;
@@ -804,14 +804,26 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setState(prev => ({ ...prev, hasRaisedHand: newState }));
 
     try {
-      await supabase
-        .from('live_space_speakers')
-        .update({ 
-          has_raised_hand: newState,
-          hand_raised_at: newState ? new Date().toISOString() : null
-        })
-        .eq('space_id', roomInfo.id)
-        .eq('user_id', currentUser.id);
+      // Use appropriate table based on room type
+      if (roomInfo.type === 'audio_space') {
+        await supabase
+          .from('live_space_speakers')
+          .update({ 
+            has_raised_hand: newState,
+            hand_raised_at: newState ? new Date().toISOString() : null
+          })
+          .eq('space_id', roomInfo.id)
+          .eq('user_id', currentUser.id);
+      } else {
+        await supabase
+          .from('live_stream_viewers')
+          .update({ 
+            has_raised_hand: newState,
+            hand_raised_at: newState ? new Date().toISOString() : null
+          })
+          .eq('stream_id', roomInfo.id)
+          .eq('user_id', currentUser.id);
+      }
 
       toast.success(newState ? '✋ Hand raised!' : 'Hand lowered');
     } catch (error) {
@@ -856,12 +868,17 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
     toast.success('Participant can now speak');
   }, []);
 
-  const muteAll = useCallback(() => {
+  const muteAll = useCallback(async () => {
     if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
       toast.error('Only hosts can mute all participants');
       return;
     }
 
+    const roomInfo = roomInfoRef.current;
+    const currentUser = userRef.current;
+    if (!roomInfo || !currentUser) return;
+
+    // Update local state immediately for responsiveness
     setState(prev => ({
       ...prev,
       participants: prev.participants.map(p => 
@@ -871,15 +888,49 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ),
     }));
 
-    toast.success('All participants muted');
+    try {
+      // Persist to database - use appropriate table based on room type
+      if (roomInfo.type === 'audio_space') {
+        await supabase
+          .from('live_space_speakers')
+          .update({ is_muted: true, host_muted: true })
+          .eq('space_id', roomInfo.id)
+          .neq('user_id', currentUser.id);
+      } else {
+        await supabase
+          .from('live_stream_viewers')
+          .update({ is_muted: true, host_muted: true })
+          .eq('stream_id', roomInfo.id)
+          .neq('user_id', currentUser.id);
+      }
+
+      // Broadcast to all participants for immediate mute effect
+      const controlChannel = supabase.channel(`space-control-${roomInfo.id}`);
+      await controlChannel.send({
+        type: 'broadcast',
+        event: 'mute_all',
+        payload: { by: currentUser.id },
+      });
+      supabase.removeChannel(controlChannel);
+
+      toast.success('All participants muted');
+    } catch (error) {
+      console.error('[UnifiedLive] Failed to mute all:', error);
+      toast.error('Failed to mute all');
+    }
   }, []);
 
-  const unmuteAll = useCallback(() => {
+  const unmuteAll = useCallback(async () => {
     if (roleRef.current !== 'host' && roleRef.current !== 'co_host') {
       toast.error('Only hosts can unmute all participants');
       return;
     }
 
+    const roomInfo = roomInfoRef.current;
+    const currentUser = userRef.current;
+    if (!roomInfo || !currentUser) return;
+
+    // Update local state immediately
     setState(prev => ({
       ...prev,
       participants: prev.participants.map(p => 
@@ -889,7 +940,36 @@ export const UnifiedLiveProvider: React.FC<{ children: React.ReactNode }> = ({ c
       ),
     }));
 
-    toast.success('All participants can now speak');
+    try {
+      // Persist to database
+      if (roomInfo.type === 'audio_space') {
+        await supabase
+          .from('live_space_speakers')
+          .update({ is_muted: false, host_muted: false })
+          .eq('space_id', roomInfo.id)
+          .neq('user_id', currentUser.id);
+      } else {
+        await supabase
+          .from('live_stream_viewers')
+          .update({ is_muted: false, host_muted: false })
+          .eq('stream_id', roomInfo.id)
+          .neq('user_id', currentUser.id);
+      }
+
+      // Broadcast to all participants
+      const controlChannel = supabase.channel(`space-control-${roomInfo.id}`);
+      await controlChannel.send({
+        type: 'broadcast',
+        event: 'allow_unmute',
+        payload: { by: currentUser.id },
+      });
+      supabase.removeChannel(controlChannel);
+
+      toast.success('All participants can now speak');
+    } catch (error) {
+      console.error('[UnifiedLive] Failed to unmute all:', error);
+      toast.error('Failed to unmute all');
+    }
   }, []);
 
   const inviteToSpeak = useCallback(async (userId: string) => {
