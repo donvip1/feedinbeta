@@ -561,10 +561,6 @@ const Feed = () => {
     }
     await refetch();
     updateSyncTime();
-    toast({
-      title: 'Feed refreshed',
-      description: 'You\'re up to date!',
-    });
   }, [isOffline, refetch, updateSyncTime, toast]);
 
   const { 
