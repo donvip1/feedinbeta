@@ -4,7 +4,8 @@ import {
   X, Mic, MicOff, Hand, Users, MessageCircle, Gift, Share2, Crown, UserPlus, 
   Radio, Settings, PhoneOff, Volume2, VolumeX, Sparkles, Heart, Flame, 
   PartyPopper, ThumbsUp, Star, MoreVertical, Shield, ChevronDown, Wifi, WifiOff,
-  AudioLines, Home, Monitor, MonitorOff, Speaker, ArrowLeft
+  AudioLines, Home, Monitor, MonitorOff, Speaker, ArrowLeft, Maximize2, Copy,
+  Flag, Ban, Bell, BellOff, RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -28,6 +29,7 @@ import { useOptionalSpaceContext, ConnectionStatus } from '@/context/SpaceContex
 import { motion, AnimatePresence } from 'framer-motion';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
 import { AnimatedEmojiButton, REACTION_TYPES, LIVE_REACTIONS } from '@/components/shared/AnimatedEmojiButton';
+import { useIsMobile } from '@/hooks/use-mobile';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +100,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const { user } = useAuth();
   const { setHideBottomNav } = useNavigation();
   const spaceContext = useOptionalSpaceContext();
+  const isMobile = useIsMobile();
   const [space, setSpace] = useState<SpaceData | null>(null);
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [isMuted, setIsMuted] = useState(true);
@@ -123,6 +126,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
+  const [isNotificationsOn, setIsNotificationsOn] = useState(true);
+  const [isPiPActive, setIsPiPActive] = useState(false);
   
   // Listener audio output controls
   const [isOutputMuted, setIsOutputMuted] = useState(false);
@@ -1323,14 +1328,143 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="rounded-full" onClick={handleShare}>
-                <Share2 className="w-4 h-4" />
-              </Button>
+              
+              {/* Unified 3-dot Menu - All options in one place, especially on mobile */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <MoreVertical className="w-5 h-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur-md border-border">
+                  {/* Connection Status Actions */}
+                  {(connectionStatus === 'reconnecting' || connectionStatus === 'failed') && (
+                    <>
+                      <DropdownMenuItem onClick={forceResubscribe} className="cursor-pointer">
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                        {connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Retry Connection'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  
+                  {/* Common Actions */}
+                  <DropdownMenuItem onClick={handleShare} className="cursor-pointer">
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share Space
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      const shareUrl = `${window.location.origin}/live/space/${spaceId}`;
+                      await navigator.clipboard.writeText(shareUrl);
+                      toast.success("Link copied!");
+                    }} 
+                    className="cursor-pointer"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Link
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      try {
+                        const videoEl = document.querySelector('video');
+                        if (videoEl) {
+                          if (document.pictureInPictureElement) {
+                            await document.exitPictureInPicture();
+                            setIsPiPActive(false);
+                          } else {
+                            await videoEl.requestPictureInPicture();
+                            setIsPiPActive(true);
+                          }
+                        } else {
+                          toast.error("No video available for Picture-in-Picture");
+                        }
+                      } catch {
+                        toast.error("Picture-in-picture not supported");
+                      }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <Maximize2 className="w-4 h-4 mr-2" />
+                    {isPiPActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuSeparator />
+                  
+                  <DropdownMenuItem onClick={forceResubscribe} className="cursor-pointer">
+                    <AudioLines className="w-4 h-4 mr-2" />
+                    Refresh Audio
+                  </DropdownMenuItem>
+                  
+                  {!isHost && (
+                    <>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          setIsNotificationsOn(!isNotificationsOn);
+                          toast.success(isNotificationsOn ? "Notifications off" : "Notifications on");
+                        }} 
+                        className="cursor-pointer"
+                      >
+                        {isNotificationsOn ? (
+                          <>
+                            <BellOff className="w-4 h-4 mr-2" />
+                            Turn Off Notifications
+                          </>
+                        ) : (
+                          <>
+                            <Bell className="w-4 h-4 mr-2" />
+                            Turn On Notifications
+                          </>
+                        )}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={() => toast.success("Report submitted")} 
+                        className="cursor-pointer"
+                      >
+                        <Flag className="w-4 h-4 mr-2" />
+                        Report Space
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => toast.success("Host blocked")} 
+                        className="cursor-pointer text-destructive focus:text-destructive"
+                      >
+                        <Ban className="w-4 h-4 mr-2" />
+                        Block Host
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  
+                  {isHost && (
+                    <>
+                      <DropdownMenuItem onClick={() => setShowListenersModal(true)} className="cursor-pointer">
+                        <Users className="w-4 h-4 mr-2" />
+                        View All Listeners
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowSpeakerQueue(true)} className="cursor-pointer">
+                        <Hand className="w-4 h-4 mr-2" />
+                        Speaker Queue
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  
+                  <DropdownMenuSeparator />
+                  
+                  {/* End/Leave Action */}
+                  <DropdownMenuItem 
+                    onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
+                    className="cursor-pointer text-destructive focus:text-destructive"
+                  >
+                    <PhoneOff className="w-4 h-4 mr-2" />
+                    {isHost ? 'End Space' : 'Leave Space'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
-          {/* Host Controls Bar */}
-          {isHost && (
+          {/* Host Controls Bar - compact on mobile */}
+          {isHost && !isMobile && (
             <div className="flex items-center gap-3 mt-3 p-3 rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20">
               <div className="flex items-center gap-2 shrink-0">
                 <Switch 
@@ -1589,23 +1723,34 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           ))}
         </div>
 
-        <div className="flex items-center gap-3 p-4">
+        <div className={cn(
+          "flex items-center gap-2 p-3",
+          isMobile ? "flex-wrap justify-center" : "gap-3 p-4"
+        )}>
           {/* Leave/End button */}
           <Button 
             variant={isHost ? "destructive" : "outline"} 
             onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
             className={cn(
-              "flex-shrink-0 h-12 px-4 rounded-xl font-semibold",
+              "flex-shrink-0 rounded-xl font-semibold",
+              isMobile ? "h-10 px-3 text-sm" : "h-12 px-4",
               isHost && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
             )}
           >
-            <PhoneOff className="w-4 h-4 mr-2" />
+            <PhoneOff className={cn(isMobile ? "w-4 h-4 mr-1" : "w-4 h-4 mr-2")} />
             {isHost ? 'End' : 'Leave'}
           </Button>
 
-          {/* Horizontally scrollable action buttons */}
-          <div className="flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide">
-            <div className="flex gap-2 items-center min-w-max pb-1">
+          {/* Action buttons - responsive grid on mobile, scroll on desktop */}
+          <div className={cn(
+            isMobile 
+              ? "flex flex-wrap gap-2 justify-center flex-1" 
+              : "flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide"
+          )}>
+            <div className={cn(
+              "flex items-center",
+              isMobile ? "flex-wrap gap-2 justify-center" : "gap-2 min-w-max pb-1"
+            )}>
               {/* Mic button - for everyone with mic permission */}
               {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted)) && (
                 <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
@@ -1613,7 +1758,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     variant={isMuted ? "outline" : "default"}
                     size="icon"
                     className={cn(
-                      "h-12 w-12 rounded-xl transition-all relative",
+                      "rounded-xl transition-all relative",
+                      isMobile ? "h-10 w-10" : "h-12 w-12",
                       !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0",
                       myHostMuted && "opacity-50"
                     )}
@@ -1621,9 +1767,9 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     disabled={myHostMuted && isMuted}
                     title={isMuted ? "Unmute" : "Mute"}
                   >
-                    {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    {isMuted ? <MicOff className={isMobile ? "w-4 h-4" : "w-5 h-5"} /> : <Mic className={isMobile ? "w-4 h-4" : "w-5 h-5"} />}
                     {myHostMuted && (
-                      <Shield className="absolute -top-1 -right-1 w-4 h-4 text-red-500" />
+                      <Shield className="absolute -top-1 -right-1 w-4 h-4 text-destructive" />
                     )}
                   </Button>
                 </motion.div>
@@ -1636,19 +1782,20 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     variant={hasRaisedHand ? "default" : "outline"}
                     size="icon"
                     className={cn(
-                      "h-12 w-12 rounded-xl",
+                      "rounded-xl",
+                      isMobile ? "h-10 w-10" : "h-12 w-12",
                       hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
                     )}
                     onClick={toggleRaiseHand}
                     title={hasRaisedHand ? "Lower hand" : "Raise hand"}
                   >
-                    <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
+                    <Hand className={cn(isMobile ? "w-4 h-4" : "w-5 h-5", hasRaisedHand && "animate-pulse")} />
                   </Button>
                 </motion.div>
               )}
 
-              {/* Test Audio */}
-              {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed))) && (
+              {/* Test Audio - hide on mobile to save space */}
+              {!isMobile && (canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed))) && (
                 <Button 
                   variant="outline" 
                   size="icon" 
@@ -1664,22 +1811,28 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-12 w-12 rounded-xl flex-shrink-0"
+                className={cn(
+                  "rounded-xl flex-shrink-0",
+                  isMobile ? "h-10 w-10" : "h-12 w-12"
+                )}
                 onClick={() => setShowChat(!showChat)}
                 title="Chat"
               >
-                <MessageCircle className="w-5 h-5" />
+                <MessageCircle className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
               </Button>
 
               {/* Gift */}
               <Button 
                 variant="outline" 
                 size="icon" 
-                className="h-12 w-12 rounded-xl relative flex-shrink-0"
+                className={cn(
+                  "rounded-xl relative flex-shrink-0",
+                  isMobile ? "h-10 w-10" : "h-12 w-12"
+                )}
                 onClick={() => setShowGiftModal(true)}
                 title="Gifts"
               >
-                <Gift className="w-5 h-5" />
+                <Gift className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
                 {totalGifts > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full text-[10px] text-white flex items-center justify-center">
                     {totalGifts > 99 ? '99+' : totalGifts}
@@ -1693,8 +1846,9 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   variant={isOutputMuted ? "default" : "outline"}
                   size="icon"
                   className={cn(
-                    "h-12 w-12 rounded-xl transition-all",
-                    isOutputMuted && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 border-0"
+                    "rounded-xl transition-all",
+                    isMobile ? "h-10 w-10" : "h-12 w-12",
+                    isOutputMuted && "bg-gradient-to-r from-destructive to-destructive/80 border-0"
                   )}
                   onClick={() => {
                     setIsOutputMuted(!isOutputMuted);
@@ -1705,165 +1859,150 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   }}
                   title={isOutputMuted ? "Unmute speaker" : "Mute speaker"}
                 >
-                  {isOutputMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                  {isOutputMuted ? <VolumeX className={isMobile ? "w-4 h-4" : "w-5 h-5"} /> : <Volume2 className={isMobile ? "w-4 h-4" : "w-5 h-5"} />}
                 </Button>
               </motion.div>
 
-              {/* Loudspeaker Toggle */}
-              <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                <Button
-                  variant={useLoudspeaker ? "default" : "outline"}
-                  size="icon"
-                  className={cn(
-                    "h-12 w-12 rounded-xl transition-all",
-                    useLoudspeaker && "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 border-0"
-                  )}
-                  onClick={async () => {
-                    const newValue = !useLoudspeaker;
-                    setUseLoudspeaker(newValue);
-                    
-                    const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]');
-                    
-                    if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
-                      try {
-                        const devices = await navigator.mediaDevices.enumerateDevices();
-                        const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-                        
-                        const targetDevice = audioOutputs.find(d => 
-                          newValue 
-                            ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
-                            : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
-                        );
-                        
-                        if (targetDevice) {
-                          for (const audio of audioElements) {
-                            await (audio as any).setSinkId(targetDevice.deviceId);
-                          }
-                          toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                        } else {
-                          toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                        }
-                      } catch (error) {
-                        console.log('[LiveSpace] setSinkId not supported:', error);
-                        toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                      }
-                    } else {
-                      toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                    }
-                  }}
-                  title={useLoudspeaker ? "Earpiece" : "Loudspeaker"}
-                >
-                  <Speaker className="w-5 h-5" />
-                </Button>
-              </motion.div>
-
-              {/* Refresh Audio - for troubleshooting */}
-              <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-12 w-12 rounded-xl transition-all"
-                  onClick={forceResubscribe}
-                  title="Refresh audio connections"
-                >
-                  <AudioLines className="w-5 h-5" />
-                </Button>
-              </motion.div>
-
-              {/* Host-only controls */}
-              {isHost && (
-                <>
-                  {/* Screen Share */}
-                  <Button 
-                    variant={isScreenSharing ? "default" : "outline"}
-                    size="icon" 
-                    className={cn(
-                      "h-12 w-12 rounded-xl flex-shrink-0",
-                      isScreenSharing && "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-0"
-                    )}
-                    onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                    title={isScreenSharing ? "Stop share" : "Share screen"}
-                  >
-                    {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
-                  </Button>
-
-                  {/* Invite */}
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    className="h-12 w-12 rounded-xl flex-shrink-0"
-                    onClick={() => setShowInviteModal(true)}
-                    title="Invite"
-                  >
-                    <UserPlus className="w-5 h-5" />
-                  </Button>
-
-                  {/* Settings/More for hosts */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        className="h-12 w-12 rounded-xl flex-shrink-0"
-                      >
-                        <Settings className="w-5 h-5" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={forceResubscribe}>
-                        <AudioLines className="w-4 h-4 mr-2" />
-                        Refresh Audio Connections
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={toggleMuteAllParticipants}>
-                        {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
-                        {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => toggleMicForAll(!space?.allow_mic_for_all)}>
-                        <Mic className="w-4 h-4 mr-2" />
-                        {space?.allow_mic_for_all ? 'Disable Open Mic' : 'Enable Open Mic'}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setShowListenersModal(true)}>
-                        <Users className="w-4 h-4 mr-2" />
-                        View All Listeners
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              )}
-
-              {/* Leave/End Space Button - CRITICAL for all users */}
-              {isHost ? (
+              {/* Loudspeaker Toggle - hide on mobile to save space, available in menu */}
+              {!isMobile && (
                 <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
                   <Button
-                    variant="destructive"
+                    variant={useLoudspeaker ? "default" : "outline"}
                     size="icon"
-                    className="h-12 w-12 rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 border-0"
-                    onClick={() => setShowEndConfirm(true)}
-                    title="End Space"
+                    className={cn(
+                      "h-12 w-12 rounded-xl transition-all",
+                      useLoudspeaker && "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 border-0"
+                    )}
+                    onClick={async () => {
+                      const newValue = !useLoudspeaker;
+                      setUseLoudspeaker(newValue);
+                      
+                      const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]');
+                      
+                      if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
+                        try {
+                          const devices = await navigator.mediaDevices.enumerateDevices();
+                          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+                          
+                          const targetDevice = audioOutputs.find(d => 
+                            newValue 
+                              ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
+                              : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
+                          );
+                          
+                          if (targetDevice) {
+                            for (const audio of audioElements) {
+                              await (audio as any).setSinkId(targetDevice.deviceId);
+                            }
+                            toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                          } else {
+                            toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                          }
+                        } catch (error) {
+                          console.log('[LiveSpace] setSinkId not supported:', error);
+                          toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                        }
+                      } else {
+                        toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                      }
+                    }}
+                    title={useLoudspeaker ? "Earpiece" : "Loudspeaker"}
                   >
-                    <PhoneOff className="w-5 h-5" />
+                    <Speaker className="w-5 h-5" />
                   </Button>
                 </motion.div>
-              ) : (
+              )}
+
+              {/* Refresh Audio - hide on mobile, available in menu */}
+              {!isMobile && (
                 <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-12 w-12 rounded-xl border-red-500/50 text-red-500 hover:bg-red-500/10 hover:text-red-400"
-                    onClick={handleLeaveSpace}
-                    title="Leave Space"
+                    className="h-12 w-12 rounded-xl transition-all"
+                    onClick={forceResubscribe}
+                    title="Refresh audio connections"
                   >
-                    <PhoneOff className="w-5 h-5" />
+                    <AudioLines className="w-5 h-5" />
                   </Button>
                 </motion.div>
               )}
 
-              {/* Swipe hint indicator */}
-              <div className="flex-shrink-0 pl-2 pr-1 opacity-40">
-                <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
-              </div>
+              {/* Host-only controls - show only on desktop or essential ones */}
+              {isHost && (
+                <>
+                  {/* Screen Share - hide on mobile */}
+                  {!isMobile && (
+                    <Button 
+                      variant={isScreenSharing ? "default" : "outline"}
+                      size="icon" 
+                      className={cn(
+                        "h-12 w-12 rounded-xl flex-shrink-0",
+                        isScreenSharing && "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-0"
+                      )}
+                      onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                      title={isScreenSharing ? "Stop share" : "Share screen"}
+                    >
+                      {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+                    </Button>
+                  )}
+
+                  {/* Invite - hide on mobile */}
+                  {!isMobile && (
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-12 w-12 rounded-xl flex-shrink-0"
+                      onClick={() => setShowInviteModal(true)}
+                      title="Invite"
+                    >
+                      <UserPlus className="w-5 h-5" />
+                    </Button>
+                  )}
+
+                  {/* Settings/More for hosts - hide on mobile, using 3-dot menu instead */}
+                  {!isMobile && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button 
+                          variant="outline" 
+                          size="icon" 
+                          className="h-12 w-12 rounded-xl flex-shrink-0"
+                        >
+                          <Settings className="w-5 h-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={forceResubscribe}>
+                          <AudioLines className="w-4 h-4 mr-2" />
+                          Refresh Audio Connections
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={toggleMuteAllParticipants}>
+                          {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
+                          {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => toggleMicForAll(!space?.allow_mic_for_all)}>
+                          <Mic className="w-4 h-4 mr-2" />
+                          {space?.allow_mic_for_all ? 'Disable Open Mic' : 'Enable Open Mic'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => setShowListenersModal(true)}>
+                          <Users className="w-4 h-4 mr-2" />
+                          View All Listeners
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </>
+              )}
+
+              {/* Swipe hint indicator - hide on mobile */}
+              {!isMobile && (
+                <div className="flex-shrink-0 pl-2 pr-1 opacity-40">
+                  <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
+                </div>
+              )}
             </div>
           </div>
         </div>
