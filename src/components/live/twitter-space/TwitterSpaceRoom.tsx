@@ -32,7 +32,9 @@ import {
   Volume2,
   VolumeX,
   Hand,
+  Circle,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 import { LiveGiftModal } from '../LiveGiftModal';
 import { SpeakerQueuePanel } from '../SpeakerQueuePanel';
@@ -160,6 +162,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [myRole, setMyRole] = useState<string>('listener');
   const [myHostMuted, setMyHostMuted] = useState(false);
   const [allMuted, setAllMuted] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingLoading, setRecordingLoading] = useState(false);
 
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
@@ -459,6 +463,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
     
     setSpace(data);
+    // Initialize recording state from database
+    if (data.is_recording_enabled) {
+      setIsRecording(true);
+    }
     await fetchSpeakers();
   };
 
@@ -662,6 +670,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   };
 
   const handleLeave = async () => {
+    // Stop recording if active before ending
+    if (isRecording && isHost) {
+      await handleRecordingToggle();
+    }
+    
     if (isHost) {
       // End the space if host leaves
       await supabase
@@ -674,6 +687,50 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       await spaceContext.leaveSpace();
     }
     onClose();
+  };
+
+  const handleRecordingToggle = async () => {
+    if (!isHost || recordingLoading) return;
+    
+    setRecordingLoading(true);
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        toast.error('Please sign in to record');
+        return;
+      }
+
+      const action = isRecording ? 'stop' : 'start';
+      
+      const response = await supabase.functions.invoke('livekit-recording', {
+        body: {
+          action,
+          roomId: spaceId,
+          roomType: 'live_spaces',
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Recording failed');
+      }
+
+      const newRecordingState = action === 'start';
+      setIsRecording(newRecordingState);
+      
+      // Update database
+      await supabase
+        .from('live_spaces')
+        .update({ is_recording_enabled: newRecordingState })
+        .eq('id', spaceId);
+
+      toast.success(action === 'start' ? '🔴 Recording started' : '⏹️ Recording stopped');
+    } catch (error: any) {
+      console.error('[Recording] Error:', error);
+      toast.error(error.message || 'Failed to toggle recording');
+    } finally {
+      setRecordingLoading(false);
+    }
   };
 
   const handleReplySubmit = async () => {
@@ -891,6 +948,29 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
                 {raisedHandsCount}
               </span>
+            </button>
+          )}
+          {/* Recording button - Host only */}
+          {isHost && (
+            <button
+              onClick={handleRecordingToggle}
+              disabled={recordingLoading}
+              className={cn(
+                "p-2 rounded-full transition-all",
+                isRecording 
+                  ? "bg-red-500/20 border border-red-500" 
+                  : "hover:bg-zinc-800"
+              )}
+              title={isRecording ? "Stop Recording" : "Start Recording"}
+            >
+              <Circle 
+                className={cn(
+                  "w-5 h-5 transition-colors",
+                  isRecording 
+                    ? "text-red-500 fill-red-500 animate-pulse" 
+                    : "text-zinc-400"
+                )} 
+              />
             </button>
           )}
           {/* End/Leave button */}
