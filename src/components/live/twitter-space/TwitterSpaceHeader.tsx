@@ -41,18 +41,20 @@ export const TwitterSpaceHeader = ({
           </button>
         )}
         
-        <button 
-          onClick={onSettings} 
-          className="p-2 text-white hover:bg-zinc-800 rounded-full transition-colors"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
-        
+        {/* End/Leave button - before settings */}
         <button
           onClick={onLeave}
           className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-full transition-colors"
         >
           {isHost ? 'End' : 'Leave'}
+        </button>
+        
+        {/* Settings button */}
+        <button 
+          onClick={onSettings} 
+          className="p-2 text-white hover:bg-zinc-800 rounded-full transition-colors"
+        >
+          <Settings className="w-5 h-5" />
         </button>
       </div>
     </div>
