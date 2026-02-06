@@ -37,14 +37,24 @@ const config: CapacitorConfig = {
     allowMixedContent: true,
     captureInput: true,
     webContentsDebuggingEnabled: true,
-    // Background audio configuration
     backgroundColor: '#000000',
+    // Note: For true background audio, add these to android/app/src/main/AndroidManifest.xml:
+    // <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    // <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    // <uses-permission android:name="android.permission.WAKE_LOCK" />
+    // And add to the <activity> tag: android:launchMode="singleTask"
   },
   ios: {
     contentInset: 'automatic',
     scrollEnabled: true,
-    // Background audio configuration
     backgroundColor: '#000000',
+    // Note: For true background audio, add to ios/App/App/Info.plist:
+    // <key>UIBackgroundModes</key>
+    // <array>
+    //   <string>audio</string>
+    //   <string>voip</string>
+    //   <string>fetch</string>
+    // </array>
   },
 };
 

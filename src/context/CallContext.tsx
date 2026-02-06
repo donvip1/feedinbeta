@@ -3,6 +3,7 @@ import { LiveKitCallManager, CallConnectionStatus } from '@/lib/livekit-call-man
 import { supabase } from '@/integrations/supabase/client';
 import { callSounds } from '@/utils/callSounds';
 import { useToast } from '@/hooks/use-toast';
+import { backgroundServiceManager } from '@/lib/background-service-manager';
 
 interface CallState {
   callId: string | null;
@@ -198,6 +199,15 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     const displayName = profile?.display_name || 'User';
 
+    // Start background service for this call
+    const serviceType = callType === 'video' ? 'video_call' : 'voice_call';
+    await backgroundServiceManager.startService(
+      callId,
+      serviceType,
+      `${callType === 'video' ? 'Video' : 'Voice'} Call`,
+      []
+    );
+
     setCallState(prev => ({
       ...prev,
       callId,
@@ -332,6 +342,11 @@ export const CallProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         console.error('[CallContext] Error updating call log:', error);
       }
+    }
+    
+    // Stop background service for this call
+    if (callState.callId) {
+      await backgroundServiceManager.stopService(callState.callId);
     }
     
     await callManagerRef.current?.disconnect();
