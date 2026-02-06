@@ -1149,31 +1149,18 @@ const FooterControlBar = ({
           </motion.button>
         )}
 
-        {/* Input Container - Takes remaining space */}
+        {/* Input Container - Takes remaining space, mic button inside */}
         <div className="flex-1 min-w-0">
           <BroadcastInput
             onSendMessage={onSendMessage}
             placeholder="Say something..."
             isBroadcastMode={isBroadcastMode}
+            showMicButton={(roomType === 'audio_space') || canSpeak}
+            isMuted={isMuted}
+            onMicToggle={onMicToggle}
+            isHardMuted={isHardMuted}
           />
         </div>
-
-        {/* Mic Button - Show for all in audio spaces, or speakers/hosts in video */}
-        {/* In audio spaces everyone can speak; in video only hosts/speakers */}
-        {((roomType === 'audio_space') || canSpeak) && !isHardMuted && (
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={onMicToggle}
-            className={cn(
-              "p-2.5 rounded-full transition-all shrink-0",
-              !isMuted 
-                ? "bg-white text-black" 
-                : "bg-white/10 text-white/60"
-            )}
-          >
-            {isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </motion.button>
-        )}
 
         {/* Raise Hand Button - For listeners only in audio spaces (to request co-host/speaker promotion) */}
         {role === 'listener' && roomType === 'audio_space' && (

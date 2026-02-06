@@ -1,6 +1,6 @@
 import { useState, useRef, KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Smile } from 'lucide-react';
+import { Send, Smile, Mic, MicOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DEFAULT_EMOJIS } from '@/components/shared/EmojiReactions';
 
@@ -9,6 +9,11 @@ interface BroadcastInputProps {
   placeholder?: string;
   className?: string;
   isBroadcastMode?: boolean;
+  // Mic control props
+  showMicButton?: boolean;
+  isMuted?: boolean;
+  onMicToggle?: () => void;
+  isHardMuted?: boolean;
 }
 
 export const BroadcastInput = ({
@@ -16,6 +21,10 @@ export const BroadcastInput = ({
   placeholder = "Say something...",
   className,
   isBroadcastMode = false,
+  showMicButton = false,
+  isMuted = true,
+  onMicToggle,
+  isHardMuted = false,
 }: BroadcastInputProps) => {
   const [message, setMessage] = useState('');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -42,7 +51,7 @@ export const BroadcastInput = ({
 
   return (
     <div className={cn(
-      "relative flex items-center gap-3 bg-black/40 backdrop-blur-md rounded-full px-4 py-2",
+      "relative flex items-center gap-2 bg-black/40 backdrop-blur-md rounded-full px-3 py-2",
       className
     )}>
       {/* Emoji Picker Popup */}
@@ -78,13 +87,32 @@ export const BroadcastInput = ({
         )}
       </AnimatePresence>
 
-      {/* Emoji Button */}
+      {/* Emoji Button - Inside left */}
       <button 
-        className="p-1.5 text-white/60 hover:text-white transition-colors"
+        className="p-1.5 text-white/60 hover:text-white transition-colors shrink-0"
         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
       >
         <Smile className="w-5 h-5" />
       </button>
+
+      {/* Mic Button - Inside left, next to emoji */}
+      {showMicButton && (
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={onMicToggle}
+          disabled={isHardMuted}
+          className={cn(
+            "p-1.5 rounded-full transition-all shrink-0",
+            isHardMuted && "opacity-50 cursor-not-allowed",
+            !isMuted 
+              ? "text-emerald-400" 
+              : "text-white/60 hover:text-white"
+          )}
+          title={isHardMuted ? "Muted by host" : isMuted ? "Unmute" : "Mute"}
+        >
+          {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+        </motion.button>
+      )}
 
       {/* Input */}
       <input
@@ -95,20 +123,20 @@ export const BroadcastInput = ({
         onKeyDown={handleKeyDown}
         placeholder={isBroadcastMode ? "Type broadcast message..." : placeholder}
         className={cn(
-          "flex-1 bg-transparent outline-none text-white text-sm",
+          "flex-1 min-w-0 bg-transparent outline-none text-white text-sm",
           "placeholder:text-white/40"
         )}
       />
 
-      {/* Send Button */}
+      {/* Send Button - Inside right */}
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={handleSend}
         disabled={!message.trim()}
         className={cn(
-          "p-2 rounded-full transition-all ml-1",
+          "p-2 rounded-full transition-all shrink-0",
           message.trim() 
-            ? "bg-gradient-to-r from-pink-500 to-rose-500 text-white" 
+            ? "bg-gradient-to-r from-primary to-primary/80 text-primary-foreground" 
             : "bg-white/10 text-white/40"
         )}
       >
