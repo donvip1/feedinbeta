@@ -1319,6 +1319,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Back Button - keeps connection alive, navigates away */}
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -1329,198 +1330,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               
-              {/* Consolidated 3-dot Menu - All options in one place */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <MoreVertical className="w-5 h-5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 bg-background/95 backdrop-blur-md border-border">
-                  {/* Connection Status Actions */}
-                  {(connectionStatus === 'reconnecting' || connectionStatus === 'failed') && (
-                    <>
-                      <DropdownMenuItem onClick={forceResubscribe} className="cursor-pointer">
-                        <RefreshCw className="w-4 h-4 mr-2" />
-                        {connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Retry Connection'}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  
-                  {/* Common Actions */}
-                  <DropdownMenuItem onClick={handleShare} className="cursor-pointer">
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share Space
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={async () => {
-                      const shareUrl = `${window.location.origin}/live/space/${spaceId}`;
-                      await navigator.clipboard.writeText(shareUrl);
-                      toast.success("Link copied!");
-                    }} 
-                    className="cursor-pointer"
-                  >
-                    <Copy className="w-4 h-4 mr-2" />
-                    Copy Link
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    onClick={async () => {
-                      try {
-                        const videoEl = document.querySelector('video');
-                        if (videoEl) {
-                          if (document.pictureInPictureElement) {
-                            await document.exitPictureInPicture();
-                            setIsPiPActive(false);
-                          } else {
-                            await videoEl.requestPictureInPicture();
-                            setIsPiPActive(true);
-                          }
-                        } else {
-                          toast.error("No video available for Picture-in-Picture");
-                        }
-                      } catch {
-                        toast.error("Picture-in-picture not supported");
-                      }
-                    }}
-                    className="cursor-pointer"
-                  >
-                    <Maximize2 className="w-4 h-4 mr-2" />
-                    {isPiPActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
-                  </DropdownMenuItem>
-                  
-                  <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem onClick={forceResubscribe} className="cursor-pointer">
-                    <AudioLines className="w-4 h-4 mr-2" />
-                    Refresh Audio
-                  </DropdownMenuItem>
-                  
-                  {/* Loudspeaker toggle - consolidated from footer */}
-                  <DropdownMenuItem 
-                    onClick={async () => {
-                      const newValue = !useLoudspeaker;
-                      setUseLoudspeaker(newValue);
-                      const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]');
-                      if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
-                        try {
-                          const devices = await navigator.mediaDevices.enumerateDevices();
-                          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-                          const targetDevice = audioOutputs.find(d => 
-                            newValue 
-                              ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
-                              : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
-                          );
-                          if (targetDevice) {
-                            for (const audio of audioElements) {
-                              await (audio as any).setSinkId(targetDevice.deviceId);
-                            }
-                          }
-                        } catch (error) {
-                          console.log('[LiveSpace] setSinkId not supported:', error);
-                        }
-                      }
-                      toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                    }} 
-                    className="cursor-pointer"
-                  >
-                    <Speaker className="w-4 h-4 mr-2" />
-                    {useLoudspeaker ? 'Switch to Earpiece' : 'Switch to Loudspeaker'}
-                  </DropdownMenuItem>
-                  
-                  {/* Host-only controls - consolidated from footer */}
-                  {isHost && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                        className="cursor-pointer"
-                      >
-                        {isScreenSharing ? <MonitorOff className="w-4 h-4 mr-2" /> : <Monitor className="w-4 h-4 mr-2" />}
-                        {isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowInviteModal(true)} className="cursor-pointer">
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Invite Users
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={toggleMuteAllParticipants} className="cursor-pointer">
-                        {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
-                        {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => toggleMicForAll(!space?.allow_mic_for_all)} className="cursor-pointer">
-                        <Mic className="w-4 h-4 mr-2" />
-                        {space?.allow_mic_for_all ? 'Disable Open Mic' : 'Enable Open Mic'}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setShowListenersModal(true)} className="cursor-pointer">
-                        <Users className="w-4 h-4 mr-2" />
-                        View All Listeners
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowSpeakerQueue(true)} className="cursor-pointer">
-                        <Hand className="w-4 h-4 mr-2" />
-                        Speaker Queue
-                        {raisedHands.length > 0 && (
-                          <Badge className="ml-auto h-5 w-5 p-0 justify-center bg-amber-500 text-white">
-                            {raisedHands.length}
-                          </Badge>
-                        )}
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  
-                  {!isHost && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => {
-                          setIsNotificationsOn(!isNotificationsOn);
-                          toast.success(isNotificationsOn ? "Notifications off" : "Notifications on");
-                        }} 
-                        className="cursor-pointer"
-                      >
-                        {isNotificationsOn ? (
-                          <>
-                            <BellOff className="w-4 h-4 mr-2" />
-                            Turn Off Notifications
-                          </>
-                        ) : (
-                          <>
-                            <Bell className="w-4 h-4 mr-2" />
-                            Turn On Notifications
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => toast.success("Report submitted")} 
-                        className="cursor-pointer"
-                      >
-                        <Flag className="w-4 h-4 mr-2" />
-                        Report Space
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => toast.success("Host blocked")} 
-                        className="cursor-pointer text-destructive focus:text-destructive"
-                      >
-                        <Ban className="w-4 h-4 mr-2" />
-                        Block Host
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  
-                  <DropdownMenuSeparator />
-                  
-                  {/* End/Leave Action */}
-                  <DropdownMenuItem 
-                    onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
-                    className="cursor-pointer text-destructive focus:text-destructive"
-                  >
-                    <PhoneOff className="w-4 h-4 mr-2" />
-                    {isHost ? 'End Space' : 'Leave Space'}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* End/Leave Button - Right in header for quick access */}
+              <Button
+                variant="destructive"
+                size="sm"
+                className="rounded-full px-4"
+                onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
+              >
+                {isHost ? 'End' : 'Leave'}
+              </Button>
             </div>
           </div>
 
@@ -1929,7 +1747,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         </div>
       </div>
 
-      {/* Right-side action stack - Share and Speaker Queue (host) */}
+      {/* Right-side action stack - Share, Speaker Queue (host), and Options Menu */}
       <div className="absolute right-4 top-40 z-40 flex flex-col gap-3">
         {/* Share button - solid background, no shadow */}
         <motion.button
@@ -1957,6 +1775,191 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             )}
           </motion.button>
         )}
+
+        {/* 3-Dot Options Menu - Consolidated from header */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              className="w-11 h-11 rounded-full bg-background border border-border flex items-center justify-center hover:bg-muted transition-colors"
+            >
+              <MoreVertical className="w-5 h-5 text-foreground" />
+            </motion.button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 bg-background border-border z-50">
+            {/* Connection Status Actions */}
+            {(connectionStatus === 'reconnecting' || connectionStatus === 'failed') && (
+              <>
+                <DropdownMenuItem onClick={forceResubscribe} className="cursor-pointer">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {connectionStatus === 'reconnecting' ? 'Reconnecting...' : 'Retry Connection'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+              </>
+            )}
+            
+            {/* Common Actions */}
+            <DropdownMenuItem onClick={handleShare} className="cursor-pointer">
+              <Share2 className="w-4 h-4 mr-2" />
+              Share Space
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={async () => {
+                const shareUrl = `${window.location.origin}/live/space/${spaceId}`;
+                await navigator.clipboard.writeText(shareUrl);
+                toast.success("Link copied!");
+              }} 
+              className="cursor-pointer"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copy Link
+            </DropdownMenuItem>
+            <DropdownMenuItem 
+              onClick={async () => {
+                try {
+                  const videoEl = document.querySelector('video');
+                  if (videoEl) {
+                    if (document.pictureInPictureElement) {
+                      await document.exitPictureInPicture();
+                      setIsPiPActive(false);
+                    } else {
+                      await videoEl.requestPictureInPicture();
+                      setIsPiPActive(true);
+                    }
+                  } else {
+                    toast.error("No video available for Picture-in-Picture");
+                  }
+                } catch {
+                  toast.error("Picture-in-picture not supported");
+                }
+              }}
+              className="cursor-pointer"
+            >
+              <Maximize2 className="w-4 h-4 mr-2" />
+              {isPiPActive ? 'Exit Picture-in-Picture' : 'Picture-in-Picture'}
+            </DropdownMenuItem>
+            
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuItem onClick={forceResubscribe} className="cursor-pointer">
+              <AudioLines className="w-4 h-4 mr-2" />
+              Refresh Audio
+            </DropdownMenuItem>
+            
+            {/* Loudspeaker toggle */}
+            <DropdownMenuItem 
+              onClick={async () => {
+                const newValue = !useLoudspeaker;
+                setUseLoudspeaker(newValue);
+                const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]');
+                if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
+                  try {
+                    const devices = await navigator.mediaDevices.enumerateDevices();
+                    const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+                    const targetDevice = audioOutputs.find(d => 
+                      newValue 
+                        ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
+                        : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
+                    );
+                    if (targetDevice) {
+                      for (const audio of audioElements) {
+                        await (audio as any).setSinkId(targetDevice.deviceId);
+                      }
+                    }
+                  } catch (error) {
+                    console.log('[LiveSpace] setSinkId not supported:', error);
+                  }
+                }
+                toast(newValue ? 'Loudspeaker' : 'Earpiece');
+              }} 
+              className="cursor-pointer"
+            >
+              <Speaker className="w-4 h-4 mr-2" />
+              {useLoudspeaker ? 'Switch to Earpiece' : 'Switch to Loudspeaker'}
+            </DropdownMenuItem>
+            
+            {/* Host-only controls */}
+            {isHost && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                  className="cursor-pointer"
+                >
+                  {isScreenSharing ? <MonitorOff className="w-4 h-4 mr-2" /> : <Monitor className="w-4 h-4 mr-2" />}
+                  {isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowInviteModal(true)} className="cursor-pointer">
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Invite Users
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={toggleMuteAllParticipants} className="cursor-pointer">
+                  {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
+                  {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => toggleMicForAll(!space?.allow_mic_for_all)} className="cursor-pointer">
+                  <Mic className="w-4 h-4 mr-2" />
+                  {space?.allow_mic_for_all ? 'Disable Open Mic' : 'Enable Open Mic'}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowListenersModal(true)} className="cursor-pointer">
+                  <Users className="w-4 h-4 mr-2" />
+                  View All Listeners
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setShowSpeakerQueue(true)} className="cursor-pointer">
+                  <Hand className="w-4 h-4 mr-2" />
+                  Speaker Queue
+                  {raisedHands.length > 0 && (
+                    <Badge className="ml-auto h-5 w-5 p-0 justify-center bg-amber-500 text-white">
+                      {raisedHands.length}
+                    </Badge>
+                  )}
+                </DropdownMenuItem>
+              </>
+            )}
+            
+            {!isHost && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => {
+                    setIsNotificationsOn(!isNotificationsOn);
+                    toast.success(isNotificationsOn ? "Notifications off" : "Notifications on");
+                  }} 
+                  className="cursor-pointer"
+                >
+                  {isNotificationsOn ? (
+                    <>
+                      <BellOff className="w-4 h-4 mr-2" />
+                      Turn Off Notifications
+                    </>
+                  ) : (
+                    <>
+                      <Bell className="w-4 h-4 mr-2" />
+                      Turn On Notifications
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => toast.success("Report submitted")} 
+                  className="cursor-pointer"
+                >
+                  <Flag className="w-4 h-4 mr-2" />
+                  Report Space
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => toast.success("Host blocked")} 
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <Ban className="w-4 h-4 mr-2" />
+                  Block Host
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Chat Panel - slides from bottom, semi-transparent so users can see reactions */}
