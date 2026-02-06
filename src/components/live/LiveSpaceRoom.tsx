@@ -1329,7 +1329,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 <ArrowLeft className="w-5 h-5" />
               </Button>
               
-              {/* Unified 3-dot Menu - All options in one place, especially on mobile */}
+              {/* Consolidated 3-dot Menu - All options in one place */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
@@ -1396,8 +1396,82 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                     Refresh Audio
                   </DropdownMenuItem>
                   
+                  {/* Loudspeaker toggle - consolidated from footer */}
+                  <DropdownMenuItem 
+                    onClick={async () => {
+                      const newValue = !useLoudspeaker;
+                      setUseLoudspeaker(newValue);
+                      const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]');
+                      if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
+                        try {
+                          const devices = await navigator.mediaDevices.enumerateDevices();
+                          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+                          const targetDevice = audioOutputs.find(d => 
+                            newValue 
+                              ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
+                              : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
+                          );
+                          if (targetDevice) {
+                            for (const audio of audioElements) {
+                              await (audio as any).setSinkId(targetDevice.deviceId);
+                            }
+                          }
+                        } catch (error) {
+                          console.log('[LiveSpace] setSinkId not supported:', error);
+                        }
+                      }
+                      toast(newValue ? 'Loudspeaker' : 'Earpiece');
+                    }} 
+                    className="cursor-pointer"
+                  >
+                    <Speaker className="w-4 h-4 mr-2" />
+                    {useLoudspeaker ? 'Switch to Earpiece' : 'Switch to Loudspeaker'}
+                  </DropdownMenuItem>
+                  
+                  {/* Host-only controls - consolidated from footer */}
+                  {isHost && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem 
+                        onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+                        className="cursor-pointer"
+                      >
+                        {isScreenSharing ? <MonitorOff className="w-4 h-4 mr-2" /> : <Monitor className="w-4 h-4 mr-2" />}
+                        {isScreenSharing ? 'Stop Screen Share' : 'Share Screen'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowInviteModal(true)} className="cursor-pointer">
+                        <UserPlus className="w-4 h-4 mr-2" />
+                        Invite Users
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={toggleMuteAllParticipants} className="cursor-pointer">
+                        {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
+                        {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toggleMicForAll(!space?.allow_mic_for_all)} className="cursor-pointer">
+                        <Mic className="w-4 h-4 mr-2" />
+                        {space?.allow_mic_for_all ? 'Disable Open Mic' : 'Enable Open Mic'}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setShowListenersModal(true)} className="cursor-pointer">
+                        <Users className="w-4 h-4 mr-2" />
+                        View All Listeners
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setShowSpeakerQueue(true)} className="cursor-pointer">
+                        <Hand className="w-4 h-4 mr-2" />
+                        Speaker Queue
+                        {raisedHands.length > 0 && (
+                          <Badge className="ml-auto h-5 w-5 p-0 justify-center bg-amber-500 text-white">
+                            {raisedHands.length}
+                          </Badge>
+                        )}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  
                   {!isHost && (
                     <>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem 
                         onClick={() => {
                           setIsNotificationsOn(!isNotificationsOn);
@@ -1431,19 +1505,6 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                       >
                         <Ban className="w-4 h-4 mr-2" />
                         Block Host
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  
-                  {isHost && (
-                    <>
-                      <DropdownMenuItem onClick={() => setShowListenersModal(true)} className="cursor-pointer">
-                        <Users className="w-4 h-4 mr-2" />
-                        View All Listeners
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setShowSpeakerQueue(true)} className="cursor-pointer">
-                        <Hand className="w-4 h-4 mr-2" />
-                        Speaker Queue
                       </DropdownMenuItem>
                     </>
                   )}
@@ -1863,149 +1924,39 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                 </Button>
               </motion.div>
 
-              {/* Loudspeaker Toggle - hide on mobile to save space, available in menu */}
-              {!isMobile && (
-                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                  <Button
-                    variant={useLoudspeaker ? "default" : "outline"}
-                    size="icon"
-                    className={cn(
-                      "h-12 w-12 rounded-xl transition-all",
-                      useLoudspeaker && "bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 border-0"
-                    )}
-                    onClick={async () => {
-                      const newValue = !useLoudspeaker;
-                      setUseLoudspeaker(newValue);
-                      
-                      const audioElements = document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]');
-                      
-                      if (audioElements.length > 0 && 'setSinkId' in audioElements[0]) {
-                        try {
-                          const devices = await navigator.mediaDevices.enumerateDevices();
-                          const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
-                          
-                          const targetDevice = audioOutputs.find(d => 
-                            newValue 
-                              ? d.label.toLowerCase().includes('speaker') || d.deviceId === 'default'
-                              : d.label.toLowerCase().includes('earpiece') || d.label.toLowerCase().includes('phone')
-                          );
-                          
-                          if (targetDevice) {
-                            for (const audio of audioElements) {
-                              await (audio as any).setSinkId(targetDevice.deviceId);
-                            }
-                            toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                          } else {
-                            toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                          }
-                        } catch (error) {
-                          console.log('[LiveSpace] setSinkId not supported:', error);
-                          toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                        }
-                      } else {
-                        toast(newValue ? 'Loudspeaker' : 'Earpiece');
-                      }
-                    }}
-                    title={useLoudspeaker ? "Earpiece" : "Loudspeaker"}
-                  >
-                    <Speaker className="w-5 h-5" />
-                  </Button>
-                </motion.div>
-              )}
-
-              {/* Refresh Audio - hide on mobile, available in menu */}
-              {!isMobile && (
-                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-12 w-12 rounded-xl transition-all"
-                    onClick={forceResubscribe}
-                    title="Refresh audio connections"
-                  >
-                    <AudioLines className="w-5 h-5" />
-                  </Button>
-                </motion.div>
-              )}
-
-              {/* Host-only controls - show only on desktop or essential ones */}
-              {isHost && (
-                <>
-                  {/* Screen Share - hide on mobile */}
-                  {!isMobile && (
-                    <Button 
-                      variant={isScreenSharing ? "default" : "outline"}
-                      size="icon" 
-                      className={cn(
-                        "h-12 w-12 rounded-xl flex-shrink-0",
-                        isScreenSharing && "bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 border-0"
-                      )}
-                      onClick={isScreenSharing ? stopScreenShare : startScreenShare}
-                      title={isScreenSharing ? "Stop share" : "Share screen"}
-                    >
-                      {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
-                    </Button>
-                  )}
-
-                  {/* Invite - hide on mobile */}
-                  {!isMobile && (
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      className="h-12 w-12 rounded-xl flex-shrink-0"
-                      onClick={() => setShowInviteModal(true)}
-                      title="Invite"
-                    >
-                      <UserPlus className="w-5 h-5" />
-                    </Button>
-                  )}
-
-                  {/* Settings/More for hosts - hide on mobile, using 3-dot menu instead */}
-                  {!isMobile && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="icon" 
-                          className="h-12 w-12 rounded-xl flex-shrink-0"
-                        >
-                          <Settings className="w-5 h-5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={forceResubscribe}>
-                          <AudioLines className="w-4 h-4 mr-2" />
-                          Refresh Audio Connections
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={toggleMuteAllParticipants}>
-                          {allParticipantsMuted ? <Volume2 className="w-4 h-4 mr-2" /> : <VolumeX className="w-4 h-4 mr-2" />}
-                          {allParticipantsMuted ? 'Allow All to Unmute' : 'Mute All Participants'}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => toggleMicForAll(!space?.allow_mic_for_all)}>
-                          <Mic className="w-4 h-4 mr-2" />
-                          {space?.allow_mic_for_all ? 'Disable Open Mic' : 'Enable Open Mic'}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => setShowListenersModal(true)}>
-                          <Users className="w-4 h-4 mr-2" />
-                          View All Listeners
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </>
-              )}
-
-              {/* Swipe hint indicator - hide on mobile */}
-              {!isMobile && (
-                <div className="flex-shrink-0 pl-2 pr-1 opacity-40">
-                  <ChevronDown className="w-4 h-4 rotate-[-90deg]" />
-                </div>
-              )}
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Right-side action stack - Share, Record (host), Speaker Queue (host) */}
+      <div className="absolute right-4 top-40 z-40 flex flex-col gap-3">
+        {/* Share button */}
+        <motion.button
+          whileTap={{ scale: 0.9 }}
+          onClick={handleShare}
+          className="w-11 h-11 rounded-full bg-background/90 border border-border flex items-center justify-center shadow-lg hover:bg-muted transition-colors"
+          title="Share Space"
+        >
+          <Share2 className="w-5 h-5 text-foreground" />
+        </motion.button>
+
+        {/* Speaker Queue button - host only */}
+        {isHost && (
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowSpeakerQueue(true)}
+            className="w-11 h-11 rounded-full bg-background/90 border border-border flex items-center justify-center shadow-lg hover:bg-muted transition-colors relative"
+            title="Speaker Queue"
+          >
+            <Hand className="w-5 h-5 text-foreground" />
+            {raisedHands.length > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 rounded-full text-[10px] text-white flex items-center justify-center font-semibold">
+                {raisedHands.length}
+              </span>
+            )}
+          </motion.button>
+        )}
       </div>
 
       {/* Chat Panel - slides from bottom, semi-transparent so users can see reactions */}
