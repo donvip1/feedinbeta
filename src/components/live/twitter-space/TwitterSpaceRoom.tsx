@@ -29,6 +29,9 @@ import {
   ArrowLeft,
   Camera,
   Gift,
+  Volume2,
+  VolumeX,
+  Hand,
 } from 'lucide-react';
 
 import { LiveGiftModal } from '../LiveGiftModal';
@@ -37,6 +40,7 @@ import { ReportContentModal } from '@/components/moderation/ReportContentModal';
 import { SpaceRulesModal } from './SpaceRulesModal';
 import { SpaceFeedbackModal } from './SpaceFeedbackModal';
 import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
+import { FloatingReactions } from '../FloatingReactions';
 
 interface TwitterSpaceRoomProps {
   spaceId: string;
@@ -90,6 +94,13 @@ interface FloatingReaction {
   left: number;
 }
 
+interface FloatingGiftReaction {
+  id: string | number;
+  type: string;
+  senderName?: string;
+  emoji?: string;
+}
+
 interface Reply {
   id: string;
   user_id: string;
@@ -129,6 +140,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   
   // Gift animations state
   const [giftAnimations, setGiftAnimations] = useState<GiftAnimation[]>([]);
+  const [floatingGiftReactions, setFloatingGiftReactions] = useState<FloatingGiftReaction[]>([]);
   
   // Data states
   const [space, setSpace] = useState<SpaceData | null>(null);
@@ -147,6 +159,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [hasRaisedHand, setHasRaisedHand] = useState(false);
   const [myRole, setMyRole] = useState<string>('listener');
   const [myHostMuted, setMyHostMuted] = useState(false);
+  const [allMuted, setAllMuted] = useState(false);
 
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
@@ -290,14 +303,25 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           credits: '💰',
         };
 
+        const emoji = giftEmojis[giftData.gift_type] || '🎁';
+
+        // Add to FloatingReactions for TikTok-style floating animation
+        const floatingGift: FloatingGiftReaction = {
+          id: giftData.id,
+          type: giftData.gift_type,
+          senderName: senderProfile?.display_name || 'Someone',
+          emoji,
+        };
+        setFloatingGiftReactions(prev => [...prev, floatingGift]);
+
+        // Also keep the banner notification
         const newGiftAnim: GiftAnimation = {
           id: giftData.id,
-          emoji: giftEmojis[giftData.gift_type] || '🎁',
+          emoji,
           senderName: senderProfile?.display_name || 'Someone',
           receiverName: receiverProfile?.display_name || 'Host',
           value: giftData.credit_value || 1,
         };
-
         setGiftAnimations(prev => [...prev, newGiftAnim]);
 
         // Add gift message to chat
@@ -307,7 +331,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           user: senderProfile?.display_name || 'Someone',
           handle: '@' + (senderProfile?.username || 'user'),
           time: 'Just now',
-          text: `🎁 Sent ${giftEmojis[giftData.gift_type] || '🎁'} ${giftData.gift_type} (${giftData.credit_value} credits)`,
+          text: `🎁 Sent ${emoji} ${giftData.gift_type} (${giftData.credit_value} credits)`,
           avatar: senderProfile?.avatar_url || '',
           likes: 0,
           liked_by_me: false,
@@ -315,7 +339,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         };
         setReplies(prev => [...prev, giftChatMessage]);
 
-        // Remove animation after 5 seconds
+        // Remove banner animation after 5 seconds
         setTimeout(() => {
           setGiftAnimations(prev => prev.filter(g => g.id !== newGiftAnim.id));
         }, 5000);
@@ -553,6 +577,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const handleToggleMute = async () => {
     if (!user) return;
     
+    // If listener, this is a request to speak
+    if (myRole === 'listener') {
+      await handleRaiseHand();
+      return;
+    }
+    
     if (myHostMuted && isMicOn) {
       toast.error('Host has muted you. Wait for host to allow you to unmute.');
       return;
@@ -596,7 +626,32 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       .eq('space_id', spaceId)
       .eq('user_id', user.id);
 
-    toast.success(newHandState ? '✋ Hand raised!' : 'Hand lowered');
+    toast.success(newHandState ? '✋ Request sent to host!' : 'Request cancelled');
+  };
+
+  const handleMuteAll = async () => {
+    if (!isHost) return;
+    
+    const newMuteState = !allMuted;
+    setAllMuted(newMuteState);
+    
+    // Broadcast mute all event
+    const channel = supabase.channel(`space-control-${spaceId}`);
+    await channel.send({
+      type: 'broadcast',
+      event: newMuteState ? 'mute_all' : 'allow_unmute',
+      payload: { by: user?.id },
+    });
+    supabase.removeChannel(channel);
+    
+    // Update all speakers in database
+    await supabase
+      .from('live_space_speakers')
+      .update({ host_muted: newMuteState })
+      .eq('space_id', spaceId)
+      .neq('user_id', user?.id);
+    
+    toast.success(newMuteState ? '🔇 All participants muted' : '🔊 Participants can now unmute');
   };
 
   const handleMinimize = () => {
@@ -810,6 +865,14 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     );
   }
 
+  // Sort speakers: Host first, then co-hosts, speakers, and listeners last
+  const sortedSpeakers = [...speakers].sort((a, b) => {
+    const roleOrder: Record<string, number> = { host: 0, co_host: 1, speaker: 2, listener: 3 };
+    const aOrder = a.user_id === space?.user_id ? 0 : (roleOrder[a.role] ?? 3);
+    const bOrder = b.user_id === space?.user_id ? 0 : (roleOrder[b.role] ?? 3);
+    return aOrder - bOrder;
+  });
+
   return (
     <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col overflow-hidden">
       {/* Header */}
@@ -817,77 +880,118 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         <button onClick={handleMinimize} className="p-2">
           <ArrowLeft className="w-5 h-5 text-white" />
         </button>
-        <h1 className="text-white font-bold text-base flex-1 text-center truncate">{space?.title}</h1>
-        <button onClick={() => setShowSettings(true)} className="p-2">
-          <Settings className="w-5 h-5 text-white" />
-        </button>
+        <h1 className="text-white font-bold text-base flex-1 text-center truncate px-2">{space?.title}</h1>
+        <div className="flex items-center gap-1">
+          {isHost && raisedHandsCount > 0 && (
+            <button 
+              onClick={() => setShowSpeakerQueue(true)}
+              className="p-2 relative"
+            >
+              <Hand className="w-5 h-5 text-amber-400" />
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                {raisedHandsCount}
+              </span>
+            </button>
+          )}
+          <button onClick={() => setShowSettings(true)} className="p-2">
+            <Settings className="w-5 h-5 text-white" />
+          </button>
+        </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 overflow-hidden">
-        <h2 className="text-white text-2xl font-bold text-center mb-8">
-          {space?.title}
-        </h2>
-
-        {/* User Grid */}
-        <div className="grid grid-cols-3 gap-4 max-w-[320px]">
-          {speakers.slice(0, 12).map((speaker) => {
-            const speaking = (audioLevels[speaker.user_id] || 0) > 10;
-            const isHostUser = speaker.user_id === space.user_id;
-            
-            return (
-              <button
-                key={speaker.id}
-                onClick={() => navigateToProfile(speaker.user_id)}
-                className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-zinc-900/50 transition-colors"
-              >
-                <div className="relative">
-                  {/* Speaking ring */}
-                  {speaking && (
-                    <div className="absolute inset-0 rounded-full ring-2 ring-green-500 ring-offset-2 ring-offset-zinc-950 animate-pulse" />
-                  )}
-                  
-                  {/* Avatar */}
-                  <div className="w-16 h-16 rounded-full overflow-hidden bg-zinc-800 border-2 border-zinc-700">
-                    {speaker.profile?.avatar_url ? (
-                      <img 
-                        src={speaker.profile.avatar_url} 
-                        alt={speaker.profile.display_name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-400 text-xl font-semibold">
-                        {speaker.profile?.display_name?.[0] || 'U'}
+      {/* Main Content - Organized Avatar Grid */}
+      <div className="flex-1 flex flex-col px-4 pt-4 overflow-y-auto">
+        {/* Connection Status */}
+        {connectionStatus !== 'connected' && connectionStatus !== 'disconnected' && (
+          <p className="text-center text-zinc-500 text-xs mb-2 capitalize">{connectionStatus}...</p>
+        )}
+        
+        {/* Speakers Row (Host, Co-hosts, Speakers) */}
+        <div className="mb-4">
+          <p className="text-zinc-500 text-xs font-medium mb-3">Speakers ({sortedSpeakers.filter(s => s.role !== 'listener').length})</p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {sortedSpeakers
+              .filter(s => s.role !== 'listener')
+              .slice(0, 8)
+              .map((speaker) => {
+                const speaking = (audioLevels[speaker.user_id] || 0) > 10;
+                const isHostUser = speaker.user_id === space?.user_id;
+                
+                return (
+                  <button
+                    key={speaker.id}
+                    onClick={() => navigateToProfile(speaker.user_id)}
+                    className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-zinc-900/50 transition-colors w-20"
+                  >
+                    <div className="relative">
+                      {speaking && (
+                        <div className="absolute inset-0 rounded-full ring-2 ring-green-500 ring-offset-2 ring-offset-zinc-950 animate-pulse" />
+                      )}
+                      <div className={`w-14 h-14 rounded-full overflow-hidden bg-zinc-800 border-2 ${isHostUser ? 'border-purple-500' : 'border-zinc-700'}`}>
+                        {speaker.profile?.avatar_url ? (
+                          <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-zinc-400 text-lg font-semibold">
+                            {speaker.profile?.display_name?.[0] || 'U'}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  
-                  {/* Muted indicator */}
-                  {speaker.is_muted && (
-                    <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-zinc-800 rounded-full flex items-center justify-center border-2 border-zinc-950">
-                      <MicOff className="w-3 h-3 text-zinc-400" />
+                      {speaker.is_muted && (
+                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-zinc-800 rounded-full flex items-center justify-center border-2 border-zinc-950">
+                          <MicOff className="w-2.5 h-2.5 text-zinc-400" />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                    <div className="text-center max-w-full">
+                      <div className="flex items-center justify-center gap-0.5">
+                        <span className="text-white text-[11px] font-medium truncate max-w-[50px]">
+                          {speaker.profile?.display_name?.split(' ')[0] || 'User'}
+                        </span>
+                        {speaker.profile?.is_verified && (
+                          <CheckCircle2 className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />
+                        )}
+                      </div>
+                      <span className={`text-[9px] ${isHostUser ? 'text-purple-400' : 'text-zinc-500'}`}>
+                        {isHostUser ? 'Host' : speaker.role === 'co_host' ? 'Co-host' : 'Speaker'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
 
-                {/* Name and role */}
-                <div className="text-center max-w-full">
-                  <div className="flex items-center justify-center gap-1 max-w-full">
-                    <span className="text-white text-xs font-medium truncate max-w-[60px]">
+        {/* Listeners Grid */}
+        {sortedSpeakers.filter(s => s.role === 'listener').length > 0 && (
+          <div>
+            <p className="text-zinc-500 text-xs font-medium mb-3">Listening ({sortedSpeakers.filter(s => s.role === 'listener').length})</p>
+            <div className="grid grid-cols-5 gap-2">
+              {sortedSpeakers
+                .filter(s => s.role === 'listener')
+                .slice(0, 15)
+                .map((speaker) => (
+                  <button
+                    key={speaker.id}
+                    onClick={() => navigateToProfile(speaker.user_id)}
+                    className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-zinc-900/50 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700">
+                      {speaker.profile?.avatar_url ? (
+                        <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-400 text-sm font-semibold">
+                          {speaker.profile?.display_name?.[0] || 'U'}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-zinc-400 text-[9px] truncate max-w-full">
                       {speaker.profile?.display_name?.split(' ')[0] || 'User'}
                     </span>
-                    {speaker.profile?.is_verified && (
-                      <CheckCircle2 className="w-3 h-3 text-blue-400 flex-shrink-0" />
-                    )}
-                  </div>
-                  <span className={`text-[10px] ${isHostUser ? 'text-purple-400' : 'text-zinc-500'}`}>
-                    {isHostUser ? 'Host' : speaker.role === 'co_host' ? 'Co-host' : speaker.role === 'speaker' ? 'Speaker' : 'Listener'}
-                  </span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Floating Reactions */}
@@ -909,7 +1013,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         </AnimatePresence>
       </div>
 
-      {/* Gift Animations - TikTok style notifications */}
+      {/* Floating Gift Reactions - TikTok/Tango style */}
+      <FloatingReactions reactions={floatingGiftReactions} className="z-40" />
+
+      {/* Gift Animations - Banner notifications */}
       <AnimatePresence>
         {giftAnimations.map((gift) => (
           <motion.div
@@ -951,29 +1058,48 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={handleToggleMute}
-              className={`w-14 h-14 rounded-full border border-zinc-800 flex items-center justify-center transition-all ${
-                isMicOn ? 'bg-purple-600 border-transparent' : 'bg-transparent'
+              className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all ${
+                canSpeak
+                  ? isMicOn
+                    ? 'bg-purple-600 border-purple-500 text-white'
+                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                  : hasRaisedHand
+                    ? 'bg-amber-600 border-amber-500 text-white'
+                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
               }`}
             >
-              {isMicOn ? (
-                <Mic className="w-6 h-6 text-white" />
+              {canSpeak ? (
+                isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
               ) : (
-                <MicOff className="w-6 h-6 text-zinc-400" />
+                <Hand className="w-6 h-6" />
               )}
             </button>
             <span className="text-xs text-zinc-500">
-              {isMicOn ? 'Mute' : canSpeak ? 'Unmute' : 'Request'}
+              {canSpeak ? (isMicOn ? 'Mute' : 'Unmute') : hasRaisedHand ? 'Pending' : 'Request'}
             </span>
           </div>
 
           {/* Center Icons */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => setView('guests')}
               className="p-2 text-zinc-400 hover:text-white transition-colors"
             >
-              <Users className="w-6 h-6" />
+              <Users className="w-5 h-5" />
             </button>
+
+            {/* Master Mute Button - Host Only */}
+            {isHost && (
+              <button
+                onClick={handleMuteAll}
+                className={`p-2 transition-colors ${
+                  allMuted ? 'text-red-400 hover:text-red-300' : 'text-zinc-400 hover:text-white'
+                }`}
+                title={allMuted ? 'Allow unmute' : 'Mute all'}
+              >
+                {allMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+            )}
 
             {/* Gift Button */}
             <button
@@ -984,21 +1110,21 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                   : 'text-amber-400 hover:text-amber-300'
               }`}
             >
-              <Gift className="w-6 h-6" />
+              <Gift className="w-5 h-5" />
             </button>
 
             <button
               onClick={() => setShowReactions(true)}
               className="p-2 text-zinc-400 hover:text-white transition-colors"
             >
-              <Heart className="w-6 h-6" />
+              <Heart className="w-5 h-5" />
             </button>
 
             <button
               onClick={() => setShowShare(true)}
               className="p-2 text-zinc-400 hover:text-white transition-colors"
             >
-              <Share2 className="w-6 h-6" />
+              <Share2 className="w-5 h-5" />
             </button>
           </div>
 
