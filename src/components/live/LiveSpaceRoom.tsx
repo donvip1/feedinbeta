@@ -1929,24 +1929,24 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         </div>
       </div>
 
-      {/* Right-side action stack - Share, Record (host), Speaker Queue (host) */}
+      {/* Right-side action stack - Share and Speaker Queue (host) */}
       <div className="absolute right-4 top-40 z-40 flex flex-col gap-3">
-        {/* Share button */}
+        {/* Share button - solid background, no shadow */}
         <motion.button
           whileTap={{ scale: 0.9 }}
           onClick={handleShare}
-          className="w-11 h-11 rounded-full bg-background/90 border border-border flex items-center justify-center shadow-lg hover:bg-muted transition-colors"
+          className="w-11 h-11 rounded-full bg-background border border-border flex items-center justify-center hover:bg-muted transition-colors"
           title="Share Space"
         >
           <Share2 className="w-5 h-5 text-foreground" />
         </motion.button>
 
-        {/* Speaker Queue button - host only */}
+        {/* Speaker Queue button - host only, solid background */}
         {isHost && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => setShowSpeakerQueue(true)}
-            className="w-11 h-11 rounded-full bg-background/90 border border-border flex items-center justify-center shadow-lg hover:bg-muted transition-colors relative"
+            className="w-11 h-11 rounded-full bg-background border border-border flex items-center justify-center hover:bg-muted transition-colors relative"
             title="Speaker Queue"
           >
             <Hand className="w-5 h-5 text-foreground" />
