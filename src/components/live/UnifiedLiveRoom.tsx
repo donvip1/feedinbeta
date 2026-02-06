@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Users, Heart, Wifi, WifiOff, Crown, 
   Plus, Radio, Zap, Sword, Monitor, Megaphone,
-  Share2, Gift, Pin, Minimize2, MoreVertical,
+  Share2, Gift, ArrowLeft, Minimize2, MoreVertical,
   Mic, MicOff, Video, VideoOff, Hand, Circle
 } from 'lucide-react';
 import { StreamOptionsMenu } from '@/components/live/StreamOptionsMenu';
@@ -574,14 +574,15 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
         className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/80 to-transparent"
       >
         <div className="flex items-center justify-between">
-          {/* Left: Minimize + Host Info Pill */}
+          {/* Left: Back + Host Info Pill */}
           <div className="flex items-center gap-2">
-            {/* Minimize/Pin Button */}
+            {/* Back Button - keeps connection alive, navigates away */}
             <button
               onClick={minimize}
               className="p-2 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
+              title="Go back - connection continues in background"
             >
-              <Pin className="w-4 h-4 text-white/80" />
+              <ArrowLeft className="w-4 h-4 text-white/80" />
             </button>
             
             {/* Host Info Pill */}
@@ -621,59 +622,8 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             </div>
           </div>
 
-          {/* Right Actions */}
+          {/* Right Actions - Simplified: Only connection status and End/Leave */}
           <div className="flex items-center gap-2">
-            {/* Raised Hands Button (Host in Audio Spaces) */}
-            {isHost && roomInfo.type === 'audio_space' && (
-              <button
-                onClick={() => setShowRaisedHands(true)}
-                className="relative p-2 rounded-full bg-amber-500/20 backdrop-blur-md hover:bg-amber-500/40 transition-colors"
-              >
-                <Hand className="w-5 h-5 text-amber-400" />
-                {raisedHandsCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-amber-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1 animate-pulse">
-                    {raisedHandsCount}
-                  </span>
-                )}
-              </button>
-            )}
-            
-            {/* Recording Button (Host Only) */}
-            {isHost && (
-              <button
-                onClick={() => toggleRecording()}
-                className={cn(
-                  "relative p-2 rounded-full backdrop-blur-md transition-colors",
-                  isRecording 
-                    ? "bg-red-500/30 hover:bg-red-500/50" 
-                    : "bg-black/40 hover:bg-black/60"
-                )}
-              >
-                <Circle className={cn(
-                  "w-5 h-5",
-                  isRecording ? "text-red-500 fill-red-500 animate-pulse" : "text-white"
-                )} />
-                {isRecording && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
-                )}
-              </button>
-            )}
-            
-            {/* Participants Button (Host) */}
-            {isHost && (
-              <button
-                onClick={() => setShowParticipants(true)}
-                className="relative p-2 rounded-full bg-black/40 backdrop-blur-md hover:bg-black/60 transition-colors"
-              >
-                <Users className="w-5 h-5 text-white" />
-                {participants.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-destructive rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1">
-                    {participants.length}
-                  </span>
-                )}
-              </button>
-            )}
-
             {/* Connection Status */}
             {connectionStatus === 'reconnecting' && (
               <div className="flex items-center gap-1.5 bg-amber-500/20 backdrop-blur-md px-2 py-1 rounded-full">
@@ -681,15 +631,6 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
                 <span className="text-xs text-amber-400">Reconnecting...</span>
               </div>
             )}
-
-            {/* 3-Dot Options Menu */}
-            <StreamOptionsMenu
-              isHost={isHost}
-              streamId={roomInfo.id}
-              hostId={roomInfo.hostId}
-              streamTitle={roomInfo.title || (roomInfo.type === 'audio_space' ? 'Live Space' : 'Live Stream')}
-              onEndStream={handleLeave}
-            />
 
             {/* End/Leave Button */}
             <button
@@ -974,16 +915,53 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
             <Share2 className="w-6 h-6 text-white" />
           </motion.button>
 
-          {/* Minimize Button */}
-          <motion.button
-            whileTap={{ scale: 0.9 }}
-            onClick={minimize}
-            className="p-3 rounded-full bg-slate-800/80 backdrop-blur-md"
-          >
-            <Minimize2 className="w-5 h-5 text-white/80" />
-          </motion.button>
+          {/* Recording Button (Host Only) - Moved from header */}
+          {isHost && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => toggleRecording()}
+              className={cn(
+                "p-3 rounded-full bg-background border border-border transition-colors",
+                isRecording && "bg-red-500/20 border-red-500"
+              )}
+            >
+              <Circle className={cn(
+                "w-5 h-5",
+                isRecording ? "text-red-500 fill-red-500 animate-pulse" : "text-foreground"
+              )} />
+              {isRecording && (
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping" />
+              )}
+            </motion.button>
+          )}
 
-          {/* More Options Menu - Screen Share, Camera, PK Battle */}
+          {/* Raised Hands Button (Host in Audio Spaces) - Moved from header */}
+          {isHost && roomInfo.type === 'audio_space' && (
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowRaisedHands(true)}
+              className="relative p-3 rounded-full bg-background border border-border hover:bg-muted transition-colors"
+            >
+              <Hand className="w-5 h-5 text-foreground" />
+              {raisedHandsCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-amber-500 rounded-full flex items-center justify-center text-[10px] font-bold text-white px-1 animate-pulse">
+                  {raisedHandsCount}
+                </span>
+              )}
+            </motion.button>
+          )}
+
+          {/* 3-Dot Options Menu - All controls consolidated here */}
+          <StreamOptionsMenu
+            isHost={isHost}
+            streamId={roomInfo.id}
+            hostId={roomInfo.hostId}
+            streamTitle={roomInfo.title || (roomInfo.type === 'audio_space' ? 'Live Space' : 'Live Stream')}
+            onEndStream={handleLeave}
+            className="!bg-background !border !border-border !text-foreground"
+          />
+
+          {/* More Options Menu - Screen Share, Camera, PK Battle (Host only) */}
           {isHost && (
             <RightSideMenu
               roomType={roomInfo.type}

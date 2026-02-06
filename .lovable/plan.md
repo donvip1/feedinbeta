@@ -1,43 +1,52 @@
-# Plan: Consolidate Live Space Controls - COMPLETED ✅
+# Live Space/Stream UI Consolidation - COMPLETED ✅
 
 ## Summary
 
-Successfully implemented all improvements to the Live Space Room interface:
+Successfully implemented all improvements to both LiveSpaceRoom and UnifiedLiveRoom:
 
-### 1. ✅ Right-Side Action Stack
-- Vertical action stack on the right side (position: absolute right-4 top-40)
+### 1. ✅ Changed Pin/Minimize to Back Button
+- Replaced Pin icon with ArrowLeft icon in both components
+- Back button keeps connection alive while navigating away
+- Connection persists until host/user explicitly ends or leaves
+- Title updated to "Go back - connection continues in background"
+
+### 2. ✅ Moved Controls from Header to Right-Side Action Stack
+- **UnifiedLiveRoom**: 
+  - Recording button moved from header to right-side stack
+  - Raised hands button (audio spaces) moved from header to right-side stack
+  - 3-dots StreamOptionsMenu moved from header to right-side stack
+  - Header now only has: Back button, Host Info Pill, End/Leave button
+  
+- **LiveSpaceRoom**:
+  - 3-dots DropdownMenu moved from header to right-side stack
+  - Header now only has: Back button, End/Leave button
+  - Right-side stack includes: Share, Speaker Queue, Options Menu
+
+### 3. ✅ Simplified Header Layout
+- Both components now have minimal header:
+  - Left: Back button + Host info
+  - Right: End/Leave button only
+- All secondary options consolidated into right-side action stack
+
+### 4. ✅ Button Styling
+- Using solid backgrounds with `bg-background border border-border`
+- No transparent shadows or overlays
+- Consistent styling across both components
+
+### 5. ✅ Right-Side Action Stack
+- Vertical action stack on the right side (position: absolute right-4)
 - Includes:
   - **Share button** - always visible
   - **Speaker Queue button** (host only) - with raised hands count badge
-- Uses solid backgrounds: `bg-background border border-border` (no shadows/transparency)
+  - **Recording button** (host only) - video streams
+  - **3-dots Options Menu** - consolidated all options
 
-### 2. ✅ Removed Transparent Shadows
-- Updated button styling to use solid backgrounds with borders
-- Removed `shadow-lg` and `bg-white/10` classes
-- Clean, readable icons on all viewport sizes
+## Connection Persistence
+- Back button calls `minimize()` which keeps connection alive
+- Users can navigate around the app while stream/space continues
+- FloatingLivePlayer shows when minimized
+- Only explicit "End" or "Leave" disconnects the session
 
-### 3. ✅ Consolidated 3-Dot Menu
-- Single vertical 3-dots menu in the header contains ALL options:
-  - Connection retry (if reconnecting/failed)
-  - Share Space / Copy Link / Picture-in-Picture
-  - Refresh Audio
-  - Loudspeaker Toggle
-  - Screen Share (host only)
-  - Invite Users (host only)
-  - Mute All / Allow Unmute (host only)
-  - Open Mic toggle (host only)
-  - View All Listeners (host only)
-  - Speaker Queue with badge (host only)
-  - Notifications toggle (viewer only)
-  - Report / Block (viewer only)
-  - End/Leave Space
-
-### 4. ✅ Footer Simplified
-- Essential controls only:
-  - Leave/End button
-  - Mic toggle
-  - Raise Hand (listeners)
-  - Test Audio (desktop only)
-  - Chat
-  - Gift
-  - Volume (speaker mute)
+## Files Modified
+- `src/components/live/UnifiedLiveRoom.tsx`
+- `src/components/live/LiveSpaceRoom.tsx`
