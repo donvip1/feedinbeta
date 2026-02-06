@@ -28,14 +28,27 @@ import {
   Type,
   ArrowLeft,
   Camera,
+  Gift,
 } from 'lucide-react';
 
 import { LiveGiftModal } from '../LiveGiftModal';
 import { SpeakerQueuePanel } from '../SpeakerQueuePanel';
+import { ReportContentModal } from '@/components/moderation/ReportContentModal';
+import { SpaceRulesModal } from './SpaceRulesModal';
+import { SpaceFeedbackModal } from './SpaceFeedbackModal';
+import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 
 interface TwitterSpaceRoomProps {
   spaceId: string;
   onClose: () => void;
+}
+
+interface GiftAnimation {
+  id: string;
+  emoji: string;
+  senderName: string;
+  receiverName: string;
+  value: number;
 }
 
 interface Speaker {
@@ -87,6 +100,7 @@ interface Reply {
   avatar: string;
   likes: number;
   liked_by_me: boolean;
+  isGift?: boolean;
 }
 
 const REACTION_EMOJIS = [
@@ -108,6 +122,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [showSettings, setShowSettings] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showSpeakerQueue, setShowSpeakerQueue] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showAudioSettingsModal, setShowAudioSettingsModal] = useState(false);
+  
+  // Gift animations state
+  const [giftAnimations, setGiftAnimations] = useState<GiftAnimation[]>([]);
   
   // Data states
   const [space, setSpace] = useState<SpaceData | null>(null);
@@ -239,10 +260,73 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       })
       .subscribe();
 
+    // Gift channel - listen for gifts in this space
+    const giftChannel = supabase
+      .channel(`space-gifts-${spaceId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'live_space_gifts',
+        filter: `space_id=eq.${spaceId}`,
+      }, async (payload: any) => {
+        const giftData = payload.new;
+        
+        // Fetch sender and receiver profiles
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('display_name, username, avatar_url')
+          .eq('id', giftData.sender_id)
+          .single();
+
+        const { data: receiverProfile } = await supabase
+          .from('profiles')
+          .select('display_name, username')
+          .eq('id', giftData.receiver_id)
+          .single();
+
+        const giftEmojis: Record<string, string> = {
+          rose: '🌹', coffee: '☕', heart: '❤️', diamond: '💎',
+          rocket: '🚀', castle: '🏰', crown: '👑', universe: '🌌',
+          credits: '💰',
+        };
+
+        const newGiftAnim: GiftAnimation = {
+          id: giftData.id,
+          emoji: giftEmojis[giftData.gift_type] || '🎁',
+          senderName: senderProfile?.display_name || 'Someone',
+          receiverName: receiverProfile?.display_name || 'Host',
+          value: giftData.credit_value || 1,
+        };
+
+        setGiftAnimations(prev => [...prev, newGiftAnim]);
+
+        // Add gift message to chat
+        const giftChatMessage: Reply = {
+          id: `gift-${giftData.id}`,
+          user_id: giftData.sender_id,
+          user: senderProfile?.display_name || 'Someone',
+          handle: '@' + (senderProfile?.username || 'user'),
+          time: 'Just now',
+          text: `🎁 Sent ${giftEmojis[giftData.gift_type] || '🎁'} ${giftData.gift_type} (${giftData.credit_value} credits)`,
+          avatar: senderProfile?.avatar_url || '',
+          likes: 0,
+          liked_by_me: false,
+          isGift: true,
+        };
+        setReplies(prev => [...prev, giftChatMessage]);
+
+        // Remove animation after 5 seconds
+        setTimeout(() => {
+          setGiftAnimations(prev => prev.filter(g => g.id !== newGiftAnim.id));
+        }, 5000);
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(controlChannel);
+      supabase.removeChannel(giftChannel);
     };
   }, [spaceId, isHost, user?.id]);
 
@@ -825,6 +909,41 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         </AnimatePresence>
       </div>
 
+      {/* Gift Animations - TikTok style notifications */}
+      <AnimatePresence>
+        {giftAnimations.map((gift) => (
+          <motion.div
+            key={gift.id}
+            initial={{ opacity: 0, x: -100, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 100, scale: 0.8 }}
+            transition={{ type: 'spring', damping: 20 }}
+            className="fixed left-4 top-1/3 z-50 max-w-[280px]"
+          >
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/90 to-pink-500/90 backdrop-blur-sm shadow-lg">
+              <motion.span 
+                className="text-3xl"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 0.5, repeat: 2 }}
+              >
+                {gift.emoji}
+              </motion.span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-semibold truncate">
+                  {gift.senderName}
+                </p>
+                <p className="text-white/80 text-xs truncate">
+                  sent {gift.emoji} to {gift.receiverName}
+                </p>
+              </div>
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20">
+                <span className="text-white text-xs font-bold">+{gift.value}</span>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
       {/* BOTTOM CONTROLS */}
       <div className="px-4 py-4 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
         <div className="flex items-center justify-between max-w-md mx-auto">
@@ -848,12 +967,24 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           </div>
 
           {/* Center Icons */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setView('guests')}
               className="p-2 text-zinc-400 hover:text-white transition-colors"
             >
               <Users className="w-6 h-6" />
+            </button>
+
+            {/* Gift Button */}
+            <button
+              onClick={() => setShowGiftModal(true)}
+              className={`p-2 transition-colors ${
+                isHost 
+                  ? 'text-teal-400 hover:text-teal-300' 
+                  : 'text-amber-400 hover:text-amber-300'
+              }`}
+            >
+              <Gift className="w-6 h-6" />
             </button>
 
             <button
@@ -964,8 +1095,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             <div className="space-y-1">
               <button
                 onClick={() => {
-                  toast.info('Audio settings coming soon');
                   setShowSettings(false);
+                  setShowAudioSettingsModal(true);
                 }}
                 className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
               >
@@ -974,8 +1105,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </button>
               <button
                 onClick={() => {
-                  toast.info('Thank you for your feedback!');
                   setShowSettings(false);
+                  setShowFeedbackModal(true);
                 }}
                 className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
               >
@@ -984,8 +1115,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </button>
               <button
                 onClick={() => {
-                  toast.info('Be respectful, no spam, keep it civil.');
                   setShowSettings(false);
+                  setShowRulesModal(true);
                 }}
                 className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
               >
@@ -994,8 +1125,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </button>
               <button
                 onClick={() => {
-                  toast.info('Space reported. We will review it.');
                   setShowSettings(false);
+                  setShowReportModal(true);
                 }}
                 className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
               >
@@ -1081,7 +1212,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                           <span className="text-zinc-500 text-sm">{reply.handle}</span>
                           <span className="text-zinc-500 text-sm">· {reply.time}</span>
                         </div>
-                        <p className="text-zinc-300 text-sm mt-2 break-words">{reply.text}</p>
+                        {reply.isGift ? (
+                          <div className="mt-2 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-lg px-3 py-2 inline-block">
+                            <span className="text-pink-400 font-medium">{reply.text}</span>
+                          </div>
+                        ) : (
+                          <p className="text-zinc-300 text-sm mt-2 break-words">{reply.text}</p>
+                        )}
                         <div className="flex gap-6 mt-3 text-zinc-500 text-xs">
                           <button 
                             onClick={(e) => {
@@ -1168,6 +1305,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             avatar_url: s.profile?.avatar_url || '',
           }))}
           isHost={isHost}
+          isSpace={true}
         />
       )}
 
@@ -1178,6 +1316,35 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           isHost={isHost}
         />
       )}
+
+      {/* Report Modal */}
+      <ReportContentModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="live_stream"
+        contentId={spaceId}
+        reportedUserId={space?.user_id}
+      />
+
+      {/* Rules Modal */}
+      <SpaceRulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+      />
+
+      {/* Feedback Modal */}
+      <SpaceFeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        spaceId={spaceId}
+        spaceTitle={space?.title || 'Space'}
+      />
+
+      {/* Audio Settings Modal */}
+      <SpaceAudioSettingsModal
+        isOpen={showAudioSettingsModal}
+        onClose={() => setShowAudioSettingsModal(false)}
+      />
 
       <style>{`
         @keyframes space-float {

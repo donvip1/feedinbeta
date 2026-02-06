@@ -7,3 +7,6 @@ export { TwitterSpaceGuests } from './TwitterSpaceGuests';
 export { TwitterSpaceReactionPicker } from './TwitterSpaceReactionPicker';
 export { TwitterSpaceShareMenu } from './TwitterSpaceShareMenu';
 export { TwitterSpaceSettingsMenu } from './TwitterSpaceSettingsMenu';
+export { SpaceRulesModal } from './SpaceRulesModal';
+export { SpaceFeedbackModal } from './SpaceFeedbackModal';
+export { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';

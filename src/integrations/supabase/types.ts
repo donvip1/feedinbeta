@@ -6804,6 +6804,41 @@ export type Database = {
         }
         Relationships: []
       }
+      space_feedback: {
+        Row: {
+          created_at: string | null
+          feedback: string | null
+          id: string
+          rating: number
+          space_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          feedback?: string | null
+          id?: string
+          rating: number
+          space_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          feedback?: string | null
+          id?: string
+          rating?: number
+          space_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "space_feedback_space_id_fkey"
+            columns: ["space_id"]
+            isOneToOne: false
+            referencedRelation: "live_spaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       starred_messages: {
         Row: {
           conversation_id: string | null
