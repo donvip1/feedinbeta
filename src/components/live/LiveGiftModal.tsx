@@ -80,7 +80,25 @@ export const LiveGiftModal = ({
       return;
     }
     
-    const recipientId = isHost ? selectedRecipient : hostId;
+    // Determine recipient based on user role
+    let recipientId: string | null = null;
+    if (isHost) {
+      // Hosts can only gift listeners/speakers in the list
+      recipientId = selectedRecipient;
+      if (!recipientId) {
+        toast.error("Please select a listener or speaker to gift");
+        return;
+      }
+      // Prevent hosts from gifting themselves
+      if (recipientId === user.id) {
+        toast.error("You cannot gift yourself");
+        return;
+      }
+    } else {
+      // Listeners/guests can gift the host or speakers
+      recipientId = hostId;
+    }
+
     if (!recipientId) {
       toast.error("Please select a recipient");
       return;
@@ -246,15 +264,15 @@ export const LiveGiftModal = ({
             {/* Recipient Selection for Hosts */}
             {isHost && (
               <div>
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">Select Viewer</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Select Listener or Speaker</Label>
                 <ScrollArea className="h-24 border rounded-xl p-2 mt-2 bg-muted/30">
                   {viewers.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      No active viewers
+                      No active listeners or speakers
                     </p>
                   ) : (
                     <div className="flex gap-2 flex-wrap">
-                      {viewers.map((viewer) => (
+                      {viewers.filter(v => v.id !== user?.id).map((viewer) => (
                         <button
                           key={viewer.id}
                           onClick={() => setSelectedRecipient(viewer.id)}
@@ -326,15 +344,15 @@ export const LiveGiftModal = ({
             {/* Recipient Selection for Hosts */}
             {isHost && (
               <div>
-                <Label className="text-xs font-semibold uppercase text-muted-foreground">Select Viewer</Label>
+                <Label className="text-xs font-semibold uppercase text-muted-foreground">Select Listener or Speaker</Label>
                 <ScrollArea className="h-24 border rounded-xl p-2 mt-2 bg-muted/30">
                   {viewers.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      No active viewers
+                      No active listeners or speakers
                     </p>
                   ) : (
                     <div className="flex gap-2 flex-wrap">
-                      {viewers.map((viewer) => (
+                      {viewers.filter(v => v.id !== user?.id).map((viewer) => (
                         <button
                           key={viewer.id}
                           onClick={() => setSelectedRecipient(viewer.id)}
