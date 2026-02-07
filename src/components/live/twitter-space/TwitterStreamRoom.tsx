@@ -1,12 +1,35 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigation } from '@/context/NavigationContext';
 import { useOptionalLiveStreamContext } from '@/context/LiveStreamContext';
-import { cn } from '@/lib/utils';
+import { useNavigation } from '@/context/NavigationContext';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mic,
+  MicOff,
+  MessageSquare,
+  Users,
+  Share2,
+  Settings,
+  Heart,
+  X,
+  Search,
+  Link as LinkIcon,
+  Send,
+  Flag,
+  MessageCircle,
+  CheckCircle2,
+  FileText,
+  ArrowLeft,
+  Gift,
+  Circle,
+  Video,
+  VideoOff,
+  Hand,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   Room,
   RoomEvent,
@@ -20,32 +43,81 @@ import {
   ConnectionState,
 } from 'livekit-client';
 
-import { TwitterSpaceHeader } from './TwitterSpaceHeader';
-import { TwitterSpaceControls } from './TwitterSpaceControls';
-import { TwitterSpaceChat } from './TwitterSpaceChat';
-import { TwitterSpaceReactionPicker } from './TwitterSpaceReactionPicker';
 import { LiveGiftModal } from '../LiveGiftModal';
+import { ReportContentModal } from '@/components/moderation/ReportContentModal';
+import { SpaceRulesModal } from './SpaceRulesModal';
+import { SpaceFeedbackModal } from './SpaceFeedbackModal';
+import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
-import { Circle, Video, VideoOff, Users, Radio, ArrowLeft, Settings, Share2, Link, X } from 'lucide-react';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface TwitterStreamRoomProps {
   streamId: string;
   onClose: () => void;
 }
 
-interface Reaction {
-  id: string | number;
-  type: string;
+interface GiftAnimation {
+  id: string;
   emoji: string;
-  senderName?: string;
+  senderName: string;
+  receiverName: string;
+  value: number;
 }
 
-const REACTION_EMOJIS: Record<string, string> = {
-  heart: '❤️', like: '👍', laugh: '😂', fire: '🔥', clap: '👏', love: '😍', star: '⭐',
-};
+interface Viewer {
+  id: string;
+  user_id: string;
+  role: string;
+  is_muted: boolean;
+  has_raised_hand: boolean;
+  profile?: {
+    display_name: string;
+    username: string;
+    avatar_url: string;
+    is_verified?: boolean;
+  };
+}
+
+interface StreamData {
+  id: string;
+  title: string;
+  description: string;
+  user_id: string;
+  status: string;
+  viewer_count: number;
+  category?: string;
+  started_at?: string;
+}
+
+interface FloatingReaction {
+  id: string;
+  emoji: string;
+  left: number;
+}
+
+interface FloatingGiftReaction {
+  id: string | number;
+  type: string;
+  senderName?: string;
+  emoji?: string;
+}
+
+interface Reply {
+  id: string;
+  user_id: string;
+  user: string;
+  handle: string;
+  time: string;
+  text: string;
+  avatar: string;
+  likes: number;
+  liked_by_me: boolean;
+  isGift?: boolean;
+}
+
+const REACTION_EMOJIS = [
+  '😂', '😮', '😢', '💜', '💯',
+  '👏', '✊', '👍', '👎', '👋'
+];
 
 export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps) => {
   const navigate = useNavigate();
@@ -59,34 +131,45 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const videoTrackRef = useRef<LocalVideoTrack | null>(null);
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
 
-  // Stream state
-  const [stream, setStream] = useState<any>(null);
-  const [host, setHost] = useState<any>(null);
-  const [isHost, setIsHost] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  // Connection state
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('idle');
-  const [isMicOn, setIsMicOn] = useState(false);
-  const [isCameraOn, setIsCameraOn] = useState(false);
-  const [hasVideo, setHasVideo] = useState(false);
-  const [viewerCount, setViewerCount] = useState(0);
-
-  // UI state
+  // View states
+  const [view, setView] = useState<'main' | 'guests'>('main');
   const [showChat, setShowChat] = useState(false);
   const [showReactions, setShowReactions] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showAudioSettingsModal, setShowAudioSettingsModal] = useState(false);
 
-  // Recording state
+  // Gift animations state
+  const [giftAnimations, setGiftAnimations] = useState<GiftAnimation[]>([]);
+  const [floatingGiftReactions, setFloatingGiftReactions] = useState<FloatingGiftReaction[]>([]);
+
+  // Data states
+  const [stream, setStream] = useState<StreamData | null>(null);
+  const [host, setHost] = useState<any>(null);
+  const [viewers, setViewers] = useState<Viewer[]>([]);
+  const [floatingReactions, setFloatingReactions] = useState<FloatingReaction[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const [activeGuestTab, setActiveGuestTab] = useState('All');
+  const [replies, setReplies] = useState<Reply[]>([]);
+  const [replyText, setReplyText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<{ id: string; user: string; handle: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Connection state
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('idle');
+  const [isMicOn, setIsMicOn] = useState(false);
+  const [isCameraOn, setIsCameraOn] = useState(true);
+  const [hasVideo, setHasVideo] = useState(false);
+
+  // User states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingLoading, setRecordingLoading] = useState(false);
 
-  // Reactions
-  const [reactions, setReactions] = useState<Reaction[]>([]);
-  const [viewers, setViewers] = useState<any[]>([]);
+  const isHost = stream?.user_id === user?.id;
 
   // Hide bottom nav
   useEffect(() => {
@@ -94,61 +177,78 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     return () => setHideBottomNav(false);
   }, [setHideBottomNav]);
 
-  // Fetch stream data
+  // Initialize stream
   useEffect(() => {
-    const fetchStream = async () => {
-      const { data: streamData, error } = await supabase
-        .from('live_streams')
-        .select('*')
-        .eq('id', streamId)
-        .maybeSingle();
-
-      if (error || !streamData) {
-        console.error('[TwitterStreamRoom] Error fetching stream:', error);
-        toast.error('Stream not found');
-        onClose();
-        return;
-      }
-
-      setStream(streamData);
-      setIsHost(user?.id === streamData.user_id);
-      setViewerCount(streamData.viewer_count || 0);
-
-      // Fetch host profile
-      const { data: hostData } = await supabase
-        .from('profiles')
-        .select('id, display_name, username, avatar_url, is_verified')
-        .eq('id', streamData.user_id)
-        .single();
-
-      if (hostData) {
-        setHost(hostData);
-      }
-
-      // Fetch viewers
-      const { data: viewersData } = await supabase
-        .from('live_stream_viewers')
-        .select('user_id, profiles(id, display_name, username, avatar_url)')
-        .eq('stream_id', streamId);
-
-      if (viewersData) {
-        setViewers(viewersData.map(v => ({
-          id: v.user_id,
-          ...(v.profiles as any),
-        })));
-      }
-
-      setLoading(false);
+    const initStream = async () => {
+      await fetchStreamData();
     };
+    initStream();
 
-    if (streamId && user) {
-      fetchStream();
+    return () => {
+      if (roomRef.current) {
+        roomRef.current.disconnect();
+      }
+      videoTrackRef.current?.stop();
+      audioTrackRef.current?.stop();
+    };
+  }, [streamId]);
+
+  // Fetch stream data
+  const fetchStreamData = async () => {
+    const { data: streamData, error } = await supabase
+      .from('live_streams')
+      .select('*')
+      .eq('id', streamId)
+      .maybeSingle();
+
+    if (error || !streamData) {
+      toast.error('Stream not found');
+      onClose();
+      return;
     }
-  }, [streamId, user, onClose]);
+
+    setStream(streamData);
+
+    // Fetch host profile
+    const { data: hostData } = await supabase
+      .from('profiles')
+      .select('id, display_name, username, avatar_url, is_verified')
+      .eq('id', streamData.user_id)
+      .single();
+
+    if (hostData) {
+      setHost(hostData);
+    }
+
+    await fetchViewers();
+    setLoading(false);
+
+    // Initialize LiveKit after data is ready
+    setTimeout(() => initializeLiveKit(streamData), 100);
+  };
+
+  // Fetch viewers
+  const fetchViewers = async () => {
+    const { data: viewersData } = await supabase
+      .from('live_stream_viewers')
+      .select('user_id, profiles(id, display_name, username, avatar_url, is_verified)')
+      .eq('stream_id', streamId);
+
+    if (viewersData) {
+      setViewers(viewersData.map(v => ({
+        id: v.user_id,
+        user_id: v.user_id,
+        role: 'listener',
+        is_muted: true,
+        has_raised_hand: false,
+        profile: v.profiles as any,
+      })));
+    }
+  };
 
   // Initialize LiveKit
-  const initializeLiveKit = useCallback(async () => {
-    if (!user || !stream) return;
+  const initializeLiveKit = async (streamData: StreamData) => {
+    if (!user) return;
 
     try {
       setConnectionStatus('connecting');
@@ -156,9 +256,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       const { data, error } = await supabase.functions.invoke('livekit-token', {
         body: {
           roomName: `stream-${streamId}`,
-          participantName: user.user_metadata?.display_name || user.user_metadata?.username || (isHost ? 'Host' : 'Viewer'),
+          participantName: user.user_metadata?.display_name || user.user_metadata?.username || 'Viewer',
           participantIdentity: user.id,
-          isHost,
+          isHost: user.id === streamData.user_id,
         },
       });
 
@@ -180,17 +280,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       lkRoom.on(RoomEvent.ConnectionStateChanged, (state) => {
         if (state === ConnectionState.Connected) {
           setConnectionStatus('connected');
-          if (isHost) {
+          if (user.id === streamData.user_id) {
             toast.success("You are now live!");
-            supabase
-              .from("live_streams")
-              .update({
-                status: "live",
-                stream_ready: true,
-                connection_state: "live",
-                started_at: new Date().toISOString(),
-              })
-              .eq("id", streamId);
+            supabase.from("live_streams").update({
+              status: "live",
+              stream_ready: true,
+              connection_state: "live",
+              started_at: new Date().toISOString(),
+            }).eq("id", streamId);
           }
         } else if (state === ConnectionState.Reconnecting) {
           setConnectionStatus('reconnecting');
@@ -201,11 +298,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       // Participant events
       lkRoom.on(RoomEvent.ParticipantConnected, () => {
-        setViewerCount(lkRoom.remoteParticipants.size + 1);
+        fetchViewers();
       });
 
       lkRoom.on(RoomEvent.ParticipantDisconnected, () => {
-        setViewerCount(lkRoom.remoteParticipants.size + 1);
+        fetchViewers();
       });
 
       // Track subscription for viewers
@@ -232,7 +329,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       await lkRoom.connect(data.url, data.token);
 
       // Publish tracks if host
-      if (isHost) {
+      if (user.id === streamData.user_id) {
         const videoTrack = await createLocalVideoTrack({
           facingMode: "user",
           resolution: VideoPresets.h720,
@@ -263,53 +360,207 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       setConnectionStatus('error');
       toast.error(error.message || 'Failed to connect');
     }
-  }, [user, stream, streamId, isHost]);
+  };
 
-  // Initialize on stream load
-  useEffect(() => {
-    if (stream && !loading) {
-      initializeLiveKit();
-    }
-
-    return () => {
-      if (roomRef.current) {
-        roomRef.current.disconnect();
-      }
-      videoTrackRef.current?.stop();
-      audioTrackRef.current?.stop();
-      document.querySelectorAll('audio').forEach(el => el.remove());
-    };
-  }, [stream, loading]);
-
-  // Subscribe to reactions
+  // Realtime subscriptions
   useEffect(() => {
     if (!streamId) return;
 
-    const channel = supabase.channel(`stream-reactions-${streamId}`)
+    // Reactions broadcast channel
+    const reactionsChannel = supabase
+      .channel(`stream-reactions-${streamId}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'live_stream_reactions',
         filter: `stream_id=eq.${streamId}`,
       }, (payload: any) => {
-        const reactionType = payload.new.reaction_type || 'heart';
-        const newReaction: Reaction = {
-          id: Date.now() + Math.random(),
-          type: reactionType,
-          emoji: REACTION_EMOJIS[reactionType] || '❤️',
-        };
-        setReactions(prev => [...prev, newReaction]);
-        setTimeout(() => {
-          setReactions(prev => prev.filter(r => r.id !== newReaction.id));
-        }, 3000);
+        if (payload.new?.user_id !== user?.id) {
+          const reactionEmojis: Record<string, string> = {
+            heart: '❤️', like: '👍', laugh: '😂', fire: '🔥', clap: '👏', love: '😍', star: '⭐',
+          };
+          handleFloatingReaction(reactionEmojis[payload.new.reaction_type] || '❤️');
+        }
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, [streamId]);
+    // Gift channel
+    const giftChannel = supabase
+      .channel(`stream-gifts-${streamId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'live_stream_gifts',
+        filter: `stream_id=eq.${streamId}`,
+      }, async (payload: any) => {
+        const giftData = payload.new;
+
+        const { data: senderProfile } = await supabase
+          .from('profiles')
+          .select('display_name, username, avatar_url')
+          .eq('id', giftData.sender_id)
+          .single();
+
+        const { data: receiverProfile } = await supabase
+          .from('profiles')
+          .select('display_name, username')
+          .eq('id', giftData.receiver_id)
+          .single();
+
+        const giftEmojis: Record<string, string> = {
+          rose: '🌹', coffee: '☕', heart: '❤️', diamond: '💎',
+          rocket: '🚀', castle: '🏰', crown: '👑', universe: '🌌',
+          credits: '💰',
+        };
+
+        const emoji = giftEmojis[giftData.gift_type] || '🎁';
+
+        const floatingGift: FloatingGiftReaction = {
+          id: giftData.id,
+          type: giftData.gift_type,
+          senderName: senderProfile?.display_name || 'Someone',
+          emoji,
+        };
+        setFloatingGiftReactions(prev => [...prev, floatingGift]);
+
+        const newGiftAnim: GiftAnimation = {
+          id: giftData.id,
+          emoji,
+          senderName: senderProfile?.display_name || 'Someone',
+          receiverName: receiverProfile?.display_name || 'Host',
+          value: giftData.credit_value || 1,
+        };
+        setGiftAnimations(prev => [...prev, newGiftAnim]);
+
+        const giftChatMessage: Reply = {
+          id: `gift-${giftData.id}`,
+          user_id: giftData.sender_id,
+          user: senderProfile?.display_name || 'Someone',
+          handle: '@' + (senderProfile?.username || 'user'),
+          time: 'Just now',
+          text: `🎁 Sent ${emoji} ${giftData.gift_type} (${giftData.credit_value} credits)`,
+          avatar: senderProfile?.avatar_url || '',
+          likes: 0,
+          liked_by_me: false,
+          isGift: true,
+        };
+        setReplies(prev => [...prev, giftChatMessage]);
+
+        setTimeout(() => {
+          setGiftAnimations(prev => prev.filter(g => g.id !== newGiftAnim.id));
+        }, 5000);
+      })
+      .subscribe();
+
+    // Stream ended event
+    const streamChannel = supabase
+      .channel(`stream-events-${streamId}`)
+      .on('broadcast', { event: 'room_ended' }, () => {
+        toast.info('Stream has ended');
+        onClose();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(reactionsChannel);
+      supabase.removeChannel(giftChannel);
+      supabase.removeChannel(streamChannel);
+    };
+  }, [streamId, user?.id]);
+
+  // Fetch replies - using type assertion for table not in generated types
+  useEffect(() => {
+    if (!streamId) return;
+
+    const fetchReplies = async () => {
+      // Use type assertion to bypass strict type checking for tables not yet in generated types
+      const supabaseAny = supabase as any;
+      const { data, error } = await supabaseAny
+        .from('live_stream_messages')
+        .select('*')
+        .eq('stream_id', streamId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error || !data) return;
+
+      const messagesData = data as Array<{
+        id: string;
+        user_id: string;
+        content: string;
+        created_at: string;
+      }>;
+
+      if (messagesData.length > 0) {
+        const userIds = messagesData.map(m => m.user_id);
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, username, avatar_url')
+          .in('id', userIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+        setReplies(
+          messagesData.reverse().map((msg) => ({
+            id: msg.id,
+            user_id: msg.user_id,
+            user: profileMap.get(msg.user_id)?.display_name || 'User',
+            handle: '@' + (profileMap.get(msg.user_id)?.username || 'user'),
+            time: getRelativeTime(msg.created_at),
+            text: msg.content,
+            avatar: profileMap.get(msg.user_id)?.avatar_url || '',
+            likes: 0,
+            liked_by_me: false,
+          }))
+        );
+      }
+    };
+
+    fetchReplies();
+
+    // Subscribe to broadcast channel for new messages
+    const channel = supabase
+      .channel(`stream-chat-${streamId}`)
+      .on('broadcast', { event: 'new_message' }, () => {
+        fetchReplies();
+        if (!showChat) {
+          setUnreadMessages(prev => prev + 1);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [streamId, showChat]);
+
+  // Helper to get relative time
+  const getRelativeTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${Math.floor(diffHours / 24)}d`;
+  };
+
+  const handleFloatingReaction = (emoji: string) => {
+    const newReaction: FloatingReaction = {
+      id: `${Date.now()}-${Math.random()}`,
+      emoji,
+      left: Math.random() * 60 + 20,
+    };
+    setFloatingReactions(prev => [...prev, newReaction]);
+    setTimeout(() => {
+      setFloatingReactions(prev => prev.filter(r => r.id !== newReaction.id));
+    }, 4000);
+  };
 
   // Handle mic toggle
-  const handleMicToggle = useCallback(() => {
+  const handleMicToggle = () => {
     if (!isHost) return;
     if (audioTrackRef.current) {
       if (isMicOn) {
@@ -319,10 +570,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       }
     }
     setIsMicOn(!isMicOn);
-  }, [isHost, isMicOn]);
+  };
 
   // Handle camera toggle
-  const handleCameraToggle = useCallback(() => {
+  const handleCameraToggle = () => {
     if (!isHost) return;
     if (videoTrackRef.current) {
       if (isCameraOn) {
@@ -332,7 +583,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       }
     }
     setIsCameraOn(!isCameraOn);
-  }, [isHost, isCameraOn]);
+  };
 
   // Handle recording toggle
   const handleRecordingToggle = async () => {
@@ -342,19 +593,13 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     try {
       const action = isRecording ? 'stop' : 'start';
       const { error } = await supabase.functions.invoke('livekit-recording', {
-        body: {
-          action,
-          roomId: streamId,
-          roomType: 'live_streams',
-        },
+        body: { action, roomId: streamId, roomType: 'live_streams' },
       });
 
       if (error) throw error;
-
       setIsRecording(action === 'start');
-      toast.success(action === 'start' ? 'Recording started' : 'Recording stopped');
+      toast.success(action === 'start' ? '🔴 Recording started' : '⏹️ Recording stopped');
     } catch (error: any) {
-      console.error('[TwitterStreamRoom] Recording error:', error);
       toast.error('Failed to toggle recording');
     } finally {
       setRecordingLoading(false);
@@ -364,20 +609,17 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   // Handle leave/end
   const handleLeave = async () => {
     if (isHost) {
-      // Stop recording if active
       if (isRecording) {
         await supabase.functions.invoke('livekit-recording', {
           body: { action: 'stop', roomId: streamId, roomType: 'live_streams' },
         });
       }
 
-      // End the stream
       await supabase.from('live_streams').update({
         status: 'ended',
         ended_at: new Date().toISOString(),
       }).eq('id', streamId);
 
-      // Broadcast room ended
       supabase.channel(`stream-events-${streamId}`).send({
         type: 'broadcast',
         event: 'room_ended',
@@ -395,7 +637,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   };
 
   // Handle back (minimize)
-  const handleBack = () => {
+  const handleMinimize = () => {
     if (streamContext) {
       streamContext.minimizeStream();
     }
@@ -405,76 +647,229 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   // Handle reaction
   const handleReaction = async (emoji: string) => {
     setShowReactions(false);
+    handleFloatingReaction(emoji);
+
+    const reactionTypes: Record<string, string> = {
+      '❤️': 'heart', '👍': 'like', '😂': 'laugh', '🔥': 'fire', '👏': 'clap', '😍': 'love', '⭐': 'star',
+    };
+
     await supabase.from('live_stream_reactions').insert({
       stream_id: streamId,
       user_id: user?.id,
-      reaction_type: Object.keys(REACTION_EMOJIS).find(k => REACTION_EMOJIS[k] === emoji) || 'heart',
+      reaction_type: reactionTypes[emoji] || 'heart',
     });
   };
 
-  // Handle share
-  const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: stream?.title || 'Live Stream',
-          text: `Watch this live stream: ${stream?.title}`,
-          url: shareUrl,
-        });
-      } else {
-        await navigator.clipboard.writeText(shareUrl);
-        toast.success('Link copied to clipboard');
-      }
-    } catch (error) {
-      // User cancelled
+  const handleReplySubmit = async () => {
+    if (!user || !replyText.trim()) return;
+
+    const content = replyingTo
+      ? `@${replyingTo.handle.replace('@', '')} ${replyText}`
+      : replyText;
+
+    // Insert into messages table (using any to bypass type checking for table not in generated types)
+    const { error } = await (supabase as any).from('live_stream_messages').insert({
+      stream_id: streamId,
+      user_id: user.id,
+      content,
+    });
+
+    if (!error) {
+      // Broadcast to notify others
+      supabase.channel(`stream-chat-${streamId}`).send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: { user_id: user.id },
+      });
     }
+
+    setReplyText('');
+    setReplyingTo(null);
+    toast.success('Reply sent!');
   };
 
-  // Handle chat open
-  const handleChatToggle = () => {
-    setShowChat(!showChat);
-    if (!showChat) {
-      setUnreadCount(0);
-    }
+  const handleLikeMessage = (messageId: string) => {
+    setReplies(prev => prev.map(reply => {
+      if (reply.id === messageId) {
+        return {
+          ...reply,
+          liked_by_me: !reply.liked_by_me,
+          likes: reply.liked_by_me ? reply.likes - 1 : reply.likes + 1,
+        };
+      }
+      return reply;
+    }));
+  };
+
+  const handleReplyToMessage = (reply: Reply) => {
+    setReplyingTo({ id: reply.id, user: reply.user, handle: reply.handle });
+  };
+
+  const navigateToProfile = (userId: string) => {
+    navigate(`/profile/${userId}`);
   };
 
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4" />
-          <p className="text-zinc-400">Connecting to stream...</p>
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  // Create sorted list with host first, then viewers
+  const sortedParticipants = [
+    // Host as speaker
+    ...(host ? [{
+      id: host.id,
+      user_id: host.id,
+      role: 'host',
+      is_muted: !isMicOn,
+      has_raised_hand: false,
+      profile: host,
+    }] : []),
+    // All other viewers as listeners
+    ...viewers.filter(v => v.user_id !== host?.id),
+  ];
+
+  const speakersCount = sortedParticipants.filter(s => s.role !== 'listener').length;
+  const listenersCount = sortedParticipants.filter(s => s.role === 'listener').length;
+
+  // Guests overlay
+  if (view === 'guests') {
+    const filteredParticipants = sortedParticipants.filter(s => {
+      if (activeGuestTab === 'All') return true;
+      if (activeGuestTab === 'Co-hosts') return s.role === 'co_host';
+      if (activeGuestTab === 'Speakers') return s.role === 'host' || s.role === 'speaker';
+      if (activeGuestTab === 'Listening') return s.role === 'listener';
+      return true;
+    });
+
+    return (
+      <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col">
+        <div className="px-4 py-4 border-b border-zinc-800 flex items-center justify-between">
+          <button onClick={() => setView('main')} className="p-2">
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </button>
+          <h2 className="text-white font-bold text-lg">Guests</h2>
+          <div className="w-9" />
+        </div>
+
+        <div className="px-4 py-3">
+          <div className="flex items-center bg-zinc-800 rounded-full px-3 py-2">
+            <Search className="w-4 h-4 text-zinc-500" />
+            <input
+              type="text"
+              placeholder="Search guests"
+              className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none ml-2"
+            />
+          </div>
+        </div>
+
+        <div className="px-4 py-3 flex gap-2 overflow-x-auto scrollbar-hide">
+          {['All', 'Co-hosts', 'Speakers', 'Listening'].map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveGuestTab(tab)}
+              className={`px-5 py-2 rounded-full border text-sm font-medium whitespace-nowrap transition-colors ${
+                activeGuestTab === tab
+                  ? 'bg-purple-600 border-transparent'
+                  : 'border-zinc-700 text-zinc-300'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 overflow-y-auto scrollbar-hide">
+          {/* Host Section */}
+          {host && (activeGuestTab === 'All' || activeGuestTab === 'Speakers') && (
+            <div className="px-4 py-3">
+              <h3 className="text-zinc-400 text-sm font-semibold mb-3">Host</h3>
+              <button
+                onClick={() => navigateToProfile(host.id)}
+                className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
+              >
+                <img
+                  src={host.avatar_url || ''}
+                  alt="host"
+                  className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                />
+                <div className="flex-1">
+                  <p className="text-white font-medium">{host.display_name}</p>
+                  <p className="text-zinc-500 text-sm">@{host.username}</p>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* Listeners Section */}
+          {filteredParticipants.filter(s => s.role === 'listener').length > 0 && (
+            <div className="px-4 py-3">
+              <h3 className="text-zinc-400 text-sm font-semibold mb-3">
+                Listeners ({filteredParticipants.filter(s => s.role === 'listener').length})
+              </h3>
+              <div className="space-y-2">
+                {filteredParticipants
+                  .filter(s => s.role === 'listener')
+                  .map(viewer => (
+                    <button
+                      key={viewer.id}
+                      onClick={() => navigateToProfile(viewer.user_id)}
+                      className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
+                    >
+                      <img
+                        src={viewer.profile?.avatar_url || ''}
+                        alt={viewer.profile?.display_name}
+                        className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                      />
+                      <div className="flex-1">
+                        <p className="text-white font-medium">{viewer.profile?.display_name}</p>
+                        <p className="text-zinc-500 text-sm">@{viewer.profile?.username}</p>
+                      </div>
+                    </button>
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col">
+    <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-zinc-950">
-        <button onClick={handleBack} className="p-2 text-white hover:bg-zinc-800 rounded-full transition-colors">
-          <ArrowLeft className="w-5 h-5" />
+      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+        <button onClick={handleMinimize} className="p-2">
+          <ArrowLeft className="w-5 h-5 text-white" />
         </button>
-
-        <div className="flex items-center gap-3">
-          {/* Record Button for Host */}
+        <h1 className="text-white font-bold text-base flex-1 text-center truncate px-2">{stream?.title}</h1>
+        <div className="flex items-center gap-2">
+          {/* Recording button - Host only */}
           {isHost && (
             <button
               onClick={handleRecordingToggle}
               disabled={recordingLoading}
               className={cn(
-                "p-2 rounded-full transition-colors",
+                "p-2 rounded-full transition-all",
                 isRecording
-                  ? "text-red-500 bg-red-500/20"
-                  : "text-zinc-400 hover:bg-zinc-800"
+                  ? "bg-red-500/20 border border-red-500"
+                  : "hover:bg-zinc-800"
               )}
+              title={isRecording ? "Stop Recording" : "Start Recording"}
             >
-              <Circle className={cn("w-5 h-5", isRecording && "fill-red-500 animate-pulse")} />
+              <Circle
+                className={cn(
+                  "w-5 h-5 transition-colors",
+                  isRecording
+                    ? "text-red-500 fill-red-500 animate-pulse"
+                    : "text-zinc-400"
+                )}
+              />
             </button>
           )}
-
           {/* End/Leave button */}
           <button
             onClick={handleLeave}
@@ -482,220 +877,543 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           >
             {isHost ? 'End' : 'Leave'}
           </button>
-
           {/* Settings button */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="p-2 text-white hover:bg-zinc-800 rounded-full transition-colors"
-          >
-            <Settings className="w-5 h-5" />
+          <button onClick={() => setShowSettings(true)} className="p-2">
+            <Settings className="w-5 h-5 text-white" />
           </button>
         </div>
       </div>
 
-      {/* Main Content Area - Video Feed */}
-      <div className="flex-1 relative overflow-hidden">
-        {/* Video Element */}
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isHost}
-          className={cn(
-            "absolute inset-0 w-full h-full object-cover",
-            !hasVideo && "hidden"
-          )}
-        />
-
-        {/* No Video Fallback */}
-        {!hasVideo && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-900 to-zinc-950">
-            <Avatar className="w-24 h-24 mb-4 ring-4 ring-purple-500/30">
-              <AvatarImage src={host?.avatar_url} />
-              <AvatarFallback className="text-2xl bg-purple-600">
-                {host?.display_name?.[0] || 'H'}
-              </AvatarFallback>
-            </Avatar>
-            <h2 className="text-xl font-bold text-white mb-1">{host?.display_name || 'Host'}</h2>
-            <p className="text-zinc-400 text-sm mb-4">@{host?.username}</p>
-            {connectionStatus === 'connecting' && (
-              <p className="text-purple-400 text-sm">Connecting...</p>
-            )}
-            {connectionStatus === 'reconnecting' && (
-              <p className="text-amber-400 text-sm">Reconnecting...</p>
-            )}
-          </div>
+      {/* Main Content - Video + User Grid */}
+      <div className="flex-1 flex flex-col px-4 pt-4 overflow-y-auto">
+        {/* Connection Status */}
+        {connectionStatus !== 'connected' && connectionStatus !== 'idle' && (
+          <p className="text-center text-zinc-500 text-xs mb-2 capitalize">{connectionStatus}...</p>
         )}
 
-        {/* Stream Info Overlay */}
-        <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-          <div className="flex items-center gap-2">
-            {/* Live Badge */}
-            <Badge className="bg-red-500 text-white px-2 py-0.5 text-xs font-bold">
-              <Radio className="w-3 h-3 mr-1 animate-pulse" />
-              LIVE
-            </Badge>
-            {/* Viewer Count */}
-            <div className="flex items-center gap-1 bg-black/50 px-2 py-1 rounded-full">
-              <Users className="w-3 h-3 text-white" />
-              <span className="text-white text-xs">{viewerCount}</span>
-            </div>
-          </div>
-
-          {/* Recording Indicator */}
-          {isRecording && (
-            <div className="flex items-center gap-1 bg-red-500/80 px-2 py-1 rounded-full">
-              <Circle className="w-2 h-2 fill-white text-white animate-pulse" />
-              <span className="text-white text-xs font-medium">REC</span>
-            </div>
-          )}
-        </div>
-
-        {/* Stream Title */}
-        <div className="absolute bottom-20 left-4 right-4">
-          <h3 className="text-white font-semibold text-lg drop-shadow-lg">
-            {stream?.title || 'Live Stream'}
-          </h3>
-          {stream?.description && (
-            <p className="text-zinc-300 text-sm mt-1 line-clamp-2 drop-shadow">
-              {stream.description}
-            </p>
-          )}
-        </div>
-
-        {/* Floating Reactions */}
-        <FloatingReactions reactions={reactions} />
-
-        {/* Right Side Action Stack */}
-        {isHost && (
-          <div className="absolute right-4 bottom-24 flex flex-col gap-3">
-            {/* Camera Toggle */}
-            <button
-              onClick={handleCameraToggle}
-              className={cn(
-                "w-12 h-12 rounded-full flex items-center justify-center border transition-all",
-                isCameraOn
-                  ? "bg-purple-600 border-purple-500 text-white"
-                  : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:border-zinc-500"
+        {/* Video Container */}
+        <div className="relative mb-4 mx-auto w-full max-w-sm aspect-video rounded-2xl overflow-hidden bg-zinc-800">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted={isHost}
+            className={cn(
+              "w-full h-full object-cover",
+              !hasVideo && "hidden"
+            )}
+          />
+          {!hasVideo && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              {host?.avatar_url ? (
+                <img src={host.avatar_url} alt={host?.display_name} className="w-20 h-20 rounded-full" />
+              ) : (
+                <div className="w-20 h-20 rounded-full bg-zinc-700 flex items-center justify-center text-zinc-400 text-3xl">
+                  {host?.display_name?.[0] || 'H'}
+                </div>
               )}
-            >
-              {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-            </button>
+            </div>
+          )}
+          {/* Live badge */}
+          <div className="absolute top-3 left-3 px-2 py-1 bg-red-600 rounded text-white text-xs font-bold">
+            LIVE
+          </div>
+          {/* Viewer count */}
+          <div className="absolute top-3 right-3 px-2 py-1 bg-black/50 rounded text-white text-xs flex items-center gap-1">
+            <Users className="w-3 h-3" />
+            {viewers.length + 1}
+          </div>
+          {/* Host controls overlay */}
+          {isHost && (
+            <div className="absolute bottom-3 right-3 flex gap-2">
+              <button
+                onClick={handleCameraToggle}
+                className={cn(
+                  "p-2 rounded-full transition-all",
+                  isCameraOn ? "bg-white/20" : "bg-red-500/80"
+                )}
+              >
+                {isCameraOn ? <Video className="w-4 h-4 text-white" /> : <VideoOff className="w-4 h-4 text-white" />}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Host Section */}
+        <div className="mb-4">
+          <p className="text-zinc-500 text-xs font-medium mb-3">Host ({speakersCount})</p>
+          <div className="flex flex-wrap gap-3 justify-center">
+            {host && (
+              <button
+                onClick={() => navigateToProfile(host.id)}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-zinc-900/50 transition-colors w-20"
+              >
+                <div className="relative">
+                  <div className="w-14 h-14 rounded-full overflow-hidden bg-zinc-800 border-2 border-purple-500">
+                    {host.avatar_url ? (
+                      <img src={host.avatar_url} alt={host.display_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-zinc-400 text-lg font-semibold">
+                        {host.display_name?.[0] || 'H'}
+                      </div>
+                    )}
+                  </div>
+                  {!isMicOn && isHost && (
+                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-zinc-800 rounded-full flex items-center justify-center border-2 border-zinc-950">
+                      <MicOff className="w-2.5 h-2.5 text-zinc-400" />
+                    </div>
+                  )}
+                </div>
+                <div className="text-center max-w-full">
+                  <div className="flex items-center justify-center gap-0.5">
+                    <span className="text-white text-[11px] font-medium truncate max-w-[50px]">
+                      {host.display_name?.split(' ')[0] || 'Host'}
+                    </span>
+                    {host.is_verified && (
+                      <CheckCircle2 className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />
+                    )}
+                  </div>
+                  <span className="text-[9px] text-purple-400">Host</span>
+                </div>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Listeners Grid */}
+        {listenersCount > 0 && (
+          <div>
+            <p className="text-zinc-500 text-xs font-medium mb-3">Listening ({listenersCount})</p>
+            <div className="grid grid-cols-5 gap-2">
+              {sortedParticipants
+                .filter(s => s.role === 'listener')
+                .slice(0, 15)
+                .map((viewer) => (
+                  <button
+                    key={viewer.id}
+                    onClick={() => navigateToProfile(viewer.user_id)}
+                    className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-zinc-900/50 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700">
+                      {viewer.profile?.avatar_url ? (
+                        <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-zinc-400 text-sm font-semibold">
+                          {viewer.profile?.display_name?.[0] || 'U'}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-zinc-400 text-[9px] truncate max-w-full">
+                      {viewer.profile?.display_name?.split(' ')[0] || 'User'}
+                    </span>
+                  </button>
+                ))}
+            </div>
           </div>
         )}
       </div>
 
-      {/* Controls Bar */}
-      <TwitterSpaceControls
-        isMicOn={isMicOn}
-        onMicToggle={handleMicToggle}
-        onGuestsClick={() => {}}
-        onReactionsClick={() => setShowReactions(true)}
-        onShareClick={handleShare}
-        onChatClick={handleChatToggle}
-        unreadCount={unreadCount}
-        canSpeak={isHost}
-        hasRaisedHand={false}
-        onGiftClick={() => setShowGiftModal(true)}
-        isHost={isHost}
-      />
-
-      {/* Modals */}
-      <TwitterSpaceChat
-        isOpen={showChat}
-        onClose={() => setShowChat(false)}
-        spaceId={streamId}
-        spaceTitle={stream?.title || 'Live Stream'}
-        hostName={host?.display_name || 'Host'}
-        startedAt={stream?.started_at}
-        viewerCount={viewerCount}
-      />
-
-      <TwitterSpaceReactionPicker
-        isOpen={showReactions}
-        onClose={() => setShowReactions(false)}
-        onReaction={handleReaction}
-      />
-
-      {/* Share Modal */}
-      <AnimatePresence>
-        {showShare && (
-          <>
+      {/* Floating Reactions */}
+      <div className="fixed bottom-32 right-4 pointer-events-none">
+        <AnimatePresence>
+          {floatingReactions.map(r => (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-50"
-              onClick={() => setShowShare(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-900 rounded-t-3xl p-6 pb-safe"
+              key={r.id}
+              initial={{ opacity: 0, y: 0, scale: 1 }}
+              animate={{ opacity: 1, y: -20, scale: 1.5 }}
+              exit={{ opacity: 0, y: -500, scale: 0.8 }}
+              transition={{ duration: 4, ease: "easeOut" }}
+              className="absolute text-4xl"
+              style={{ left: `${r.left}%` }}
             >
-              <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
-              <h3 className="text-white font-semibold text-lg mb-4">Share Stream</h3>
-              <div className="space-y-3">
-                <button
-                  onClick={handleShare}
-                  className="w-full flex items-center gap-3 p-3 bg-zinc-800 rounded-xl hover:bg-zinc-700 transition-colors"
-                >
-                  <Share2 className="w-5 h-5 text-purple-400" />
-                  <span className="text-white">Share</span>
-                </button>
-                <button
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(`${window.location.origin}/live/stream/${streamId}`);
-                    toast.success('Link copied!');
-                    setShowShare(false);
-                  }}
-                  className="w-full flex items-center gap-3 p-3 bg-zinc-800 rounded-xl hover:bg-zinc-700 transition-colors"
-                >
-                  <Link className="w-5 h-5 text-zinc-400" />
-                  <span className="text-white">Copy Link</span>
-                </button>
-              </div>
+              {r.emoji}
             </motion.div>
-          </>
-        )}
+          ))}
+        </AnimatePresence>
+      </div>
+
+      {/* Floating Gift Reactions */}
+      <FloatingReactions reactions={floatingGiftReactions} className="z-40" />
+
+      {/* Gift Animations - Banner notifications */}
+      <AnimatePresence>
+        {giftAnimations.map((gift) => (
+          <motion.div
+            key={gift.id}
+            initial={{ opacity: 0, x: -100, scale: 0.8 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 100, scale: 0.8 }}
+            transition={{ type: 'spring', damping: 20 }}
+            className="fixed left-4 top-1/3 z-50 max-w-[280px]"
+          >
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/90 to-pink-500/90 backdrop-blur-sm shadow-lg">
+              <motion.span
+                className="text-3xl"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 0.5, repeat: 2 }}
+              >
+                {gift.emoji}
+              </motion.span>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-semibold truncate">{gift.senderName}</p>
+                <p className="text-white/80 text-xs truncate">sent {gift.emoji} to {gift.receiverName}</p>
+              </div>
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/20">
+                <span className="text-white text-xs font-bold">+{gift.value}</span>
+              </div>
+            </div>
+          </motion.div>
+        ))}
       </AnimatePresence>
 
-      {/* Settings Modal */}
-      <AnimatePresence>
-        {showSettings && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 z-50"
-              onClick={() => setShowSettings(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: 50 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 50 }}
-              className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-900 rounded-t-3xl p-6 pb-safe"
+      {/* BOTTOM CONTROLS */}
+      <div className="px-4 py-4 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          {/* Mic Button */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={handleMicToggle}
+              className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all ${
+                isHost
+                  ? isMicOn
+                    ? 'bg-purple-600 border-purple-500 text-white'
+                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                  : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+              }`}
+              disabled={!isHost}
             >
-              <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
-              <h3 className="text-white font-semibold text-lg mb-4">Settings</h3>
-              <div className="space-y-3">
+              {isHost ? (
+                isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
+              ) : (
+                <Hand className="w-6 h-6" />
+              )}
+            </button>
+            <span className="text-xs text-zinc-500">
+              {isHost ? (isMicOn ? 'Mute' : 'Unmute') : 'Request'}
+            </span>
+          </div>
+
+          {/* Center Icons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setView('guests')}
+              className="p-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <Users className="w-5 h-5" />
+            </button>
+
+            {/* Gift Button */}
+            <button
+              onClick={() => setShowGiftModal(true)}
+              className={`p-2 transition-colors ${
+                isHost
+                  ? 'text-teal-400 hover:text-teal-300'
+                  : 'text-amber-400 hover:text-amber-300'
+              }`}
+            >
+              <Gift className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => setShowReactions(true)}
+              className="p-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <Heart className="w-5 h-5" />
+            </button>
+
+            <button
+              onClick={() => setShowShare(true)}
+              className="p-2 text-zinc-400 hover:text-white transition-colors"
+            >
+              <Share2 className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Chat Button with Badge */}
+          <button
+            onClick={() => {
+              setShowChat(true);
+              setUnreadMessages(0);
+            }}
+            className="relative px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center gap-2 transition-colors"
+          >
+            <MessageCircle className="w-5 h-5 text-white" />
+            {unreadMessages > 0 && (
+              <span className="bg-white text-purple-600 text-xs px-1.5 py-0.5 font-bold rounded-full">
+                {unreadMessages}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* REACTION PICKER */}
+      {showReactions && (
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowReactions(false)}>
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="grid grid-cols-5 gap-4">
+              {REACTION_EMOJIS.map(emoji => (
                 <button
-                  onClick={() => {
-                    toast.info('View rules feature coming soon');
-                    setShowSettings(false);
-                  }}
-                  className="w-full flex items-center gap-3 p-3 bg-zinc-800 rounded-xl hover:bg-zinc-700 transition-colors"
+                  key={emoji}
+                  onClick={() => handleReaction(emoji)}
+                  className="text-4xl aspect-square flex items-center justify-center hover:scale-125 transition-transform active:scale-90"
                 >
-                  <Settings className="w-5 h-5 text-zinc-400" />
-                  <span className="text-white">View Rules</span>
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SHARE MENU */}
+      {showShare && (
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowShare(false)}>
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  toast.success('Stream link copied!');
+                  navigator.clipboard.writeText(window.location.href);
+                  setShowShare(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Copy Link</span>
+                <LinkIcon className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: stream?.title,
+                      url: window.location.href,
+                    });
+                  }
+                  setShowShare(false);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Share via...</span>
+                <Share2 className="w-5 h-5 text-zinc-400" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SETTINGS MENU */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowSettings(false)}>
+          <div
+            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="space-y-1">
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowAudioSettingsModal(true);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Adjust settings</span>
+                <Settings className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowFeedbackModal(true);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">Share feedback</span>
+                <MessageSquare className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowRulesModal(true);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-white font-medium">View rules</span>
+                <FileText className="w-5 h-5 text-zinc-400" />
+              </button>
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  setShowReportModal(true);
+                }}
+                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+              >
+                <span className="text-red-500 font-medium">Report this Stream</span>
+                <Flag className="w-5 h-5 text-red-500" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHAT SIDEBAR */}
+      {showChat && (
+        <motion.div
+          initial={{ opacity: 0, x: 300 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 300 }}
+          className="fixed inset-0 z-50 bg-black/60 flex justify-end"
+          onClick={() => setShowChat(false)}
+        >
+          <motion.div
+            className="w-full max-w-md bg-zinc-900 flex flex-col h-full overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Chat Header */}
+            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+              <h2 className="text-white font-bold">Stream</h2>
+              <button onClick={() => setShowChat(false)} className="p-2">
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            {/* Stream Info */}
+            <div className="px-4 py-4 border-b border-zinc-800">
+              <div className="space-y-2">
+                <p className="text-sm text-white font-medium">
+                  {host?.display_name} • LIVE
+                </p>
+                <p className="text-lg text-white font-bold">{stream?.title}</p>
+                <div className="flex gap-2 text-xs text-zinc-400">
+                  <span>🔴 Live</span>
+                  <span>👥 {viewers.length + 1} watching</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Replies Feed */}
+            <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4">
+              <h3 className="text-zinc-400 text-sm font-semibold mb-4">
+                {replies.length > 0 ? `${replies.length} replies` : 'No replies yet'}
+              </h3>
+              <div className="space-y-4">
+                {replies.map(reply => (
+                  <div key={reply.id} className="pb-4 border-b border-zinc-800">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigateToProfile(reply.user_id);
+                        }}
+                        className="flex-shrink-0"
+                      >
+                        <img
+                          src={reply.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${reply.user}`}
+                          alt={reply.user}
+                          className="w-10 h-10 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                        />
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigateToProfile(reply.user_id);
+                            }}
+                            className="text-white font-semibold hover:underline"
+                          >
+                            {reply.user}
+                          </button>
+                          <span className="text-zinc-500 text-sm">{reply.handle}</span>
+                          <span className="text-zinc-500 text-sm">· {reply.time}</span>
+                        </div>
+                        {reply.isGift ? (
+                          <div className="mt-2 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-lg px-3 py-2 inline-block">
+                            <span className="text-pink-400 font-medium">{reply.text}</span>
+                          </div>
+                        ) : (
+                          <p className="text-zinc-300 text-sm mt-2 break-words">{reply.text}</p>
+                        )}
+                        <div className="flex gap-6 mt-3 text-zinc-500 text-xs">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReplyToMessage(reply);
+                            }}
+                            className="flex items-center gap-1 hover:text-purple-400 transition-colors"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Reply</span>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleLikeMessage(reply.id);
+                            }}
+                            className={`flex items-center gap-1 transition-colors ${
+                              reply.liked_by_me ? 'text-red-500' : 'hover:text-red-400'
+                            }`}
+                          >
+                            <Heart className={`w-4 h-4 ${reply.liked_by_me ? 'fill-current' : ''}`} />
+                            <span>{reply.likes > 0 ? reply.likes : 'Like'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Reply Input */}
+            <div className="px-4 py-4 border-t border-zinc-800 pb-safe">
+              {replyingTo && (
+                <div className="flex items-center justify-between mb-2 px-2">
+                  <span className="text-xs text-zinc-400">
+                    Replying to <span className="text-purple-400">{replyingTo.handle}</span>
+                  </span>
+                  <button
+                    onClick={() => setReplyingTo(null)}
+                    className="text-zinc-500 hover:text-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleReplySubmit();
+                    }
+                  }}
+                  placeholder={replyingTo ? `Reply to ${replyingTo.user}...` : "Say something..."}
+                  className="flex-1 bg-zinc-800 text-white placeholder-zinc-500 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+                />
+                <button
+                  onClick={handleReplySubmit}
+                  disabled={!replyText.trim()}
+                  className="p-2 text-purple-600 hover:text-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-5 h-5" />
                 </button>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
 
       {showGiftModal && (
         <LiveGiftModal
@@ -703,11 +1421,58 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           onClose={() => setShowGiftModal(false)}
           streamId={streamId}
           hostId={stream?.user_id || ''}
-          viewers={viewers}
+          viewers={viewers.map(v => ({
+            id: v.user_id,
+            display_name: v.profile?.display_name || 'User',
+            username: v.profile?.username || 'user',
+            avatar_url: v.profile?.avatar_url || '',
+          }))}
           isHost={isHost}
           isSpace={false}
         />
       )}
+
+      {/* Report Modal */}
+      <ReportContentModal
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        contentType="live_stream"
+        contentId={streamId}
+        reportedUserId={stream?.user_id}
+      />
+
+      {/* Rules Modal */}
+      <SpaceRulesModal
+        isOpen={showRulesModal}
+        onClose={() => setShowRulesModal(false)}
+      />
+
+      {/* Feedback Modal */}
+      <SpaceFeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        spaceId={streamId}
+        spaceTitle={stream?.title || 'Stream'}
+      />
+
+      {/* Audio Settings Modal */}
+      <SpaceAudioSettingsModal
+        isOpen={showAudioSettingsModal}
+        onClose={() => setShowAudioSettingsModal(false)}
+      />
+
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .pb-safe {
+          padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+      `}</style>
     </div>
   );
 };
