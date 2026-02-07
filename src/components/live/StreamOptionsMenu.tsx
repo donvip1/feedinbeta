@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { shareUrls } from '@/lib/url-utils';
 
 interface StreamOptionsMenuProps {
   isHost: boolean;
@@ -54,7 +55,7 @@ export const StreamOptionsMenu = ({
   const [isPiPActive, setIsPiPActive] = useState(false);
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
+    const shareUrl = shareUrls.liveStream(streamId);
     try {
       await navigator.share({
         title: streamTitle,
@@ -68,7 +69,7 @@ export const StreamOptionsMenu = ({
   };
 
   const handleCopyLink = () => {
-    const shareUrl = `${window.location.origin}/live/stream/${streamId}`;
+    const shareUrl = shareUrls.liveStream(streamId);
     navigator.clipboard.writeText(shareUrl);
     toast.success("Link copied!");
   };
