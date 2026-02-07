@@ -1,4 +1,5 @@
 export { TwitterSpaceRoom } from './TwitterSpaceRoom';
+export { TwitterStreamRoom } from './TwitterStreamRoom';
 export { TwitterSpaceHeader } from './TwitterSpaceHeader';
 export { TwitterSpaceUserGrid } from './TwitterSpaceUserGrid';
 export { TwitterSpaceControls } from './TwitterSpaceControls';
