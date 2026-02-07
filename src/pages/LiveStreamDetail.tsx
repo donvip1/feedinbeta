@@ -3,17 +3,22 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Radio } from 'lucide-react';
-import { UnifiedRoom } from '@/components/live/unified';
+import { ArrowLeft, Radio, Loader2, Video, Users, Play, Lock, Clock } from 'lucide-react';
+import { TwitterStreamRoom } from '@/components/live/twitter-space';
 import { useOptionalLiveStreamContext } from '@/context/LiveStreamContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
+import { formatDistanceToNow } from 'date-fns';
 
 const LiveStreamDetail = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { streamId } = useParams<{ streamId: string }>();
   const [stream, setStream] = useState<any>(null);
+  const [host, setHost] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showRoom, setShowRoom] = useState(false);
   const streamContext = useOptionalLiveStreamContext();
 
   useEffect(() => {
@@ -29,6 +34,18 @@ const LiveStreamDetail = () => {
       loadStream();
     }
   }, [user, authLoading, streamId, navigate]);
+
+  // Check if we're returning from minimized state
+  useEffect(() => {
+    if (streamContext && streamContext.streamState.isActive && !streamContext.streamState.isMinimized) {
+      const activeStreamId = streamContext.streamState.streamInfo?.id;
+      if (activeStreamId === streamId || (stream && activeStreamId === stream.id)) {
+        console.log('[LiveStreamDetail] Already in this stream, showing room directly');
+        setShowRoom(true);
+        setLoading(false);
+      }
+    }
+  }, [streamContext?.streamState.isActive, streamContext?.streamState.isMinimized, streamId, stream?.id]);
 
   const loadStream = async () => {
     try {
@@ -58,11 +75,8 @@ const LiveStreamDetail = () => {
         .eq('id', streamData.user_id)
         .maybeSingle();
 
-      // Combine the data
-      setStream({
-        ...streamData,
-        profiles: profileData
-      });
+      setStream(streamData);
+      setHost(profileData);
     } catch (error) {
       console.error('Error loading stream:', error);
     } finally {
@@ -70,11 +84,21 @@ const LiveStreamDetail = () => {
     }
   };
 
+  const handleJoin = () => {
+    if (!user) {
+      toast.error('Please sign in to join this stream');
+      sessionStorage.setItem('redirectAfterAuth', window.location.pathname);
+      navigate('/auth?redirect=' + encodeURIComponent(window.location.pathname));
+      return;
+    }
+    setShowRoom(true);
+  };
+
   if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Loading stream...</p>
         </div>
       </div>
@@ -97,60 +121,129 @@ const LiveStreamDetail = () => {
     );
   }
 
-  if (stream.status !== 'live') {
+  // Show live room with new Twitter-style UI
+  if (showRoom && stream) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <div className="text-center space-y-4">
-          <Radio className="w-16 h-16 mx-auto text-muted-foreground" />
-          <h2 className="text-2xl font-bold text-foreground">Stream Ended</h2>
-          <p className="text-muted-foreground">This live stream has ended.</p>
-          <Button onClick={() => navigate('/live')}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Browse Live Streams
-          </Button>
-        </div>
-      </div>
+      <TwitterStreamRoom 
+        streamId={stream.id} 
+        onClose={() => {
+          setShowRoom(false);
+          navigate('/live');
+        }} 
+      />
     );
   }
 
   // Check if user is the host
   const isHost = user?.id === stream.user_id;
 
-  // Build room data for UnifiedRoom
-  const roomData = {
-    id: stream.id,
-    host: {
-      id: stream.user_id,
-      name: stream.profiles?.display_name || stream.profiles?.username || 'Host',
-      handle: stream.profiles?.username ? `@${stream.profiles.username}` : undefined,
-      avatar: stream.profiles?.avatar_url || '',
-      level: 42, // Could be fetched from user data
-    },
-    type: (stream.room_type || 'video_broadcast') as 'video_broadcast' | 'audio_space' | 'pk_battle',
-    title: stream.title || 'Live Stream',
-    description: stream.description,
-    viewers: stream.viewer_count || 0,
-    status: stream.status as 'scheduled' | 'live' | 'ended',
-    startedAt: stream.started_at,
-  };
-
+  // Preview page for streams (similar to SpaceDetail)
   return (
-    <UnifiedRoom
-      room={roomData}
-      isHost={isHost}
-      onClose={() => navigate('/live')}
-      onMinimize={() => {
-        if (streamContext) {
-          streamContext.minimizeStream();
-        }
-        navigate('/live');
-      }}
-      onMaximize={() => {
-        if (streamContext) {
-          streamContext.maximizeStream();
-        }
-      }}
-    />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted p-4">
+      <div className="max-w-md w-full text-center space-y-6">
+        {/* Host Avatar */}
+        <div className="relative mx-auto w-fit">
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+            {host?.avatar_url ? (
+              <Avatar className="w-20 h-20 ring-4 ring-primary/20">
+                <AvatarImage src={host.avatar_url} />
+                <AvatarFallback>{host.display_name?.[0] || 'H'}</AvatarFallback>
+              </Avatar>
+            ) : (
+              <Video className="w-10 h-10 text-primary" />
+            )}
+          </div>
+          {stream?.status === 'live' && (
+            <span className="absolute -top-1 -right-1 flex h-4 w-4">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500" />
+            </span>
+          )}
+        </div>
+
+        {/* Stream Info */}
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold">{stream?.title}</h1>
+          {stream?.description && (
+            <p className="text-muted-foreground text-sm">{stream.description}</p>
+          )}
+          
+          {/* Host info */}
+          {host && (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <span className="text-sm text-muted-foreground">Hosted by</span>
+              <span className="text-sm font-medium">{host.display_name}</span>
+              <span className="text-sm text-muted-foreground">@{host.username}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Badges */}
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {stream?.category && (
+            <Badge variant="secondary">{stream.category}</Badge>
+          )}
+          {stream?.room_type && (
+            <Badge variant="outline">{stream.room_type.replace('_', ' ')}</Badge>
+          )}
+        </div>
+
+        {/* Status */}
+        <div className="space-y-2">
+          {stream?.status === 'live' ? (
+            <>
+              <div className="flex items-center justify-center gap-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-red-500 font-medium">Live Now</span>
+              </div>
+              <div className="flex items-center justify-center gap-1 text-sm text-muted-foreground">
+                <Users className="w-4 h-4" />
+                <span>{stream?.viewer_count || 0} watching</span>
+              </div>
+            </>
+          ) : stream?.status === 'scheduled' ? (
+            <div className="space-y-1">
+              <Badge variant="outline" className="text-blue-500 border-blue-500">
+                <Clock className="w-3 h-3 mr-1" />
+                Scheduled
+              </Badge>
+              {stream?.scheduled_start && (
+                <p className="text-sm text-muted-foreground">
+                  Starts {formatDistanceToNow(new Date(stream.scheduled_start), { addSuffix: true })}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <p className="text-muted-foreground">This stream has ended</p>
+              {stream?.ended_at && (
+                <p className="text-sm text-muted-foreground">
+                  {formatDistanceToNow(new Date(stream.ended_at), { addSuffix: true })}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="space-y-3">
+          {stream?.status === 'live' && (
+            <Button onClick={handleJoin} size="lg" className="w-full">
+              <Video className="w-4 h-4 mr-2" />
+              {isHost ? 'Return to Stream' : 'Join Stream'}
+            </Button>
+          )}
+
+          {stream?.status === 'ended' && (
+            <p className="text-sm text-muted-foreground">Stream has ended</p>
+          )}
+
+          <Button variant="ghost" onClick={() => navigate('/live')} className="w-full">
+            Back to Live
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
 
