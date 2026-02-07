@@ -49,6 +49,7 @@ import { SpaceRulesModal } from './SpaceRulesModal';
 import { SpaceFeedbackModal } from './SpaceFeedbackModal';
 import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
+import { shareUrls } from '@/lib/url-utils';
 
 interface TwitterStreamRoomProps {
   streamId: string;
@@ -1181,8 +1182,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             <div className="space-y-3">
               <button
                 onClick={() => {
+                  const shareUrl = shareUrls.liveStream(streamId);
                   toast.success('Stream link copied!');
-                  navigator.clipboard.writeText(window.location.href);
+                  navigator.clipboard.writeText(shareUrl);
                   setShowShare(false);
                 }}
                 className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
@@ -1192,10 +1194,12 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
               </button>
               <button
                 onClick={() => {
+                  const shareUrl = shareUrls.liveStream(streamId);
                   if (navigator.share) {
                     navigator.share({
                       title: stream?.title,
-                      url: window.location.href,
+                      text: `Watch this live stream: ${stream?.title}`,
+                      url: shareUrl,
                     });
                   }
                   setShowShare(false);

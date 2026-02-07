@@ -28,6 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { shareUrls } from '@/lib/url-utils';
 import { cn } from '@/lib/utils';
 
 interface ChatMessage {
@@ -597,8 +598,9 @@ export const UnifiedLiveRoom = ({ roomInfo, role, onClose }: UnifiedLiveRoomProp
 
   // Share - with proper URL and full share options
   const handleShare = async () => {
-    const pathType = roomInfo.type === 'audio_space' ? 'space' : 'stream';
-    const url = `${window.location.origin}/live/${pathType}/${roomInfo.id}`;
+    const url = roomInfo.type === 'audio_space' 
+      ? shareUrls.liveSpace(roomInfo.id)
+      : shareUrls.liveStream(roomInfo.id);
     const shareTitle = roomInfo.title || (roomInfo.type === 'audio_space' ? 'Live Space' : 'Live Stream');
     const shareText = roomInfo.type === 'audio_space' 
       ? `Join this live audio space: ${shareTitle}` 

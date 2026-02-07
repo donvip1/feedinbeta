@@ -12,6 +12,7 @@ import { useNavigation } from "@/context/NavigationContext";
 import { useOptionalLiveStreamContext } from "@/context/LiveStreamContext";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { shareUrls } from "@/lib/url-utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -400,14 +401,15 @@ export const UnifiedRoom = ({
   }, [room.id, onClose]);
   
   const handleShare = useCallback(async () => {
+    const url = shareUrls.liveStream(room.id);
     try {
       await navigator.share({
         title: room.title,
         text: `Watch ${room.host.name} live!`,
-        url: `${window.location.origin}/live/stream/${room.id}`,
+        url,
       });
     } catch {
-      navigator.clipboard.writeText(`${window.location.origin}/live/stream/${room.id}`);
+      navigator.clipboard.writeText(url);
       toast.success("Link copied!");
     }
   }, [room]);
