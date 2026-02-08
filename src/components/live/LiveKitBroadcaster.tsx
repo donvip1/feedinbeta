@@ -11,7 +11,7 @@ import {
   Video, VideoOff, Mic, MicOff, FlipHorizontal,
   Users, Send, X, Gift, Radio, 
   Wifi, WifiOff, Share2, Home, Coins, Crown, Loader2, AlertCircle,
-  Volume2, VolumeX, MessageCircle, Monitor, MonitorOff
+  Volume2, VolumeX, MessageCircle, Monitor, MonitorOff, Swords
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LiveGiftModal } from "./LiveGiftModal";
@@ -724,65 +724,63 @@ export const LiveKitBroadcaster = ({ streamId, onClose }: LiveKitBroadcasterProp
         className="absolute bottom-0 left-0 right-0 z-20 p-4 space-y-4"
         style={{ paddingBottom: isKeyboardOpen ? keyboardHeight + 16 : 16 }}
       >
-        {/* Control Buttons */}
-        <div className="flex items-center justify-center gap-4">
-          <Button
-            size="icon"
-            variant="ghost"
+        {/* Control Buttons - icons only, no circles */}
+        <div className="flex items-center justify-center gap-6">
+          <button
             onClick={toggleAudio}
             className={cn(
-              "h-12 w-12 rounded-full",
-              isAudioOn ? "bg-white/20" : "bg-red-500"
+              "transition-colors",
+              isAudioOn ? "text-white" : "text-red-500"
             )}
           >
-            {isAudioOn ? <Mic className="h-5 w-5 text-white" /> : <MicOff className="h-5 w-5 text-white" />}
-          </Button>
+            {isAudioOn ? <Mic className="h-6 w-6" /> : <MicOff className="h-6 w-6" />}
+          </button>
 
-          <Button
-            size="icon"
-            variant="ghost"
+          <button
             onClick={toggleVideo}
             className={cn(
-              "h-12 w-12 rounded-full",
-              isVideoOn ? "bg-white/20" : "bg-red-500"
+              "transition-colors",
+              isVideoOn ? "text-white" : "text-red-500"
             )}
           >
-            {isVideoOn ? <Video className="h-5 w-5 text-white" /> : <VideoOff className="h-5 w-5 text-white" />}
-          </Button>
+            {isVideoOn ? <Video className="h-6 w-6" /> : <VideoOff className="h-6 w-6" />}
+          </button>
 
-          <Button
-            size="icon"
-            variant="ghost"
+          <button
             onClick={switchCamera}
-            className="h-12 w-12 rounded-full bg-white/20"
+            className="text-white hover:text-zinc-300 transition-colors"
             disabled={isScreenSharing}
           >
-            <FlipHorizontal className="h-5 w-5 text-white" />
-          </Button>
+            <FlipHorizontal className="h-6 w-6" />
+          </button>
 
-          <Button
-            size="icon"
-            variant="ghost"
+          <button
             onClick={handleScreenShare}
             className={cn(
-              "h-12 w-12 rounded-full",
-              isScreenSharing ? "bg-primary" : "bg-white/20"
+              "transition-colors",
+              isScreenSharing ? "text-purple-400" : "text-white hover:text-purple-400"
             )}
           >
-            {isScreenSharing ? <MonitorOff className="h-5 w-5 text-white" /> : <Monitor className="h-5 w-5 text-white" />}
-          </Button>
+            {isScreenSharing ? <MonitorOff className="h-6 w-6" /> : <Monitor className="h-6 w-6" />}
+          </button>
 
-          <Button
-            size="icon"
-            variant="ghost"
+          <button
             onClick={() => setShowChat(!showChat)}
             className={cn(
-              "h-12 w-12 rounded-full",
-              showChat ? "bg-primary/50" : "bg-white/20"
+              "transition-colors",
+              showChat ? "text-purple-400" : "text-white hover:text-purple-400"
             )}
           >
-            <MessageCircle className="h-5 w-5 text-white" />
-          </Button>
+            <MessageCircle className="h-6 w-6" />
+          </button>
+
+          {/* PK Battle */}
+          <button
+            onClick={() => toast.info('PK Battle coming soon!')}
+            className="text-orange-400 hover:text-orange-300 transition-colors"
+          >
+            <Swords className="h-6 w-6" />
+          </button>
         </div>
 
         {/* Go Live / Chat Input */}

@@ -103,9 +103,7 @@ export function ScreenShareButton({
         whileTap={{ scale: 0.85 }}
         onClick={stopScreenShare}
         className={cn(
-          'rounded-full bg-red-500 flex items-center justify-center shadow-lg',
-          'hover:bg-red-600 transition-colors',
-          sizeClasses[size],
+          'text-red-500 hover:text-red-400 transition-colors',
           className
         )}
       >
@@ -116,7 +114,7 @@ export function ScreenShareButton({
             animate={{ scale: 1, rotate: 0 }}
             exit={{ scale: 0, rotate: 180 }}
           >
-            <StopCircle className={cn('text-white', iconSizes[size])} />
+            <StopCircle className={iconSizes[size]} />
           </motion.div>
         </AnimatePresence>
       </motion.button>
@@ -130,17 +128,15 @@ export function ScreenShareButton({
           whileTap={{ scale: 0.85 }}
           disabled={disabled || isLoading}
           className={cn(
-            'rounded-full bg-black/40 backdrop-blur flex items-center justify-center',
-            'hover:bg-black/60 transition-colors',
+            'text-white hover:text-purple-400 transition-colors',
             'disabled:opacity-50 disabled:cursor-not-allowed',
-            sizeClasses[size],
             className
           )}
         >
           {isLoading ? (
-            <Loader2 className={cn('text-white animate-spin', iconSizes[size])} />
+            <Loader2 className={cn('animate-spin', iconSizes[size])} />
           ) : (
-            <Monitor className={cn('text-white', iconSizes[size])} />
+            <Monitor className={iconSizes[size]} />
           )}
         </motion.button>
       </DropdownMenuTrigger>
