@@ -888,29 +888,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </button>
         <h1 className="text-white font-bold text-base flex-1 text-center truncate px-2">{stream?.title}</h1>
         <div className="flex items-center gap-2">
-          {/* Recording button - Host only */}
-          {isHost && (
-            <button
-              onClick={handleRecordingToggle}
-              disabled={recordingLoading}
-              className={cn(
-                "p-2 rounded-full transition-all",
-                isRecording
-                  ? "bg-red-500/20 border border-red-500"
-                  : "hover:bg-zinc-800"
-              )}
-              title={isRecording ? "Stop Recording" : "Start Recording"}
-            >
-              <Circle
-                className={cn(
-                  "w-5 h-5 transition-colors",
-                  isRecording
-                    ? "text-red-500 fill-red-500 animate-pulse"
-                    : "text-zinc-400"
-                )}
-              />
-            </button>
-          )}
           {/* End/Leave button */}
           <button
             onClick={handleLeave}
@@ -1054,30 +1031,30 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         )}
       </div>
 
-      {/* RIGHT-SIDE ACTION STACK - Vertical icons without circles */}
-      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4">
+      {/* RIGHT-SIDE ACTION STACK - Vertical icons only, no circles */}
+      <div className="fixed right-3 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-5">
         {/* Heart / Reactions */}
         <button
           onClick={() => setShowReactions(true)}
-          className="p-3 text-white hover:text-red-400 transition-colors"
+          className="text-white hover:text-red-400 transition-colors"
         >
-          <Heart className="w-7 h-7" />
+          <Heart className="w-6 h-6" />
         </button>
 
-        {/* Gift */}
+        {/* Gift - keep green highlight */}
         <button
           onClick={() => setShowGiftModal(true)}
-          className="p-3 bg-emerald-500 rounded-full text-white hover:bg-emerald-600 transition-colors"
+          className="text-emerald-400 hover:text-emerald-300 transition-colors"
         >
-          <Gift className="w-7 h-7" />
+          <Gift className="w-6 h-6" />
         </button>
 
         {/* Share */}
         <button
           onClick={() => setShowShare(true)}
-          className="p-3 text-white hover:text-purple-400 transition-colors"
+          className="text-white hover:text-purple-400 transition-colors"
         >
-          <Share2 className="w-7 h-7" />
+          <Share2 className="w-6 h-6" />
         </button>
 
         {/* Recording - Host only */}
@@ -1086,13 +1063,13 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             onClick={handleRecordingToggle}
             disabled={recordingLoading}
             className={cn(
-              "p-3 transition-colors",
+              "transition-colors",
               isRecording 
                 ? "text-red-500" 
                 : "text-white hover:text-red-400"
             )}
           >
-            <Circle className={cn("w-7 h-7", isRecording && "fill-red-500 animate-pulse")} />
+            <Circle className={cn("w-6 h-6", isRecording && "fill-red-500 animate-pulse")} />
           </button>
         )}
 
@@ -1101,22 +1078,22 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           <button
             onClick={handleScreenShare}
             className={cn(
-              "p-3 transition-colors",
+              "transition-colors",
               isScreenSharing 
                 ? "text-purple-400" 
                 : "text-white hover:text-purple-400"
             )}
           >
-            <Monitor className="w-7 h-7" />
+            <Monitor className="w-6 h-6" />
           </button>
         )}
 
-        {/* PK Battle */}
+        {/* PK Battle - visible to all */}
         <button
           onClick={handlePKBattle}
-          className="p-3 text-orange-400 hover:text-orange-300 transition-colors"
+          className="text-orange-400 hover:text-orange-300 transition-colors"
         >
-          <Swords className="w-7 h-7" />
+          <Swords className="w-6 h-6" />
         </button>
       </div>
 
