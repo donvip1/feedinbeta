@@ -28,6 +28,8 @@ import {
   Video,
   VideoOff,
   Hand,
+  Monitor,
+  Swords,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -49,6 +51,7 @@ import { SpaceRulesModal } from './SpaceRulesModal';
 import { SpaceFeedbackModal } from './SpaceFeedbackModal';
 import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
+import { PKBattleChallenge } from '../unified/PKBattleChallenge';
 import { shareUrls } from '@/lib/url-utils';
 
 interface TwitterStreamRoomProps {
@@ -169,6 +172,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   // User states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingLoading, setRecordingLoading] = useState(false);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [showPKBattle, setShowPKBattle] = useState(false);
 
   const isHost = stream?.user_id === user?.id;
 
@@ -607,6 +612,41 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     }
   };
 
+  // Handle screen share toggle
+  const handleScreenShare = async () => {
+    if (!isHost) return;
+    
+    if (isScreenSharing) {
+      // Stop screen share
+      setIsScreenSharing(false);
+      toast.success('Screen sharing stopped');
+    } else {
+      try {
+        // Start screen share
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        if (stream) {
+          setIsScreenSharing(true);
+          toast.success('Screen sharing started');
+          
+          // Listen for when user stops sharing via browser UI
+          stream.getVideoTracks()[0].onended = () => {
+            setIsScreenSharing(false);
+            toast.info('Screen sharing ended');
+          };
+        }
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          toast.error('Failed to start screen share');
+        }
+      }
+    }
+  };
+
+  // Handle PK Battle
+  const handlePKBattle = () => {
+    setShowPKBattle(true);
+  };
+
   // Handle leave/end
   const handleLeave = async () => {
     if (isHost) {
@@ -1014,6 +1054,72 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         )}
       </div>
 
+      {/* RIGHT-SIDE ACTION STACK - Vertical icons without circles */}
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-4">
+        {/* Heart / Reactions */}
+        <button
+          onClick={() => setShowReactions(true)}
+          className="p-3 text-white hover:text-red-400 transition-colors"
+        >
+          <Heart className="w-7 h-7" />
+        </button>
+
+        {/* Gift */}
+        <button
+          onClick={() => setShowGiftModal(true)}
+          className="p-3 bg-emerald-500 rounded-full text-white hover:bg-emerald-600 transition-colors"
+        >
+          <Gift className="w-7 h-7" />
+        </button>
+
+        {/* Share */}
+        <button
+          onClick={() => setShowShare(true)}
+          className="p-3 text-white hover:text-purple-400 transition-colors"
+        >
+          <Share2 className="w-7 h-7" />
+        </button>
+
+        {/* Recording - Host only */}
+        {isHost && (
+          <button
+            onClick={handleRecordingToggle}
+            disabled={recordingLoading}
+            className={cn(
+              "p-3 transition-colors",
+              isRecording 
+                ? "text-red-500" 
+                : "text-white hover:text-red-400"
+            )}
+          >
+            <Circle className={cn("w-7 h-7", isRecording && "fill-red-500 animate-pulse")} />
+          </button>
+        )}
+
+        {/* Screen Share - Host only */}
+        {isHost && (
+          <button
+            onClick={handleScreenShare}
+            className={cn(
+              "p-3 transition-colors",
+              isScreenSharing 
+                ? "text-purple-400" 
+                : "text-white hover:text-purple-400"
+            )}
+          >
+            <Monitor className="w-7 h-7" />
+          </button>
+        )}
+
+        {/* PK Battle */}
+        <button
+          onClick={handlePKBattle}
+          className="p-3 text-orange-400 hover:text-orange-300 transition-colors"
+        >
+          <Swords className="w-7 h-7" />
+        </button>
+      </div>
+
       {/* Floating Reactions */}
       <div className="fixed bottom-32 right-4 pointer-events-none">
         <AnimatePresence>
@@ -1067,83 +1173,66 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         ))}
       </AnimatePresence>
 
-      {/* BOTTOM CONTROLS */}
-      <div className="px-4 py-4 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
-        <div className="flex items-center justify-between max-w-md mx-auto">
-          {/* Mic Button */}
-          <div className="flex flex-col items-center gap-1">
-            <button
-              onClick={handleMicToggle}
-              className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all ${
-                isHost
-                  ? isMicOn
-                    ? 'bg-purple-600 border-purple-500 text-white'
-                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                  : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
-              }`}
-              disabled={!isHost}
-            >
-              {isHost ? (
-                isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
-              ) : (
-                <Hand className="w-6 h-6" />
-              )}
-            </button>
-            <span className="text-xs text-zinc-500">
-              {isHost ? (isMicOn ? 'Mute' : 'Unmute') : 'Request'}
-            </span>
-          </div>
-
-          {/* Center Icons */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setView('guests')}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
-            >
-              <Users className="w-5 h-5" />
-            </button>
-
-            {/* Gift Button */}
-            <button
-              onClick={() => setShowGiftModal(true)}
-              className={`p-2 transition-colors ${
-                isHost
-                  ? 'text-teal-400 hover:text-teal-300'
-                  : 'text-amber-400 hover:text-amber-300'
-              }`}
-            >
-              <Gift className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => setShowReactions(true)}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
-            >
-              <Heart className="w-5 h-5" />
-            </button>
-
-            <button
-              onClick={() => setShowShare(true)}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
-            >
-              <Share2 className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Chat Button with Badge */}
+      {/* BOTTOM CONTROLS - Chat input style footer */}
+      <div className="px-4 py-3 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
+        <div className="flex items-center gap-3">
+          {/* Left side - Emoji & Mic */}
           <button
-            onClick={() => {
-              setShowChat(true);
-              setUnreadMessages(0);
-            }}
-            className="relative px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center gap-2 transition-colors"
+            onClick={() => setView('guests')}
+            className="p-2 rounded-full bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
           >
-            <MessageCircle className="w-5 h-5 text-white" />
-            {unreadMessages > 0 && (
-              <span className="bg-white text-purple-600 text-xs px-1.5 py-0.5 font-bold rounded-full">
-                {unreadMessages}
-              </span>
+            <Users className="w-5 h-5" />
+          </button>
+
+          {/* Mic toggle */}
+          <button
+            onClick={handleMicToggle}
+            className={cn(
+              "p-2 rounded-full transition-colors",
+              isHost
+                ? isMicOn
+                  ? "bg-emerald-500 text-white"
+                  : "bg-zinc-800 text-zinc-400 hover:text-white"
+                : "bg-zinc-800 text-zinc-400"
             )}
+            disabled={!isHost}
+          >
+            {isHost ? (
+              isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />
+            ) : (
+              <Hand className="w-5 h-5" />
+            )}
+          </button>
+
+          {/* Chat input */}
+          <div className="flex-1 flex items-center bg-zinc-800 rounded-full px-4 py-2">
+            <input
+              type="text"
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleReplySubmit();
+                }
+              }}
+              placeholder="Say something..."
+              className="flex-1 bg-transparent text-white placeholder-zinc-500 outline-none text-sm"
+            />
+          </div>
+
+          {/* Send button */}
+          <button
+            onClick={handleReplySubmit}
+            disabled={!replyText.trim()}
+            className={cn(
+              "p-2 rounded-full transition-colors",
+              replyText.trim()
+                ? "bg-purple-600 text-white hover:bg-purple-700"
+                : "bg-zinc-800 text-zinc-500"
+            )}
+          >
+            <Send className="w-5 h-5" />
           </button>
         </div>
       </div>
@@ -1463,6 +1552,28 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       <SpaceAudioSettingsModal
         isOpen={showAudioSettingsModal}
         onClose={() => setShowAudioSettingsModal(false)}
+      />
+
+      {/* PK Battle Modal */}
+      <PKBattleChallenge
+        isOpen={showPKBattle}
+        onClose={() => setShowPKBattle(false)}
+        mode="select"
+        onAccept={() => {
+          setShowPKBattle(false);
+          toast.success('PK Battle started!');
+        }}
+        onDecline={() => setShowPKBattle(false)}
+        availableUsers={viewers.map(v => ({
+          id: v.user_id,
+          name: v.profile?.display_name || 'User',
+          avatar: v.profile?.avatar_url,
+          isLive: true,
+        }))}
+        onSelectChallenger={(userId) => {
+          setShowPKBattle(false);
+          toast.success(`Challenge sent to user!`);
+        }}
       />
 
       <style>{`
