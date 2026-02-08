@@ -2,26 +2,18 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateLiveStreamModal } from "@/components/live/CreateLiveStreamModal";
 import { CreateSpaceModal } from "@/components/live/CreateSpaceModal";
-import { UnifiedLiveRoom } from "@/components/live/UnifiedLiveRoom";
 import { LiveDashboard } from "@/components/live/LiveDashboard";
 import { GoLiveModal } from "@/components/live/GoLiveModal";
 import { SpaceContentManager } from "@/components/live/SpaceContentManager";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { RoomInfo, ParticipantRole } from "@/context/UnifiedLiveContext";
-
-interface SelectedRoom {
-  roomInfo: RoomInfo;
-  role: ParticipantRole;
-}
 
 const Live = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [createStreamModalOpen, setCreateStreamModalOpen] = useState(false);
   const [createSpaceModalOpen, setCreateSpaceModalOpen] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState<SelectedRoom | null>(null);
   const [showGoLiveModal, setShowGoLiveModal] = useState(false);
   const [showContentManager, setShowContentManager] = useState(false);
 
@@ -282,40 +274,18 @@ const Live = () => {
 
   // ===== HANDLERS =====
   const handleStreamCreated = (streamId: string) => {
-    // Find the newly created stream and open it
-    refetchMyStreams().then(({ data }) => {
-      const stream = data?.find((s: any) => s.id === streamId);
-      if (stream) {
-        openRoom(stream, 'video_broadcast', 'host');
-      }
-    });
+    // Navigate to stream detail page - uses TwitterStreamRoom for hosts too
+    navigate(`/live/stream/${streamId}`, { state: { autoJoin: true } });
   };
 
   const handleSpaceCreated = (spaceId: string) => {
-    refetchMySpaces().then(({ data }) => {
-      const space = data?.find((s: any) => s.id === spaceId);
-      if (space) {
-        openRoom(space, 'audio_space', 'host');
-      }
-    });
-  };
-
-  const openRoom = (item: any, type: 'video_broadcast' | 'audio_space', role: ParticipantRole) => {
-    const roomInfo: RoomInfo = {
-      id: item.id,
-      title: item.title,
-      type,
-      hostId: item.user_id,
-      hostName: item.profiles?.display_name || item.profiles?.username || 'Host',
-      hostAvatar: item.profiles?.avatar_url || '',
-      startedAt: item.started_at,
-    };
-    setSelectedRoom({ roomInfo, role });
+    // Navigate to space detail page
+    navigate(`/live/space/${spaceId}`, { state: { autoJoin: true } });
   };
 
   const handleStreamClick = (stream: any) => {
-    const isMyStream = stream.user_id === user?.id;
-    openRoom(stream, 'video_broadcast', isMyStream ? 'host' : 'viewer');
+    // All streams now use TwitterStreamRoom via detail page route
+    navigate(`/live/stream/${stream.id}`, { state: { autoJoin: true } });
   };
 
   const handleSpaceClick = (space: any) => {
@@ -325,16 +295,6 @@ const Live = () => {
     }
   };
 
-  // Render unified room if selected
-  if (selectedRoom) {
-    return (
-      <UnifiedLiveRoom
-        roomInfo={selectedRoom.roomInfo}
-        role={selectedRoom.role}
-        onClose={() => setSelectedRoom(null)}
-      />
-    );
-  }
 
   return (
     <>
