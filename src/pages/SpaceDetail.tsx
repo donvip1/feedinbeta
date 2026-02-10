@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useOptionalSpaceContext } from '@/context/SpaceContext';
@@ -17,6 +17,7 @@ const SpaceDetail = () => {
   const { spaceId } = useParams<{ spaceId: string }>();
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const spaceContext = useOptionalSpaceContext();
   const [space, setSpace] = useState<any>(null);
   const [host, setHost] = useState<any>(null);
@@ -44,7 +45,15 @@ const SpaceDetail = () => {
     }
   }, [spaceId]);
 
-  // No auto-join - always show preview and let user click "Join Space"
+  // Auto-join for hosts (when they just created the space)
+  useEffect(() => {
+    const autoJoin = (location.state as any)?.autoJoin;
+    if (autoJoin && space && user && space.user_id === user.id && !showRoom) {
+      console.log('[SpaceDetail] Auto-joining as host');
+      audioPlaybackManager.enableAudioPlayback();
+      setShowRoom(true);
+    }
+  }, [space, user, location.state, showRoom]);
 
   const fetchSpace = async () => {
     console.log('[SpaceDetail] Fetching space with ID:', spaceId);
