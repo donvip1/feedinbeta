@@ -511,7 +511,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const joinSpace = async () => {
     if (!user) return;
     
-    // Check if already in space
+    // Check if already actively in space
     const { data: existing } = await supabase
       .from('live_space_speakers')
       .select('*')
@@ -534,16 +534,47 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       const isSpaceHost = space?.user_id === user.id;
       role = isSpaceHost ? 'host' : 'listener';
 
-      const { error } = await supabase.from('live_space_speakers').insert({
-        space_id: spaceId,
-        user_id: user.id,
-        role,
-        is_muted: !isSpaceHost,
-      });
+      // Check for a previous record (user left and is rejoining)
+      const { data: previousRecord } = await supabase
+        .from('live_space_speakers')
+        .select('id')
+        .eq('space_id', spaceId)
+        .eq('user_id', user.id)
+        .not('left_at', 'is', null)
+        .order('left_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (error) {
-        toast.error('Failed to join space');
-        return;
+      if (previousRecord) {
+        // Re-activate the old record
+        const { error } = await supabase
+          .from('live_space_speakers')
+          .update({
+            left_at: null,
+            role,
+            is_muted: !isSpaceHost,
+            has_raised_hand: false,
+            host_muted: false,
+          })
+          .eq('id', previousRecord.id);
+
+        if (error) {
+          toast.error('Failed to rejoin space');
+          return;
+        }
+      } else {
+        // First time joining - insert new record
+        const { error } = await supabase.from('live_space_speakers').insert({
+          space_id: spaceId,
+          user_id: user.id,
+          role,
+          is_muted: !isSpaceHost,
+        });
+
+        if (error) {
+          toast.error('Failed to join space');
+          return;
+        }
       }
 
       setMyRole(role);
