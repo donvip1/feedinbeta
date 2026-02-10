@@ -175,9 +175,10 @@ export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceCha
             <div className="flex-1 min-w-0">
               <p 
                 className="text-xs font-semibold text-primary cursor-pointer hover:underline"
-                onClick={() => navigate(`/profile/${msg.user_id}`)}
+                onClick={() => navigate(`/profile/${msg.profile?.username || msg.user_id}`, { state: { returnTo: `/live/space/${spaceId}` } })}
               >
                 {msg.profile?.display_name || 'User'}
+                <span className="text-muted-foreground font-normal ml-1">@{msg.profile?.username || 'user'}</span>
               </p>
               <MentionText
                 text={msg.content}
