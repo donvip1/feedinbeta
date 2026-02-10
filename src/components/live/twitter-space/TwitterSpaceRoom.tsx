@@ -96,6 +96,7 @@ interface FloatingReaction {
   id: string;
   emoji: string;
   left: number;
+  displayName?: string;
 }
 
 interface FloatingGiftReaction {
@@ -271,7 +272,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       .channel(`space-reactions-${spaceId}`)
       .on('broadcast', { event: 'reaction' }, (payload: any) => {
         if (payload.payload?.user_id !== user?.id) {
-          handleFloatingReaction(payload.payload?.emoji);
+          handleFloatingReaction(payload.payload?.emoji, payload.payload?.display_name);
         }
       })
       .subscribe();
@@ -606,26 +607,29 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
-  const handleFloatingReaction = (emoji: string) => {
+  const handleFloatingReaction = (emoji: string, displayName?: string) => {
     const id = `${Date.now()}-${Math.random()}`;
-    setFloatingReactions(prev => [...prev, { id, emoji, left: 40 + Math.random() * 20 }]);
+    setFloatingReactions(prev => [...prev, { id, emoji, left: 35 + Math.random() * 30, displayName }]);
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.id !== id));
-    }, 4000);
+    }, 3000);
   };
 
   const handleReaction = async (emoji: string) => {
     if (!user) return;
     
+    // Get current user's display name
+    const myDisplayName = speakers.find(s => s.user_id === user.id)?.profile?.display_name || 'Someone';
+    
     // Show locally
-    handleFloatingReaction(emoji);
+    handleFloatingReaction(emoji, myDisplayName);
     
     // Broadcast to others
     const channel = supabase.channel(`space-reactions-${spaceId}`);
     await channel.send({
       type: 'broadcast',
       event: 'reaction',
-      payload: { emoji, user_id: user.id },
+      payload: { emoji, user_id: user.id, display_name: myDisplayName },
     });
     supabase.removeChannel(channel);
     
@@ -1151,20 +1155,25 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         )}
       </div>
 
-      {/* Floating Reactions */}
-      <div className="fixed bottom-32 right-4 pointer-events-none">
+      {/* Floating Reactions - Center screen */}
+      <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
         <AnimatePresence>
           {floatingReactions.map(r => (
             <motion.div
               key={r.id}
-              initial={{ opacity: 0, y: 0, scale: 1 }}
-              animate={{ opacity: 1, y: -20, scale: 1.5 }}
-              exit={{ opacity: 0, y: -500, scale: 0.8 }}
-              transition={{ duration: 4, ease: "easeOut" }}
-              className="absolute text-4xl"
-              style={{ left: `${r.left}%` }}
+              initial={{ opacity: 0, y: 40, scale: 0.5 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -200, scale: 0.6 }}
+              transition={{ duration: 2.5, ease: "easeOut" }}
+              className="absolute flex flex-col items-center gap-1"
+              style={{ left: `${r.left}%`, top: '40%' }}
             >
-              {r.emoji}
+              <span className="text-5xl drop-shadow-lg">{r.emoji}</span>
+              {r.displayName && (
+                <span className="text-xs font-semibold text-white bg-black/60 px-2 py-0.5 rounded-full whitespace-nowrap backdrop-blur-sm">
+                  {r.displayName}
+                </span>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
