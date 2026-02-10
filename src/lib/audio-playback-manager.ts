@@ -295,12 +295,20 @@ class AudioPlaybackManager {
     this.isMuted = muted;
     console.log('[AudioPlayback] Master mute:', muted);
 
+    const vol = muted ? 0 : this.volume;
+
     this.audioElements.forEach(audio => {
-      audio.volume = muted ? 0 : this.volume;
+      audio.volume = vol;
+    });
+
+    // Also update ALL audio/video elements on the page (LiveKit creates its own)
+    document.querySelectorAll('audio, video').forEach((el) => {
+      const media = el as HTMLMediaElement;
+      media.volume = vol;
     });
 
     if (this.masterGainNode) {
-      this.masterGainNode.gain.value = muted ? 0 : this.volume;
+      this.masterGainNode.gain.value = vol;
     }
   }
 
@@ -316,10 +324,18 @@ class AudioPlaybackManager {
    */
   setVolume(volume: number) {
     this.volume = Math.max(0, Math.min(1, volume));
+    console.log('[AudioPlayback] Setting volume to:', this.volume);
     
     if (!this.isMuted) {
+      // Update managed audio elements
       this.audioElements.forEach(audio => {
         audio.volume = this.volume;
+      });
+
+      // Also update ALL audio/video elements on the page (LiveKit creates its own)
+      document.querySelectorAll('audio, video').forEach((el) => {
+        const media = el as HTMLMediaElement;
+        media.volume = this.volume;
       });
 
       if (this.masterGainNode) {
