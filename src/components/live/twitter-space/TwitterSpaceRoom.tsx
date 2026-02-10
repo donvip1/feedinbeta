@@ -1185,21 +1185,23 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       <FloatingReactions reactions={floatingGiftReactions} className="z-40" />
 
       {/* Gift Animations - Banner notifications */}
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {giftAnimations.map((gift) => (
           <motion.div
             key={gift.id}
-            initial={{ opacity: 0, x: -100, scale: 0.8 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: 100, scale: 0.8 }}
-            transition={{ type: 'spring', damping: 20 }}
+            layout
+            initial={{ opacity: 0, x: -80 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 80 }}
+            transition={{ type: 'tween', ease: [0.25, 0.1, 0.25, 1], duration: 0.4 }}
             className="fixed left-4 top-1/3 z-50 max-w-[280px]"
+            style={{ willChange: 'transform, opacity' }}
           >
             <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/90 to-pink-500/90 backdrop-blur-sm shadow-lg">
               <motion.span 
                 className="text-3xl"
-                animate={{ scale: [1, 1.3, 1] }}
-                transition={{ duration: 0.5, repeat: 2 }}
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ type: 'tween', ease: 'easeInOut', duration: 0.6, repeat: 1 }}
               >
                 {gift.emoji}
               </motion.span>
