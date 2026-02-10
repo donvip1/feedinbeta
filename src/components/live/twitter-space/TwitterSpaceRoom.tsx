@@ -239,15 +239,30 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         table: 'live_spaces',
         filter: `id=eq.${spaceId}`,
       }, async (payload: any) => {
-        if (payload.new.status === 'ended' && payload.old?.status === 'live') {
-          await spaceContext?.leaveSpace();
-          toast.info('Space has ended');
-          navigate('/live');
+        if (payload.new.status === 'ended') {
+          console.log('[SpaceRoom] Space ended via realtime, navigating out');
+          try {
+            await spaceContext?.leaveSpace();
+          } catch (e) {
+            console.warn('[SpaceRoom] Error leaving space:', e);
+          }
+          toast.info('This space has ended');
+          navigate('/live', { replace: true });
           return;
         }
         if (payload.new.status === 'live') {
           setSpace(payload.new);
         }
+      })
+      .on('broadcast', { event: 'space_ended' }, async () => {
+        console.log('[SpaceRoom] Space ended via broadcast, navigating out');
+        try {
+          await spaceContext?.leaveSpace();
+        } catch (e) {
+          console.warn('[SpaceRoom] Error leaving space:', e);
+        }
+        toast.info('This space has ended');
+        navigate('/live', { replace: true });
       })
       .subscribe();
 
@@ -718,11 +733,23 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
     
     if (isHost) {
-      // End the space if host leaves
+      // End the space - update DB and broadcast to all participants
       await supabase
         .from('live_spaces')
         .update({ status: 'ended', ended_at: new Date().toISOString() })
         .eq('id', spaceId);
+
+      // Broadcast immediate end signal to all participants
+      await supabase
+        .channel(`space-${spaceId}`)
+        .send({ type: 'broadcast', event: 'space_ended', payload: {} });
+
+      // Mark all participants as left
+      await supabase
+        .from('live_space_speakers')
+        .update({ left_at: new Date().toISOString() })
+        .eq('space_id', spaceId)
+        .is('left_at', null);
     }
     
     if (spaceContext) {
