@@ -168,6 +168,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [isRecording, setIsRecording] = useState(false);
   const [recordingLoading, setRecordingLoading] = useState(false);
   const [isLoudspeaker, setIsLoudspeaker] = useState(true); // Default to loudspeaker on
+  const [showVolumeSlider, setShowVolumeSlider] = useState(false);
+  const [volumeLevel, setVolumeLevel] = useState(100); // 0-100
 
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
@@ -1246,29 +1248,67 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </span>
             </div>
 
-            {/* Loudspeaker Toggle */}
-            <div className="flex flex-col items-center gap-1">
+            {/* Volume Control */}
+            <div className="relative flex flex-col items-center gap-1">
               <button
-                onClick={() => {
-                  setIsLoudspeaker(!isLoudspeaker);
-                  // Toggle volume between loudspeaker and earpiece levels
-                  if (isLoudspeaker) {
-                    audioPlaybackManager.setVolume(0.3);
-                  } else {
-                    audioPlaybackManager.setVolume(1.0);
-                  }
-                }}
+                onClick={() => setShowVolumeSlider(!showVolumeSlider)}
                 className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                  isLoudspeaker
+                  volumeLevel > 50
                     ? 'bg-green-600/20 text-green-400'
+                    : volumeLevel > 0
+                    ? 'bg-yellow-600/20 text-yellow-400'
                     : 'bg-transparent text-zinc-500'
                 }`}
               >
-                {isLoudspeaker ? <Volume2 className="w-5 h-5" /> : <Volume1 className="w-5 h-5" />}
+                {volumeLevel > 50 ? <Volume2 className="w-5 h-5" /> : volumeLevel > 0 ? <Volume1 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
               </button>
               <span className="text-xs text-zinc-500">
-                {isLoudspeaker ? 'Speaker' : 'Earpiece'}
+                {volumeLevel > 50 ? 'Speaker' : volumeLevel > 0 ? 'Earpiece' : 'Muted'}
               </span>
+
+              {/* Volume Slider Popover */}
+              <AnimatePresence>
+                {showVolumeSlider && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-zinc-800 border border-zinc-700 rounded-2xl p-4 w-56 shadow-xl z-50"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-white text-sm font-semibold">Volume</span>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300">{volumeLevel}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={volumeLevel}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setVolumeLevel(val);
+                        audioPlaybackManager.setVolume(val / 100);
+                        setIsLoudspeaker(val > 50);
+                      }}
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer accent-green-500 bg-zinc-600"
+                      style={{
+                        background: `linear-gradient(to right, #22c55e ${volumeLevel}%, #52525b ${volumeLevel}%)`,
+                      }}
+                    />
+                    <div className="flex justify-between mt-2 text-[10px] text-zinc-500">
+                      <span>Earpiece</span>
+                      <span>Loudspeaker</span>
+                    </div>
+                    <button
+                      onClick={() => setShowVolumeSlider(false)}
+                      className="mt-3 w-full text-center text-xs text-zinc-400 hover:text-white transition-colors"
+                    >
+                      Done
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
