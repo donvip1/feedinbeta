@@ -1689,6 +1689,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           }))}
           isHost={isHost}
           isSpace={true}
+          spaceName={space?.title || ''}
         />
       )}
 
