@@ -96,6 +96,7 @@ interface FloatingReaction {
   id: string;
   emoji: string;
   left: number;
+  displayName?: string;
 }
 
 interface FloatingGiftReaction {
@@ -553,16 +554,17 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     return `${Math.floor(diffHours / 24)}d`;
   };
 
-  const handleFloatingReaction = (emoji: string) => {
+  const handleFloatingReaction = (emoji: string, displayName?: string) => {
     const newReaction: FloatingReaction = {
       id: `${Date.now()}-${Math.random()}`,
       emoji,
-      left: Math.random() * 60 + 20,
+      left: 35 + Math.random() * 30,
+      displayName,
     };
     setFloatingReactions(prev => [...prev, newReaction]);
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.id !== newReaction.id));
-    }, 4000);
+    }, 3000);
   };
 
   // Handle mic toggle
@@ -688,7 +690,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   // Handle reaction
   const handleReaction = async (emoji: string) => {
     setShowReactions(false);
-    handleFloatingReaction(emoji);
+    const myName = viewers.find((v: any) => v.user_id === user?.id)?.profile?.display_name || host?.display_name || 'Someone';
+    handleFloatingReaction(emoji, myName);
 
     const reactionTypes: Record<string, string> = {
       '❤️': 'heart', '👍': 'like', '😂': 'laugh', '🔥': 'fire', '👏': 'clap', '😍': 'love', '⭐': 'star',
@@ -1085,20 +1088,25 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </button>
       </div>
 
-      {/* Floating Reactions */}
-      <div className="fixed bottom-32 right-4 pointer-events-none">
+      {/* Floating Reactions - Center screen */}
+      <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
         <AnimatePresence>
           {floatingReactions.map(r => (
             <motion.div
               key={r.id}
-              initial={{ opacity: 0, y: 0, scale: 1 }}
-              animate={{ opacity: 1, y: -20, scale: 1.5 }}
-              exit={{ opacity: 0, y: -500, scale: 0.8 }}
-              transition={{ duration: 4, ease: "easeOut" }}
-              className="absolute text-4xl"
-              style={{ left: `${r.left}%` }}
+              initial={{ opacity: 0, y: 40, scale: 0.5 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -200, scale: 0.6 }}
+              transition={{ duration: 2.5, ease: "easeOut" }}
+              className="absolute flex flex-col items-center gap-1"
+              style={{ left: `${r.left}%`, top: '40%' }}
             >
-              {r.emoji}
+              <span className="text-5xl drop-shadow-lg">{r.emoji}</span>
+              {r.displayName && (
+                <span className="text-xs font-semibold text-white bg-black/60 px-2 py-0.5 rounded-full whitespace-nowrap backdrop-blur-sm">
+                  {r.displayName}
+                </span>
+              )}
             </motion.div>
           ))}
         </AnimatePresence>
