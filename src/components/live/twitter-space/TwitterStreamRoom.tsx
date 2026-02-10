@@ -51,6 +51,7 @@ import { SpaceRulesModal } from './SpaceRulesModal';
 import { SpaceFeedbackModal } from './SpaceFeedbackModal';
 import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
+import { MentionText } from '../MentionText';
 import { PKBattleChallenge } from '../unified/PKBattleChallenge';
 import { shareUrls } from '@/lib/url-utils';
 
@@ -1408,7 +1409,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                             <span className="text-pink-400 font-medium">{reply.text}</span>
                           </div>
                         ) : (
-                          <p className="text-zinc-300 text-sm mt-2 break-words">{reply.text}</p>
+                          <MentionText text={reply.text} className="text-zinc-300 text-sm mt-2 break-words" />
                         )}
                         <div className="flex gap-6 mt-3 text-zinc-500 text-xs">
                           <button
