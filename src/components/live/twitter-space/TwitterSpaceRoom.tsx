@@ -37,6 +37,7 @@ import {
   Speaker,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { shareUrls } from '@/lib/url-utils';
 
 import { LiveGiftModal } from '../LiveGiftModal';
 import { SpeakerQueuePanel } from '../SpeakerQueuePanel';
@@ -91,6 +92,7 @@ interface SpaceData {
   is_private: boolean;
   started_at?: string;
   allow_mic_for_all?: boolean;
+  cover_image_url?: string;
 }
 
 interface FloatingReaction {
@@ -1410,15 +1412,32 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       {showShare && (
         <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowShare(false)}>
           <div
-            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6 pb-safe"
             onClick={e => e.stopPropagation()}
           >
-            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+
+            {/* Cover Image Preview */}
+            <div className="mb-4 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-800/50">
+              {space?.cover_image_url ? (
+                <img src={space.cover_image_url} alt={space?.title} className="w-full h-32 object-cover" />
+              ) : (
+                <div className="w-full h-20 bg-gradient-to-r from-purple-600/30 to-pink-600/30 flex items-center justify-center">
+                  <Mic className="w-8 h-8 text-purple-400" />
+                </div>
+              )}
+              <div className="px-3 py-2">
+                <p className="text-white text-sm font-semibold truncate">{space?.title || 'Live Space'}</p>
+                <p className="text-zinc-500 text-xs truncate">feedinbeta.lovable.app</p>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <button
                 onClick={() => {
+                  const url = shareUrls.liveSpace(space?.share_link || spaceId);
                   toast.success('Space link copied!');
-                  navigator.clipboard.writeText(window.location.href);
+                  navigator.clipboard.writeText(url);
                   setShowShare(false);
                 }}
                 className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
@@ -1428,10 +1447,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </button>
               <button
                 onClick={() => {
+                  const url = shareUrls.liveSpace(space?.share_link || spaceId);
                   if (navigator.share) {
                     navigator.share({
                       title: space?.title,
-                      url: window.location.href,
+                      text: `Join me in this live space: ${space?.title}`,
+                      url,
                     });
                   }
                   setShowShare(false);

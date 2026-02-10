@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, MessageCircle, Share2 } from 'lucide-react';
+import { Link, MessageCircle, Share2, Mic } from 'lucide-react';
 import { toast } from 'sonner';
 import { shareUrls } from '@/lib/url-utils';
 
@@ -10,6 +10,7 @@ interface TwitterSpaceShareMenuProps {
   spaceId: string;
   shareLink: string;
   spaceTitle: string;
+  coverImageUrl?: string;
 }
 
 export const TwitterSpaceShareMenu = ({
@@ -18,6 +19,7 @@ export const TwitterSpaceShareMenu = ({
   spaceId,
   shareLink,
   spaceTitle,
+  coverImageUrl,
 }: TwitterSpaceShareMenuProps) => {
   const shareUrl = shareUrls.liveSpace(shareLink || spaceId);
 
@@ -58,7 +60,6 @@ export const TwitterSpaceShareMenu = ({
         </div>
       ),
       onClick: () => {
-        // Navigate to compose with space link
         window.location.href = `/compose?content=${encodeURIComponent(`Join me in this live space! ${shareUrl}`)}`;
       },
     },
@@ -66,7 +67,6 @@ export const TwitterSpaceShareMenu = ({
       label: 'Invite via Chat',
       icon: <MessageCircle className="w-5 h-5 text-zinc-400" />,
       onClick: () => {
-        // Could open invite modal
         toast.info('Coming soon');
         onClose();
       },
@@ -101,7 +101,26 @@ export const TwitterSpaceShareMenu = ({
             exit={{ opacity: 0, y: 50 }}
             className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-900 rounded-t-3xl p-6 pb-safe"
           >
-            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
+            <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+
+            {/* Link Preview Card */}
+            <div className="mb-4 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-800/50">
+              {coverImageUrl ? (
+                <img
+                  src={coverImageUrl}
+                  alt={spaceTitle}
+                  className="w-full h-32 object-cover"
+                />
+              ) : (
+                <div className="w-full h-20 bg-gradient-to-r from-purple-600/30 to-pink-600/30 flex items-center justify-center">
+                  <Mic className="w-8 h-8 text-purple-400" />
+                </div>
+              )}
+              <div className="px-3 py-2">
+                <p className="text-white text-sm font-semibold truncate">{spaceTitle || 'Live Space'}</p>
+                <p className="text-zinc-500 text-xs truncate">feedinbeta.lovable.app</p>
+              </div>
+            </div>
 
             <div className="space-y-1">
               {options.map((option) => (
