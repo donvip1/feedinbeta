@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { SpaceChat } from './SpaceChat';
 import { SpaceInviteModal } from './SpaceInviteModal';
 import { LiveGiftModal } from './LiveGiftModal';
+import { SpaceWalletBoard } from './SpaceWalletBoard';
 import { SpeakerQueuePanel } from './SpeakerQueuePanel';
 import { TestAudioModal } from './TestAudioModal';
 import { SpeakerAvatarWithWaves } from './SpeakerAvatarWithWaves';
@@ -1324,17 +1325,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   isHost={isHost}
                   onPromote={(speakerId) => promoteSpeaker(speakerId, 'speaker')}
                 />
-                {/* TikTok-style gift counter */}
-                <div 
-                  className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-pink-500/20 border border-amber-500/30 cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => setShowGiftModal(true)}
-                >
-                  <Gift className="w-3.5 h-3.5 text-amber-400" />
-                  <span className="text-amber-400 font-semibold text-xs">{totalGiftValue.toLocaleString()}</span>
-                  {totalGifts > 0 && (
-                    <span className="text-muted-foreground text-[10px]">({totalGifts})</span>
-                  )}
-                </div>
+                {/* TikTok-style gift counter replaced with wallet board */}
+                <SpaceWalletBoard spaceId={spaceId} />
               </div>
             </div>
             
@@ -1888,6 +1880,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         viewers={getViewersList()}
         isHost={isHost}
         isSpace={true}
+        spaceName={space?.title || ''}
       />
 
       {/* End Space Confirmation */}

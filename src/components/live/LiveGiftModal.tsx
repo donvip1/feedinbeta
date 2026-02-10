@@ -23,6 +23,7 @@ interface LiveGiftModalProps {
   viewers: Array<{ id: string; display_name: string; username: string; avatar_url: string }>;
   isHost: boolean;
   isSpace?: boolean; // If true, inserts into live_space_gifts instead of live_stream_gifts
+  spaceName?: string; // Name of the space/stream for descriptions
 }
 
 // Premium animated gift types with colors matching reference design
@@ -47,6 +48,7 @@ export const LiveGiftModal = ({
   viewers,
   isHost,
   isSpace = false,
+  spaceName = '',
 }: LiveGiftModalProps) => {
   const { user } = useAuth();
   const { permissions } = useAdminRole();
@@ -65,13 +67,12 @@ export const LiveGiftModal = ({
 
   const fetchUserCredits = async () => {
     if (!user) return;
-    // Calculate balance from credit_transactions
     const { data } = await supabase
-      .from('credit_transactions')
-      .select('amount')
-      .eq('user_id', user.id);
-    const balance = data?.reduce((sum, t) => sum + t.amount, 0) || 0;
-    setUserCredits(balance);
+      .from('user_credits')
+      .select('balance')
+      .eq('user_id', user.id)
+      .single();
+    setUserCredits(data?.balance || 0);
   };
 
   const handleSendGift = async (giftType: string, creditValue: number) => {
@@ -113,12 +114,31 @@ export const LiveGiftModal = ({
     setSentGift(giftType);
 
     try {
+      // Get sender display name for descriptions
+      const { data: senderProfile } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', user.id)
+        .single();
+      const senderName = senderProfile?.display_name || senderProfile?.username || 'Someone';
+
+      // Get recipient display name
+      const { data: recipientProfile } = await supabase
+        .from('profiles')
+        .select('display_name, username')
+        .eq('id', recipientId)
+        .single();
+      const recipientName = recipientProfile?.display_name || recipientProfile?.username || 'User';
+
+      const sourceLabel = spaceName ? `"${spaceName}"` : (isSpace ? 'a space' : 'a stream');
+      const giftEmoji = GIFTS.find(g => g.type === giftType)?.emoji || '🎁';
+
       // Deduct credits from sender via transaction
       await supabase.from('credit_transactions').insert({
         user_id: user.id,
         amount: -creditValue,
         type: 'gift_sent',
-        description: `Sent ${giftType} gift in live stream`,
+        description: `${giftEmoji} Sent ${giftType} to @${recipientProfile?.username || recipientName} in ${sourceLabel}`,
         related_id: streamId,
       });
 
@@ -128,7 +148,7 @@ export const LiveGiftModal = ({
         user_id: recipientId,
         amount: recipientAmount,
         type: 'gift_received',
-        description: `Received ${giftType} gift in live stream`,
+        description: `${giftEmoji} Received ${giftType} from @${senderProfile?.username || senderName} in ${sourceLabel}`,
         related_id: streamId,
       });
 
@@ -157,7 +177,7 @@ export const LiveGiftModal = ({
         credit_value: creditValue,
         sender_id: user.id,
         receiver_id: recipientId,
-        source_type: 'live_stream',
+        source_type: isSpace ? 'live_space' : 'live_stream',
         source_id: streamId,
         platform_fee: creditValue - recipientAmount,
       });
@@ -167,8 +187,8 @@ export const LiveGiftModal = ({
         user_id: recipientId,
         from_user_id: user.id,
         type: 'live_gift',
-        title: 'You received a gift!',
-        message: `Someone sent you a ${giftType} gift (${creditValue} credits) in the ${isSpace ? 'space' : 'stream'}`,
+        title: `${giftEmoji} Gift from ${senderName}!`,
+        message: `${senderName} sent you a ${giftType} (${recipientAmount} credits) in ${sourceLabel}`,
         related_id: streamId,
         related_type: isSpace ? 'space' : 'live_stream'
       });
