@@ -207,9 +207,15 @@ const SpaceDetail = () => {
           {/* Host info */}
           {host && (
             <div className="flex items-center justify-center gap-2 pt-2">
-              <span className="text-sm text-muted-foreground">Hosted by</span>
-              <span className="text-sm font-medium">{host.display_name}</span>
-              <span className="text-sm text-muted-foreground">@{host.username}</span>
+              {user && space?.user_id === user.id ? (
+                <span className="text-sm font-medium text-primary">You're hosting this space</span>
+              ) : (
+                <>
+                  <span className="text-sm text-muted-foreground">Hosted by</span>
+                  <span className="text-sm font-medium">{host.display_name}</span>
+                  <span className="text-sm text-muted-foreground">@{host.username}</span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -273,8 +279,17 @@ const SpaceDetail = () => {
         <div className="space-y-3">
           {space?.status === 'live' && (
             <Button onClick={handleJoin} size="lg" className="w-full">
-              <Mic className="w-4 h-4 mr-2" />
-              Join Space
+              {user && space?.user_id === user.id ? (
+                <>
+                  <Mic className="w-4 h-4 mr-2" />
+                  Return to Your Space
+                </>
+              ) : (
+                <>
+                  <Mic className="w-4 h-4 mr-2" />
+                  Join Space
+                </>
+              )}
             </Button>
           )}
 
