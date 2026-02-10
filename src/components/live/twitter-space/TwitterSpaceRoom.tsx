@@ -31,8 +31,10 @@ import {
   Gift,
   Volume2,
   VolumeX,
+  Volume1,
   Hand,
   Circle,
+  Speaker,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -164,6 +166,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [allMuted, setAllMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingLoading, setRecordingLoading] = useState(false);
+  const [isLoudspeaker, setIsLoudspeaker] = useState(true); // Default to loudspeaker on
 
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
@@ -517,32 +520,40 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       .is('left_at', null)
       .maybeSingle();
 
+    let role: string;
+
     if (existing) {
+      role = existing.role;
       setMyRole(existing.role);
       setIsMuted(existing.is_muted);
-      return;
+      if (existing.role === 'host') {
+        setIsMicOn(true);
+      }
+    } else {
+      // Check if this user is the host
+      const isSpaceHost = space?.user_id === user.id;
+      role = isSpaceHost ? 'host' : 'listener';
+
+      const { error } = await supabase.from('live_space_speakers').insert({
+        space_id: spaceId,
+        user_id: user.id,
+        role,
+        is_muted: !isSpaceHost,
+      });
+
+      if (error) {
+        toast.error('Failed to join space');
+        return;
+      }
+
+      setMyRole(role);
+      setIsMuted(!isSpaceHost);
+      if (isSpaceHost) {
+        setIsMicOn(true);
+      }
     }
 
-    // Check if this user is the host
-    const isSpaceHost = space?.user_id === user.id;
-    const role = isSpaceHost ? 'host' : 'listener';
-
-    const { error } = await supabase.from('live_space_speakers').insert({
-      space_id: spaceId,
-      user_id: user.id,
-      role,
-      is_muted: !isSpaceHost,
-    });
-
-    if (error) {
-      toast.error('Failed to join space');
-      return;
-    }
-
-    setMyRole(role);
-    setIsMuted(!isSpaceHost);
-
-    // Connect audio
+    // ALWAYS connect audio regardless of existing record
     if (spaceContext) {
       audioPlaybackManager.enableAudioPlayback();
       await spaceContext.connectAudio(role);
@@ -1143,28 +1154,55 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       <div className="px-4 py-4 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
         <div className="flex items-center justify-between max-w-md mx-auto">
           {/* Mic / Request Button */}
-          <div className="flex flex-col items-center gap-1">
-            <button
-              onClick={handleToggleMute}
-              className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all ${
-                canSpeak
-                  ? isMicOn
-                    ? 'bg-purple-600 border-purple-500 text-white'
-                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                  : hasRaisedHand
-                    ? 'bg-amber-600 border-amber-500 text-white'
-                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
-              }`}
-            >
-              {canSpeak ? (
-                isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
-              ) : (
-                <Hand className="w-6 h-6" />
-              )}
-            </button>
-            <span className="text-xs text-zinc-500">
-              {canSpeak ? (isMicOn ? 'Mute' : 'Unmute') : hasRaisedHand ? 'Pending' : 'Request'}
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={handleToggleMute}
+                className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all ${
+                  canSpeak
+                    ? isMicOn
+                      ? 'bg-purple-600 border-purple-500 text-white'
+                      : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                    : hasRaisedHand
+                      ? 'bg-amber-600 border-amber-500 text-white'
+                      : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                }`}
+              >
+                {canSpeak ? (
+                  isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
+                ) : (
+                  <Hand className="w-6 h-6" />
+                )}
+              </button>
+              <span className="text-xs text-zinc-500">
+                {canSpeak ? (isMicOn ? 'Mute' : 'Unmute') : hasRaisedHand ? 'Pending' : 'Request'}
+              </span>
+            </div>
+
+            {/* Loudspeaker Toggle */}
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={() => {
+                  setIsLoudspeaker(!isLoudspeaker);
+                  // Toggle volume between loudspeaker and earpiece levels
+                  if (isLoudspeaker) {
+                    audioPlaybackManager.setVolume(0.3);
+                  } else {
+                    audioPlaybackManager.setVolume(1.0);
+                  }
+                }}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                  isLoudspeaker
+                    ? 'bg-green-600/20 text-green-400'
+                    : 'bg-transparent text-zinc-500'
+                }`}
+              >
+                {isLoudspeaker ? <Volume2 className="w-5 h-5" /> : <Volume1 className="w-5 h-5" />}
+              </button>
+              <span className="text-xs text-zinc-500">
+                {isLoudspeaker ? 'Speaker' : 'Earpiece'}
+              </span>
+            </div>
           </div>
 
           {/* Center Icons */}
