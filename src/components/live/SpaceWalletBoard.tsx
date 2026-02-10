@@ -15,19 +15,19 @@ interface TopGifter {
 interface SpaceWalletBoardProps {
   spaceId: string;
   className?: string;
+  variant?: 'compact' | 'bar';
 }
 
-export const SpaceWalletBoard = ({ spaceId, className }: SpaceWalletBoardProps) => {
+const GIFT_EMOJI_MAP: Record<string, string> = {
+  rose: '🌹', coffee: '☕', heart: '❤️', diamond: '💎',
+  rocket: '🚀', castle: '🏰', crown: '👑', universe: '🌌', credits: '💰',
+};
+
+export const SpaceWalletBoard = ({ spaceId, className, variant = 'compact' }: SpaceWalletBoardProps) => {
   const [totalValue, setTotalValue] = useState(0);
   const [giftCount, setGiftCount] = useState(0);
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
-  const [expanded, setExpanded] = useState(false);
-  const [lastGift, setLastGift] = useState<{ emoji: string; value: number } | null>(null);
-
-  const GIFT_EMOJI_MAP: Record<string, string> = {
-    rose: '🌹', coffee: '☕', heart: '❤️', diamond: '💎',
-    rocket: '🚀', castle: '🏰', crown: '👑', universe: '🌌', credits: '💰',
-  };
+  const [lastGift, setLastGift] = useState<{ emoji: string; value: number; sender: string } | null>(null);
 
   const fetchData = async () => {
     const { data, count } = await supabase
@@ -39,7 +39,6 @@ export const SpaceWalletBoard = ({ spaceId, className }: SpaceWalletBoardProps) 
     const total = data?.reduce((sum, g) => sum + (g.credit_value || 0), 0) || 0;
     setTotalValue(total);
 
-    // Calculate top gifters
     if (data && data.length > 0) {
       const gifterMap = new Map<string, number>();
       data.forEach(g => {
@@ -82,95 +81,92 @@ export const SpaceWalletBoard = ({ spaceId, className }: SpaceWalletBoardProps) 
         schema: 'public',
         table: 'live_space_gifts',
         filter: `space_id=eq.${spaceId}`,
-      }, (payload: any) => {
+      }, async (payload: any) => {
         fetchData();
-        // Flash animation for new gift
         const emoji = GIFT_EMOJI_MAP[payload.new?.gift_type] || '🎁';
-        setLastGift({ emoji, value: payload.new?.credit_value || 0 });
-        setTimeout(() => setLastGift(null), 2000);
+        // Get sender name
+        const { data: sender } = await supabase
+          .from('profiles')
+          .select('display_name')
+          .eq('id', payload.new?.sender_id)
+          .single();
+        setLastGift({ emoji, value: payload.new?.credit_value || 0, sender: sender?.display_name || 'Someone' });
+        setTimeout(() => setLastGift(null), 3000);
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
   }, [spaceId]);
 
+  // Bar variant - full width, prominent
+  if (variant === 'bar') {
+    return (
+      <div className={cn("relative w-full", className)}>
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-pink-500/10 border border-amber-500/20">
+          {/* Left: Total earnings */}
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500/30 to-orange-500/30 flex items-center justify-center">
+              <Coins className="w-4 h-4 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-amber-400 font-bold text-sm leading-tight">{totalValue.toLocaleString()}</p>
+              <p className="text-[10px] text-muted-foreground">{giftCount} gifts</p>
+            </div>
+          </div>
+
+          {/* Center: Top gifters */}
+          <div className="flex items-center gap-2">
+            {topGifters.slice(0, 3).map((gifter, i) => (
+              <div key={gifter.sender_id} className="flex items-center gap-1 text-[10px]">
+                <span className={cn(
+                  "w-4 h-4 rounded-full flex items-center justify-center font-bold",
+                  i === 0 ? "bg-amber-500/30 text-amber-400" :
+                  i === 1 ? "bg-gray-400/20 text-gray-400" :
+                  "bg-orange-500/20 text-orange-400"
+                )}>
+                  {i === 0 ? <Crown className="w-2.5 h-2.5" /> : i + 1}
+                </span>
+                <span className="text-muted-foreground truncate max-w-[50px]">{gifter.display_name}</span>
+              </div>
+            ))}
+            {topGifters.length === 0 && (
+              <span className="text-[10px] text-muted-foreground">No gifts yet</span>
+            )}
+          </div>
+
+          {/* Right: Gift icon */}
+          <Gift className="w-4 h-4 text-amber-400/60" />
+        </div>
+
+        {/* New gift animation */}
+        <AnimatePresence>
+          {lastGift && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute -bottom-7 left-0 right-0 flex items-center justify-center"
+            >
+              <span className="text-xs bg-amber-500/20 border border-amber-500/30 rounded-full px-3 py-0.5 text-amber-400">
+                {lastGift.emoji} {lastGift.sender} sent +{lastGift.value} credits
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  // Compact variant (default) - small badge
   return (
     <div className={cn("relative", className)}>
-      {/* Compact wallet badge */}
-      <motion.button
-        onClick={() => setExpanded(!expanded)}
-        className={cn(
-          "flex items-center gap-1.5 px-2.5 py-1.5 rounded-full",
-          "bg-gradient-to-r from-amber-500/20 to-orange-500/20",
-          "border border-amber-500/30 backdrop-blur-sm",
-          "hover:scale-105 transition-transform"
-        )}
-        whileTap={{ scale: 0.95 }}
-      >
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30">
         <Coins className="w-3.5 h-3.5 text-amber-400" />
         <span className="text-amber-400 font-bold text-xs">{totalValue.toLocaleString()}</span>
         {giftCount > 0 && (
           <span className="text-muted-foreground text-[10px]">({giftCount})</span>
         )}
-      </motion.button>
-
-      {/* New gift flash */}
-      <AnimatePresence>
-        {lastGift && (
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.5 }}
-            animate={{ opacity: 1, y: -20, scale: 1 }}
-            exit={{ opacity: 0, y: -40, scale: 0.5 }}
-            className="absolute -top-6 left-1/2 -translate-x-1/2 text-lg pointer-events-none"
-          >
-            {lastGift.emoji} +{lastGift.value}
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Expanded board */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: -5 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: -5 }}
-            className="absolute top-full right-0 mt-2 w-56 bg-card border border-border rounded-xl shadow-xl z-50 p-3 space-y-3"
-          >
-            {/* Total */}
-            <div className="text-center">
-              <p className="text-xs text-muted-foreground">Space Earnings</p>
-              <p className="text-2xl font-bold text-amber-400">{totalValue.toLocaleString()}</p>
-              <p className="text-[10px] text-muted-foreground">{giftCount} gifts received</p>
-            </div>
-
-            {/* Top gifters */}
-            {topGifters.length > 0 && (
-              <div>
-                <p className="text-[10px] uppercase text-muted-foreground font-semibold flex items-center gap-1 mb-1.5">
-                  <TrendingUp className="w-3 h-3" /> Top Gifters
-                </p>
-                <div className="space-y-1.5">
-                  {topGifters.map((gifter, i) => (
-                    <div key={gifter.sender_id} className="flex items-center gap-2 text-xs">
-                      <span className={cn(
-                        "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-                        i === 0 ? "bg-amber-500/20 text-amber-400" :
-                        i === 1 ? "bg-gray-400/20 text-gray-400" :
-                        "bg-orange-500/20 text-orange-400"
-                      )}>
-                        {i === 0 ? <Crown className="w-3 h-3" /> : i + 1}
-                      </span>
-                      <span className="truncate flex-1 font-medium">{gifter.display_name}</span>
-                      <span className="text-amber-400 font-semibold">{gifter.total_value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      </div>
     </div>
   );
 };

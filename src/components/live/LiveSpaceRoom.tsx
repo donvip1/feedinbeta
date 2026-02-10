@@ -1325,8 +1325,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   isHost={isHost}
                   onPromote={(speakerId) => promoteSpeaker(speakerId, 'speaker')}
                 />
-                {/* TikTok-style gift counter replaced with wallet board */}
-                <SpaceWalletBoard spaceId={spaceId} />
+                {/* Gift counter - small inline */}
               </div>
             </div>
             
@@ -1378,6 +1377,9 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
               </Button>
             </div>
           </div>
+
+          {/* Space Wallet Board - visible to everyone below header */}
+          <SpaceWalletBoard spaceId={spaceId} variant="bar" />
 
           {/* Host Controls Bar - compact on mobile */}
           {isHost && !isMobile && (
