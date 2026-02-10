@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { SpaceMentionInput } from './SpaceMentionInput';
-import { cn } from '@/lib/utils';
+import { MentionText } from './MentionText';
 import { toast } from 'sonner';
 
 interface SpaceChatProps {
@@ -35,19 +35,15 @@ export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceCha
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Format message content with highlighted mentions
-  const formatMessageWithMentions = (content: string) => {
-    const parts = content.split(/(@\w+)/g);
-    return parts.map((part, index) => {
-      if (part.startsWith('@')) {
-        return (
-          <span key={index} className={cn("text-primary font-semibold")}>
-            {part}
-          </span>
-        );
-      }
-      return part;
-    });
+  const handleMentionClick = async (username: string) => {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .single();
+    if (profile) {
+      navigate(`/profile/${profile.id}`, { state: { returnTo: `/live/space/${spaceId}` } });
+    }
   };
 
   useEffect(() => {
@@ -183,9 +179,11 @@ export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceCha
               >
                 {msg.profile?.display_name || 'User'}
               </p>
-              <p className="text-sm break-words">
-                {formatMessageWithMentions(msg.content)}
-              </p>
+              <MentionText
+                text={msg.content}
+                className="text-sm break-words"
+                onMentionClick={handleMentionClick}
+              />
             </div>
           </div>
         ))}
