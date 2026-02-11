@@ -1770,7 +1770,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   )}
                   onClick={() => {
                     setIsOutputMuted(!isOutputMuted);
-                    document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"]').forEach(audio => {
+                    document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"], [id^="space-lk-audio-"]').forEach(audio => {
                       audio.muted = !isOutputMuted;
                     });
                     toast(isOutputMuted ? 'Speaker unmuted' : 'Speaker muted');
