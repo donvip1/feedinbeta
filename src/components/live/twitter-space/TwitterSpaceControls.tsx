@@ -62,13 +62,6 @@ export const TwitterSpaceControls = ({
         {/* Center Icons */}
         <div className="flex items-center gap-4">
           <button
-            onClick={onGuestsClick}
-            className="p-2 text-zinc-400 hover:text-white transition-colors"
-          >
-            <Users className="w-6 h-6" />
-          </button>
-
-          <button
             onClick={onReactionsClick}
             className="p-2 text-zinc-400 hover:text-white transition-colors"
           >
