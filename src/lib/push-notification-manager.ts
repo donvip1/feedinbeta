@@ -87,14 +87,14 @@ class PushNotificationManager {
       }
 
       // Check for existing subscription
-      this.subscription = await this.registration!.pushManager.getSubscription();
+      this.subscription = await (this.registration as any).pushManager.getSubscription();
       
       if (!this.subscription) {
         console.log('[Push] Creating new push subscription...');
         const vapidKey = this.vapidPublicKey || FALLBACK_VAPID_PUBLIC_KEY;
         const key = this.urlBase64ToUint8Array(vapidKey);
         
-        this.subscription = await this.registration!.pushManager.subscribe({
+        this.subscription = await (this.registration as any).pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: key.buffer as ArrayBuffer,
         });
@@ -132,7 +132,7 @@ class PushNotificationManager {
       const initialized = await this.initialize();
       if (!initialized) return false;
     }
-    this.subscription = await this.registration!.pushManager.getSubscription();
+    this.subscription = await (this.registration as any).pushManager.getSubscription();
     return !!this.subscription;
   }
 
