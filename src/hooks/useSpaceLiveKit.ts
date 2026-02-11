@@ -124,9 +124,10 @@ export const useSpaceLiveKit = ({
 
       const levels: AudioLevels = {};
 
-      // Local participant audio level
+      // Local participant audio level - only report if track is not muted
       if (room.localParticipant && localTrackRef.current) {
-        const localLevel = room.localParticipant.audioLevel || 0;
+        const isMuted = localTrackRef.current.isMuted;
+        const localLevel = isMuted ? 0 : (room.localParticipant.audioLevel || 0);
         levels[room.localParticipant.identity] = localLevel * 100;
       }
 
