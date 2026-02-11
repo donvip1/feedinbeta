@@ -18,7 +18,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { 
   ArrowLeft, Shield, Users, Gavel, ShoppingCart, History, 
   Search, X, Check, AlertTriangle, RefreshCw, UserPlus,
-  Crown, Ban, Eye
+  Crown, Ban, Eye, Radio, StopCircle
 } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 
@@ -30,6 +30,65 @@ const AdminPanel = () => {
   const [searchUsername, setSearchUsername] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [endingLive, setEndingLive] = useState(false);
+
+  // Fetch active live spaces and streams
+  const { data: activeSpaces, refetch: refetchSpaces } = useQuery({
+    queryKey: ['admin-active-spaces'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('live_spaces')
+        .select('id, title, host_id, status, created_at, viewer_count')
+        .eq('status', 'live');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: permissions.isAdmin || permissions.isDeveloper,
+  });
+
+  const { data: activeStreams, refetch: refetchStreams } = useQuery({
+    queryKey: ['admin-active-streams'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('live_streams')
+        .select('id, title, host_id, status, created_at, viewer_count')
+        .eq('status', 'live');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: permissions.isAdmin || permissions.isDeveloper,
+  });
+
+  const handleEndAllLive = async () => {
+    setEndingLive(true);
+    try {
+      const [spacesRes, streamsRes] = await Promise.all([
+        supabase.from('live_spaces').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('status', 'live'),
+        supabase.from('live_streams').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('status', 'live'),
+      ]);
+      if (spacesRes.error) throw spacesRes.error;
+      if (streamsRes.error) throw streamsRes.error;
+      toast.success('All live streams and spaces ended');
+      refetchSpaces();
+      refetchStreams();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to end all');
+    } finally {
+      setEndingLive(false);
+    }
+  };
+
+  const handleEndSingle = async (type: 'space' | 'stream', id: string) => {
+    try {
+      const table = type === 'space' ? 'live_spaces' : 'live_streams';
+      const { error } = await supabase.from(table).update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+      if (error) throw error;
+      toast.success(`${type === 'space' ? 'Space' : 'Stream'} ended`);
+      type === 'space' ? refetchSpaces() : refetchStreams();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to end');
+    }
+  };
 
   // Fetch pending P2P orders
   const { data: pendingOrders, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
@@ -200,7 +259,7 @@ const AdminPanel = () => {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue={permissions.canManageP2P ? "p2p" : permissions.canManageDisputes ? "disputes" : "roles"}>
-          <TabsList className="grid w-full grid-cols-4 mb-6">
+          <TabsList className="grid w-full grid-cols-5 mb-6">
             {permissions.canManageP2P && (
               <TabsTrigger value="p2p" className="gap-1">
                 <ShoppingCart className="w-4 h-4" /> P2P
@@ -214,6 +273,11 @@ const AdminPanel = () => {
             {permissions.canManageRoles && (
               <TabsTrigger value="roles" className="gap-1">
                 <Users className="w-4 h-4" /> Roles
+              </TabsTrigger>
+            )}
+            {(permissions.isAdmin || permissions.isDeveloper) && (
+              <TabsTrigger value="live" className="gap-1">
+                <Radio className="w-4 h-4" /> Live
               </TabsTrigger>
             )}
             {(permissions.isAdmin || permissions.isDeveloper) && (
@@ -474,6 +538,119 @@ const AdminPanel = () => {
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Live Management Tab */}
+          {(permissions.isAdmin || permissions.isDeveloper) && (
+            <TabsContent value="live" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Radio className="w-5 h-5 text-red-500" />
+                    Live Stream & Space Management
+                  </CardTitle>
+                  <CardDescription>
+                    Monitor and control all active live sessions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* End All Button */}
+                  <div className="flex items-center justify-between p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <div>
+                      <p className="font-semibold text-sm">End All Live Sessions</p>
+                      <p className="text-xs text-muted-foreground">
+                        Immediately end all active streams and spaces
+                      </p>
+                    </div>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm" disabled={endingLive}>
+                          <StopCircle className="w-4 h-4 mr-2" />
+                          End All
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5 text-destructive" />
+                            End All Live Sessions?
+                          </DialogTitle>
+                        </DialogHeader>
+                        <p className="text-sm text-muted-foreground">
+                          This will immediately end <strong>{(activeSpaces?.length || 0) + (activeStreams?.length || 0)}</strong> active sessions. 
+                          All participants will be disconnected. This action cannot be undone.
+                        </p>
+                        <DialogFooter>
+                          <Button variant="destructive" onClick={handleEndAllLive} disabled={endingLive}>
+                            {endingLive ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <StopCircle className="w-4 h-4 mr-2" />}
+                            Confirm End All
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
+                  {/* Active Spaces */}
+                  <div>
+                    <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      Active Spaces
+                      <Badge variant="secondary">{activeSpaces?.length || 0}</Badge>
+                    </h3>
+                    {activeSpaces && activeSpaces.length > 0 ? (
+                      <div className="space-y-2">
+                        {activeSpaces.map((space: any) => (
+                          <div key={space.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <p className="font-medium text-sm">{space.title || 'Untitled Space'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {space.viewer_count || 0} viewers · Started {formatDistanceToNow(new Date(space.created_at), { addSuffix: true })}
+                              </p>
+                            </div>
+                            <Button variant="destructive" size="sm" onClick={() => handleEndSingle('space', space.id)}>
+                              <StopCircle className="w-3 h-3 mr-1" /> End
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No active spaces</p>
+                    )}
+                  </div>
+
+                  {/* Active Streams */}
+                  <div>
+                    <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                      Active Streams
+                      <Badge variant="secondary">{activeStreams?.length || 0}</Badge>
+                    </h3>
+                    {activeStreams && activeStreams.length > 0 ? (
+                      <div className="space-y-2">
+                        {activeStreams.map((stream: any) => (
+                          <div key={stream.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <p className="font-medium text-sm">{stream.title || 'Untitled Stream'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {stream.viewer_count || 0} viewers · Started {formatDistanceToNow(new Date(stream.created_at), { addSuffix: true })}
+                              </p>
+                            </div>
+                            <Button variant="destructive" size="sm" onClick={() => handleEndSingle('stream', stream.id)}>
+                              <StopCircle className="w-3 h-3 mr-1" /> End
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No active streams</p>
+                    )}
+                  </div>
+
+                  {/* Refresh */}
+                  <Button variant="outline" size="sm" onClick={() => { refetchSpaces(); refetchStreams(); }}>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Refresh
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>
