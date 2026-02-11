@@ -25,10 +25,23 @@ const SpaceDetail = () => {
   const [showRoom, setShowRoom] = useState(false);
   const [showReplay, setShowReplay] = useState(false);
 
-  // Check if we're returning from minimized state
+  const returningFromMinimize = (location.state as any)?.returningFromMinimize;
+
+  // Check if we're returning from minimized state - run BEFORE fetch
   useEffect(() => {
+    // If returning from minimize via FloatingSpacePlayer, show room immediately
+    if (returningFromMinimize && spaceContext && spaceContext.spaceState.isActive) {
+      const activeSpaceId = spaceContext.spaceState.spaceInfo?.id;
+      if (activeSpaceId === spaceId || (space && activeSpaceId === space.id)) {
+        console.log('[SpaceDetail] Returning from minimize, showing room immediately');
+        setShowRoom(true);
+        setLoading(false);
+        return;
+      }
+    }
+    
+    // Also handle case where context is active and not minimized
     if (spaceContext && spaceContext.spaceState.isActive && !spaceContext.spaceState.isMinimized) {
-      // If we're already in this space and it's not minimized, show the room immediately
       const activeSpaceId = spaceContext.spaceState.spaceInfo?.id;
       if (activeSpaceId === spaceId || (space && activeSpaceId === space.id)) {
         console.log('[SpaceDetail] Already in this space, showing room directly');
@@ -36,7 +49,7 @@ const SpaceDetail = () => {
         setLoading(false);
       }
     }
-  }, [spaceContext?.spaceState.isActive, spaceContext?.spaceState.isMinimized, spaceId, space?.id]);
+  }, [spaceContext?.spaceState.isActive, spaceContext?.spaceState.isMinimized, spaceId, space?.id, returningFromMinimize]);
 
   useEffect(() => {
     if (spaceId) {
@@ -45,11 +58,11 @@ const SpaceDetail = () => {
     }
   }, [spaceId]);
 
-  // Auto-join for hosts (when they just created the space)
+  // Auto-join when autoJoin state is set (from dashboard click or host creation)
   useEffect(() => {
     const autoJoin = (location.state as any)?.autoJoin;
-    if (autoJoin && space && user && space.user_id === user.id && !showRoom) {
-      console.log('[SpaceDetail] Auto-joining as host');
+    if (autoJoin && space && user && !showRoom) {
+      console.log('[SpaceDetail] Auto-joining space');
       audioPlaybackManager.enableAudioPlayback();
       setShowRoom(true);
     }

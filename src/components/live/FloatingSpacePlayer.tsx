@@ -44,7 +44,7 @@ export const FloatingSpacePlayer: React.FC = () => {
     // Navigate to the space - use the correct route with /live/space/
     const spaceId = spaceState.spaceInfo?.id;
     if (spaceId) {
-      navigate(`/live/space/${spaceId}`);
+      navigate(`/live/space/${spaceId}`, { state: { autoJoin: true, returningFromMinimize: true } });
     }
   };
 
