@@ -47,6 +47,33 @@ const LiveStreamDetail = () => {
     }
   }, [streamContext?.streamState.isActive, streamContext?.streamState.isMinimized, streamId, stream?.id]);
 
+  // Set OG meta tags for social sharing
+  useEffect(() => {
+    if (!stream) return;
+    const ogImage = stream.cover_image_url || `${window.location.origin}/favicon.png`;
+    const ogTitle = stream.title || 'Live Stream on FeedIn';
+    const ogDesc = stream.description || `Watch this live stream on FeedIn`;
+
+    const setMeta = (property: string, content: string) => {
+      let el = document.querySelector(`meta[property="${property}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute('property', property);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
+    document.title = ogTitle;
+    setMeta('og:title', ogTitle);
+    setMeta('og:description', ogDesc);
+    setMeta('og:image', ogImage);
+    setMeta('og:url', window.location.href);
+    setMeta('og:type', 'website');
+
+    return () => { document.title = 'FeedIn'; };
+  }, [stream]);
+
   const loadStream = async () => {
     try {
       // Fetch from live_streams table directly (not the view)
@@ -141,6 +168,17 @@ const LiveStreamDetail = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted p-4">
       <div className="max-w-md w-full text-center space-y-6">
+        {/* Cover Image Preview */}
+        {stream?.cover_image_url && (
+          <div className="w-full rounded-2xl overflow-hidden border border-border">
+            <img 
+              src={stream.cover_image_url} 
+              alt={stream.title} 
+              className="w-full h-40 object-cover"
+            />
+          </div>
+        )}
+
         {/* Host Avatar */}
         <div className="relative mx-auto w-fit">
           <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -185,6 +223,12 @@ const LiveStreamDetail = () => {
           )}
           {stream?.room_type && (
             <Badge variant="outline">{stream.room_type.replace('_', ' ')}</Badge>
+          )}
+          {stream?.is_private && (
+            <Badge variant="outline" className="text-amber-500 border-amber-500">
+              <Lock className="w-3 h-3 mr-1" />
+              Private
+            </Badge>
           )}
         </div>
 

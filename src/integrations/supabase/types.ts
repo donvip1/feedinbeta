@@ -4179,11 +4179,13 @@ export type Database = {
           id: string
           is_chat_locked: boolean | null
           is_premium: boolean | null
+          is_private: boolean | null
           last_health_check: string | null
           peak_viewers: number | null
           room_type: string | null
           scheduled_start: string | null
           sfu_track_name: string | null
+          share_link: string | null
           started_at: string | null
           status: string
           stream_key: string
@@ -4213,11 +4215,13 @@ export type Database = {
           id?: string
           is_chat_locked?: boolean | null
           is_premium?: boolean | null
+          is_private?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
           room_type?: string | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
+          share_link?: string | null
           started_at?: string | null
           status?: string
           stream_key: string
@@ -4247,11 +4251,13 @@ export type Database = {
           id?: string
           is_chat_locked?: boolean | null
           is_premium?: boolean | null
+          is_private?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
           room_type?: string | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
+          share_link?: string | null
           started_at?: string | null
           status?: string
           stream_key?: string

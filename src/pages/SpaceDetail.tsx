@@ -68,6 +68,33 @@ const SpaceDetail = () => {
     }
   }, [space, user, location.state, showRoom]);
 
+  // Set OG meta tags for social sharing
+  useEffect(() => {
+    if (!space) return;
+    const ogImage = space.cover_image_url || `${window.location.origin}/favicon.png`;
+    const ogTitle = space.title || 'Live Space on FeedIn';
+    const ogDesc = space.description || `Join this live space on FeedIn`;
+
+    const setMeta = (property: string, content: string) => {
+      let el = document.querySelector(`meta[property="${property}"]`);
+      if (!el) {
+        el = document.createElement('meta');
+        el.setAttribute('property', property);
+        document.head.appendChild(el);
+      }
+      el.setAttribute('content', content);
+    };
+
+    document.title = ogTitle;
+    setMeta('og:title', ogTitle);
+    setMeta('og:description', ogDesc);
+    setMeta('og:image', ogImage);
+    setMeta('og:url', window.location.href);
+    setMeta('og:type', 'website');
+
+    return () => { document.title = 'FeedIn'; };
+  }, [space]);
+
   const fetchSpace = async () => {
     console.log('[SpaceDetail] Fetching space with ID:', spaceId);
     
@@ -190,6 +217,17 @@ const SpaceDetail = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted p-4">
       <div className="max-w-md w-full text-center space-y-6">
+        {/* Cover Image Preview */}
+        {space?.cover_image_url && (
+          <div className="w-full rounded-2xl overflow-hidden border border-border">
+            <img 
+              src={space.cover_image_url} 
+              alt={space.title} 
+              className="w-full h-40 object-cover"
+            />
+          </div>
+        )}
+
         {/* Icon or Host Avatar */}
         <div className="relative mx-auto w-fit">
           <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">

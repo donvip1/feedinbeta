@@ -13,10 +13,10 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const spaceId = url.searchParams.get("id");
+    const streamId = url.searchParams.get("id");
 
-    if (!spaceId) {
-      return new Response(JSON.stringify({ error: "Missing space id" }), {
+    if (!streamId) {
+      return new Response(JSON.stringify({ error: "Missing stream id" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -27,63 +27,53 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Try by UUID first, then by share_link
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(spaceId);
+    const { data: stream, error } = await supabase
+      .from("live_streams")
+      .select("id, title, description, cover_image_url, user_id, status, viewer_count")
+      .eq("id", streamId)
+      .maybeSingle();
 
-    let query = supabase
-      .from("live_spaces")
-      .select("id, title, description, cover_image_url, user_id, status, listener_count");
-
-    if (isUUID) {
-      query = query.eq("id", spaceId);
-    } else {
-      query = query.eq("share_link", spaceId);
-    }
-
-    const { data: space, error } = await query.maybeSingle();
-
-    if (error || !space) {
+    if (error || !stream) {
       return new Response(
-        JSON.stringify({ error: "Space not found" }),
+        JSON.stringify({ error: "Stream not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Get host profile
     let hostName = "FEEDIN User";
-    if (space.user_id) {
+    if (stream.user_id) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("display_name, username")
-        .eq("id", space.user_id)
+        .eq("id", stream.user_id)
         .maybeSingle();
       if (profile) {
         hostName = profile.display_name || profile.username || "FEEDIN User";
       }
     }
 
-    const title = space.title || "Live Space on FEEDIN";
-    const description = space.description || `Hosted by ${hostName} • ${space.listener_count || 0} listening`;
-    const defaultImage = "https://feedinbeta.lovable.app/favicon.png";
-    const image = space.cover_image_url || defaultImage;
-    const spaceUrl = `https://feedinbeta.lovable.app/live/space/${space.id}`;
+    const title = stream.title || "Live Stream on FEEDIN";
+    const description = stream.description || `Hosted by ${hostName} • ${stream.viewer_count || 0} watching`;
+    const image = stream.cover_image_url || "https://feedinbeta.lovable.app/favicon.png";
+    const streamUrl = `https://feedinbeta.lovable.app/live/stream/${stream.id}`;
 
     return new Response(
       JSON.stringify({
         title,
         description,
         image,
-        url: spaceUrl,
+        url: streamUrl,
         host: hostName,
-        status: space.status,
-        listeners: space.listener_count,
+        status: stream.status,
+        viewers: stream.viewer_count,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   } catch (err) {
-    console.error("OG Space error:", err);
+    console.error("OG Stream error:", err);
     return new Response(
       JSON.stringify({ error: "Internal error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
