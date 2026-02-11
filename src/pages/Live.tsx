@@ -25,6 +25,7 @@ const Live = () => {
         .from("live_streams")
         .select("*")
         .eq("status", "live")
+        .or("is_private.is.null,is_private.eq.false")
         .order("viewer_count", { ascending: false });
       
       if (error) throw error;
@@ -58,6 +59,7 @@ const Live = () => {
         .from("live_streams")
         .select("*")
         .eq("status", "scheduled")
+        .or("is_private.is.null,is_private.eq.false")
         .order("scheduled_start", { ascending: true });
       
       if (error) throw error;
@@ -118,6 +120,7 @@ const Live = () => {
         .from("live_spaces")
         .select("*")
         .eq("status", "live")
+        .or("is_private.is.null,is_private.eq.false")
         .order("viewer_count", { ascending: false });
       
       if (error) throw error;
@@ -181,6 +184,7 @@ const Live = () => {
         .from("live_spaces")
         .select("*")
         .eq("status", "scheduled")
+        .or("is_private.is.null,is_private.eq.false")
         .order("scheduled_start", { ascending: true });
       
       if (error) throw error;
