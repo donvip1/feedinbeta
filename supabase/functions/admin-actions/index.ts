@@ -468,6 +468,17 @@ serve(async (req) => {
 
         await logAction("assign_role", "user_role", targetUserId, targetProfile?.username, { role, permissions });
 
+        // Send notification to the promoted user
+        await supabaseService.from("notifications").insert({
+          user_id: targetUserId,
+          from_user_id: user.id,
+          type: "role_promotion",
+          title: `You've been promoted to ${role}!`,
+          message: `Congratulations! You now have ${role} privileges on FeedIn.${notes ? ` Note: ${notes}` : ''}`,
+          related_id: targetUserId,
+          related_type: "role",
+        });
+
         return new Response(
           JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -660,6 +671,17 @@ serve(async (req) => {
           tierId, 
           notes,
           credits: tier.subscription_credits 
+        });
+
+        // Send notification to the user about plan upgrade
+        await supabaseService.from("notifications").insert({
+          user_id: targetUserId,
+          from_user_id: user.id,
+          type: "plan_upgrade",
+          title: `Your plan has been upgraded to ${tier.name}!`,
+          message: `Congratulations! You've been upgraded to the ${tier.name} plan.${tier.subscription_credits ? ` You received ${tier.subscription_credits} credits.` : ''}`,
+          related_id: tierId,
+          related_type: "subscription",
         });
 
         return new Response(

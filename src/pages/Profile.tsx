@@ -12,6 +12,7 @@ import { FollowersModal } from '@/components/profile/FollowersModal';
 import { FriendsModal } from '@/components/profile/FriendsModal';
 import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
+import { RolePlanBadge } from '@/components/profile/RolePlanBadge';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { BackButton } from '@/components/navigation/BackButton';
@@ -830,7 +831,8 @@ const Profile = () => {
               <h1 className="text-2xl font-bold text-foreground">
                 {profile.display_name || 'Unknown'}
               </h1>
-              {profile.is_premium && (
+              <RolePlanBadge userId={profile.id} />
+              {profile.is_premium && !profile.id && (
                 <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-lg">
                   <Crown className="w-3 h-3 mr-1" />
                   Premium
