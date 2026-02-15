@@ -141,7 +141,17 @@ export const WithdrawTab: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
       queryClient.invalidateQueries({ queryKey: ['credit-transactions'] });
     } catch (err: any) {
-      toast.error(err.message || 'Withdrawal failed');
+      // Show friendly error - edge function already returns user-friendly messages
+      const rawMsg = err.message || '';
+      let friendlyMsg = 'Something went wrong. Please try again.';
+      if (rawMsg.includes('non-2xx')) {
+        friendlyMsg = 'We couldn\'t process your withdrawal right now. Please try again in a moment.';
+      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('network')) {
+        friendlyMsg = 'Connection issue. Please check your internet and try again.';
+      } else if (rawMsg) {
+        friendlyMsg = rawMsg;
+      }
+      toast.error(friendlyMsg);
     } finally {
       setWithdrawing(false);
     }
