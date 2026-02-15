@@ -46,7 +46,7 @@ serve(async (req) => {
       .from("user_roles")
       .select("*")
       .eq("user_id", user.id)
-      .in("role", ["admin", "moderator", "developer"])
+      .in("role", ["admin", "moderator", "developer", "super_admin"])
       .single();
 
     if (!adminRole) {
@@ -56,8 +56,9 @@ serve(async (req) => {
       );
     }
 
-    const isDeveloper = adminRole.role === "developer";
-    const isAdmin = adminRole.role === "admin";
+    const isSuperAdmin = adminRole.role === "super_admin";
+    const isDeveloper = adminRole.role === "developer" || isSuperAdmin;
+    const isAdmin = adminRole.role === "admin" || isSuperAdmin;
 
     const requestData = await req.json();
     const { action, ...params } = requestData;

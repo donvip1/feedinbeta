@@ -73,7 +73,7 @@ export const useSubscriptionFeatures = () => {
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
-          .in('role', ['admin', 'moderator', 'developer'])
+          .in('role', ['admin', 'moderator', 'developer', 'super_admin'])
           .maybeSingle(),
       ]);
 

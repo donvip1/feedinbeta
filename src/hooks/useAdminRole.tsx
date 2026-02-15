@@ -42,7 +42,7 @@ export const useAdminRole = () => {
         .from('user_roles')
         .select('*')
         .eq('user_id', user.id)
-        .in('role', ['admin', 'moderator', 'developer'])
+        .in('role', ['admin', 'moderator', 'developer', 'super_admin'])
         .maybeSingle();
 
       if (error || !data) {
@@ -62,9 +62,10 @@ export const useAdminRole = () => {
       }
 
       const roleData = data as any;
-      const isAdmin = roleData.role === 'admin';
+      const isSuperAdmin = roleData.role === 'super_admin';
+      const isAdmin = roleData.role === 'admin' || isSuperAdmin;
       const isModerator = roleData.role === 'moderator';
-      const isDeveloper = roleData.role === 'developer';
+      const isDeveloper = roleData.role === 'developer' || isSuperAdmin;
 
       // Developers have all permissions
       const canManageP2P = isDeveloper || isAdmin || roleData.can_manage_p2p === true;
