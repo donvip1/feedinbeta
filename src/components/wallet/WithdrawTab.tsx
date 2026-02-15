@@ -105,7 +105,7 @@ export const WithdrawTab: React.FC = () => {
     },
   });
 
-  const { data: credits } = useQuery({
+  const { data: creditsData } = useQuery({
     queryKey: ['user-credits', user?.id],
     queryFn: async () => {
       const { data } = await supabase.rpc('get_user_credits', { p_user_id: user?.id });
@@ -114,26 +114,18 @@ export const WithdrawTab: React.FC = () => {
     enabled: !!user,
   });
 
+  // Credits may be a number (from this query) or an object { balance } (from Wallet page cache)
+  const creditsNum = typeof creditsData === 'number' 
+    ? creditsData 
+    : ((creditsData as any)?.balance ?? (Number(creditsData) || 0));
+
   const amount = parseInt(creditAmount) || 0;
   const feeCredits = Math.floor(amount * PLATFORM_FEE_PERCENT / 100);
   const netCredits = amount - feeCredits;
   const netUsd = netCredits / CREDITS_PER_USD;
   const netNgn = netUsd * (ngnRate || 1500);
-  const creditsNum = typeof credits === 'number' ? credits : Number(credits) || 0;
   const hasEnoughCredits = creditsNum >= amount;
   const isValid = amount >= MIN_WITHDRAWAL_CREDITS && !!selectedAccountId && hasEnoughCredits;
-
-  // Debug: log validation state
-  console.log('[WithdrawTab] Validation:', { 
-    amount, 
-    minMet: amount >= MIN_WITHDRAWAL_CREDITS, 
-    selectedAccountId, 
-    credits, 
-    creditsNum, 
-    hasEnoughCredits, 
-    withdrawing, 
-    isValid 
-  });
 
   const handleWithdraw = async () => {
     if (!isValid) return;
@@ -260,7 +252,7 @@ export const WithdrawTab: React.FC = () => {
               className="mt-1.5"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Available: {credits?.toLocaleString() || 0} credits
+              Available: {creditsNum?.toLocaleString() || 0} credits
             </p>
           </div>
 
