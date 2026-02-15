@@ -6,7 +6,7 @@
  */
 
 // The production domain - update this when you have a custom domain
-const PRODUCTION_DOMAIN = 'feedinbeta.lovable.app';
+const PRODUCTION_DOMAIN = 'feedinn.com';
 
 /**
  * Checks if the current origin is a Lovable preview/development URL

@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
 
     const title = stream.title || "Live Stream on FEEDIN";
     const description = stream.description || `Hosted by ${hostName} • ${stream.viewer_count || 0} watching`;
-    const image = stream.cover_image_url || "https://feedinbeta.lovable.app/favicon.png";
-    const streamUrl = `https://feedinbeta.lovable.app/live/stream/${stream.id}`;
+    const image = stream.cover_image_url || "https://feedinn.com/favicon.png";
+    const streamUrl = `https://feedinn.com/live/stream/${stream.id}`;
 
     return new Response(
       JSON.stringify({
