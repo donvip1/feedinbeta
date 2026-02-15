@@ -561,6 +561,112 @@ serve(async (req) => {
         );
       }
 
+      // ============ SUBSCRIPTION MANAGEMENT ============
+      case "get_user_subscription": {
+        if (!isDeveloper && !isAdmin) {
+          return new Response(
+            JSON.stringify({ error: "No permission to view subscriptions" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const { targetUserId } = params;
+
+        const { data: sub } = await supabaseService
+          .from("user_subscriptions")
+          .select("*, subscription_tiers(*)")
+          .eq("user_id", targetUserId)
+          .eq("status", "active")
+          .maybeSingle();
+
+        return new Response(
+          JSON.stringify({ success: true, subscription: sub }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      case "upgrade_user_plan": {
+        if (!isDeveloper && !isAdmin) {
+          return new Response(
+            JSON.stringify({ error: "No permission to manage subscriptions" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const { targetUserId, tierId, notes } = params;
+
+        // Validate tier exists
+        const { data: tier, error: tierError } = await supabaseService
+          .from("subscription_tiers")
+          .select("*")
+          .eq("id", tierId)
+          .eq("is_active", true)
+          .single();
+
+        if (tierError || !tier) {
+          throw new Error("Invalid subscription tier");
+        }
+
+        // Deactivate any existing active subscription
+        await supabaseService
+          .from("user_subscriptions")
+          .update({ status: "cancelled", cancel_at_period_end: true, updated_at: new Date().toISOString() })
+          .eq("user_id", targetUserId)
+          .eq("status", "active");
+
+        // Create new subscription (admin-granted, no payment required)
+        const now = new Date();
+        const periodEnd = new Date(now);
+        periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+        const { error: insertError } = await supabaseService
+          .from("user_subscriptions")
+          .insert({
+            user_id: targetUserId,
+            tier_id: tierId,
+            status: "active",
+            payment_provider: "admin_granted",
+            current_period_start: now.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+            cancel_at_period_end: false,
+          });
+
+        if (insertError) throw insertError;
+
+        // Grant subscription credits if applicable
+        if (tier.subscription_credits && tier.subscription_credits > 0) {
+          await supabaseService.rpc("increment_credits", {
+            p_user_id: targetUserId,
+            p_amount: tier.subscription_credits,
+          }).then(() => {}).catch(() => {
+            // If RPC doesn't exist, try direct update
+            return supabaseService
+              .from("user_credits")
+              .update({ balance: supabaseService.rpc ? undefined : tier.subscription_credits })
+              .eq("user_id", targetUserId);
+          });
+        }
+
+        // Get username for logging
+        const { data: targetProfile } = await supabaseService
+          .from("profiles")
+          .select("username")
+          .eq("id", targetUserId)
+          .single();
+
+        await logAction("upgrade_user_plan", "subscription", targetUserId, targetProfile?.username, { 
+          tierName: tier.name, 
+          tierId, 
+          notes,
+          credits: tier.subscription_credits 
+        });
+
+        return new Response(
+          JSON.stringify({ success: true, tierName: tier.name }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       default:
         throw new Error("Invalid action");
     }
