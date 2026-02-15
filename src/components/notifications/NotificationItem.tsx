@@ -7,6 +7,7 @@ import { X, Check, UserPlus } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { BadgeCelebration } from './BadgeCelebration';
 
 interface NotificationItemProps {
   notification: {
@@ -32,6 +33,7 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
   const { toast } = useToast();
   const { user } = useAuth();
   const [responding, setResponding] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   const handleFriendRequestResponse = async (e: React.MouseEvent, accept: boolean) => {
     e.stopPropagation();
@@ -106,6 +108,12 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         .update({ is_read: true })
         .eq('id', notification.id);
       onUpdate();
+    }
+
+    // Show celebration for role/plan notifications
+    if (notification.type === 'role_promotion' || notification.type === 'plan_upgrade') {
+      setShowCelebration(true);
+      return;
     }
 
     // Navigate directly to the exact content based on type
@@ -313,43 +321,53 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
   }
 
   return (
-    <button
-      onClick={handleClick}
-      className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors text-left ${
-        !notification.is_read ? 'bg-accent/50 font-semibold' : ''
-      }`}
-    >
-      <Avatar className="w-10 h-10">
-        <AvatarImage src={notification.from_user?.avatar_url || ''} />
-        <AvatarFallback>
-          {notification.from_user?.display_name?.[0] || '?'}
-        </AvatarFallback>
-      </Avatar>
-
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm ${!notification.is_read ? 'font-semibold' : ''}`}>{notification.title}</p>
-        {notification.message && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {notification.message}
-          </p>
-        )}
-        <p className="text-xs text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-        </p>
-      </div>
-
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 flex-shrink-0"
-        onClick={handleDelete}
-      >
-        <X className="w-4 h-4" />
-      </Button>
-
-      {!notification.is_read && (
-        <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
+    <>
+      {showCelebration && (
+        <BadgeCelebration
+          type={notification.type as 'role_promotion' | 'plan_upgrade'}
+          title={notification.title}
+          message={notification.message || undefined}
+          onComplete={() => setShowCelebration(false)}
+        />
       )}
-    </button>
+      <button
+        onClick={handleClick}
+        className={`w-full p-4 flex items-start gap-3 hover:bg-accent transition-colors text-left ${
+          !notification.is_read ? 'bg-accent/50 font-semibold' : ''
+        }`}
+      >
+        <Avatar className="w-10 h-10">
+          <AvatarImage src={notification.from_user?.avatar_url || ''} />
+          <AvatarFallback>
+            {notification.from_user?.display_name?.[0] || '?'}
+          </AvatarFallback>
+        </Avatar>
+
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm ${!notification.is_read ? 'font-semibold' : ''}`}>{notification.title}</p>
+          {notification.message && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {notification.message}
+            </p>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">
+            {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+          </p>
+        </div>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 flex-shrink-0"
+          onClick={handleDelete}
+        >
+          <X className="w-4 h-4" />
+        </Button>
+
+        {!notification.is_read && (
+          <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />
+        )}
+      </button>
+    </>
   );
 };

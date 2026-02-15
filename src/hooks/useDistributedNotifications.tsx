@@ -10,7 +10,8 @@ export interface DistributedCounts {
 
 const FEED_NOTIFICATION_TYPES = [
   'like', 'comment', 'reply', 'mention', 'refeed', 'quote', 
-  'follow', 'story_reply', 'story_reaction', 'post_promoted'
+  'follow', 'story_reply', 'story_reaction', 'post_promoted',
+  'role_promotion', 'plan_upgrade'
 ];
 
 const MESSAGE_NOTIFICATION_TYPES = [
