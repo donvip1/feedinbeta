@@ -811,7 +811,7 @@ const Profile = () => {
               {isOwnProfile && (
                 <label
                   htmlFor="profile-avatar-upload"
-                  className="absolute bottom-0 right-0 bg-gradient-to-r from-primary to-accent rounded-full p-2.5 cursor-pointer hover:opacity-90 transition-opacity shadow-lg"
+                  className="absolute bottom-0 left-0 bg-gradient-to-r from-primary to-accent rounded-full p-2.5 cursor-pointer hover:opacity-90 transition-opacity shadow-lg"
                 >
                   <Camera className="w-4 h-4 text-primary-foreground" />
                   <input
