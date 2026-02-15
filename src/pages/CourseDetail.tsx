@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { BackButton } from '@/components/navigation/BackButton';
 import { motion } from 'framer-motion';
 import { 
   ArrowLeft, Play, Clock, BookOpen, Users, Star, Award, 
@@ -129,9 +130,7 @@ export default function CourseDetail() {
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-lg border-b border-border">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <Button onClick={() => navigate(-1)} variant="ghost" size="icon">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <BackButton fallback="/ai/learn" />
             <div className="flex gap-2">
               <Button 
                 variant="ghost" 

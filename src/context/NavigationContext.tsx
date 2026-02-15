@@ -1,11 +1,13 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface NavigationContextType {
   isSubPage: boolean;
   hideBottomNav: boolean;
   setHideBottomNav: (hide: boolean) => void;
   isLiveStreamPage: boolean;
+  goBack: (fallback?: string) => void;
+  historyStack: string[];
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
@@ -28,14 +30,85 @@ const HIDDEN_NAV_ROUTES = [
   '/space/'
 ];
 
+// Route hierarchy for fallback derivation
+const ROUTE_FALLBACKS: Record<string, string> = {
+  '/wallet/p2p': '/wallet',
+  '/wallet/credits': '/wallet',
+  '/wallet/subscription': '/wallet',
+  '/p2p/payment-methods': '/wallet/p2p',
+  '/settings/account': '/settings',
+  '/settings/currency': '/settings',
+  '/settings/privacy': '/settings',
+  '/settings/notifications': '/settings',
+  '/ai/learn': '/ai/copilot',
+};
+
+function deriveFallback(pathname: string): string {
+  // Check explicit map first
+  if (ROUTE_FALLBACKS[pathname]) return ROUTE_FALLBACKS[pathname];
+  
+  // Derive parent: /a/b/c -> /a/b -> /a -> /
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length > 1) {
+    return '/' + segments.slice(0, -1).join('/');
+  }
+  return '/feed';
+}
+
 export const NavigationProvider = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const [hideBottomNav, setHideBottomNav] = useState(false);
+  const historyStackRef = useRef<string[]>([]);
+  const [historyStack, setHistoryStack] = useState<string[]>([]);
 
-// Check if current page is a livestream/space detail page OR the main /live dashboard
+  // Track navigation history
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const stack = historyStackRef.current;
+    
+    // Don't push duplicates
+    if (stack[stack.length - 1] !== currentPath) {
+      stack.push(currentPath);
+      // Keep stack manageable
+      if (stack.length > 50) stack.shift();
+      setHistoryStack([...stack]);
+    }
+  }, [location.pathname]);
+
+  const goBack = useCallback((fallback?: string) => {
+    const state = location.state as { returnTo?: string; preserveFeed?: boolean } | null;
+    
+    // 1. Explicit returnTo in state
+    if (state?.returnTo) {
+      navigate(state.returnTo, { state: { preserveFeed: state.preserveFeed } });
+      return;
+    }
+
+    // 2. Use our tracked history stack
+    const stack = historyStackRef.current;
+    if (stack.length > 1) {
+      // Pop current page
+      stack.pop();
+      const previousPath = stack[stack.length - 1];
+      if (previousPath && previousPath !== location.pathname) {
+        navigate(previousPath, { replace: true });
+        return;
+      }
+    }
+
+    // 3. Try browser history
+    if (window.history.length > 2) {
+      navigate(-1);
+      return;
+    }
+
+    // 4. Fallback
+    navigate(fallback || deriveFallback(location.pathname), { replace: true });
+  }, [navigate, location]);
+
   const isLiveStreamPage = useMemo(() => {
     const pathname = location.pathname;
-    // Hide on exact /live dashboard AND on live stream/space detail pages
     const isLiveDashboard = pathname === '/live';
     const isLiveDetail = HIDDEN_NAV_ROUTES.some(route => pathname.startsWith(route));
     return isLiveDashboard || isLiveDetail;
@@ -43,20 +116,12 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
 
   const isSubPage = useMemo(() => {
     const pathname = location.pathname;
-    
-    // Check if it's an exact match to main routes
     const isMainRoute = MAIN_ROUTES.includes(pathname);
-    
-    // Profile page (without /edit) is also a main route
     const isProfilePage = /^\/profile\/[^\/]+$/.test(pathname) && !pathname.endsWith('/edit');
-    
-    // Root, welcome, auth, and install are not sub-pages
     const isRootPage = ['/', '/welcome', '/auth', '/install'].includes(pathname);
-    
     return !isMainRoute && !isProfilePage && !isRootPage;
   }, [location.pathname]);
 
-  // Reset manual hide when navigating
   useEffect(() => {
     setHideBottomNav(false);
   }, [location.pathname]);
@@ -65,8 +130,10 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
     isSubPage,
     hideBottomNav,
     setHideBottomNav,
-    isLiveStreamPage
-  }), [isSubPage, hideBottomNav, isLiveStreamPage]);
+    isLiveStreamPage,
+    goBack,
+    historyStack
+  }), [isSubPage, hideBottomNav, isLiveStreamPage, goBack, historyStack]);
 
   return (
     <NavigationContext.Provider value={value}>
@@ -78,12 +145,13 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
 export const useNavigation = () => {
   const context = useContext(NavigationContext);
   if (!context) {
-    // Return safe defaults if used outside provider
     return {
       isSubPage: false,
       hideBottomNav: false,
       setHideBottomNav: () => {},
-      isLiveStreamPage: false
+      isLiveStreamPage: false,
+      goBack: () => { window.history.back(); },
+      historyStack: []
     };
   }
   return context;

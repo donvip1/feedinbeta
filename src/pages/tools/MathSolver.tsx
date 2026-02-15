@@ -3,6 +3,7 @@ import { ArrowLeft, Calculator, Loader2, Copy, Sparkles, Zap, Download, CheckCir
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -153,9 +154,7 @@ $$[Mathematical expression if needed]$$
       {/* Header */}
       <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
         <div className="flex items-center justify-between p-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton fallback="/ai/copilot" />
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
               <Calculator className="w-5 h-5" />

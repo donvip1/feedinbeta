@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Globe } from 'lucide-react';
+import { Globe } from 'lucide-react';
+import { BackButton } from '@/components/navigation/BackButton';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { P2PListingCard } from '@/components/p2p/P2PListingCard';
@@ -113,9 +114,7 @@ const P2PMarketplace = () => {
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/wallet')} className="h-8 w-8">
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+            <BackButton fallback="/wallet" className="h-8 w-8" />
             <h1 className="text-lg font-semibold">Market</h1>
           </div>
           {myCredits && <CreateListingModal userCredits={myCredits.balance} />}

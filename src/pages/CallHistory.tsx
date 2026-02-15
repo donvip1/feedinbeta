@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, Phone, Video, PhoneIncoming, PhoneOutgoing, PhoneMissed, Coins } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { BackButton } from '@/components/navigation/BackButton';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 
@@ -131,14 +132,7 @@ const CallHistory = () => {
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <Button
-                onClick={() => navigate(-1)}
-                variant="ghost"
-                size="icon"
-                className="text-gray-400 hover:text-white"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
+              <BackButton fallback="/messages" className="text-gray-400 hover:text-white" />
               <img src={feedinLogo} alt="FEEDIN" className="w-10 h-10" />
               <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 Call History

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Search as SearchIcon, TrendingUp, Clock, Hash, Users as UsersIcon, FileText, X } from 'lucide-react';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
@@ -217,9 +218,7 @@ const Search = () => {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
           <div className="flex items-center gap-3 px-4 py-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <BackButton fallback="/feed" />
             <div className="flex-1 relative">
               <Input
                 value={query}

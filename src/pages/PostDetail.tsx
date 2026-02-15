@@ -6,6 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import ImmersivePostCard from '@/components/feed/ImmersivePostCard';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, X } from 'lucide-react';
+import { useNavigation } from '@/context/NavigationContext';
 import { cn } from '@/lib/utils';
 import DraggableCommentsPanel from '@/components/feed/DraggableCommentsPanel';
 
@@ -155,18 +156,11 @@ const PostDetail = () => {
     }
   }, [user, navigate]);
 
+  const { goBack } = useNavigation();
   const handleBack = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Check if we have a valid history to go back to
-    // window.history.length includes the current page, so we need > 2 for a real back
-    if (window.history.length > 2) {
-      navigate(-1);
-    } else {
-      // No history, go to feed as fallback
-      navigate('/feed', { replace: true });
-    }
+    goBack('/feed');
   };
 
   const toggleGlobalMute = () => {

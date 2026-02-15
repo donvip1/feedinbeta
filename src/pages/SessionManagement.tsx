@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useSecureSession } from '@/hooks/useSecureSession';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -116,9 +117,7 @@ const SessionManagement = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <BackButton fallback="/settings" />
           <div>
             <h1 className="text-xl font-bold">Session Management</h1>
             <p className="text-sm text-muted-foreground">Manage your active sessions</p>

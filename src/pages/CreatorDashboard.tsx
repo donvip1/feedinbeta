@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RecordingsManager } from '@/components/live/RecordingsManager';
 import { 
@@ -171,9 +172,7 @@ const CreatorDashboard = () => {
       <header className="sticky top-0 z-50 bg-card/50 backdrop-blur-lg border-b border-border shadow-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <BackButton fallback="/feed" />
             <BarChart3 className="w-6 h-6 text-primary" />
             <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Creator Dashboard

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigation } from '@/context/NavigationContext';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { StoryViewer } from '@/components/stories/StoryViewer';
 const StoryDetail = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { goBack } = useNavigation();
   const { storyId } = useParams<{ storyId: string }>();
   const [story, setStory] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -93,7 +95,7 @@ const StoryDetail = () => {
     <StoryViewer
       userId={story.user_id}
       allUserStories={allUserStories}
-      onClose={() => navigate(-1)}
+      onClose={() => goBack('/feed')}
       onStoryChange={() => {}}
     />
   );

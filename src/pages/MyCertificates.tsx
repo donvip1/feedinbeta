@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Award, Download, Search, Filter, GraduationCap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CertificateCard } from '@/components/learn/CertificateCard';
@@ -44,9 +45,7 @@ const MyCertificates = () => {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-lg border-b">
         <div className="flex items-center gap-3 p-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <BackButton fallback="/ai/learn" />
           <div>
             <h1 className="text-xl font-bold">My Certificates</h1>
             <p className="text-sm text-muted-foreground">Your earned credentials</p>

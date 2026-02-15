@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -171,9 +172,7 @@ Transform the following text to sound completely human-written:`;
         {/* Header */}
         <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b border-border">
           <div className="flex items-center justify-between p-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <BackButton fallback="/ai/copilot" />
             <div className="flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-primary" />
               <span className="font-semibold">Humanize AI</span>

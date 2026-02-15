@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { BackButton } from '@/components/navigation/BackButton';
 import { 
   ArrowLeft, Rocket, TrendingUp, Users, Eye, Clock, 
   MessageCircle, Heart, Play, Image as ImageIcon, Sparkles
@@ -308,14 +309,7 @@ const Promotions = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="container mx-auto px-4 py-3 flex items-center gap-3">
-          <Button
-            onClick={() => navigate(-1)}
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <BackButton fallback="/feed" className="text-muted-foreground hover:text-foreground" />
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
               <Rocket className="w-5 h-5 text-primary" />

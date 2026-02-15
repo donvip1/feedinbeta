@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Award, CheckCircle, XCircle, Calendar, User, BookOpen, ArrowLeft, Share2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
@@ -111,9 +112,7 @@ const CertificateVerify = () => {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-background/80 backdrop-blur-lg border-b">
         <div className="flex items-center justify-between p-4 max-w-4xl mx-auto">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <BackButton fallback="/ai/learn" />
           <img src={feedinLogo} alt="FeedIn" className="h-8" />
           <Button variant="ghost" size="icon" onClick={handleShare}>
             <Share2 className="w-5 h-5" />
