@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Send, CreditCard, Gift } from 'lucide-react';
+import { Send, CreditCard, Gift, Banknote } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +16,7 @@ interface BalanceCardProps {
   currencyCode?: string;
   onSendClick: () => void;
   onBuyClick: () => void;
+  onWithdrawClick?: () => void;
 }
 
 const CREDITS_PER_USD = 100;
@@ -30,6 +31,7 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
   currencyCode = 'USD',
   onSendClick,
   onBuyClick,
+  onWithdrawClick,
 }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -90,15 +92,21 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex gap-2">
         <Button onClick={onSendClick} variant="outline" className="flex-1 h-10">
-          <Send className="w-4 h-4 mr-2" />
+          <Send className="w-4 h-4 mr-1.5" />
           Send
         </Button>
         <Button onClick={onBuyClick} className="flex-1 h-10">
-          <CreditCard className="w-4 h-4 mr-2" />
+          <CreditCard className="w-4 h-4 mr-1.5" />
           Buy
         </Button>
+        {onWithdrawClick && (
+          <Button onClick={onWithdrawClick} variant="outline" className="flex-1 h-10">
+            <Banknote className="w-4 h-4 mr-1.5" />
+            Withdraw
+          </Button>
+        )}
       </div>
     </div>
   );

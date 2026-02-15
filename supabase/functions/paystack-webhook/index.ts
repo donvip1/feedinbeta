@@ -39,8 +39,55 @@ Deno.serve(async (req) => {
     const event = JSON.parse(body);
     console.log('Paystack webhook event:', event.event);
 
+    // Handle transfer events (withdrawals)
+    if (event.event === 'transfer.success' || event.event === 'transfer.failed' || event.event === 'transfer.reversed') {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      );
+      const transferData = event.data;
+      const reference = transferData.reference;
+
+      if (event.event === 'transfer.success') {
+        await supabase
+          .from('withdrawal_requests')
+          .update({ status: 'completed', processed_at: new Date().toISOString() })
+          .eq('paystack_reference', reference);
+        console.log(`Transfer completed: ${reference}`);
+      } else {
+        // Failed or reversed
+        const { data: withdrawal } = await supabase
+          .from('withdrawal_requests')
+          .select('id, user_id, credit_amount')
+          .eq('paystack_reference', reference)
+          .single();
+
+        if (withdrawal) {
+          await supabase
+            .from('withdrawal_requests')
+            .update({
+              status: 'failed',
+              failure_reason: transferData.reason || event.event,
+              processed_at: new Date().toISOString(),
+            })
+            .eq('id', withdrawal.id);
+
+          // Refund credits
+          await supabase.rpc('refund_failed_withdrawal', {
+            p_user_id: withdrawal.user_id,
+            p_amount: withdrawal.credit_amount,
+            p_withdrawal_id: withdrawal.id,
+          });
+          console.log(`Transfer failed, refunded ${withdrawal.credit_amount} credits to ${withdrawal.user_id}`);
+        }
+      }
+
+      return new Response(JSON.stringify({ received: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (event.event !== 'charge.success') {
-      // Acknowledge non-charge events
       return new Response(JSON.stringify({ received: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

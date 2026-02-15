@@ -5,7 +5,8 @@ import {
   CreditCard, 
   Crown, 
   ShoppingBag, 
-  History 
+  History,
+  Banknote 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ const tabs = [
   { id: 'gifts', label: 'Gifts', icon: Gift },
   { id: 'buy', label: 'Buy', icon: CreditCard },
   { id: 'subscribe', label: 'Subscribe', icon: Crown },
+  { id: 'withdraw', label: 'Withdraw', icon: Banknote },
   { id: 'marketplace', label: 'Market', icon: ShoppingBag },
   { id: 'history', label: 'History', icon: History },
 ];
