@@ -3,11 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { ArrowLeft, Coins, Shield, History, TrendingUp, Globe, Filter } from 'lucide-react';
+import { ArrowLeft, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { P2PListingCard } from '@/components/p2p/P2PListingCard';
@@ -35,14 +34,10 @@ const P2PMarketplace = () => {
         .select('*, profiles(display_name, username, avatar_url)')
         .eq('status', 'active')
         .order('created_at', { ascending: false });
-      
-      // Filter by region if enabled
       if (showRegionOnly && userCountry) {
         query = query.eq('country_code', userCountry);
       }
-      
       const { data, error } = await query;
-      
       if (error) throw error;
       return data;
     },
@@ -57,7 +52,6 @@ const P2PMarketplace = () => {
         .select('balance')
         .eq('user_id', user.id)
         .single();
-      
       if (error) throw error;
       return data;
     },
@@ -74,7 +68,6 @@ const P2PMarketplace = () => {
         .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
         .order('created_at', { ascending: false })
         .limit(10);
-      
       if (error) throw error;
       return data;
     },
@@ -82,181 +75,116 @@ const P2PMarketplace = () => {
   });
 
   const handleBuyCredits = async (listingId: string, sellerId: string, creditsAmount: number, priceUsd: number) => {
-    if (!user) {
-      toast.error('Please sign in to buy credits');
-      return;
-    }
-
+    if (!user) { toast.error('Please sign in to buy credits'); return; }
     if (!eligibility.canBuy) {
       if (eligibility.isBuyerBanned) {
         toast.error(`You are banned from buying until ${new Date(eligibility.buyerBanUntil!).toLocaleDateString()}`);
-      } else {
-        toast.error('Please complete your P2P setup first');
-      }
+      } else { toast.error('Please complete your P2P setup first'); }
       return;
     }
-
     if (creditsAmount < eligibility.minTradeAmount) {
       toast.error(`Minimum trade amount is ${eligibility.minTradeAmount} credits`);
       return;
     }
-
     setProcessingId(listingId);
     try {
       const { data, error } = await supabase.from('p2p_transactions').insert({
-        listing_id: listingId,
-        buyer_id: user.id,
-        seller_id: sellerId,
-        credits_amount: creditsAmount,
-        price_usd: priceUsd,
+        listing_id: listingId, buyer_id: user.id, seller_id: sellerId,
+        credits_amount: creditsAmount, price_usd: priceUsd,
         expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
       }).select().single();
-
       if (error) throw error;
-
       const { error: escrowError } = await supabase.functions.invoke('p2p-escrow', {
         body: { action: 'create_transaction', transactionId: data.id },
       });
-
       if (escrowError) throw escrowError;
-
       toast.success('Transaction created! Proceed with payment.');
       navigate(`/wallet/p2p/${data.id}`);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create transaction');
-    } finally {
-      setProcessingId(null);
-    }
+    } finally { setProcessingId(null); }
   };
 
   const activeCount = myTransactions?.filter(t => !['completed', 'cancelled'].includes(t.status)).length || 0;
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-sm border-b border-border/50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              <div>
-                <h1 className="text-xl font-bold">P2P Marketplace</h1>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
-                  <Shield className="w-3 h-3" /> Escrow Protected Trading
-                </p>
-              </div>
-            </div>
-            {myCredits && <CreateListingModal userCredits={myCredits.balance} />}
+      {/* Header */}
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="h-8 w-8">
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <h1 className="text-lg font-semibold">Market</h1>
           </div>
+          {myCredits && <CreateListingModal userCredits={myCredits.balance} />}
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Eligibility Banner */}
+      <div className="container mx-auto px-4 py-4 space-y-4">
+        {/* Eligibility */}
         <EligibilityBanner />
 
-        {/* P2P Rate Info */}
-        <Card className="bg-gradient-to-r from-primary/5 to-accent/5 border-primary/20">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="text-sm font-medium">P2P Rate</span>
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-muted-foreground">
-                  Buy: <span className="font-medium text-foreground">{P2P_CONFIG.BUY_RATE} credits/$1</span>
-                </span>
-                <span className="text-muted-foreground">
-                  Sell: <span className="font-medium text-primary">{P2P_CONFIG.SELL_RATE} credits/$1</span>
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Balance + Rate row */}
+        <div className="flex items-center justify-between py-3">
+          <div>
+            <p className="text-xs text-muted-foreground uppercase tracking-wider">Balance</p>
+            <p className="text-2xl font-bold text-foreground">{myCredits?.balance?.toLocaleString() || '0'}</p>
+            <p className="text-xs text-muted-foreground">{myCredits ? formatCreditsValue(myCredits.balance) : ''}</p>
+          </div>
+          <div className="text-right text-sm">
+            <p className="text-muted-foreground">
+              Buy <span className="font-medium text-foreground">{P2P_CONFIG.BUY_RATE}/$</span>
+            </p>
+            <p className="text-muted-foreground">
+              Sell <span className="font-medium text-foreground">{P2P_CONFIG.SELL_RATE}/$</span>
+            </p>
+            {activeCount > 0 && (
+              <p className="text-xs text-primary mt-1">{activeCount} active</p>
+            )}
+          </div>
+        </div>
 
-        {/* Balance Card */}
-        {myCredits && (
-          <Card className="bg-gradient-to-r from-primary/10 to-primary/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Your Balance</p>
-                  <p className="text-3xl font-bold flex items-center gap-2">
-                    <Coins className="w-6 h-6 text-primary" />
-                    {myCredits.balance.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    ≈ {formatCreditsValue(myCredits.balance)}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {activeCount > 0 && (
-                    <Badge variant="secondary" className="gap-1">
-                      <History className="w-3 h-3" />
-                      {activeCount} Active
-                    </Badge>
-                  )}
-                  {eligibility.userCountry && (
-                    <Badge variant="outline" className="gap-1">
-                      <Globe className="w-3 h-3" />
-                      {eligibility.userCountry}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
+        {/* Tabs */}
         <Tabs defaultValue="listings">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="listings">Available Listings</TabsTrigger>
-            <TabsTrigger value="my-orders">My Orders</TabsTrigger>
+          <TabsList className="w-full h-9 bg-muted/50">
+            <TabsTrigger value="listings" className="flex-1 text-xs">Listings</TabsTrigger>
+            <TabsTrigger value="my-orders" className="flex-1 text-xs">My Orders</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="listings" className="mt-4 space-y-4">
-            {/* Region Filter */}
+          <TabsContent value="listings" className="mt-3 space-y-3">
+            {/* Region toggle */}
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Filter</span>
-              </div>
-              <Button
-                variant={showRegionOnly ? "default" : "outline"}
-                size="sm"
+              <span className="text-xs text-muted-foreground">
+                {listings?.length || 0} available
+              </span>
+              <button
                 onClick={() => setShowRegionOnly(!showRegionOnly)}
-                className="gap-1"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
-                <Globe className="h-3 w-3" />
-                {showRegionOnly ? `${userCountry} Only` : 'All Regions'}
-              </Button>
+                <Globe className="w-3 h-3" />
+                {showRegionOnly ? userCountry : 'All'}
+              </button>
             </div>
 
             {listingsLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+              <div className="space-y-px">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="animate-pulse h-16 bg-muted/30 rounded" />
+                ))}
               </div>
             ) : listings?.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p>No active listings in {showRegionOnly ? userCountry : 'any region'}</p>
-                  <p className="text-sm">Be the first to sell your credits!</p>
-                  {showRegionOnly && (
-                    <Button 
-                      variant="link" 
-                      onClick={() => setShowRegionOnly(false)}
-                      className="mt-2"
-                    >
-                      View all regions
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
+              <div className="text-center py-12 text-muted-foreground">
+                <p className="text-sm">No listings{showRegionOnly ? ` in ${userCountry}` : ''}</p>
+                {showRegionOnly && (
+                  <button onClick={() => setShowRegionOnly(false)} className="text-xs text-primary mt-1 hover:underline">
+                    View all regions
+                  </button>
+                )}
+              </div>
             ) : (
-              <div className="grid gap-4">
+              <div className="divide-y divide-border/50">
                 {listings?.map((listing) => (
                   <P2PListingCard
                     key={listing.id}
@@ -270,35 +198,31 @@ const P2PMarketplace = () => {
             )}
           </TabsContent>
 
-          <TabsContent value="my-orders" className="mt-4 space-y-4">
+          <TabsContent value="my-orders" className="mt-3">
             {myTransactions?.length === 0 ? (
-              <Card>
-                <CardContent className="py-8 text-center text-muted-foreground">
-                  <p>No transactions yet</p>
-                </CardContent>
-              </Card>
+              <div className="text-center py-12 text-sm text-muted-foreground">
+                No transactions yet
+              </div>
             ) : (
-              myTransactions?.map((tx) => (
-                <Card 
-                  key={tx.id} 
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => navigate(`/wallet/p2p/${tx.id}`)}
-                >
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{tx.credits_amount} Credits</p>
-                        <p className="text-sm text-muted-foreground">
-                          {tx.buyer_id === user?.id ? 'Buying' : 'Selling'} • ${tx.price_usd}
-                        </p>
-                      </div>
-                      <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'}>
-                        {tx.status.replace('_', ' ')}
-                      </Badge>
+              <div className="divide-y divide-border/50">
+                {myTransactions?.map((tx) => (
+                  <div
+                    key={tx.id}
+                    onClick={() => navigate(`/wallet/p2p/${tx.id}`)}
+                    className="flex items-center justify-between py-3 px-1 cursor-pointer hover:bg-muted/20 transition-colors"
+                  >
+                    <div>
+                      <p className="text-sm font-medium">{tx.credits_amount.toLocaleString()} credits</p>
+                      <p className="text-xs text-muted-foreground">
+                        {tx.buyer_id === user?.id ? 'Buying' : 'Selling'} · ${tx.price_usd}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))
+                    <span className="text-xs text-muted-foreground capitalize">
+                      {tx.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
           </TabsContent>
         </Tabs>
