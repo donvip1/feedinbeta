@@ -260,14 +260,14 @@ serve(async (req) => {
           .from("p2p_disputes")
           .select(`
             *,
-            transaction:p2p_transactions(
+            transaction:p2p_transactions!p2p_disputes_transaction_id_fkey(
               credits_amount,
               price_usd,
               buyer:profiles!buyer_id(display_name, username),
               seller:profiles!seller_id(display_name, username)
             ),
-            initiator:profiles!initiated_by(display_name, username),
-            moderator:profiles!moderator_id(display_name, username)
+            initiator:profiles!p2p_disputes_initiated_by_profiles_fkey(display_name, username),
+            moderator:profiles!p2p_disputes_moderator_id_profiles_fkey(display_name, username)
           `)
           .eq("status", status)
           .order("created_at", { ascending: false })
@@ -395,8 +395,8 @@ serve(async (req) => {
           .from("user_roles")
           .select(`
             *,
-            user:profiles!user_id(display_name, username, avatar_url),
-            assigner:profiles!assigned_by(display_name, username)
+            user:profiles!user_roles_user_id_profiles_fkey(display_name, username, avatar_url),
+            assigner:profiles!user_roles_assigned_by_profiles_fkey(display_name, username)
           `)
           .in("role", ["admin", "moderator", "developer"])
           .order("created_at", { ascending: false });
@@ -560,7 +560,7 @@ serve(async (req) => {
           .from("admin_action_logs")
           .select(`
             *,
-            admin:profiles!admin_id(display_name, username)
+            admin:profiles!admin_action_logs_admin_id_profiles_fkey(display_name, username)
           `)
           .order("created_at", { ascending: false })
           .limit(limit);
