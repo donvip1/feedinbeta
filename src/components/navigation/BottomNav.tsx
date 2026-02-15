@@ -244,7 +244,7 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
                         onClick={() => handleNavClick(item.path, item.id)}
                         variant="ghost"
                         size="icon"
-                        className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${textColor}`}
+                        className={`h-16 w-16 hover:bg-transparent transition-all duration-150 touch-feedback ${textColor}`}
                       >
                         {item.isProfile && avatarUrl ? (
                           <div className={`rounded-full transition-all duration-150 ${
@@ -254,16 +254,16 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
                                 : 'ring-2 ring-primary ring-offset-2 ring-offset-background'
                               : ''
                           }`}>
-                            <Avatar className="w-7 h-7">
+                            <Avatar className="w-10 h-10">
                               <AvatarImage src={avatarUrl} />
-                              <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
+                              <AvatarFallback><Icon className="w-6 h-6" /></AvatarFallback>
                             </Avatar>
                           </div>
                         ) : (
                           <div className="relative">
                             <Icon 
-                              size={24}
-                              strokeWidth={2.5}
+                              size={38}
+                              strokeWidth={3}
                               className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
                             />
                             {badgeCount > 0 && (
