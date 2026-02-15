@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Gift, Send, ArrowDownLeft, Sparkles, RefreshCw, Loader2 } from 'lucide-react';
+import { Gift, Send, ArrowDownLeft, Sparkles, RefreshCw, Loader2, CheckSquare, X } from 'lucide-react';
 import { ReceivedGifts } from './ReceivedGifts';
 import { SentGifts } from './SentGifts';
 import { SendDirectGiftModal } from './SendDirectGiftModal';
@@ -14,6 +14,9 @@ export const GiftsTab = () => {
   const { user } = useAuth();
   const [showSendGiftModal, setShowSendGiftModal] = useState(false);
   const [isConvertingAll, setIsConvertingAll] = useState(false);
+  const [isConvertingSelected, setIsConvertingSelected] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedGiftIds, setSelectedGiftIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   // Fetch gift statistics
@@ -101,6 +104,50 @@ export const GiftsTab = () => {
     }
   };
 
+  // Handle convert selected gifts
+  const handleConvertSelected = async () => {
+    if (selectedGiftIds.size === 0) return;
+    setIsConvertingSelected(true);
+    
+    try {
+      let converted = 0;
+      let totalCredits = 0;
+      
+      for (const giftId of selectedGiftIds) {
+        const { data, error } = await supabase.rpc('convert_gift', { p_gift_id: giftId });
+        if (error) throw error;
+        const result = data as { success: boolean; error?: string; credits_added?: number };
+        if (result.success) {
+          converted++;
+          totalCredits += result.credits_added || 0;
+        }
+      }
+      
+      toast.success(`Converted ${converted} gifts! +${totalCredits} credits added`);
+      setSelectedGiftIds(new Set());
+      setSelectionMode(false);
+      
+      queryClient.invalidateQueries({ queryKey: ['received-gifts'] });
+      queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+      queryClient.invalidateQueries({ queryKey: ['gift-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['unconverted-gifts'] });
+    } catch (error: any) {
+      console.error('Error converting selected gifts:', error);
+      toast.error(error.message || 'Failed to convert gifts');
+    } finally {
+      setIsConvertingSelected(false);
+    }
+  };
+
+  const toggleGiftSelection = (id: string) => {
+    setSelectedGiftIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   // Real-time subscription for gift updates
   useEffect(() => {
     if (!user) return;
@@ -152,19 +199,63 @@ export const GiftsTab = () => {
                 </span>
               </p>
             </div>
-            <Button
-              onClick={handleConvertAll}
-              disabled={isConvertingAll}
-              className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
-            >
-              {isConvertingAll ? (
-                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+            <div className="flex flex-col gap-1.5">
+              <Button
+                onClick={handleConvertAll}
+                disabled={isConvertingAll || selectionMode}
+                size="sm"
+                className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
+              >
+                {isConvertingAll ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Convert All
+              </Button>
+              {!selectionMode ? (
+                <Button
+                  onClick={() => setSelectionMode(true)}
+                  size="sm"
+                  variant="outline"
+                  className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                  Select
+                </Button>
               ) : (
-                <RefreshCw className="w-4 h-4 mr-2" />
+                <Button
+                  onClick={() => { setSelectionMode(false); setSelectedGiftIds(new Set()); }}
+                  size="sm"
+                  variant="outline"
+                >
+                  <X className="w-3.5 h-3.5 mr-1.5" />
+                  Cancel
+                </Button>
               )}
-              Convert All
-            </Button>
+            </div>
           </div>
+          {/* Convert Selected bar */}
+          {selectionMode && selectedGiftIds.size > 0 && (
+            <div className="mt-3 pt-3 border-t border-yellow-500/20 flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                {selectedGiftIds.size} gift{selectedGiftIds.size > 1 ? 's' : ''} selected
+              </span>
+              <Button
+                onClick={handleConvertSelected}
+                disabled={isConvertingSelected}
+                size="sm"
+                className="bg-primary hover:bg-primary/90"
+              >
+                {isConvertingSelected ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                ) : (
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                Convert Selected
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -228,7 +319,11 @@ export const GiftsTab = () => {
               </TabsTrigger>
             </TabsList>
             <TabsContent value="received" className="mt-3">
-              <ReceivedGifts />
+              <ReceivedGifts 
+                selectionMode={selectionMode} 
+                selectedIds={selectedGiftIds} 
+                onToggleSelect={toggleGiftSelection} 
+              />
             </TabsContent>
             <TabsContent value="sent" className="mt-3">
               <SentGifts />
