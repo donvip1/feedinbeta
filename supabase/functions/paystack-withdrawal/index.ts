@@ -11,6 +11,23 @@ const PLATFORM_FEE_PERCENT = 30;
 const MIN_WITHDRAWAL_CREDITS = 1000;
 const COOLDOWN_MINUTES = 5; // Rate limit: one withdrawal per 5 minutes
 
+function getFriendlyErrorMessage(technicalError: string): string {
+  const lower = technicalError.toLowerCase();
+  if (lower.includes('insufficient') || lower.includes('not enough'))
+    return 'You don\'t have enough credits for this withdrawal. Please check your balance.';
+  if (lower.includes('check constraint') || lower.includes('violates'))
+    return 'We couldn\'t process your withdrawal right now. Please try again shortly.';
+  if (lower.includes('paystack') || lower.includes('transfer'))
+    return 'Our payment provider is temporarily unavailable. Please try again in a few minutes.';
+  if (lower.includes('timeout') || lower.includes('timed out'))
+    return 'The request took too long. Please try again.';
+  if (lower.includes('network') || lower.includes('fetch'))
+    return 'Connection issue. Please check your internet and try again.';
+  if (lower.includes('not configured'))
+    return 'Payment system is being set up. Please try again later.';
+  return 'Something went wrong with your withdrawal. Please try again or contact support.';
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -367,7 +384,9 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Withdrawal error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    // Return user-friendly error messages instead of raw technical errors
+    const friendlyMessage = getFriendlyErrorMessage(error.message || 'Unknown error');
+    return new Response(JSON.stringify({ error: friendlyMessage }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
