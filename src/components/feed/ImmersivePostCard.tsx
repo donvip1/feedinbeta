@@ -1601,50 +1601,59 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
             {/* Divider */}
             <div className="border-t border-border mx-4" />
             
-            {/* Social Buttons Row - Facebook style, evenly spaced at bottom */}
-            <div className="flex items-center justify-between px-4 py-3">
-              <button onClick={handleLike} className="flex items-center gap-1.5 group flex-1 justify-center">
+            {/* Social buttons row - LEFT ALIGNED (matches Photo+ layout) */}
+            <div className="flex items-center justify-start gap-4 px-3 py-2.5">
+              {/* Like */}
+              <button onClick={handleLike} className="flex items-center gap-1.5 group">
                 <Heart className={cn("w-5 h-5 transition-transform group-active:scale-90", liked ? "text-destructive fill-destructive" : "text-muted-foreground")} />
                 <span className="text-muted-foreground text-xs font-medium">{formatCount(likesCount)}</span>
               </button>
-              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group flex-1 justify-center">
+              
+              {/* Comments */}
+              <button onClick={() => handleCommentsOpenChange(true)} className="flex items-center gap-1.5 group">
                 <MessageCircle className={cn("w-5 h-5 transition-transform group-active:scale-90", hasCommented ? "text-blue-500" : "text-muted-foreground")} />
                 <span className={cn("text-xs font-medium", hasCommented ? "text-blue-500" : "text-muted-foreground")}>{formatCount(commentsCount)}</span>
               </button>
-              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
+              
+              {/* Refeed */}
+              <button onClick={() => { setRefeedOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
                 <Repeat className={cn("w-5 h-5 transition-transform group-active:scale-90", hasRefeeded ? "text-green-500" : "text-muted-foreground")} />
                 <span className={cn("text-xs font-medium", hasRefeeded ? "text-green-500" : "text-muted-foreground")}>{formatCount(refeedsCount)}</span>
               </button>
-              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
+
+              {/* Gift */}
+              <button onClick={() => { setGiftOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
                 <Gift className={cn("w-5 h-5 transition-transform group-active:scale-90", hasGifted ? "text-pink-500" : "text-muted-foreground")} />
                 <span className={cn("text-xs font-medium", hasGifted ? "text-pink-500" : "text-muted-foreground")}>{formatCount(giftsCount)}</span>
               </button>
-              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group flex-1 justify-center">
+
+              {/* Views */}
+              <div className="flex items-center gap-1.5">
+                <Eye className="w-5 h-5 text-muted-foreground/60" />
+                <span className="text-muted-foreground/60 text-xs font-medium">{formatCount(post.views_count || 0)}</span>
+              </div>
+              
+              {/* Share */}
+              <button onClick={() => { setShareOpen(true); onInteractionStart?.(); }} className="flex items-center gap-1.5 group">
                 <Share2 className="w-5 h-5 text-muted-foreground transition-transform group-active:scale-90" />
               </button>
             </div>
-            
-            {/* Views count - subtle at bottom */}
-            <div className="flex items-center justify-between px-4 pb-3">
-              <div className="flex items-center gap-1">
-                <Eye className="w-4 h-4 text-muted-foreground/60" />
-                <span className="text-muted-foreground/60 text-xs">{formatCount(post.views_count || 0)} views</span>
-              </div>
-              
-              {/* Promote Button */}
-              {user && !isPromoted && (
+
+            {/* Promote Button - LEFT ALIGNED (matches Photo+ layout) */}
+            {user && !isPromoted && (
+              <div className="flex justify-start px-3 pb-2.5">
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
                     navigate(`/promote/${post.id}`, { state: { returnTo: window.location.pathname } });
                   }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95 shadow-sm"
+                  className="flex items-center gap-1 px-2.5 py-1 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-white hover:from-pink-600 hover:to-rose-600 transition-all active:scale-95"
                 >
                   <TrendingUp className="w-3.5 h-3.5" />
-                  <span className="text-xs font-semibold">Promote</span>
+                  <span className="text-[10px] font-semibold">Promote</span>
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
