@@ -92,7 +92,7 @@ const Feed = () => {
       ]);
       return (streamsCount || 0) + (spacesCount || 0);
     },
-    refetchInterval: 30000, // Refresh every 30 seconds for stability
+    refetchInterval: false, // No polling - use realtime updates only
     staleTime: Infinity, // Never auto-refetch to prevent scroll resets
   });
 
@@ -165,9 +165,9 @@ const Feed = () => {
       // Sort by viewer count
       return liveItems.sort((a, b) => (b.viewer_count || 0) - (a.viewer_count || 0));
     },
-    // Always fetch live content, not just when on live tab - for inline display
-    refetchInterval: 3000, // Refresh every 3 seconds for instant updates
-    staleTime: 0, // Always consider stale
+    // Only poll when user is actively on the live tab
+    refetchInterval: activeTab === 'live' ? 15000 : false, // 15s only on live tab
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 
   // Fetch inline live content for For You feed (separate query for inline cards)
@@ -222,8 +222,10 @@ const Feed = () => {
     staleTime: 0,
   });
 
-  // Subscribe to live content changes for real-time updates
+  // Subscribe to live content changes - only refetch when on live tab
   useEffect(() => {
+    if (activeTab !== 'live') return; // Don't subscribe unless on live tab
+    
     const channel = supabase
       .channel('feed-live-updates')
       .on('postgres_changes', {
@@ -231,18 +233,16 @@ const Feed = () => {
         schema: 'public',
         table: 'live_streams',
       }, () => {
-        console.log('[Feed] Live streams updated');
         refetchLiveCount();
-        if (activeTab === 'live') refetchLive();
+        refetchLive();
       })
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'live_spaces',
       }, () => {
-        console.log('[Feed] Live spaces updated');
         refetchLiveCount();
-        if (activeTab === 'live') refetchLive();
+        refetchLive();
       })
       .subscribe();
 

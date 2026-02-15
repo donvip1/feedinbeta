@@ -106,23 +106,11 @@ export function useFeedEngine(options: UseFeedEngineOptions = {}) {
   const [isNewSession, setIsNewSession] = useState(true);
   const hasInitialized = useRef(false);
 
-  // Track visibility changes for session rotation
+  // Track initialization only - NO visibility change refresh
+  // Feed should NEVER auto-refresh while user is browsing
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && hasInitialized.current) {
-        // User returned to app - mark as new session for rotation
-        setIsNewSession(true);
-        queryClient.invalidateQueries({ queryKey: ['feed-engine'] });
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     hasInitialized.current = true;
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [queryClient]);
+  }, []);
 
   // Main feed query
   const feedQuery = useInfiniteQuery({
