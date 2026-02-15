@@ -8932,6 +8932,10 @@ export type Database = {
         Args: { track_id: string }
         Returns: undefined
       }
+      increment_platform_wallet: {
+        Args: { amount: number; column_name: string }
+        Returns: undefined
+      }
       increment_post_comments_count: {
         Args: { post_id: string }
         Returns: undefined
