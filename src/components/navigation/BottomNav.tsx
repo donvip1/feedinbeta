@@ -214,72 +214,71 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
                 WebkitTransform: 'translateZ(0)',
               }}
             >
-        <div className="max-w-screen-xl mx-auto px-2">
+        <div className="mx-4 md:mx-6">
           <div className="flex items-center justify-between py-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.path);
-              const isPressed = pressedId === item.id;
-              const badgeCount = getNavBadgeCount(item.id);
-              
-              // Dynamic colors based on transparent mode
-              const textColor = transparent 
-                ? (active ? 'text-white' : 'text-white/80 hover:text-white')
-                : (active ? 'text-primary' : 'text-muted-foreground hover:text-foreground');
-              
-              return (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>
-                    <motion.div
-                      whileTap={{ 
-                        scale: 0.85,
-                        transition: { type: "spring", stiffness: 400, damping: 17 }
-                      }}
-                      animate={isPressed ? {
-                        y: [0, -4, 0],
-                        transition: { duration: 0.3, ease: "easeOut" }
-                      } : {}}
-                    >
-                      <Button
-                        onClick={() => handleNavClick(item.path, item.id)}
-                        variant="ghost"
-                        size="icon"
-                        className={`h-12 w-12 hover:bg-transparent transition-all duration-150 touch-feedback ${textColor}`}
-                      >
-                        {item.isProfile && avatarUrl ? (
-                          <div className={`rounded-full transition-all duration-150 ${
-                            active 
-                              ? transparent 
-                                ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' 
-                                : 'ring-2 ring-primary ring-offset-2 ring-offset-background'
-                              : ''
-                          }`}>
-                            <Avatar className="w-7 h-7">
-                              <AvatarImage src={avatarUrl} />
-                              <AvatarFallback><Icon className="w-4 h-4" /></AvatarFallback>
-                            </Avatar>
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <Icon 
-                              size={24}
-                              strokeWidth={2.5}
-                              className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
-                            />
-                            {badgeCount > 0 && (
-                              <UnreadBadge count={badgeCount} size="sm" />
-                            )}
-                          </div>
-                        )}
-                      </Button>
-                    </motion.div>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    <p>{item.label}</p>
-                  </TooltipContent>
-                </Tooltip>
-              );
-            })}
+             {navItems.map((item) => {
+               const Icon = item.icon;
+               const active = isActive(item.path);
+               const isPressed = pressedId === item.id;
+               const badgeCount = getNavBadgeCount(item.id);
+               
+               // Dynamic colors based on transparent mode
+               const textColor = transparent 
+                 ? (active ? 'text-white' : 'text-white/80 hover:text-white')
+                 : (active ? 'text-primary' : 'text-muted-foreground hover:text-foreground');
+               
+               return (
+                 <Tooltip key={item.id}>
+                   <TooltipTrigger asChild>
+                     <motion.div
+                       whileTap={{ 
+                         scale: 0.85,
+                         transition: { type: "spring", stiffness: 400, damping: 17 }
+                       }}
+                       animate={isPressed ? {
+                         y: [0, -4, 0],
+                         transition: { duration: 0.3, ease: "easeOut" }
+                       } : {}}
+                       className="flex items-center justify-center"
+                     >
+                       <button
+                         onClick={() => handleNavClick(item.path, item.id)}
+                         className={`p-2 transition-all duration-150 touch-feedback ${textColor}`}
+                       >
+                         {item.isProfile && avatarUrl ? (
+                           <div className={`rounded-full transition-all duration-150 ${
+                             active 
+                               ? transparent 
+                                 ? 'ring-2 ring-white ring-offset-2 ring-offset-transparent' 
+                                 : 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+                               : ''
+                           }`}>
+                             <Avatar className="w-10 h-10">
+                               <AvatarImage src={avatarUrl} />
+                               <AvatarFallback><Icon className="w-6 h-6" /></AvatarFallback>
+                             </Avatar>
+                           </div>
+                         ) : (
+                           <div className="relative flex items-center justify-center">
+                             <Icon 
+                               size={38}
+                               strokeWidth={2.5}
+                               className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
+                             />
+                             {badgeCount > 0 && (
+                               <UnreadBadge count={badgeCount} size="sm" />
+                             )}
+                           </div>
+                         )}
+                       </button>
+                     </motion.div>
+                   </TooltipTrigger>
+                   <TooltipContent side="top">
+                     <p>{item.label}</p>
+                   </TooltipContent>
+                 </Tooltip>
+               );
+             })}
           </div>
         </div>
             </nav>
