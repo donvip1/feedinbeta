@@ -12,6 +12,7 @@ interface SpeakerQueuePanelProps {
   spaceId: string;
   isHost: boolean;
   onClose: () => void;
+  onSpeakerUpdate?: () => void;
 }
 
 interface QueuedSpeaker {
@@ -27,7 +28,7 @@ interface QueuedSpeaker {
   };
 }
 
-export const SpeakerQueuePanel = ({ spaceId, isHost, onClose }: SpeakerQueuePanelProps) => {
+export const SpeakerQueuePanel = ({ spaceId, isHost, onClose, onSpeakerUpdate }: SpeakerQueuePanelProps) => {
   const [queue, setQueue] = useState<QueuedSpeaker[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -103,6 +104,7 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose }: SpeakerQueuePane
       supabase.removeChannel(promotionChannel);
 
       toast.success(`${speaker.profile?.display_name || 'User'} is now a speaker!`);
+      onSpeakerUpdate?.();
     } catch (error) {
       toast.error('Failed to promote speaker');
     }
@@ -119,6 +121,7 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose }: SpeakerQueuePane
         .eq('id', speaker.id);
 
       toast.info(`Request from ${speaker.profile?.display_name || 'User'} declined`);
+      onSpeakerUpdate?.();
     } catch (error) {
       toast.error('Failed to decline request');
     }
@@ -150,6 +153,7 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose }: SpeakerQueuePane
       supabase.removeChannel(promotionChannel);
 
       toast.success(`${speaker.profile?.display_name || 'User'} is now a co-host!`);
+      onSpeakerUpdate?.();
     } catch (error) {
       toast.error('Failed to promote to co-host');
     }
