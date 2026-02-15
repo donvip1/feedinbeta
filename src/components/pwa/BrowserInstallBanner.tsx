@@ -50,8 +50,19 @@ export const BrowserInstallBanner = () => {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
+    // Fallback: if beforeinstallprompt doesn't fire within 4 seconds on mobile, 
+    // show banner with manual instructions
+    const isMobile = /android|mobile/i.test(navigator.userAgent);
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    if (isMobile) {
+      fallbackTimer = setTimeout(() => {
+        setShowBanner(true);
+      }, 4000);
+    }
+
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      if (fallbackTimer) clearTimeout(fallbackTimer);
     };
   }, []);
 
@@ -88,11 +99,13 @@ export const BrowserInstallBanner = () => {
             <Smartphone className="w-5 h-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm text-foreground">Install Feedin App</h3>
+            <h3 className="font-semibold text-sm text-foreground">Install FeedIn App</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
               {isIOS 
                 ? 'Tap Share then "Add to Home Screen"' 
-                : 'Install for a better experience'}
+                : deferredPrompt
+                  ? 'Install for a better experience'
+                  : 'Tap ⋮ menu then "Add to Home Screen"'}
             </p>
           </div>
           <button 
