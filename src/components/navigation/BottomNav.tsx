@@ -260,9 +260,9 @@ export const BottomNav = ({ currentPage = 'default', hidden = false, transparent
                            </div>
                          ) : (
                            <div className="relative flex items-center justify-center">
-                             <Icon 
-                               size={38}
-                               strokeWidth={2.5}
+                              <Icon 
+                                size={27}
+                                strokeWidth={1.25}
                                className={`transition-transform duration-150 ${active ? 'scale-110' : ''}`}
                              />
                              {badgeCount > 0 && (
