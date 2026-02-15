@@ -15,12 +15,15 @@ export const InstallAppPrompt = () => {
   const [isStandalone, setIsStandalone] = useState(false);
 
   useEffect(() => {
+    // Check if running in Capacitor native app
+    const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.() || !!(window as any).Capacitor;
+    
     // Check if already installed as PWA
     const standalone = window.matchMedia('(display-mode: standalone)').matches 
       || (window.navigator as any).standalone === true;
-    setIsStandalone(standalone);
+    setIsStandalone(standalone || isCapacitor);
 
-    if (standalone) return;
+    if (standalone || isCapacitor) return;
 
     // Detect platform
     const userAgent = navigator.userAgent.toLowerCase();
