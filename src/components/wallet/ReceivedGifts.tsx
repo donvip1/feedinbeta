@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { format } from 'date-fns';
 import { User, Image, Radio, Send, ChevronRight, RefreshCw, Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,7 +26,13 @@ const giftEmojis: Record<string, string> = {
   custom: '🎁',
 };
 
-export const ReceivedGifts = () => {
+interface ReceivedGiftsProps {
+  selectionMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (id: string) => void;
+}
+
+export const ReceivedGifts = ({ selectionMode = false, selectedIds, onToggleSelect }: ReceivedGiftsProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -175,6 +182,15 @@ export const ReceivedGifts = () => {
             className={`flex items-center justify-between p-3 rounded-lg bg-accent/50 hover:bg-accent transition-colors ${clickable ? 'cursor-pointer' : ''}`}
           >
             <div className="flex items-center gap-3">
+              {/* Selection checkbox for unconverted gifts */}
+              {selectionMode && !isConverted && (
+                <Checkbox
+                  checked={selectedIds?.has(gift.id)}
+                  onCheckedChange={() => onToggleSelect?.(gift.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="data-[state=checked]:bg-primary"
+                />
+              )}
               <div className="text-2xl">
                 {giftEmojis[gift.gift_type] || '🎁'}
               </div>
