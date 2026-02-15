@@ -119,8 +119,21 @@ export const WithdrawTab: React.FC = () => {
   const netCredits = amount - feeCredits;
   const netUsd = netCredits / CREDITS_PER_USD;
   const netNgn = netUsd * (ngnRate || 1500);
-  const hasEnoughCredits = (credits || 0) >= amount || (credits || 0) > 999999999; // Admin unlimited bypass
-  const isValid = amount >= MIN_WITHDRAWAL_CREDITS && !!selectedAccountId && hasEnoughCredits && !withdrawing;
+  const creditsNum = typeof credits === 'number' ? credits : Number(credits) || 0;
+  const hasEnoughCredits = creditsNum >= amount;
+  const isValid = amount >= MIN_WITHDRAWAL_CREDITS && !!selectedAccountId && hasEnoughCredits;
+
+  // Debug: log validation state
+  console.log('[WithdrawTab] Validation:', { 
+    amount, 
+    minMet: amount >= MIN_WITHDRAWAL_CREDITS, 
+    selectedAccountId, 
+    credits, 
+    creditsNum, 
+    hasEnoughCredits, 
+    withdrawing, 
+    isValid 
+  });
 
   const handleWithdraw = async () => {
     if (!isValid) return;
