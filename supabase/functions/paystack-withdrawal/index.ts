@@ -350,11 +350,21 @@ Deno.serve(async (req) => {
           p_amount: credit_amount,
           p_withdrawal_id: withdrawal?.id || null,
         });
-        return new Response(JSON.stringify({ 
-          error: 'Transfer could not be initiated. Credits have been refunded.',
-          details: transferData.message,
-        }), {
-          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+
+        // Translate Paystack errors to friendly messages
+        const paystackMsg = (transferData.message || '').toLowerCase();
+        let friendlyError = 'We couldn\'t process your withdrawal right now. Your credits have been refunded.';
+        if (paystackMsg.includes('starter business') || paystackMsg.includes('third party payout')) {
+          friendlyError = 'Withdrawals are temporarily unavailable while we complete payment provider verification. Your credits have been refunded. Please try again later.';
+        } else if (paystackMsg.includes('insufficient') || paystackMsg.includes('balance')) {
+          friendlyError = 'Our payment system has insufficient funds to process this withdrawal right now. Your credits have been refunded. Please try again later.';
+        } else if (paystackMsg.includes('recipient')) {
+          friendlyError = 'There was an issue with your bank account details. Your credits have been refunded. Please verify your bank info and try again.';
+        }
+
+        console.error('Transfer failed:', transferData.message);
+        return new Response(JSON.stringify({ error: friendlyError }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
