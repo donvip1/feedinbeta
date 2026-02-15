@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { Wallet as WalletIcon, Crown, ShoppingCart } from 'lucide-react';
+import { Wallet as WalletIcon, Crown, ShoppingCart, Shield, Code, Star, Sparkles, Zap } from 'lucide-react';
+import { RolePlanBadge } from '@/components/profile/RolePlanBadge';
 import { BackButton } from '@/components/navigation/BackButton';
 import { format } from 'date-fns';
 import { GiftsTab } from '@/components/wallet/GiftsTab';
@@ -415,6 +416,11 @@ const Wallet = () => {
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">Renews</span>
                     <span className="text-sm">{format(new Date(subscription.current_period_end), 'MMM d, yyyy')}</span>
+                  </div>
+                  {/* Badge earned */}
+                  <div className="flex justify-between items-center pt-2 border-t border-border">
+                    <span className="text-sm text-muted-foreground">Your Badge</span>
+                    {user?.id && <RolePlanBadge userId={user.id} />}
                   </div>
                 </CardContent>
               </Card>

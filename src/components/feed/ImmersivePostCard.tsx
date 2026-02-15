@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarBadgeIcon } from '@/components/profile/AvatarBadgeIcon';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import CommentsModal from './CommentsModal';
@@ -680,8 +681,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     <AvatarImage src={post.profiles?.avatar_url || ''} />
                     <AvatarFallback className="bg-primary text-white text-sm">{displayName[0]?.toUpperCase()}</AvatarFallback>
                   </Avatar>
-                  {/* Online indicator */}
-                  <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-black rounded-full" />
+                  <AvatarBadgeIcon userId={post.user_id} size="sm" />
                 </div>
                 <div className="flex flex-col flex-1">
                   <div className="flex items-center gap-2">

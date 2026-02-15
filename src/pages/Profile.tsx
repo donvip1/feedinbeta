@@ -12,6 +12,7 @@ import { FollowersModal } from '@/components/profile/FollowersModal';
 import { FriendsModal } from '@/components/profile/FriendsModal';
 import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
+import { AvatarBadgeIcon } from '@/components/profile/AvatarBadgeIcon';
 import { RolePlanBadge } from '@/components/profile/RolePlanBadge';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -806,6 +807,7 @@ const Profile = () => {
                   {profile.display_name?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
+              <AvatarBadgeIcon userId={profile.id} size="lg" />
               {isOwnProfile && (
                 <label
                   htmlFor="profile-avatar-upload"

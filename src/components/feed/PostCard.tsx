@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarBadgeIcon } from '@/components/profile/AvatarBadgeIcon';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -659,10 +660,13 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
             className="flex items-center gap-3 cursor-pointer"
             onClick={handleProfileClick}
           >
-            <Avatar className="w-10 h-10">
-              <AvatarImage src={post.profiles?.avatar_url || ''} />
-              <AvatarFallback>{displayName[0]?.toUpperCase()}</AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="w-10 h-10">
+                <AvatarImage src={post.profiles?.avatar_url || ''} />
+                <AvatarFallback>{displayName[0]?.toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <AvatarBadgeIcon userId={post.user_id} size="sm" />
+            </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <p className="font-semibold text-sm">{displayName}</p>
