@@ -278,7 +278,7 @@ const Wallet = () => {
 
   const tierInfo = getTierInfo();
 
-  const handlePurchasePackage = async (packageId: string, priceId: string) => {
+  const handlePurchasePackage = async (packageId: string, _priceId: string) => {
     try {
       setLoadingPackage(packageId);
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -288,19 +288,17 @@ const Wallet = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+      const { data, error } = await supabase.functions.invoke('paystack-checkout', {
         body: {
-          type: 'one_time',
-          priceId: priceId,
-          successUrl: `${window.location.origin}/wallet?success=true`,
-          cancelUrl: `${window.location.origin}/wallet?canceled=true`,
+          type: 'credits',
+          itemId: packageId,
         },
       });
 
       if (error) throw error;
 
-      if (data?.url) {
-        window.location.href = data.url;
+      if (data?.authorization_url) {
+        window.location.href = data.authorization_url;
       }
     } catch (error: any) {
       toast({
@@ -313,7 +311,7 @@ const Wallet = () => {
     }
   };
 
-  const handleSubscribe = async (tierId: string, priceId: string) => {
+  const handleSubscribe = async (tierId: string, _priceId: string) => {
     try {
       setLoadingTier(tierId);
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -323,19 +321,17 @@ const Wallet = () => {
         return;
       }
 
-      const { data, error } = await supabase.functions.invoke('stripe-checkout', {
+      const { data, error } = await supabase.functions.invoke('paystack-checkout', {
         body: {
           type: 'subscription',
-          priceId: priceId,
-          successUrl: `${window.location.origin}/wallet?success=true`,
-          cancelUrl: `${window.location.origin}/wallet?canceled=true`,
+          itemId: tierId,
         },
       });
 
       if (error) throw error;
 
-      if (data?.url) {
-        window.location.href = data.url;
+      if (data?.authorization_url) {
+        window.location.href = data.authorization_url;
       }
     } catch (error: any) {
       toast({
