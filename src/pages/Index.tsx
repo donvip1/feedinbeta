@@ -44,7 +44,7 @@ const Index = () => {
   // Only show sign up/sign in page for unauthenticated users
   return (
     <div className="min-h-screen bg-black text-white overflow-y-auto">
-      <main className="container mx-auto px-4 py-16">
+      <main className="container mx-auto px-4 py-4">
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto mb-16 animate-fade-in">
           <div className="flex justify-center -mb-32">
