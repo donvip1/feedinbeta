@@ -113,8 +113,17 @@ serve(async (req) => {
     }
     if (!itemId) throw new Error('Missing item ID');
 
-    let amount = 0; // in kobo (Paystack uses smallest currency unit)
+    let amountInKobo = 0;
     let metadata: Record<string, string> = { user_id: user.id, type };
+
+    // Fetch NGN exchange rate from database
+    const { data: rateData } = await supabaseClient
+      .from('exchange_rates')
+      .select('rate')
+      .eq('currency_code', 'NGN')
+      .maybeSingle();
+    
+    const ngnRate = rateData?.rate || 1600; // fallback rate
 
     if (type === 'credits') {
       const { data: pkg, error } = await supabaseClient
@@ -127,7 +136,7 @@ serve(async (req) => {
       if (error || !pkg) throw new Error('Invalid credit package');
 
       const totalCredits = pkg.credits + (pkg.bonus_credits || 0);
-      amount = Math.round(pkg.price * 100); // USD cents → kobo equivalent
+      amountInKobo = Math.round(pkg.price * ngnRate * 100); // USD → NGN → kobo
       metadata.package_id = pkg.id;
       metadata.credits = totalCredits.toString();
       metadata.description = `${pkg.name} - ${totalCredits} credits`;
@@ -141,7 +150,7 @@ serve(async (req) => {
 
       if (error || !tier) throw new Error('Invalid subscription tier');
 
-      amount = Math.round(tier.price * 100);
+      amountInKobo = Math.round(tier.price * ngnRate * 100); // USD → NGN → kobo
       metadata.tier_id = tier.id;
       metadata.tier_name = tier.name;
       metadata.description = `${tier.name} subscription`;
@@ -156,8 +165,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email: user.email,
-        amount,
-        currency: 'USD',
+        amount: amountInKobo,
+        currency: 'NGN',
         metadata,
         callback_url: `${req.headers.get('origin') || 'https://feedinbeta.lovable.app'}/${type === 'credits' ? 'credits' : 'subscription'}?reference=`,
       }),
