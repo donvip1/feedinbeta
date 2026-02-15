@@ -24,7 +24,7 @@ const Index = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="animate-pulse">
-          <img src={feedinLogo} alt="feedin" className="w-72 h-72" />
+          <img src={feedinLogo} alt="feedin" className="w-[432px] h-[432px]" />
         </div>
       </div>
     );
@@ -35,7 +35,7 @@ const Index = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="animate-pulse">
-          <img src={feedinLogo} alt="feedin" className="w-72 h-72" />
+          <img src={feedinLogo} alt="feedin" className="w-[432px] h-[432px]" />
         </div>
       </div>
     );
@@ -48,7 +48,7 @@ const Index = () => {
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto mb-16 animate-fade-in">
           <div className="flex justify-center mb-6">
-            <img src={feedinLogo} alt="feedin" className="w-[345px] h-[345px]" />
+            <img src={feedinLogo} alt="feedin" className="w-[518px] h-[518px]" />
           </div>
           <p className="text-xl text-gray-400">
             Connect with friends, join groups, and chat with people worldwide
