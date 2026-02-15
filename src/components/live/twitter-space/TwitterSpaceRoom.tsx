@@ -1053,6 +1053,19 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           >
             {isHost ? 'End' : 'Leave'}
           </button>
+          {/* Share & Guests - top right */}
+          <button
+            onClick={() => setShowShare(true)}
+            className="p-1.5 text-zinc-400 hover:text-white"
+          >
+            <Share2 className="w-4.5 h-4.5" />
+          </button>
+          <button
+            onClick={() => setView('guests')}
+            className="p-1.5 text-zinc-400 hover:text-white"
+          >
+            <Users className="w-4.5 h-4.5" />
+          </button>
         </div>
       </div>
 
@@ -1297,14 +1310,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </AnimatePresence>
             </div>
 
-            {/* Guests */}
-            <button
-              onClick={() => setView('guests')}
-              className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
-            >
-              <Users className="w-5 h-5" />
-            </button>
-
             {/* Gift */}
             <button
               onClick={() => setShowGiftModal(true)}
@@ -1319,14 +1324,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
             >
               <Heart className="w-5 h-5" />
-            </button>
-
-            {/* Share */}
-            <button
-              onClick={() => setShowShare(true)}
-              className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
-            >
-              <Share2 className="w-5 h-5" />
             </button>
 
             {/* Mute All - Host Only */}
