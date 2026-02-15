@@ -18,7 +18,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { 
   ArrowLeft, Shield, Users, Gavel, ShoppingCart, History, 
   Search, X, Check, AlertTriangle, RefreshCw, UserPlus,
-  Crown, Ban, Eye, Radio, StopCircle
+  Crown, Ban, Eye, Radio, StopCircle, CreditCard
 } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 
@@ -259,30 +259,35 @@ const AdminPanel = () => {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue={permissions.canManageP2P ? "p2p" : permissions.canManageDisputes ? "disputes" : "roles"}>
-          <TabsList className="grid w-full grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-6 mb-6">
             {permissions.canManageP2P && (
-              <TabsTrigger value="p2p" className="gap-1">
-                <ShoppingCart className="w-4 h-4" /> P2P
+              <TabsTrigger value="p2p" className="gap-1 text-xs">
+                <ShoppingCart className="w-3 h-3" /> P2P
               </TabsTrigger>
             )}
             {permissions.canManageDisputes && (
-              <TabsTrigger value="disputes" className="gap-1">
-                <Gavel className="w-4 h-4" /> Disputes
+              <TabsTrigger value="disputes" className="gap-1 text-xs">
+                <Gavel className="w-3 h-3" /> Disputes
               </TabsTrigger>
             )}
             {permissions.canManageRoles && (
-              <TabsTrigger value="roles" className="gap-1">
-                <Users className="w-4 h-4" /> Roles
+              <TabsTrigger value="roles" className="gap-1 text-xs">
+                <Users className="w-3 h-3" /> Roles
               </TabsTrigger>
             )}
             {(permissions.isAdmin || permissions.isDeveloper) && (
-              <TabsTrigger value="live" className="gap-1">
-                <Radio className="w-4 h-4" /> Live
+              <TabsTrigger value="subscriptions" className="gap-1 text-xs">
+                <CreditCard className="w-3 h-3" /> Plans
               </TabsTrigger>
             )}
             {(permissions.isAdmin || permissions.isDeveloper) && (
-              <TabsTrigger value="logs" className="gap-1">
-                <History className="w-4 h-4" /> Logs
+              <TabsTrigger value="live" className="gap-1 text-xs">
+                <Radio className="w-3 h-3" /> Live
+              </TabsTrigger>
+            )}
+            {(permissions.isAdmin || permissions.isDeveloper) && (
+              <TabsTrigger value="logs" className="gap-1 text-xs">
+                <History className="w-3 h-3" /> Logs
               </TabsTrigger>
             )}
           </TabsList>
@@ -540,6 +545,13 @@ const AdminPanel = () => {
                   </div>
                 </CardContent>
               </Card>
+            </TabsContent>
+          )}
+
+          {/* Subscriptions Tab */}
+          {(permissions.isAdmin || permissions.isDeveloper) && (
+            <TabsContent value="subscriptions" className="space-y-4">
+              <ManageSubscriptionCard />
             </TabsContent>
           )}
 
@@ -854,6 +866,216 @@ const AssignRoleCard = ({ onSuccess }: { onSuccess: () => void }) => {
               <Check className="w-4 h-4 mr-2" />
               Assign Role
             </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
+// Subscription management component
+const ManageSubscriptionCard = () => {
+  const [searchUsername, setSearchUsername] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [selectedTier, setSelectedTier] = useState('');
+  const [currentSub, setCurrentSub] = useState<any>(null);
+  const [loadingSub, setLoadingSub] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [notes, setNotes] = useState('');
+
+  const { data: tiers } = useQuery({
+    queryKey: ['admin-subscription-tiers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subscription_tiers')
+        .select('*')
+        .eq('is_active', true)
+        .order('price', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const handleSearch = async () => {
+    if (!searchUsername.trim()) return;
+    const { data, error } = await supabase.functions.invoke('admin-actions', {
+      body: { action: 'search_user', username: searchUsername },
+    });
+    if (!error && data.users) {
+      setSearchResults(data.users);
+    }
+  };
+
+  const handleSelectUser = async (user: any) => {
+    setSelectedUser(user);
+    setSearchResults([]);
+    setLoadingSub(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-actions', {
+        body: { action: 'get_user_subscription', targetUserId: user.id },
+      });
+      if (!error) {
+        setCurrentSub(data.subscription);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingSub(false);
+    }
+  };
+
+  const handleUpgrade = async () => {
+    if (!selectedUser || !selectedTier) return;
+    setProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-actions', {
+        body: { 
+          action: 'upgrade_user_plan', 
+          targetUserId: selectedUser.id, 
+          tierId: selectedTier,
+          notes,
+        },
+      });
+      if (error) throw error;
+      toast.success(`Upgraded @${selectedUser.username} to ${data.tierName}`);
+      // Refresh subscription
+      handleSelectUser(selectedUser);
+      setNotes('');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upgrade plan');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const currentTierName = currentSub?.subscription_tiers
+    ? (Array.isArray(currentSub.subscription_tiers) ? currentSub.subscription_tiers[0]?.name : currentSub.subscription_tiers?.name)
+    : null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CreditCard className="w-5 h-5" />
+          Manage User Subscriptions
+        </CardTitle>
+        <CardDescription>Search for a user and upgrade their plan</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex gap-2">
+          <Input 
+            placeholder="Search username..."
+            value={searchUsername}
+            onChange={(e) => setSearchUsername(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+          <Button onClick={handleSearch}>
+            <Search className="w-4 h-4" />
+          </Button>
+        </div>
+
+        {searchResults.length > 0 && !selectedUser && (
+          <div className="space-y-2">
+            {searchResults.map((user) => (
+              <div 
+                key={user.id}
+                className="p-2 border rounded-lg flex items-center gap-2 cursor-pointer hover:bg-muted"
+                onClick={() => handleSelectUser(user)}
+              >
+                <Avatar className="w-8 h-8">
+                  <AvatarImage src={user.avatar_url} />
+                  <AvatarFallback>{user.display_name?.[0]}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium text-sm">{user.display_name}</p>
+                  <p className="text-xs text-muted-foreground">@{user.username}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {selectedUser && (
+          <div className="space-y-4 p-4 border rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Avatar>
+                  <AvatarImage src={selectedUser.avatar_url} />
+                  <AvatarFallback>{selectedUser.display_name?.[0]}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{selectedUser.display_name}</p>
+                  <p className="text-sm text-muted-foreground">@{selectedUser.username}</p>
+                </div>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => { setSelectedUser(null); setCurrentSub(null); }}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+
+            {loadingSub ? (
+              <div className="flex justify-center py-4">
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              </div>
+            ) : (
+              <>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="text-sm font-medium">Current Plan</p>
+                  <p className="text-lg font-bold">
+                    {currentTierName ? (
+                      <Badge variant="default">{currentTierName}</Badge>
+                    ) : (
+                      <Badge variant="outline">No active plan (Starter)</Badge>
+                    )}
+                  </p>
+                  {currentSub?.current_period_end && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Expires: {format(new Date(currentSub.current_period_end), 'PPp')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Upgrade to</p>
+                  <Select value={selectedTier} onValueChange={setSelectedTier}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a plan..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tiers?.map((tier) => (
+                        <SelectItem key={tier.id} value={tier.id}>
+                          <div className="flex items-center gap-2">
+                            <Crown className="w-3 h-3" />
+                            {tier.name} - ${tier.price}/{tier.interval}
+                            {tier.subscription_credits > 0 && ` (+${tier.subscription_credits} credits)`}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <Textarea 
+                  placeholder="Notes (optional)..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+
+                <Button 
+                  onClick={handleUpgrade} 
+                  disabled={processing || !selectedTier} 
+                  className="w-full"
+                >
+                  {processing ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Crown className="w-4 h-4 mr-2" />
+                  )}
+                  Upgrade Plan
+                </Button>
+              </>
+            )}
           </div>
         )}
       </CardContent>
