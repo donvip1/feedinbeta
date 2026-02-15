@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { BottomNav } from '@/components/navigation/BottomNav';
-import { ArrowLeft, Wallet as WalletIcon, Crown, ShoppingCart } from 'lucide-react';
+import { Wallet as WalletIcon, Crown, ShoppingCart } from 'lucide-react';
+import { BackButton } from '@/components/navigation/BackButton';
 import { format } from 'date-fns';
 import { GiftsTab } from '@/components/wallet/GiftsTab';
 import { WalletTabs } from '@/components/wallet/WalletTabs';
@@ -351,22 +352,7 @@ const Wallet = () => {
         <div className="px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Button
-                onClick={() => {
-                  // Check for returnTo state from navigating pages (e.g., live stream gift bar)
-                  const returnTo = (location.state as { returnTo?: string })?.returnTo;
-                  if (returnTo) {
-                    navigate(returnTo);
-                  } else {
-                    navigate(-1);
-                  }
-                }}
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
+              <BackButton fallback="/feed" className="h-9 w-9" />
               <WalletIcon className="w-5 h-5 text-primary" />
               <h1 className="text-lg font-bold">Wallet</h1>
             </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Heart, Search, Loader2, AlertTriangle, BookOpen, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -150,9 +151,7 @@ IMPORTANT: Never diagnose or prescribe treatment. Always emphasize consulting he
     <div className="min-h-screen bg-background pb-20">
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border p-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton fallback="/ai/copilot" />
           <div className="flex-1">
             <h1 className="text-xl font-bold flex items-center gap-2">
               <Heart className="h-5 w-5 text-primary" />

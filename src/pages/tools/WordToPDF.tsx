@@ -2,6 +2,7 @@ import { useState, ChangeEvent } from 'react';
 import { ArrowLeft, FileText, Download, Upload, Loader2, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -99,9 +100,7 @@ const WordToPDF = () => {
     <div className="min-h-screen bg-background pb-20">
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border p-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton fallback="/ai/copilot" />
           <div className="flex-1">
             <h1 className="text-xl font-bold">Word to PDF</h1>
             <p className="text-sm text-muted-foreground">Convert Word documents to PDF format</p>

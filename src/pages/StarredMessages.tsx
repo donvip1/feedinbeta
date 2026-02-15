@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { BackButton } from '@/components/navigation/BackButton';
 import { ArrowLeft, Star, Image, Video, FileText, Mic, Users, MessageCircle, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -60,13 +61,7 @@ const StarredMessages = () => {
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => navigate(-1)}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <BackButton fallback="/messages" />
             <div className="flex items-center gap-2">
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
               <h1 className="text-xl font-bold">Starred Messages</h1>

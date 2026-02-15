@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { supabase } from '@/integrations/supabase/client';
 import PostCard from '@/components/feed/PostCard';
 import { BottomNav } from '@/components/navigation/BottomNav';
@@ -78,9 +79,7 @@ const HashtagSearch = () => {
       <div className="min-h-screen bg-background pb-20">
         <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b">
           <div className="flex items-center gap-3 px-4 py-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
+            <BackButton fallback="/feed" />
             <h1 className="text-xl font-bold">#{hashtag}</h1>
           </div>
         </header>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Palette, Download, Loader2, Sparkles, Zap } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { BackButton } from '@/components/navigation/BackButton';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -101,9 +102,7 @@ const LogoMaker = () => {
     <div className="min-h-screen bg-background pb-20">
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border p-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+          <BackButton fallback="/ai/copilot" />
           <div className="flex-1">
             <h1 className="text-xl font-bold">Logo Maker</h1>
             <p className="text-sm text-muted-foreground">AI-powered logo design</p>

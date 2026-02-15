@@ -14,6 +14,7 @@ import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
+import { BackButton } from '@/components/navigation/BackButton';
 import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagram, Twitter, Linkedin, Facebook, Youtube, Mic, Link as LinkIcon, Bookmark, FileText, Upload, UserPlus, Rocket, UserCheck, X, MapPin, Briefcase, Bell } from 'lucide-react';
 
 import { getCountryFlag } from '@/lib/location-service';
@@ -758,14 +759,7 @@ const Profile = () => {
           {/* Header controls overlaid on cover */}
           <div className="absolute top-0 left-0 right-0 z-40">
             <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-              <Button 
-                onClick={() => navigate(-1)} 
-                variant="ghost" 
-                size="icon" 
-                className="bg-background/40 backdrop-blur-md hover:bg-background/60 border border-background/20 shadow-lg"
-              >
-                <ArrowLeft className="w-5 h-5 text-foreground" />
-              </Button>
+              <BackButton fallback="/feed" className="bg-background/40 backdrop-blur-md hover:bg-background/60 border border-background/20 shadow-lg" />
               {isOwnProfile && (
                 <Button 
                   onClick={() => navigate('/settings')} 
