@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.send-fcm-push]
 verify_jwt = true
+
+[functions.paystack-webhook]
+verify_jwt = false

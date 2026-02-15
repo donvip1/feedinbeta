@@ -64,9 +64,9 @@ Deno.serve(async (req) => {
 
     const title = space.title || "Live Space on FEEDIN";
     const description = space.description || `Hosted by ${hostName} • ${space.listener_count || 0} listening`;
-    const defaultImage = "https://feedinbeta.lovable.app/favicon.png";
+    const defaultImage = "https://feedinn.com/favicon.png";
     const image = space.cover_image_url || defaultImage;
-    const spaceUrl = `https://feedinbeta.lovable.app/live/space/${space.id}`;
+    const spaceUrl = `https://feedinn.com/live/space/${space.id}`;
 
     return new Response(
       JSON.stringify({

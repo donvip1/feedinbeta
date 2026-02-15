@@ -184,7 +184,7 @@ serve(async (req) => {
         amount: amountInKobo,
         currency: 'NGN',
         metadata,
-        callback_url: `${req.headers.get('origin') || 'https://feedinbeta.lovable.app'}/${type === 'credits' ? 'credits' : 'subscription'}?reference=`,
+        callback_url: `https://feedinn.com/${type === 'credits' ? 'credits' : 'subscription'}?reference=`,
       }),
     });
 
