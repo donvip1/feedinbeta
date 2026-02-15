@@ -44,10 +44,10 @@ const Index = () => {
   // Only show sign up/sign in page for unauthenticated users
   return (
     <div className="min-h-screen bg-black text-white overflow-y-auto">
-      <main className="container mx-auto px-4 py-4">
+      <main className="container mx-auto px-4 pt-0 pb-4">
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto mb-16 animate-fade-in">
-          <div className="flex justify-center -mb-32">
+          <div className="flex justify-center -mt-20 -mb-32">
             <img src={feedinLogo} alt="feedin" className="w-[518px] h-[518px]" />
           </div>
           <p className="text-xl text-gray-400">
