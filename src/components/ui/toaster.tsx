@@ -7,7 +7,7 @@ export function Toaster() {
       richColors 
       closeButton={false}
       theme="system" 
-      duration={2500}
+      duration={2000}
       toastOptions={{
         className: "backdrop-blur-md rounded-2xl",
         style: {

@@ -3630,6 +3630,7 @@ export type Database = {
           content: string
           created_at: string | null
           id: string
+          reply_to_id: string | null
           space_id: string | null
           user_id: string
         }
@@ -3637,6 +3638,7 @@ export type Database = {
           content: string
           created_at?: string | null
           id?: string
+          reply_to_id?: string | null
           space_id?: string | null
           user_id: string
         }
@@ -3644,10 +3646,18 @@ export type Database = {
           content?: string
           created_at?: string | null
           id?: string
+          reply_to_id?: string | null
           space_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "live_space_messages_reply_to_id_fkey"
+            columns: ["reply_to_id"]
+            isOneToOne: false
+            referencedRelation: "live_space_messages"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "live_space_messages_space_id_fkey"
             columns: ["space_id"]
