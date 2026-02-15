@@ -47,7 +47,7 @@ const Index = () => {
       <main className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto mb-16 animate-fade-in">
-          <div className="flex justify-center mb-1">
+          <div className="flex justify-center -mb-32">
             <img src={feedinLogo} alt="feedin" className="w-[518px] h-[518px]" />
           </div>
           <p className="text-xl text-gray-400">
