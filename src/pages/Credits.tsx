@@ -139,6 +139,7 @@ const Credits = () => {
                 promotionLabel={pkg.promotion_label}
                 promotionActive={pkg.promotion_active}
                 discountPercentage={pkg.discount_percentage}
+                features={(pkg as any).features as string[] | undefined}
                 onPurchase={() => handlePurchase(pkg.id)}
               />
             ))}

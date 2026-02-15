@@ -1,5 +1,8 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Video, Mic, Calendar, ChevronRight } from "lucide-react";
+import { X, Video, Mic, Calendar, ChevronRight, Lock, Crown } from "lucide-react";
+import { useLivestreamPermission } from "@/hooks/useLivestreamPermission";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface GoLiveModalProps {
   open: boolean;
@@ -16,7 +19,33 @@ export const GoLiveModal = ({
   onAudioSpace,
   onSchedule,
 }: GoLiveModalProps) => {
+  const { canLivestream } = useLivestreamPermission();
+  const navigate = useNavigate();
+
   const handleVideoClick = () => {
+    if (!canLivestream) {
+      toast(
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 font-semibold">
+            <Lock className="w-4 h-4" /> Livestream Locked
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Video livestreaming requires the <strong>Popular Pack</strong> or higher. Upgrade your credit pack to unlock this feature!
+          </p>
+          <button
+            onClick={() => {
+              navigate('/credits');
+              toast.dismiss();
+            }}
+            className="mt-1 text-sm font-semibold text-primary hover:underline text-left"
+          >
+            Upgrade Now →
+          </button>
+        </div>,
+        { duration: 6000 }
+      );
+      return;
+    }
     onClose();
     onVideoStream();
   };
@@ -70,19 +99,42 @@ export const GoLiveModal = ({
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={handleVideoClick}
-                className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-pink-500/10 to-red-500/10 border border-pink-500/20 hover:border-pink-500/40 transition-colors text-left"
+                className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-colors text-left relative ${
+                  canLivestream
+                    ? "bg-gradient-to-r from-pink-500/10 to-red-500/10 border-pink-500/20 hover:border-pink-500/40"
+                    : "bg-gradient-to-r from-slate-800/50 to-slate-700/50 border-slate-600/30 opacity-70"
+                }`}
               >
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-pink-500 to-red-500 flex items-center justify-center shrink-0">
-                  <Video className="w-7 h-7 text-white" />
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${
+                  canLivestream
+                    ? "bg-gradient-to-br from-pink-500 to-red-500"
+                    : "bg-gradient-to-br from-slate-600 to-slate-700"
+                }`}>
+                  {canLivestream ? (
+                    <Video className="w-7 h-7 text-white" />
+                  ) : (
+                    <Lock className="w-7 h-7 text-white/60" />
+                  )}
                 </div>
                 <div className="flex-1">
-                  <p className="text-lg font-semibold text-white">Video Stream</p>
-                  <p className="text-sm text-white/60">Standard broadcast with camera</p>
+                  <p className="text-lg font-semibold text-white flex items-center gap-2">
+                    Video Stream
+                    {!canLivestream && (
+                      <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                        <Crown className="w-3 h-3" /> Popular+
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm text-white/60">
+                    {canLivestream
+                      ? "Standard broadcast with camera"
+                      : "Upgrade to Popular Pack or higher to unlock"}
+                  </p>
                 </div>
                 <ChevronRight className="w-5 h-5 text-white/40" />
               </motion.button>
 
-              {/* Audio Space Option */}
+              {/* Audio Space Option - Always available */}
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}

@@ -18,10 +18,11 @@ interface PackageCardProps {
   currencySymbol?: string;
   exchangeRate?: number;
   currencyCode?: string;
+  features?: string[];
   onPurchase: () => void;
 }
 
-const CREDIT_FEATURES = [
+const DEFAULT_CREDIT_FEATURES = [
   { icon: Image, text: 'AI Image Generation' },
   { icon: MessageSquare, text: 'AI Chat & Writing' },
   { icon: Gift, text: 'Send Gifts to Creators' },
@@ -41,6 +42,7 @@ export const PackageCard: React.FC<PackageCardProps> = ({
   currencySymbol = '$',
   exchangeRate = 1,
   currencyCode = 'USD',
+  features,
   onPurchase,
 }) => {
   const totalCredits = credits + bonusCredits;
@@ -211,12 +213,14 @@ export const PackageCard: React.FC<PackageCardProps> = ({
 
         {/* Features List */}
         <div className="space-y-2 py-2 border-t border-border/50">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Use credits for:</p>
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            {features && features.length > 0 ? 'Includes:' : 'Use credits for:'}
+          </p>
           <div className="grid grid-cols-2 gap-1.5">
-            {CREDIT_FEATURES.map((feature, index) => (
+            {(features && features.length > 0 ? features : DEFAULT_CREDIT_FEATURES.map(f => f.text)).map((feature, index) => (
               <div key={index} className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Check className="w-3 h-3 text-green-500 flex-shrink-0" />
-                <span className="truncate">{feature.text}</span>
+                <span className="truncate">{typeof feature === 'string' ? feature : feature}</span>
               </div>
             ))}
           </div>

@@ -1990,6 +1990,7 @@ export type Database = {
           credits: number
           currency: string
           discount_percentage: number | null
+          features: Json | null
           id: string
           is_active: boolean | null
           name: string
@@ -1999,6 +2000,7 @@ export type Database = {
           promotion_label: string | null
           promotion_start: string | null
           stripe_price_id: string
+          tier_level: number | null
           updated_at: string | null
         }
         Insert: {
@@ -2007,6 +2009,7 @@ export type Database = {
           credits: number
           currency?: string
           discount_percentage?: number | null
+          features?: Json | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -2016,6 +2019,7 @@ export type Database = {
           promotion_label?: string | null
           promotion_start?: string | null
           stripe_price_id: string
+          tier_level?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -2024,6 +2028,7 @@ export type Database = {
           credits?: number
           currency?: string
           discount_percentage?: number | null
+          features?: Json | null
           id?: string
           is_active?: boolean | null
           name?: string
@@ -2033,6 +2038,7 @@ export type Database = {
           promotion_label?: string | null
           promotion_start?: string | null
           stripe_price_id?: string
+          tier_level?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -7391,6 +7397,7 @@ export type Database = {
         Row: {
           balance: number
           created_at: string | null
+          highest_tier_level: number | null
           id: string
           is_admin_minted: boolean | null
           last_gift_sent_at: string | null
@@ -7402,6 +7409,7 @@ export type Database = {
         Insert: {
           balance?: number
           created_at?: string | null
+          highest_tier_level?: number | null
           id?: string
           is_admin_minted?: boolean | null
           last_gift_sent_at?: string | null
@@ -7413,6 +7421,7 @@ export type Database = {
         Update: {
           balance?: number
           created_at?: string | null
+          highest_tier_level?: number | null
           id?: string
           is_admin_minted?: boolean | null
           last_gift_sent_at?: string | null

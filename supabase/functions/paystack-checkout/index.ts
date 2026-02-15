@@ -58,6 +58,30 @@ serve(async (req) => {
           p_description: metadata.description || 'Credit purchase via Paystack',
           p_reference: reference,
         });
+
+        // Update highest tier level if this package is higher
+        if (metadata.package_id) {
+          const { data: pkg } = await supabaseClient
+            .from('credit_packages')
+            .select('tier_level')
+            .eq('id', metadata.package_id)
+            .single();
+
+          if (pkg?.tier_level) {
+            const { data: currentCredits } = await supabaseClient
+              .from('user_credits')
+              .select('highest_tier_level')
+              .eq('user_id', user.id)
+              .single();
+
+            if ((currentCredits?.highest_tier_level ?? 0) < pkg.tier_level) {
+              await supabaseClient
+                .from('user_credits')
+                .update({ highest_tier_level: pkg.tier_level })
+                .eq('user_id', user.id);
+            }
+          }
+        }
       } else if (metadata.type === 'subscription') {
         // Create/update user subscription
         const { error: subError } = await supabaseClient
