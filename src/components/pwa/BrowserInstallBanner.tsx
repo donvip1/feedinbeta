@@ -14,12 +14,15 @@ export const BrowserInstallBanner = () => {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    // Check if running in Capacitor native app
+    const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.() || !!(window as any).Capacitor;
+    
     // Check if already installed (standalone mode)
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
       || (window.navigator as any).standalone === true;
     
-    if (isStandalone) {
-      return; // Already installed, don't show banner
+    if (isStandalone || isCapacitor) {
+      return; // Already installed or native app, don't show banner
     }
 
     // Check if dismissed this session
