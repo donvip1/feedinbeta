@@ -128,14 +128,12 @@ export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceCha
       
       if (error) {
         console.error('[SpaceChat] Error sending message:', error);
-        toast.error('Failed to send message');
       } else {
         console.log('[SpaceChat] Message sent successfully:', data);
         setNewMessage('');
       }
     } catch (error) {
       console.error('[SpaceChat] Error sending message:', error);
-      toast.error('Failed to send message');
     } finally {
       setSending(false);
     }

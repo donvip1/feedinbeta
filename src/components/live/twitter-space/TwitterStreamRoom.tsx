@@ -53,6 +53,7 @@ import { SpaceFeedbackModal } from './SpaceFeedbackModal';
 import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
 import { MentionText } from '../MentionText';
+import { ThreadedRepliesList } from './ThreadedRepliesList';
 import { PKBattleChallenge } from '../unified/PKBattleChallenge';
 import { shareUrls } from '@/lib/url-utils';
 
@@ -120,6 +121,7 @@ interface Reply {
   likes: number;
   liked_by_me: boolean;
   isGift?: boolean;
+  reply_to_id?: string | null;
 }
 
 const REACTION_EMOJIS = [
@@ -732,7 +734,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
     setReplyText('');
     setReplyingTo(null);
-    toast.success('Reply sent!');
   };
 
   const handleLikeMessage = (messageId: string) => {
@@ -1391,73 +1392,12 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
               <h3 className="text-zinc-400 text-sm font-semibold mb-4">
                 {replies.length > 0 ? `${replies.length} replies` : 'No replies yet'}
               </h3>
-              <div className="space-y-4">
-                {replies.map(reply => (
-                  <div key={reply.id} className="pb-4 border-b border-zinc-800">
-                    <div className="flex gap-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigateToProfile(reply.user_id);
-                        }}
-                        className="flex-shrink-0"
-                      >
-                        <img
-                          src={reply.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${reply.user}`}
-                          alt={reply.user}
-                          className="w-10 h-10 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
-                        />
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigateToProfile(reply.user_id);
-                            }}
-                            className="text-white font-semibold hover:underline"
-                          >
-                            {reply.user}
-                          </button>
-                          <span className="text-zinc-500 text-sm">{reply.handle}</span>
-                          <span className="text-zinc-500 text-sm">· {reply.time}</span>
-                        </div>
-                        {reply.isGift ? (
-                          <div className="mt-2 bg-gradient-to-r from-pink-500/20 to-purple-500/20 rounded-lg px-3 py-2 inline-block">
-                            <span className="text-pink-400 font-medium">{reply.text}</span>
-                          </div>
-                        ) : (
-                          <MentionText text={reply.text} className="text-zinc-300 text-sm mt-2 break-words" />
-                        )}
-                        <div className="flex gap-6 mt-3 text-zinc-500 text-xs">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleReplyToMessage(reply);
-                            }}
-                            className="flex items-center gap-1 hover:text-purple-400 transition-colors"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            <span>Reply</span>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleLikeMessage(reply.id);
-                            }}
-                            className={`flex items-center gap-1 transition-colors ${
-                              reply.liked_by_me ? 'text-red-500' : 'hover:text-red-400'
-                            }`}
-                          >
-                            <Heart className={`w-4 h-4 ${reply.liked_by_me ? 'fill-current' : ''}`} />
-                            <span>{reply.likes > 0 ? reply.likes : 'Like'}</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ThreadedRepliesList
+                replies={replies}
+                onReplyToMessage={handleReplyToMessage}
+                onLikeMessage={handleLikeMessage}
+                onNavigateToProfile={navigateToProfile}
+              />
             </div>
 
             {/* Reply Input */}
