@@ -7143,6 +7143,7 @@ export type Database = {
           name: string
           price: number
           stripe_price_id: string
+          subscription_credits: number | null
           updated_at: string | null
         }
         Insert: {
@@ -7155,6 +7156,7 @@ export type Database = {
           name: string
           price: number
           stripe_price_id: string
+          subscription_credits?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -7167,6 +7169,7 @@ export type Database = {
           name?: string
           price?: number
           stripe_price_id?: string
+          subscription_credits?: number | null
           updated_at?: string | null
         }
         Relationships: []
@@ -8001,6 +8004,8 @@ export type Database = {
           current_period_end: string
           current_period_start: string
           id: string
+          payment_provider: string | null
+          paystack_reference: string | null
           status: string
           stripe_customer_id: string
           stripe_subscription_id: string
@@ -8014,6 +8019,8 @@ export type Database = {
           current_period_end: string
           current_period_start: string
           id?: string
+          payment_provider?: string | null
+          paystack_reference?: string | null
           status: string
           stripe_customer_id: string
           stripe_subscription_id: string
@@ -8027,6 +8034,8 @@ export type Database = {
           current_period_end?: string
           current_period_start?: string
           id?: string
+          payment_provider?: string | null
+          paystack_reference?: string | null
           status?: string
           stripe_customer_id?: string
           stripe_subscription_id?: string

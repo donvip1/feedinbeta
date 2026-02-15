@@ -100,6 +100,22 @@ serve(async (req) => {
           console.error('Subscription upsert error:', subError);
           throw new Error('Failed to activate subscription');
         }
+
+        // Grant subscription credits to user
+        const { data: tier } = await supabaseClient
+          .from('subscription_tiers')
+          .select('subscription_credits, name')
+          .eq('id', metadata.tier_id)
+          .single();
+
+        if (tier?.subscription_credits && tier.subscription_credits > 0) {
+          await supabaseClient.rpc('add_credits_from_purchase', {
+            p_user_id: user.id,
+            p_amount: tier.subscription_credits,
+            p_description: `${tier.name} subscription credits`,
+            p_reference: reference,
+          });
+        }
       }
 
       return new Response(JSON.stringify({ success: true }), {
