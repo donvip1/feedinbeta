@@ -74,9 +74,9 @@ const Index = () => {
 
           <div className="bg-white rounded-3xl p-8 hover:scale-105 transition-transform duration-300">
             <Gift className="w-12 h-12 mb-4 text-pink-500 stroke-[2]" />
-            <h3 className="text-2xl font-bold text-black mb-3">500 Free Credits</h3>
+            <h3 className="text-2xl font-bold text-black mb-3">10 Free Credits</h3>
             <p className="text-gray-600">
-              Every new creator gets 500 credits on signup. Start gifting, trading, or going live immediately.
+              Every new creator gets 10 free credits on signup. Start gifting, trading, or going live immediately.
             </p>
           </div>
 
@@ -118,7 +118,7 @@ const Index = () => {
 
         {/* Social Proof */}
         <p className="text-center text-gray-400 text-sm mb-4">
-          🎁 500 free credits on signup · 💰 85% earnings on gifts · 🌍 No country restrictions
+          🎁 10 free credits on signup · 💰 85% earnings on gifts · 🌍 No country restrictions
         </p>
 
         {/* Footer */}
