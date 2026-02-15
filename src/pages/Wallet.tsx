@@ -20,6 +20,7 @@ import { BalanceCard } from '@/components/wallet/BalanceCard';
 import { PackageCard } from '@/components/wallet/PackageCard';
 import { SubscriptionCard } from '@/components/wallet/SubscriptionCard';
 import { TransactionList } from '@/components/wallet/TransactionList';
+import { WithdrawTab } from '@/components/wallet/WithdrawTab';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { useCachedQuery } from '@/hooks/useCachedQuery';
 import { useCurrency } from '@/context/CurrencyContext';
@@ -384,6 +385,7 @@ const Wallet = () => {
               currencyCode={currentCurrency}
               onSendClick={() => setIsSendModalOpen(true)}
               onBuyClick={() => setActiveTab('buy')}
+              onWithdrawClick={() => setActiveTab('withdraw')}
             />
 
             {/* Active Subscription Card */}
@@ -419,6 +421,9 @@ const Wallet = () => {
             )}
           </div>
         )}
+
+        {/* Withdraw Tab */}
+        {activeTab === 'withdraw' && <WithdrawTab />}
 
         {/* Gifts Tab */}
         {activeTab === 'gifts' && <GiftsTab />}

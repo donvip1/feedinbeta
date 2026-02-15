@@ -5656,6 +5656,7 @@ export type Database = {
           subscription_revenue: number | null
           total_earned: number
           updated_at: string | null
+          withdrawal_revenue: number | null
         }
         Insert: {
           ai_feature_revenue?: number | null
@@ -5670,6 +5671,7 @@ export type Database = {
           subscription_revenue?: number | null
           total_earned?: number
           updated_at?: string | null
+          withdrawal_revenue?: number | null
         }
         Update: {
           ai_feature_revenue?: number | null
@@ -5684,6 +5686,7 @@ export type Database = {
           subscription_revenue?: number | null
           total_earned?: number
           updated_at?: string | null
+          withdrawal_revenue?: number | null
         }
         Relationships: []
       }
@@ -7360,6 +7363,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_bank_accounts: {
+        Row: {
+          account_name: string
+          account_number: string
+          bank_code: string
+          bank_name: string
+          created_at: string
+          id: string
+          is_default: boolean
+          is_verified: boolean
+          recipient_code: string | null
+          user_id: string
+        }
+        Insert: {
+          account_name: string
+          account_number: string
+          bank_code: string
+          bank_name: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          is_verified?: boolean
+          recipient_code?: string | null
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          account_number?: string
+          bank_code?: string
+          bank_name?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          is_verified?: boolean
+          recipient_code?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_bans: {
         Row: {
           ban_type: string
@@ -8074,6 +8116,65 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          amount_ngn: number
+          bank_account_id: string | null
+          credit_amount: number
+          exchange_rate_used: number
+          failure_reason: string | null
+          id: string
+          net_credits: number
+          paystack_reference: string | null
+          paystack_transfer_code: string | null
+          platform_fee_credits: number
+          processed_at: string | null
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount_ngn?: number
+          bank_account_id?: string | null
+          credit_amount: number
+          exchange_rate_used?: number
+          failure_reason?: string | null
+          id?: string
+          net_credits?: number
+          paystack_reference?: string | null
+          paystack_transfer_code?: string | null
+          platform_fee_credits?: number
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount_ngn?: number
+          bank_account_id?: string | null
+          credit_amount?: number
+          exchange_rate_used?: number
+          failure_reason?: string | null
+          id?: string
+          net_credits?: number
+          paystack_reference?: string | null
+          paystack_transfer_code?: string | null
+          platform_fee_credits?: number
+          processed_at?: string | null
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_requests_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "user_bank_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       active_stories: {
@@ -8303,6 +8404,10 @@ export type Database = {
       create_conversation: { Args: { other_user_id: string }; Returns: string }
       decrement_viewer_count: {
         Args: { p_stream_id: string }
+        Returns: undefined
+      }
+      deduct_credits_for_withdrawal: {
+        Args: { p_amount: number; p_user_id: string }
         Returns: undefined
       }
       deduct_credits_safe: {
@@ -8985,6 +9090,10 @@ export type Database = {
           p_source_id?: string
           p_type: string
         }
+        Returns: undefined
+      }
+      refund_failed_withdrawal: {
+        Args: { p_amount: number; p_user_id: string; p_withdrawal_id: string }
         Returns: undefined
       }
       request_creator_payout: { Args: { p_amount: number }; Returns: Json }

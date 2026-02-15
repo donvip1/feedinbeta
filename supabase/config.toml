@@ -62,3 +62,6 @@ verify_jwt = true
 
 [functions.paystack-webhook]
 verify_jwt = false
+
+[functions.paystack-withdrawal]
+verify_jwt = true
