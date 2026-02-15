@@ -85,14 +85,15 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // 2. Use our tracked history stack
+    // 2. Use our tracked history stack (primary method)
     const stack = historyStackRef.current;
     if (stack.length > 1) {
-      // Pop current page
+      // Pop current page off the stack
       stack.pop();
       const previousPath = stack[stack.length - 1];
       if (previousPath && previousPath !== location.pathname) {
-        navigate(previousPath, { replace: true });
+        // Use regular navigate (not replace) so browser history stays intact
+        navigate(previousPath);
         return;
       }
     }
@@ -103,8 +104,8 @@ export const NavigationProvider = ({ children }: { children: React.ReactNode }) 
       return;
     }
 
-    // 4. Fallback
-    navigate(fallback || deriveFallback(location.pathname), { replace: true });
+    // 4. Fallback to derived parent route
+    navigate(fallback || deriveFallback(location.pathname));
   }, [navigate, location]);
 
   const isLiveStreamPage = useMemo(() => {
