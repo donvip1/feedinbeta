@@ -8049,8 +8049,8 @@ export type Database = {
           payment_provider: string | null
           paystack_reference: string | null
           status: string
-          stripe_customer_id: string
-          stripe_subscription_id: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
           tier_id: string
           updated_at: string | null
           user_id: string
@@ -8064,8 +8064,8 @@ export type Database = {
           payment_provider?: string | null
           paystack_reference?: string | null
           status: string
-          stripe_customer_id: string
-          stripe_subscription_id: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           tier_id: string
           updated_at?: string | null
           user_id: string
@@ -8079,8 +8079,8 @@ export type Database = {
           payment_provider?: string | null
           paystack_reference?: string | null
           status?: string
-          stripe_customer_id?: string
-          stripe_subscription_id?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
           tier_id?: string
           updated_at?: string | null
           user_id?: string
