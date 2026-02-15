@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Banknote, Plus, Loader2, Trash2, AlertCircle } from 'lucide-react';
+import { Banknote, Plus, Loader2, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
 import { BankAccountForm } from './BankAccountForm';
 import { format } from 'date-fns';
 import { useCurrency } from '@/context/CurrencyContext';
@@ -40,17 +40,54 @@ export const WithdrawTab: React.FC = () => {
     enabled: !!user,
   });
 
+  // Auto-select default bank account
+  useEffect(() => {
+    if (bankAccounts && bankAccounts.length > 0 && !selectedAccountId) {
+      const defaultAcc = bankAccounts.find((a: any) => a.is_default) || bankAccounts[0];
+      setSelectedAccountId(defaultAcc.id);
+    }
+  }, [bankAccounts, selectedAccountId]);
+
+  // Realtime subscription for withdrawal status changes
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('withdrawal-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'withdrawal_requests',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const updated = payload.new as any;
+          if (updated.status === 'completed') {
+            toast.success(`Withdrawal of ${updated.credit_amount} credits completed!`);
+          } else if (updated.status === 'failed') {
+            toast.error(`Withdrawal failed: ${updated.failure_reason || 'Unknown error'}. Credits refunded.`);
+          }
+          queryClient.invalidateQueries({ queryKey: ['withdrawals'] });
+          queryClient.invalidateQueries({ queryKey: ['user-credits'] });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user, queryClient]);
+
   const { data: withdrawals } = useQuery({
     queryKey: ['withdrawals', user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('withdrawal_requests')
+        .from('withdrawal_requests' as any)
         .select('*, user_bank_accounts(bank_name, account_number)')
         .eq('user_id', user?.id)
         .order('requested_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      return data;
+      return data as any[];
     },
     enabled: !!user,
   });

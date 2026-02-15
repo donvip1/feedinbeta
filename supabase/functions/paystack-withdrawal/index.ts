@@ -9,6 +9,7 @@ const PAYSTACK_BASE = 'https://api.paystack.co';
 const CREDITS_PER_USD = 100;
 const PLATFORM_FEE_PERCENT = 30;
 const MIN_WITHDRAWAL_CREDITS = 1000;
+const COOLDOWN_MINUTES = 5; // Rate limit: one withdrawal per 5 minutes
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -57,6 +58,14 @@ Deno.serve(async (req) => {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      // Validate input format
+      if (!/^\d{10}$/.test(account_number)) {
+        return new Response(JSON.stringify({ error: 'Account number must be exactly 10 digits' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const res = await fetch(
         `${PAYSTACK_BASE}/bank/resolve?account_number=${account_number}&bank_code=${bank_code}`,
         { headers: { Authorization: `Bearer ${paystackSecretKey}` } },
@@ -72,6 +81,33 @@ Deno.serve(async (req) => {
       const { bank_code, bank_name, account_number, account_name } = params;
       if (!bank_code || !bank_name || !account_number || !account_name) {
         return new Response(JSON.stringify({ error: 'All bank fields required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Check for duplicate account
+      const { data: existing } = await serviceClient
+        .from('user_bank_accounts')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('account_number', account_number)
+        .eq('bank_code', bank_code)
+        .maybeSingle();
+
+      if (existing) {
+        return new Response(JSON.stringify({ error: 'This bank account is already saved' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Limit to 5 bank accounts per user
+      const { count } = await serviceClient
+        .from('user_bank_accounts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id);
+
+      if ((count ?? 0) >= 5) {
+        return new Response(JSON.stringify({ error: 'Maximum 5 bank accounts allowed' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -107,13 +143,41 @@ Deno.serve(async (req) => {
     if (action === 'request-withdrawal') {
       const { credit_amount, bank_account_id } = params;
 
-      if (!credit_amount || credit_amount < MIN_WITHDRAWAL_CREDITS) {
-        return new Response(JSON.stringify({ error: `Minimum withdrawal is ${MIN_WITHDRAWAL_CREDITS} credits` }), {
+      // Validate credit_amount is a positive integer
+      if (!credit_amount || !Number.isInteger(credit_amount) || credit_amount <= 0) {
+        return new Response(JSON.stringify({ error: 'Invalid credit amount' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Get bank account
+      if (credit_amount < MIN_WITHDRAWAL_CREDITS) {
+        return new Response(JSON.stringify({ error: `Minimum withdrawal is ${MIN_WITHDRAWAL_CREDITS} credits (~$9.99)` }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!bank_account_id) {
+        return new Response(JSON.stringify({ error: 'Please select a bank account' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Rate limit: check for recent pending/processing withdrawals
+      const cooldownTime = new Date(Date.now() - COOLDOWN_MINUTES * 60 * 1000).toISOString();
+      const { data: recentWithdrawals } = await serviceClient
+        .from('withdrawal_requests')
+        .select('id')
+        .eq('user_id', user.id)
+        .in('status', ['pending', 'processing'])
+        .gte('requested_at', cooldownTime);
+
+      if (recentWithdrawals && recentWithdrawals.length > 0) {
+        return new Response(JSON.stringify({ error: `Please wait ${COOLDOWN_MINUTES} minutes between withdrawal requests` }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Get bank account (verify ownership)
       const { data: bankAccount, error: bankErr } = await serviceClient
         .from('user_bank_accounts')
         .select('*')
@@ -143,28 +207,34 @@ Deno.serve(async (req) => {
       const amountNgn = Math.round(netUsd * ngnRate * 100) / 100;
       const amountKobo = Math.round(amountNgn * 100);
 
-      // Deduct credits atomically
+      if (amountKobo < 100) {
+        return new Response(JSON.stringify({ error: 'Amount too small to transfer' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Deduct credits atomically (checks balance inside)
       const { error: deductErr } = await serviceClient.rpc('deduct_credits_for_withdrawal', {
         p_user_id: user.id,
         p_amount: credit_amount,
       });
 
       if (deductErr) {
-        return new Response(JSON.stringify({ error: deductErr.message }), {
+        console.error('Deduction error:', deductErr);
+        return new Response(JSON.stringify({ error: deductErr.message || 'Insufficient credits' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Record platform fee revenue
-      await serviceClient.rpc('increment_platform_wallet', {
-        column_name: 'withdrawal_revenue',
-        amount: platformFeeCredits,
-      }).catch(() => {
-        // If RPC doesn't exist, update directly
-        serviceClient.from('platform_wallet').update({
-          withdrawal_revenue: platformFeeCredits,
-        }).eq('id', (serviceClient.from('platform_wallet').select('id').limit(1)));
-      });
+      // Record platform fee revenue atomically
+      try {
+        await serviceClient.rpc('increment_platform_wallet', {
+          column_name: 'withdrawal_revenue',
+          amount: platformFeeCredits,
+        });
+      } catch (e) {
+        console.error('Platform wallet update error (non-blocking):', e);
+      }
 
       // Create or reuse Paystack transfer recipient
       let recipientCode = bankAccount.recipient_code;
@@ -186,13 +256,14 @@ Deno.serve(async (req) => {
         const recipientData = await recipientRes.json();
 
         if (!recipientData.status) {
-          // Refund on failure
+          // Refund on recipient creation failure
           await serviceClient.rpc('refund_failed_withdrawal', {
             p_user_id: user.id,
             p_amount: credit_amount,
             p_withdrawal_id: null,
           });
-          return new Response(JSON.stringify({ error: 'Failed to create transfer recipient', details: recipientData }), {
+          console.error('Recipient creation failed:', recipientData);
+          return new Response(JSON.stringify({ error: 'Failed to create transfer recipient. Credits refunded.' }), {
             status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           });
         }
@@ -204,8 +275,10 @@ Deno.serve(async (req) => {
           .eq('id', bank_account_id);
       }
 
+      // Generate unique reference
+      const reference = `wdr_${user.id.slice(0, 8)}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+
       // Initiate Paystack transfer
-      const reference = `wdr_${user.id.slice(0, 8)}_${Date.now()}`;
       const transferRes = await fetch(`${PAYSTACK_BASE}/transfer`, {
         method: 'POST',
         headers: {
@@ -227,6 +300,7 @@ Deno.serve(async (req) => {
         }),
       });
       const transferData = await transferRes.json();
+      console.log('Transfer response:', JSON.stringify(transferData));
 
       // Create withdrawal request record
       const withdrawalStatus = transferData.status ? 'processing' : 'failed';
@@ -248,19 +322,41 @@ Deno.serve(async (req) => {
         .select()
         .single();
 
+      if (wdErr) {
+        console.error('Withdrawal record error:', wdErr);
+      }
+
       if (!transferData.status) {
-        // Refund credits on transfer failure
+        // Refund credits on transfer initiation failure
         await serviceClient.rpc('refund_failed_withdrawal', {
           p_user_id: user.id,
           p_amount: credit_amount,
           p_withdrawal_id: withdrawal?.id || null,
         });
-        return new Response(JSON.stringify({ error: 'Transfer failed', details: transferData.message }), {
+        return new Response(JSON.stringify({ 
+          error: 'Transfer could not be initiated. Credits have been refunded.',
+          details: transferData.message,
+        }), {
           status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
       return new Response(JSON.stringify({ success: true, withdrawal }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ─── GET WITHDRAWAL STATUS ───
+    if (action === 'get-withdrawals') {
+      const { data: withdrawals, error } = await serviceClient
+        .from('withdrawal_requests')
+        .select('*, user_bank_accounts(bank_name, account_number)')
+        .eq('user_id', user.id)
+        .order('requested_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      return new Response(JSON.stringify({ withdrawals }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
