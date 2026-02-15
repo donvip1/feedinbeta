@@ -8221,6 +8221,15 @@ export type Database = {
       }
     }
     Functions: {
+      add_credits_from_purchase: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_reference?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       admin_grant_credits: {
         Args: { credit_amount: number; reason?: string; target_user_id: string }
         Returns: Json
