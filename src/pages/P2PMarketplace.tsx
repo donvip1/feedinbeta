@@ -113,7 +113,7 @@ const P2PMarketplace = () => {
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm border-b border-border/50">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/wallet')} className="h-8 w-8">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/wallet')} className="h-8 w-8">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <h1 className="text-lg font-semibold">Market</h1>
