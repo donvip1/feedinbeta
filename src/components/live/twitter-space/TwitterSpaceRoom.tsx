@@ -1014,56 +1014,44 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   return (
     <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-        <button onClick={handleMinimize} className="p-2">
+      <div className="px-3 py-2.5 border-b border-zinc-800 flex items-center gap-2">
+        <button onClick={handleMinimize} className="p-1.5">
           <ArrowLeft className="w-5 h-5 text-white" />
         </button>
-        <h1 className="text-white font-bold text-base flex-1 text-center truncate px-2">{space?.title}</h1>
-        <div className="flex items-center gap-2">
+        <h1 className="text-white font-bold text-sm flex-1 truncate">{space?.title}</h1>
+        <div className="flex items-center gap-1">
           {isHost && raisedHandsCount > 0 && (
             <button 
               onClick={() => setShowSpeakerQueue(true)}
-              className="p-2 relative"
+              className="p-1.5 relative"
             >
-              <Hand className="w-5 h-5 text-amber-400" />
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+              <Hand className="w-4.5 h-4.5 text-amber-400" />
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
                 {raisedHandsCount}
               </span>
             </button>
           )}
-          {/* Recording button - Host only */}
           {isHost && (
             <button
               onClick={handleRecordingToggle}
               disabled={recordingLoading}
               className={cn(
-                "p-2 rounded-full transition-all",
-                isRecording 
-                  ? "bg-red-500/20 border border-red-500" 
-                  : "hover:bg-zinc-800"
+                "p-1.5 rounded-full transition-all",
+                isRecording ? "text-red-500" : "text-zinc-400 hover:text-white"
               )}
               title={isRecording ? "Stop Recording" : "Start Recording"}
             >
-              <Circle 
-                className={cn(
-                  "w-5 h-5 transition-colors",
-                  isRecording 
-                    ? "text-red-500 fill-red-500 animate-pulse" 
-                    : "text-zinc-400"
-                )} 
-              />
+              <Circle className={cn("w-4 h-4", isRecording && "fill-red-500 animate-pulse")} />
             </button>
           )}
-          {/* End/Leave button */}
+          <button onClick={() => setShowSettings(true)} className="p-1.5 text-zinc-400 hover:text-white">
+            <Settings className="w-4.5 h-4.5" />
+          </button>
           <button
             onClick={handleLeave}
-            className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-full transition-colors"
+            className="ml-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-full transition-colors"
           >
             {isHost ? 'End' : 'Leave'}
-          </button>
-          {/* Settings button */}
-          <button onClick={() => setShowSettings(true)} className="p-2">
-            <Settings className="w-5 h-5 text-white" />
           </button>
         </div>
       </div>
@@ -1228,53 +1216,43 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       </AnimatePresence>
 
       {/* BOTTOM CONTROLS */}
-      <div className="px-4 py-4 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
+      <div className="px-4 py-3 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
         <div className="flex items-center justify-between max-w-md mx-auto">
-          {/* Mic / Request Button */}
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col items-center gap-1">
-              <button
-                onClick={handleToggleMute}
-                className={`w-14 h-14 rounded-full border flex items-center justify-center transition-all ${
-                  canSpeak
-                    ? isMicOn
-                      ? 'bg-purple-600 border-purple-500 text-white'
-                      : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                    : hasRaisedHand
-                      ? 'bg-amber-600 border-amber-500 text-white'
-                      : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
-                }`}
-              >
-                {canSpeak ? (
-                  isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
-                ) : (
-                  <Hand className="w-6 h-6" />
-                )}
-              </button>
-              <span className="text-xs text-zinc-500">
-                {canSpeak ? (isMicOn ? 'Mute' : 'Unmute') : hasRaisedHand ? 'Pending' : 'Request'}
-              </span>
-            </div>
+          {/* Left: Mic / Request */}
+          <div className="flex flex-col items-center gap-0.5">
+            <button
+              onClick={handleToggleMute}
+              className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${
+                canSpeak
+                  ? isMicOn
+                    ? 'bg-purple-600 border-purple-500 text-white'
+                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                  : hasRaisedHand
+                    ? 'bg-amber-600 border-amber-500 text-white'
+                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+              }`}
+            >
+              {canSpeak ? (
+                isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />
+              ) : (
+                <Hand className="w-5 h-5" />
+              )}
+            </button>
+            <span className="text-[10px] text-zinc-500">
+              {canSpeak ? (isMicOn ? 'Mute' : 'Unmute') : hasRaisedHand ? 'Pending' : 'Request'}
+            </span>
+          </div>
 
-            {/* Volume Control */}
-            <div className="relative flex flex-col items-center gap-1">
+          {/* Center: Action row */}
+          <div className="flex items-center gap-1">
+            {/* Volume */}
+            <div className="relative">
               <button
                 onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                  volumeLevel > 50
-                    ? 'bg-green-600/20 text-green-400'
-                    : volumeLevel > 0
-                    ? 'bg-yellow-600/20 text-yellow-400'
-                    : 'bg-transparent text-zinc-500'
-                }`}
+                className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
               >
                 {volumeLevel > 50 ? <Volume2 className="w-5 h-5" /> : volumeLevel > 0 ? <Volume1 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
               </button>
-              <span className="text-xs text-zinc-500">
-                {volumeLevel > 50 ? 'Speaker' : volumeLevel > 0 ? 'Earpiece' : 'Muted'}
-              </span>
-
-              {/* Volume Slider Popover */}
               <AnimatePresence>
                 {showVolumeSlider && (
                   <motion.div
@@ -1282,7 +1260,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.9 }}
                     transition={{ duration: 0.2 }}
-                    className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-zinc-800 border border-zinc-700 rounded-2xl p-4 w-56 shadow-xl z-50"
+                    className="absolute bottom-14 left-1/2 -translate-x-1/2 bg-zinc-800 border border-zinc-700 rounded-2xl p-4 w-56 shadow-xl z-50"
                   >
                     <div className="flex items-center justify-between mb-3">
                       <span className="text-white text-sm font-semibold">Volume</span>
@@ -1318,65 +1296,61 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 )}
               </AnimatePresence>
             </div>
-          </div>
 
-          {/* Center Icons */}
-          <div className="flex items-center gap-2">
+            {/* Guests */}
             <button
               onClick={() => setView('guests')}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
+              className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
             >
               <Users className="w-5 h-5" />
             </button>
 
-            {/* Master Mute Button - Host Only */}
-            {isHost && (
-              <button
-                onClick={handleMuteAll}
-                className={`p-2 transition-colors ${
-                  allMuted ? 'text-red-400 hover:text-red-300' : 'text-zinc-400 hover:text-white'
-                }`}
-                title={allMuted ? 'Allow unmute' : 'Mute all'}
-              >
-                {allMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
-              </button>
-            )}
-
-            {/* Gift Button */}
+            {/* Gift */}
             <button
               onClick={() => setShowGiftModal(true)}
-              className={`p-2 transition-colors ${
-                isHost 
-                  ? 'text-teal-400 hover:text-teal-300' 
-                  : 'text-amber-400 hover:text-amber-300'
-              }`}
+              className="p-2.5 rounded-full text-amber-400 hover:text-amber-300 hover:bg-zinc-800/50 transition-all"
             >
               <Gift className="w-5 h-5" />
             </button>
 
+            {/* Reactions */}
             <button
               onClick={() => setShowReactions(true)}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
+              className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
             >
               <Heart className="w-5 h-5" />
             </button>
 
+            {/* Share */}
             <button
               onClick={() => setShowShare(true)}
-              className="p-2 text-zinc-400 hover:text-white transition-colors"
+              className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
             >
               <Share2 className="w-5 h-5" />
             </button>
+
+            {/* Mute All - Host Only */}
+            {isHost && (
+              <button
+                onClick={handleMuteAll}
+                className={`p-2.5 rounded-full transition-all hover:bg-zinc-800/50 ${
+                  allMuted ? 'text-red-400' : 'text-zinc-400 hover:text-white'
+                }`}
+                title={allMuted ? 'Allow unmute' : 'Mute all'}
+              >
+                {allMuted ? <VolumeX className="w-5 h-5" /> : <Speaker className="w-5 h-5" />}
+              </button>
+            )}
           </div>
 
-          {/* Chat Button with Badge */}
+          {/* Right: Chat */}
           <button
             onClick={() => setShowChat(true)}
-            className="relative px-4 py-2 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center gap-2 transition-colors"
+            className="relative w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center justify-center transition-colors"
           >
             <MessageCircle className="w-5 h-5 text-white" />
             {unreadMessages > 0 && (
-              <span className="bg-white text-purple-600 text-xs px-1.5 py-0.5 font-bold rounded-full">
+              <span className="absolute -top-1 -right-1 bg-white text-purple-600 text-[10px] min-w-[18px] h-[18px] px-1 font-bold rounded-full flex items-center justify-center">
                 {unreadMessages}
               </span>
             )}
@@ -1640,6 +1614,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           spaceId={spaceId}
           onClose={() => setShowSpeakerQueue(false)}
           isHost={isHost}
+          onSpeakerUpdate={fetchSpeakers}
         />
       )}
 
