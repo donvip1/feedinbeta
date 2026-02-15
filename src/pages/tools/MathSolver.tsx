@@ -46,12 +46,8 @@ const MathSolver = () => {
     setSolution('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+      const { fetchAIAgent } = await import('@/utils/aiAgentFetch');
+      const response = await fetchAIAgent({
         body: JSON.stringify({
           messages: [{ role: 'user', content: problem }],
           systemPrompt: `You are an expert math tutor. Solve math problems step by step with clear explanations.

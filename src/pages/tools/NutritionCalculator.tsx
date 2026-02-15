@@ -83,13 +83,8 @@ const NutritionCalculator = () => {
     try {
       const foodList = foods.map(f => `${f.quantity} of ${f.name}`).join(', ');
       
-      const session = await supabase.auth.getSession();
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+      const { fetchAIAgent } = await import('@/utils/aiAgentFetch');
+      const response = await fetchAIAgent({
         body: JSON.stringify({
           messages: [
             {

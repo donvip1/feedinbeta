@@ -137,12 +137,8 @@ const AIAgent = () => {
         content: messageText,
       });
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+      const { fetchAIAgent } = await import('@/utils/aiAgentFetch');
+      const response = await fetchAIAgent({
         body: JSON.stringify({ 
           messages: currentMessages.map(m => ({ role: m.role, content: m.content })),
           systemPrompt: SYSTEM_PROMPT,
