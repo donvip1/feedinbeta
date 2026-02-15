@@ -121,12 +121,8 @@ Generate a complete, well-structured ${essayTypes.find(t => t.value === essayTyp
 with approximately ${wordCount} words.`;
 
       // Use streaming for better UX
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+      const { fetchAIAgent } = await import('@/utils/aiAgentFetch');
+      const response = await fetchAIAgent({
         body: JSON.stringify({
           messages: [{ role: 'user', content: userPrompt }],
           systemPrompt,

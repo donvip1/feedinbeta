@@ -57,12 +57,8 @@ const Paraphraser = () => {
     try {
       const modeInfo = MODES.find(m => m.id === mode);
       
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-agent`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-        },
+      const { fetchAIAgent } = await import('@/utils/aiAgentFetch');
+      const response = await fetchAIAgent({
         body: JSON.stringify({
           messages: [{ role: 'user', content: inputText }],
           systemPrompt: `You are a professional paraphrasing assistant. Rewrite the given text in a ${modeInfo?.name.toLowerCase()} style.
