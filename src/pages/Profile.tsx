@@ -827,21 +827,15 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Name & Username - Centered */}
+          {/* Name & Username & Role - Centered */}
           <div className="text-center mb-4">
-            <div className="flex items-center justify-center gap-2 flex-wrap mb-1">
-              <h1 className="text-2xl font-bold text-foreground">
-                {profile.display_name || 'Unknown'}
-              </h1>
-              <RolePlanBadge userId={profile.id} />
-              {profile.is_premium && !profile.id && (
-                <Badge className="bg-gradient-to-r from-yellow-500 to-orange-500 text-white border-0 shadow-lg">
-                  <Crown className="w-3 h-3 mr-1" />
-                  Premium
-                </Badge>
-              )}
-            </div>
+            <h1 className="text-2xl font-bold text-foreground mb-0.5">
+              {profile.display_name || 'Unknown'}
+            </h1>
             <p className="text-muted-foreground text-sm">@{profile.username || 'user'}</p>
+            <div className="flex justify-center mt-1.5">
+              <RolePlanBadge userId={profile.id} />
+            </div>
             {!isOwnProfile && isFollowingMe && (
               <p className="text-xs text-muted-foreground mt-1">Following you</p>
             )}
