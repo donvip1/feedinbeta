@@ -1,20 +1,19 @@
-import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Coins, Gift, TrendingUp, ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { BottomNav } from "@/components/navigation/BottomNav";
 import { PackageCard } from "@/components/wallet/PackageCard";
 import { useCachedQuery } from "@/hooks/useCachedQuery";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/shared/PageHeader";
+import { usePaystack } from "@/hooks/usePaystack";
 
 const Credits = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [loading, setLoading] = useState<string | null>(null);
+  const { loading, initializePayment } = usePaystack({ type: 'credits' });
 
   const { data: packages, isLoading: packagesLoading } = useCachedQuery({
     cacheKey: "credit_packages",
@@ -59,36 +58,8 @@ const Credits = () => {
     enabled: !!user,
   });
 
-  const handlePurchase = async (packageId: string, priceId: string) => {
-    try {
-      setLoading(packageId);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        navigate("/auth");
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke("stripe-checkout", {
-        body: {
-          type: "credits",
-          priceId: priceId,
-          successUrl: `${window.location.origin}/credits?success=true`,
-          cancelUrl: `${window.location.origin}/credits?canceled=true`,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.url) {
-        window.location.href = data.url;
-      }
-    } catch (error: any) {
-      console.error("Error:", error);
-      toast.error(error.message || "Failed to purchase credits");
-    } finally {
-      setLoading(null);
-    }
+  const handlePurchase = async (packageId: string) => {
+    await initializePayment(packageId);
   };
 
   return (
@@ -168,7 +139,7 @@ const Credits = () => {
                 promotionLabel={pkg.promotion_label}
                 promotionActive={pkg.promotion_active}
                 discountPercentage={pkg.discount_percentage}
-                onPurchase={() => handlePurchase(pkg.id, pkg.stripe_price_id)}
+                onPurchase={() => handlePurchase(pkg.id)}
               />
             ))}
           </div>
