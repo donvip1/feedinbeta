@@ -96,7 +96,7 @@ export default function Welcome() {
               className="w-full h-12 text-base"
               size="lg"
             >
-              {sharedContent ? 'Sign Up to View' : 'Claim Your 500 Free Credits'}
+              {sharedContent ? 'Sign Up to View' : 'Claim Your 10 Free Credits'}
             </Button>
             <Button 
               onClick={() => navigate('/auth')} 
@@ -109,7 +109,7 @@ export default function Welcome() {
           </div>
 
           <p className="text-xs text-muted-foreground pt-4">
-            🎁 500 free credits · 💰 85% on gifts · 🌍 Works everywhere
+            🎁 10 free credits · 💰 85% on gifts · 🌍 Works everywhere
           </p>
         </div>
       </div>
