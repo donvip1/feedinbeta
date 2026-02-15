@@ -1,17 +1,15 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Users, Phone, Coins, Shield, Sparkles, LogOut } from 'lucide-react';
+import { Coins, Zap, Users, Gift, Globe, TrendingUp } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
-import feedinIcon from '@/assets/feedin-icon.png';
 import { useEffect, useState } from 'react';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
   const [isRedirecting, setIsRedirecting] = useState(false);
 
-  // Redirect authenticated users to feed immediately
   useEffect(() => {
     if (!loading && user) {
       setIsRedirecting(true);
@@ -19,8 +17,7 @@ const Index = () => {
     }
   }, [loading, user, navigate]);
 
-  // Show loading spinner while auth state is being determined OR while redirecting
-  if (loading || isRedirecting) {
+  if (loading || isRedirecting || user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-black">
         <div className="animate-pulse">
@@ -30,18 +27,6 @@ const Index = () => {
     );
   }
 
-  // If user exists but hasn't redirected yet, show loading
-  if (user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-black">
-        <div className="animate-pulse">
-          <img src={feedinLogo} alt="feedin" className="w-40 h-40" />
-        </div>
-      </div>
-    );
-  }
-
-  // Only show sign up/sign in page for unauthenticated users
   return (
     <div className="min-h-screen bg-black text-white overflow-y-auto">
       <main className="container mx-auto px-4 py-16">
@@ -50,64 +35,64 @@ const Index = () => {
           <div className="flex justify-center mb-6">
             <img src={feedinLogo} alt="feedin" className="w-48 h-48" />
           </div>
-          <p className="text-xl text-gray-400">
-            Connect with friends, join groups, and chat with people worldwide
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-pink-500 to-blue-500 bg-clip-text text-transparent">
+            Start Earning Today
+          </h1>
+          <p className="text-xl text-gray-300 mb-2">
+            No followers needed. No payment restrictions. No waiting.
+          </p>
+          <p className="text-gray-500">
+            Go live, get gifted, cash out — from anywhere in the world.
           </p>
         </div>
 
-        {/* Features Grid */}
+        {/* Value Props Grid */}
         <div className="grid md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-12">
-          {/* Chat & Connect */}
           <div className="bg-white rounded-3xl p-8 hover:scale-105 transition-transform duration-300">
-            <MessageCircle className="w-12 h-12 mb-4 text-pink-500 stroke-[2]" />
-            <h3 className="text-2xl font-bold text-black mb-3">Chat & Connect</h3>
+            <Zap className="w-12 h-12 mb-4 text-pink-500 stroke-[2]" />
+            <h3 className="text-2xl font-bold text-black mb-3">Go Live, Get Paid</h3>
             <p className="text-gray-600">
-              Send messages, share media, and stay connected with friends
+              Start streaming instantly. Viewers send gifts and you earn 85% — no minimums, no delays.
             </p>
           </div>
 
-          {/* Join Groups */}
           <div className="bg-white rounded-3xl p-8 hover:scale-105 transition-transform duration-300">
-            <Users className="w-12 h-12 mb-4 text-purple-500 stroke-[2]" />
-            <h3 className="text-2xl font-bold text-black mb-3">Join Groups</h3>
+            <Coins className="w-12 h-12 mb-4 text-purple-500 stroke-[2]" />
+            <h3 className="text-2xl font-bold text-black mb-3">Earn & Cash Out</h3>
             <p className="text-gray-600">
-              Explore groups for games, flirt, romance, advice, and more
+              No geographic restrictions. No high withdrawal fees. Trade credits and cash out your way.
             </p>
           </div>
 
-          {/* Voice & Video Calls */}
           <div className="bg-white rounded-3xl p-8 hover:scale-105 transition-transform duration-300">
-            <Phone className="w-12 h-12 mb-4 text-cyan-500 stroke-[2]" />
-            <h3 className="text-2xl font-bold text-black mb-3">Voice & Video Calls</h3>
+            <Users className="w-12 h-12 mb-4 text-cyan-500 stroke-[2]" />
+            <h3 className="text-2xl font-bold text-black mb-3">Build Your Community</h3>
             <p className="text-gray-600">
-              Make crystal clear voice and video calls to your friends
+              Create fan groups, host audio spaces, and grow your audience with zero algorithm bias.
             </p>
           </div>
 
-          {/* Credit System */}
           <div className="bg-white rounded-3xl p-8 hover:scale-105 transition-transform duration-300">
-            <Coins className="w-12 h-12 mb-4 text-pink-500 stroke-[2]" />
-            <h3 className="text-2xl font-bold text-black mb-3">Credit System</h3>
+            <Gift className="w-12 h-12 mb-4 text-pink-500 stroke-[2]" />
+            <h3 className="text-2xl font-bold text-black mb-3">500 Free Credits</h3>
             <p className="text-gray-600">
-              Buy credits, earn daily rewards, and trade with other users
+              Every new creator gets 500 credits on signup. Start gifting, trading, or going live immediately.
             </p>
           </div>
 
-          {/* Safe & Secure */}
           <div className="bg-white rounded-3xl p-8 hover:scale-105 transition-transform duration-300">
-            <Shield className="w-12 h-12 mb-4 text-purple-500 stroke-[2]" />
-            <h3 className="text-2xl font-bold text-black mb-3">Safe & Secure</h3>
+            <Globe className="w-12 h-12 mb-4 text-purple-500 stroke-[2]" />
+            <h3 className="text-2xl font-bold text-black mb-3">No Barriers</h3>
             <p className="text-gray-600">
-              Auto-moderation keeps the community safe and friendly
+              Works everywhere. No country restrictions, no payment gatekeeping, no verification hassle.
             </p>
           </div>
 
-          {/* Premium Features */}
           <div className="bg-white rounded-3xl p-8 hover:scale-105 transition-transform duration-300">
-            <Sparkles className="w-12 h-12 mb-4 text-cyan-500 stroke-[2]" />
-            <h3 className="text-2xl font-bold text-black mb-3">Premium Features</h3>
+            <TrendingUp className="w-12 h-12 mb-4 text-cyan-500 stroke-[2]" />
+            <h3 className="text-2xl font-bold text-black mb-3">Grow & Earn More</h3>
             <p className="text-gray-600">
-              Unlock more friends, groups, and exclusive benefits
+              Creator leaderboards, regional discovery, and smart tools to boost your earnings over time.
             </p>
           </div>
         </div>
@@ -119,7 +104,7 @@ const Index = () => {
             size="lg"
             className="bg-gradient-to-r from-pink-500 to-blue-500 hover:shadow-[0_0_30px_rgba(236,72,153,0.5)] text-white text-lg px-12 py-6 rounded-full font-semibold"
           >
-            Get Started
+            Start Earning Today
           </Button>
           <Button
             onClick={() => navigate('/auth')}
@@ -130,6 +115,11 @@ const Index = () => {
             Sign In
           </Button>
         </div>
+
+        {/* Social Proof */}
+        <p className="text-center text-gray-400 text-sm mb-4">
+          🎁 500 free credits on signup · 💰 85% earnings on gifts · 🌍 No country restrictions
+        </p>
 
         {/* Footer */}
         <p className="text-center text-gray-500 text-sm">
