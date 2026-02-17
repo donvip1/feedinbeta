@@ -123,6 +123,7 @@ const AIToolsHub = lazy(() => import("./pages/AIToolsHub"));
 const AIAgent = lazy(() => import("./pages/AIAgent"));
 const AdBuilder = lazy(() => import("./pages/AdBuilder"));
 const MyAds = lazy(() => import("./pages/MyAds"));
+const StarredMessages = lazy(() => import("./pages/StarredMessages"));
 
 // Lazy load ALL AI tools - reduces memory during build
 const BackgroundRemover = lazy(() => import("./pages/tools/BackgroundRemover"));
@@ -296,6 +297,7 @@ const App = () => {
             
             {/* Social */}
             <Route path="/messages" element={<Messages />} />
+            <Route path="/messages/starred" element={<StarredMessages />} />
             <Route path="/friends" element={<Friends />} />
             <Route path="/call" element={<Call />} />
             <Route path="/call/join/:inviteCode" element={<CallInvite />} />
@@ -375,6 +377,9 @@ const App = () => {
             <Route path="/ai/tools/jpg-to-pdf" element={<ImagesToPDF />} />
             <Route path="/ai/tools/humanize" element={<HumanizeAI />} />
             
+            {/* Certificate Verification (public) */}
+            <Route path="/verify/:certificateNumber" element={<CertificateVerify />} />
+
             {/* Groups */}
             <Route path="/groups" element={<Groups />} />
             <Route path="/groups/:groupId" element={<GroupDetail />} />
