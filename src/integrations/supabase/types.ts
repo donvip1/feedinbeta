@@ -8415,8 +8415,8 @@ export type Database = {
       add_credits_from_purchase: {
         Args: {
           p_amount: number
-          p_description?: string
-          p_reference?: string
+          p_description: string
+          p_reference: string
           p_user_id: string
         }
         Returns: undefined
@@ -8433,10 +8433,9 @@ export type Database = {
         Args: { p_amount: number; p_reason?: string; p_user_id: string }
         Returns: Json
       }
-      admin_withdraw_from_profits: {
-        Args: { p_amount: number; p_reason?: string }
-        Returns: boolean
-      }
+      admin_withdraw_from_profits:
+        | { Args: { p_amount: number; p_reason?: string }; Returns: boolean }
+        | { Args: { p_amount: number; p_reason?: string }; Returns: Json }
       admin_withdraw_to_team_wallet: {
         Args: { p_amount: number; p_reason?: string }
         Returns: Json
@@ -8466,6 +8465,7 @@ export type Database = {
         Args: { target_user_id: string }
         Returns: boolean
       }
+      can_mint_credits: { Args: never; Returns: boolean }
       can_request_payout: { Args: { p_user_id: string }; Returns: Json }
       can_send_friend_request: {
         Args: { target_user_id: string }
@@ -8486,6 +8486,7 @@ export type Database = {
         Args: { field_name: string; target_user_id: string }
         Returns: boolean
       }
+      can_withdraw_from_wallet: { Args: never; Returns: boolean }
       check_all_posts_viewed: { Args: never; Returns: boolean }
       cleanup_expired_stories: { Args: never; Returns: undefined }
       cleanup_old_view_history: { Args: never; Returns: undefined }
@@ -8918,6 +8919,7 @@ export type Database = {
           post_id: string
         }[]
       }
+      get_subscription_statistics: { Args: never; Returns: Json }
       get_targeted_ads: {
         Args: { p_limit?: number; p_user_id: string }
         Returns: {
