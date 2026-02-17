@@ -238,7 +238,7 @@ const Settings = () => {
     },
     {
       icon: ShieldCheck,
-      title: 'Admin Wallet',
+      title: 'FeedIn Wallet',
       description: 'Platform wallet and credit management',
       route: '/wallet/admin',
       color: 'text-emerald-500'

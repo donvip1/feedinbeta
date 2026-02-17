@@ -149,11 +149,31 @@ const AdminWallet = () => {
     },
   });
 
-  // Server-side permission check - can manage credits (admin ONLY)
+  // Server-side permission check - can manage credits (admin + super_admin)
   const { data: canManageCredits, isLoading: loadingManagePermission } = useQuery({
     queryKey: ["can-manage-credits"],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("can_manage_credits");
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
+  // Server-side permission check - can mint credits (super_admin ONLY)
+  const { data: canMintCredits } = useQuery({
+    queryKey: ["can-mint-credits"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("can_mint_credits");
+      if (error) throw error;
+      return data as boolean;
+    },
+  });
+
+  // Server-side permission check - can withdraw (super_admin ONLY)
+  const { data: canWithdraw } = useQuery({
+    queryKey: ["can-withdraw"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("can_withdraw_from_wallet");
       if (error) throw error;
       return data as boolean;
     },
@@ -336,6 +356,18 @@ const AdminWallet = () => {
     enabled: canViewWallet === true,
   });
 
+  // Fetch subscription statistics
+  const { data: subscriptionStats } = useQuery({
+    queryKey: ["subscription-statistics"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_subscription_statistics" as any);
+      if (error) throw error;
+      return data as any;
+    },
+    enabled: canViewWallet === true,
+    refetchInterval: 30000,
+  });
+
   // Withdraw from profits wallet mutation
   const withdrawProfitsMutation = useMutation({
     mutationFn: async ({ amount, reason }: { amount: number; reason: string }) => {
@@ -482,7 +514,7 @@ const AdminWallet = () => {
             <BackButton fallback="/settings" className="text-muted-foreground hover:text-foreground" size="sm" />
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-primary" />
-              <h1 className="text-xl font-bold">Admin Wallet</h1>
+              <h1 className="text-xl font-bold">FeedIn Wallet</h1>
             </div>
             <div className="ml-auto flex items-center gap-2">
               <Button
@@ -496,8 +528,10 @@ const AdminWallet = () => {
               >
                 <RefreshCw className={`w-4 h-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
               </Button>
-              {canManageCredits ? (
-                <Badge variant="default" className="bg-primary">Full Access</Badge>
+              {canMintCredits ? (
+                <Badge variant="default" className="bg-primary">CEO Access</Badge>
+              ) : canManageCredits ? (
+                <Badge variant="default" className="bg-primary">Admin Access</Badge>
               ) : (
                 <Badge variant="secondary">
                   <Eye className="w-3 h-3 mr-1" />
@@ -571,7 +605,7 @@ const AdminWallet = () => {
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="flex items-center gap-1.5 text-xs">
                 <Wallet className="w-3.5 h-3.5 text-green-500" />
-                Platform Wallet
+                FeedIn Wallet
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
@@ -1254,135 +1288,88 @@ const AdminWallet = () => {
             </TabsTrigger>
           </TabsList>
 
+          {canMintCredits && (
+            <TabsContent value="mint" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Fund FeedIn Wallet</CardTitle>
+                  <CardDescription>
+                    Mint new credits from unlimited supply into the FeedIn Wallet. Max supply: {maxSupply.toLocaleString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="mint-amount">Amount to Fund</Label>
+                    <Input id="mint-amount" type="number" placeholder="Enter amount"
+                      value={mintAmount} onChange={(e) => setMintAmount(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mint-reason">Reason (optional)</Label>
+                    <Input id="mint-reason" placeholder="Enter reason for funding"
+                      value={mintReason} onChange={(e) => setMintReason(e.target.value)} />
+                  </div>
+                  <Button onClick={() => mintMutation.mutate({ amount: parseInt(mintAmount), reason: mintReason })}
+                    disabled={!mintAmount || mintMutation.isPending} className="w-full">
+                    {mintMutation.isPending ? "Funding..." : "Fund FeedIn Wallet"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
           {canManageCredits && (
+            <TabsContent value="transfer" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Transfer to User</CardTitle>
+                  <CardDescription>Transfer credits from FeedIn Wallet to a user</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="transfer-user">User ID</Label>
+                    <Input id="transfer-user" placeholder="Enter user UUID"
+                      value={transferUserId} onChange={(e) => setTransferUserId(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="transfer-amount">Amount</Label>
+                    <Input id="transfer-amount" type="number" placeholder="Enter amount"
+                      value={transferAmount} onChange={(e) => setTransferAmount(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="transfer-reason">Reason (optional)</Label>
+                    <Input id="transfer-reason" placeholder="Enter reason for transfer"
+                      value={transferReason} onChange={(e) => setTransferReason(e.target.value)} />
+                  </div>
+                  <Button onClick={() => transferMutation.mutate({ userId: transferUserId, amount: parseInt(transferAmount), reason: transferReason })}
+                    disabled={!transferAmount || !transferUserId || transferMutation.isPending} className="w-full">
+                    {transferMutation.isPending ? "Transferring..." : "Transfer Credits"}
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {canWithdraw && (
             <>
-              <TabsContent value="mint" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Mint Credits</CardTitle>
-                    <CardDescription>
-                      Create new credits and add to platform wallet. Max supply: {maxSupply.toLocaleString()}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="mint-amount">Amount to Mint</Label>
-                      <Input
-                        id="mint-amount"
-                        type="number"
-                        placeholder="Enter amount"
-                        value={mintAmount}
-                        onChange={(e) => setMintAmount(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="mint-reason">Reason (optional)</Label>
-                      <Input
-                        id="mint-reason"
-                        placeholder="Enter reason for minting"
-                        value={mintReason}
-                        onChange={(e) => setMintReason(e.target.value)}
-                      />
-                    </div>
-                    <Button 
-                      onClick={() => mintMutation.mutate({ amount: parseInt(mintAmount), reason: mintReason })}
-                      disabled={!mintAmount || mintMutation.isPending}
-                      className="w-full"
-                    >
-                      {mintMutation.isPending ? "Minting..." : "Mint Credits"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="transfer" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Transfer to User</CardTitle>
-                    <CardDescription>
-                      Transfer credits from platform wallet to a user
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="transfer-user">User ID</Label>
-                      <Input
-                        id="transfer-user"
-                        placeholder="Enter user UUID"
-                        value={transferUserId}
-                        onChange={(e) => setTransferUserId(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="transfer-amount">Amount</Label>
-                      <Input
-                        id="transfer-amount"
-                        type="number"
-                        placeholder="Enter amount"
-                        value={transferAmount}
-                        onChange={(e) => setTransferAmount(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="transfer-reason">Reason (optional)</Label>
-                      <Input
-                        id="transfer-reason"
-                        placeholder="Enter reason for transfer"
-                        value={transferReason}
-                        onChange={(e) => setTransferReason(e.target.value)}
-                      />
-                    </div>
-                    <Button 
-                      onClick={() => transferMutation.mutate({ 
-                        userId: transferUserId, 
-                        amount: parseInt(transferAmount), 
-                        reason: transferReason 
-                      })}
-                      disabled={!transferAmount || !transferUserId || transferMutation.isPending}
-                      className="w-full"
-                    >
-                      {transferMutation.isPending ? "Transferring..." : "Transfer Credits"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
               <TabsContent value="withdraw" className="space-y-4">
                 <Card>
                   <CardHeader>
                     <CardTitle>Withdraw to Team Wallet</CardTitle>
-                    <CardDescription>
-                      Move credits from platform wallet to your team wallet
-                    </CardDescription>
+                    <CardDescription>Move credits from FeedIn Wallet to your team wallet</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="withdraw-amount">Amount</Label>
-                      <Input
-                        id="withdraw-amount"
-                        type="number"
-                        placeholder="Enter amount"
-                        value={withdrawAmount}
-                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                      />
+                      <Input id="withdraw-amount" type="number" placeholder="Enter amount"
+                        value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="withdraw-reason">Reason (optional)</Label>
-                      <Input
-                        id="withdraw-reason"
-                        placeholder="Enter reason for withdrawal"
-                        value={withdrawReason}
-                        onChange={(e) => setWithdrawReason(e.target.value)}
-                      />
+                      <Input id="withdraw-reason" placeholder="Enter reason for withdrawal"
+                        value={withdrawReason} onChange={(e) => setWithdrawReason(e.target.value)} />
                     </div>
-                    <Button 
-                      onClick={() => withdrawMutation.mutate({ 
-                        amount: parseInt(withdrawAmount), 
-                        reason: withdrawReason 
-                      })}
-                      disabled={!withdrawAmount || withdrawMutation.isPending}
-                      className="w-full"
-                    >
+                    <Button onClick={() => withdrawMutation.mutate({ amount: parseInt(withdrawAmount), reason: withdrawReason })}
+                      disabled={!withdrawAmount || withdrawMutation.isPending} className="w-full">
                       {withdrawMutation.isPending ? "Withdrawing..." : "Withdraw to Team Wallet"}
                     </Button>
                   </CardContent>
@@ -1394,41 +1381,25 @@ const AdminWallet = () => {
                   <CardHeader>
                     <CardTitle>Withdraw from Profits Wallet</CardTitle>
                     <CardDescription>
-                      Withdraw collected fees from the profits wallet. Current balance: {(profitsWallet?.balance || 0).toLocaleString()}
+                      Withdraw collected fees. Balance: {(profitsWallet?.balance || 0).toLocaleString()}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="profits-withdraw-amount">Amount</Label>
-                      <Input
-                        id="profits-withdraw-amount"
-                        type="number"
-                        placeholder="Enter amount"
-                        value={withdrawProfitsAmount}
-                        onChange={(e) => setWithdrawProfitsAmount(e.target.value)}
-                      />
+                      <Input id="profits-withdraw-amount" type="number" placeholder="Enter amount"
+                        value={withdrawProfitsAmount} onChange={(e) => setWithdrawProfitsAmount(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="profits-withdraw-reason">Reason (optional)</Label>
-                      <Input
-                        id="profits-withdraw-reason"
-                        placeholder="Enter reason for withdrawal"
-                        value={withdrawProfitsReason}
-                        onChange={(e) => setWithdrawProfitsReason(e.target.value)}
-                      />
+                      <Input id="profits-withdraw-reason" placeholder="Enter reason for withdrawal"
+                        value={withdrawProfitsReason} onChange={(e) => setWithdrawProfitsReason(e.target.value)} />
                     </div>
-                    <Button 
-                      onClick={() => {
-                        withdrawProfitsMutation.mutate({ 
-                          amount: parseInt(withdrawProfitsAmount), 
-                          reason: withdrawProfitsReason 
-                        });
-                        setWithdrawProfitsAmount("");
-                        setWithdrawProfitsReason("");
-                      }}
-                      disabled={!withdrawProfitsAmount || withdrawProfitsMutation.isPending}
-                      className="w-full"
-                    >
+                    <Button onClick={() => {
+                      withdrawProfitsMutation.mutate({ amount: parseInt(withdrawProfitsAmount), reason: withdrawProfitsReason });
+                      setWithdrawProfitsAmount(""); setWithdrawProfitsReason("");
+                    }}
+                      disabled={!withdrawProfitsAmount || withdrawProfitsMutation.isPending} className="w-full">
                       {withdrawProfitsMutation.isPending ? "Withdrawing..." : "Withdraw from Profits"}
                     </Button>
                   </CardContent>
