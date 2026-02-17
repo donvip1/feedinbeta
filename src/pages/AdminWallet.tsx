@@ -544,38 +544,101 @@ const AdminWallet = () => {
       </header>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Credit Circulation Overview */}
-        <Card className="border-primary/20">
+        {/* How FeedIn Credits Work - Educational Banner */}
+        <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5">
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="w-5 h-5 text-primary" />
-              Credit Circulation Overview
+              <Shield className="w-5 h-5 text-primary" />
+              How FeedIn Credits Work
             </CardTitle>
-           <CardDescription>Real-time credit distribution · Excludes CEO reserve (minting source)</CardDescription>
+            <CardDescription>Understanding the credit supply model</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Circulating Supply (in user hands)</span>
-              <span className="text-2xl font-bold text-primary">
-                {circulatingSupply.toLocaleString()} / {maxSupply.toLocaleString()}
-              </span>
+            {/* Flow Diagram */}
+            <div className="flex flex-col md:flex-row items-stretch gap-3">
+              {/* CEO Reserve */}
+              <div className="flex-1 p-3 rounded-lg bg-muted/50 border border-dashed border-muted-foreground/30 text-center">
+                <Lock className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
+                <p className="text-xs font-medium text-muted-foreground">CEO Reserve</p>
+                <p className="text-sm font-bold text-muted-foreground">Unlimited</p>
+                <p className="text-[10px] text-muted-foreground/70 mt-1">Minting source · Hidden from supply</p>
+              </div>
+              
+              {/* Arrow */}
+              <div className="flex items-center justify-center md:py-0 py-1">
+                <ArrowDownRight className="w-5 h-5 text-primary md:rotate-0 rotate-90" />
+              </div>
+              
+              {/* FeedIn Wallet */}
+              <div className="flex-[2] p-3 rounded-lg bg-primary/10 border border-primary/30 text-center">
+                <Wallet className="w-5 h-5 text-primary mx-auto mb-1" />
+                <p className="text-xs font-medium text-primary">FeedIn Wallet (Total Supply)</p>
+                <p className="text-xl font-bold text-primary">{maxSupply.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Available to distribute: {(creditStats?.platform_balance || 0).toLocaleString()}</p>
+              </div>
+              
+              {/* Arrow */}
+              <div className="flex items-center justify-center md:py-0 py-1">
+                <ArrowDownRight className="w-5 h-5 text-primary md:rotate-0 rotate-90" />
+              </div>
+              
+              {/* User Wallets */}
+              <div className="flex-[2] p-3 rounded-lg bg-accent/10 border border-accent/30 text-center">
+                <Users className="w-5 h-5 text-accent mx-auto mb-1" />
+                <p className="text-xs font-medium text-accent">User Wallets (Circulating)</p>
+                <p className="text-xl font-bold text-accent">{circulatingSupply.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground mt-1">{creditStats?.user_count || 0} users · Subscriptions, gifts, transfers</p>
+              </div>
             </div>
-            <Progress value={parseFloat(circulatingPercent)} className="h-3" />
-            <p className="text-xs text-muted-foreground text-right">{circulatingPercent}% of FeedIn allocation (30%)</p>
+            
+            {/* Circulation Progress */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">Credits in circulation vs Total Supply</span>
+                <span className="font-medium text-foreground">{circulatingPercent}%</span>
+              </div>
+              <Progress value={parseFloat(circulatingPercent)} className="h-2" />
+            </div>
+            
+            {/* Key Info */}
+            <div className="p-2 rounded-lg bg-muted/30 border border-muted-foreground/10">
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                <strong>How it works:</strong> The CEO mints credits from the reserve into the FeedIn Wallet. 
+                When users subscribe via Paystack, purchase credits, or receive admin transfers — credits are sent 
+                directly from the FeedIn Wallet to their personal wallet. All movements are audited.
+              </p>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Distribution Cards */}
+        {/* Live Balances Dashboard */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="border-blue-500/30 bg-blue-500/5">
+          <Card className="border-primary/30 bg-primary/5">
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="flex items-center gap-1.5 text-xs">
-                <Users className="w-3.5 h-3.5 text-blue-500" />
+                <Wallet className="w-3.5 h-3.5 text-primary" />
+                FeedIn Wallet
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-3 pb-3">
+              <p className="text-xl font-bold text-primary">
+                {(creditStats?.platform_balance || 0).toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                of {maxSupply.toLocaleString()} total
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-accent/30 bg-accent/5">
+            <CardHeader className="pb-1 pt-3 px-3">
+              <CardTitle className="flex items-center gap-1.5 text-xs">
+                <Users className="w-3.5 h-3.5 text-accent" />
                 User Wallets
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              <p className="text-xl font-bold text-blue-500">
+              <p className="text-xl font-bold text-accent">
                 {(creditStats?.user_credits_total || 0).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -584,49 +647,32 @@ const AdminWallet = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-orange-500/30 bg-orange-500/5">
+          <Card className="border-destructive/30 bg-destructive/5">
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="flex items-center gap-1.5 text-xs">
-                <Lock className="w-3.5 h-3.5 text-orange-500" />
+                <Lock className="w-3.5 h-3.5 text-destructive" />
                 P2P Escrow
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              <p className="text-xl font-bold text-orange-500">
+              <p className="text-xl font-bold text-destructive">
                 {(creditStats?.p2p_escrow_locked || 0).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
-                {(creditStats?.p2p_active_listings || 0).toLocaleString()} in listings
+                {(creditStats?.p2p_active_listings || 0).toLocaleString()} listings
               </p>
             </CardContent>
           </Card>
 
-          <Card className="border-green-500/30 bg-green-500/5">
+          <Card className="border-secondary/30 bg-secondary/5">
             <CardHeader className="pb-1 pt-3 px-3">
               <CardTitle className="flex items-center gap-1.5 text-xs">
-                <Wallet className="w-3.5 h-3.5 text-green-500" />
-                FeedIn Wallet
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="px-3 pb-3">
-              <p className="text-xl font-bold text-green-500">
-                {(creditStats?.platform_balance || 0).toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Earned: {platformWallet?.total_earned?.toLocaleString() || 0}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-purple-500/30 bg-purple-500/5">
-            <CardHeader className="pb-1 pt-3 px-3">
-              <CardTitle className="flex items-center gap-1.5 text-xs">
-                <PiggyBank className="w-3.5 h-3.5 text-purple-500" />
+                <PiggyBank className="w-3.5 h-3.5 text-secondary-foreground" />
                 Team Wallets
               </CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              <p className="text-xl font-bold text-purple-500">
+              <p className="text-xl font-bold text-secondary-foreground">
                 {(creditStats?.team_wallets_total || 0).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">
