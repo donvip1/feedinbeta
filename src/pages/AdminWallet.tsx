@@ -551,17 +551,17 @@ const AdminWallet = () => {
               <TrendingUp className="w-5 h-5 text-primary" />
               Credit Circulation Overview
             </CardTitle>
-            <CardDescription>Real-time credit distribution across the platform</CardDescription>
+           <CardDescription>Real-time credit distribution · Excludes CEO reserve (minting source)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Circulating Supply</span>
+              <span className="text-sm text-muted-foreground">Circulating Supply (in user hands)</span>
               <span className="text-2xl font-bold text-primary">
                 {circulatingSupply.toLocaleString()} / {maxSupply.toLocaleString()}
               </span>
             </div>
             <Progress value={parseFloat(circulatingPercent)} className="h-3" />
-            <p className="text-xs text-muted-foreground text-right">{circulatingPercent}% of max supply</p>
+            <p className="text-xs text-muted-foreground text-right">{circulatingPercent}% of FeedIn allocation (30%)</p>
           </CardContent>
         </Card>
 
@@ -1294,7 +1294,7 @@ const AdminWallet = () => {
                 <CardHeader>
                   <CardTitle>Fund FeedIn Wallet</CardTitle>
                   <CardDescription>
-                    Mint new credits from unlimited supply into the FeedIn Wallet. Max supply: {maxSupply.toLocaleString()}
+                    Mint credits from CEO reserve into the FeedIn Wallet. FeedIn allocation: {maxSupply.toLocaleString()}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
