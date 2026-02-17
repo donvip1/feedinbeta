@@ -1,65 +1,31 @@
 
 
-# Fix: Exclude Super Admin from Supply Calculations
+## Fix: Double Credit Deduction on Transfers
 
-## The Problem
+### The Problem
+The `transfer_credits` database function has a critical bug that deducts credits **twice** from the sender:
 
-Currently, the "Total Supply" shows the full 1 billion and "Circulating Supply" includes the super admin's ~1 billion personal balance. The super admin wallet is a minting reserve -- it shouldn't appear in supply numbers at all.
+1. It manually runs `UPDATE user_credits SET balance = balance - amount`
+2. It then inserts a negative transaction into `credit_transactions`, which triggers the `apply_credit_transaction` function that **also** subtracts from the balance
 
-## New Model
+This means every transfer costs the sender 2x the intended amount. Your 50 + 100 credit transfers actually deducted 100 + 200 = 300 credits instead of 150.
 
-```text
-Super Admin Wallet: ~999,997,055 (HIDDEN from supply -- this is the mint source)
+### The Fix
 
-Total Supply (shown in FeedIn Wallet): 300,000,000 (the 30% minted into FeedIn)
-  |
-  +-- FeedIn Wallet Balance: 299,989,703 (available to distribute)
-  +-- Circulating (in user hands): 10,297 (actual user balances, excluding super admin)
-```
+**Step 1: Fix the `transfer_credits` function**
+Remove the direct `UPDATE user_credits` statements for the sender. The trigger on `credit_transactions` already handles balance updates automatically. Only keep the direct update for the recipient's `ON CONFLICT` insert (since the trigger handles that too, we'll remove both direct updates and let the trigger do all the work).
 
-## Changes
+**Step 2: Refund Adrian's 150 lost credits**
+Insert a corrective `credit_transaction` to restore the 150 credits that were incorrectly double-deducted.
 
-### 1. Data Corrections (3 updates)
+### Technical Details
 
-- Set `credit_supply.total_supply` to **300,000,000** (the 30% allocation, not 1B)
-- Set `credit_supply.circulating_supply` to **10,297** (actual non-admin user balances)
-- Set `platform_wallet.balance` to **299,989,703** (300M minus what's already distributed)
-- Insert an audit transaction recording this correction
+The corrected `transfer_credits` function will:
+- Remove the `UPDATE user_credits SET balance = balance - p_amount` line for regular users
+- Remove the `INSERT INTO user_credits ... ON CONFLICT DO UPDATE` for the recipient
+- Rely entirely on the `apply_credit_transaction` trigger (which already fires on every `credit_transactions` insert) to handle all balance changes
+- This matches how every other credit operation in the system works (gifts, purchases, etc.)
 
-### 2. Update `get_credit_statistics()` Database Function
-
-Modify the SQL function so:
-- `user_credits_total` excludes the super admin's balance (filters out super_admin role users)
-- `circulating_supply` is calculated as the sum of all non-admin user balances, not read from the `credit_supply` table
-- `total_minted` reflects the total amount ever minted into the FeedIn Wallet
-
-### 3. Frontend Label Updates in `AdminWallet.tsx`
-
-- "Total Supply" label changes to reflect the FeedIn Wallet allocation (30%), not the unlimited reserve
-- "Circulating Supply" shows only what regular users hold
-- Add a note or subtitle clarifying: "Excludes CEO reserve (minting source)"
-- The progress bar calculates percentage against 300M (FeedIn allocation), not 1B
-
-## Technical Details
-
-### SQL: Updated `get_credit_statistics()`
-
-The key change is excluding super_admin users from the user balance totals:
-
-```sql
--- Get user balances EXCLUDING super admin (minting reserve)
-SELECT COALESCE(SUM(uc.balance), 0), COUNT(*)
-INTO v_user_credits_total, v_user_count
-FROM user_credits uc
-WHERE NOT EXISTS (
-  SELECT 1 FROM user_roles ur
-  WHERE ur.user_id = uc.user_id AND ur.role = 'super_admin'
-);
-```
-
-### Frontend: AdminWallet.tsx changes
-
-- `maxSupply` uses `credit_supply.total_supply` which will now be 300M
-- Circulating percentage calculated against 300M
-- Labels updated to clarify the supply model
+### Refund
+Adrian will receive +150 credits (type: `refund`, description: "Refund for double-deducted transfers") to correct the balance from 64 back to 214.
 
