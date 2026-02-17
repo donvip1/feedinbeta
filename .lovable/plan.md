@@ -1,135 +1,46 @@
 
 
-# Rebuild: FeedIn Wallet System
+# FeedIn Wallet: 70/30 Supply Distribution
 
-## Overview
+## How It Will Work
 
-Rename "Admin Wallet" to "FeedIn Wallet" and restructure the entire credit flow so all credits distributed to users (subscriptions, transfers, gifts from admins) are deducted from the FeedIn Wallet (platform_wallet). Only the CEO/Super Admin can fund the FeedIn Wallet from the unlimited supply (minting). Admins with granted permissions can transfer but not withdraw. Moderators get view-only access. A new Subscribers section will track all subscription activity.
-
-## Current Issues Found
-
-- **tester1 (super_admin)** has ~1 billion credits in personal balance -- these were not deducted from platform_wallet
-- Platform wallet balance is 0 with only 10,000 ever minted
-- Admin grants (10,000 credits across 20 transactions) went directly to users without deducting from platform_wallet
-- No tracking of subscriber activity in the admin dashboard
-
-## Changes
-
-### 1. Database: New Permission Function for Super Admin Only Minting
-
-Create `can_mint_credits()` that restricts minting to `super_admin` role only, separate from `can_manage_credits()` which allows both `super_admin` and `admin` (with granted permissions).
-
-### 2. Database: Fix `admin_mint_credits` -- Super Admin Only
-
-Restrict to `super_admin` role exclusively. This is the "Fund FeedIn Wallet" action.
-
-### 3. Database: Fix `admin_transfer_to_user` -- Deduct from Platform Wallet
-
-Already deducts from platform wallet (confirmed in code). No change needed, but will ensure admin role with `can_manage_credits` flag can use it.
-
-### 4. Database: Update Permission Functions
+The total credit supply is 1 billion. The Super Admin/CEO holds 70% as the unlimited minting reserve, and 30% flows into the FeedIn Wallet for circulation to all users.
 
 ```text
-can_mint_credits()     -> super_admin ONLY
-can_manage_credits()   -> super_admin OR admin (unchanged)
-can_view_admin_wallet() -> super_admin, admin, moderator (unchanged)
-can_withdraw()         -> super_admin ONLY (new)
+Total Supply: 1,000,000,000
+    |
+    +-- 70% Super Admin Reserve: 700,000,000 (minting source, stays untouched)
+    |
+    +-- 30% FeedIn Wallet: 300,000,000 (circulation fund)
+              |
+              +-- Already distributed to users: 10,297
+              |
+              +-- Available balance: 299,989,703
 ```
 
-### 5. Database: Create Subscriber Tracking View
+The Super Admin's personal balance (~999,997,055) remains as-is -- it represents the unlimited minting power. When the CEO funds the FeedIn Wallet, credits move from this reserve into the wallet.
 
-A new SQL function `get_subscription_statistics()` that returns:
-- Total subscribers per tier (Basic, Pro, Premium)
-- Revenue from subscriptions
-- Recent subscription activations
-- Active vs expired subscriptions
+## Data Changes
 
-### 6. Database: Recalculate/Deduct Previously Distributed Credits
+| Record | Field | Current Value | New Value |
+|--------|-------|---------------|-----------|
+| `credit_supply` | `total_supply` | 100,000,000 | 1,000,000,000 |
+| `credit_supply` | `circulating_supply` | ~1,000,007,352 | 10,297 |
+| `platform_wallet` | `balance` | 0 | 299,989,703 |
 
-The 10,000 credits that were admin_granted to users were never deducted from the platform wallet. We need to either:
-- Deduct 10,000 from platform_wallet (but it's already at 0)
-- Or mint enough to cover the deficit first
+The Super Admin's personal balance stays unchanged at ~999,997,055.
 
-Since the super_admin has ~1B credits personally, those need to be corrected too. We'll sync the platform wallet to reflect reality.
+## How Credits Flow Going Forward
 
-### 7. Frontend: Rename and Restructure `AdminWallet.tsx`
+1. **CEO/Super Admin funds FeedIn Wallet** -- Credits transfer from the 70% reserve into the FeedIn Wallet (minting)
+2. **FeedIn Wallet distributes** -- All subscriptions, admin transfers, gifts, and purchases deduct from the FeedIn Wallet's 299,989,703 balance
+3. **When FeedIn Wallet runs low** -- The CEO mints more from their reserve into the wallet
 
-Rename all references from "Admin Wallet" to "FeedIn Wallet" throughout:
-- Page title, settings menu, route descriptions
-- Header text: "FeedIn Wallet" with FeedIn branding
+## Technical Steps
 
-### 8. Frontend: Role-Based UI Sections
+1. Update `credit_supply`: set `total_supply` to 1B, `circulating_supply` to 10,297
+2. Update `platform_wallet`: set `balance` to 299,989,703
+3. Insert an audit `credit_transaction` recording this correction
 
-```text
-Super Admin/CEO sees:
-  - Fund FeedIn Wallet (mint from unlimited supply)
-  - Transfer to users
-  - Withdraw to team wallet / profits
-  - All statistics + subscriber tracking
-  - Full transaction history
-
-Admin (with granted permissions) sees:
-  - Transfer to users (from FeedIn Wallet balance)
-  - All statistics + subscriber tracking
-  - Transaction history
-  - NO minting, NO withdrawing
-
-Moderator sees:
-  - View-only statistics
-  - View subscriber list
-  - View transaction history
-  - NO actions at all
-```
-
-### 9. Frontend: New "Subscribers" Tab/Section
-
-Add a subscribers section showing:
-- Cards per tier with subscriber counts
-- List of active subscribers with username, plan, start date, expiry
-- Subscription revenue totals
-- Recent subscription activity
-
-### 10. Webhook: Ensure Subscription Credits Come from Platform Wallet
-
-Update `paystack-webhook` so that when subscription credits are granted, they are deducted from the platform wallet balance (not created from nothing).
-
----
-
-## Technical Implementation Details
-
-### Files to Create/Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `supabase/migrations/new.sql` | Create | New permission functions, subscriber stats function, wallet adjustments |
-| `src/pages/AdminWallet.tsx` | Major rewrite | Rename to FeedIn Wallet, add role-based sections, subscriber tracking |
-| `src/pages/Settings.tsx` | Edit | Rename "Admin Wallet" to "FeedIn Wallet" |
-| `supabase/functions/paystack-webhook/index.ts` | Edit | Deduct subscription credits from platform_wallet |
-
-### New SQL Functions
-
-1. **`can_mint_credits()`** - Returns true only for super_admin
-2. **`can_withdraw_from_wallet()`** - Returns true only for super_admin
-3. **`get_subscription_statistics()`** - Returns subscriber counts, revenue, active list
-4. **`get_active_subscribers(p_limit int)`** - Returns detailed subscriber list with profiles
-
-### Database Migration Steps
-
-1. Create new permission functions
-2. Create subscriber statistics functions
-3. Update `admin_mint_credits` to check `super_admin` only
-4. Add platform_wallet deduction to `add_credits_from_purchase` for subscription credits
-5. Sync credit_supply with actual distributed amounts
-
-### Paystack Webhook Update
-
-When granting subscription credits, also deduct from platform_wallet:
-```text
--- After adding credits to user via add_credits_from_purchase
-UPDATE platform_wallet 
-SET balance = balance - subscription_credits
-WHERE id = '00000000-0000-0000-0000-000000000001';
-```
-
-This ensures the FeedIn Wallet is the single source of truth for all credit distribution.
+No schema changes or code changes needed -- just data corrections to align with the 70/30 model.
 
