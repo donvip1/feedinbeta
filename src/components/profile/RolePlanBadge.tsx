@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Shield, Crown, Code, Star, Sparkles, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 
 interface RolePlanBadgeProps {
   userId: string;
@@ -22,8 +23,10 @@ const PLAN_CONFIG: Record<string, { label: string; icon: React.ElementType; grad
 };
 
 export const RolePlanBadge = ({ userId, compact = false }: RolePlanBadgeProps) => {
+  const { user } = useAuth();
   const [role, setRole] = useState<string | null>(null);
   const [planName, setPlanName] = useState<string | null>(null);
+  const [viewerIsAdmin, setViewerIsAdmin] = useState(false);
 
   useEffect(() => {
     const fetchRoleAndPlan = async () => {
@@ -52,7 +55,25 @@ export const RolePlanBadge = ({ userId, compact = false }: RolePlanBadgeProps) =
     if (userId) fetchRoleAndPlan();
   }, [userId]);
 
-  const roleConfig = role ? ROLE_CONFIG[role] : null;
+  // Check if viewer is admin so they can see other admin badges
+  useEffect(() => {
+    if (!user?.id || user.id === userId) {
+      setViewerIsAdmin(user?.id === userId);
+      return;
+    }
+    supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['admin', 'moderator', 'developer', 'super_admin'])
+      .maybeSingle()
+      .then(({ data }) => setViewerIsAdmin(!!data));
+  }, [user?.id, userId]);
+
+  const isOwnProfile = user?.id === userId;
+  const canSeeAdminRole = isOwnProfile || viewerIsAdmin;
+
+  const roleConfig = role && canSeeAdminRole ? ROLE_CONFIG[role] : null;
   const planConfig = planName ? Object.entries(PLAN_CONFIG).find(([key]) => planName.includes(key))?.[1] : null;
 
   if (!roleConfig && !planConfig) return null;
