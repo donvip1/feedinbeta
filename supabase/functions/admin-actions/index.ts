@@ -410,19 +410,50 @@ serve(async (req) => {
       }
 
       case "assign_role": {
-        if (!isDeveloper && !adminRole.can_manage_roles) {
+        // Only super_admin, developers, and admins with can_manage_roles can assign
+        if (!isDeveloper && !isAdmin && !adminRole.can_manage_roles) {
           return new Response(
             JSON.stringify({ error: "No permission to assign roles" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
 
+        // Moderators cannot assign roles
+        if (adminRole.role === "moderator") {
+          return new Response(
+            JSON.stringify({ error: "Moderators cannot assign roles" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
         const { targetUserId, role, permissions, notes } = params;
 
-        // Only developers can assign developer role
+        // Nobody can assign super_admin role
+        if (role === "super_admin") {
+          return new Response(
+            JSON.stringify({ error: "Cannot assign super_admin role" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Only super_admin/developers can assign developer role
         if (role === "developer" && !isDeveloper) {
           return new Response(
-            JSON.stringify({ error: "Only developers can assign developer role" }),
+            JSON.stringify({ error: "Only super admins can assign developer role" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Cannot modify a super_admin's role
+        const { data: targetCurrentRole } = await supabaseService
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", targetUserId)
+          .maybeSingle();
+
+        if (targetCurrentRole?.role === "super_admin") {
+          return new Response(
+            JSON.stringify({ error: "Cannot modify super admin's role" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -486,9 +517,18 @@ serve(async (req) => {
       }
 
       case "revoke_role": {
-        if (!isDeveloper && !adminRole.can_manage_roles) {
+        // Only super_admin, developers, and admins with can_manage_roles can revoke
+        if (!isDeveloper && !isAdmin && !adminRole.can_manage_roles) {
           return new Response(
             JSON.stringify({ error: "No permission to revoke roles" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Moderators cannot revoke roles
+        if (adminRole.role === "moderator") {
+          return new Response(
+            JSON.stringify({ error: "Moderators cannot revoke roles" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -502,10 +542,18 @@ serve(async (req) => {
           .eq("user_id", targetUserId)
           .single();
 
-        // Only developers can revoke developer role
+        // NOBODY can demote super_admin
+        if (targetRole?.role === "super_admin") {
+          return new Response(
+            JSON.stringify({ error: "Cannot demote super admin" }),
+            { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Only super_admin/developers can revoke developer role
         if (targetRole?.role === "developer" && !isDeveloper) {
           return new Response(
-            JSON.stringify({ error: "Only developers can revoke developer role" }),
+            JSON.stringify({ error: "Only super admins can revoke developer role" }),
             { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -522,6 +570,17 @@ serve(async (req) => {
           .single();
 
         await logAction("revoke_role", "user_role", targetUserId, targetProfile?.username, { previousRole: targetRole?.role });
+
+        // Notify demoted user
+        await supabaseService.from("notifications").insert({
+          user_id: targetUserId,
+          from_user_id: user.id,
+          type: "role_demotion",
+          title: "Role update",
+          message: `Your ${targetRole?.role} role has been removed. You are now a regular user.`,
+          related_id: targetUserId,
+          related_type: "role",
+        });
 
         return new Response(
           JSON.stringify({ success: true }),
