@@ -116,7 +116,7 @@ const AdminPanel = () => {
     enabled: permissions.canManageDisputes,
   });
 
-  // Fetch admin users
+  // Fetch admin users (for roles tab)
   const { data: adminUsers, refetch: refetchAdminUsers } = useQuery({
     queryKey: ['admin-users'],
     queryFn: async () => {
@@ -127,6 +127,45 @@ const AdminPanel = () => {
       return data.users || [];
     },
     enabled: permissions.canManageRoles,
+  });
+
+  // Fetch team members (all admins/moderators - visible to any admin)
+  const { data: teamMembers } = useQuery({
+    queryKey: ['admin-team-members'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('user_id, role, created_at, assigned_by')
+        .order('role');
+      if (error) throw error;
+      
+      if (!data || data.length === 0) return [];
+      
+      // Fetch profiles for all team members
+      const userIds = data.map(r => r.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url')
+        .in('id', userIds);
+      
+      // Fetch assigner profiles
+      const assignerIds = data.filter(r => r.assigned_by).map(r => r.assigned_by!);
+      let assignerProfiles: any[] = [];
+      if (assignerIds.length > 0) {
+        const { data: assigners } = await supabase
+          .from('profiles')
+          .select('id, username, display_name')
+          .in('id', assignerIds);
+        assignerProfiles = assigners || [];
+      }
+      
+      return data.map(role => ({
+        ...role,
+        profile: profiles?.find(p => p.id === role.user_id),
+        assigner: assignerProfiles.find(p => p.id === role.assigned_by),
+      }));
+    },
+    enabled: permissions.isAdmin || permissions.isDeveloper,
   });
 
   // Fetch action logs
@@ -259,7 +298,7 @@ const AdminPanel = () => {
 
       <div className="container mx-auto px-4 py-6">
         <Tabs defaultValue={permissions.canManageP2P ? "p2p" : permissions.canManageDisputes ? "disputes" : "roles"}>
-          <TabsList className="grid w-full grid-cols-6 mb-6">
+          <TabsList className="grid w-full grid-cols-7 mb-6">
             {permissions.canManageP2P && (
               <TabsTrigger value="p2p" className="gap-1 text-xs">
                 <ShoppingCart className="w-3 h-3" /> P2P
@@ -288,6 +327,11 @@ const AdminPanel = () => {
             {(permissions.isAdmin || permissions.isDeveloper) && (
               <TabsTrigger value="logs" className="gap-1 text-xs">
                 <History className="w-3 h-3" /> Logs
+              </TabsTrigger>
+            )}
+            {(permissions.isAdmin || permissions.isDeveloper) && (
+              <TabsTrigger value="team" className="gap-1 text-xs">
+                <Shield className="w-3 h-3" /> Team
               </TabsTrigger>
             )}
           </TabsList>
@@ -693,6 +737,94 @@ const AdminPanel = () => {
                       </div>
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Team Overview Tab */}
+          {(permissions.isAdmin || permissions.isDeveloper) && (
+            <TabsContent value="team" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-primary" />
+                    Team Overview
+                  </CardTitle>
+                  <CardDescription>
+                    All administrators and moderators on the platform ({teamMembers?.length || 0} members)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {!teamMembers || teamMembers.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      No team members found
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Group by role */}
+                      {(['super_admin', 'developer', 'admin', 'moderator'] as const).map(roleType => {
+                        const members = teamMembers.filter((m: any) => m.role === roleType);
+                        if (members.length === 0) return null;
+                        
+                        const roleLabels: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+                          super_admin: { label: 'CEO / Super Admin', icon: <Crown className="w-4 h-4" />, color: 'text-yellow-500' },
+                          developer: { label: 'Developers', icon: <Shield className="w-4 h-4" />, color: 'text-primary' },
+                          admin: { label: 'Administrators', icon: <Shield className="w-4 h-4" />, color: 'text-blue-500' },
+                          moderator: { label: 'Moderators', icon: <Users className="w-4 h-4" />, color: 'text-green-500' },
+                        };
+                        
+                        const roleInfo = roleLabels[roleType];
+                        
+                        return (
+                          <div key={roleType}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <span className={roleInfo.color}>{roleInfo.icon}</span>
+                              <h3 className="font-semibold text-sm">{roleInfo.label}</h3>
+                              <Badge variant="secondary" className="text-xs">{members.length}</Badge>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {members.map((member: any) => (
+                                <Card key={member.user_id} className="border border-border/50">
+                                  <CardContent className="p-4">
+                                    <div className="flex items-center gap-3">
+                                      <Avatar className="h-10 w-10">
+                                        <AvatarImage src={member.profile?.avatar_url} />
+                                        <AvatarFallback>
+                                          {member.profile?.display_name?.[0] || 'U'}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium truncate">
+                                          {member.profile?.display_name || 'Unknown'}
+                                        </p>
+                                        <p className="text-sm text-muted-foreground truncate">
+                                          @{member.profile?.username || 'unknown'}
+                                        </p>
+                                      </div>
+                                      <Badge 
+                                        variant={roleType === 'super_admin' || roleType === 'developer' ? 'default' : 'outline'}
+                                        className="text-xs shrink-0"
+                                      >
+                                        {roleType === 'super_admin' ? 'CEO' : roleType}
+                                      </Badge>
+                                    </div>
+                                    {member.assigner && (
+                                      <p className="text-xs text-muted-foreground mt-2">
+                                        Added by @{member.assigner.display_name || member.assigner.username}
+                                        {member.created_at && ` • ${formatDistanceToNow(new Date(member.created_at), { addSuffix: true })}`}
+                                      </p>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
