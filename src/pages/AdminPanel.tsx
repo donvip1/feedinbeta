@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminRole } from '@/hooks/useAdminRole';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -18,7 +19,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { 
   ArrowLeft, Shield, Users, Gavel, ShoppingCart, History, 
   Search, X, Check, AlertTriangle, RefreshCw, UserPlus,
-  Crown, Ban, Eye, Radio, StopCircle, CreditCard
+  Crown, Ban, Eye, Radio, StopCircle, CreditCard, UserMinus
 } from 'lucide-react';
 import { BottomNav } from '@/components/navigation/BottomNav';
 
@@ -26,11 +27,13 @@ const AdminPanel = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { permissions, isLoading: permissionsLoading } = useAdminRole();
+  const { user } = useAuth();
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [searchUsername, setSearchUsername] = useState('');
   const [cancelReason, setCancelReason] = useState('');
   const [processing, setProcessing] = useState(false);
   const [endingLive, setEndingLive] = useState(false);
+  const [demoting, setDemoting] = useState<string | null>(null);
 
   // Fetch active live spaces and streams
   const { data: activeSpaces, refetch: refetchSpaces } = useQuery({
@@ -167,6 +170,23 @@ const AdminPanel = () => {
     },
     enabled: permissions.isAdmin || permissions.isDeveloper,
   });
+
+  const handleDemoteUser = async (targetUserId: string, username: string) => {
+    setDemoting(targetUserId);
+    try {
+      const { error } = await supabase.functions.invoke('admin-actions', {
+        body: { action: 'revoke_role', targetUserId },
+      });
+      if (error) throw error;
+      toast.success(`@${username} has been demoted to normal user`);
+      refetchAdminUsers();
+      queryClient.invalidateQueries({ queryKey: ['admin-team-members'] });
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to demote user');
+    } finally {
+      setDemoting(null);
+    }
+  };
 
   // Fetch action logs
   const { data: actionLogs } = useQuery({
@@ -555,7 +575,7 @@ const AdminPanel = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
-                    {adminUsers?.map((admin: any) => (
+                     {adminUsers?.map((admin: any) => (
                       <div key={admin.id} className="p-3 border rounded-lg flex items-center gap-3">
                         <Avatar>
                           <AvatarImage src={admin.user?.avatar_url} />
@@ -579,11 +599,47 @@ const AdminPanel = () => {
                             {admin.can_manage_roles && <Badge variant="outline" className="text-xs">Roles</Badge>}
                           </div>
                         </div>
-                        {admin.assigner && (
-                          <p className="text-xs text-muted-foreground">
-                            Added by @{admin.assigner.username}
-                          </p>
-                        )}
+                        <div className="flex flex-col items-end gap-1">
+                          {admin.assigner && (
+                            <p className="text-xs text-muted-foreground">
+                              Added by @{admin.assigner.username}
+                            </p>
+                          )}
+                          {/* Demote button - only show if: not super_admin target, and current user has permission */}
+                          {admin.role !== 'super_admin' && admin.user_id !== user?.id && (
+                            (permissions.isDeveloper || (permissions.isAdmin && admin.role !== 'developer'))
+                          ) && (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
+                                  <UserMinus className="w-3 h-3 mr-1" /> Demote
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Demote @{admin.user?.username}?</DialogTitle>
+                                </DialogHeader>
+                                <p className="text-sm text-muted-foreground">
+                                  This will remove their <strong>{admin.role}</strong> role and make them a normal user. They will lose all admin permissions.
+                                </p>
+                                <DialogFooter>
+                                  <Button 
+                                    variant="destructive" 
+                                    onClick={() => handleDemoteUser(admin.user_id, admin.user?.username)}
+                                    disabled={demoting === admin.user_id}
+                                  >
+                                    {demoting === admin.user_id ? (
+                                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                      <UserMinus className="w-4 h-4 mr-2" />
+                                    )}
+                                    Confirm Demote
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -815,6 +871,40 @@ const AdminPanel = () => {
                                         Added by @{member.assigner.display_name || member.assigner.username}
                                         {member.created_at && ` • ${formatDistanceToNow(new Date(member.created_at), { addSuffix: true })}`}
                                       </p>
+                                    )}
+                                    {/* Demote button in team view */}
+                                    {member.role !== 'super_admin' && member.user_id !== user?.id && (
+                                      (permissions.isDeveloper || (permissions.isAdmin && member.role !== 'developer'))
+                                    ) && permissions.canManageRoles && (
+                                      <Dialog>
+                                        <DialogTrigger asChild>
+                                          <Button variant="outline" size="sm" className="mt-2 w-full text-destructive border-destructive/30 hover:bg-destructive/10">
+                                            <UserMinus className="w-3 h-3 mr-1" /> Demote to User
+                                          </Button>
+                                        </DialogTrigger>
+                                        <DialogContent>
+                                          <DialogHeader>
+                                            <DialogTitle>Demote @{member.profile?.username}?</DialogTitle>
+                                          </DialogHeader>
+                                          <p className="text-sm text-muted-foreground">
+                                            This will remove their <strong>{member.role}</strong> role and make them a normal user.
+                                          </p>
+                                          <DialogFooter>
+                                            <Button 
+                                              variant="destructive" 
+                                              onClick={() => handleDemoteUser(member.user_id, member.profile?.username)}
+                                              disabled={demoting === member.user_id}
+                                            >
+                                              {demoting === member.user_id ? (
+                                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                              ) : (
+                                                <UserMinus className="w-4 h-4 mr-2" />
+                                              )}
+                                              Confirm Demote
+                                            </Button>
+                                          </DialogFooter>
+                                        </DialogContent>
+                                      </Dialog>
                                     )}
                                   </CardContent>
                                 </Card>
