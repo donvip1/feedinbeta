@@ -9,6 +9,7 @@ import { ReportMessageModal } from './ReportMessageModal';
 import { MessageContextMenu } from '@/components/messages/MessageContextMenu';
 import { cn } from '@/lib/utils';
 import { getEmojiSizeClass, isEmojiOnly } from '@/lib/emoji-utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface GroupMessage {
   id: string;
@@ -254,8 +255,9 @@ export const GroupMessageBubble = ({
           
           {/* Sender Name - Show for first message in group from others */}
           {!isOwn && isFirstInGroup && (
-            <span className="text-xs text-primary font-medium mb-0.5 ml-1">
+            <span className="text-xs text-primary font-medium mb-0.5 ml-1 flex items-center gap-1">
               {message.sender.display_name || 'Unknown User'}
+              <VerifiedBadge userId={message.sender_id} size="sm" />
             </span>
           )}
 

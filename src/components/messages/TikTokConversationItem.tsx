@@ -3,12 +3,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Check, CheckCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ActivityType, getActivityIcon, getActivityColor } from './TypingIndicator';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface TikTokConversationItemProps {
   id: string;
   avatarUrl?: string | null;
   displayName: string;
   username?: string | null;
+  userId?: string;
   lastMessage?: string;
   lastMessageTime?: string;
   lastMessageSenderId?: string;
@@ -28,6 +30,7 @@ export const TikTokConversationItem = ({
   avatarUrl,
   displayName,
   username,
+  userId,
   lastMessage,
   lastMessageTime,
   lastMessageSenderId,
@@ -84,10 +87,11 @@ export const TikTokConversationItem = ({
       <div className="flex-1 flex justify-between items-center min-w-0">
         <div className="max-w-[70%] text-left">
           <h5 className={cn(
-            "font-bold truncate",
+            "font-bold truncate flex items-center gap-1",
             hasUnread ? "text-foreground" : "text-foreground"
           )}>
-            {displayName}
+            <span className="truncate">{displayName}</span>
+            {userId && <VerifiedBadge userId={userId} size="sm" />}
           </h5>
           
           {/* Last message or typing indicator */}

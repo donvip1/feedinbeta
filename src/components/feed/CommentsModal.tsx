@@ -12,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatTextWithHashtagsAndMentions } from "@/lib/text-formatting-utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface CommentsModalProps {
   isOpen: boolean;
@@ -480,10 +481,11 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p
-                          className="text-sm font-semibold cursor-pointer hover:underline"
+                          className="text-sm font-semibold cursor-pointer hover:underline flex items-center gap-1"
                           onClick={() => navigate(`/profile/${c.profiles?.username || c.user_id}`)}
                         >
                           {c.profiles?.display_name}
+                          <VerifiedBadge userId={c.user_id} size="sm" />
                         </p>
                         <span className="text-xs text-muted-foreground">
                           {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
@@ -610,10 +612,11 @@ export default function CommentsModal({ isOpen, onClose, postId, postData, onCom
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <p
-                                className="text-sm font-semibold cursor-pointer hover:underline"
+                                className="text-sm font-semibold cursor-pointer hover:underline flex items-center gap-1"
                                 onClick={() => navigate(`/profile/${reply.profiles?.username || reply.user_id}`)}
                               >
                                 {reply.profiles?.display_name}
+                                <VerifiedBadge userId={reply.user_id} size="sm" />
                               </p>
                               <span className="text-xs text-muted-foreground">
                                 {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}

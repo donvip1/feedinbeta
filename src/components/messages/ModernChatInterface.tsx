@@ -18,6 +18,7 @@ import {
   Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin,
   Gift, Sparkles, Clock
 } from 'lucide-react';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { ScheduleMessageModal } from './ScheduleMessageModal';
 import { AttachmentPicker } from './AttachmentPicker';
 import { ModernMessageBubble } from './ModernMessageBubble';
@@ -1203,7 +1204,7 @@ export const ModernChatInterface = ({
             )}
           </div>
           <div className="flex-1 min-w-0 overflow-hidden">
-            <h2 className="font-semibold truncate text-sm">{otherUser?.display_name || 'Loading...'}</h2>
+            <h2 className="font-semibold truncate text-sm flex items-center gap-1">{otherUser?.display_name || 'Loading...'} {otherUser?.id && <VerifiedBadge userId={otherUser.id} size="sm" />}</h2>
             <p className="text-xs text-muted-foreground truncate">
               {isTyping ? (
                 <span className="text-primary flex items-center gap-1 animate-pulse">
