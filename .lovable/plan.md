@@ -1,31 +1,40 @@
 
 
-## Fix: Double Credit Deduction on Transfers
+# Fix Verified Badge Not Showing in Photo+ and Across the App
 
-### The Problem
-The `transfer_credits` database function has a critical bug that deducts credits **twice** from the sender:
+## Root Cause
 
-1. It manually runs `UPDATE user_credits SET balance = balance - amount`
-2. It then inserts a negative transaction into `credit_transactions`, which triggers the `apply_credit_transaction` function that **also** subtracts from the balance
+The `VerifiedBadge` component queries `user_subscriptions` with a joined select: `subscription_tiers(name)`. However, there is **no foreign key constraint** between `user_subscriptions.tier_id` and `subscription_tiers.id`. Without this foreign key, the Supabase client cannot perform the join, so the tier name always comes back as `null` -- meaning badges never render for subscription-based users.
 
-This means every transfer costs the sender 2x the intended amount. Your 50 + 100 credit transfers actually deducted 100 + 200 = 300 credits instead of 150.
+For users with admin/moderator roles, the badge *would* show (since the role query works independently), but the subscription-based badge is completely broken for everyone.
 
-### The Fix
+## Fix Plan
 
-**Step 1: Fix the `transfer_credits` function**
-Remove the direct `UPDATE user_credits` statements for the sender. The trigger on `credit_transactions` already handles balance updates automatically. Only keep the direct update for the recipient's `ON CONFLICT` insert (since the trigger handles that too, we'll remove both direct updates and let the trigger do all the work).
+### Step 1: Add the missing foreign key constraint (Database Migration)
 
-**Step 2: Refund Adrian's 150 lost credits**
-Insert a corrective `credit_transaction` to restore the 150 credits that were incorrectly double-deducted.
+Add a foreign key from `user_subscriptions.tier_id` to `subscription_tiers.id` so the Supabase client join works correctly.
 
-### Technical Details
+```sql
+ALTER TABLE public.user_subscriptions
+ADD CONSTRAINT fk_user_subscriptions_tier
+FOREIGN KEY (tier_id) REFERENCES public.subscription_tiers(id);
+```
 
-The corrected `transfer_credits` function will:
-- Remove the `UPDATE user_credits SET balance = balance - p_amount` line for regular users
-- Remove the `INSERT INTO user_credits ... ON CONFLICT DO UPDATE` for the recipient
-- Rely entirely on the `apply_credit_transaction` trigger (which already fires on every `credit_transactions` insert) to handle all balance changes
-- This matches how every other credit operation in the system works (gifts, purchases, etc.)
+### Step 2: No code changes needed
 
-### Refund
-Adrian will receive +150 credits (type: `refund`, description: "Refund for double-deducted transfers") to correct the balance from 64 back to 214.
+The `VerifiedBadge` component code is already correctly placed in:
+- PhotoPostSlide (Photo+ fullscreen)
+- PostCard (Photo+ feed cards)
+- ImmersivePostCard (Video feed)
+- Profile page
+- Comments, Messages, Groups, Profile preview
+
+Once the foreign key is added, the existing `subscription_tiers(name)` join will start working and badges will appear for all Pro and Premium subscribers immediately.
+
+## Technical Details
+
+- The `tier_id` column already exists and has valid data linking to `subscription_tiers.id`
+- The Supabase JS client uses PostgREST, which requires foreign keys to resolve embedded/joined selects
+- This single migration fixes badges across the entire app since all badge rendering goes through the same `VerifiedBadge` component
+- The component's 2-minute cache will pick up the correct data after the fix, showing badges consistently
 
