@@ -1,8 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, Zap, Crown, Star, Sparkles } from 'lucide-react';
+import { Check, Zap, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import badgePro from '@/assets/badge-pro.png';
+import badgePremium from '@/assets/badge-premium.png';
 
 interface SubscriptionCardProps {
   id: string;
@@ -16,10 +18,9 @@ interface SubscriptionCardProps {
   onSubscribe: () => void;
 }
 
-const tierIcons: Record<string, React.ElementType> = {
-  'Basic': Zap,
-  'Pro': Crown,
-  'Premium': Star,
+const tierBadgeImages: Record<string, string> = {
+  'Pro': badgePro,
+  'Premium': badgePremium,
 };
 
 export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
@@ -32,7 +33,7 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
   isLoading,
   onSubscribe,
 }) => {
-  const Icon = tierIcons[name] || Zap;
+  const badgeImage = tierBadgeImages[name];
 
   return (
     <div 
@@ -66,7 +67,11 @@ export const SubscriptionCard: React.FC<SubscriptionCardProps> = ({
             "p-2 rounded-lg",
             isPopular ? "bg-primary/20" : "bg-secondary"
           )}>
-            <Icon className={cn("w-5 h-5", isPopular ? "text-primary" : "text-muted-foreground")} />
+            {badgeImage ? (
+              <img src={badgeImage} alt={name} className="w-6 h-6" />
+            ) : (
+              <Zap className={cn("w-5 h-5", isPopular ? "text-primary" : "text-muted-foreground")} />
+            )}
           </div>
           <h3 className="text-lg font-semibold text-foreground">{name}</h3>
         </div>
