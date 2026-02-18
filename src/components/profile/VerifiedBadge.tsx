@@ -78,9 +78,9 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
   if (!badgeSrc) return null;
 
   const sizeMap = {
-    sm: 'w-4 h-4',
-    md: 'w-5 h-5',
-    lg: 'w-6 h-6',
+    sm: 'w-[22px] h-[22px]',
+    md: 'w-[27px] h-[27px]',
+    lg: 'w-[32px] h-[32px]',
   };
 
   return (
