@@ -9,11 +9,10 @@ interface VerifiedBadgeProps {
 }
 
 // Unified cache for badge data
-const badgeDataCache = new Map<string, { plan: string | null; hasAdminRole: boolean; ts: number }>();
+const badgeDataCache = new Map<string, { plan: string | null; ts: number }>();
 const CACHE_TTL = 120000; // 2 minutes
 
-function getBadgeSrc(plan: string | null, hasAdminRole: boolean): string | null {
-  if (hasAdminRole) return badgePremium;
+function getBadgeSrc(plan: string | null): string | null {
   if (plan?.includes('premium')) return badgePremium;
   if (plan?.includes('pro') || plan?.includes('popular')) return badgePro;
   return null;
@@ -22,17 +21,14 @@ function getBadgeSrc(plan: string | null, hasAdminRole: boolean): string | null 
 export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
   const cached = userId ? badgeDataCache.get(userId) : null;
   const [planName, setPlanName] = useState<string | null>(cached?.plan ?? null);
-  const [hasAdminRole, setHasAdminRole] = useState(cached?.hasAdminRole ?? false);
   const [loaded, setLoaded] = useState(!!cached && Date.now() - cached.ts < CACHE_TTL);
 
   useEffect(() => {
     if (!userId) return;
 
-    // Use cache if fresh
     const c = badgeDataCache.get(userId);
     if (c && Date.now() - c.ts < CACHE_TTL) {
       setPlanName(c.plan);
-      setHasAdminRole(c.hasAdminRole);
       setLoaded(true);
       return;
     }
@@ -40,30 +36,20 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
     let cancelled = false;
 
     const fetchBadgeData = async () => {
-      const [planResult, roleResult] = await Promise.all([
-        supabase
-          .from('user_subscriptions')
-          .select('subscription_tiers(name)')
-          .eq('user_id', userId)
-          .eq('status', 'active')
-          .maybeSingle(),
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .in('role', ['admin', 'moderator', 'developer', 'super_admin'])
-          .maybeSingle(),
-      ]);
+      const planResult = await supabase
+        .from('user_subscriptions')
+        .select('subscription_tiers(name)')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .maybeSingle();
 
       if (cancelled) return;
 
       const tierData = planResult.data as any;
       const plan = tierData?.subscription_tiers?.name?.toLowerCase() || null;
-      const isAdmin = !!roleResult.data;
 
-      badgeDataCache.set(userId, { plan, hasAdminRole: isAdmin, ts: Date.now() });
+      badgeDataCache.set(userId, { plan, ts: Date.now() });
       setPlanName(plan);
-      setHasAdminRole(isAdmin);
       setLoaded(true);
     };
 
@@ -71,10 +57,9 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
     return () => { cancelled = true; };
   }, [userId]);
 
-  // Don't render anything until loaded (prevents flash), unless cache gave us data
   if (!loaded) return null;
 
-  const badgeSrc = getBadgeSrc(planName, hasAdminRole);
+  const badgeSrc = getBadgeSrc(planName);
   if (!badgeSrc) return null;
 
   const sizeMap = {
