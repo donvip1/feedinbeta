@@ -1,0 +1,1 @@
+ALTER TABLE public.user_subscriptions DROP CONSTRAINT fk_user_subscriptions_tier;
