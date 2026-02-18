@@ -12,6 +12,7 @@ import RefeedModal from './RefeedModal';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatCompactTime } from '@/lib/format-time';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 // Format count for display
 const formatCount = (count: number): string => {
@@ -288,8 +289,9 @@ const PhotoPostSlide = memo(function PhotoPostSlide({
           </Avatar>
           <div className="flex flex-col flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-white text-sm">
+              <span className="font-semibold text-white text-sm flex items-center gap-1">
                 {displayName}
+                <VerifiedBadge userId={post.user_id} size="sm" />
               </span>
               {user && post.user_id !== user.id && (
                 <button 
