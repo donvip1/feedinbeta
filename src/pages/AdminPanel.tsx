@@ -139,6 +139,7 @@ const AdminPanel = () => {
       const { data, error } = await supabase
         .from('user_roles')
         .select('user_id, role, created_at, assigned_by')
+        .in('role', ['super_admin', 'developer', 'admin', 'moderator'])
         .order('role');
       if (error) throw error;
       
@@ -169,6 +170,8 @@ const AdminPanel = () => {
       }));
     },
     enabled: permissions.isAdmin || permissions.isDeveloper,
+    staleTime: 30000,
+    refetchOnWindowFocus: false,
   });
 
   const handleDemoteUser = async (targetUserId: string, username: string) => {

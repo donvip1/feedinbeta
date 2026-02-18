@@ -293,6 +293,19 @@ export const useRealtimeSubscriptions = () => {
       .subscribe();
     channelsRef.current.push(profileChannel);
 
+    // 11. User roles real-time (for admin team/roles stability)
+    const rolesChannel = supabase
+      .channel('realtime-user-roles')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'user_roles',
+      }, () => {
+        invalidateQueries(['admin-team-members', 'admin-users', 'admin-permissions']);
+      })
+      .subscribe();
+    channelsRef.current.push(rolesChannel);
+
     // Cleanup on unmount
     return () => {
       channelsRef.current.forEach(ch => supabase.removeChannel(ch));
