@@ -76,17 +76,11 @@ export const RolePlanBadge = ({ userId, compact = false }: RolePlanBadgeProps) =
   const roleConfig = role && canSeeAdminRole ? ROLE_CONFIG[role] : null;
   const planConfig = planName ? Object.entries(PLAN_CONFIG).find(([key]) => planName.includes(key))?.[1] : null;
 
-  if (!roleConfig && !planConfig) return null;
+  if (!planConfig) return null;
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      {roleConfig && (
-        <Badge className={`bg-gradient-to-r ${roleConfig.gradient} text-white border-0 shadow-md text-[10px] ${compact ? 'px-1.5 py-0' : 'px-2 py-0.5'}`}>
-          <roleConfig.icon className={`${compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-0.5`} />
-          {roleConfig.label}
-        </Badge>
-      )}
-      {planConfig && !roleConfig && (
+      {planConfig && (
         <Badge className={`bg-gradient-to-r ${planConfig.gradient} text-white border-0 shadow-md text-[10px] ${compact ? 'px-1.5 py-0' : 'px-2 py-0.5'}`}>
           <planConfig.icon className={`${compact ? 'w-2.5 h-2.5' : 'w-3 h-3'} mr-0.5`} />
           {planConfig.label}
