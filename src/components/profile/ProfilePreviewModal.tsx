@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { UserPlus, MessageCircle, Users, Heart, Eye, X, Clock, UserCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface ProfilePreviewModalProps {
   open: boolean;
@@ -290,7 +291,7 @@ export const ProfilePreviewModal = ({ open, onClose, userId }: ProfilePreviewMod
             </Avatar>
 
             <div>
-              <h2 className="text-2xl font-bold text-white">{displayName}</h2>
+              <h2 className="text-2xl font-bold text-white flex items-center justify-center gap-1">{displayName} <VerifiedBadge userId={userId} size="md" /></h2>
               <p className="text-sm text-gray-400">{username}</p>
             </div>
 

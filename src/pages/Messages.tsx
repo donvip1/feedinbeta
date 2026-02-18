@@ -664,6 +664,7 @@ export default function Messages() {
                       avatarUrl={conv.other_participant.avatar_url}
                       displayName={conv.other_participant.display_name || 'Unknown User'}
                       username={conv.other_participant.username}
+                      userId={conv.other_participant.id}
                       lastMessage={
                         conv.last_message 
                           ? `${conv.last_message.sender_id === user?.id ? 'You: ' : ''}${conv.last_message.content}`

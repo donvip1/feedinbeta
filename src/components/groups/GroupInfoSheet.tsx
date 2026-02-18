@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface GroupInfoSheetProps {
   open: boolean;
@@ -178,11 +179,12 @@ export const GroupInfoSheet = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span 
-              className="font-medium text-white truncate cursor-pointer hover:underline"
+              className="font-medium text-white truncate cursor-pointer hover:underline flex items-center gap-1"
               onClick={() => navigate(`/profile/${member.user_id}`)}
             >
               {member.display_name || 'User'}
               {isCurrentUser && ' (You)'}
+              <VerifiedBadge userId={member.user_id} size="sm" />
             </span>
             {(member.role === 'admin' || member.role === 'owner') && (
               <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-medium">
