@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AvatarBadgeIcon } from '@/components/profile/AvatarBadgeIcon';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import CommentsModal from './CommentsModal';
@@ -685,8 +686,9 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                 </div>
                 <div className="flex flex-col flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-base text-white cursor-pointer" onClick={handleProfileClick}>
+                    <span className="font-bold text-base text-white cursor-pointer flex items-center gap-1" onClick={handleProfileClick}>
                       {displayName}
+                      <VerifiedBadge userId={post.user_id} size="sm" />
                     </span>
                     {/* Follow button inline */}
                     {user && user.id !== post.user_id && (

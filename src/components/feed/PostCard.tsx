@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AvatarBadgeIcon } from '@/components/profile/AvatarBadgeIcon';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -669,7 +670,7 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <p className="font-semibold text-sm">{displayName}</p>
+                <p className="font-semibold text-sm flex items-center gap-1">{displayName} <VerifiedBadge userId={post.user_id} size="sm" /></p>
                 <span className="text-xs text-muted-foreground">
                   {formatCompactTime(post.created_at)}
                 </span>

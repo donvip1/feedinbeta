@@ -14,6 +14,7 @@ import { ProfileImageModal } from '@/components/profile/ProfileImageModal';
 import { CoverImageCropper } from '@/components/profile/CoverImageCropper';
 import { AvatarBadgeIcon } from '@/components/profile/AvatarBadgeIcon';
 import { RolePlanBadge } from '@/components/profile/RolePlanBadge';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { AvatarImageCropper } from '@/components/profile/AvatarImageCropper';
 import { BottomNav } from '@/components/navigation/BottomNav';
 import { BackButton } from '@/components/navigation/BackButton';
@@ -829,8 +830,9 @@ const Profile = () => {
 
           {/* Name & Username & Role - Centered */}
           <div className="text-center mb-4">
-            <h1 className="text-2xl font-bold text-foreground mb-0.5">
+            <h1 className="text-2xl font-bold text-foreground mb-0.5 flex items-center justify-center gap-1">
               {profile.display_name || 'Unknown'}
+              <VerifiedBadge userId={profile.id} size="md" />
             </h1>
             <p className="text-muted-foreground text-sm">@{profile.username || 'user'}</p>
             <div className="flex justify-center mt-1.5">
