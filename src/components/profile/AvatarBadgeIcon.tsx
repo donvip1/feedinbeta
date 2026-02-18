@@ -88,13 +88,12 @@ export const AvatarBadgeIcon = ({ userId, size = 'sm' }: AvatarBadgeIconProps) =
   const isOwnProfile = user?.id === userId;
   const canSeeAdminRole = isOwnProfile || viewerIsAdmin;
 
-  // Only show role badge if viewer is allowed; always show plan badge
-  const roleConfig = role && canSeeAdminRole ? ROLE_ICON_CONFIG[role] : null;
+  // Only show subscription plan badge on avatar, not role badges
   const planConfig = planName
     ? Object.entries(PLAN_ICON_CONFIG).find(([key]) => planName.includes(key))?.[1]
     : null;
 
-  const config = roleConfig || planConfig;
+  const config = planConfig;
   if (!config) return null;
 
   const Icon = config.icon;
