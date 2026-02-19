@@ -1,52 +1,50 @@
 
-# Fix Badge Size and Badge Display Reliability
 
-## Problem Summary
+# Add Verified Badges Across the Entire App
 
-Two issues need fixing:
+## Problem
+The VerifiedBadge (subscription badge) is missing from several key areas of the app where user names are displayed. Currently it only shows in some places but not others.
 
-1. **Badge size is too large** - The verified badge icons next to usernames need to be reduced by 15%.
-2. **Badges appear and disappear inconsistently** - Subscribed users sometimes see their badge, sometimes don't. This is caused by a **missing database foreign key**.
+## Where Badges Already Exist
+- Feed PostCard (Photo+ card view)
+- Feed ImmersivePostCard (video fullscreen)
+- Feed PhotoPostSlide (Photo+ swipeable view)
+- Feed CommentsModal (full-screen comments)
+- Messages conversation list (TikTokConversationItem)
+- Messages chat header (ModernChatInterface)
+- Groups message bubbles (GroupMessageBubble)
+- Groups info sheet member list (GroupInfoSheet)
+- Profile page
 
-## Root Cause of Badge Flickering
+## Where Badges Are Missing (To Fix)
 
-The `VerifiedBadge` component queries `user_subscriptions` with a joined select: `subscription_tiers(name)`. However, there is **no foreign key constraint** between `user_subscriptions.tier_id` and `subscription_tiers.id` in the database.
+### 1. InlineCommentsPanel (Feed inline comments)
+Comments and replies show display names but no badge. Add `VerifiedBadge` next to each commenter's name and each reply author's name.
 
-Without this foreign key, the database cannot perform the join reliably -- the tier name comes back as `null` randomly, which makes badges appear and disappear.
+- **Line ~396**: After `{c.profiles?.display_name}` add `<VerifiedBadge userId={c.user_id} size="sm" />`
+- **Line ~473**: After `{reply.profiles?.display_name}` add `<VerifiedBadge userId={reply.user_id} size="sm" />`
+- Add `flex items-center gap-1` to the parent `<p>` tags
+- Import VerifiedBadge at top of file
 
-## Fix Plan
+### 2. GroupMembersSheet (Group members list)
+Member names in the group members list have no badge.
 
-### Step 1: Reduce badge sizes by 15%
+- **Line ~280**: After `{member.display_name || 'User'}` add `<VerifiedBadge userId={member.user_id} size="sm" />`
+- Add `flex items-center gap-1` to the parent span
+- Import VerifiedBadge at top of file
 
-**File: `src/components/profile/VerifiedBadge.tsx`**
+### 3. NewConversationModal (New message user list)
+User names in the new conversation search/friends list have no badge.
 
-Current sizes and new sizes (reduced by ~15%):
-- sm: 22px --> 19px
-- md: 27px --> 23px  
-- lg: 32px --> 27px
-
-### Step 2: Add missing foreign key constraint (Database)
-
-Run a migration to add the foreign key:
-
-```text
-ALTER TABLE public.user_subscriptions
-ADD CONSTRAINT fk_user_subscriptions_tier
-FOREIGN KEY (tier_id) REFERENCES public.subscription_tiers(id);
-```
-
-This single database fix will make badges show reliably across the entire app since all badge components query `subscription_tiers(name)` through this same join.
-
-### Step 3: Improve VerifiedBadge resilience
-
-Update `VerifiedBadge.tsx` to add a fallback query approach -- if the join returns null, do a separate direct query to `subscription_tiers` using the `tier_id`. This ensures badges work even if caching or timing causes issues.
-
-Also clear the badge cache on auth state changes so badges refresh properly when users log in.
+- **Line ~347**: After `{u.display_name || 'Unknown User'}` add `<VerifiedBadge userId={u.id} size="sm" />`
+- Add `flex items-center gap-1` to the parent `<p>` tag
+- Import VerifiedBadge at top of file
 
 ## Technical Details
 
-- The `tier_id` column already exists in `user_subscriptions` with valid data
-- The database client requires foreign keys to resolve joined/embedded selects
-- The 2-minute cache in `VerifiedBadge` will naturally pick up correct data after the FK fix
-- The fallback query adds an extra safety net for edge cases
-- Badge size reduction applies to the inline verified icon next to names (not the avatar overlay icon which is already smaller)
+- All additions use `<VerifiedBadge userId={...} size="sm" />` for consistency
+- The VerifiedBadge component already handles caching (2-min TTL), fallback queries, and auth-state cache clearing from the previous fix
+- No database changes needed -- the foreign key and fallback query from the previous fix ensure reliable data
+- The badge will only render for users with active Pro or Premium subscriptions
+- 3 files need to be modified: `InlineCommentsPanel.tsx`, `GroupMembersSheet.tsx`, `NewConversationModal.tsx`
+
