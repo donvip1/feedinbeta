@@ -1,50 +1,48 @@
 
+# Fix Verified Badges Not Showing in Photo+ Feed
 
-# Add Verified Badges Across the Entire App
+## Root Cause
 
-## Problem
-The VerifiedBadge (subscription badge) is missing from several key areas of the app where user names are displayed. Currently it only shows in some places but not others.
+The foreign key constraint between `user_subscriptions.tier_id` and `subscription_tiers.id` was **added then immediately dropped** by two conflicting migrations:
+- Migration 1: Added the FK constraint
+- Migration 2: Dropped the FK constraint
 
-## Where Badges Already Exist
-- Feed PostCard (Photo+ card view)
-- Feed ImmersivePostCard (video fullscreen)
-- Feed PhotoPostSlide (Photo+ swipeable view)
-- Feed CommentsModal (full-screen comments)
-- Messages conversation list (TikTokConversationItem)
-- Messages chat header (ModernChatInterface)
-- Groups message bubbles (GroupMessageBubble)
-- Groups info sheet member list (GroupInfoSheet)
-- Profile page
+Without this foreign key, the Supabase JS client cannot resolve the embedded select `subscription_tiers(name)` in the query. The entire query returns an error or null data, which means the fallback (`tierData?.tier_id`) is also null -- so **no badge renders for any user anywhere**.
 
-## Where Badges Are Missing (To Fix)
+The badge appears to work intermittently because:
+- Sometimes a cached result from a previous session is used (2-min TTL cache)
+- The auth state change clears the cache, triggering a fresh query that fails again
 
-### 1. InlineCommentsPanel (Feed inline comments)
-Comments and replies show display names but no badge. Add `VerifiedBadge` next to each commenter's name and each reply author's name.
+## Fix Plan
 
-- **Line ~396**: After `{c.profiles?.display_name}` add `<VerifiedBadge userId={c.user_id} size="sm" />`
-- **Line ~473**: After `{reply.profiles?.display_name}` add `<VerifiedBadge userId={reply.user_id} size="sm" />`
-- Add `flex items-center gap-1` to the parent `<p>` tags
-- Import VerifiedBadge at top of file
+### Step 1: Re-add the foreign key constraint (Database)
 
-### 2. GroupMembersSheet (Group members list)
-Member names in the group members list have no badge.
+Create a new migration to add back the foreign key:
 
-- **Line ~280**: After `{member.display_name || 'User'}` add `<VerifiedBadge userId={member.user_id} size="sm" />`
-- Add `flex items-center gap-1` to the parent span
-- Import VerifiedBadge at top of file
+```text
+ALTER TABLE public.user_subscriptions
+ADD CONSTRAINT fk_user_subscriptions_tier
+FOREIGN KEY (tier_id) REFERENCES public.subscription_tiers(id);
+```
 
-### 3. NewConversationModal (New message user list)
-User names in the new conversation search/friends list have no badge.
+### Step 2: Make VerifiedBadge query more resilient
 
-- **Line ~347**: After `{u.display_name || 'Unknown User'}` add `<VerifiedBadge userId={u.id} size="sm" />`
-- Add `flex items-center gap-1` to the parent `<p>` tag
-- Import VerifiedBadge at top of file
+Update `VerifiedBadge.tsx` to use a **two-step query approach** instead of relying on the embedded join:
+
+1. First query: `user_subscriptions` to get `tier_id` only (no join -- this always works)
+2. Second query: `subscription_tiers` to get the tier name by ID
+
+This ensures badges work even if the FK is somehow missing or the join fails. The component already has a fallback, but it doesn't trigger because when the join fails, the entire `planResult.data` is null (not just the nested object).
+
+**Changes to `src/components/profile/VerifiedBadge.tsx`:**
+- Replace the single joined query with two separate sequential queries
+- First: `select('tier_id').eq('user_id', userId).eq('status', 'active')`
+- Then: `select('name').eq('id', tierId)` on `subscription_tiers`
+
+This is a 1-file code change + 1 database migration.
 
 ## Technical Details
 
-- All additions use `<VerifiedBadge userId={...} size="sm" />` for consistency
-- The VerifiedBadge component already handles caching (2-min TTL), fallback queries, and auth-state cache clearing from the previous fix
-- No database changes needed -- the foreign key and fallback query from the previous fix ensure reliable data
-- The badge will only render for users with active Pro or Premium subscriptions
-- 3 files need to be modified: `InlineCommentsPanel.tsx`, `GroupMembersSheet.tsx`, `NewConversationModal.tsx`
-
+- The second migration file (`20260219134515_...`) that dropped the constraint will remain (it already ran), but the new migration re-adds it
+- The two-step query approach adds minimal overhead (one extra small query) but guarantees reliability regardless of FK status
+- All existing badge placements (PostCard, PhotoPostSlide, ImmersivePostCard, CommentsModal, InlineCommentsPanel, GroupMembersSheet, NewConversationModal) will automatically work once this fix is applied since they all use the same `VerifiedBadge` component
