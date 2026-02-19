@@ -18,6 +18,11 @@ function getBadgeSrc(plan: string | null): string | null {
   return null;
 }
 
+// Clear cache on auth changes
+supabase.auth.onAuthStateChange(() => {
+  badgeDataCache.clear();
+});
+
 export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
   const cached = userId ? badgeDataCache.get(userId) : null;
   const [planName, setPlanName] = useState<string | null>(cached?.plan ?? null);
@@ -36,9 +41,10 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
     let cancelled = false;
 
     const fetchBadgeData = async () => {
+      // Primary query: joined select
       const planResult = await supabase
         .from('user_subscriptions')
-        .select('subscription_tiers(name)')
+        .select('tier_id, subscription_tiers(name)')
         .eq('user_id', userId)
         .eq('status', 'active')
         .maybeSingle();
@@ -46,7 +52,18 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
       if (cancelled) return;
 
       const tierData = planResult.data as any;
-      const plan = tierData?.subscription_tiers?.name?.toLowerCase() || null;
+      let plan = tierData?.subscription_tiers?.name?.toLowerCase() || null;
+
+      // Fallback: if join returned null but we have a tier_id, query directly
+      if (!plan && tierData?.tier_id) {
+        const { data: tierDirect } = await supabase
+          .from('subscription_tiers')
+          .select('name')
+          .eq('id', tierData.tier_id)
+          .maybeSingle();
+        if (cancelled) return;
+        plan = tierDirect?.name?.toLowerCase() || null;
+      }
 
       badgeDataCache.set(userId, { plan, ts: Date.now() });
       setPlanName(plan);
@@ -63,9 +80,9 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
   if (!badgeSrc) return null;
 
   const sizeMap = {
-    sm: 'w-[22px] h-[22px]',
-    md: 'w-[27px] h-[27px]',
-    lg: 'w-[32px] h-[32px]',
+    sm: 'w-[19px] h-[19px]',
+    md: 'w-[23px] h-[23px]',
+    lg: 'w-[27px] h-[27px]',
   };
 
   return (
