@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface User {
   id: string;
@@ -344,7 +345,7 @@ export const NewConversationModal = ({ open, onClose, onSelectUser, initialImage
         </Avatar>
         
         <div className="flex-1 text-left min-w-0">
-          <p className="font-semibold truncate">{u.display_name || 'Unknown User'}</p>
+          <p className="font-semibold truncate flex items-center gap-1">{u.display_name || 'Unknown User'} <VerifiedBadge userId={u.id} size="sm" /></p>
           {u.username && (
             <p className="text-sm text-muted-foreground truncate">@{u.username}</p>
           )}

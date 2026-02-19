@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatTextWithHashtagsAndMentions } from "@/lib/text-formatting-utils";
+import { VerifiedBadge } from "@/components/profile/VerifiedBadge";
 
 interface InlineCommentsPanelProps {
   isOpen: boolean;
@@ -390,10 +391,11 @@ export default function InlineCommentsPanel({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
                       <p
-                        className="text-xs font-semibold cursor-pointer hover:underline"
+                        className="text-xs font-semibold cursor-pointer hover:underline flex items-center gap-1"
                         onClick={() => handleNavigateToProfile(c.profiles?.username || null, c.user_id)}
                       >
                         {c.profiles?.display_name}
+                        <VerifiedBadge userId={c.user_id} size="sm" />
                       </p>
                       <span className="text-[10px] text-muted-foreground">
                         {formatDistanceToNow(new Date(c.created_at), { addSuffix: true })}
@@ -467,10 +469,11 @@ export default function InlineCommentsPanel({
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
                             <p
-                              className="text-xs font-semibold cursor-pointer hover:underline"
+                              className="text-xs font-semibold cursor-pointer hover:underline flex items-center gap-1"
                               onClick={() => handleNavigateToProfile(reply.profiles?.username || null, reply.user_id)}
                             >
                               {reply.profiles?.display_name}
+                              <VerifiedBadge userId={reply.user_id} size="sm" />
                             </p>
                             <span className="text-[10px] text-muted-foreground">
                               {formatDistanceToNow(new Date(reply.created_at), { addSuffix: true })}

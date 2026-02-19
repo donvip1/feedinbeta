@@ -16,6 +16,7 @@ import {
 import { cn } from '@/lib/utils';
 import { GroupRoleManagement } from './GroupRoleManagement';
 import { PresenceStatus } from '@/hooks/usePresence';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface GroupMembersSheetProps {
   open: boolean;
@@ -279,6 +280,7 @@ export const GroupMembersSheet = ({
                         >
                           {member.display_name || 'User'}
                           {isCurrentUser && ' (You)'}
+                          <VerifiedBadge userId={member.user_id} size="sm" />
                         </span>
                         {roleIcon}
                         {roleBadge && (
