@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Users, Radio, Zap, Mic, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 type RoomType = 'video_broadcast' | 'audio_space' | 'pk_battle';
 
@@ -8,6 +9,7 @@ interface LiveFeedItemProps {
   id: string;
   title: string;
   hostName: string;
+  hostUserId?: string;
   hostAvatar?: string;
   hostLevel?: number;
   roomType: RoomType;
@@ -22,6 +24,7 @@ export const LiveFeedItem = ({
   id,
   title,
   hostName,
+  hostUserId,
   hostAvatar,
   hostLevel,
   roomType,
@@ -122,7 +125,10 @@ export const LiveFeedItem = ({
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-white truncate">{hostName}</p>
+            <p className="font-semibold text-white truncate flex items-center gap-1">
+              {hostName}
+              {hostUserId && <VerifiedBadge userId={hostUserId} size="sm" />}
+            </p>
             <p className="text-sm text-white/70 truncate">{title}</p>
           </div>
         </div>
