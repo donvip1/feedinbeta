@@ -1142,7 +1142,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span 
-                    className="font-bold text-sm text-white cursor-pointer" 
+                    className="font-bold text-sm text-white cursor-pointer flex items-center gap-1" 
                     style={{ textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1150,6 +1150,7 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
                     }}
                   >
                     {displayName}
+                    <VerifiedBadge userId={post.user_id} size="sm" />
                   </span>
                   {/* Follow button inline */}
                   {user && user.id !== post.user_id && (

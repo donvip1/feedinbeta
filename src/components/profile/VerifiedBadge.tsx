@@ -10,7 +10,7 @@ interface VerifiedBadgeProps {
 
 // Unified cache for badge data
 const badgeDataCache = new Map<string, { plan: string | null; ts: number }>();
-const CACHE_TTL = 120000; // 2 minutes
+const CACHE_TTL = 1800000; // 30 minutes
 
 function getBadgeSrc(plan: string | null): string | null {
   if (plan?.includes('premium')) return badgePremium;
@@ -19,8 +19,10 @@ function getBadgeSrc(plan: string | null): string | null {
 }
 
 // Clear cache on auth changes
-supabase.auth.onAuthStateChange(() => {
-  badgeDataCache.clear();
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT') {
+    badgeDataCache.clear();
+  }
 });
 
 export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
