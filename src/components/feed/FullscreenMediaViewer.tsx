@@ -13,6 +13,7 @@ import ShareModal from './ShareModal';
 import GiftModal from './GiftModal';
 import RefeedModal from './RefeedModal';
 import { tailwindGradientToCSS } from '@/lib/tailwind-gradient-utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface Post {
   id: string;
@@ -700,7 +701,7 @@ export default function FullscreenMediaViewer({
                             <AvatarFallback>{postDisplayName[0]?.toUpperCase()}</AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="font-semibold text-white text-sm">{postDisplayName}</p>
+                            <p className="font-semibold text-white text-sm flex items-center gap-1">{postDisplayName} <VerifiedBadge userId={p.user_id} size="sm" /></p>
                             <p className="text-xs text-white/60">@{postUsername}</p>
                           </div>
                         </div>
