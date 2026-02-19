@@ -816,13 +816,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span 
-                    className="font-semibold text-foreground text-sm cursor-pointer hover:underline"
+                    className="font-semibold text-foreground text-sm cursor-pointer hover:underline flex items-center gap-1"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleProfileClick();
                     }}
                   >
                     {displayName}
+                    <VerifiedBadge userId={post.user_id} size="sm" />
                   </span>
                   {user && user.id !== post.user_id && (
                     <button 
@@ -1519,13 +1520,14 @@ const ImmersivePostCard = memo(function ImmersivePostCard({
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span 
-                    className="font-semibold text-foreground text-sm cursor-pointer hover:underline"
+                    className="font-semibold text-foreground text-sm cursor-pointer hover:underline flex items-center gap-1"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleProfileClick();
                     }}
                   >
                     {displayName}
+                    <VerifiedBadge userId={post.user_id} size="sm" />
                   </span>
                   {user && user.id !== post.user_id && (
                     <button 
