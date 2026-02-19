@@ -52,15 +52,22 @@ export const AvatarBadgeIcon = ({ userId, size = 'sm' }: AvatarBadgeIconProps) =
           .maybeSingle(),
         supabase
           .from('user_subscriptions')
-          .select('subscription_tiers(name)')
+          .select('tier_id')
           .eq('user_id', userId)
           .eq('status', 'active')
           .maybeSingle(),
       ]);
 
       const r = roleResult.data?.role || null;
-      const tierData = planResult.data as any;
-      const p = tierData?.subscription_tiers?.name?.toLowerCase() || null;
+      let p: string | null = null;
+      if (planResult.data?.tier_id) {
+        const { data: tierData } = await supabase
+          .from('subscription_tiers')
+          .select('name')
+          .eq('id', planResult.data.tier_id)
+          .maybeSingle();
+        p = tierData?.name?.toLowerCase() || null;
+      }
 
       badgeCache.set(userId, { role: r, plan: p, ts: Date.now() });
       setRole(r);

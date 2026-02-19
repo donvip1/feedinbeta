@@ -41,28 +41,27 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
     let cancelled = false;
 
     const fetchBadgeData = async () => {
-      // Primary query: joined select
-      const planResult = await supabase
+      // Step 1: Get tier_id from user_subscriptions (always works, no join needed)
+      const { data: subData } = await supabase
         .from('user_subscriptions')
-        .select('tier_id, subscription_tiers(name)')
+        .select('tier_id')
         .eq('user_id', userId)
         .eq('status', 'active')
         .maybeSingle();
 
       if (cancelled) return;
 
-      const tierData = planResult.data as any;
-      let plan = tierData?.subscription_tiers?.name?.toLowerCase() || null;
+      let plan: string | null = null;
 
-      // Fallback: if join returned null but we have a tier_id, query directly
-      if (!plan && tierData?.tier_id) {
-        const { data: tierDirect } = await supabase
+      // Step 2: Get tier name from subscription_tiers
+      if (subData?.tier_id) {
+        const { data: tierData } = await supabase
           .from('subscription_tiers')
           .select('name')
-          .eq('id', tierData.tier_id)
+          .eq('id', subData.tier_id)
           .maybeSingle();
         if (cancelled) return;
-        plan = tierDirect?.name?.toLowerCase() || null;
+        plan = tierData?.name?.toLowerCase() || null;
       }
 
       badgeDataCache.set(userId, { plan, ts: Date.now() });
