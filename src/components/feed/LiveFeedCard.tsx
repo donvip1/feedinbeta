@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface LiveFeedCardProps {
   item: {
@@ -15,6 +16,7 @@ interface LiveFeedCardProps {
     topic_category?: string;
     share_link?: string;
     host: {
+      id?: string;
       display_name: string;
       username: string;
       avatar_url: string;
@@ -123,7 +125,10 @@ export const LiveFeedCard = ({ item, onClick }: LiveFeedCardProps) => {
             <AvatarFallback>{item.host.display_name[0]}</AvatarFallback>
           </Avatar>
           <div>
-            <p className="text-white font-medium text-sm">{item.host.display_name}</p>
+            <p className="text-white font-medium text-sm flex items-center gap-1">
+              {item.host.display_name}
+              {item.host.id && <VerifiedBadge userId={item.host.id} size="sm" />}
+            </p>
             <p className="text-white/60 text-xs">@{item.host.username}</p>
           </div>
         </div>

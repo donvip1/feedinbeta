@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
+import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 
 interface InlineLiveCardProps {
   item: {
@@ -15,6 +16,7 @@ interface InlineLiveCardProps {
     thumbnail_url?: string;
     topic_category?: string;
     host: {
+      id?: string;
       display_name: string;
       username: string;
       avatar_url: string;
@@ -131,7 +133,10 @@ export const InlineLiveCard = ({ item, onClick }: InlineLiveCardProps) => {
             <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-red-500 rounded-full border-2 border-black animate-pulse" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-white font-medium text-sm truncate">{item.host.display_name}</p>
+            <p className="text-white font-medium text-sm truncate flex items-center gap-1">
+              {item.host.display_name}
+              {item.host.id && <VerifiedBadge userId={item.host.id} size="sm" />}
+            </p>
             <p className="text-white/60 text-xs truncate">@{item.host.username}</p>
           </div>
         </div>
