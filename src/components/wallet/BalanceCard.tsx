@@ -92,21 +92,21 @@ export const BalanceCard: React.FC<BalanceCardProps> = ({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2">
-        <Button onClick={onSendClick} variant="outline" className="flex-1 h-10">
-          <Send className="w-4 h-4 mr-1.5" />
-          Send
+      <div className="grid grid-cols-3 gap-2">
+        <Button onClick={onSendClick} variant="outline" className="h-10 text-xs sm:text-sm min-w-0">
+          <Send className="w-4 h-4 mr-1 shrink-0" />
+          <span className="truncate">Send</span>
         </Button>
-        <Button onClick={onBuyClick} className="flex-1 h-10">
-          <CreditCard className="w-4 h-4 mr-1.5" />
-          Buy
+        <Button onClick={onBuyClick} className="h-10 text-xs sm:text-sm min-w-0">
+          <CreditCard className="w-4 h-4 mr-1 shrink-0" />
+          <span className="truncate">Buy</span>
         </Button>
-        {onWithdrawClick && (
-          <Button onClick={onWithdrawClick} variant="outline" className="flex-1 h-10">
-            <Banknote className="w-4 h-4 mr-1.5" />
-            Withdraw
+        {onWithdrawClick ? (
+          <Button onClick={onWithdrawClick} variant="outline" className="h-10 text-xs sm:text-sm min-w-0">
+            <Banknote className="w-4 h-4 mr-1 shrink-0" />
+            <span className="truncate">Withdraw</span>
           </Button>
-        )}
+        ) : <div />}
       </div>
     </div>
   );

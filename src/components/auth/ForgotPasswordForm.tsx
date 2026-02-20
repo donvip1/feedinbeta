@@ -24,7 +24,7 @@ export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
   const handleResetPassword = async (method: 'email' | 'phone') => {
     setLoading(true);
     try {
-      const redirectUrl = `${window.location.origin}/auth`;
+      const redirectUrl = `${window.location.origin}/reset-password`;
 
       if (method === 'email') {
         emailSchema.parse(email);
