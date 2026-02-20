@@ -678,21 +678,14 @@ serve(async (req) => {
           throw new Error("Invalid subscription tier");
         }
 
-        // Deactivate any existing active subscription
-        await supabaseService
-          .from("user_subscriptions")
-          .update({ status: "cancelled", cancel_at_period_end: true, updated_at: new Date().toISOString() })
-          .eq("user_id", targetUserId)
-          .eq("status", "active");
-
-        // Create new subscription (admin-granted, no payment required)
+        // Upsert subscription (handles both new and existing users)
         const now = new Date();
         const periodEnd = new Date(now);
         periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-        const { error: insertError } = await supabaseService
+        const { error: upsertError } = await supabaseService
           .from("user_subscriptions")
-          .insert({
+          .upsert({
             user_id: targetUserId,
             tier_id: tierId,
             status: "active",
@@ -700,9 +693,10 @@ serve(async (req) => {
             current_period_start: now.toISOString(),
             current_period_end: periodEnd.toISOString(),
             cancel_at_period_end: false,
-          });
+            updated_at: now.toISOString(),
+          }, { onConflict: "user_id" });
 
-        if (insertError) throw insertError;
+        if (upsertError) throw upsertError;
 
         // Grant subscription credits if applicable
         if (tier.subscription_credits && tier.subscription_credits > 0) {
