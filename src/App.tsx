@@ -124,7 +124,7 @@ const AIAgent = lazy(() => import("./pages/AIAgent"));
 const AdBuilder = lazy(() => import("./pages/AdBuilder"));
 const MyAds = lazy(() => import("./pages/MyAds"));
 const StarredMessages = lazy(() => import("./pages/StarredMessages"));
-
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 // Lazy load ALL AI tools - reduces memory during build
 const BackgroundRemover = lazy(() => import("./pages/tools/BackgroundRemover"));
 const ImageUpscaler = lazy(() => import("./pages/tools/ImageUpscaler"));
@@ -280,6 +280,7 @@ const App = () => {
             <Route path="/" element={<Index />} />
             <Route path="/welcome" element={<Welcome />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/install" element={<Install />} />
             <Route path="/referral/:username" element={<Referral />} />
             <Route path="/ref/:username" element={<Referral />} />

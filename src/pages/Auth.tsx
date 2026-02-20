@@ -28,6 +28,10 @@ const Auth = () => {
   }, []);
 
   useEffect(() => {
+    // Skip redirect if this is a recovery flow (user clicked password reset link)
+    const hash = window.location.hash;
+    if (hash.includes('type=recovery')) return;
+
     if (user) {
       const redirectTo = searchParams.get('redirect') || sessionStorage.getItem('redirectAfterAuth');
 
