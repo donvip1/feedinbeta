@@ -715,3 +715,132 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* ========== MOBILE APP ENHANCEMENTS ========== */
+
+/* Touch-friendly buttons - minimum 44px tap targets (Apple HIG) */
+@layer components {
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    @apply flex items-center justify-center;
+  }
+
+  /* Mobile card style - elevated with clear boundaries */
+  .mobile-card {
+    @apply rounded-xl bg-card border border-border/50 shadow-sm;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .mobile-card:active {
+    @apply scale-[0.98] transition-transform duration-100;
+  }
+
+  /* App-style button */
+  .app-button {
+    @apply rounded-xl font-medium px-4 py-3 text-sm transition-all duration-150 active:scale-95;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 48px;
+  }
+
+  .app-button-primary {
+    @apply app-button bg-primary text-primary-foreground;
+  }
+
+  .app-button-secondary {
+    @apply app-button bg-secondary text-secondary-foreground;
+  }
+
+  /* Mobile list item with press feedback */
+  .mobile-list-item {
+    @apply flex items-center gap-3 px-4 py-3 transition-colors duration-100;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    min-height: 52px;
+  }
+
+  .mobile-list-item:active {
+    background-color: hsl(var(--accent) / 0.1);
+  }
+
+  /* Mobile page container */
+  .mobile-page {
+    @apply min-h-screen pb-20;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+
+  /* Mobile header bar */
+  .mobile-header {
+    @apply sticky top-0 z-50 flex items-center h-14 px-4 bg-background/95 backdrop-blur-md border-b border-border/50;
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Touch feedback for interactive elements */
+  .touch-feedback {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    cursor: pointer;
+  }
+
+  .touch-feedback:active {
+    opacity: 0.7;
+    transition: opacity 0.1s ease;
+  }
+
+  /* Mobile-optimized icon button */
+  .icon-button {
+    @apply flex items-center justify-center rounded-full p-2 transition-all duration-150;
+    min-height: 40px;
+    min-width: 40px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  .icon-button:active {
+    @apply scale-90 bg-accent/10;
+  }
+
+  /* Floating action button */
+  .mobile-fab {
+    @apply fixed z-50 rounded-full shadow-lg flex items-center justify-center;
+    @apply bg-primary text-primary-foreground;
+    width: 56px;
+    height: 56px;
+    right: 16px;
+    bottom: calc(80px + env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-fab:active {
+    @apply scale-90;
+    transition: transform 0.1s ease;
+  }
+
+  /* Responsive text - scales appropriately */
+  .text-responsive {
+    @apply text-sm sm:text-base;
+  }
+
+  .text-responsive-lg {
+    @apply text-base sm:text-lg md:text-xl;
+  }
+
+  /* Bottom sheet style */
+  .mobile-bottom-sheet {
+    @apply fixed inset-x-0 bottom-0 z-50 rounded-t-2xl bg-card border-t border-border shadow-2xl;
+    padding-bottom: env(safe-area-inset-bottom);
+    max-height: 90vh;
+    max-height: 90dvh;
+  }
+
+  /* Mobile section */
+  .mobile-section {
+    @apply px-4 py-3;
+  }
+
+  .mobile-section-title {
+    @apply text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-1;
+  }
+}
