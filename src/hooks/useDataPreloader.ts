@@ -6,6 +6,7 @@ import { navigationPrefetcher } from '@/lib/navigation-prefetcher';
 import { feedCache } from '@/lib/feed-cache';
 import { supabase } from '@/integrations/supabase/client';
 import { memoryCache } from '@/lib/memory-cache';
+import { preloadBadgeData } from '@/components/profile/VerifiedBadge';
 
 /**
  * Hook to initialize data preloading and background sync on app start
@@ -27,6 +28,9 @@ export function useDataPreloader(): void {
       
       // Preload user profile immediately for instant access
       preloadUserProfile(user.id);
+      
+      // Preload badge data for the current user
+      preloadBadgeData(user.id);
       
       // Preload feed data in background
       preloadFeedData(user.id);
