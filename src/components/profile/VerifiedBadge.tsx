@@ -27,8 +27,10 @@ supabase.auth.onAuthStateChange((event) => {
 
 export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
   const cached = userId ? badgeDataCache.get(userId) : null;
+  const validCache = cached && Date.now() - cached.ts < CACHE_TTL;
   const [planName, setPlanName] = useState<string | null>(cached?.plan ?? null);
-  const [loaded, setLoaded] = useState(!!cached && Date.now() - cached.ts < CACHE_TTL);
+  // Show immediately if we have valid cache (even if plan is null = no badge)
+  const [loaded, setLoaded] = useState(!!validCache);
 
   useEffect(() => {
     if (!userId) return;
@@ -43,7 +45,6 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
     let cancelled = false;
 
     const fetchBadgeData = async () => {
-      // Step 1: Get tier_id from user_subscriptions (always works, no join needed)
       const { data: subData } = await supabase
         .from('user_subscriptions')
         .select('tier_id')
@@ -55,7 +56,6 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
 
       let plan: string | null = null;
 
-      // Step 2: Get tier name from subscription_tiers
       if (subData?.tier_id) {
         const { data: tierData } = await supabase
           .from('subscription_tiers')
@@ -75,6 +75,7 @@ export const VerifiedBadge = ({ userId, size = 'sm' }: VerifiedBadgeProps) => {
     return () => { cancelled = true; };
   }, [userId]);
 
+  // Don't hide content while loading - show nothing only if loaded and no badge
   if (!loaded) return null;
 
   const badgeSrc = getBadgeSrc(planName);
@@ -102,4 +103,28 @@ export const invalidateVerifiedBadgeCache = (userId?: string) => {
   } else {
     badgeDataCache.clear();
   }
+};
+
+// Preload badge data for a user (call on app init)
+export const preloadBadgeData = async (userId: string) => {
+  if (badgeDataCache.has(userId)) return;
+  
+  const { data: subData } = await supabase
+    .from('user_subscriptions')
+    .select('tier_id')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  let plan: string | null = null;
+  if (subData?.tier_id) {
+    const { data: tierData } = await supabase
+      .from('subscription_tiers')
+      .select('name')
+      .eq('id', subData.tier_id)
+      .maybeSingle();
+    plan = tierData?.name?.toLowerCase() || null;
+  }
+
+  badgeDataCache.set(userId, { plan, ts: Date.now() });
 };
