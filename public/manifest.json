@@ -23,13 +23,13 @@
       "purpose": "maskable"
     },
     {
-      "src": "/icon-192.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icon-192.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -37,5 +37,13 @@
   ],
   "categories": ["social", "entertainment"],
   "prefer_related_applications": false,
-  "related_applications": []
+  "related_applications": [],
+  "screenshots": [
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
 }
