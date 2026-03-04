@@ -1058,21 +1058,24 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 {filteredSpeakers
                   .filter(s => s.role === 'speaker')
                   .map(speaker => (
-                    <button
+                    <div
                       key={speaker.id}
-                      onClick={() => navigateToProfile(speaker.user_id)}
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
                     >
                       <img
                         src={speaker.profile?.avatar_url || ''}
                         alt={speaker.profile?.display_name}
                         className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                        onClick={() => navigateToProfile(speaker.user_id)}
                       />
-                      <div className="flex-1">
+                      <div 
+                        className="flex-1"
+                        onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                      >
                         <p className="text-white font-medium">{speaker.profile?.display_name}</p>
                         <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
                       </div>
-                    </button>
+                    </div>
                   ))}
               </div>
             </div>
@@ -1088,21 +1091,24 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 {filteredSpeakers
                   .filter(s => s.role === 'listener')
                   .map(speaker => (
-                    <button
+                    <div
                       key={speaker.id}
-                      onClick={() => navigateToProfile(speaker.user_id)}
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
                     >
                       <img
                         src={speaker.profile?.avatar_url || ''}
                         alt={speaker.profile?.display_name}
                         className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                        onClick={() => navigateToProfile(speaker.user_id)}
                       />
-                      <div className="flex-1">
+                      <div 
+                        className="flex-1"
+                        onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                      >
                         <p className="text-white font-medium">{speaker.profile?.display_name}</p>
                         <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
                       </div>
-                    </button>
+                    </div>
                   ))}
               </div>
             </div>
