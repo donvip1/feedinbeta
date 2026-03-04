@@ -50,15 +50,12 @@ export const BrowserInstallBanner = () => {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Fallback: if beforeinstallprompt doesn't fire within 4 seconds on mobile, 
-    // show banner with manual instructions
-    const isMobile = /android|mobile/i.test(navigator.userAgent);
+    // Fallback: if beforeinstallprompt doesn't fire within 4 seconds,
+    // show banner with manual instructions for ALL browsers (mobile & desktop)
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
-    if (isMobile) {
-      fallbackTimer = setTimeout(() => {
-        setShowBanner(true);
-      }, 4000);
-    }
+    fallbackTimer = setTimeout(() => {
+      setShowBanner(true);
+    }, 4000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);

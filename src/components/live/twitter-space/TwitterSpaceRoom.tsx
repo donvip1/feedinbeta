@@ -1588,22 +1588,42 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               </button>
             </div>
 
-            {/* Space Info */}
-            <div className="px-4 py-4 border-b border-zinc-800">
-              <div className="space-y-2">
-                <p className="text-sm text-white font-medium">
-                  {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name} • LIVE
-                </p>
-                <p className="text-lg text-white font-bold">{space?.title}</p>
-                <div className="flex gap-2 text-xs text-zinc-400">
-                  <span>🔴 Live</span>
-                  <span>👥 {speakers.length} listening</span>
+            {/* Space Info with Cover Image */}
+            {space?.cover_image_url ? (
+              <div className="relative w-full h-36 overflow-hidden border-b border-zinc-800">
+                <img src={space.cover_image_url} alt={space?.title || 'Space'} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/40 to-transparent" />
+                <div className="absolute bottom-3 left-4 right-4">
+                  <p className="text-sm font-bold text-white/80">
+                    {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name}
+                  </p>
+                  <p className="text-base font-black text-white drop-shadow-lg truncate mt-0.5">{space?.title}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-1.5 bg-purple-500/20 px-2 py-0.5 rounded-full border border-purple-500/30">
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                      <span className="text-[10px] font-black text-purple-300 uppercase tracking-widest">Live</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-400 font-bold">👥 {speakers.length} listening</span>
+                  </div>
                 </div>
               </div>
-              <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400">
-                <p>Just now • {speakers.length} Views</p>
+            ) : (
+              <div className="px-4 py-4 border-b border-zinc-800">
+                <div className="space-y-2">
+                  <p className="text-sm text-white font-medium">
+                    {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name} • LIVE
+                  </p>
+                  <p className="text-lg text-white font-bold">{space?.title}</p>
+                  <div className="flex gap-2 text-xs text-zinc-400">
+                    <span>🔴 Live</span>
+                    <span>👥 {speakers.length} listening</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-zinc-800 text-xs text-zinc-400">
+                  <p>Just now • {speakers.length} Views</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Replies Feed */}
             <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4">
