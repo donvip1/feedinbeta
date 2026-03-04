@@ -70,6 +70,7 @@ export default defineConfig(({ mode }) => ({
     },
   },
   build: {
+    chunkSizeWarningLimit: 2000,
     // Generate unique build hashes for cache busting
     rollupOptions: {
       output: {

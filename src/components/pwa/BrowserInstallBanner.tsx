@@ -27,8 +27,16 @@ export const BrowserInstallBanner = () => {
 
     // Check if dismissed this session
     const dismissedThisSession = sessionStorage.getItem('install-banner-dismissed');
+    const dismissedAt = localStorage.getItem('install-banner-dismissed-time');
     if (dismissedThisSession) {
       return;
+    }
+    // Also check if dismissed for 12 hours via localStorage
+    if (dismissedAt) {
+      const dismissedTime = parseInt(dismissedAt, 10);
+      if (Date.now() - dismissedTime < 12 * 60 * 60 * 1000) {
+        return;
+      }
     }
 
     // Detect iOS
@@ -80,6 +88,7 @@ export const BrowserInstallBanner = () => {
   const handleDismiss = () => {
     setShowBanner(false);
     sessionStorage.setItem('install-banner-dismissed', 'true');
+    localStorage.setItem('install-banner-dismissed-time', Date.now().toString());
   };
 
   if (!showBanner) return null;
