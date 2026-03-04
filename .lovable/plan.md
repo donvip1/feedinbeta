@@ -1,32 +1,56 @@
 
 
-## Plan: Add Cover Image to Chat & Fix Install Banner
+## Plan: Host Speaker Management via Display Name Tap
 
-### Issue 1: Cover Image Missing in Live Space Chat
+### What We're Building
 
-The chat sidebar in `TwitterSpaceRoom.tsx` (lines 1570-1606) shows space info (host name, title, listener count) but does **not** display the space's cover image. The `space?.cover_image_url` data is already available in the component.
+When a host taps on a participant's **display name** (not avatar) in the live space, a dropdown/action sheet appears with role management options:
+- **For listeners**: "Invite to Speak" — sends a real-time invitation the listener can accept/decline
+- **For speakers**: "Move to Listener" — demotes them back to listener immediately
 
-**Fix**: Insert the cover image between the "Space Info" header and the replies feed in the chat sidebar (around line 1592). If a cover image exists, render it as a banner with a gradient overlay, similar to what `SpaceChat.tsx` already does. If no cover image, keep the current text-only layout.
+Tapping the **avatar** continues to navigate to the user's profile as it does now.
 
-**Location**: `src/components/live/twitter-space/TwitterSpaceRoom.tsx`, lines ~1591-1606
+### Technical Approach
 
-Changes:
-- Add cover image display above the space info text block
-- Use the same gradient overlay style (`bg-gradient-to-t from-zinc-900`)
-- Show title and live badge overlaid on the image
+#### 1. Add Speaker Action Sheet Component
+Create `src/components/live/twitter-space/SpeakerActionSheet.tsx` — a bottom sheet modal showing:
+- User's avatar, name, username
+- Action buttons based on current role:
+  - Listener → "Invite to Speak" button
+  - Speaker → "Move to Listener" button
+- Only visible to host/co-host
 
-### Issue 2: Install App Prompt Not Showing
+#### 2. Add Speaker Invite Dialog Component  
+Create `src/components/live/twitter-space/SpeakInviteDialog.tsx` — a dialog shown to the invited listener:
+- Shows who invited them and the space name
+- "Accept" and "Decline" buttons
+- On accept: updates DB role to `speaker`, broadcasts promotion event, connects audio for broadcasting
+- On decline: dismisses the dialog
 
-The `BrowserInstallBanner` component is rendered in `App.tsx` but uses `sessionStorage` to track dismissal — meaning it only hides for the current session. However, `InstallAppPrompt` uses `localStorage` with a 24-hour cooldown. Both check for Capacitor/standalone mode correctly.
+#### 3. Modify `TwitterSpaceRoom.tsx`
+- **Split click handlers**: Avatar click → `navigateToProfile()`, display name click → `openSpeakerActionSheet(speaker)` (host only; non-hosts still navigate to profile)
+- **Add state** for selected speaker and action sheet visibility
+- **Add invite logic**: When host taps "Invite to Speak" on a listener:
+  - Insert into `live_space_invitations` table (existing table)
+  - Broadcast an `invite-to-speak` event on the space control channel
+- **Add demote logic**: When host taps "Move to Listener" on a speaker:
+  - Update `live_space_speakers` role to `listener`, set `is_muted: true`, `mic_allowed: false`
+  - Broadcast a `demoted-to-listener` event so the demoted user's UI updates
+- **Listen for demote broadcast**: Update local state when current user gets demoted (set role, mute mic, update toggle)
+- **Listen for invite broadcast**: Show the invite dialog to the targeted listener
 
-The likely issue is that users on browsers that don't fire `beforeinstallprompt` (especially iOS Safari, some Android browsers) may never see the banner because the fallback timer only triggers for mobile Android user agents.
+#### 4. Update Speaker Grid & Listener Grid in `TwitterSpaceRoom.tsx`
+- In the main view speaker grid (lines ~1111-1182) and listener grid (lines ~1186-1217):
+  - Keep avatar `onClick → navigateToProfile`
+  - Add separate `onClick` on display name text → `handleNameTap(speaker)` which opens the action sheet for hosts
+- In the guests view (lines ~920-1001): Same split
 
-**Fix**: 
-- In `BrowserInstallBanner.tsx`, extend the fallback to also show on desktop browsers after a delay, not just mobile Android
-- Ensure the banner appears more reliably by also showing it on iOS (it already does, but the 2-second timer may be too short for slow connections)
+#### 5. Update Guests Panel (`TwitterSpaceGuests.tsx`)
+- Same pattern: avatar navigates to profile, display name opens action sheet for hosts
 
-### Files to Modify
-
-1. **`src/components/live/twitter-space/TwitterSpaceRoom.tsx`** — Add cover image banner to chat sidebar
-2. **`src/components/pwa/BrowserInstallBanner.tsx`** — Improve fallback logic so the install prompt appears more reliably for all users
+### Key Details
+- Reuses existing `live_space_invitations` table and `speaker-promotion` broadcast pattern from `SpeakerQueuePanel`
+- Demote broadcasts use the existing `space-control` channel with a new `demoted-to-listener` event
+- The demoted user's `spaceContext.updateRole('listener')` is called to stop audio broadcasting
+- No database schema changes needed — uses existing tables
 
