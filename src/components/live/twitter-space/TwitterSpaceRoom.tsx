@@ -858,7 +858,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
   if (!space) {
     return (
-      <div className="fixed inset-0 z-50 bg-zinc-950 flex items-center justify-center">
+      <div className="fixed inset-0 z-50 bg-[#050505] flex items-center justify-center">
         <div className="text-white">Loading...</div>
       </div>
     );
@@ -875,9 +875,9 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     });
 
     return (
-      <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col">
+      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col">
         {/* Guest Header */}
-        <div className="px-4 py-4 border-b border-zinc-800 flex items-center justify-between">
+        <div className="px-4 py-4 border-b border-white/5 flex items-center justify-between">
           <button onClick={() => setView('main')} className="p-2">
             <ArrowLeft className="w-5 h-5 text-white" />
           </button>
@@ -1012,20 +1012,27 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-500">
       {/* Header */}
-      <div className="px-3 py-2.5 border-b border-zinc-800 flex items-center gap-2">
-        <button onClick={handleMinimize} className="p-1.5">
-          <ArrowLeft className="w-5 h-5 text-white" />
-        </button>
-        <h1 className="text-white font-bold text-sm flex-1 truncate">{space?.title}</h1>
-        <div className="flex items-center gap-1">
+      <div className="p-4 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <button onClick={handleMinimize} className="p-2 hover:bg-white/5 rounded-full transition-all">
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </button>
+          <div className="flex items-center gap-2 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
+            <div className="w-3 h-3 text-purple-400 animate-pulse">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/></svg>
+            </div>
+            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
           {isHost && raisedHandsCount > 0 && (
             <button 
               onClick={() => setShowSpeakerQueue(true)}
-              className="p-1.5 relative"
+              className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/5"
             >
-              <Hand className="w-4.5 h-4.5 text-amber-400" />
+              <Hand className="w-5 h-5 text-amber-400" />
               <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
                 {raisedHandsCount}
               </span>
@@ -1036,7 +1043,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               onClick={handleRecordingToggle}
               disabled={recordingLoading}
               className={cn(
-                "p-1.5 rounded-full transition-all",
+                "w-10 h-10 flex items-center justify-center rounded-full bg-white/5 transition-all",
                 isRecording ? "text-red-500" : "text-zinc-400 hover:text-white"
               )}
               title={isRecording ? "Stop Recording" : "Start Recording"}
@@ -1044,124 +1051,172 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               <Circle className={cn("w-4 h-4", isRecording && "fill-red-500 animate-pulse")} />
             </button>
           )}
-          <button onClick={() => setShowSettings(true)} className="p-1.5 text-zinc-400 hover:text-white">
-            <Settings className="w-4.5 h-4.5" />
+          <button
+            onClick={() => setShowShare(true)}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
+          >
+            <Share2 className="w-5 h-5 text-white" />
           </button>
           <button
             onClick={handleLeave}
-            className="ml-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-full transition-colors"
+            className="bg-red-500/10 text-red-500 px-6 py-2 rounded-full text-xs font-black uppercase border border-red-500/20 hover:bg-red-500/20 transition-all"
           >
             {isHost ? 'End' : 'Leave'}
-          </button>
-          {/* Share & Guests - top right */}
-          <button
-            onClick={() => setShowShare(true)}
-            className="p-1.5 text-zinc-400 hover:text-white"
-          >
-            <Share2 className="w-4.5 h-4.5" />
-          </button>
-          <button
-            onClick={() => setView('guests')}
-            className="p-1.5 text-zinc-400 hover:text-white"
-          >
-            <Users className="w-4.5 h-4.5" />
           </button>
         </div>
       </div>
 
-      {/* Main Content - Organized Avatar Grid */}
-      <div className="flex-1 flex flex-col px-4 pt-4 overflow-y-auto">
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {/* Connection Status */}
         {connectionStatus !== 'connected' && connectionStatus !== 'disconnected' && (
-          <p className="text-center text-zinc-500 text-xs mb-2 capitalize">{connectionStatus}...</p>
+          <p className="text-center text-slate-500 text-xs mb-2 capitalize">{connectionStatus}...</p>
         )}
-        
-        {/* Speakers Row (Host, Co-hosts, Speakers) */}
-        <div className="mb-4">
-          <p className="text-zinc-500 text-xs font-medium mb-3">Speakers ({sortedSpeakers.filter(s => s.role !== 'listener').length})</p>
-          <div className="flex flex-wrap gap-3 justify-center">
+
+        {/* Room Info - Centered Host */}
+        <div className="p-8 text-center max-w-lg mx-auto">
+          <div className="mb-6 relative inline-block">
+            <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full" />
+            <img
+              src={speakers.find(s => s.user_id === space?.user_id)?.profile?.avatar_url || ''}
+              alt="Host"
+              className="w-24 h-24 rounded-[2.5rem] border-4 border-white/10 relative z-10 shadow-2xl object-cover cursor-pointer"
+              onClick={() => space?.user_id && navigateToProfile(space.user_id)}
+            />
+            <div className="absolute -bottom-2 -right-2 bg-purple-600 p-2 rounded-2xl z-20 border-4 border-[#050505]">
+              <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </div>
+          </div>
+          <h1 className="text-2xl font-black mb-2 leading-tight text-white">{space?.title}</h1>
+          <p className="text-sm text-slate-400 mb-3">
+            Hosted by {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name || 'Host'}
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <button
+              onClick={() => setView('guests')}
+              className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full hover:bg-white/10 transition-all"
+            >
+              <Users className="w-3 h-3 text-slate-500" />
+              <span className="text-xs font-bold text-slate-400">{speakers.length}</span>
+            </button>
+            <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full">
+              <Volume2 className="w-3 h-3 text-slate-500" />
+              <span className="text-xs font-bold text-slate-400">{sortedSpeakers.filter(s => s.role !== 'listener').length} Speakers</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Speaker Grid - Twitter/Clubhouse style */}
+        <div className="px-6 pb-20 max-w-3xl mx-auto">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-y-10 gap-x-4 mb-12">
             {sortedSpeakers
               .filter(s => s.role !== 'listener')
-              .slice(0, 8)
+              .slice(0, 12)
               .map((speaker) => {
-                const speaking = (audioLevels[speaker.user_id] || 0) > 10;
+                const speaking = (audioLevels[speaker.user_id] || 0) > 10 && !speaker.is_muted;
                 const isHostUser = speaker.user_id === space?.user_id;
                 
                 return (
                   <button
                     key={speaker.id}
                     onClick={() => navigateToProfile(speaker.user_id)}
-                    className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-zinc-900/50 transition-colors w-20"
+                    className="flex flex-col items-center gap-4 group"
                   >
                     <div className="relative">
+                      {/* Ping-style audio wave indicators */}
                       {speaking && (
-                        <div className="absolute inset-0 rounded-full ring-2 ring-green-500 ring-offset-2 ring-offset-zinc-950 animate-pulse" />
+                        <>
+                          <div className="absolute -inset-4 rounded-[2.5rem] border-2 border-purple-500/30 animate-[ping_2s_infinite] opacity-50" />
+                          <div className="absolute -inset-2 rounded-[2.5rem] border-2 border-purple-500/50 animate-[ping_1.5s_infinite]" />
+                        </>
                       )}
-                      <div className={`w-14 h-14 rounded-full overflow-hidden bg-zinc-800 border-2 ${isHostUser ? 'border-purple-500' : 'border-zinc-700'}`}>
+                      <div className={cn(
+                        "w-20 h-20 sm:w-24 sm:h-24 rounded-[2.2rem] p-1 bg-gradient-to-tr transition-all duration-500",
+                        speaking ? 'from-purple-500 to-pink-500 scale-105' : 'from-white/10 to-white/5'
+                      )}>
                         {speaker.profile?.avatar_url ? (
-                          <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
+                          <img
+                            src={speaker.profile.avatar_url}
+                            alt={speaker.profile.display_name}
+                            className="w-full h-full rounded-[1.9rem] object-cover bg-slate-900 border-2 border-[#050505]"
+                          />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-zinc-400 text-lg font-semibold">
+                          <div className="w-full h-full rounded-[1.9rem] bg-slate-900 border-2 border-[#050505] flex items-center justify-center text-slate-400 text-xl font-bold">
                             {speaker.profile?.display_name?.[0] || 'U'}
                           </div>
                         )}
                       </div>
-                      {speaker.is_muted && (
-                        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-zinc-800 rounded-full flex items-center justify-center border-2 border-zinc-950">
-                          <MicOff className="w-2.5 h-2.5 text-zinc-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="text-center max-w-full">
-                      <div className="flex items-center justify-center gap-0.5">
-                        <span className="text-white text-[11px] font-medium truncate max-w-[50px]">
-                          {speaker.profile?.display_name?.split(' ')[0] || 'User'}
-                        </span>
-                        {speaker.profile?.is_verified && (
-                          <CheckCircle2 className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />
+                      {/* Microbadge indicators */}
+                      <div className="absolute -bottom-1 -right-1 flex gap-1">
+                        {isHostUser && (
+                          <div className="bg-amber-400 p-1.5 rounded-xl shadow-xl border-2 border-[#050505]">
+                            <svg className="w-3 h-3 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          </div>
+                        )}
+                        {speaker.is_muted && (
+                          <div className="bg-zinc-700 p-1.5 rounded-xl shadow-xl border-2 border-[#050505]">
+                            <MicOff className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        {speaking && (
+                          <div className="bg-purple-600 p-1.5 rounded-xl shadow-xl border-2 border-[#050505] animate-bounce">
+                            <Volume2 className="w-3 h-3 text-white" />
+                          </div>
                         )}
                       </div>
-                      <span className={`text-[9px] ${isHostUser ? 'text-purple-400' : 'text-zinc-500'}`}>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-black truncate max-w-[90px] group-hover:text-purple-400 transition-colors text-white">
+                        {speaker.profile?.display_name?.split(' ')[0] || 'User'}
+                      </p>
+                      <p className={cn(
+                        "text-[8px] font-black uppercase tracking-widest",
+                        isHostUser ? 'text-amber-400' : speaker.role === 'co_host' ? 'text-purple-400' : 'text-slate-500'
+                      )}>
                         {isHostUser ? 'Host' : speaker.role === 'co_host' ? 'Co-host' : 'Speaker'}
-                      </span>
+                      </p>
                     </div>
                   </button>
                 );
               })}
           </div>
-        </div>
 
-        {/* Listeners Grid */}
-        {sortedSpeakers.filter(s => s.role === 'listener').length > 0 && (
-          <div>
-            <p className="text-zinc-500 text-xs font-medium mb-3">Listening ({sortedSpeakers.filter(s => s.role === 'listener').length})</p>
-            <div className="grid grid-cols-5 gap-2">
-              {sortedSpeakers
-                .filter(s => s.role === 'listener')
-                .slice(0, 15)
-                .map((speaker) => (
-                  <button
-                    key={speaker.id}
-                    onClick={() => navigateToProfile(speaker.user_id)}
-                    className="flex flex-col items-center gap-1 p-1.5 rounded-lg hover:bg-zinc-900/50 transition-colors"
-                  >
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700">
-                      {speaker.profile?.avatar_url ? (
-                        <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-400 text-sm font-semibold">
-                          {speaker.profile?.display_name?.[0] || 'U'}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-zinc-400 text-[9px] truncate max-w-full">
-                      {speaker.profile?.display_name?.split(' ')[0] || 'User'}
-                    </span>
-                  </button>
-                ))}
+          {/* Listeners Section */}
+          {sortedSpeakers.filter(s => s.role === 'listener').length > 0 && (
+            <div className="border-t border-white/5 pt-8">
+              <div className="flex items-center justify-between mb-6">
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+                  Listeners ({sortedSpeakers.filter(s => s.role === 'listener').length})
+                </h4>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-6 opacity-80">
+                {sortedSpeakers
+                  .filter(s => s.role === 'listener')
+                  .slice(0, 18)
+                  .map((speaker) => (
+                    <button
+                      key={speaker.id}
+                      onClick={() => navigateToProfile(speaker.user_id)}
+                      className="flex flex-col items-center gap-2"
+                    >
+                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/5">
+                        {speaker.profile?.avatar_url ? (
+                          <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm font-semibold">
+                            {speaker.profile?.display_name?.[0] || 'U'}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-500 truncate w-full text-center">
+                        {speaker.profile?.display_name?.split(' ')[0] || 'User'}
+                      </span>
+                    </button>
+                  ))}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Floating Reactions - Center screen */}
@@ -1228,130 +1283,147 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         ))}
       </AnimatePresence>
 
-      {/* BOTTOM CONTROLS */}
-      <div className="px-4 py-3 pb-safe bg-zinc-950/95 backdrop-blur-sm border-t border-zinc-800/50">
-        <div className="flex items-center justify-between max-w-md mx-auto">
-          {/* Left: Mic / Request */}
-          <div className="flex flex-col items-center gap-0.5">
+      {/* BOTTOM CONTROLS - Premium rounded bar */}
+      <div className="p-6 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem] shadow-2xl flex items-center justify-between px-8">
+        <div className="flex items-center gap-6">
+          {/* Mic / Request */}
+          <div className="flex flex-col items-center gap-2">
             <button
               onClick={handleToggleMute}
-              className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${
+              className={cn(
+                "relative w-14 h-14 flex items-center justify-center rounded-[1.8rem] transition-all active:scale-90 shadow-xl",
                 canSpeak
                   ? isMicOn
-                    ? 'bg-purple-600 border-purple-500 text-white'
-                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-red-500/10 text-red-500'
                   : hasRaisedHand
-                    ? 'bg-amber-600 border-amber-500 text-white'
-                    : 'bg-transparent border-zinc-700 text-zinc-400 hover:border-zinc-500'
-              }`}
+                    ? 'bg-white text-black'
+                    : 'bg-white/5 text-slate-400'
+              )}
             >
               {canSpeak ? (
-                isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />
+                isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
               ) : (
-                <Hand className="w-5 h-5" />
+                <Hand className="w-6 h-6" />
+              )}
+              {hasRaisedHand && !canSpeak && (
+                <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full ring-4 ring-[#0F1119]">!</span>
               )}
             </button>
-            <span className="text-[10px] text-zinc-500">
-              {canSpeak ? (isMicOn ? 'Mute' : 'Unmute') : hasRaisedHand ? 'Pending' : 'Request'}
+            <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">
+              {canSpeak ? (isMicOn ? 'On Air' : 'Muted') : hasRaisedHand ? 'Pending' : 'Request'}
             </span>
           </div>
 
-          {/* Center: Action row */}
-          <div className="flex items-center gap-1">
-            {/* Volume */}
-            <div className="relative">
+          {/* Hand raise for speakers */}
+          {canSpeak && (
+            <div className="flex flex-col items-center gap-2">
               <button
-                onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-                className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
+                onClick={() => setShowReactions(true)}
+                className="w-14 h-14 bg-white/5 rounded-[1.8rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all shadow-xl"
               >
-                {volumeLevel > 50 ? <Volume2 className="w-5 h-5" /> : volumeLevel > 0 ? <Volume1 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+                <Heart className="w-6 h-6 text-slate-400" />
               </button>
-              <AnimatePresence>
-                {showVolumeSlider && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute bottom-14 left-1/2 -translate-x-1/2 bg-zinc-800 border border-zinc-700 rounded-2xl p-4 w-56 shadow-xl z-50"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-white text-sm font-semibold">Volume</span>
-                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-zinc-700 text-zinc-300">{volumeLevel}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={volumeLevel}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setVolumeLevel(val);
-                        audioPlaybackManager.setVolume(val / 100);
-                        setIsLoudspeaker(val > 50);
-                      }}
-                      className="w-full h-2 rounded-full appearance-none cursor-pointer accent-green-500 bg-zinc-600"
-                      style={{
-                        background: `linear-gradient(to right, #22c55e ${volumeLevel}%, #52525b ${volumeLevel}%)`,
-                      }}
-                    />
-                    <div className="flex justify-between mt-2 text-[10px] text-zinc-500">
-                      <span>Earpiece</span>
-                      <span>Loudspeaker</span>
-                    </div>
-                    <button
-                      onClick={() => setShowVolumeSlider(false)}
-                      className="mt-3 w-full text-center text-xs text-zinc-400 hover:text-white transition-colors"
-                    >
-                      Done
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">React</span>
             </div>
+          )}
+        </div>
 
-            {/* Gift */}
-            <button
-              onClick={() => setShowGiftModal(true)}
-              className="p-2.5 rounded-full text-amber-400 hover:text-amber-300 hover:bg-zinc-800/50 transition-all"
-            >
-              <Gift className="w-5 h-5" />
-            </button>
+        <div className="flex items-center gap-4">
+          {/* Gift Button - Gradient */}
+          <button
+            onClick={() => setShowGiftModal(true)}
+            className="w-14 h-14 bg-gradient-to-tr from-pink-500 to-rose-500 rounded-[1.5rem] flex items-center justify-center shadow-lg shadow-pink-500/20 active:scale-90 transition-all"
+          >
+            <Gift className="w-6 h-6 text-white" />
+          </button>
 
-            {/* Reactions */}
-            <button
-              onClick={() => setShowReactions(true)}
-              className="p-2.5 rounded-full text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all"
-            >
-              <Heart className="w-5 h-5" />
-            </button>
-
-            {/* Mute All - Host Only */}
-            {isHost && (
-              <button
-                onClick={handleMuteAll}
-                className={`p-2.5 rounded-full transition-all hover:bg-zinc-800/50 ${
-                  allMuted ? 'text-red-400' : 'text-zinc-400 hover:text-white'
-                }`}
-                title={allMuted ? 'Allow unmute' : 'Mute all'}
-              >
-                {allMuted ? <VolumeX className="w-5 h-5" /> : <Speaker className="w-5 h-5" />}
-              </button>
-            )}
-          </div>
-
-          {/* Right: Chat */}
+          {/* Chat */}
           <button
             onClick={() => setShowChat(true)}
-            className="relative w-12 h-12 rounded-full bg-purple-600 hover:bg-purple-700 flex items-center justify-center transition-colors"
+            className="relative w-14 h-14 bg-white/5 rounded-[1.5rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
           >
-            <MessageCircle className="w-5 h-5 text-white" />
+            <MessageSquare className="w-6 h-6 text-white" />
             {unreadMessages > 0 && (
-              <span className="absolute -top-1 -right-1 bg-white text-purple-600 text-[10px] min-w-[18px] h-[18px] px-1 font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full ring-4 ring-[#0F1119]">
                 {unreadMessages}
               </span>
             )}
           </button>
+
+          {/* More / Settings */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-14 h-14 bg-white/5 rounded-[1.5rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+          >
+            <MoreHorizontal className="w-6 h-6 text-white" />
+          </button>
+
+          {/* Volume */}
+          <div className="relative">
+            <button
+              onClick={() => setShowVolumeSlider(!showVolumeSlider)}
+              className="w-14 h-14 bg-white/5 rounded-[1.5rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+            >
+              {volumeLevel > 50 ? <Volume2 className="w-6 h-6 text-white" /> : volumeLevel > 0 ? <Volume1 className="w-6 h-6 text-white" /> : <VolumeX className="w-6 h-6 text-white" />}
+            </button>
+            <AnimatePresence>
+              {showVolumeSlider && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-[#11131E] border border-white/10 rounded-2xl p-4 w-56 shadow-xl z-50"
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-white text-sm font-semibold">Volume</span>
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/10 text-slate-300">{volumeLevel}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={volumeLevel}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setVolumeLevel(val);
+                      audioPlaybackManager.setVolume(val / 100);
+                      setIsLoudspeaker(val > 50);
+                    }}
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer accent-purple-500 bg-white/10"
+                    style={{
+                      background: `linear-gradient(to right, #a855f7 ${volumeLevel}%, rgba(255,255,255,0.1) ${volumeLevel}%)`,
+                    }}
+                  />
+                  <div className="flex justify-between mt-2 text-[10px] text-slate-500">
+                    <span>Earpiece</span>
+                    <span>Loudspeaker</span>
+                  </div>
+                  <button
+                    onClick={() => setShowVolumeSlider(false)}
+                    className="mt-3 w-full text-center text-xs text-slate-400 hover:text-white transition-colors"
+                  >
+                    Done
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Mute All - Host Only */}
+          {isHost && (
+            <button
+              onClick={handleMuteAll}
+              className={cn(
+                "w-14 h-14 rounded-[1.5rem] flex items-center justify-center active:scale-90 transition-all shadow-xl",
+                allMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-slate-400 hover:bg-white/10'
+              )}
+              title={allMuted ? 'Allow unmute' : 'Mute all'}
+            >
+              {allMuted ? <VolumeX className="w-6 h-6" /> : <Speaker className="w-6 h-6" />}
+            </button>
+          )}
         </div>
       </div>
 
