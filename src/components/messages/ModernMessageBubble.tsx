@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { Reply, Forward, Check, CheckCheck, FileText, Pin } from 'lucide-react';
@@ -88,6 +89,7 @@ export const ModernMessageBubble = ({
   onPin,
   onForward,
 }: MessageBubbleProps) => {
+  const navigate = useNavigate();
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [touchStart, setTouchStart] = useState(0);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -244,7 +246,7 @@ export const ModernMessageBubble = ({
         {showAvatar && isLastInGroup && !isOwn && (
           <Avatar 
             className="w-8 h-8 cursor-pointer hover:ring-2 hover:ring-primary/30 transition-all flex-shrink-0 mt-auto"
-            onClick={() => window.location.href = `/profile/${message.sender_id}`}
+            onClick={() => navigate(`/profile/${message.sender_id}`)}
           >
             <AvatarImage src={message.profiles.avatar_url || ''} />
             <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-xs font-medium">

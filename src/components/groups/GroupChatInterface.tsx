@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useMessageCache } from '@/hooks/useMessageCache';
 import { useGroupRealtime, useGroupTyping, GroupMessagePayload } from '@/hooks/useGroupRealtime';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -111,6 +112,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   const { toast } = useToast();
   const navigate = useNavigate();
   
+  const { cachedMessages, hasCachedData, saveToCache, appendMessage: appendCachedMessage } = useMessageCache(`group_${groupId}`);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [group, setGroup] = useState<Group | null>(null);
@@ -236,6 +238,30 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
   });
   
   // Load group data
+  // Load cached messages immediately for instant display
+  useEffect(() => {
+    if (hasCachedData && cachedMessages.length > 0 && messages.length === 0) {
+      const formattedCached: GroupMessage[] = cachedMessages.map(msg => ({
+        id: msg.id,
+        group_id: groupId,
+        content: msg.content,
+        sender_id: msg.sender_id,
+        created_at: msg.created_at,
+        media_url: msg.media_url,
+        media_type: msg.media_type,
+        sender: {
+          id: msg.sender_id,
+          display_name: msg.profiles?.display_name || 'Unknown',
+          avatar_url: msg.profiles?.avatar_url || null,
+        },
+        reactions: [],
+      }));
+      setMessages(formattedCached);
+      setIsLoading(false);
+      setTimeout(() => scrollToBottom(), 50);
+    }
+  }, [hasCachedData]);
+
   useEffect(() => {
     if (!user?.id || !groupId) return;
     loadGroup();
@@ -321,8 +347,8 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
         .select('*')
         .eq('group_id', groupId)
         .is('deleted_at', null)
-        .order('created_at', { ascending: true })
-        .limit(500);
+        .order('created_at', { ascending: false })
+        .limit(50);
       
       if (error) throw error;
       
@@ -334,7 +360,7 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
       
-      let formattedMessages: GroupMessage[] = (data || []).map(msg => ({
+      let formattedMessages: GroupMessage[] = (data || []).reverse().map(msg => ({
         ...msg,
         sender: profileMap.get(msg.sender_id) || { id: msg.sender_id, display_name: 'Unknown', avatar_url: null },
         reactions: [],
@@ -350,6 +376,20 @@ export const GroupChatInterface = ({ groupId, onBack }: GroupChatInterfaceProps)
       }
       
       setMessages(formattedMessages);
+      
+      // Save to cache for instant load next time
+      saveToCache(formattedMessages.map(m => ({
+        id: m.id,
+        content: m.content,
+        sender_id: m.sender_id,
+        created_at: m.created_at,
+        media_url: m.media_url,
+        media_type: m.media_type,
+        profiles: {
+          display_name: m.sender?.display_name || null,
+          avatar_url: m.sender?.avatar_url || null,
+        },
+      })));
       
       if (formattedMessages.length > 0) {
         const lastMessage = formattedMessages[formattedMessages.length - 1];
