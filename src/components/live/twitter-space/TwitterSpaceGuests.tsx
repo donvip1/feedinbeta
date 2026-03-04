@@ -24,6 +24,7 @@ interface TwitterSpaceGuestsProps {
   isHost: boolean;
   onClose: () => void;
   audioLevels: Record<string, number>;
+  onNameTap?: (speaker: Speaker) => void;
 }
 
 type TabType = 'All' | 'Co-hosts' | 'Speakers' | 'Listening';
@@ -34,6 +35,7 @@ export const TwitterSpaceGuests = ({
   isHost,
   onClose,
   audioLevels,
+  onNameTap,
 }: TwitterSpaceGuestsProps) => {
   const [activeTab, setActiveTab] = useState<TabType>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,7 +88,14 @@ export const TwitterSpaceGuests = ({
         )}
       </div>
 
-      <div className="flex-1 min-w-0">
+      <div 
+        className="flex-1 min-w-0 cursor-pointer"
+        onClick={() => {
+          if (isHost && onNameTap && speaker.role !== 'host') {
+            onNameTap(speaker);
+          }
+        }}
+      >
         <div className="flex items-center gap-1">
           <span className="text-white font-medium truncate">
             {speaker.profile?.display_name || 'User'}

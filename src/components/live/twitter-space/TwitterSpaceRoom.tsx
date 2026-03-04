@@ -48,6 +48,8 @@ import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
 import { MentionText } from '../MentionText';
 import { ThreadedRepliesList } from './ThreadedRepliesList';
+import { SpeakerActionSheet } from './SpeakerActionSheet';
+import { SpeakInviteDialog } from './SpeakInviteDialog';
 
 interface TwitterSpaceRoomProps {
   spaceId: string;
@@ -172,9 +174,15 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [allMuted, setAllMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingLoading, setRecordingLoading] = useState(false);
-  const [isLoudspeaker, setIsLoudspeaker] = useState(true); // Default to loudspeaker on
+  const [isLoudspeaker, setIsLoudspeaker] = useState(true);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [volumeLevel, setVolumeLevel] = useState(100); // 0-100
+  const [volumeLevel, setVolumeLevel] = useState(100);
+  
+  // Speaker management states
+  const [selectedSpeaker, setSelectedSpeaker] = useState<Speaker | null>(null);
+  const [showActionSheet, setShowActionSheet] = useState(false);
+  const [showSpeakInvite, setShowSpeakInvite] = useState(false);
+  const [inviterName, setInviterName] = useState('');
 
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
@@ -301,6 +309,23 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           setMyHostMuted(false);
           toast.info('You can now unmute');
         }
+      })
+      .on('broadcast', { event: 'invite-to-speak' }, (payload: any) => {
+        if (payload.payload?.target_user_id === user?.id) {
+          setInviterName(payload.payload?.inviter_name || 'Host');
+          setShowSpeakInvite(true);
+        }
+      })
+      .on('broadcast', { event: 'demoted-to-listener' }, (payload: any) => {
+        if (payload.payload?.target_user_id === user?.id) {
+          setMyRole('listener');
+          setIsMicOn(false);
+          setIsMuted(true);
+          spaceContext?.setMuted(true);
+          spaceContext?.updateRole?.('listener');
+          toast.info('You have been moved to listener');
+        }
+        fetchSpeakers();
       })
       .subscribe();
 
@@ -852,6 +877,89 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     setReplyingTo({ id: reply.id, user: reply.user, handle: reply.handle });
   };
   
+  // Handle host name tap to open action sheet
+  const handleNameTap = (speaker: Speaker) => {
+    if (!isHost || speaker.user_id === user?.id || speaker.role === 'host') return;
+    setSelectedSpeaker(speaker);
+    setShowActionSheet(true);
+  };
+
+  // Invite listener to speak
+  const handleInviteToSpeak = async (targetUserId: string) => {
+    if (!user || !space) return;
+    
+    // Insert invitation record
+    await supabase.from('live_space_invitations').insert({
+      space_id: spaceId,
+      inviter_id: user.id,
+      invitee_id: targetUserId,
+      status: 'pending',
+    });
+
+    // Broadcast invite
+    const channel = supabase.channel(`space-control-${spaceId}`);
+    const myProfile = speakers.find(s => s.user_id === user.id)?.profile;
+    await channel.send({
+      type: 'broadcast',
+      event: 'invite-to-speak',
+      payload: { target_user_id: targetUserId, inviter_name: myProfile?.display_name || 'Host' },
+    });
+    supabase.removeChannel(channel);
+
+    toast.success('Invitation sent!');
+  };
+
+  // Demote speaker to listener
+  const handleDemoteToListener = async (targetUserId: string) => {
+    if (!user) return;
+
+    await supabase
+      .from('live_space_speakers')
+      .update({ role: 'listener', is_muted: true, mic_allowed: false })
+      .eq('space_id', spaceId)
+      .eq('user_id', targetUserId);
+
+    // Broadcast demote
+    const channel = supabase.channel(`space-control-${spaceId}`);
+    await channel.send({
+      type: 'broadcast',
+      event: 'demoted-to-listener',
+      payload: { target_user_id: targetUserId, by: user.id },
+    });
+    supabase.removeChannel(channel);
+
+    fetchSpeakers();
+    toast.success('User moved to listener');
+  };
+
+  // Accept speak invitation
+  const handleAcceptInvite = async () => {
+    if (!user) return;
+    setShowSpeakInvite(false);
+
+    // Update role in DB
+    await supabase
+      .from('live_space_speakers')
+      .update({ role: 'speaker', is_muted: false, has_raised_hand: false, host_muted: false, mic_allowed: true })
+      .eq('space_id', spaceId)
+      .eq('user_id', user.id);
+
+    setMyRole('speaker');
+    setIsMicOn(true);
+    setIsMuted(false);
+    setHasRaisedHand(false);
+    setMyHostMuted(false);
+
+    if (spaceContext) {
+      spaceContext.setMuted(false);
+      spaceContext.updateRole?.('speaker');
+      await spaceContext.startListenerBroadcast();
+    }
+
+    toast.success('🎙️ You are now a speaker!');
+    fetchSpeakers();
+  };
+
   // Navigate to user profile
   const navigateToProfile = (userId: string) => {
     navigate(`/profile/${userId}`);
@@ -950,21 +1058,24 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 {filteredSpeakers
                   .filter(s => s.role === 'speaker')
                   .map(speaker => (
-                    <button
+                    <div
                       key={speaker.id}
-                      onClick={() => navigateToProfile(speaker.user_id)}
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
                     >
                       <img
                         src={speaker.profile?.avatar_url || ''}
                         alt={speaker.profile?.display_name}
                         className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                        onClick={() => navigateToProfile(speaker.user_id)}
                       />
-                      <div className="flex-1">
+                      <div 
+                        className="flex-1"
+                        onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                      >
                         <p className="text-white font-medium">{speaker.profile?.display_name}</p>
                         <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
                       </div>
-                    </button>
+                    </div>
                   ))}
               </div>
             </div>
@@ -980,21 +1091,24 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 {filteredSpeakers
                   .filter(s => s.role === 'listener')
                   .map(speaker => (
-                    <button
+                    <div
                       key={speaker.id}
-                      onClick={() => navigateToProfile(speaker.user_id)}
                       className="flex items-center gap-3 p-3 rounded-lg hover:bg-zinc-900 cursor-pointer w-full text-left"
                     >
                       <img
                         src={speaker.profile?.avatar_url || ''}
                         alt={speaker.profile?.display_name}
                         className="w-12 h-12 rounded-full hover:ring-2 hover:ring-purple-500 transition-all"
+                        onClick={() => navigateToProfile(speaker.user_id)}
                       />
-                      <div className="flex-1">
+                      <div 
+                        className="flex-1"
+                        onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                      >
                         <p className="text-white font-medium">{speaker.profile?.display_name}</p>
                         <p className="text-zinc-500 text-sm">@{speaker.profile?.username}</p>
                       </div>
-                    </button>
+                    </div>
                   ))}
               </div>
             </div>
@@ -1118,12 +1232,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 const isHostUser = speaker.user_id === space?.user_id;
                 
                 return (
-                  <button
+                  <div
                     key={speaker.id}
-                    onClick={() => navigateToProfile(speaker.user_id)}
                     className="flex flex-col items-center gap-4 group"
                   >
-                    <div className="relative">
+                    <div className="relative cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
                       {/* Ping-style audio wave indicators */}
                       {speaking && (
                         <>
@@ -1166,7 +1279,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                         )}
                       </div>
                     </div>
-                    <div className="text-center">
+                    <div 
+                      className="text-center cursor-pointer"
+                      onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                    >
                       <p className="text-xs font-black truncate max-w-[90px] group-hover:text-purple-400 transition-colors text-white">
                         {speaker.profile?.display_name?.split(' ')[0] || 'User'}
                       </p>
@@ -1177,7 +1293,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                         {isHostUser ? 'Host' : speaker.role === 'co_host' ? 'Co-host' : 'Speaker'}
                       </p>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
           </div>
@@ -1195,12 +1311,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                   .filter(s => s.role === 'listener')
                   .slice(0, 18)
                   .map((speaker) => (
-                    <button
+                    <div
                       key={speaker.id}
-                      onClick={() => navigateToProfile(speaker.user_id)}
                       className="flex flex-col items-center gap-2"
                     >
-                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/5">
+                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/5 cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
                         {speaker.profile?.avatar_url ? (
                           <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
                         ) : (
@@ -1209,10 +1324,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                           </div>
                         )}
                       </div>
-                      <span className="text-[10px] font-bold text-slate-500 truncate w-full text-center">
+                      <span 
+                        className="text-[10px] font-bold text-slate-500 truncate w-full text-center cursor-pointer hover:text-purple-400 transition-colors"
+                        onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                      >
                         {speaker.profile?.display_name?.split(' ')[0] || 'User'}
                       </span>
-                    </button>
+                    </div>
                   ))}
               </div>
             </div>
@@ -1735,6 +1853,25 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       <SpaceAudioSettingsModal
         isOpen={showAudioSettingsModal}
         onClose={() => setShowAudioSettingsModal(false)}
+      />
+
+      {/* Speaker Action Sheet */}
+      {showActionSheet && selectedSpeaker && (
+        <SpeakerActionSheet
+          speaker={selectedSpeaker}
+          onClose={() => { setShowActionSheet(false); setSelectedSpeaker(null); }}
+          onInviteToSpeak={handleInviteToSpeak}
+          onDemoteToListener={handleDemoteToListener}
+        />
+      )}
+
+      {/* Speak Invite Dialog */}
+      <SpeakInviteDialog
+        isOpen={showSpeakInvite}
+        inviterName={inviterName}
+        spaceName={space?.title || 'Space'}
+        onAccept={handleAcceptInvite}
+        onDecline={() => setShowSpeakInvite(false)}
       />
 
       <style>{`
