@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useOptionalSpaceContext } from '@/context/SpaceContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { PhoneOff, Mic, MicOff, Maximize2, Radio, Users } from 'lucide-react';
+import { PhoneOff, Mic, MicOff, Maximize2, X, Users } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls, PanInfo } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -41,7 +41,6 @@ export const FloatingSpacePlayer: React.FC = () => {
 
   const handleMaximize = () => {
     maximizeSpace();
-    // Navigate to the space - use the correct route with /live/space/
     const spaceId = spaceState.spaceInfo?.id;
     if (spaceId) {
       navigate(`/live/space/${spaceId}`, { state: { autoJoin: true, returningFromMinimize: true } });
@@ -62,7 +61,6 @@ export const FloatingSpacePlayer: React.FC = () => {
     const newX = position.x + info.offset.x;
     const newY = position.y + info.offset.y;
     
-    // Snap to edges
     const screenWidth = window.innerWidth;
     const widgetWidth = 200;
     
@@ -76,7 +74,6 @@ export const FloatingSpacePlayer: React.FC = () => {
 
   return (
     <>
-      {/* Invisible constraints container */}
       <div 
         ref={constraintsRef} 
         className="fixed inset-0 pointer-events-none z-[90]"
@@ -100,86 +97,68 @@ export const FloatingSpacePlayer: React.FC = () => {
           }}
           className="touch-none"
         >
-          <div className="bg-gradient-to-br from-slate-900 via-purple-900/90 to-slate-900 rounded-2xl shadow-2xl border border-primary/30 overflow-hidden backdrop-blur-xl w-52">
-            {/* Header with pulsing live indicator */}
-            <div className="px-3 py-2 flex items-center gap-2 bg-black/20">
-              <div className="relative">
-                <Radio className="w-4 h-4 text-red-500" />
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-ping" />
-              </div>
-              <span className="text-xs font-medium text-white/80 truncate flex-1">
-                {spaceState.spaceInfo?.title || 'Live Space'}
-              </span>
-              <span className="text-xs text-primary">{duration}</span>
-            </div>
-
-            {/* Host info */}
-            <div className="p-3 flex items-center gap-3">
-              <div className="relative">
-                <Avatar className="w-10 h-10 border-2 border-primary/50">
+          <div className="bg-[#11131E]/90 backdrop-blur-xl rounded-[2rem] shadow-2xl border border-white/10 overflow-hidden w-52">
+            {/* Content - clickable to expand */}
+            <div 
+              className="flex items-center gap-3 p-4 cursor-pointer"
+              onClick={handleMaximize}
+            >
+              <div className="relative shrink-0">
+                <Avatar className="w-12 h-12 border-2 border-purple-500">
                   <AvatarImage src={spaceState.spaceInfo?.hostAvatar || ''} />
-                  <AvatarFallback className="bg-primary/20 text-primary">
+                  <AvatarFallback className="bg-purple-500/20 text-purple-400">
                     {spaceState.spaceInfo?.hostName?.[0] || 'H'}
                   </AvatarFallback>
                 </Avatar>
-                {/* Audio wave indicator */}
+                {/* Green dot connection indicator */}
                 <div className={cn(
-                  "absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center",
+                  "absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-[#11131E]",
                   spaceState.connectionStatus === 'connected' ? 'bg-green-500' : 'bg-amber-500'
-                )}>
-                  <Users className="w-2.5 h-2.5 text-white" />
-                </div>
+                )} />
               </div>
               
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
-                  {spaceState.spaceInfo?.hostName || 'Host'}
+                <p className="font-black text-sm text-white truncate">
+                  {spaceState.spaceInfo?.title || 'Live Space'}
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  {spaceState.myRole === 'host' ? 'Hosting' : 
-                   spaceState.myRole === 'co_host' ? 'Co-hosting' :
-                   spaceState.myRole === 'speaker' ? 'Speaking' : 'Listening'}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  <p className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">Live Session</p>
+                </div>
               </div>
             </div>
 
-            {/* Control buttons */}
+            {/* Controls */}
             <div className="px-3 pb-3 flex items-center justify-between gap-2">
               {canSpeak ? (
-                <Button
-                  size="icon"
-                  variant="ghost"
+                <button
                   onClick={handleToggleMute}
                   className={cn(
-                    "h-8 w-8 rounded-full",
+                    "h-8 w-8 rounded-full flex items-center justify-center transition-colors",
                     spaceState.isMuted 
                       ? 'bg-red-500/20 text-red-400' 
                       : 'bg-green-500/20 text-green-400'
                   )}
                 >
                   {spaceState.isMuted ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                </Button>
+                </button>
               ) : (
-                <div className="h-8 w-8" /> // Placeholder for listeners
+                <div className="h-8 w-8" />
               )}
 
-              <Button
-                size="icon"
-                variant="ghost"
+              <button
                 onClick={handleMaximize}
-                className="h-8 w-8 rounded-full bg-primary/20 text-primary hover:bg-primary/30"
+                className="h-8 w-8 rounded-full bg-white/5 text-slate-400 hover:bg-white/10 flex items-center justify-center"
               >
                 <Maximize2 className="w-4 h-4" />
-              </Button>
+              </button>
 
-              <Button
-                size="icon"
-                variant="ghost"
+              <button
                 onClick={handleLeave}
-                className="h-8 w-8 rounded-full bg-red-600 text-white hover:bg-red-700"
+                className="h-8 w-8 rounded-full bg-red-500/10 text-red-500 hover:bg-red-500/20 flex items-center justify-center"
               >
-                <PhoneOff className="w-4 h-4" />
-              </Button>
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
         </motion.div>

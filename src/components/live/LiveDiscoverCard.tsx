@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Radio, Mic, Zap, Hash } from "lucide-react";
+import { Users, Mic, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type RoomType = "video_broadcast" | "audio_space" | "pk_battle";
@@ -18,6 +18,9 @@ interface LiveDiscoverCardProps {
   hashtags?: string[];
   onClick: () => void;
   className?: string;
+  // Optional participants for stacked avatar display
+  participants?: { avatar_url?: string }[];
+  trendingScore?: number;
 }
 
 export const LiveDiscoverCard = ({
@@ -34,6 +37,8 @@ export const LiveDiscoverCard = ({
   hashtags,
   onClick,
   className,
+  participants,
+  trendingScore,
 }: LiveDiscoverCardProps) => {
   const formatViewers = (count: number) => {
     if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
@@ -43,145 +48,77 @@ export const LiveDiscoverCard = ({
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.98 }}
       onClick={onClick}
       className={cn(
-        "relative aspect-[4/5] rounded-3xl overflow-hidden cursor-pointer group",
-        "bg-gradient-to-br from-slate-800 to-slate-900",
+        "bg-[#11131E] border border-white/5 rounded-[2.5rem] p-5 hover:border-purple-500/30 transition-all cursor-pointer group relative overflow-hidden",
         className
       )}
     >
-      {/* Background Image/Gradient */}
-      {thumbnailUrl ? (
-        <img
-          src={thumbnailUrl}
-          alt={title}
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-      ) : (
-        <div
-          className={cn(
-            "absolute inset-0 bg-gradient-to-br",
-            roomType === "pk_battle"
-              ? "from-blue-900/80 via-purple-900/80 to-red-900/80"
-              : roomType === "audio_space"
-              ? "from-green-900/80 to-emerald-900/80"
-              : "from-pink-900/80 to-red-900/80"
-          )}
-        />
-      )}
-
-      {/* Overlay Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
-
-      {/* Top Badges */}
-      <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {/* Live Badge */}
-          <motion.div
-            animate={{ opacity: [1, 0.6, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-white text-xs font-bold bg-red-500"
-          >
-            <Radio className="w-3 h-3" />
-            LIVE
-          </motion.div>
-
-          {/* Room Type Badge */}
-          {roomType === "pk_battle" && (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-blue-500 to-red-500 text-white">
-              <Zap className="w-3 h-3" />
-              PK BATTLE
-            </div>
-          )}
-          {roomType === "audio_space" && (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-500/80 text-white backdrop-blur-sm">
-              <Mic className="w-3 h-3" />
-              AUDIO
-            </div>
-          )}
-        </div>
-
-        {/* Premium Badge */}
-        {isPremium && (
-          <div className="bg-gradient-to-r from-yellow-500 to-orange-500 px-2 py-1 rounded-full text-xs font-bold text-white">
-            PREMIUM
-          </div>
-        )}
-      </div>
-
-      {/* Bottom Content */}
-      <div className="absolute bottom-0 left-0 right-0 p-4">
-        {/* Host Info */}
-        <div className="flex items-center gap-3 mb-2">
-          <div className="relative">
-            <img
-              src={hostAvatar || `https://i.pravatar.cc/150?u=${id}`}
-              alt={hostName}
-              className="w-10 h-10 rounded-full border-2 border-white/30 object-cover"
-            />
-            {hostLevel && (
-              <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-yellow-500 to-orange-500 text-[10px] font-bold px-1.5 rounded-full text-white min-w-[20px] text-center">
-                {hostLevel}
-              </div>
+      <div className="flex items-center gap-4 relative z-10">
+        {/* Host Avatar */}
+        <div className="relative shrink-0">
+          <img
+            src={hostAvatar || `https://i.pravatar.cc/150?u=${id}`}
+            alt={hostName}
+            className="w-16 h-16 rounded-3xl object-cover border-2 border-white/5 group-hover:border-purple-500/50 transition-all"
+          />
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-purple-600 rounded-lg flex items-center justify-center border-2 border-[#11131E]">
+            {roomType === "audio_space" ? (
+              <Mic className="w-3 h-3 text-white" />
+            ) : (
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
             )}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-white truncate">{hostName}</p>
-            <p className="text-sm text-white/70 truncate">{title}</p>
-          </div>
+          {hostLevel && (
+            <div className="absolute -top-1 -left-1 bg-gradient-to-r from-amber-500 to-orange-500 text-[8px] font-bold px-1.5 rounded-lg text-white min-w-[18px] text-center border-2 border-[#11131E]">
+              {hostLevel}
+            </div>
+          )}
         </div>
 
-        {/* Category & Hashtags */}
-        {(category || (hashtags && hashtags.length > 0)) && (
-          <div className="flex items-center gap-1.5 mb-2 overflow-hidden">
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <h3 className="font-bold text-base text-white truncate pr-8 group-hover:text-purple-400 transition-colors">
+            {title}
+          </h3>
+          <p className="text-xs text-slate-500 font-bold mb-2">Hosted by {hostName}</p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-white/5 px-2 py-0.5 rounded-lg text-[10px] font-black text-slate-400 uppercase">
+              <Users className="w-3 h-3" /> {formatViewers(viewerCount)}
+            </div>
+            {(trendingScore || viewerCount > 50) && (
+              <div className="flex items-center gap-1.5 bg-purple-500/10 px-2 py-0.5 rounded-lg text-[10px] font-black text-purple-400 uppercase">
+                <Flame className="w-3 h-3" /> {trendingScore || viewerCount}
+              </div>
+            )}
             {category && (
-              <span className="text-xs bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded-full text-white/80 capitalize whitespace-nowrap">
+              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded-lg text-slate-500 capitalize font-bold">
                 {category.replace(/_/g, ' ')}
               </span>
             )}
-            {hashtags && hashtags.slice(0, 2).map((tag) => (
-              <span key={tag} className="text-xs text-primary/80 whitespace-nowrap">
-                #{tag}
-              </span>
-            ))}
           </div>
-        )}
-
-        {/* Viewer Count */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-white/80 text-sm">
-            <Users className="w-4 h-4" />
-            <span>{formatViewers(viewerCount)}</span>
-          </div>
-
-          {roomType === "video_broadcast" && (
-            <div className="bg-white/10 backdrop-blur-sm px-2 py-0.5 rounded text-xs text-white/80">
-              HD
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Animated Border for PK Battle */}
-      {roomType === "pk_battle" && (
-        <motion.div
-          className="absolute inset-0 rounded-3xl pointer-events-none border-2"
-          animate={{
-            borderColor: [
-              "rgba(59, 130, 246, 0.6)",
-              "rgba(168, 85, 247, 0.6)",
-              "rgba(239, 68, 68, 0.6)",
-              "rgba(59, 130, 246, 0.6)",
-            ],
-          }}
-          transition={{ duration: 2, repeat: Infinity }}
-        />
+      {/* Stacked participant avatars in top-right */}
+      {participants && participants.length > 0 && (
+        <div className="absolute top-6 right-6">
+          <div className="flex -space-x-3">
+            {participants.slice(0, 3).map((p, i) => (
+              <img 
+                key={i} 
+                src={p.avatar_url || `https://i.pravatar.cc/150?u=${id}-${i}`} 
+                className="w-8 h-8 rounded-xl border-2 border-[#11131E] object-cover" 
+              />
+            ))}
+          </div>
+        </div>
       )}
 
-      {/* Hover Overlay */}
-      <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+      {/* Decorative glow */}
+      <div className="absolute -bottom-10 -right-10 w-24 h-24 bg-purple-500/5 blur-[40px] rounded-full group-hover:bg-purple-500/10 transition-colors pointer-events-none" />
     </motion.div>
   );
 };

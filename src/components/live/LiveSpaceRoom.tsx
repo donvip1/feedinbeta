@@ -1206,11 +1206,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-gradient-to-b from-background via-background to-primary/5">
-      {/* Animated Background */}
+    <div className="fixed inset-0 z-50 bg-[#050505]">
+      {/* Subtle ambient glow */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-pink-500/5 rounded-full blur-[100px]" />
       </div>
 
       {/* Floating reactions */}
@@ -1302,155 +1302,78 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         )}
       </AnimatePresence>
 
-      {/* Header */}
-      <div className="sticky top-0 z-10 backdrop-blur-xl bg-background/80 border-b border-border/50">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-500/20 border border-red-500/30">
-                  <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-semibold text-red-400 uppercase">Live</span>
-                </div>
-                <span className="text-xs text-muted-foreground">{duration}</span>
-                <ConnectionStatusBadge />
-                {space?.topic_category && (
-                  <Badge variant="secondary" className="text-[10px] h-5">
-                    {space.topic_category}
-                  </Badge>
-                )}
-              </div>
-              <h1 className="text-lg font-bold truncate">{space?.title}</h1>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
-                <ListenersModal 
-                  listeners={listeners}
-                  totalCount={listeners.length}
-                  isHost={isHost}
-                  onPromote={(speakerId) => promoteSpeaker(speakerId, 'speaker')}
-                />
-                {/* Gift counter - small inline */}
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {/* Back Button - keeps connection alive, navigates away */}
-              <button 
-                onClick={handleMinimize}
-                title="Go back - audio continues in background"
-                className="p-2"
-              >
-                <ArrowLeft className="w-5 h-5 text-foreground" />
-              </button>
-              
-              {/* Manage Viewers - plain icon, no background (Host only) */}
-              {isHost && (
-                <button 
-                  onClick={() => setShowListenersModal(true)}
-                  title="Manage Viewers"
-                  className="p-2"
-                >
-                  <Users className="w-5 h-5 text-foreground" />
-                </button>
-              )}
-              
-              {/* Speaker Queue - plain icon, no background (Host only) */}
-              {isHost && (
-                <button 
-                  onClick={() => setShowSpeakerQueue(true)}
-                  title="Speaker Queue"
-                  className="p-2 relative"
-                >
-                  <Hand className="w-5 h-5 text-foreground" />
-                  {raisedHands.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold">
-                      {raisedHands.length}
-                    </span>
-                  )}
-                </button>
-              )}
-              
-              {/* End/Leave Button */}
-              <Button
-                variant="destructive"
-                size="sm"
-                className="rounded-full px-4"
-                onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
-              >
-                {isHost ? 'End' : 'Leave'}
-              </Button>
-            </div>
+      {/* Header - minimal bar */}
+      <div className="sticky top-0 z-10 p-4 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={handleMinimize}
+            title="Minimize - audio continues"
+            className="p-2 hover:bg-white/5 rounded-full transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-white" />
+          </button>
+          <div className="flex items-center gap-2 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
+            <Wifi className="w-3 h-3 text-purple-400 animate-pulse" />
+            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">
+              {connectionStatus === 'connected' ? 'HD Audio' : connectionStatus === 'connecting' ? 'Connecting...' : connectionStatus}
+            </span>
           </div>
-
-          {/* Space Wallet Board - visible to everyone below header */}
-          <SpaceWalletBoard spaceId={spaceId} variant="bar" />
-
-          {/* Host Controls Bar - compact on mobile */}
-          {isHost && !isMobile && (
-            <div className="flex items-center gap-3 mt-3 p-3 rounded-xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20">
-              <div className="flex items-center gap-2 shrink-0">
-                <Switch 
-                  checked={space?.allow_mic_for_all !== false}
-                  onCheckedChange={toggleMicForAll}
-                  id="mic-for-all"
-                  className="scale-90"
-                />
-                <label htmlFor="mic-for-all" className="text-xs font-medium cursor-pointer whitespace-nowrap">
-                  Allow Mic for All
-                </label>
-              </div>
-              
-              <div className="h-6 w-px bg-border shrink-0" />
-              
-              <Button 
-                size="sm" 
-                variant={allParticipantsMuted ? "outline" : "destructive"}
-                className="h-8 gap-1.5"
-                onClick={toggleMuteAllParticipants}
-              >
-                {allParticipantsMuted ? (
-                  <>
-                    <Volume2 className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Unmute All</span>
-                  </>
-                ) : (
-                  <>
-                    <VolumeX className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">Mute All</span>
-                  </>
-                )}
-              </Button>
-              
-              <div className="h-6 w-px bg-border shrink-0 hidden sm:block" />
-              
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 gap-1.5 ml-auto hidden sm:flex"
-                onClick={() => setShowSpeakerQueue(true)}
-              >
-                <Hand className="w-3.5 h-3.5" />
-                Queue
-                {raisedHands.length > 0 && (
-                  <Badge className="h-5 w-5 p-0 justify-center bg-amber-500 text-white">
-                    {raisedHands.length}
-                  </Badge>
-                )}
-              </Button>
-            </div>
-          )}
+          <span className="text-xs text-slate-500">{duration}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleShare}
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
+          >
+            <Share2 className="w-5 h-5 text-white" />
+          </button>
+          <button
+            onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
+            className="bg-red-500/10 text-red-500 px-6 py-2 rounded-full text-xs font-black uppercase border border-red-500/20 hover:bg-red-500/20 transition-colors"
+          >
+            {isHost ? 'End' : 'Leave'}
+          </button>
         </div>
       </div>
 
+      {/* Space Wallet Board */}
+      <div className="px-4 py-2">
+        <SpaceWalletBoard spaceId={spaceId} variant="bar" />
+      </div>
+
       {/* Main content */}
-      <ScrollArea className="flex-1 h-[calc(100vh-180px)]">
-        <div className="px-4 py-6 space-y-6">
-          {/* Hosts section */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Crown className="w-4 h-4 text-amber-400" />
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Hosts</span>
+      <ScrollArea className="flex-1 h-[calc(100vh-220px)]">
+        <div className="px-6 py-6 space-y-6">
+          {/* Room Info - centered */}
+          <div className="text-center max-w-lg mx-auto py-4">
+            <div className="mb-4 relative inline-block">
+              <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full" />
+              <img 
+                src={hosts[0]?.profile?.avatar_url || ''} 
+                className="w-24 h-24 rounded-[2.5rem] border-4 border-white/10 relative z-10 shadow-2xl object-cover bg-slate-900"
+                alt="Host"
+              />
+              <div className="absolute -bottom-2 -right-2 bg-purple-600 p-2 rounded-2xl z-20 border-4 border-[#050505]">
+                <Crown className="w-4 h-4 text-white" />
+              </div>
             </div>
-            <div className="flex flex-wrap gap-6 justify-center">
+            <h1 className="text-2xl font-black mb-2 leading-tight text-white">{space?.title}</h1>
+            <div className="flex items-center justify-center gap-4 text-slate-500">
+              <button 
+                onClick={() => setShowListenersModal(true)}
+                className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full hover:bg-white/10 transition-colors"
+              >
+                <Users className="w-3 h-3" /> 
+                <span className="text-xs font-bold">{speakers.length}</span>
+              </button>
+              <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full">
+                <Volume2 className="w-3 h-3" /> 
+                <span className="text-xs font-bold">{hosts.length + activeSpeakers.length} Speakers</span>
+              </div>
+            </div>
+          </div>
+          {/* Speaker Grid */}
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-y-10 gap-x-4">
               {hosts.map((speaker) => (
                 <SpeakerAvatarWithWaves
                   key={speaker.id}
@@ -1471,41 +1394,28 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
                   showCrown
                 />
               ))}
-            </div>
-          </section>
+              {activeSpeakers.map((speaker) => (
+                <SpeakerAvatarWithWaves
+                  key={speaker.id}
+                  speaker={speaker}
+                  isHost={isHost}
+                  currentUserId={user?.id}
+                  audioLevel={audioLevels[speaker.user_id] || 0}
+                  onGift={() => {
+                    setSelectedGiftRecipient(speaker.user_id);
+                    setShowGiftModal(true);
+                  }}
+                  onHostMute={() => hostMuteUser(speaker.id)}
+                  onHostUnmute={() => hostUnmuteUser(speaker.id)}
+                  onToggleMicPermission={(allowed) => toggleMicPermission(speaker.id, allowed)}
+                  onRemove={() => removeSpeaker(speaker.id)}
+                  onProfileClick={() => navigate(`/profile/${speaker.user_id}`)}
+                  size="md"
+                />
+              ))}
+          </div>
 
-          {/* Speakers section */}
-          {activeSpeakers.length > 0 && (
-            <section>
-              <div className="flex items-center gap-2 mb-4">
-                <Mic className="w-4 h-4 text-primary" />
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Speakers</span>
-              </div>
-              <div className="flex flex-wrap gap-4 justify-center">
-                {activeSpeakers.map((speaker) => (
-                  <SpeakerAvatarWithWaves
-                    key={speaker.id}
-                    speaker={speaker}
-                    isHost={isHost}
-                    currentUserId={user?.id}
-                    audioLevel={audioLevels[speaker.user_id] || 0}
-                    onGift={() => {
-                      setSelectedGiftRecipient(speaker.user_id);
-                      setShowGiftModal(true);
-                    }}
-                    onHostMute={() => hostMuteUser(speaker.id)}
-                    onHostUnmute={() => hostUnmuteUser(speaker.id)}
-                    onToggleMicPermission={(allowed) => toggleMicPermission(speaker.id, allowed)}
-                    onRemove={() => removeSpeaker(speaker.id)}
-                    onProfileClick={() => navigate(`/profile/${speaker.user_id}`)}
-                    size="md"
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Raised hands - visible to ALL users */}
+          {/* Listeners section */}
           {raisedHands.length > 0 && (
             <section className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20">
               <div className="flex items-center justify-between mb-4">
@@ -1561,56 +1471,46 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           )}
 
           {/* Listeners section */}
-          <section>
-            <div className="flex items-center gap-2 mb-4">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Listeners ({listeners.length})
-              </span>
+          <div className="border-t border-white/5 pt-8">
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Listeners ({listeners.length})</h4>
+              {raisedHands.length > 0 && isHost && (
+                <button 
+                  onClick={() => setShowSpeakerQueue(true)}
+                  className="flex items-center gap-2 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20"
+                >
+                  <Hand className="w-3 h-3 text-purple-400" />
+                  <span className="text-[10px] font-black text-purple-400">{raisedHands.length} requested</span>
+                </button>
+              )}
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="grid grid-cols-4 sm:grid-cols-6 gap-6 opacity-80">
               {listeners.slice(0, 24).map((listener) => (
-                <div key={listener.id} className="relative group">
-                  <Avatar 
-                    className={cn(
-                      "w-12 h-12 ring-2 transition-all cursor-pointer",
-                      listener.has_raised_hand ? "ring-amber-400 animate-bounce" : "ring-transparent hover:ring-primary/50"
-                    )}
+                <div key={listener.id} className="flex flex-col items-center gap-2 group relative">
+                  <img 
+                    src={listener.profile?.avatar_url || ''} 
+                    className="w-12 h-12 rounded-2xl object-cover bg-white/5 cursor-pointer"
                     onClick={() => navigate(`/profile/${listener.user_id}`)}
-                  >
-                    <AvatarImage src={listener.profile?.avatar_url || ''} />
-                    <AvatarFallback className="text-xs bg-muted">
-                      {listener.profile?.display_name?.[0] || 'U'}
-                    </AvatarFallback>
-                  </Avatar>
+                    onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(listener.profile?.display_name || 'U')}&background=1e1b4b&color=a78bfa`; }}
+                  />
+                  <span className="text-[10px] font-bold text-slate-500 truncate w-full text-center">{listener.profile?.display_name || 'User'}</span>
                   {listener.has_raised_hand && (
                     <span className="absolute -top-1 -right-1 text-lg">✋</span>
-                  )}
-                  {isHost && (
-                    <div className="absolute -bottom-1 -right-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button 
-                        size="icon" 
-                        className="w-5 h-5 rounded-full"
-                        onClick={() => promoteSpeaker(listener.id, 'speaker')}
-                      >
-                        <Mic className="w-3 h-3" />
-                      </Button>
-                    </div>
                   )}
                 </div>
               ))}
               {listeners.length > 24 && (
-                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-sm font-medium text-slate-500">
                   +{listeners.length - 24}
                 </div>
               )}
             </div>
-          </section>
+          </div>
         </div>
       </ScrollArea>
 
-      {/* Bottom controls */}
-      <div className="fixed bottom-0 left-0 right-0 backdrop-blur-xl bg-background/90 border-t border-border/50 pb-safe">
+      {/* Control Bar */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem] shadow-2xl z-30 pb-safe">
         {/* Host muted warning */}
         {myHostMuted && canSpeak && (
           <div className="flex items-center justify-center gap-2 py-2 px-4 bg-red-500/10 border-b border-red-500/20">
