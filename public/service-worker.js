@@ -55,11 +55,9 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_STATIC).then((cache) => {
       console.log('[SW] Caching static assets');
       return cache.addAll(STATIC_ASSETS);
-    }).then(() => {
-      // Skip waiting immediately to take over faster
-      console.log('[SW] Skipping waiting to activate immediately');
-      return self.skipWaiting();
     })
+    // Do NOT call self.skipWaiting() here - let the user decide via the update prompt
+    // Auto-skipWaiting causes page reloads that kick users out of live spaces
   );
 });
 
