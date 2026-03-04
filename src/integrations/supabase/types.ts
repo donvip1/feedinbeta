@@ -3634,11 +3634,41 @@ export type Database = {
           },
         ]
       }
+      live_space_message_likes: {
+        Row: {
+          created_at: string
+          id: string
+          message_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "live_space_message_likes_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "live_space_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       live_space_messages: {
         Row: {
           content: string
           created_at: string | null
           id: string
+          likes_count: number
           reply_to_id: string | null
           space_id: string | null
           user_id: string
@@ -3647,6 +3677,7 @@ export type Database = {
           content: string
           created_at?: string | null
           id?: string
+          likes_count?: number
           reply_to_id?: string | null
           space_id?: string | null
           user_id: string
@@ -3655,6 +3686,7 @@ export type Database = {
           content?: string
           created_at?: string | null
           id?: string
+          likes_count?: number
           reply_to_id?: string | null
           space_id?: string | null
           user_id?: string

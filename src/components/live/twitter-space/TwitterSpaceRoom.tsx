@@ -360,12 +360,24 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         };
 
         const emoji = giftEmojis[giftData.gift_type] || '🎁';
+        const senderName = senderProfile?.display_name || 'Someone';
+        const receiverName = receiverProfile?.display_name || 'Host';
+        const creditValue = giftData.credit_value || 1;
+        const recipientAmount = Math.floor(creditValue * 0.85);
+
+        // Toast notification for the receiver (host/speaker)
+        if (giftData.receiver_id === user?.id) {
+          toast(`${emoji} ${senderName} sent you a ${giftData.gift_type}! (+${recipientAmount} credits)`, {
+            icon: '🎁',
+            duration: 6000,
+          });
+        }
 
         // Add to FloatingReactions for TikTok-style floating animation
         const floatingGift: FloatingGiftReaction = {
           id: giftData.id,
           type: giftData.gift_type,
-          senderName: senderProfile?.display_name || 'Someone',
+          senderName,
           emoji,
         };
         setFloatingGiftReactions(prev => [...prev, floatingGift]);
@@ -374,9 +386,9 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         const newGiftAnim: GiftAnimation = {
           id: giftData.id,
           emoji,
-          senderName: senderProfile?.display_name || 'Someone',
-          receiverName: receiverProfile?.display_name || 'Host',
-          value: giftData.credit_value || 1,
+          senderName,
+          receiverName,
+          value: creditValue,
         };
         setGiftAnimations(prev => [...prev, newGiftAnim]);
 
@@ -384,10 +396,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         const giftChatMessage: Reply = {
           id: `gift-${giftData.id}`,
           user_id: giftData.sender_id,
-          user: senderProfile?.display_name || 'Someone',
+          user: senderName,
           handle: '@' + (senderProfile?.username || 'user'),
           time: 'Just now',
-          text: `🎁 Sent ${emoji} ${giftData.gift_type} (${giftData.credit_value} credits)`,
+          text: `🎁 Sent ${emoji} ${giftData.gift_type} (${creditValue} credits)`,
           avatar: senderProfile?.avatar_url || '',
           likes: 0,
           liked_by_me: false,
@@ -436,19 +448,29 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     const fetchReplies = async () => {
       const { data } = await supabase
         .from('live_space_messages')
-        .select('*')
+        .select('*, likes_count')
         .eq('space_id', spaceId)
         .order('created_at', { ascending: false })
         .limit(20);
 
       if (data && data.length > 0) {
         const userIds = data.map(m => m.user_id);
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, display_name, username, avatar_url')
-          .in('id', userIds);
+        const messageIds = data.map(m => m.id);
+        
+        const [{ data: profiles }, { data: myLikes }] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, display_name, username, avatar_url')
+            .in('id', userIds),
+          user ? supabase
+            .from('live_space_message_likes')
+            .select('message_id')
+            .eq('user_id', user.id)
+            .in('message_id', messageIds) : { data: [] },
+        ]);
 
         const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+        const likedSet = new Set(myLikes?.map(l => l.message_id) || []);
 
         setReplies(
           data.reverse().map((msg) => ({
@@ -459,8 +481,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             time: getRelativeTime(msg.created_at),
             text: msg.content,
             avatar: profileMap.get(msg.user_id)?.avatar_url || '',
-            likes: 0,
-            liked_by_me: false,
+            likes: (msg as any).likes_count || 0,
+            liked_by_me: likedSet.has(msg.id),
             reply_to_id: (msg as any).reply_to_id || null,
           }))
         );
@@ -858,18 +880,52 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     setReplyingTo(null);
   };
   
-  // Handle like toggle
-  const handleLikeMessage = (messageId: string) => {
-    setReplies(prev => prev.map(reply => {
-      if (reply.id === messageId) {
+  // Handle like toggle - persistent
+  const handleLikeMessage = async (messageId: string) => {
+    if (!user) return;
+    
+    const reply = replies.find(r => r.id === messageId);
+    if (!reply || reply.isGift) return;
+    
+    const isLiked = reply.liked_by_me;
+    
+    // Optimistic update
+    setReplies(prev => prev.map(r => {
+      if (r.id === messageId) {
         return {
-          ...reply,
-          liked_by_me: !reply.liked_by_me,
-          likes: reply.liked_by_me ? reply.likes - 1 : reply.likes + 1,
+          ...r,
+          liked_by_me: !isLiked,
+          likes: isLiked ? r.likes - 1 : r.likes + 1,
         };
       }
-      return reply;
+      return r;
     }));
+
+    try {
+      if (isLiked) {
+        await supabase
+          .from('live_space_message_likes')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('user_id', user.id);
+      } else {
+        await supabase
+          .from('live_space_message_likes')
+          .insert({ message_id: messageId, user_id: user.id });
+      }
+    } catch (error) {
+      // Revert on error
+      setReplies(prev => prev.map(r => {
+        if (r.id === messageId) {
+          return {
+            ...r,
+            liked_by_me: isLiked,
+            likes: isLiked ? r.likes + 1 : r.likes - 1,
+          };
+        }
+        return r;
+      }));
+    }
   };
   
   // Handle reply to specific message
@@ -1403,8 +1459,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       </AnimatePresence>
 
       {/* BOTTOM CONTROLS - Premium rounded bar */}
-      <div className="p-6 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem] shadow-2xl flex items-center justify-between px-8">
-        <div className="flex items-center gap-6">
+      <div className="p-4 sm:p-6 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem] shadow-2xl flex items-center justify-between px-4 sm:px-8">
+        <div className="flex items-center gap-3 sm:gap-6">
           {/* Mic / Request */}
           <div className="flex flex-col items-center gap-2">
             <button
@@ -1434,21 +1490,19 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </span>
           </div>
 
-          {/* Hand raise for speakers */}
-          {canSpeak && (
-            <div className="flex flex-col items-center gap-2">
-              <button
-                onClick={() => setShowReactions(true)}
-                className="w-14 h-14 bg-white/5 rounded-[1.8rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all shadow-xl"
-              >
-                <Heart className="w-6 h-6 text-slate-400" />
-              </button>
-              <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">React</span>
-            </div>
-          )}
+          {/* React button - available to ALL participants */}
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => setShowReactions(true)}
+              className="w-14 h-14 bg-white/5 rounded-[1.8rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all shadow-xl"
+            >
+              <Heart className="w-6 h-6 text-slate-400" />
+            </button>
+            <span className="text-[9px] font-black uppercase tracking-tighter text-slate-500">React</span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {/* Gift Button - Gradient */}
           <button
             onClick={() => setShowGiftModal(true)}
@@ -1493,7 +1547,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.9 }}
                   transition={{ duration: 0.2 }}
-                  className="absolute bottom-16 left-1/2 -translate-x-1/2 bg-[#11131E] border border-white/10 rounded-2xl p-4 w-56 shadow-xl z-50"
+                  className="absolute bottom-16 right-0 bg-[#11131E] border border-white/10 rounded-2xl p-4 w-56 shadow-xl z-50"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-white text-sm font-semibold">Volume</span>
