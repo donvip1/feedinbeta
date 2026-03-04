@@ -65,14 +65,13 @@ export const MobileInstallModal = () => {
 
     // Show modal based on engagement
     const showTrigger = () => {
-      // Show after 30 seconds OR 3+ page views
-      if (pageViews >= 3) {
+      // Show after 2+ page views immediately, or after 5 seconds for first-time visitors
+      if (pageViews >= 2) {
         setShowModal(true);
       } else {
-        // Show after 30 seconds for first-time visitors
         setTimeout(() => {
           setShowModal(true);
-        }, 30000);
+        }, 5000);
       }
     };
 

@@ -1,14 +1,16 @@
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import { Users, Video, MessageCircle, Link2 } from 'lucide-react';
+import { Users, Video, MessageCircle, Link2, Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import feedinLogo from '@/assets/feedin-logo.png';
 import { AndroidAppBanner } from '@/components/native/AndroidAppBanner';
 import { useAuth } from '@/hooks/useAuth';
+import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 
 export default function Welcome() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { shouldShowPrompt, isInstalled, promptInstall, isIOS, deferredPrompt } = useInstallPrompt();
   const [sharedContent, setSharedContent] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
@@ -98,6 +100,30 @@ export default function Welcome() {
             <span className="text-xs text-muted-foreground">Chat</span>
           </div>
         </div>
+
+        {/* Install App Banner - shown for non-installed users */}
+        {!isInstalled && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                <Download className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm">Install FeedIn App</h3>
+                <p className="text-xs text-muted-foreground">
+                  {isIOS 
+                    ? 'Tap Share → "Add to Home Screen"' 
+                    : 'Get the app for a better experience'}
+                </p>
+              </div>
+              {deferredPrompt && (
+                <Button size="sm" onClick={promptInstall} className="flex-shrink-0">
+                  Install
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* CTA Buttons */}
         <div className="space-y-3 pt-4">
