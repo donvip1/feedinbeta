@@ -102,6 +102,7 @@ interface ChatInterfaceProps {
 }
 
 const EMOJI_QUICK = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
+const MESSAGES_PER_PAGE = 50;
 
 export const ModernChatInterface = ({ 
   conversationId, 
@@ -136,6 +137,8 @@ export const ModernChatInterface = ({
   const [showSearch, setShowSearch] = useState(false);
   const [pinnedMessages, setPinnedMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [newMessagesCount, setNewMessagesCount] = useState(0);
   
   // Media upload modal state
@@ -427,7 +430,7 @@ export const ModernChatInterface = ({
     if (!conversationId) return;
     
     try {
-      // Load ALL messages without limit - important for full history
+      // Load recent messages with pagination
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -440,13 +443,17 @@ export const ModernChatInterface = ({
           )
         `)
         .eq('conversation_id', conversationId)
-        .is('deleted_at', null) // Exclude soft-deleted messages
-        .order('created_at', { ascending: true })
-        .limit(1000); // Explicitly set high limit to get all messages
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE);
 
       if (error) throw error;
       
-      const messageIds = (data || []).map(msg => msg.id);
+      // Reverse to show in ascending order
+      const sortedData = (data || []).reverse();
+      setHasMoreMessages((data || []).length === MESSAGES_PER_PAGE);
+      
+      const messageIds = sortedData.map(msg => msg.id);
       let receipts: any[] = [];
       
       if (messageIds.length > 0) {
@@ -457,7 +464,7 @@ export const ModernChatInterface = ({
         receipts = receiptsData || [];
       }
       
-      const formattedMessages = (data || []).map(msg => {
+      const formattedMessages = sortedData.map(msg => {
         const msgReceipts = receipts.filter(r => r.message_id === msg.id);
         const isRead = msgReceipts.length > 0 && msgReceipts.some(r => r.user_id !== user?.id);
         const isDelivered = msg.sender_id === user?.id;
@@ -524,6 +531,75 @@ export const ModernChatInterface = ({
     } catch (error: any) {
       console.error('Error loading messages:', error);
       setIsLoading(false);
+    }
+  };
+
+  const loadOlderMessages = async () => {
+    if (!conversationId || isLoadingMore || !hasMoreMessages || messages.length === 0) return;
+    
+    setIsLoadingMore(true);
+    const oldestMessage = messages[0];
+    
+    try {
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          sender:profiles!messages_sender_id_fkey(display_name, avatar_url),
+          reactions:message_reactions(
+            emoji,
+            user_id,
+            user:profiles(display_name, avatar_url)
+          )
+        `)
+        .eq('conversation_id', conversationId)
+        .is('deleted_at', null)
+        .lt('created_at', oldestMessage.created_at)
+        .order('created_at', { ascending: false })
+        .limit(MESSAGES_PER_PAGE);
+
+      if (error) throw error;
+      
+      const sortedData = (data || []).reverse();
+      setHasMoreMessages((data || []).length === MESSAGES_PER_PAGE);
+      
+      const formattedOlder = sortedData.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender_id: msg.sender_id,
+        created_at: msg.created_at,
+        media_url: msg.media_url || null,
+        media_type: msg.media_type || null,
+        reply_to_id: msg.reply_to_id || null,
+        reply_to_message: null,
+        profiles: {
+          display_name: msg.sender?.display_name || 'Unknown User',
+          avatar_url: msg.sender?.avatar_url || null,
+        },
+        reactions: msg.reactions || [],
+        read_receipts: [],
+        status: 'delivered' as Message['status'],
+        is_pinned: msg.is_pinned || false,
+        edited_at: msg.edited_at || null,
+      }));
+      
+      // Preserve scroll position
+      const scrollContainer = scrollAreaRef.current;
+      const previousScrollHeight = scrollContainer?.scrollHeight || 0;
+      
+      setMessages(prev => [...formattedOlder, ...prev]);
+      
+      // Restore scroll position after prepending
+      requestAnimationFrame(() => {
+        if (scrollContainer) {
+          const newScrollHeight = scrollContainer.scrollHeight;
+          scrollContainer.scrollTop = newScrollHeight - previousScrollHeight;
+        }
+      });
+    } catch (error) {
+      console.error('Error loading older messages:', error);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -1307,6 +1383,20 @@ export const ModernChatInterface = ({
         ref={scrollAreaRef}
       >
         <div className="py-4 space-y-4">
+          {/* Load older messages button */}
+          {hasMoreMessages && (
+            <div className="flex justify-center py-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={loadOlderMessages}
+                disabled={isLoadingMore}
+                className="text-xs text-muted-foreground"
+              >
+                {isLoadingMore ? 'Loading...' : 'Load older messages'}
+              </Button>
+            </div>
+          )}
           {Object.entries(groupedMessages).map(([date, dateMessages]) => (
             <div key={date}>
               {/* Date Header */}

@@ -98,10 +98,10 @@ Your messaging system is well-built with most core WhatsApp/Telegram features al
 ## Recommended Implementation Order
 
 ```text
-Phase 1 (Critical fixes):
-  ├─ Fix avatar SPA navigation (1 line fix)
-  ├─ Add message pagination for DMs and groups
-  └─ Add group message caching
+Phase 1 (Critical fixes): ✅ DONE
+  ├─ ✅ Fix avatar SPA navigation (useNavigate)
+  ├─ ✅ Add message pagination for DMs (50 per page, cursor-based)
+  └─ ✅ Add group message caching (useMessageCache)
 
 Phase 2 (Feature parity):
   ├─ Link preview cards (edge function + component)
