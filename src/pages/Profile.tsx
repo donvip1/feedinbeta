@@ -22,6 +22,7 @@ import { ArrowLeft, Settings, Eye, Crown, MessageCircle, Heart, Camera, Instagra
 
 import { getCountryFlag } from '@/lib/location-service';
 import { PostsGrid } from '@/components/profile/PostsGrid';
+import { PastSpaces } from '@/components/profile/PastSpaces';
 import { ViewHistory } from '@/components/profile/ViewHistory';
 import { usePageRefresh } from '@/context/RefreshContext';
 import { useProfileWithCache } from '@/hooks/useProfileWithCache';
@@ -1088,6 +1089,9 @@ const Profile = () => {
             </div>
             <PostsGrid userId={resolvedUserId || ''} />
           </div>
+
+          {/* Past Spaces Section */}
+          <PastSpaces userId={resolvedUserId || ''} />
 
           {/* View History - Only for own profile */}
           {isOwnProfile && (
