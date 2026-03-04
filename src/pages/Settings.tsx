@@ -39,7 +39,10 @@ import {
   Sun,
   BarChart3,
   Gift,
-  Rocket
+  Rocket,
+  Info,
+  FileText,
+  Scale
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -457,7 +460,45 @@ const Settings = () => {
           </Card>
         )}
 
-        {/* Note: Danger Zone moved to Privacy & Security settings */}
+        {/* About FeedIn */}
+        <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">
+          <div className="p-6">
+            <h3 className="text-lg font-bold mb-4 text-foreground flex items-center gap-2">
+              <Info className="w-5 h-5 text-primary" />
+              About FeedIn
+            </h3>
+            {renderOptionsList([
+              {
+                icon: Scale,
+                title: 'Terms of Service',
+                description: 'Read our terms and conditions',
+                route: '/settings/about?section=terms',
+                color: 'text-blue-500'
+              },
+              {
+                icon: Shield,
+                title: 'Privacy Policy',
+                description: 'How we handle your data',
+                route: '/settings/about?section=privacy',
+                color: 'text-green-500'
+              },
+              {
+                icon: Users,
+                title: 'Community Guidelines',
+                description: 'Our community standards',
+                route: '/settings/about?section=community',
+                color: 'text-purple-500'
+              },
+              {
+                icon: FileText,
+                title: 'Full Policy Document',
+                description: 'View the complete policy PDF',
+                route: '/settings/about',
+                color: 'text-amber-500'
+              }
+            ])}
+          </div>
+        </Card>
 
         {/* Sign Out */}
         <Card className="bg-gradient-to-br from-card/50 to-card/30 backdrop-blur-sm border-border shadow-xl mt-6">

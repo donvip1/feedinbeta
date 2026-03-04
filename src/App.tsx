@@ -125,6 +125,7 @@ const AdBuilder = lazy(() => import("./pages/AdBuilder"));
 const MyAds = lazy(() => import("./pages/MyAds"));
 const StarredMessages = lazy(() => import("./pages/StarredMessages"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AboutFeedIn = lazy(() => import("./pages/AboutFeedIn"));
 // Lazy load ALL AI tools - reduces memory during build
 const BackgroundRemover = lazy(() => import("./pages/tools/BackgroundRemover"));
 const ImageUpscaler = lazy(() => import("./pages/tools/ImageUpscaler"));
@@ -425,6 +426,7 @@ const App = () => {
             <Route path="/settings/investors" element={<Investors />} />
             <Route path="/settings/investment-docs" element={<InvestmentDocs />} />
             <Route path="/settings/currency" element={<CurrencySettings />} />
+            <Route path="/settings/about" element={<AboutFeedIn />} />
             <Route path="/admin/analytics" element={<AdminAnalytics />} />
             <Route path="/admin/deleted-posts" element={<AdminDeletedPosts />} />
             <Route path="/admin/panel" element={<AdminPanel />} />
