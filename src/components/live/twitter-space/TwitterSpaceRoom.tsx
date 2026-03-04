@@ -1226,12 +1226,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 const isHostUser = speaker.user_id === space?.user_id;
                 
                 return (
-                  <button
+                  <div
                     key={speaker.id}
-                    onClick={() => navigateToProfile(speaker.user_id)}
                     className="flex flex-col items-center gap-4 group"
                   >
-                    <div className="relative">
+                    <div className="relative cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
                       {/* Ping-style audio wave indicators */}
                       {speaking && (
                         <>
@@ -1274,7 +1273,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                         )}
                       </div>
                     </div>
-                    <div className="text-center">
+                    <div 
+                      className="text-center cursor-pointer"
+                      onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                    >
                       <p className="text-xs font-black truncate max-w-[90px] group-hover:text-purple-400 transition-colors text-white">
                         {speaker.profile?.display_name?.split(' ')[0] || 'User'}
                       </p>
@@ -1285,7 +1287,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                         {isHostUser ? 'Host' : speaker.role === 'co_host' ? 'Co-host' : 'Speaker'}
                       </p>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
           </div>
@@ -1303,12 +1305,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                   .filter(s => s.role === 'listener')
                   .slice(0, 18)
                   .map((speaker) => (
-                    <button
+                    <div
                       key={speaker.id}
-                      onClick={() => navigateToProfile(speaker.user_id)}
                       className="flex flex-col items-center gap-2"
                     >
-                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/5">
+                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/5 cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
                         {speaker.profile?.avatar_url ? (
                           <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
                         ) : (
@@ -1317,10 +1318,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                           </div>
                         )}
                       </div>
-                      <span className="text-[10px] font-bold text-slate-500 truncate w-full text-center">
+                      <span 
+                        className="text-[10px] font-bold text-slate-500 truncate w-full text-center cursor-pointer hover:text-purple-400 transition-colors"
+                        onClick={() => isHost ? handleNameTap(speaker) : navigateToProfile(speaker.user_id)}
+                      >
                         {speaker.profile?.display_name?.split(' ')[0] || 'User'}
                       </span>
-                    </button>
+                    </div>
                   ))}
               </div>
             </div>
