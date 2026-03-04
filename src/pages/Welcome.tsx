@@ -145,7 +145,10 @@ export default function Welcome() {
         </div>
 
         <p className="text-xs text-muted-foreground pt-4">
-          Join our community and start sharing your moments today
+          By continuing, you agree to our{' '}
+          <a href="/settings/about?section=terms" className="text-primary hover:underline">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/settings/about?section=privacy" className="text-primary hover:underline">Privacy Policy</a>
         </p>
       </div>
       </div>
