@@ -134,9 +134,9 @@ const Index = () => {
         {/* Footer */}
         <p className="text-center text-gray-500 text-sm">
           By continuing, you agree to our{' '}
-          <span className="text-pink-400 hover:underline cursor-pointer">Terms of Service</span>
+          <a href="/settings/about?section=terms" className="text-pink-400 hover:underline">Terms of Service</a>
           {' '}and{' '}
-          <span className="text-pink-400 hover:underline cursor-pointer">Privacy Policy</span>
+          <a href="/settings/about?section=privacy" className="text-pink-400 hover:underline">Privacy Policy</a>
         </p>
       </main>
     </div>
