@@ -12,8 +12,9 @@ class AutoUpdater {
   private isChecking = false;
   private lastCheck = 0;
   private pendingUpdate = false;
-  private readonly CHECK_INTERVAL = 60 * 1000; // 1 minute for faster updates
-  private readonly MIN_CHECK_GAP = 15 * 1000; // 15 seconds minimum between checks
+  private updatePromptShown = false; // Track if we already showed the prompt this session
+  private readonly CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes between checks
+  private readonly MIN_CHECK_GAP = 60 * 1000; // 1 minute minimum between checks
   private readonly IDLE_THRESHOLD = 3 * 1000; // 3 seconds of inactivity to apply update
   private readonly FORCE_CHECK_ON_RESUME = true; // Always check when app resumes
 
@@ -78,21 +79,17 @@ class AutoUpdater {
       this.checkForUpdates();
     }, this.CHECK_INTERVAL);
 
-    // Initial check after 5 seconds (faster initial check for APK users)
-    setTimeout(() => this.checkForUpdates(), 5000);
+    // Initial check after 30 seconds (give app time to load)
+    setTimeout(() => this.checkForUpdates(), 30000);
   }
 
   private handleVisibilityChange = () => {
     if (document.visibilityState === 'visible') {
-      // Check for updates when app becomes visible
+      // Only check for updates when returning, don't auto-apply
       this.checkForUpdates();
-    } else if (document.visibilityState === 'hidden') {
-      // Perfect time to apply pending updates when user leaves
-      if (this.registration?.waiting) {
-        console.log('[AutoUpdater] App hidden, applying pending update...');
-        this.registration.waiting.postMessage({ action: 'skipWaiting' });
-      }
     }
+    // Do NOT auto-apply updates when app goes hidden - this causes
+    // page reloads that kick users out of live spaces
   };
 
   private handleFocus = () => {
@@ -112,10 +109,13 @@ class AutoUpdater {
 
     newWorker.addEventListener('statechange', () => {
       if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        console.log('[AutoUpdater] New version ready, notifying user...');
+        console.log('[AutoUpdater] New version ready');
         this.pendingUpdate = true;
-        // Dispatch custom event to show update prompt
-        window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
+        // Only show update prompt once per session
+        if (!this.updatePromptShown) {
+          this.updatePromptShown = true;
+          window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
+        }
       }
     });
   };
@@ -135,9 +135,13 @@ class AutoUpdater {
       
       // Check if there's a waiting worker
       if (this.registration.waiting) {
-        console.log('[AutoUpdater] Update available, notifying user...');
+        console.log('[AutoUpdater] Update available');
         this.pendingUpdate = true;
-        window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
+        // Only show update prompt once per session
+        if (!this.updatePromptShown) {
+          this.updatePromptShown = true;
+          window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
+        }
         return true;
       }
       
