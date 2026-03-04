@@ -29,9 +29,12 @@ const SpaceDetail = () => {
 
   // Check if we're returning from minimized state - run BEFORE fetch
   useEffect(() => {
+    if (!spaceContext || !spaceContext.spaceState.isActive) return;
+    
+    const activeSpaceId = spaceContext.spaceState.spaceInfo?.id;
+    
     // If returning from minimize via FloatingSpacePlayer, show room immediately
-    if (returningFromMinimize && spaceContext && spaceContext.spaceState.isActive) {
-      const activeSpaceId = spaceContext.spaceState.spaceInfo?.id;
+    if (returningFromMinimize) {
       if (activeSpaceId === spaceId || (space && activeSpaceId === space.id)) {
         console.log('[SpaceDetail] Returning from minimize, showing room immediately');
         setShowRoom(true);
@@ -40,14 +43,12 @@ const SpaceDetail = () => {
       }
     }
     
-    // Also handle case where context is active and not minimized
-    if (spaceContext && spaceContext.spaceState.isActive && !spaceContext.spaceState.isMinimized) {
-      const activeSpaceId = spaceContext.spaceState.spaceInfo?.id;
-      if (activeSpaceId === spaceId || (space && activeSpaceId === space.id)) {
-        console.log('[SpaceDetail] Already in this space, showing room directly');
-        setShowRoom(true);
-        setLoading(false);
-      }
+    // If we're actively in this space (context is active, not minimized, OR even minimized),
+    // always show the room - prevents getting kicked to lobby on remounts/reloads
+    if (activeSpaceId === spaceId || (space && activeSpaceId === space.id)) {
+      console.log('[SpaceDetail] Active space matches, showing room directly');
+      setShowRoom(true);
+      setLoading(false);
     }
   }, [spaceContext?.spaceState.isActive, spaceContext?.spaceState.isMinimized, spaceId, space?.id, returningFromMinimize]);
 
