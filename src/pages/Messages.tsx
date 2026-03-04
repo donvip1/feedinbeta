@@ -663,8 +663,6 @@ export default function Messages() {
             <div className="pb-20">
               {/* Activity Section - TikTok Style */}
               <InboxActivitySection
-                onFollowersClick={() => navigate('/friends')}
-                onActivityClick={() => navigate('/notifications/history')}
                 totalUnreadCount={totalUnreadCount}
                 onMarkAllRead={markAllMessagesAsRead}
               />
