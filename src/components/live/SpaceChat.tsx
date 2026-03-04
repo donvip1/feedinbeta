@@ -12,7 +12,9 @@ import { toast } from 'sonner';
 interface SpaceChatProps {
   spaceId: string;
   onClose: () => void;
-  navigateToLive?: boolean; // If true, navigate to /live instead of just closing
+  navigateToLive?: boolean;
+  coverImageUrl?: string;
+  spaceTitle?: string;
 }
 
 interface ChatMessage {
@@ -27,7 +29,7 @@ interface ChatMessage {
   };
 }
 
-export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceChatProps) => {
+export const SpaceChat = ({ spaceId, onClose, navigateToLive = false, coverImageUrl, spaceTitle }: SpaceChatProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -158,6 +160,19 @@ export const SpaceChat = ({ spaceId, onClose, navigateToLive = false }: SpaceCha
         </Button>
         <h3 className="font-semibold flex-1">Chat</h3>
       </div>
+
+      {/* Cover Image Banner */}
+      {coverImageUrl && (
+        <div className="relative w-full h-24 overflow-hidden border-b">
+          <img src={coverImageUrl} alt={spaceTitle || 'Space'} className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
+          {spaceTitle && (
+            <p className="absolute bottom-2 left-4 text-sm font-semibold text-white drop-shadow-lg truncate max-w-[80%]">
+              {spaceTitle}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">

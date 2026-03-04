@@ -85,6 +85,7 @@ interface SpaceData {
   is_private: boolean;
   started_at?: string;
   allow_mic_for_all?: boolean;
+  cover_image_url?: string;
 }
 
 // Use unified reactions with some space-specific additions
@@ -1757,7 +1758,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             transition={{ type: 'spring', damping: 25 }}
             className="fixed inset-x-0 bottom-0 h-[60vh] bg-background/95 backdrop-blur-lg border-t border-border z-40 rounded-t-3xl"
           >
-            <SpaceChat spaceId={spaceId} onClose={() => setShowChat(false)} />
+            <SpaceChat spaceId={spaceId} onClose={() => setShowChat(false)} coverImageUrl={space?.cover_image_url} spaceTitle={space?.title} />
           </motion.div>
         )}
       </AnimatePresence>
