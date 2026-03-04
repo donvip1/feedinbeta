@@ -1855,6 +1855,25 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         onClose={() => setShowAudioSettingsModal(false)}
       />
 
+      {/* Speaker Action Sheet */}
+      {showActionSheet && selectedSpeaker && (
+        <SpeakerActionSheet
+          speaker={selectedSpeaker}
+          onClose={() => { setShowActionSheet(false); setSelectedSpeaker(null); }}
+          onInviteToSpeak={handleInviteToSpeak}
+          onDemoteToListener={handleDemoteToListener}
+        />
+      )}
+
+      {/* Speak Invite Dialog */}
+      <SpeakInviteDialog
+        isOpen={showSpeakInvite}
+        inviterName={inviterName}
+        spaceName={space?.title || 'Space'}
+        onAccept={handleAcceptInvite}
+        onDecline={() => setShowSpeakInvite(false)}
+      />
+
       <style>{`
         @keyframes space-float {
           0% { transform: translateY(0) scale(1); opacity: 0; }
