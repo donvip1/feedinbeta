@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { 
   ArrowLeft, Send, Smile, Phone, Video, Mic, X, Image as ImageIcon, 
   Paperclip, Search, MoreVertical, Circle, ChevronDown, Reply, Pin,
-  Gift, Sparkles, Clock
+  Gift, Sparkles, Clock, BellOff, Bell
 } from 'lucide-react';
 import { VerifiedBadge } from '@/components/profile/VerifiedBadge';
 import { ScheduleMessageModal } from './ScheduleMessageModal';
@@ -31,6 +31,7 @@ import { DeleteMessageModal, DeleteOption } from './DeleteMessageModal';
 import { AIReplySuggestions } from './AIReplySuggestions';
 import { ChatGiftButton } from './ChatGiftButton';
 import { ForwardMessageSheet } from './ForwardMessageSheet';
+import { MuteConversationSheet } from './MuteConversationSheet';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -170,6 +171,9 @@ export const ModernChatInterface = ({
     timestamp: string;
   } | null>(null);
   
+  // Mute state
+  const [showMuteSheet, setShowMuteSheet] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
@@ -333,6 +337,20 @@ export const ModernChatInterface = ({
     const init = async () => {
       await loadOtherUser();
       await loadMessages();
+      // Load mute state
+      if (user?.id) {
+        const { data } = await supabase
+          .from('conversation_participants')
+          .select('is_muted, muted_until')
+          .eq('conversation_id', conversationId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (data) {
+          const mutedUntil = data.muted_until ? new Date(data.muted_until) : null;
+          const stillMuted = data.is_muted && (!mutedUntil || mutedUntil > new Date());
+          setIsMuted(stillMuted);
+        }
+      }
     };
     init();
   }, [conversationId, user?.id]);
@@ -1333,13 +1351,17 @@ export const ModernChatInterface = ({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 rounded-xl">
-              <DropdownMenuItem className="gap-2">
+              <DropdownMenuItem className="gap-2" onClick={() => setShowSearch(true)}>
                 <Search className="w-4 h-4" />
                 Search in chat
               </DropdownMenuItem>
               <DropdownMenuItem className="gap-2">
                 <Pin className="w-4 h-4" />
                 Pinned messages ({pinnedMessages.length})
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2" onClick={() => setShowMuteSheet(true)}>
+                {isMuted ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+                {isMuted ? 'Unmute chat' : 'Mute chat'}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem className="gap-2 text-destructive">
@@ -1830,6 +1852,34 @@ export const ModernChatInterface = ({
         onClose={() => setShowScheduleModal(false)}
         onSchedule={handleScheduleMessage}
         messageContent={newMessage}
+      />
+      
+      {/* Mute Conversation Sheet */}
+      <MuteConversationSheet
+        isOpen={showMuteSheet}
+        onClose={() => setShowMuteSheet(false)}
+        isMuted={isMuted}
+        onMute={async (durationMs) => {
+          if (!user) return;
+          const mutedUntil = durationMs ? new Date(Date.now() + durationMs).toISOString() : null;
+          await supabase
+            .from('conversation_participants')
+            .update({ is_muted: true, muted_until: mutedUntil })
+            .eq('conversation_id', conversationId)
+            .eq('user_id', user.id);
+          setIsMuted(true);
+          toast({ title: 'Conversation muted' });
+        }}
+        onUnmute={async () => {
+          if (!user) return;
+          await supabase
+            .from('conversation_participants')
+            .update({ is_muted: false, muted_until: null })
+            .eq('conversation_id', conversationId)
+            .eq('user_id', user.id);
+          setIsMuted(false);
+          toast({ title: 'Conversation unmuted' });
+        }}
       />
     </div>
   );

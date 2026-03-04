@@ -10,6 +10,7 @@ import { MessageReactionsDisplay } from '@/components/groups/MessageReactionsDis
 import { MessageContextMenu } from './MessageContextMenu';
 import { cn } from '@/lib/utils';
 import { getEmojiSizeClass, isEmojiOnly } from '@/lib/emoji-utils';
+import { LinkPreviewCard } from './LinkPreviewCard';
 
 interface MessageBubbleProps {
   message: {
@@ -168,6 +169,15 @@ export const ModernMessageBubble = ({
     const date = new Date(dateStr);
     return format(date, 'HH:mm');
   };
+
+  // Extract first URL from message content
+  const extractUrl = (text: string): string | null => {
+    const urlRegex = /https?:\/\/[^\s<>"{}|\\^`\[\]]+/i;
+    const match = text.match(urlRegex);
+    return match ? match[0] : null;
+  };
+
+  const firstUrl = message.content ? extractUrl(message.content) : null;
 
   const renderMedia = () => {
     if (!message.media_url) return null;
@@ -371,6 +381,11 @@ export const ModernMessageBubble = ({
                     </p>
                   );
                 })()
+              )}
+              
+              {/* Link Preview */}
+              {firstUrl && !message.media_url && (
+                <LinkPreviewCard url={firstUrl} isOwn={isOwn} />
               )}
               
               {/* Inline Time and Status */}
