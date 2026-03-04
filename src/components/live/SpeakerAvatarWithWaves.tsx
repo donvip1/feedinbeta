@@ -1,7 +1,6 @@
 import { Crown, Gift, Mic, MicOff, MoreVertical, Shield, Volume2, VolumeX, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,155 +60,94 @@ export const SpeakerAvatarWithWaves = ({
   showCrown 
 }: SpeakerAvatarWithWavesProps) => {
   const sizeClasses = {
+    sm: 'w-14 h-14',
+    md: 'w-20 h-20',
+    lg: 'w-24 h-24',
+  };
+
+  const avatarInnerClasses = {
     sm: 'w-12 h-12',
-    md: 'w-16 h-16',
-    lg: 'w-20 h-20',
+    md: 'w-[4.5rem] h-[4.5rem]',
+    lg: 'w-[5.5rem] h-[5.5rem]',
   };
 
-  const wavesSizeClasses = {
-    sm: { inner: 'w-14 h-14', middle: 'w-16 h-16', outer: 'w-18 h-18' },
-    md: { inner: 'w-20 h-20', middle: 'w-24 h-24', outer: 'w-28 h-28' },
-    lg: { inner: 'w-24 h-24', middle: 'w-28 h-28', outer: 'w-32 h-32' },
-  };
-
-  // More sensitive speaking detection - threshold of 2 for very responsive indicator
-  // audioLevel is 0-100 from the analyzer
   const isSpeaking = !speaker.is_muted && !speaker.host_muted && audioLevel > 2;
   const isSelf = speaker.user_id === currentUserId;
   const canShowHostControls = isHost && !isSelf && speaker.role !== 'host';
-  
-  // Normalize audio level for animations (0-1 range, with amplification for visual effect)
-  // audioLevel is 0-100, normalize to 0-1 with more sensitivity
-  const normalizedLevel = Math.min(audioLevel / 30, 1);
 
   return (
-    <div className="flex flex-col items-center gap-2 group">
-      <div className="relative flex items-center justify-center">
-        {/* Animated audio wave rings */}
+    <div className="flex flex-col items-center gap-4 group">
+      <div className="relative">
+        {/* Ping-style wave borders */}
         {isSpeaking && (
           <>
-            {/* Outer ring - slowest, largest */}
-            <motion.div
-              className={cn(
-                "absolute rounded-full border-2 border-primary/20",
-                wavesSizeClasses[size].outer
-              )}
-              animate={{
-                scale: [1, 1.15 + normalizedLevel * 0.15],
-                opacity: [0.4, 0],
-              }}
-              transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                ease: "easeOut",
-              }}
+            <div 
+              className="absolute -inset-4 rounded-[2.5rem] border-2 border-purple-500/30 opacity-50"
+              style={{ animation: 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite' }}
             />
-            
-            {/* Middle ring - medium speed */}
-            <motion.div
-              className={cn(
-                "absolute rounded-full border-2 border-primary/40",
-                wavesSizeClasses[size].middle
-              )}
-              animate={{
-                scale: [1, 1.1 + normalizedLevel * 0.1],
-                opacity: [0.6, 0],
-              }}
-              transition={{
-                duration: 0.9,
-                repeat: Infinity,
-                ease: "easeOut",
-                delay: 0.15,
-              }}
-            />
-            
-            {/* Inner ring - fastest, most visible */}
-            <motion.div
-              className={cn(
-                "absolute rounded-full border-2 border-primary/60",
-                wavesSizeClasses[size].inner
-              )}
-              animate={{
-                scale: [1, 1.05 + normalizedLevel * 0.05],
-                opacity: [0.8, 0.2],
-              }}
-              transition={{
-                duration: 0.6,
-                repeat: Infinity,
-                ease: "easeOut",
-                delay: 0.3,
-              }}
-            />
-
-            {/* Glow effect behind avatar */}
-            <motion.div
-              className={cn(
-                "absolute rounded-full bg-primary/20 blur-md",
-                sizeClasses[size]
-              )}
-              animate={{
-                scale: [1, 1.2 + normalizedLevel * 0.3],
-                opacity: [0.5 + normalizedLevel * 0.3, 0.2],
-              }}
-              transition={{
-                duration: 0.3,
-                repeat: Infinity,
-                repeatType: "reverse",
-              }}
+            <div 
+              className="absolute -inset-2 rounded-[2.5rem] border-2 border-purple-500/50"
+              style={{ animation: 'ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite' }}
             />
           </>
         )}
         
-        {/* Avatar with dynamic ring */}
+        {/* Avatar with gradient border */}
         <motion.div
-          animate={isSpeaking ? { scale: [1, 1.02, 1] } : {}}
-          transition={{ duration: 0.2, repeat: isSpeaking ? Infinity : 0 }}
+          animate={isSpeaking ? { scale: [1, 1.05, 1] } : {}}
+          transition={{ duration: 0.5, repeat: isSpeaking ? Infinity : 0 }}
           onClick={onProfileClick}
-          className={onProfileClick ? "cursor-pointer" : ""}
-        >
-          <Avatar className={cn(
-            sizeClasses[size],
-            "ring-4 transition-all relative z-10",
-            isSpeaking 
-              ? "ring-primary shadow-lg shadow-primary/40" 
-              : speaker.is_muted 
-              ? "ring-muted" 
-              : "ring-green-500/50",
-            onProfileClick && "hover:ring-primary/70"
-          )}>
-            <AvatarImage src={speaker.profile?.avatar_url || ''} />
-            <AvatarFallback className="text-lg font-bold">
-              {speaker.profile?.display_name?.[0] || 'U'}
-            </AvatarFallback>
-          </Avatar>
-        </motion.div>
-
-        {/* Crown for hosts */}
-        {showCrown && speaker.role === 'host' && (
-          <div className="absolute -top-2 left-1/2 -translate-x-1/2 z-20">
-            <Crown className="w-5 h-5 text-amber-400 fill-amber-400" />
-          </div>
-        )}
-
-        {/* Mute indicator */}
-        <motion.div 
           className={cn(
-            "absolute -bottom-1 -right-1 rounded-full p-1 z-20",
-            speaker.is_muted ? "bg-red-500" : "bg-green-500"
+            "p-1 bg-gradient-to-tr transition-all duration-500 cursor-pointer",
+            sizeClasses[size],
+            isSpeaking 
+              ? 'from-purple-500 to-pink-500 scale-105' 
+              : speaker.is_muted 
+              ? 'from-white/10 to-white/5' 
+              : 'from-green-500/50 to-emerald-500/50'
           )}
-          animate={isSpeaking ? { scale: [1, 1.2, 1] } : {}}
-          transition={{ duration: 0.3, repeat: isSpeaking ? Infinity : 0 }}
+          style={{ borderRadius: '2.2rem' }}
         >
-          {speaker.is_muted ? (
-            <MicOff className="w-3 h-3 text-white" />
-          ) : (
-            <Mic className="w-3 h-3 text-white" />
-          )}
+          <img 
+            src={speaker.profile?.avatar_url || ''} 
+            alt={speaker.profile?.display_name || 'User'}
+            className="w-full h-full object-cover bg-slate-900 border-2 border-[#050505]"
+            style={{ borderRadius: '1.9rem' }}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(speaker.profile?.display_name || 'U')}&background=6366f1&color=fff`;
+            }}
+          />
         </motion.div>
+
+        {/* Microbadge indicators */}
+        <div className="absolute -bottom-1 -right-1 flex gap-1">
+          {showCrown && speaker.role === 'host' && (
+            <div className="bg-amber-400 p-1.5 shadow-xl border-2 border-[#050505]" style={{ borderRadius: '0.75rem' }}>
+              <Crown className="w-3 h-3 text-black fill-current" />
+            </div>
+          )}
+          {isSpeaking && (
+            <div className="bg-purple-600 p-1.5 shadow-xl border-2 border-[#050505] animate-bounce" style={{ borderRadius: '0.75rem' }}>
+              <Volume2 className="w-3 h-3 text-white" />
+            </div>
+          )}
+          {!isSpeaking && (
+            <div className={cn(
+              "p-1.5 shadow-xl border-2 border-[#050505]",
+              speaker.is_muted ? "bg-red-500" : "bg-green-500"
+            )} style={{ borderRadius: '0.75rem' }}>
+              {speaker.is_muted ? (
+                <MicOff className="w-3 h-3 text-white" />
+              ) : (
+                <Mic className="w-3 h-3 text-white" />
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Host muted indicator */}
         {speaker.host_muted && (
-          <div className="absolute -top-1 -left-1 rounded-full p-1 bg-red-500 z-20">
+          <div className="absolute -top-1 -left-1 rounded-xl p-1 bg-red-500 z-20 border-2 border-[#050505]">
             <Shield className="w-3 h-3 text-white" />
           </div>
         )}
@@ -265,47 +203,29 @@ export const SpeakerAvatarWithWaves = ({
       <div className="text-center">
         <p 
           className={cn(
-            "text-xs font-medium truncate max-w-[80px]",
-            onProfileClick && "cursor-pointer hover:text-primary"
+            "text-xs font-black truncate max-w-[90px] group-hover:text-purple-400 transition-colors",
+            onProfileClick && "cursor-pointer"
           )}
           onClick={onProfileClick}
         >
           {speaker.profile?.display_name || 'User'}
         </p>
-        
-        {/* Role badge */}
-        {speaker.role !== 'listener' && speaker.role !== 'speaker' && (
-          <Badge variant="secondary" className="text-[10px] h-4 mt-0.5">
-            {speaker.role === 'host' ? 'Host' : 'Co-host'}
-          </Badge>
-        )}
-        
-        {/* Mute status text - visible to everyone */}
-        <div className="flex items-center justify-center gap-1 mt-0.5">
-          {speaker.host_muted ? (
-            <span className="text-[10px] text-red-400 flex items-center gap-0.5">
-              <Shield className="w-2.5 h-2.5" />
-              Host muted
-            </span>
-          ) : speaker.is_muted ? (
-            <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-              <MicOff className="w-2.5 h-2.5" />
-              Muted
-            </span>
-          ) : (
-            <span className="text-[10px] text-green-400 flex items-center gap-0.5">
-              <Mic className="w-2.5 h-2.5" />
-              Speaking
-            </span>
-          )}
-        </div>
+        <p className={cn(
+          "text-[8px] font-black uppercase tracking-widest",
+          speaker.role === 'host' ? 'text-amber-400' : 
+          speaker.role === 'co_host' ? 'text-purple-400' : 'text-slate-500'
+        )}>
+          {speaker.role === 'host' ? 'Host' : 
+           speaker.role === 'co_host' ? 'Co-host' : 
+           speaker.role === 'speaker' ? 'Speaker' : ''}
+        </p>
       </div>
 
       {/* Gift button on hover */}
       <Button
         size="sm"
         variant="outline"
-        className="h-6 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+        className="h-6 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity border-white/10 text-white/60 hover:text-white"
         onClick={onGift}
       >
         <Gift className="w-3 h-3 mr-1" />
