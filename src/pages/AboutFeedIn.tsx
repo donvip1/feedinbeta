@@ -63,12 +63,6 @@ const AboutFeedIn = () => {
   const activeSection = searchParams.get('section');
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
-  }, [loading, user, navigate]);
-
-  useEffect(() => {
     if (activeSection) {
       const el = document.getElementById(activeSection);
       if (el) {
@@ -82,7 +76,7 @@ const AboutFeedIn = () => {
       <header className="sticky top-0 z-50 bg-card/80 backdrop-blur-lg border-b border-border">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center space-x-3">
-            <Button onClick={() => navigate('/settings')} size="sm" variant="ghost">
+            <Button onClick={() => navigate(-1)} size="sm" variant="ghost">
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <img src={feedinLogo} alt="FeedIn" className="w-8 h-8" />
@@ -158,7 +152,7 @@ const AboutFeedIn = () => {
         </div>
       </main>
 
-      <BottomNav />
+      {user && <BottomNav />}
     </div>
   );
 };
