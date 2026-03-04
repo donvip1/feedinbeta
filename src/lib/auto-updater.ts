@@ -109,13 +109,10 @@ class AutoUpdater {
 
     newWorker.addEventListener('statechange', () => {
       if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        console.log('[AutoUpdater] New version ready');
+        console.log('[AutoUpdater] New version ready, applying silently...');
         this.pendingUpdate = true;
-        // Only show update prompt once per session
-        if (!this.updatePromptShown) {
-          this.updatePromptShown = true;
-          window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
-        }
+        // Apply update silently - no popup, just activate the new SW
+        this.applyUpdate();
       }
     });
   };
@@ -133,15 +130,11 @@ class AutoUpdater {
       await this.registration.update();
       console.log('[AutoUpdater] Update check completed');
       
-      // Check if there's a waiting worker
+      // Check if there's a waiting worker - apply silently
       if (this.registration.waiting) {
-        console.log('[AutoUpdater] Update available');
+        console.log('[AutoUpdater] Update available, applying silently...');
         this.pendingUpdate = true;
-        // Only show update prompt once per session
-        if (!this.updatePromptShown) {
-          this.updatePromptShown = true;
-          window.dispatchEvent(new CustomEvent(UPDATE_AVAILABLE_EVENT));
-        }
+        this.applyUpdate();
         return true;
       }
       

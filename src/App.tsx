@@ -21,7 +21,7 @@ import { SpaceInviteNotification } from "@/components/live/SpaceInviteNotificati
 import { RealtimeProvider } from "@/components/shared/RealtimeProvider";
 import { ActiveCallIndicator } from "@/components/calls/ActiveCallIndicator";
 import { MobileInstallModal } from "@/components/pwa/MobileInstallModal";
-import { UpdatePromptModal } from "@/components/pwa/UpdatePromptModal";
+
 import { BrowserInstallBanner } from "@/components/pwa/BrowserInstallBanner";
 import { ProfileCompletionModal } from "@/components/auth/ProfileCompletionModal";
 import { appDataSync } from "@/lib/app-data-sync";
@@ -159,8 +159,6 @@ const NutritionCalculator = lazy(() => import("./pages/tools/NutritionCalculator
 const ImagesToPDF = lazy(() => import("./pages/tools/ImagesToPDF"));
 const HumanizeAI = lazy(() => import("./pages/tools/HumanizeAI"));
 
-// Custom event for update available - defined locally to avoid mixed import
-const UPDATE_AVAILABLE_EVENT = 'feedin-update-available';
 
 // Create QueryClient with stable settings - NO auto-refresh to prevent kicking users off screens
 const queryClient = new QueryClient({
@@ -186,7 +184,7 @@ appDataSync.initialize(queryClient);
 const LazyFallback = () => <LoadingScreen />;
 
 const App = () => {
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  
 
   // Initialize offline manager, auto-updater, native app manager, and Sentry
   useEffect(() => {
@@ -209,12 +207,6 @@ const App = () => {
       console.log('Auto-updater ready');
     });
 
-    // Listen for update available event
-    const handleUpdateAvailable = () => {
-      setShowUpdateModal(true);
-    };
-    window.addEventListener(UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
-    
     // Request notification permission on app load
     if ('Notification' in window && Notification.permission === 'default') {
       setTimeout(() => {
@@ -223,26 +215,8 @@ const App = () => {
         });
       }, 3000);
     }
-
-    return () => {
-      window.removeEventListener(UPDATE_AVAILABLE_EVENT, handleUpdateAvailable);
-    };
   }, []);
 
-  const handleUpdate = () => {
-    setShowUpdateModal(false);
-    // Dynamic import for update action
-    import('@/lib/auto-updater').then(({ autoUpdater }) => {
-      autoUpdater.applyUpdate();
-    });
-  };
-
-  const handleUpdateLater = () => {
-    setShowUpdateModal(false);
-    import('@/lib/auto-updater').then(({ autoUpdater }) => {
-      autoUpdater.dismissUpdate();
-    });
-  };
 
   return (
     <ErrorBoundary>
@@ -270,11 +244,6 @@ const App = () => {
                   <MobileInstallModal />
                   <BrowserInstallBanner />
                   <ProfileCompletionModal />
-                  <UpdatePromptModal 
-                    open={showUpdateModal} 
-                    onUpdate={handleUpdate} 
-                    onLater={handleUpdateLater} 
-                  />
                 <Suspense fallback={<LazyFallback />}>
                 <Routes>
             {/* Main */}
