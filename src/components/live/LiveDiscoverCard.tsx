@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Users, Mic, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { AspectRatio } from "@/components/ui/aspect-ratio";
+
 
 type RoomType = "video_broadcast" | "audio_space" | "pk_battle";
 
