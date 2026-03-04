@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, ChevronLeft } from 'lucide-react';
+import { MessageSquarePlus, Search, ArrowLeft, Users, Lock, Globe, Plus, CheckCheck, Shield, MoreVertical, ChevronLeft, Archive } from 'lucide-react';
 import { MessageSettingsSheet } from '@/components/messages/MessageSettingsSheet';
 import { ModernChatInterface } from '@/components/messages/ModernChatInterface';
 import { NewConversationModal } from '@/components/messages/NewConversationModal';
@@ -48,6 +48,8 @@ interface Conversation {
   isOnline?: boolean;
   isTyping?: boolean;
   activityType?: ActivityType;
+  is_archived?: boolean;
+  is_muted?: boolean;
 }
 
 interface Group {
@@ -87,6 +89,7 @@ export default function Messages() {
   const [secretMode, setSecretMode] = useState(false);
   const [showMessageSettings, setShowMessageSettings] = useState(false);
   const [highlightMessageId, setHighlightMessageId] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
   const handledLocationStateRef = useRef(false);
   const initialLoadDoneRef = useRef(false);
 
@@ -206,6 +209,8 @@ export default function Messages() {
             unread_count: isFromOther && selectedConversationId !== message.conversation_id 
               ? (conv.unread_count || 0) + 1 
               : conv.unread_count,
+            // Auto-unarchive on new message from other user
+            is_archived: isFromOther ? false : conv.is_archived,
           };
         }
         return conv;
@@ -281,27 +286,49 @@ export default function Messages() {
     setLoadError(null);
     try {
       // Use optimized RPC function - single query instead of 4+ per conversation
-      const { data, error } = await supabase
-        .rpc('get_conversations_with_details', { p_user_id: user.id });
+      const [rpcResult, participantResult] = await Promise.all([
+        supabase.rpc('get_conversations_with_details', { p_user_id: user.id }),
+        supabase
+          .from('conversation_participants')
+          .select('conversation_id, is_archived, is_muted, muted_until')
+          .eq('user_id', user.id),
+      ]);
 
-      if (error) throw error;
+      if (rpcResult.error) throw rpcResult.error;
 
-      const sortedConversations = (data || []).map((row: any) => ({
-        id: row.conversation_id,
-        updated_at: row.updated_at,
-        other_participant: {
-          id: row.other_user_id || '',
-          display_name: row.other_user_display_name || 'Unknown',
-          username: row.other_user_username || null,
-          avatar_url: row.other_user_avatar_url || null,
-        },
-        last_message: row.last_message_content ? {
-          content: row.last_message_content,
-          created_at: row.last_message_created_at,
-          sender_id: row.last_message_sender_id,
-        } : undefined,
-        unread_count: row.unread_count || 0,
-      }));
+      // Build a lookup for archive/mute state
+      const participantMap = new Map<string, { is_archived: boolean; is_muted: boolean; muted_until: string | null }>();
+      (participantResult.data || []).forEach((p: any) => {
+        const mutedUntil = p.muted_until ? new Date(p.muted_until) : null;
+        const stillMuted = p.is_muted && (!mutedUntil || mutedUntil > new Date());
+        participantMap.set(p.conversation_id, {
+          is_archived: p.is_archived || false,
+          is_muted: stillMuted,
+          muted_until: p.muted_until,
+        });
+      });
+
+      const sortedConversations = (rpcResult.data || []).map((row: any) => {
+        const pState = participantMap.get(row.conversation_id);
+        return {
+          id: row.conversation_id,
+          updated_at: row.updated_at,
+          other_participant: {
+            id: row.other_user_id || '',
+            display_name: row.other_user_display_name || 'Unknown',
+            username: row.other_user_username || null,
+            avatar_url: row.other_user_avatar_url || null,
+          },
+          last_message: row.last_message_content ? {
+            content: row.last_message_content,
+            created_at: row.last_message_created_at,
+            sender_id: row.last_message_sender_id,
+          } : undefined,
+          unread_count: row.unread_count || 0,
+          is_archived: pState?.is_archived || false,
+          is_muted: pState?.is_muted || false,
+        };
+      });
 
       setConversations(sortedConversations);
       // Save to cache for instant loading next time
@@ -456,9 +483,31 @@ export default function Messages() {
     }
   };
 
+  const handleArchiveConversation = async (conversationId: string) => {
+    if (!user) return;
+    const conv = conversations.find(c => c.id === conversationId);
+    const newState = !conv?.is_archived;
+    
+    // Optimistic update
+    setConversations(prev => prev.map(c => 
+      c.id === conversationId ? { ...c, is_archived: newState } : c
+    ));
+    
+    await supabase
+      .from('conversation_participants')
+      .update({ is_archived: newState })
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id);
+    
+    toast({ title: newState ? 'Chat archived' : 'Chat unarchived' });
+  };
+
   const totalUnreadCount = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
 
-  const filteredConversations = conversations.filter(conv =>
+  const archivedConversations = conversations.filter(c => c.is_archived);
+  const activeConversations = conversations.filter(c => !c.is_archived);
+
+  const filteredConversations = (showArchived ? archivedConversations : activeConversations).filter(conv =>
     conv.other_participant.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     conv.other_participant.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -620,6 +669,32 @@ export default function Messages() {
                 onMarkAllRead={markAllMessagesAsRead}
               />
               
+              {/* Archived Chats Toggle */}
+              {archivedConversations.length > 0 && !showArchived && (
+                <button
+                  onClick={() => setShowArchived(true)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-accent/50 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Archive className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-semibold text-foreground">Archived</p>
+                    <p className="text-xs text-muted-foreground">{archivedConversations.length} chat{archivedConversations.length !== 1 ? 's' : ''}</p>
+                  </div>
+                </button>
+              )}
+              
+              {showArchived && (
+                <button
+                  onClick={() => setShowArchived(false)}
+                  className="w-full flex items-center gap-2 px-4 py-2 text-sm text-primary font-medium hover:bg-accent/50 transition-colors"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back to chats
+                </button>
+              )}
+              
               {/* Conversations List */}
               {loadError && conversations.length === 0 ? (
                 <div className="p-4">
@@ -646,14 +721,20 @@ export default function Messages() {
                   <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-accent/20 flex items-center justify-center mb-4">
                     <MessageSquarePlus className="w-10 h-10 text-primary" />
                   </div>
-                  <p className="text-foreground font-semibold mb-1">No conversations yet</p>
-                  <p className="text-muted-foreground text-sm mb-4">Start chatting with friends</p>
-                  <Button
-                    onClick={() => setShowNewConversation(true)}
-                    className="bg-gradient-to-r from-primary to-accent text-white"
-                  >
-                    Start a conversation
-                  </Button>
+                  <p className="text-foreground font-semibold mb-1">
+                    {showArchived ? 'No archived chats' : 'No conversations yet'}
+                  </p>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    {showArchived ? 'Archived chats will appear here' : 'Start chatting with friends'}
+                  </p>
+                  {!showArchived && (
+                    <Button
+                      onClick={() => setShowNewConversation(true)}
+                      className="bg-gradient-to-r from-primary to-accent text-white"
+                    >
+                      Start a conversation
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="px-2">
@@ -682,7 +763,9 @@ export default function Messages() {
                       isTyping={conv.isTyping}
                       activityType={conv.activityType}
                       isSelected={selectedConversationId === conv.id}
+                      isMuted={conv.is_muted}
                       index={index}
+                      onArchive={() => handleArchiveConversation(conv.id)}
                       onClick={() => {
                         setSelectedConversationId(conv.id);
                         if (user && conv.unread_count != null && conv.unread_count > 0) {

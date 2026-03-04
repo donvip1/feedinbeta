@@ -1244,22 +1244,31 @@ export type Database = {
         Row: {
           conversation_id: string
           id: string
+          is_archived: boolean | null
+          is_muted: boolean | null
           joined_at: string
           last_read_at: string | null
+          muted_until: string | null
           user_id: string
         }
         Insert: {
           conversation_id: string
           id?: string
+          is_archived?: boolean | null
+          is_muted?: boolean | null
           joined_at?: string
           last_read_at?: string | null
+          muted_until?: string | null
           user_id: string
         }
         Update: {
           conversation_id?: string
           id?: string
+          is_archived?: boolean | null
+          is_muted?: boolean | null
           joined_at?: string
           last_read_at?: string | null
+          muted_until?: string | null
           user_id?: string
         }
         Relationships: [
