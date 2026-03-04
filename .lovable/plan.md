@@ -1,50 +1,82 @@
 
 
-# Fix: Raised Hand Persistence + Move Share to Settings
+# Phase 2 Messaging Audit: Link Previews, Chat Archive, Conversation Muting
 
-## Issue 1: Hands Still Showing After Promotion
+## Important Note
+The build output you're seeing is **not an error** — it's a successful build (✓ 6540 modules transformed). The output just gets truncated due to the large number of asset files being listed.
 
-**Root Cause**: Two problems:
+---
 
-1. **Promoted user's local state**: In `LiveSpaceRoom.tsx` line 441-461, when the promotion broadcast is received, `setMyRole(newRole)` is called but `setHasRaisedHand(false)` is **never called**. So the promoted user's hand state stays `true` locally until `fetchSpeakers()` completes — and there's a race condition where the broadcast can arrive before the DB update is visible.
+## Feature 1: Link Preview Cards
 
-2. **Other users' view**: The realtime listener (line 292) calls `fetchSpeakers()` on any `UPDATE` to `live_space_speakers`, which should clear the hand for other viewers. But the `promoteToSpeaker` function in `SpeakerQueuePanel.tsx` sends the broadcast channel message **before the DB update is guaranteed to be propagated** to realtime listeners, creating a timing gap where the old `has_raised_hand: true` state is still visible.
+**What it does**: When a message contains a URL, display a rich preview card (title, description, image, domain) below the message text — like WhatsApp/Telegram.
 
-**Fix**:
-- In `LiveSpaceRoom.tsx` promotion handler (~line 450): add `setHasRaisedHand(false)` immediately when promotion is received
-- Add a small delay before `fetchSpeakers()` in the promotion handler to ensure DB consistency
-- In `SpeakerQueuePanel.tsx`: ensure `await` on the DB update completes before sending broadcast, and call `fetchSpeakers` from the calling component via `onSpeakerUpdate`
+**Implementation**:
+- Create a new edge function `extract-link-metadata` that fetches a URL's Open Graph tags (og:title, og:description, og:image) server-side to avoid CORS issues
+- Create a `LinkPreviewCard` component that renders the preview (image, title, description, domain favicon)
+- Modify `ModernMessageBubble` to detect URLs in message content using regex, call the edge function, and render `LinkPreviewCard` below the text
+- Cache link metadata in localStorage keyed by URL to avoid refetching
 
-## Issue 2: Move Share Button to Settings
+**Files**:
+- `supabase/functions/extract-link-metadata/index.ts` (new)
+- `src/components/messages/LinkPreviewCard.tsx` (new)
+- `src/components/messages/ModernMessageBubble.tsx` (edit — add URL detection + preview rendering)
 
-**Current state**: The Share button exists in two places:
-- `LiveSpaceRoom.tsx` line 1792-1799: A floating button on the right side stack
-- `TwitterSpaceControls.tsx` line 80-85: In the center control bar
+---
 
-**Plan**:
-- Remove the Share button from `LiveSpaceRoom.tsx` right-side action stack (lines 1789-1799)
-- Remove the Share button from `TwitterSpaceControls.tsx` center icons section
-- Add a "Share Space" option to `TwitterSpaceSettingsMenu.tsx` with `Share2` icon, accepting an `onShareClick` callback prop
-- Since `LiveSpaceRoom.tsx` doesn't use `TwitterSpaceSettingsMenu`, add a settings menu (or a three-dot dropdown) in the space header/controls that includes the Share option — or add it to the existing `MoreVertical` dropdown that appears on speaker avatars
+## Feature 2: Chat Archive
 
-Looking more closely, `LiveSpaceRoom.tsx` has no dedicated settings menu. The simplest approach:
-- Add a Settings button to the right-side floating stack (replacing or alongside Share)
-- Create a simple bottom sheet settings menu within `LiveSpaceRoom.tsx` that includes Share, Report, View Rules, and Captions options
-- Update `TwitterSpaceSettingsMenu.tsx` to accept `onShareClick` prop for the Twitter-style space view
+**What it does**: Users can archive conversations to hide them from the main chat list. Archived chats appear in a separate "Archived" section accessible from the inbox.
 
-## Files to Change
+**Implementation**:
+- Add `is_archived` boolean column (default false) to `conversation_participants` table via migration
+- Add swipe-to-archive gesture on `TikTokConversationItem` (swipe left reveals Archive button)
+- Filter archived conversations out of the main list in `Messages.tsx`
+- Add an "Archived Chats" row at the top of the conversation list (shows count)
+- Tapping it expands/navigates to show archived conversations
+- Receiving a new message in an archived chat automatically unarchives it
 
-1. **`src/components/live/LiveSpaceRoom.tsx`**
-   - Add `setHasRaisedHand(false)` in the promotion broadcast handler
-   - Replace Share button in right-side stack with Settings button
-   - Add settings bottom sheet state and UI with Share as an option
+**Files**:
+- DB migration: add `is_archived` to `conversation_participants`
+- `src/components/messages/TikTokConversationItem.tsx` (edit — add swipe-to-archive)
+- `src/pages/Messages.tsx` (edit — filter archived, add archived section, auto-unarchive on new message)
 
-2. **`src/components/live/SpeakerQueuePanel.tsx`**  
-   - Ensure promotion flow is sequenced correctly (DB update → wait → broadcast)
+---
 
-3. **`src/components/live/twitter-space/TwitterSpaceControls.tsx`**
-   - Remove the Share button from center icons
+## Feature 3: Individual Conversation Muting
 
-4. **`src/components/live/twitter-space/TwitterSpaceSettingsMenu.tsx`**
-   - Add `onShareClick` prop and "Share Space" option with Share2 icon
+**What it does**: Mute notifications for specific conversations (not the whole user, just one chat). Options: mute for 1 hour, 8 hours, 1 week, or forever.
+
+**Implementation**:
+- Add `is_muted` boolean and `muted_until` timestamp columns to `conversation_participants` table (same migration as archive)
+- Add "Mute" option to the chat header's MoreVertical dropdown in `ModernChatInterface.tsx`
+- Create a `MuteConversationSheet` component with duration options
+- Show a muted icon (BellOff) on muted conversations in the conversation list
+- Check mute status before showing notifications
+
+**Files**:
+- DB migration: add `is_muted`, `muted_until` to `conversation_participants` (combined with archive migration)
+- `src/components/messages/MuteConversationSheet.tsx` (new)
+- `src/components/messages/ModernChatInterface.tsx` (edit — add mute option to dropdown)
+- `src/components/messages/TikTokConversationItem.tsx` (edit — show muted indicator)
+- `src/pages/Messages.tsx` (edit — pass mute state, respect mute for notifications)
+
+---
+
+## Combined Database Migration
+
+A single migration adds three columns to `conversation_participants`:
+```sql
+ALTER TABLE conversation_participants 
+  ADD COLUMN is_archived boolean DEFAULT false,
+  ADD COLUMN is_muted boolean DEFAULT false,
+  ADD COLUMN muted_until timestamptz DEFAULT null;
+```
+
+## Execution Order
+1. Run the DB migration (archive + mute columns)
+2. Create link preview edge function + component
+3. Add link preview to message bubbles
+4. Implement archive functionality (filter, swipe, UI)
+5. Implement mute functionality (sheet, dropdown, indicator)
 
