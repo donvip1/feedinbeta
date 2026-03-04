@@ -304,7 +304,7 @@ export const SignUpForm = ({ onEmailAlreadyExists, referrerUsername }: SignUpFor
   };
 
   return (
-    <div className="space-y-5">
+    <form method="post" action="#" onSubmit={(e) => { e.preventDefault(); if (!loading && canSubmit) handleSignUp(); }} className="space-y-5">
       {/* Google Sign Up Button */}
       <Button
         onClick={handleGoogleSignUp}
@@ -532,7 +532,7 @@ export const SignUpForm = ({ onEmailAlreadyExists, referrerUsername }: SignUpFor
 
       {/* Submit Button */}
       <Button
-        onClick={handleSignUp}
+        type="submit"
         disabled={loading || !canSubmit}
         className="w-full h-12 text-base font-semibold bg-gradient-primary hover:shadow-glow transition-all duration-200"
       >
@@ -547,6 +547,6 @@ export const SignUpForm = ({ onEmailAlreadyExists, referrerUsername }: SignUpFor
         {' '}and{' '}
         <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>
       </p>
-    </div>
+    </form>
   );
 };

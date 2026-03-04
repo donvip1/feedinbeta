@@ -184,7 +184,7 @@ export const SignInForm = ({ onForgotPassword, prefillEmail }: SignInFormProps) 
   };
 
   return (
-    <div className="space-y-5">
+    <form method="post" action="#" onSubmit={(e) => { e.preventDefault(); if (!loading) handleSignIn(); }} className="space-y-5">
       {/* Google Sign In Button */}
       <Button
         onClick={handleGoogleSignIn}
@@ -305,7 +305,7 @@ export const SignInForm = ({ onForgotPassword, prefillEmail }: SignInFormProps) 
         </div>
 
         <Button
-          onClick={handleSignIn}
+          type="submit"
           disabled={loading || !identifier || !password}
           className="w-full h-12 text-base font-semibold bg-gradient-primary hover:shadow-glow transition-all duration-200"
         >
@@ -313,6 +313,6 @@ export const SignInForm = ({ onForgotPassword, prefillEmail }: SignInFormProps) 
           Sign In
         </Button>
       </div>
-    </div>
+    </form>
   );
 };
