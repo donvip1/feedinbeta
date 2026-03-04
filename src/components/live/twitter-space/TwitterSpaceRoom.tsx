@@ -48,6 +48,8 @@ import { SpaceAudioSettingsModal } from './SpaceAudioSettingsModal';
 import { FloatingReactions } from '../FloatingReactions';
 import { MentionText } from '../MentionText';
 import { ThreadedRepliesList } from './ThreadedRepliesList';
+import { SpeakerActionSheet } from './SpeakerActionSheet';
+import { SpeakInviteDialog } from './SpeakInviteDialog';
 
 interface TwitterSpaceRoomProps {
   spaceId: string;
@@ -172,9 +174,15 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [allMuted, setAllMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingLoading, setRecordingLoading] = useState(false);
-  const [isLoudspeaker, setIsLoudspeaker] = useState(true); // Default to loudspeaker on
+  const [isLoudspeaker, setIsLoudspeaker] = useState(true);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
-  const [volumeLevel, setVolumeLevel] = useState(100); // 0-100
+  const [volumeLevel, setVolumeLevel] = useState(100);
+  
+  // Speaker management states
+  const [selectedSpeaker, setSelectedSpeaker] = useState<Speaker | null>(null);
+  const [showActionSheet, setShowActionSheet] = useState(false);
+  const [showSpeakInvite, setShowSpeakInvite] = useState(false);
+  const [inviterName, setInviterName] = useState('');
 
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
