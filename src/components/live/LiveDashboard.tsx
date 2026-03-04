@@ -460,6 +460,7 @@ export const LiveDashboard = ({
             </div>
           )}
         </div>
+        </div>
       </div>
 
       {/* Live Notifications Panel */}
