@@ -183,7 +183,10 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'live_gift':
         if (notification.related_id) {
-          navigate(`/live/${notification.related_id}`);
+          const liveGiftPath = notification.related_type === 'space' 
+            ? `/live/space/${notification.related_id}` 
+            : `/live/stream/${notification.related_id}`;
+          navigate(liveGiftPath);
         }
         break;
         
@@ -225,7 +228,10 @@ export const NotificationItem = ({ notification, onUpdate, onClose }: Notificati
         
       case 'live_invite':
         if (notification.related_id) {
-          navigate(`/live/${notification.related_id}`);
+          const liveInvitePath = notification.related_type === 'space' 
+            ? `/live/space/${notification.related_id}` 
+            : `/live/stream/${notification.related_id}`;
+          navigate(liveInvitePath);
         }
         break;
         
