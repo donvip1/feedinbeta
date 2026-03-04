@@ -660,7 +660,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       return;
     }
     
-    if (myHostMuted && isMicOn) {
+    if (myHostMuted && !isMicOn) {
       toast.error('Host has muted you. Wait for host to allow you to unmute.');
       return;
     }
