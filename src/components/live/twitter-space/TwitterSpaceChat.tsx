@@ -18,6 +18,7 @@ interface TwitterSpaceChatProps {
   hostName: string;
   startedAt?: string;
   viewerCount: number;
+  coverImageUrl?: string;
 }
 
 interface ChatMessage {
@@ -40,6 +41,7 @@ export const TwitterSpaceChat = ({
   hostName,
   startedAt,
   viewerCount,
+  coverImageUrl,
 }: TwitterSpaceChatProps) => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -170,6 +172,14 @@ export const TwitterSpaceChat = ({
                 <MoreHorizontal className="w-5 h-5" />
               </button>
             </div>
+
+            {/* Cover Image Banner */}
+            {coverImageUrl && (
+              <div className="relative w-full h-32 overflow-hidden">
+                <img src={coverImageUrl} alt={spaceTitle} className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
+              </div>
+            )}
 
             {/* Space Info Header */}
             <div className="p-4 border-b border-zinc-800">
