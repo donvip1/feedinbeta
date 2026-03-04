@@ -290,6 +290,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       .on('broadcast', { event: 'mute_all' }, (payload: any) => {
         if (payload.payload?.by !== user?.id) {
           setIsMuted(true);
+          setIsMicOn(false);
           setMyHostMuted(true);
           spaceContext?.setMuted(true);
           toast.info('You have been muted by the host');
