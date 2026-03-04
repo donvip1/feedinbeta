@@ -33,6 +33,7 @@ import {
   ShieldCheck,
   Briefcase,
   Smartphone,
+  Download,
   Banknote,
   Moon,
   Sun,
@@ -280,6 +281,13 @@ const Settings = () => {
       description: 'Manage app cache and cookies',
       route: '/settings/cache',
       color: 'text-slate-500'
+    },
+    {
+      icon: Download,
+      title: 'Download App',
+      description: 'Install FeedIn on your device',
+      route: '/install',
+      color: 'text-purple-500'
     },
     {
       icon: Briefcase,
