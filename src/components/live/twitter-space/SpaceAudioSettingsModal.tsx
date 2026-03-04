@@ -104,7 +104,7 @@ export const SpaceAudioSettingsModal = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
             transition={{ type: 'spring', damping: 25 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-zinc-900 rounded-t-3xl max-h-[85vh] overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg bg-zinc-900 rounded-t-3xl max-h-[85vh] overflow-hidden sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl sm:w-full"
           >
             {/* Handle bar */}
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mt-4 mb-2" />

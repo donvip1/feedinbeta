@@ -79,7 +79,7 @@ export const GoLiveModal = ({
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 100 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-50 sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:w-full"
+            className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-full"
           >
             <div className="bg-[#0F1119] rounded-t-[3rem] sm:rounded-[3rem] p-8 border border-white/5 shadow-2xl relative overflow-hidden">
               {/* Gradient top accent */}
