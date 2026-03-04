@@ -877,6 +877,89 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     setReplyingTo({ id: reply.id, user: reply.user, handle: reply.handle });
   };
   
+  // Handle host name tap to open action sheet
+  const handleNameTap = (speaker: Speaker) => {
+    if (!isHost || speaker.user_id === user?.id || speaker.role === 'host') return;
+    setSelectedSpeaker(speaker);
+    setShowActionSheet(true);
+  };
+
+  // Invite listener to speak
+  const handleInviteToSpeak = async (targetUserId: string) => {
+    if (!user || !space) return;
+    
+    // Insert invitation record
+    await supabase.from('live_space_invitations').insert({
+      space_id: spaceId,
+      sender_id: user.id,
+      receiver_id: targetUserId,
+      status: 'pending',
+    });
+
+    // Broadcast invite
+    const channel = supabase.channel(`space-control-${spaceId}`);
+    const myProfile = speakers.find(s => s.user_id === user.id)?.profile;
+    await channel.send({
+      type: 'broadcast',
+      event: 'invite-to-speak',
+      payload: { target_user_id: targetUserId, inviter_name: myProfile?.display_name || 'Host' },
+    });
+    supabase.removeChannel(channel);
+
+    toast.success('Invitation sent!');
+  };
+
+  // Demote speaker to listener
+  const handleDemoteToListener = async (targetUserId: string) => {
+    if (!user) return;
+
+    await supabase
+      .from('live_space_speakers')
+      .update({ role: 'listener', is_muted: true, mic_allowed: false })
+      .eq('space_id', spaceId)
+      .eq('user_id', targetUserId);
+
+    // Broadcast demote
+    const channel = supabase.channel(`space-control-${spaceId}`);
+    await channel.send({
+      type: 'broadcast',
+      event: 'demoted-to-listener',
+      payload: { target_user_id: targetUserId, by: user.id },
+    });
+    supabase.removeChannel(channel);
+
+    fetchSpeakers();
+    toast.success('User moved to listener');
+  };
+
+  // Accept speak invitation
+  const handleAcceptInvite = async () => {
+    if (!user) return;
+    setShowSpeakInvite(false);
+
+    // Update role in DB
+    await supabase
+      .from('live_space_speakers')
+      .update({ role: 'speaker', is_muted: false, has_raised_hand: false, host_muted: false, mic_allowed: true })
+      .eq('space_id', spaceId)
+      .eq('user_id', user.id);
+
+    setMyRole('speaker');
+    setIsMicOn(true);
+    setIsMuted(false);
+    setHasRaisedHand(false);
+    setMyHostMuted(false);
+
+    if (spaceContext) {
+      spaceContext.setMuted(false);
+      spaceContext.updateRole?.('speaker');
+      await spaceContext.startListenerBroadcast();
+    }
+
+    toast.success('🎙️ You are now a speaker!');
+    fetchSpeakers();
+  };
+
   // Navigate to user profile
   const navigateToProfile = (userId: string) => {
     navigate(`/profile/${userId}`);
