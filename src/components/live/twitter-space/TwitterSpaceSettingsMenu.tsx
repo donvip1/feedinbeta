@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, MessageSquare, FileText, Type, Flag } from 'lucide-react';
+import { Settings, MessageSquare, FileText, Type, Flag, Share2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
@@ -9,6 +9,7 @@ interface TwitterSpaceSettingsMenuProps {
   onClose: () => void;
   isHost: boolean;
   spaceId: string;
+  onShareClick?: () => void;
 }
 
 export const TwitterSpaceSettingsMenu = ({
@@ -16,10 +17,19 @@ export const TwitterSpaceSettingsMenu = ({
   onClose,
   isHost,
   spaceId,
+  onShareClick,
 }: TwitterSpaceSettingsMenuProps) => {
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
 
   const options = [
+    ...(onShareClick ? [{
+      label: 'Share Space',
+      icon: <Share2 className="w-5 h-5 text-zinc-400" />,
+      onClick: () => {
+        onShareClick();
+        onClose();
+      },
+    }] : []),
     {
       label: 'Adjust settings',
       icon: <Settings className="w-5 h-5 text-zinc-400" />,

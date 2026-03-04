@@ -80,7 +80,8 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose, onSpeakerUpdate }:
 
   const promoteToSpeaker = async (speaker: QueuedSpeaker) => {
     try {
-      await supabase
+      // DB update first, then wait for propagation before broadcasting
+      const { error } = await supabase
         .from('live_space_speakers')
         .update({ 
           role: 'speaker', 
@@ -89,6 +90,11 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose, onSpeakerUpdate }:
           mic_allowed: true,
         })
         .eq('id', speaker.id);
+
+      if (error) throw error;
+
+      // Small delay to ensure realtime listeners pick up the DB change
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Send promotion notification via broadcast channel
       const promotionChannel = supabase.channel(`speaker-promotion-${speaker.user_id}`);
@@ -129,7 +135,7 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose, onSpeakerUpdate }:
 
   const promoteToCoHost = async (speaker: QueuedSpeaker) => {
     try {
-      await supabase
+      const { error } = await supabase
         .from('live_space_speakers')
         .update({ 
           role: 'co_host', 
@@ -138,6 +144,10 @@ export const SpeakerQueuePanel = ({ spaceId, isHost, onClose, onSpeakerUpdate }:
           mic_allowed: true,
         })
         .eq('id', speaker.id);
+
+      if (error) throw error;
+
+      await new Promise(resolve => setTimeout(resolve, 300));
 
       // Send promotion notification via broadcast channel
       const promotionChannel = supabase.channel(`speaker-promotion-${speaker.user_id}`);

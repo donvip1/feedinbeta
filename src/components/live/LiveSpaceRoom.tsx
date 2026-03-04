@@ -130,6 +130,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [isNotificationsOn, setIsNotificationsOn] = useState(true);
   const [isPiPActive, setIsPiPActive] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   
   // Listener audio output controls
   const [isOutputMuted, setIsOutputMuted] = useState(false);
@@ -448,10 +449,12 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             
             // Update local role and enable mic
             setMyRole(newRole);
+            setHasRaisedHand(false);
             setMyMicAllowed(true);
             setMyHostMuted(false);
             
-            // Refetch speakers to update UI
+            // Small delay to ensure DB update is propagated before refetching
+            await new Promise(resolve => setTimeout(resolve, 500));
             await fetchSpeakers();
             
             // Start broadcasting if not already
@@ -1786,16 +1789,16 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         </div>
       </div>
 
-      {/* Right-side action stack - Share, Record (host), Screen Share (host) */}
+      {/* Right-side action stack - Settings, Record (host), Screen Share (host) */}
       <div className="absolute right-4 top-40 z-40 flex flex-col gap-3">
-        {/* Share button */}
+        {/* Settings button */}
         <motion.button
           whileTap={{ scale: 0.9 }}
-          onClick={handleShare}
+          onClick={() => setShowSettingsMenu(true)}
           className="w-11 h-11 rounded-full bg-background border border-border flex items-center justify-center hover:bg-muted transition-colors"
-          title="Share Space"
+          title="Settings"
         >
-          <Share2 className="w-5 h-5 text-foreground" />
+          <Settings className="w-5 h-5 text-foreground" />
         </motion.button>
 
         {/* Record button - host only, RED */}
@@ -1856,6 +1859,59 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           >
             <SpaceChat spaceId={spaceId} onClose={() => setShowChat(false)} />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Settings Bottom Sheet */}
+      <AnimatePresence>
+        {showSettingsMenu && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/60 z-50"
+              onClick={() => setShowSettingsMenu(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 50 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 50 }}
+              className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-3xl p-6 pb-safe border-t border-border"
+            >
+              <div className="w-12 h-1 bg-muted rounded-full mx-auto mb-6" />
+              <div className="space-y-1">
+                <button
+                  onClick={() => { handleShare(); setShowSettingsMenu(false); }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-muted rounded-xl transition-colors"
+                >
+                  <span className="font-medium text-foreground">Share Space</span>
+                  <Share2 className="w-5 h-5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => { toast.info('Audio settings coming soon'); setShowSettingsMenu(false); }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-muted rounded-xl transition-colors"
+                >
+                  <span className="font-medium text-foreground">Adjust settings</span>
+                  <Settings className="w-5 h-5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => { toast.info('Be respectful, no spam, keep it civil.'); setShowSettingsMenu(false); }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-muted rounded-xl transition-colors"
+                >
+                  <span className="font-medium text-foreground">View rules</span>
+                  <Flag className="w-5 h-5 text-muted-foreground" />
+                </button>
+                <button
+                  onClick={() => { toast.info('Space reported. We will review it.'); setShowSettingsMenu(false); }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-muted rounded-xl transition-colors"
+                >
+                  <span className="font-medium text-destructive">Report this Space</span>
+                  <Flag className="w-5 h-5 text-destructive" />
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 

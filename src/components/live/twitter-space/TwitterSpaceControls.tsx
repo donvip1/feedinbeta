@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mic, MicOff, Users, Heart, Share2, MessageCircle, Gift } from 'lucide-react';
+import { Mic, MicOff, Users, Heart, MessageCircle, Gift } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -8,7 +8,6 @@ interface TwitterSpaceControlsProps {
   onMicToggle: () => void;
   onGuestsClick: () => void;
   onReactionsClick: () => void;
-  onShareClick: () => void;
   onChatClick: () => void;
   unreadCount: number;
   canSpeak: boolean;
@@ -22,7 +21,6 @@ export const TwitterSpaceControls = ({
   onMicToggle,
   onGuestsClick,
   onReactionsClick,
-  onShareClick,
   onChatClick,
   unreadCount,
   canSpeak,
@@ -77,12 +75,6 @@ export const TwitterSpaceControls = ({
             </button>
           )}
 
-          <button
-            onClick={onShareClick}
-            className="p-2 text-zinc-400 hover:text-white transition-colors"
-          >
-            <Share2 className="w-6 h-6" />
-          </button>
         </div>
 
         {/* Chat Button with Badge */}
