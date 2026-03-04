@@ -310,6 +310,23 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           toast.info('You can now unmute');
         }
       })
+      .on('broadcast', { event: 'invite-to-speak' }, (payload: any) => {
+        if (payload.payload?.target_user_id === user?.id) {
+          setInviterName(payload.payload?.inviter_name || 'Host');
+          setShowSpeakInvite(true);
+        }
+      })
+      .on('broadcast', { event: 'demoted-to-listener' }, (payload: any) => {
+        if (payload.payload?.target_user_id === user?.id) {
+          setMyRole('listener');
+          setIsMicOn(false);
+          setIsMuted(true);
+          spaceContext?.setMuted(true);
+          spaceContext?.updateRole?.('listener');
+          toast.info('You have been moved to listener');
+        }
+        fetchSpeakers();
+      })
       .subscribe();
 
     // Gift channel - listen for gifts in this space
