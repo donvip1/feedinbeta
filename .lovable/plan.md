@@ -1,32 +1,30 @@
 
 
-## Plan: Add Cover Image to Chat & Fix Install Banner
+## Plan: Fix Google Safe Browsing Phishing False Positive
 
-### Issue 1: Cover Image Missing in Live Space Chat
+### Problem
+Google Safe Browsing is flagging the login page as "Possible Phishing" because the credential inputs (email/password) are not wrapped in a proper `<form>` element. Google's crawler sees password fields without standard form structure and flags it as suspicious — especially on shared subdomains like `*.lovable.app`.
 
-The chat sidebar in `TwitterSpaceRoom.tsx` (lines 1570-1606) shows space info (host name, title, listener count) but does **not** display the space's cover image. The `space?.cover_image_url` data is already available in the component.
+### Changes
 
-**Fix**: Insert the cover image between the "Space Info" header and the replies feed in the chat sidebar (around line 1592). If a cover image exists, render it as a banner with a gradient overlay, similar to what `SpaceChat.tsx` already does. If no cover image, keep the current text-only layout.
+#### 1. Wrap SignInForm inputs in a proper `<form>` element (`SignInForm.tsx`)
+- Replace the outer `<div className="space-y-5">` with a `<form>` element
+- Add `method="post"` and `action="#"` attributes (signals legitimacy to crawlers)
+- Use `onSubmit` instead of button `onClick` for the sign-in action
+- Prevents the "credential fields without a form" heuristic from triggering
 
-**Location**: `src/components/live/twitter-space/TwitterSpaceRoom.tsx`, lines ~1591-1606
+#### 2. Wrap SignUpForm inputs in a proper `<form>` element (`SignUpForm.tsx`)
+- Same treatment — wrap in `<form>` with proper attributes
+- Use `onSubmit` for form submission
 
-Changes:
-- Add cover image display above the space info text block
-- Use the same gradient overlay style (`bg-gradient-to-t from-zinc-900`)
-- Show title and live badge overlaid on the image
+#### 3. Add site ownership meta tags to `index.html`
+- Ensure `<meta name="author">` and proper canonical URL `<link rel="canonical">` point to `feedinn.com`
+- This helps Google associate the login page with a legitimate owned domain
 
-### Issue 2: Install App Prompt Not Showing
-
-The `BrowserInstallBanner` component is rendered in `App.tsx` but uses `sessionStorage` to track dismissal — meaning it only hides for the current session. However, `InstallAppPrompt` uses `localStorage` with a 24-hour cooldown. Both check for Capacitor/standalone mode correctly.
-
-The likely issue is that users on browsers that don't fire `beforeinstallprompt` (especially iOS Safari, some Android browsers) may never see the banner because the fallback timer only triggers for mobile Android user agents.
-
-**Fix**: 
-- In `BrowserInstallBanner.tsx`, extend the fallback to also show on desktop browsers after a delay, not just mobile Android
-- Ensure the banner appears more reliably by also showing it on iOS (it already does, but the 2-second timer may be too short for slow connections)
-
-### Files to Modify
-
-1. **`src/components/live/twitter-space/TwitterSpaceRoom.tsx`** — Add cover image banner to chat sidebar
-2. **`src/components/pwa/BrowserInstallBanner.tsx`** — Improve fallback logic so the install prompt appears more reliably for all users
+### After Deploy
+You will need to:
+1. Go to [Google Search Console](https://search.google.com/search-console) for `feedinn.com`
+2. Navigate to **Security & Manual Actions → Security Issues**
+3. Click **"Request a Review"** after publishing these changes
+4. Google typically resolves reviews within 72 hours
 
