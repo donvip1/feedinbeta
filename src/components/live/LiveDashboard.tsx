@@ -137,10 +137,10 @@ export const LiveDashboard = ({
   });
 
   return (
-    <div className="min-h-screen bg-[#050505] text-white">
+    <div className="min-h-[100dvh] bg-[#050505] text-white flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="px-4 py-4 flex flex-col gap-4 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-30">
-        <div className="flex justify-between items-center">
+      <header className="px-4 pt-[env(safe-area-inset-top)] flex flex-col gap-3 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
+        <div className="flex justify-between items-center pt-3 pb-1">
           <button
             onClick={() => navigate("/feed")}
             className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all active:scale-90"
@@ -173,13 +173,13 @@ export const LiveDashboard = ({
         </div>
 
         {/* Category Tabs with purple underline */}
-        <div className="flex gap-6 overflow-x-auto no-scrollbar py-2 border-b border-white/5">
+        <div className="flex gap-6 overflow-x-auto no-scrollbar py-2 border-b border-white/5 -mx-4 px-4">
           {filters.map((f) => (
             <button
               key={f}
               onClick={() => setActiveFilter(f)}
               className={cn(
-                "whitespace-nowrap pb-2 text-sm font-bold transition-all relative",
+                "whitespace-nowrap pb-2 text-sm font-bold transition-all relative shrink-0",
                 activeFilter === f ? "text-white" : "text-slate-500"
               )}
             >
@@ -192,8 +192,9 @@ export const LiveDashboard = ({
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <div className="px-4 pb-32 max-w-2xl mx-auto space-y-8">
+      {/* Main Content Area - scrollable */}
+      <div className="flex-1 overflow-y-auto overscroll-contain" data-scrollable="true">
+        <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 max-w-2xl mx-auto space-y-8 w-full">
         {/* Creator Studio Hero Card */}
         {myActiveStream ? (
           <motion.div
@@ -458,6 +459,7 @@ export const LiveDashboard = ({
               )}
             </div>
           )}
+        </div>
         </div>
       </div>
 
