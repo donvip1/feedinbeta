@@ -141,7 +141,6 @@ const STREAM_GIFTS = [
   { id: 'coffee', name: 'Coffee', icon: '☕', cost: 50 },
   { id: 'heart', name: 'Heart', icon: '💖', cost: 100 },
   { id: 'rocket', name: 'Rocket', icon: '🚀', cost: 1000 },
-  { id: 'crown', name: 'Crown', icon: '👑', cost: 5000 },
 ];
 
 const REACTION_EMOJIS = [
@@ -1118,8 +1117,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
   // --- RENDER PK PARTICIPANT VIDEO FEED ---
   const renderPKFeed = (p: PKParticipant, isFocused: boolean, isMini: boolean) => {
-    const isLeading = battleParticipants.length > 1 &&
-      Math.max(...battleParticipants.map(x => x.score)) === p.score && p.score > 0;
+    const isHostParticipant = p.id === host?.id;
 
     return (
       <div
@@ -1130,46 +1128,33 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           isFocused ? "absolute inset-0 z-0" : "",
           isMini
             ? "w-24 h-32 rounded-xl border-2 shadow-xl z-30 shrink-0"
-            : "w-full h-full border border-black"
+            : "w-full h-full"
         )}
-        style={{ borderColor: isMini ? p.color : undefined }}
+        style={{
+          borderColor: isMini ? p.color : undefined,
+          backgroundColor: !isHostParticipant ? p.color + '33' : undefined,
+        }}
       >
-        {/* Video / Avatar placeholder */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/80 to-black/40">
-          {p.id === host?.id && isCameraOn ? (
-            <video ref={p.id === host?.id ? videoRef : undefined} autoPlay playsInline muted className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center">
-              {p.avatar ? (
-                <img src={p.avatar} alt={p.name} className="w-16 h-16 rounded-full" />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-2xl font-black text-white/40">
-                  {p.name[0]}
-                </div>
-              )}
+        {isHostParticipant && isCameraOn ? (
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center" style={{ backgroundColor: p.color + '22' }}>
+            <div
+              className="w-20 h-20 rounded-full flex items-center justify-center text-4xl font-black text-white/80"
+              style={{ backgroundColor: p.color + '44' }}
+            >
+              {p.name[0]}
             </div>
-          )}
-        </div>
-
-        {/* Score badge */}
-        <div className="absolute bottom-2 left-2 z-10">
-          <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full">
-            <Flame className="w-3 h-3" style={{ color: p.color }} />
-            <span className="text-xs font-black text-white">{p.score.toLocaleString()}</span>
-          </div>
-        </div>
-
-        {/* Name */}
-        <div className="absolute top-2 left-2 z-10">
-          <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full">{p.name}</span>
-        </div>
-
-        {/* Leading crown */}
-        {isLeading && (
-          <div className="absolute top-2 right-2 z-10">
-            <Crown className="w-5 h-5 text-amber-400 fill-current drop-shadow-lg" />
+            <span className="text-white/60 text-sm font-bold mt-2">{p.name}</span>
           </div>
         )}
+
+        {/* SCORE badge */}
+        <div className="absolute bottom-2 right-2 z-10">
+          <span className="text-[10px] font-black text-white bg-black/60 px-2 py-1 rounded-full">
+            SCORE: {p.score.toLocaleString()}
+          </span>
+        </div>
       </div>
     );
   };
@@ -1193,13 +1178,12 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
                     <Users className="w-8 h-8 text-white/20" />
                   </div>
-                  <span className="text-white/30 text-xs font-bold">Waiting...</span>
                   {isHost && (
                     <button
                       onClick={() => setShowInviteModal(true)}
-                      className="bg-white/10 px-4 py-1.5 rounded-full text-xs font-bold text-white/70 hover:bg-white/20 transition flex items-center gap-2"
+                      className="text-[10px] font-bold bg-white/5 px-3 py-1 rounded-full text-white/60"
                     >
-                      <UserPlus className="w-3 h-3" /> Invite
+                      Invite PK
                     </button>
                   )}
                 </div>
@@ -1251,90 +1235,55 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       </div>
 
       {/* HEADER */}
-      <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-start z-40 pt-safe">
-        <div className="flex items-center gap-2">
-          <button onClick={handleMinimize} className="w-10 h-10 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all">
-            <Minimize2 className="w-5 h-5 text-white" />
-          </button>
-
-          {/* Host info pill */}
-          <button
-            onClick={() => host && navigateToProfile(host.id)}
-            className="flex items-center gap-2 bg-black/40 backdrop-blur-xl p-1 rounded-full border border-white/10 pr-3"
-          >
-            <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-rose-500">
-              {host?.avatar_url ? (
-                <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-rose-500/30 flex items-center justify-center text-white text-xs font-black">
-                  {host?.display_name?.[0] || 'H'}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-white leading-tight">{host?.display_name}</span>
-              <span className="text-[9px] text-white/50 font-bold">{formatNumber(viewers.length + 1)} viewers</span>
-            </div>
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="bg-black/30 backdrop-blur-xl px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
-            <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-            <span className="text-[10px] font-black tracking-widest uppercase text-white">HD Live</span>
+      <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-center z-40 pt-safe">
+        <button
+          onClick={() => host && navigateToProfile(host.id)}
+          className="flex items-center gap-2.5"
+        >
+          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-rose-500">
+            {host?.avatar_url ? (
+              <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-rose-500/30 flex items-center justify-center text-white text-xs font-black">
+                {host?.display_name?.[0] || 'H'}
+              </div>
+            )}
           </div>
-          {isHost && isPKMode && battleParticipants.length < pkMaxSlots && (
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="bg-pink-600 rounded-full px-3 py-2 text-xs font-bold text-white flex items-center gap-1 shadow-lg shadow-pink-500/30 active:scale-90 transition-all"
-            >
-              <UserPlus className="w-3 h-3" /> Invite
-            </button>
-          )}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="w-10 h-10 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
-          >
-            <MoreHorizontal className="w-5 h-5 text-white" />
-          </button>
-          <button onClick={handleLeave} className="w-10 h-10 bg-rose-500 rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 active:scale-90 transition-all">
-            <X className="w-5 h-5 text-white" />
-          </button>
-        </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-bold text-white leading-tight">{stream?.title || 'Live Stream'}</span>
+            <span className="text-[11px] text-white/50 font-medium flex items-center gap-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+              {formatNumber(viewers.length + 1)} watching
+            </span>
+          </div>
+        </button>
+
+        <button onClick={handleLeave} className="w-10 h-10 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all">
+          <X className="w-5 h-5 text-white" />
+        </button>
       </div>
 
-      {/* Gift count badge */}
-      <div className="absolute top-20 left-4 z-30 pt-safe">
-        <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-xl px-3 py-1.5 rounded-full border border-amber-500/20">
-          <Gift className="w-3.5 h-3.5 text-amber-400" />
-          <span className="text-xs font-black text-amber-400">{hostGiftTotal.toLocaleString()}</span>
-          <Coins className="w-3 h-3 text-amber-400/60" />
-        </div>
-      </div>
+      {/* Gift count badge removed from header — shown in PK score bar context */}
 
       {/* PK SCORE BAR */}
       {isPKMode && battleActive && battleParticipants.length > 0 && (
-        <div className="absolute top-28 left-0 right-0 z-30 pt-safe px-2">
+        <div className="absolute top-20 left-0 right-0 z-30 pt-safe px-3">
           <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 p-3">
-            {/* Header */}
+            {/* Header: TEAM HOST | Timer | CHALLENGERS */}
             <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                <span className="text-[10px] font-black uppercase tracking-wider text-purple-400">
-                  {pkMaxSlots}-Way Battle
-                </span>
-              </div>
-              <div className="bg-black/60 px-2 py-0.5 rounded-full border border-yellow-500/50">
+              <span className="text-[10px] font-black uppercase tracking-wider text-blue-400">Team Host</span>
+              <div className="bg-black/60 px-3 py-0.5 rounded-full border border-yellow-500/50">
                 <span className={cn(
-                  "font-mono font-bold text-xs",
+                  "font-mono font-bold text-sm",
                   battleTimeLeft <= 10 ? "text-red-500" : "text-yellow-400"
                 )}>
                   {Math.floor(battleTimeLeft / 60)}:{(battleTimeLeft % 60).toString().padStart(2, '0')}
                 </span>
               </div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-red-400">Challengers</span>
             </div>
             {/* Proportional bar */}
-            <div className="relative h-2.5 rounded-full overflow-hidden bg-white/5">
+            <div className="relative h-3 rounded-full overflow-hidden bg-white/5">
               {battleParticipants.map((p, i) => {
                 const totalScore = battleParticipants.reduce((sum, pp) => sum + pp.score, 0) || 1;
                 const percent = (p.score / totalScore) * 100;
@@ -1342,7 +1291,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 return (
                   <motion.div
                     key={p.id}
-                    className="absolute inset-y-0 rounded-full"
+                    className="absolute inset-y-0"
                     style={{ left: `${offset}%`, backgroundColor: p.color }}
                     animate={{ width: `${percent}%` }}
                     transition={{ type: "spring", stiffness: 100, damping: 15 }}
@@ -1354,100 +1303,32 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </div>
       )}
 
-      {/* MAIN CONTENT LAYER */}
-      <div className="relative flex-1 flex flex-col justify-end p-4 pb-32 z-30 pointer-events-none h-full">
-        {/* Flying Chat */}
-        <div
-          className="w-full max-w-[75%] space-y-1.5 pointer-events-auto overflow-hidden flex flex-col justify-end"
-          style={{
-            height: '220px',
-            maskImage: 'linear-gradient(to bottom, transparent 0%, black 25%)',
-          }}
-        >
+      {/* CHAT AREA */}
+      <div className="absolute bottom-44 left-0 right-16 z-30 px-4">
+        <div className="flex flex-col space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide pointer-events-auto">
           <AnimatePresence initial={false}>
             {replies.slice(-20).map((msg) => (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.2 }}
-                className="flex items-start gap-2"
+                className="px-3 py-1.5"
               >
-                <div className={cn(
-                  "px-3 py-2 rounded-2xl max-w-full",
-                  msg.isGift
-                    ? "bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/20"
-                    : "bg-black/40 backdrop-blur-md border border-white/5"
-                )}>
-                  <span className={cn(
-                    "text-[11px] font-black mr-1.5",
-                    msg.isGift ? 'text-amber-400' : 'text-rose-400'
-                  )}>{msg.user}</span>
-                  <span className="text-[11px] font-medium text-white/90">{msg.text}</span>
-                </div>
+                {msg.user_id === 'system' || msg.isGift ? (
+                  <span className="text-[11px] text-amber-400/80 font-medium">{msg.text}</span>
+                ) : (
+                  <>
+                    <span className="text-[11px] font-black mr-1.5 text-rose-400">{msg.user}</span>
+                    <span className="text-[11px] font-medium text-white/80">{msg.text}</span>
+                  </>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
           <div ref={chatEndRef} />
         </div>
-      </div>
-
-      {/* RIGHT-SIDE ACTION STACK */}
-      <div className="absolute right-3 bottom-40 flex flex-col gap-4 z-40">
-        <div className="flex flex-col items-center gap-1">
-          <button
-            onClick={() => setShowReactions(true)}
-            className="w-11 h-11 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
-          >
-            <Heart className="w-5 h-5 text-rose-500" />
-          </button>
-          <span className="text-[9px] font-black uppercase tracking-tight text-white/70">React</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-1">
-          <button
-            onClick={() => setShowShare(true)}
-            className="w-11 h-11 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
-          >
-            <Share2 className="w-5 h-5 text-white" />
-          </button>
-          <span className="text-[9px] font-black uppercase tracking-tight text-white/70">Share</span>
-        </div>
-
-        {isHost && (
-          <div className="flex flex-col items-center gap-1">
-            <button
-              onClick={handleCameraFlip}
-              className="w-11 h-11 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
-            >
-              <RotateCcw className="w-5 h-5 text-white" />
-            </button>
-            <span className="text-[9px] font-black uppercase tracking-tight text-white/70">Flip</span>
-          </div>
-        )}
-
-        <div className="flex flex-col items-center gap-1">
-          <button
-            onClick={() => setView('guests')}
-            className="w-11 h-11 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
-          >
-            <Users className="w-5 h-5 text-white" />
-          </button>
-          <span className="text-[9px] font-black uppercase tracking-tight text-white/70">{viewers.length + 1}</span>
-        </div>
-
-        {isHost && (
-          <div className="flex flex-col items-center gap-1">
-            <button
-              onClick={() => setShowPKBattle(true)}
-              className="w-11 h-11 bg-gradient-to-tr from-rose-600 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-rose-500/30 active:scale-90 transition-all"
-            >
-              <Zap className="w-5 h-5 text-white" />
-            </button>
-            <span className="text-[9px] font-black uppercase tracking-tight text-white/70">PK</span>
-          </div>
-        )}
       </div>
 
       {/* Floating Reactions */}
@@ -1583,37 +1464,23 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
         )}
 
-        <div className="flex items-center gap-2.5 max-w-lg mx-auto">
-          {/* Mic toggle - host only */}
-          {isHost && (
-            <button
-              onClick={handleMicToggle}
-              className={cn(
-                "w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-90 shrink-0",
-                isMicOn ? "bg-white/15 text-white" : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-              )}
-            >
-              {isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
-            </button>
-          )}
-
+        <div className="flex items-center gap-2.5">
           {/* Chat input */}
-          <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(); }} className="flex-1 relative min-w-0">
+          <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(); }} className="flex-1 relative min-w-0 flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2">
             <input
               type="text"
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
               placeholder="Say something..."
-              className="w-full bg-white/10 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2.5 text-sm font-medium text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-rose-500/50 transition-all"
+              className="flex-1 bg-transparent text-sm font-medium text-white placeholder-white/30 focus:outline-none"
             />
-            {replyText.trim() && (
-              <button
-                type="submit"
-                className="absolute right-1.5 top-1 w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center active:scale-90 transition-all"
-              >
-                <Send className="w-3.5 h-3.5 text-white" />
-              </button>
-            )}
+            <button
+              type="submit"
+              disabled={!replyText.trim()}
+              className="p-1 text-white/60 hover:text-white disabled:opacity-30"
+            >
+              <Send className="w-4 h-4" />
+            </button>
           </form>
 
           {/* Gift button */}
@@ -1623,19 +1490,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           >
             <Gift className="w-5 h-5 text-white" />
           </button>
-
-          {/* Camera toggle - host only */}
-          {isHost && (
-            <button
-              onClick={handleCameraToggle}
-              className={cn(
-                "w-11 h-11 rounded-full flex items-center justify-center transition-all active:scale-90 shrink-0",
-                isCameraOn ? "bg-white/15 text-white" : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
-              )}
-            >
-              {isCameraOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-            </button>
-          )}
         </div>
       </div>
 
@@ -1974,19 +1828,19 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 <span className="ml-auto text-xs text-amber-400 font-bold">{userCredits.toLocaleString()} credits</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {STREAM_GIFTS.map(gift => (
                   <button
                     key={gift.id}
                     onClick={() => handleSendStreamGift(gift)}
                     disabled={userCredits < gift.cost}
                     className={cn(
-                      "bg-black/30 border border-white/5 rounded-2xl p-3 flex flex-col items-center gap-2 hover:bg-white/10 transition group",
+                      "flex flex-col items-center gap-2 bg-black/20 p-4 rounded-xl hover:bg-white/5 transition",
                       userCredits < gift.cost && "opacity-40 pointer-events-none"
                     )}
                   >
-                    <span className="text-3xl group-hover:scale-110 transition-transform">{gift.icon}</span>
-                    <span className="text-[10px] font-bold text-white/60">{gift.cost} Credits</span>
+                    <span className="text-3xl">{gift.icon}</span>
+                    <span className="text-[10px] font-bold text-white/60">{gift.cost}</span>
                   </button>
                 ))}
               </div>
