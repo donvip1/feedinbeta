@@ -2399,6 +2399,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         onSelectChallenger={handlePKSelectChallenger}
       />
 
+      {/* In-Stream Recharge Sheet */}
+      <InStreamRechargeSheet
+        isOpen={showRefill}
+        onClose={() => setShowRefill(false)}
+        currentBalance={userCredits}
+        onBalanceUpdate={(newBalance) => setUserCredits(newBalance)}
+      />
+
       <style>{`
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
