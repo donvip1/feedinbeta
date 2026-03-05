@@ -1323,7 +1323,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             <span className="text-sm font-bold text-white leading-tight truncate">{stream?.title || 'Live Stream'}</span>
             <span className="text-[11px] text-white/50 font-medium flex items-center gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-              {formatNumber(viewers.length + 1)} watching
+              {formatNumber(viewerPresenceCount)} watching
             </span>
           </div>
         </button>
@@ -1412,37 +1412,91 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </div>
       )}
 
-      {/* RIGHT-SIDE VIEWER PANEL (TikTok-style) */}
-      <div className="absolute right-3 bottom-52 z-30 flex flex-col items-center gap-3">
+      {/* RIGHT-SIDE PANEL: Co-broadcasters + Viewers */}
+      <div className="absolute right-3 bottom-44 z-30 flex flex-col items-center gap-2 max-h-[50vh] overflow-y-auto scrollbar-hide">
         {/* Request to join for viewers */}
         {!isHost && (
           <button
             onClick={() => {
               toast.success('Request sent to host!');
-              // Broadcast request
               supabase.channel(`stream-events-${streamId}`).send({
                 type: 'broadcast',
                 event: 'join_request',
                 payload: { user_id: user?.id, display_name: user?.user_metadata?.display_name },
               });
             }}
-            className="flex flex-col items-center gap-1"
+            className="flex flex-col items-center gap-0.5"
           >
-            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
-              <Plus className="w-5 h-5 text-white" />
+            <div className="w-11 h-11 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Plus className="w-4 h-4 text-white" />
             </div>
-            <span className="text-[9px] text-white/60 font-bold">Request</span>
+            <span className="text-[8px] text-white/60 font-bold">Request</span>
           </button>
         )}
 
-        {/* Viewer avatars */}
-        {viewers.slice(0, 3).map((viewer, index) => (
+        {/* Co-broadcasters (with mic indicator) */}
+        {viewers.filter(v => v.is_co_broadcaster).map((viewer) => (
+          <div key={`co-${viewer.user_id}`} className="relative flex flex-col items-center gap-0.5">
+            <button
+              onClick={() => navigateToProfile(viewer.user_id)}
+              className="relative"
+            >
+              <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-emerald-400">
+                {viewer.profile?.avatar_url ? (
+                  <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-emerald-500/20 flex items-center justify-center text-white/60 text-sm font-bold">
+                    {viewer.profile?.display_name?.[0] || '?'}
+                  </div>
+                )}
+              </div>
+              {/* Mic status indicator */}
+              <div className={cn(
+                "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center border border-black",
+                viewer.host_muted || !viewer.is_mic_on ? 'bg-red-500' : 'bg-emerald-500'
+              )}>
+                {viewer.host_muted || !viewer.is_mic_on
+                  ? <MicOff className="w-2.5 h-2.5 text-white" />
+                  : <Mic className="w-2.5 h-2.5 text-white" />
+                }
+              </div>
+            </button>
+            <span className="text-[8px] text-white/60 font-medium truncate max-w-[48px]">
+              {viewer.profile?.display_name?.slice(0, 7) || 'User'}
+            </span>
+            {/* Host can mute/unmute co-broadcasters */}
+            {isHost && (
+              <button
+                onClick={async () => {
+                  const newMuted = !viewer.host_muted;
+                  await supabase.from('live_stream_viewers').update({
+                    host_muted: newMuted,
+                  } as any).eq('stream_id', streamId).eq('user_id', viewer.user_id);
+                  // Broadcast mute event
+                  supabase.channel(`stream-events-${streamId}`).send({
+                    type: 'broadcast',
+                    event: 'host_mute',
+                    payload: { user_id: viewer.user_id, muted: newMuted },
+                  });
+                  fetchViewers();
+                  toast.success(newMuted ? `Muted ${viewer.profile?.display_name}` : `Unmuted ${viewer.profile?.display_name}`);
+                }}
+                className="text-[7px] text-white/50 bg-black/40 px-1.5 py-0.5 rounded-full"
+              >
+                {viewer.host_muted ? 'Unmute' : 'Mute'}
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* Regular viewer avatars */}
+        {viewers.filter(v => !v.is_co_broadcaster).slice(0, 4).map((viewer) => (
           <button
             key={viewer.user_id}
             onClick={() => navigateToProfile(viewer.user_id)}
             className="relative flex flex-col items-center gap-0.5"
           >
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/20">
+            <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/20">
               {viewer.profile?.avatar_url ? (
                 <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
               ) : (
@@ -1451,22 +1505,22 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 </div>
               )}
             </div>
-            <span className="text-[9px] text-white/60 font-medium truncate max-w-[52px]">
-              {viewer.profile?.display_name?.slice(0, 8) || 'User'}
+            <span className="text-[8px] text-white/60 font-medium truncate max-w-[48px]">
+              {viewer.profile?.display_name?.slice(0, 7) || 'User'}
             </span>
           </button>
         ))}
 
         {/* View all viewers */}
-        {viewers.length > 3 && (
+        {viewers.filter(v => !v.is_co_broadcaster).length > 4 && (
           <button
             onClick={() => setView('guests')}
             className="flex flex-col items-center gap-0.5"
           >
-            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+            <div className="w-11 h-11 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
               <Users className="w-4 h-4 text-white/60" />
             </div>
-            <span className="text-[9px] text-white/60 font-bold">+{viewers.length - 3}</span>
+            <span className="text-[8px] text-white/60 font-bold">+{viewers.filter(v => !v.is_co_broadcaster).length - 4}</span>
           </button>
         )}
       </div>
