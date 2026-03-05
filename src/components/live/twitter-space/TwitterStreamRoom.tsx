@@ -34,6 +34,8 @@ import {
   CheckCircle2,
   MoreHorizontal,
   Coins,
+  UserPlus,
+  Flame,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -59,6 +61,7 @@ import { QuickGiftBar } from '../shared/QuickGiftBar';
 import { ThreadedRepliesList } from './ThreadedRepliesList';
 import { PKBattleChallenge } from '../unified/PKBattleChallenge';
 import { shareUrls } from '@/lib/url-utils';
+import type { PKParticipant } from '../unified/PKBattleBar';
 
 interface TwitterStreamRoomProps {
   streamId: string;
@@ -97,6 +100,8 @@ interface StreamData {
   category?: string;
   started_at?: string;
   cover_image_url?: string;
+  room_type?: string;
+  pk_max_slots?: number;
 }
 
 interface FloatingReaction {
@@ -127,10 +132,24 @@ interface Reply {
   reply_to_id?: string | null;
 }
 
+// PK Battle participant colors
+const PK_COLORS = ['#ec4899', '#3b82f6', '#10b981', '#f59e0b'];
+
+// Quick gift items matching existing system
+const STREAM_GIFTS = [
+  { id: 'rose', name: 'Rose', icon: '🌹', cost: 10 },
+  { id: 'coffee', name: 'Coffee', icon: '☕', cost: 50 },
+  { id: 'heart', name: 'Heart', icon: '💖', cost: 100 },
+  { id: 'rocket', name: 'Rocket', icon: '🚀', cost: 1000 },
+  { id: 'crown', name: 'Crown', icon: '👑', cost: 5000 },
+];
+
 const REACTION_EMOJIS = [
   '😂', '😮', '😢', '💜', '💯',
   '👏', '✊', '👍', '👎', '👋'
 ];
+
+const formatNumber = (num: number) => num >= 1000 ? (num / 1000).toFixed(1) + 'k' : num.toString();
 
 export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps) => {
   const navigate = useNavigate();
@@ -157,15 +176,18 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const [showSettings, setShowSettings] = useState(false);
   const [showGiftModal, setShowGiftModal] = useState(false);
   const [showQuickGift, setShowQuickGift] = useState(false);
+  const [showStreamGiftModal, setShowStreamGiftModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showAudioSettingsModal, setShowAudioSettingsModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   // Gift animations state
   const [giftAnimations, setGiftAnimations] = useState<GiftAnimation[]>([]);
   const [floatingGiftReactions, setFloatingGiftReactions] = useState<FloatingGiftReaction[]>([]);
   const [hostGiftTotal, setHostGiftTotal] = useState(0);
+  const [giftOverlay, setGiftOverlay] = useState<{ icon: string; sender: string; name: string; receiver: string } | null>(null);
 
   // Data states
   const [stream, setStream] = useState<StreamData | null>(null);
@@ -178,6 +200,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const [replyText, setReplyText] = useState('');
   const [replyingTo, setReplyingTo] = useState<{ id: string; user: string; handle: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userCredits, setUserCredits] = useState(0);
 
   // Connection state
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('idle');
@@ -185,16 +208,37 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [hasVideo, setHasVideo] = useState(false);
 
-  // PK Battle
+  // PK Battle states
   const [showPKBattle, setShowPKBattle] = useState(false);
+  const [battleParticipants, setBattleParticipants] = useState<PKParticipant[]>([]);
+  const [focusedParticipantId, setFocusedParticipantId] = useState<string | null>(null);
+  const [interactionTargetId, setInteractionTargetId] = useState<'all' | string>('all');
+  const [battleTimeLeft, setBattleTimeLeft] = useState(300);
+  const [battleActive, setBattleActive] = useState(false);
 
   const isHost = stream?.user_id === user?.id;
+  const isPKMode = stream?.room_type === 'pk_battle';
+  const pkMaxSlots = (stream as any)?.pk_max_slots || 2;
 
   // Hide bottom nav
   useEffect(() => {
     setHideBottomNav(true);
     return () => setHideBottomNav(false);
   }, [setHideBottomNav]);
+
+  // Fetch user credits
+  useEffect(() => {
+    if (!user?.id) return;
+    const fetchCredits = async () => {
+      const { data } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data) setUserCredits(data.balance || 0);
+    };
+    fetchCredits();
+  }, [user?.id]);
 
   // Initialize stream
   useEffect(() => {
@@ -226,7 +270,13 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       return;
     }
 
-    setStream(streamData);
+    setStream(streamData as any);
+
+    // If PK mode, initialize host as first participant
+    if (streamData.room_type === 'pk_battle') {
+      setBattleActive(true);
+      setBattleTimeLeft(300);
+    }
 
     // Fetch host profile
     const { data: hostData } = await supabase
@@ -237,6 +287,16 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
     if (hostData) {
       setHost(hostData);
+      // Add host as first PK participant
+      if (streamData.room_type === 'pk_battle') {
+        setBattleParticipants([{
+          id: hostData.id,
+          name: hostData.display_name || 'Host',
+          avatar: hostData.avatar_url || undefined,
+          score: 0,
+          color: PK_COLORS[0],
+        }]);
+      }
     }
 
     // Fetch initial host gift total
@@ -253,7 +313,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     await fetchViewers();
     setLoading(false);
 
-    setTimeout(() => initializeLiveKit(streamData), 100);
+    setTimeout(() => initializeLiveKit(streamData as any), 100);
   };
 
   // Fetch viewers
@@ -315,7 +375,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
               stream_ready: true,
               connection_state: "live",
               started_at: new Date().toISOString(),
-            }).eq("id", streamId);
+            } as any).eq("id", streamId);
           }
         } else if (state === ConnectionState.Reconnecting) {
           setConnectionStatus('reconnecting');
@@ -385,7 +445,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   useEffect(() => {
     if (!streamId) return;
 
-    // Reactions via BROADCAST (not postgres_changes) — faster, matches space
     const reactionsChannel = supabase
       .channel(`stream-reactions-${streamId}`)
       .on('broadcast', { event: 'reaction' }, (payload: any) => {
@@ -398,7 +457,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
     reactionsChannelRef.current = reactionsChannel;
 
-    // Gift channel — also update hostGiftTotal
+    // Gift channel — also update hostGiftTotal + PK scores
     const giftChannel = supabase
       .channel(`stream-gifts-${streamId}`)
       .on('postgres_changes', {
@@ -412,6 +471,15 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         // Update host gift total
         if (giftData.receiver_id === stream?.user_id) {
           setHostGiftTotal(prev => prev + (giftData.credit_value || 0));
+        }
+
+        // Update PK participant score
+        if (isPKMode) {
+          setBattleParticipants(prev => prev.map(p =>
+            p.id === giftData.receiver_id
+              ? { ...p, score: p.score + (giftData.credit_value || 0) }
+              : p
+          ));
         }
 
         // Show toast to host
@@ -442,6 +510,15 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         };
 
         const emoji = giftEmojis[giftData.gift_type] || '🎁';
+
+        // Show fullscreen gift overlay
+        setGiftOverlay({
+          icon: emoji,
+          sender: senderProfile?.display_name || 'Someone',
+          name: giftData.gift_type,
+          receiver: receiverProfile?.display_name || 'Host',
+        });
+        setTimeout(() => setGiftOverlay(null), 3000);
 
         setFloatingGiftReactions(prev => [...prev, {
           id: giftData.id,
@@ -496,6 +573,21 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     };
   }, [streamId, user?.id, stream?.user_id]);
 
+  // PK Battle timer
+  useEffect(() => {
+    if (!battleActive || battleTimeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setBattleTimeLeft(prev => {
+        if (prev <= 1) {
+          setBattleActive(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [battleActive, battleTimeLeft]);
+
   // Fetch replies + broadcast chat subscription with optimistic updates
   useEffect(() => {
     if (!streamId) return;
@@ -549,7 +641,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       .channel(`stream-chat-${streamId}`)
       .on('broadcast', { event: 'new_message' }, (payload: any) => {
         const msgData = payload.payload;
-        // Only add if not from current user (we already added optimistically)
         if (msgData?.user_id && msgData.user_id !== user?.id) {
           setReplies(prev => [...prev, {
             id: msgData.id || `msg-${Date.now()}`,
@@ -632,7 +723,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       await videoTrackRef.current.restartTrack({ facingMode: newFacing });
       setFacingMode(newFacing);
     } catch (e) {
-      // Fallback: stop current track, create new one
       try {
         const room = roomRef.current;
         if (!room) return;
@@ -662,7 +752,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       await supabase.from('live_streams').update({
         status: 'ended',
         ended_at: new Date().toISOString(),
-      }).eq('id', streamId);
+      } as any).eq('id', streamId);
 
       supabase.channel(`stream-events-${streamId}`).send({
         type: 'broadcast',
@@ -687,13 +777,12 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     navigate('/live');
   };
 
-  // Reaction via broadcast channel (matching space pattern)
+  // Reaction via broadcast channel
   const handleReaction = async (emoji: string) => {
     setShowReactions(false);
     const myName = host?.display_name || user?.user_metadata?.display_name || 'Someone';
     handleFloatingReaction(emoji, myName);
 
-    // Broadcast for instant UI — use stored channel ref
     if (reactionsChannelRef.current) {
       reactionsChannelRef.current.send({
         type: 'broadcast',
@@ -702,7 +791,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       });
     }
 
-    // Persist to DB (fire-and-forget)
     const reactionTypes: Record<string, string> = {
       '❤️': 'heart', '👍': 'like', '😂': 'laugh', '🔥': 'fire', '👏': 'clap', '😍': 'love', '⭐': 'star',
     };
@@ -710,7 +798,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       stream_id: streamId,
       user_id: user?.id,
       reaction_type: reactionTypes[emoji] || 'heart',
-    });
+    } as any);
   };
 
   // Chat with optimistic update
@@ -726,7 +814,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     const username = myProfile?.username || user.user_metadata?.username || 'user';
     const avatarUrl = myProfile?.avatar_url || '';
 
-    // Optimistic update — add immediately
     const optimisticMsg: Reply = {
       id: `temp-${Date.now()}`,
       user_id: user.id,
@@ -747,7 +834,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     });
 
     if (!error) {
-      // Broadcast with message data so others get it instantly — use stored channel ref
       if (chatChannelRef.current) {
         chatChannelRef.current.send({
           type: 'broadcast',
@@ -788,12 +874,112 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     navigate(`/profile/${userId}`);
   };
 
-  // PK Battle — actually wire up
+  // PK Battle — wire up
   const handlePKSelectChallenger = async (userId: string) => {
     setShowPKBattle(false);
     const newBattle = await createBattle(300);
     if (newBattle) {
       await sendChallenge(userId);
+    }
+  };
+
+  // Invite creator to PK battle
+  const handleInviteCreator = async (creatorId: string) => {
+    if (battleParticipants.length >= pkMaxSlots) return;
+    if (battleParticipants.some(p => p.id === creatorId)) return;
+
+    const viewer = viewers.find(v => v.user_id === creatorId);
+    if (!viewer?.profile) return;
+
+    setBattleParticipants(prev => [...prev, {
+      id: creatorId,
+      name: viewer.profile!.display_name || 'User',
+      avatar: viewer.profile!.avatar_url || undefined,
+      score: 0,
+      color: PK_COLORS[prev.length % PK_COLORS.length],
+    }]);
+
+    // System message
+    setReplies(prev => [...prev, {
+      id: `sys-${Date.now()}`,
+      user_id: 'system',
+      user: 'System',
+      handle: '@system',
+      time: 'Just now',
+      text: `⚔️ ${viewer.profile!.display_name} joined the battle!`,
+      avatar: '',
+      likes: 0,
+      liked_by_me: false,
+    }]);
+
+    // Send PK challenge via hook
+    const newBattle = await createBattle(300);
+    if (newBattle) {
+      await sendChallenge(creatorId);
+    }
+
+    setShowInviteModal(false);
+  };
+
+  // Send gift with target awareness (uses send_live_gift RPC)
+  const handleSendStreamGift = async (gift: typeof STREAM_GIFTS[0]) => {
+    if (!user) return;
+
+    // Determine target
+    const targetId = interactionTargetId === 'all'
+      ? stream?.user_id || ''
+      : interactionTargetId;
+
+    const targetParticipant = battleParticipants.find(p => p.id === targetId);
+    const targetName = targetParticipant?.name || host?.display_name || 'Host';
+
+    if (userCredits < gift.cost) {
+      toast.error('Not enough credits');
+      return;
+    }
+
+    try {
+      const { error } = await supabase.rpc('send_live_gift', {
+        p_stream_id: streamId,
+        p_gift_type: gift.id,
+        p_credit_value: gift.cost,
+      });
+
+      if (error) throw error;
+
+      // Optimistic local updates
+      setUserCredits(prev => prev - gift.cost);
+
+      // Show overlay
+      setGiftOverlay({
+        icon: gift.icon,
+        sender: user.user_metadata?.display_name || 'You',
+        name: gift.name,
+        receiver: targetName,
+      });
+      setTimeout(() => setGiftOverlay(null), 3000);
+
+      // Update PK score locally
+      if (isPKMode) {
+        setBattleParticipants(prev => prev.map(p =>
+          p.id === targetId ? { ...p, score: p.score + gift.cost } : p
+        ));
+      }
+
+      setShowStreamGiftModal(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to send gift');
+    }
+  };
+
+  // Focus/unfocus PK participant
+  const handleParticipantTap = (participantId: string) => {
+    if (focusedParticipantId === participantId) {
+      setFocusedParticipantId(null);
+      setInteractionTargetId('all');
+    } else {
+      setFocusedParticipantId(participantId);
+      setInteractionTargetId(participantId);
     }
   };
 
@@ -930,33 +1116,135 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-50 bg-[#050505] overflow-hidden min-h-[100dvh]">
-      {/* FULLSCREEN VIDEO BACKGROUND */}
-      <div className="absolute inset-0">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted={isHost}
-          className={cn(
-            "w-full h-full object-cover",
-            !hasVideo && "hidden"
-          )}
-        />
-        {!hasVideo && (
-          <div className="absolute inset-0 flex items-center justify-center bg-[#050505]">
-            <div className="flex flex-col items-center gap-4">
-              {host?.avatar_url ? (
-                <img src={host.avatar_url} alt={host?.display_name} className="w-28 h-28 rounded-full ring-4 ring-rose-500/50" />
+  // --- RENDER PK PARTICIPANT VIDEO FEED ---
+  const renderPKFeed = (p: PKParticipant, isFocused: boolean, isMini: boolean) => {
+    const isLeading = battleParticipants.length > 1 &&
+      Math.max(...battleParticipants.map(x => x.score)) === p.score && p.score > 0;
+
+    return (
+      <div
+        key={p.id}
+        onClick={() => handleParticipantTap(p.id)}
+        className={cn(
+          "relative overflow-hidden cursor-pointer transition-all duration-300",
+          isFocused ? "absolute inset-0 z-0" : "",
+          isMini
+            ? "w-24 h-32 rounded-xl border-2 shadow-xl z-30 shrink-0"
+            : "w-full h-full border border-black"
+        )}
+        style={{ borderColor: isMini ? p.color : undefined }}
+      >
+        {/* Video / Avatar placeholder */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/80 to-black/40">
+          {p.id === host?.id && isCameraOn ? (
+            <video ref={p.id === host?.id ? videoRef : undefined} autoPlay playsInline muted className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center">
+              {p.avatar ? (
+                <img src={p.avatar} alt={p.name} className="w-16 h-16 rounded-full" />
               ) : (
-                <div className="w-28 h-28 rounded-full bg-white/5 flex items-center justify-center text-white/40 text-4xl font-black ring-4 ring-rose-500/50">
-                  {host?.display_name?.[0] || 'H'}
+                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-2xl font-black text-white/40">
+                  {p.name[0]}
                 </div>
               )}
-              <p className="text-white/40 text-sm font-medium">Waiting for video...</p>
             </div>
+          )}
+        </div>
+
+        {/* Score badge */}
+        <div className="absolute bottom-2 left-2 z-10">
+          <div className="flex items-center gap-1 bg-black/60 backdrop-blur-sm px-2 py-1 rounded-full">
+            <Flame className="w-3 h-3" style={{ color: p.color }} />
+            <span className="text-xs font-black text-white">{p.score.toLocaleString()}</span>
           </div>
+        </div>
+
+        {/* Name */}
+        <div className="absolute top-2 left-2 z-10">
+          <span className="text-[10px] font-bold text-white bg-black/50 px-2 py-0.5 rounded-full">{p.name}</span>
+        </div>
+
+        {/* Leading crown */}
+        {isLeading && (
+          <div className="absolute top-2 right-2 z-10">
+            <Crown className="w-5 h-5 text-amber-400 fill-current drop-shadow-lg" />
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-[#050505] overflow-hidden min-h-[100dvh]">
+      {/* VIDEO ENGINE */}
+      <div className="absolute inset-0">
+        {isPKMode && battleParticipants.length > 0 ? (
+          // PK MODE: Grid or Focus layout
+          focusedParticipantId === null ? (
+            // Grid layout
+            <div className={cn(
+              "w-full h-full grid gap-[1px]",
+              pkMaxSlots <= 2 ? "grid-cols-1 grid-rows-2" : "grid-cols-2 grid-rows-2"
+            )}>
+              {battleParticipants.map(p => renderPKFeed(p, false, false))}
+              {/* Empty slots */}
+              {Array.from({ length: pkMaxSlots - battleParticipants.length }).map((_, i) => (
+                <div key={`empty-${i}`} className="relative bg-black/90 flex flex-col items-center justify-center gap-3 border border-white/5">
+                  <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
+                    <Users className="w-8 h-8 text-white/20" />
+                  </div>
+                  <span className="text-white/30 text-xs font-bold">Waiting...</span>
+                  {isHost && (
+                    <button
+                      onClick={() => setShowInviteModal(true)}
+                      className="bg-white/10 px-4 py-1.5 rounded-full text-xs font-bold text-white/70 hover:bg-white/20 transition flex items-center gap-2"
+                    >
+                      <UserPlus className="w-3 h-3" /> Invite
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Focus layout: one big + mini overlays
+            <div className="relative w-full h-full">
+              {battleParticipants.find(p => p.id === focusedParticipantId) &&
+                renderPKFeed(battleParticipants.find(p => p.id === focusedParticipantId)!, true, false)}
+              <div className="absolute bottom-32 right-3 flex flex-col gap-2 z-30">
+                {battleParticipants
+                  .filter(p => p.id !== focusedParticipantId)
+                  .map(p => renderPKFeed(p, false, true))}
+              </div>
+            </div>
+          )
+        ) : (
+          // SOLO MODE: Single video
+          <>
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted={isHost}
+              className={cn(
+                "w-full h-full object-cover",
+                !hasVideo && "hidden"
+              )}
+            />
+            {!hasVideo && (
+              <div className="absolute inset-0 flex items-center justify-center bg-[#050505]">
+                <div className="flex flex-col items-center gap-4">
+                  {host?.avatar_url ? (
+                    <img src={host.avatar_url} alt={host?.display_name} className="w-28 h-28 rounded-full ring-4 ring-rose-500/50" />
+                  ) : (
+                    <div className="w-28 h-28 rounded-full bg-white/5 flex items-center justify-center text-white/40 text-4xl font-black ring-4 ring-rose-500/50">
+                      {host?.display_name?.[0] || 'H'}
+                    </div>
+                  )}
+                  <p className="text-white/40 text-sm font-medium">Waiting for video...</p>
+                </div>
+              </div>
+            )}
+          </>
         )}
         {/* Gradient overlays */}
         <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/70 pointer-events-none" />
@@ -964,15 +1252,45 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       {/* HEADER */}
       <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-start z-40 pt-safe">
-        <button onClick={handleMinimize} className="w-10 h-10 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all">
-          <Minimize2 className="w-5 h-5 text-white" />
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={handleMinimize} className="w-10 h-10 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all">
+            <Minimize2 className="w-5 h-5 text-white" />
+          </button>
+
+          {/* Host info pill */}
+          <button
+            onClick={() => host && navigateToProfile(host.id)}
+            className="flex items-center gap-2 bg-black/40 backdrop-blur-xl p-1 rounded-full border border-white/10 pr-3"
+          >
+            <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-rose-500">
+              {host?.avatar_url ? (
+                <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-rose-500/30 flex items-center justify-center text-white text-xs font-black">
+                  {host?.display_name?.[0] || 'H'}
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-white leading-tight">{host?.display_name}</span>
+              <span className="text-[9px] text-white/50 font-bold">{formatNumber(viewers.length + 1)} viewers</span>
+            </div>
+          </button>
+        </div>
 
         <div className="flex items-center gap-2">
           <div className="bg-black/30 backdrop-blur-xl px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
             <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
             <span className="text-[10px] font-black tracking-widest uppercase text-white">HD Live</span>
           </div>
+          {isHost && isPKMode && battleParticipants.length < pkMaxSlots && (
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="bg-pink-600 rounded-full px-3 py-2 text-xs font-bold text-white flex items-center gap-1 shadow-lg shadow-pink-500/30 active:scale-90 transition-all"
+            >
+              <UserPlus className="w-3 h-3" /> Invite
+            </button>
+          )}
           <button
             onClick={() => setShowSettings(true)}
             className="w-10 h-10 bg-black/30 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
@@ -985,40 +1303,56 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </div>
       </div>
 
-      {/* HOST TAG */}
-      <div className="absolute top-16 left-4 z-30 pt-safe">
-        <button
-          onClick={() => host && navigateToProfile(host.id)}
-          className="flex items-center gap-2.5 bg-black/40 backdrop-blur-xl p-1.5 rounded-full border border-white/10 pr-4"
-        >
-          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-rose-500">
-            {host?.avatar_url ? (
-              <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full bg-white/10 flex items-center justify-center text-white/60 font-bold text-sm">
-                {host?.display_name?.[0] || 'H'}
-              </div>
-            )}
-          </div>
-          <div>
-            <p className="text-xs font-black leading-tight flex items-center gap-1 text-white">
-              {host?.display_name}
-              <Crown className="w-3 h-3 text-amber-400 fill-current" />
-              {host?.is_verified && <CheckCircle2 className="w-3 h-3 text-blue-400" />}
-            </p>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-white/50 font-bold">{(viewers.length + 1).toLocaleString()} viewers</span>
-            </div>
-          </div>
-        </button>
-
-        {/* Gift count box — always visible to all */}
-        <div className="mt-2 ml-1 flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-xl px-3 py-1.5 rounded-full border border-amber-500/20">
+      {/* Gift count badge */}
+      <div className="absolute top-20 left-4 z-30 pt-safe">
+        <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-xl px-3 py-1.5 rounded-full border border-amber-500/20">
           <Gift className="w-3.5 h-3.5 text-amber-400" />
           <span className="text-xs font-black text-amber-400">{hostGiftTotal.toLocaleString()}</span>
           <Coins className="w-3 h-3 text-amber-400/60" />
         </div>
       </div>
+
+      {/* PK SCORE BAR */}
+      {isPKMode && battleActive && battleParticipants.length > 0 && (
+        <div className="absolute top-28 left-0 right-0 z-30 pt-safe px-2">
+          <div className="bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 p-3">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-purple-400">
+                  {pkMaxSlots}-Way Battle
+                </span>
+              </div>
+              <div className="bg-black/60 px-2 py-0.5 rounded-full border border-yellow-500/50">
+                <span className={cn(
+                  "font-mono font-bold text-xs",
+                  battleTimeLeft <= 10 ? "text-red-500" : "text-yellow-400"
+                )}>
+                  {Math.floor(battleTimeLeft / 60)}:{(battleTimeLeft % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
+            </div>
+            {/* Proportional bar */}
+            <div className="relative h-2.5 rounded-full overflow-hidden bg-white/5">
+              {battleParticipants.map((p, i) => {
+                const totalScore = battleParticipants.reduce((sum, pp) => sum + pp.score, 0) || 1;
+                const percent = (p.score / totalScore) * 100;
+                const offset = battleParticipants.slice(0, i).reduce((sum, pp) => sum + (pp.score / totalScore) * 100, 0);
+                return (
+                  <motion.div
+                    key={p.id}
+                    className="absolute inset-y-0 rounded-full"
+                    style={{ left: `${offset}%`, backgroundColor: p.color }}
+                    animate={{ width: `${percent}%` }}
+                    transition={{ type: "spring", stiffness: 100, damping: 15 }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MAIN CONTENT LAYER */}
       <div className="relative flex-1 flex flex-col justify-end p-4 pb-32 z-30 pointer-events-none h-full">
@@ -1061,7 +1395,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       {/* RIGHT-SIDE ACTION STACK */}
       <div className="absolute right-3 bottom-40 flex flex-col gap-4 z-40">
-        {/* React */}
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={() => setShowReactions(true)}
@@ -1072,7 +1405,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           <span className="text-[9px] font-black uppercase tracking-tight text-white/70">React</span>
         </div>
 
-        {/* Share */}
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={() => setShowShare(true)}
@@ -1083,7 +1415,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           <span className="text-[9px] font-black uppercase tracking-tight text-white/70">Share</span>
         </div>
 
-        {/* Camera Flip - Host only */}
         {isHost && (
           <div className="flex flex-col items-center gap-1">
             <button
@@ -1096,7 +1427,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
         )}
 
-        {/* Guests */}
         <div className="flex flex-col items-center gap-1">
           <button
             onClick={() => setView('guests')}
@@ -1107,7 +1437,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           <span className="text-[9px] font-black uppercase tracking-tight text-white/70">{viewers.length + 1}</span>
         </div>
 
-        {/* PK Battle - Host only */}
         {isHost && (
           <div className="flex flex-col items-center gap-1">
             <button
@@ -1180,11 +1509,38 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         ))}
       </AnimatePresence>
 
+      {/* Fullscreen Gift Overlay */}
+      <AnimatePresence>
+        {giftOverlay && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none"
+          >
+            <motion.div
+              initial={{ scale: 0, rotate: -20 }}
+              animate={{ scale: 1, rotate: 0 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 200, damping: 12 }}
+              className="flex flex-col items-center gap-3"
+            >
+              <span className="text-8xl drop-shadow-2xl">{giftOverlay.icon}</span>
+              <div className="bg-black/70 backdrop-blur-xl px-6 py-3 rounded-2xl border border-white/10">
+                <p className="text-white font-bold text-center text-sm">
+                  {giftOverlay.sender} sent {giftOverlay.name} to {giftOverlay.receiver}!
+                </p>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* QuickGiftBar */}
       <QuickGiftBar
         isOpen={showQuickGift}
         onClose={() => setShowQuickGift(false)}
-        recipientId={stream?.user_id || ''}
+        recipientId={interactionTargetId === 'all' ? (stream?.user_id || '') : interactionTargetId}
         roomId={streamId}
         isSpace={false}
         hostId={stream?.user_id}
@@ -1195,6 +1551,38 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       {/* BOTTOM BROADCAST BAR */}
       <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe bg-gradient-to-t from-black/80 via-black/40 to-transparent z-40">
+        {/* PK Interaction target selector */}
+        {isPKMode && battleParticipants.length > 0 && (
+          <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => setInteractionTargetId('all')}
+              className={cn(
+                "text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap transition-all",
+                interactionTargetId === 'all'
+                  ? 'bg-white text-black'
+                  : 'bg-black/50 text-gray-400 border border-white/10'
+              )}
+            >
+              ALL
+            </button>
+            {battleParticipants.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setInteractionTargetId(p.id)}
+                className={cn(
+                  "text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap flex items-center gap-1 transition-all",
+                  interactionTargetId === p.id
+                    ? 'bg-white text-black'
+                    : 'bg-black/50 text-gray-400 border border-white/10'
+                )}
+              >
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
+                {p.name}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center gap-2.5 max-w-lg mx-auto">
           {/* Mic toggle - host only */}
           {isHost && (
@@ -1230,8 +1618,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
           {/* Gift button */}
           <button
-            onClick={() => setShowQuickGift(!showQuickGift)}
-            className="w-11 h-11 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20 active:scale-90 transition-all shrink-0"
+            onClick={() => setShowStreamGiftModal(true)}
+            className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-pink-500/20 active:scale-90 transition-all shrink-0"
           >
             <Gift className="w-5 h-5 text-white" />
           </button>
@@ -1474,6 +1862,139 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         )}
       </AnimatePresence>
 
+      {/* IN-STREAM INVITE MODAL */}
+      <AnimatePresence>
+        {showInviteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center"
+            onClick={() => setShowInviteModal(false)}
+          >
+            <motion.div
+              initial={{ y: 300 }}
+              animate={{ y: 0 }}
+              exit={{ y: 300 }}
+              className="w-full max-w-md bg-[#0F1119] rounded-t-[2rem] p-6 pb-safe border-t border-white/5 max-h-[70vh] flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-black text-lg flex items-center gap-2">
+                  <Swords className="w-5 h-5 text-purple-400" /> Invite Creators
+                </h3>
+                <button onClick={() => setShowInviteModal(false)} className="p-2 bg-white/5 rounded-full">
+                  <X className="w-4 h-4 text-white/60" />
+                </button>
+              </div>
+
+              <div className="flex items-center bg-white/5 rounded-2xl px-4 py-3 border border-white/5 mb-4">
+                <Search className="w-4 h-4 text-white/30" />
+                <input
+                  type="text"
+                  placeholder="Search creators..."
+                  className="flex-1 bg-transparent text-white placeholder-white/30 outline-none ml-3 text-sm"
+                />
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
+                {viewers.filter(v => v.user_id !== host?.id).map(viewer => {
+                  const isJoined = battleParticipants.some(p => p.id === viewer.user_id);
+                  return (
+                    <div key={viewer.user_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={viewer.profile?.avatar_url || ''}
+                          alt={viewer.profile?.display_name}
+                          className="w-10 h-10 rounded-full"
+                        />
+                        <div className="min-w-0">
+                          <p className="text-white font-bold text-sm truncate">{viewer.profile?.display_name}</p>
+                          <p className="text-white/40 text-xs">@{viewer.profile?.username}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleInviteCreator(viewer.user_id)}
+                        disabled={isJoined || battleParticipants.length >= pkMaxSlots}
+                        className={cn(
+                          "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
+                          isJoined
+                            ? 'bg-gray-800 text-gray-500'
+                            : 'bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20'
+                        )}
+                      >
+                        {isJoined ? 'On Stage' : 'Invite'}
+                      </button>
+                    </div>
+                  );
+                })}
+                {viewers.filter(v => v.user_id !== host?.id).length === 0 && (
+                  <p className="text-center text-white/30 text-sm py-8">No viewers to invite yet</p>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* IN-STREAM GIFT MODAL */}
+      <AnimatePresence>
+        {showStreamGiftModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-black/70 flex items-end justify-center"
+            onClick={() => setShowStreamGiftModal(false)}
+          >
+            <motion.div
+              initial={{ y: 300 }}
+              animate={{ y: 0 }}
+              exit={{ y: 300 }}
+              className="w-full max-w-md bg-[#0F1119] rounded-t-[2rem] p-6 pb-safe border-t border-white/5"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-white font-black text-lg">Send Gift</h3>
+                <button onClick={() => setShowStreamGiftModal(false)} className="p-2 bg-white/5 rounded-full">
+                  <X className="w-4 h-4 text-white/60" />
+                </button>
+              </div>
+
+              <div className="mb-4 flex items-center gap-2">
+                <Coins className="w-4 h-4 text-amber-400" />
+                <span className="text-sm text-white/60">
+                  Sending to:{' '}
+                  <span className="text-white font-bold">
+                    {interactionTargetId === 'all'
+                      ? host?.display_name || 'The Host'
+                      : battleParticipants.find(p => p.id === interactionTargetId)?.name || 'Host'}
+                  </span>
+                </span>
+                <span className="ml-auto text-xs text-amber-400 font-bold">{userCredits.toLocaleString()} credits</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {STREAM_GIFTS.map(gift => (
+                  <button
+                    key={gift.id}
+                    onClick={() => handleSendStreamGift(gift)}
+                    disabled={userCredits < gift.cost}
+                    className={cn(
+                      "bg-black/30 border border-white/5 rounded-2xl p-3 flex flex-col items-center gap-2 hover:bg-white/10 transition group",
+                      userCredits < gift.cost && "opacity-40 pointer-events-none"
+                    )}
+                  >
+                    <span className="text-3xl group-hover:scale-110 transition-transform">{gift.icon}</span>
+                    <span className="text-[10px] font-bold text-white/60">{gift.cost} Credits</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Modals */}
       {showGiftModal && (
         <LiveGiftModal
@@ -1521,6 +2042,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         isOpen={showPKBattle}
         onClose={() => setShowPKBattle(false)}
         mode="select"
+        maxSlots={pkMaxSlots}
         onAccept={() => {
           setShowPKBattle(false);
         }}
