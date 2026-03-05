@@ -182,31 +182,36 @@ export const LiveDashboard = ({
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch recorded/ended spaces with recordings
+  // Fetch recorded/ended spaces
   const { data: recordedSpaces } = useQuery({
     queryKey: ['recorded-spaces'],
     queryFn: async () => {
-      const { data } = await supabase
+      const { data: spaces, error } = await supabase
         .from('live_spaces')
-        .select(`
-          id,
-          title,
-          description,
-          user_id,
-          recording_url,
-          cover_image_url,
-          viewer_count,
-          peak_viewers,
-          ended_at,
-          started_at,
-          topic_category,
-          share_link,
-          profiles:user_id (id, display_name, username, avatar_url)
-        `)
+        .select('id, title, description, user_id, recording_url, cover_image_url, viewer_count, peak_viewers, ended_at, started_at, topic_category, share_link')
         .eq('status', 'ended')
         .order('ended_at', { ascending: false })
         .limit(50);
-      return data || [];
+
+      if (error) {
+        console.error('Failed to fetch recorded spaces:', error);
+        return [];
+      }
+      if (!spaces || spaces.length === 0) return [];
+
+      // Fetch profiles for all unique user_ids
+      const userIds = [...new Set(spaces.map(s => s.user_id))];
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+
+      return spaces.map(space => ({
+        ...space,
+        profiles: profileMap.get(space.user_id) || null,
+      }));
     },
     staleTime: 30 * 1000,
     refetchOnWindowFocus: true,
