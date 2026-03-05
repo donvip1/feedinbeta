@@ -390,6 +390,7 @@ export const LiveDashboard = ({
                           >
                             <Trash2 className={cn("w-4 h-4", deletingSpaceId === space.id ? "text-white/20 animate-spin" : "text-red-400/60")} />
                           </button>
+                        )}
                       </div>
                     </motion.div>
                   );
