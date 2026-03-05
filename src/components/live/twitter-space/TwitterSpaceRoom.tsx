@@ -1593,55 +1593,55 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       </div>
 
         {/* Main Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar" data-scrollable="true" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', transform: 'translateZ(0)' }}>
         {/* Connection Status */}
         {connectionStatus !== 'connected' && connectionStatus !== 'disconnected' && (
           <p className="text-center text-slate-500 text-xs mb-2 capitalize">{connectionStatus}...</p>
         )}
 
         {/* Room Info - Centered Host */}
-        <div className="p-8 text-center max-w-lg mx-auto">
-          <div className="mb-6 relative inline-block">
+        <div className="p-6 text-center max-w-lg mx-auto">
+          <div className="mb-5 relative inline-block">
             <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full" />
             <img
               src={speakers.find(s => s.user_id === space?.user_id)?.profile?.avatar_url || ''}
               alt="Host"
-              className="w-24 h-24 rounded-[2.5rem] border-4 border-white/10 relative z-10 shadow-2xl object-cover cursor-pointer"
+              className="w-20 h-20 rounded-[2rem] border-3 border-white/10 relative z-10 shadow-2xl object-cover cursor-pointer active:scale-95 transition-transform duration-75"
               onClick={() => space?.user_id && navigateToProfile(space.user_id)}
             />
-            <div className="absolute -bottom-2 -right-2 bg-purple-600 p-2 rounded-2xl z-20 border-4 border-[#050505]">
-              <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <div className="absolute -bottom-1.5 -right-1.5 bg-purple-600 p-1.5 rounded-xl z-20 border-3 border-[#050505]">
+              <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </div>
           </div>
-          <h1 className="text-2xl font-black mb-2 leading-tight text-white">{space?.title}</h1>
+          <h1 className="text-xl font-black mb-1.5 leading-tight text-white">{space?.title}</h1>
           <p className="text-sm text-slate-400 mb-1">
             Hosted by {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name || 'Host'}
           </p>
           {hostGiftTotal > 0 && (
-            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full mb-3">
-              <Gift className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-xs font-bold text-amber-400">Gifts: {hostGiftTotal.toLocaleString()}</span>
+            <div className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full mb-2">
+              <Gift className="w-3 h-3 text-amber-400" />
+              <span className="text-[10px] font-bold text-amber-400">Gifts: {hostGiftTotal.toLocaleString()}</span>
             </div>
           )}
-          {hostGiftTotal === 0 && <div className="mb-3" />}
-          <div className="flex items-center justify-center gap-4">
+          {hostGiftTotal === 0 && <div className="mb-2" />}
+          <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => setView('guests')}
-              className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full hover:bg-white/10 transition-all"
+              className="flex items-center gap-1 bg-white/5 px-2.5 py-0.5 rounded-full hover:bg-white/10 active:scale-95 transition-transform duration-75"
             >
-              <Users className="w-3 h-3 text-slate-500" />
-              <span className="text-xs font-bold text-slate-400">{speakers.length}</span>
+              <Users className="w-2.5 h-2.5 text-slate-500" />
+              <span className="text-[10px] font-bold text-slate-400">{speakers.length}</span>
             </button>
-            <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full">
-              <Volume2 className="w-3 h-3 text-slate-500" />
-              <span className="text-xs font-bold text-slate-400">{sortedSpeakers.filter(s => s.role !== 'listener').length} Speakers</span>
+            <div className="flex items-center gap-1 bg-white/5 px-2.5 py-0.5 rounded-full">
+              <Volume2 className="w-2.5 h-2.5 text-slate-500" />
+              <span className="text-[10px] font-bold text-slate-400">{sortedSpeakers.filter(s => s.role !== 'listener').length} Speakers</span>
             </div>
           </div>
         </div>
 
-        {/* Speaker Grid - Twitter/Clubhouse style */}
-        <div className="px-6 pb-20 max-w-3xl mx-auto">
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-y-10 gap-x-4 mb-12">
+        {/* Speaker Grid */}
+        <div className="px-5 pb-16 max-w-3xl mx-auto">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-y-8 gap-x-3 mb-10">
             {sortedSpeakers
               .filter(s => s.role !== 'listener')
               .slice(0, 12)
