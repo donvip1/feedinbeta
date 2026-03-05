@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark, Music, Disc3, Sparkles, BarChart3 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Eye, MoreVertical, Repeat, Gift, TrendingUp, MapPin, Maximize, Volume2, VolumeX, Play, Pause, Trash2, X, Bookmark, Music, Disc3, Sparkles, BarChart3, Mic, Headphones } from 'lucide-react';
 import { formatCompactTime } from '@/lib/format-time';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
@@ -642,6 +642,33 @@ export default function PostCard({ post, isPromoted, promoterName, boostLevel, a
             <button className="p-1.5 hover:bg-amber-500/10 rounded-full transition-colors">
               <BarChart3 className="w-4 h-4 text-amber-600" />
             </button>
+          </div>
+        )}
+
+        {/* Space Recording Card - for auto-posted live space recordings */}
+        {(post as any).metadata?.source === 'live_space_recording' && (
+          <div 
+            className="mb-2 border rounded-2xl overflow-hidden bg-gradient-to-br from-purple-500/10 to-pink-500/10 border-purple-500/20 cursor-pointer"
+            onClick={() => navigate(`/live/space/${(post as any).metadata.share_link || (post as any).metadata.space_id}`)}
+          >
+            <div className="p-4 flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center shrink-0">
+                <Headphones className="w-6 h-6 text-purple-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full uppercase">Space Replay</span>
+                </div>
+                <p className="text-sm font-semibold truncate">{post.content?.replace('🎙️ ', '').split(' — ')[0] || 'Live Space'}</p>
+                <p className="text-xs text-muted-foreground">
+                  {(post as any).metadata.viewer_count ? `${(post as any).metadata.viewer_count} listeners` : ''}
+                  {(post as any).metadata.duration ? ` • ${Math.floor((post as any).metadata.duration / 60)}m` : ''}
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0">
+                <Play className="w-5 h-5 text-primary-foreground ml-0.5" />
+              </div>
+            </div>
           </div>
         )}
 

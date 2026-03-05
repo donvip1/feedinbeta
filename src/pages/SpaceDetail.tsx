@@ -8,7 +8,7 @@ import { SpaceReplayPlayer } from '@/components/live/SpaceReplayPlayer';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Mic, Lock, Loader2, Users, Play, Clock } from 'lucide-react';
+import { Mic, Lock, Loader2, Users, Play, Clock, Share2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
@@ -367,10 +367,41 @@ const SpaceDetail = () => {
           )}
 
           {space?.status === 'ended' && space?.recording_url && (
-            <Button onClick={handleReplay} size="lg" className="w-full">
-              <Play className="w-4 h-4 mr-2" />
-              Listen to Replay
-            </Button>
+            <>
+              <Button onClick={handleReplay} size="lg" className="w-full">
+                <Play className="w-4 h-4 mr-2" />
+                Listen to Replay
+              </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={async () => {
+                  const shareUrl = `${window.location.origin}/live/space/${space?.share_link || spaceId}`;
+                  if (navigator.share && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                    try {
+                      await navigator.share({
+                        title: space?.title || 'Space Replay',
+                        text: `Listen to this space replay: ${space?.title}`,
+                        url: shareUrl,
+                      });
+                      return;
+                    } catch (e: any) {
+                      if (e?.name === 'AbortError') return;
+                    }
+                  }
+                  try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    toast.success('Replay link copied!');
+                  } catch {
+                    toast.error('Could not copy link');
+                  }
+                }}
+              >
+                <Share2 className="w-4 h-4 mr-2" />
+                Share Replay
+              </Button>
+            </>
           )}
 
           {space?.status === 'ended' && !space?.recording_url && (
