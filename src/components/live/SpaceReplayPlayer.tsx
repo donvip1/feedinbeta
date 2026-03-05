@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Download, Share2, X, Clock, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -8,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { shareUrls } from '@/lib/url-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { useNavigation } from '@/context/NavigationContext';
 import { SpaceChat } from './SpaceChat';
 
@@ -37,6 +38,7 @@ interface SpaceData {
 }
 
 export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) => {
+  const navigate = useNavigate();
   const { setHideBottomNav } = useNavigation();
   const [space, setSpace] = useState<SpaceData | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -270,15 +272,14 @@ export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) 
         }}
       />
 
-      {/* Header - compact */}
       <div className="flex items-center gap-2 px-3 py-2 pt-safe border-b border-white/5 shrink-0">
-        <Button variant="ghost" size="icon" onClick={onClose} className="shrink-0 w-8 h-8 text-zinc-400 hover:text-white">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/live', { state: { tab: 'Replays' } })} className="shrink-0 w-8 h-8 text-zinc-400 hover:text-white">
           <X className="w-5 h-5" />
         </Button>
         <div className="flex-1 min-w-0">
           <h1 className="text-sm font-bold text-white truncate">{space.title}</h1>
           <p className="text-[10px] text-zinc-500 truncate">
-            {space.host?.display_name} · Ended {formatDistanceToNow(new Date(space.ended_at), { addSuffix: true })}
+            {space.host?.display_name} · {space.started_at ? format(new Date(space.started_at), 'MMM d, yyyy · h:mm a') : ''} · {durationMins > 0 ? `${durationMins} min` : ''}
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">

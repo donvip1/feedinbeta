@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
+import { format } from "date-fns";
 import {
   ArrowLeft,
   Search,
@@ -83,12 +84,20 @@ export const LiveDashboard = ({
   myActiveSpace,
 }: LiveDashboardProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { permissions } = useAdminRole();
   const [activeFilter, setActiveFilter] = useState("All");
-  const [activeTab, setActiveTab] = useState<MainTab>("Discover");
+  const [activeTab, setActiveTab] = useState<MainTab>((location.state as any)?.tab === 'Replays' ? 'Replays' : 'Discover');
   const [showNotifications, setShowNotifications] = useState(false);
   const [deletingSpaceId, setDeletingSpaceId] = useState<string | null>(null);
+
+  // Clear location state after reading it
+  useEffect(() => {
+    if ((location.state as any)?.tab) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
 
@@ -97,6 +106,10 @@ export const LiveDashboard = ({
     if (!confirm("Delete this recorded space and all related data?")) return;
     setDeletingSpaceId(spaceId);
     try {
+      // Optimistic removal from cache
+      queryClient.setQueryData(['recorded-spaces'], (old: any[] | undefined) => 
+        old ? old.filter((s: any) => s.id !== spaceId) : []
+      );
       await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
       await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
       await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
@@ -108,6 +121,8 @@ export const LiveDashboard = ({
     } catch (err: any) {
       console.error("Failed to delete space:", err);
       toast.error("Failed to delete space");
+      // Re-fetch on failure to restore
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
     } finally {
       setDeletingSpaceId(null);
     }
@@ -369,7 +384,7 @@ export const LiveDashboard = ({
                         <p className="text-[11px] text-white/30 mt-1">
                           {duration > 0 ? `${duration}m` : ''}
                           {space.peak_viewers ? `${duration > 0 ? ' • ' : ''}${space.peak_viewers} listeners` : ''}
-                          {timeAgo ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${timeAgo}` : ''}
+                          {endedDate ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${format(endedDate, 'MMM d, h:mm a')}` : ''}
                         </p>
                       </div>
                       <div className="flex flex-col items-center gap-2 self-center shrink-0">
