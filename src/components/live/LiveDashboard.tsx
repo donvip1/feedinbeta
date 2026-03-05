@@ -3,7 +3,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
-  ArrowLeft,
   Search,
   Bell,
   Plus,
@@ -15,10 +14,10 @@ import {
   Mic,
   Video,
   Calendar,
-  Sparkles,
   Headphones,
   Share2,
   Trash2,
+  Tv,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -272,21 +271,14 @@ export const LiveDashboard = ({
   return (
     <div className="h-[100dvh] bg-[#050505] text-white flex flex-col">
       {/* Header */}
-      <header className="px-4 pt-[env(safe-area-inset-top)] flex flex-col gap-3 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
-        <div className="flex justify-between items-center pt-3 pb-1">
-          <button
-            onClick={() => navigate("/feed")}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all active:scale-90"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-
-          <div className="text-center">
-            <h1 className="text-xl font-bold tracking-tight">Live</h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Global Spaces</p>
+      <header className="px-5 pt-[env(safe-area-inset-top)] flex flex-col gap-3 bg-black/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
+        <div className="flex justify-between items-center pt-12 pb-1">
+          <div className="flex items-center gap-2">
+            <Tv className="w-6 h-6 text-pink-500" />
+            <span className="text-xl font-black">FeedIn Live</span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/search?context=live')}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
@@ -301,6 +293,12 @@ export const LiveDashboard = ({
               {liveCount > 0 && (
                 <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#050505]" />
               )}
+            </button>
+            <button
+              onClick={onGoLive}
+              className="bg-gradient-to-r from-pink-500 to-violet-600 px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-pink-500/25 active:scale-95 transition"
+            >
+              <Plus className="w-4 h-4" /> Go Live
             </button>
           </div>
         </div>
@@ -530,98 +528,59 @@ export const LiveDashboard = ({
         ) : (
         /* ===== DISCOVER TAB ===== */
         <>
-        {/* Creator Studio Hero Card */}
+        {/* Active Stream/Space Return Banner */}
         {myActiveStream ? (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 rounded-[2.5rem] p-6 border border-green-500/20 relative overflow-hidden"
+            onClick={() => onStreamClick(myActiveStream)}
+            className="bg-zinc-900 rounded-2xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer"
           >
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
-                <Radio className="w-7 h-7 text-white animate-pulse" />
+            <div className="h-32 bg-gradient-to-br from-green-900/50 to-emerald-900/50 relative flex items-center justify-center">
+              <div className="absolute top-3 left-3 bg-red-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                You're Live
               </div>
-              <div>
-                <p className="text-[10px] text-green-400 font-black uppercase tracking-widest">You're Live</p>
-                <h2 className="text-xl font-bold truncate">{myActiveStream.title}</h2>
-                <p className="text-xs text-slate-500">{myActiveStream.viewer_count || 0} watching now</p>
-              </div>
+              <Radio className="w-10 h-10 text-white/30 animate-pulse" />
             </div>
-            <button
-              onClick={() => onStreamClick(myActiveStream)}
-              className="w-full py-4 bg-white text-black rounded-full font-black flex items-center justify-center gap-2 hover:bg-green-50 transition-all active:scale-95 relative z-10"
-            >
-              <Video className="w-4 h-4" />
-              RETURN TO STREAM
-            </button>
+            <div className="p-4">
+              <p className="font-semibold text-sm">{myActiveStream.title}</p>
+              <p className="text-white/50 text-xs mt-1">{myActiveStream.viewer_count || 0} watching • Tap to return</p>
+            </div>
           </motion.div>
         ) : myActiveSpace ? (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-green-900/30 to-emerald-900/30 rounded-[2.5rem] p-6 border border-green-500/20 relative overflow-hidden"
+            onClick={() => onSpaceClick(myActiveSpace)}
+            className="bg-zinc-900 rounded-2xl overflow-hidden active:scale-[0.98] transition-transform cursor-pointer"
           >
-            <div className="flex items-center gap-4 mb-4 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/20">
-                <Mic className="w-7 h-7 text-white animate-pulse" />
+            <div className="h-32 bg-gradient-to-br from-green-900/50 to-emerald-900/50 relative flex items-center justify-center">
+              <div className="absolute top-3 left-3 bg-green-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1 uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                Space Active
               </div>
-              <div>
-                <p className="text-[10px] text-green-400 font-black uppercase tracking-widest">Space Active</p>
-                <h2 className="text-xl font-bold truncate">{myActiveSpace.title}</h2>
-                <p className="text-xs text-slate-500">{myActiveSpace.viewer_count || myActiveSpace.active_listeners || 0} listening</p>
-              </div>
+              <Mic className="w-10 h-10 text-white/30 animate-pulse" />
             </div>
-            <button
-              onClick={() => onSpaceClick(myActiveSpace)}
-              className="w-full py-4 bg-white text-black rounded-full font-black flex items-center justify-center gap-2 hover:bg-green-50 transition-all active:scale-95 relative z-10"
-            >
-              <Mic className="w-4 h-4" />
-              RETURN TO SPACE
-            </button>
-          </motion.div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-[#11131E] to-[#0a0b12] rounded-[2.5rem] p-6 border border-white/5 relative overflow-hidden group"
-          >
-            <div className="flex items-center gap-4 mb-6 relative z-10">
-              <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                <Radio className="w-7 h-7 text-white animate-pulse" />
-              </div>
-              <div>
-                <p className="text-[10px] text-purple-400 font-black uppercase tracking-widest">Creator Studio</p>
-                <h2 className="text-xl font-bold">Ready to broadcast?</h2>
-                <p className="text-xs text-slate-500">{followerCount > 0 ? `${followerCount} followers waiting` : 'Your audience is waiting for you'}</p>
-              </div>
+            <div className="p-4">
+              <p className="font-semibold text-sm">{myActiveSpace.title}</p>
+              <p className="text-white/50 text-xs mt-1">{myActiveSpace.viewer_count || myActiveSpace.active_listeners || 0} listening • Tap to return</p>
             </div>
-            <button
-              onClick={onGoLive}
-              className="w-full py-4 bg-white text-black rounded-full font-black flex items-center justify-center gap-2 hover:bg-purple-50 transition-all active:scale-95 relative z-10"
-            >
-              <Play className="w-4 h-4 fill-black" />
-              START GOING LIVE
-            </button>
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-purple-600/10 blur-[60px] rounded-full pointer-events-none" />
           </motion.div>
-        )}
+        ) : null}
+
 
         {/* Trending Now Section - uses filtered content */}
         {filteredContent.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Flame className="w-5 h-5 text-orange-500" />
-                <span className="font-bold">
-                  {activeFilter === 'All' ? 'Trending Now' : `${activeFilter} Streams`}
-                </span>
-              </div>
-              <button className="text-sm text-white/60 flex items-center gap-1 hover:text-white transition-colors">
-                View All <ChevronRight className="w-4 h-4" />
-              </button>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-500" />
+              <span className="text-lg font-bold">
+                {activeFilter === 'All' ? 'Trending Now' : `${activeFilter} Streams`}
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-4">
               {filteredContent.slice(0, 6).map((item, index) => (
                 <motion.div
                   key={item.id}
