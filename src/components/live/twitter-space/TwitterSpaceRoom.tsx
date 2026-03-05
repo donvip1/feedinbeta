@@ -835,6 +835,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       toast.error('Someone is already sharing their screen. Wait for them to stop.');
       return;
     }
+    // Must be connected to LiveKit room
+    if (!spaceContext) {
+      toast.error('Not connected to the space. Please wait...');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
@@ -847,16 +852,19 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       };
 
       // Publish video track to LiveKit so all participants see it
-      if (spaceContext) {
-        await spaceContext.publishScreenShare(stream);
-      }
+      await spaceContext.publishScreenShare(stream);
 
       setScreenStream(stream);
       setIsScreenSharing(true);
       toast.success('Screen sharing started');
     } catch (error: any) {
-      if (error.name !== 'NotAllowedError') {
-        toast.error('Failed to start screen sharing');
+      console.error('[ScreenShare] Error:', error);
+      if (error.name === 'NotAllowedError') {
+        // User cancelled — not an error
+      } else if (error.message?.includes('Not connected')) {
+        toast.error('Audio not connected yet. Please wait a moment and try again.');
+      } else {
+        toast.error('Failed to start screen sharing: ' + (error.message || 'Unknown error'));
       }
     }
   };
