@@ -165,19 +165,9 @@ export const CacheManager = {
    */
   async updateToNewVersionSilently(registration: ServiceWorkerRegistration): Promise<void> {
     if (registration.waiting) {
-      // Set up the listener BEFORE sending the message
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        console.log('[Cache] Controller changed, reloading silently...');
-        // Reload immediately - user won't notice in most cases
-        window.location.reload();
-      });
-
-      // Tell the service worker to skip waiting
-      console.log('[Cache] Applying update silently...');
-      registration.waiting.postMessage({ action: 'skipWaiting' });
+      // Do NOT force skipWaiting or reload - this kicks users out of live spaces
+      // The new SW will activate naturally on next page load
+      console.log('[Cache] New version waiting - will activate on next page load');
     }
   },
 
@@ -188,19 +178,9 @@ export const CacheManager = {
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.ready;
       
-      // Set up the listener BEFORE sending the message
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        console.log('[Cache] Controller changed, reloading...');
-        window.location.reload();
-      });
-
-      // Tell the service worker to skip waiting
-      if (registration.waiting) {
-        registration.waiting.postMessage({ action: 'skipWaiting' });
-      }
+      // Do NOT force skipWaiting or reload - this kicks users out of live spaces
+      // The new SW will activate naturally on next page load
+      console.log('[Cache] New version available - will activate on next page load');
     }
   },
 

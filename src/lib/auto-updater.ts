@@ -53,14 +53,10 @@ class AutoUpdater {
         this.registration.addEventListener('updatefound', this.handleUpdateFound);
       }
 
-      // Listen for controller change - apply silently
-      let refreshing = false;
+      // Do NOT reload on controllerchange - this kicks users out of live spaces
+      // The new service worker will serve updated content on the next natural page load
       navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (refreshing) return;
-        refreshing = true;
-        console.log('[AutoUpdater] Controller changed, applying update silently...');
-        // Reload silently - the service worker will serve new content
-        window.location.reload();
+        console.log('[AutoUpdater] Controller changed - new version will be active on next page load');
       });
 
       console.log('[AutoUpdater] Initialized');
@@ -109,10 +105,9 @@ class AutoUpdater {
 
     newWorker.addEventListener('statechange', () => {
       if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-        console.log('[AutoUpdater] New version ready, applying silently...');
+        console.log('[AutoUpdater] New version installed and waiting - will activate on next page load');
         this.pendingUpdate = true;
-        // Apply update silently - no popup, just activate the new SW
-        this.applyUpdate();
+        // Do NOT call skipWaiting/applyUpdate - let it activate naturally on next page load
       }
     });
   };
@@ -130,11 +125,10 @@ class AutoUpdater {
       await this.registration.update();
       console.log('[AutoUpdater] Update check completed');
       
-      // Check if there's a waiting worker - apply silently
+      // Check if there's a waiting worker - do NOT force activate, let it wait
       if (this.registration.waiting) {
-        console.log('[AutoUpdater] Update available, applying silently...');
+        console.log('[AutoUpdater] Update available - will activate on next page load');
         this.pendingUpdate = true;
-        this.applyUpdate();
         return true;
       }
       
