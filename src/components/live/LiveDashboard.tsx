@@ -123,57 +123,45 @@ export const LiveDashboard = ({
 
   const handleBulkDelete = async () => {
     if (selectedSpaces.size === 0) return;
-    if (!confirm(`Delete ${selectedSpaces.size} recorded space(s) and all related data?`)) return;
+    if (!confirm(`Delete ${selectedSpaces.size} recorded space(s) permanently?`)) return;
     setBulkDeleting(true);
     const ids = Array.from(selectedSpaces);
-    // Optimistic removal
     queryClient.setQueryData(['recorded-spaces'], (old: any[] | undefined) =>
       old ? old.filter((s: any) => !selectedSpaces.has(s.id)) : []
     );
     try {
-      for (const spaceId of ids) {
-        await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
-        await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
-        await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
-        await supabase.from("live_space_speakers").delete().eq("space_id", spaceId);
-        await supabase.from("live_spaces").delete().eq("id", spaceId);
-      }
-      toast.success(`${ids.length} space(s) deleted`);
+      const { data, error } = await supabase.rpc('delete_spaces_bulk', { p_space_ids: ids });
+      if (error) throw error;
+      toast.success(`${data || ids.length} space(s) permanently deleted`);
       setSelectedSpaces(new Set());
-      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
-    } catch {
-      toast.error("Failed to delete some spaces");
-      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+    } catch (err: any) {
+      console.error("Bulk delete failed:", err);
+      toast.error("Failed to delete: " + (err.message || "Unknown error"));
     } finally {
       setBulkDeleting(false);
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
     }
   };
   const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
 
   const handleDeleteSpace = async (e: React.MouseEvent, spaceId: string) => {
     e.stopPropagation();
-    if (!confirm("Delete this recorded space and all related data?")) return;
+    if (!confirm("Delete this recorded space permanently?")) return;
     setDeletingSpaceId(spaceId);
+    queryClient.setQueryData(['recorded-spaces'], (old: any[] | undefined) => 
+      old ? old.filter((s: any) => s.id !== spaceId) : []
+    );
     try {
-      // Optimistic removal from cache
-      queryClient.setQueryData(['recorded-spaces'], (old: any[] | undefined) => 
-        old ? old.filter((s: any) => s.id !== spaceId) : []
-      );
-      await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
-      await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
-      await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
-      await supabase.from("live_space_speakers").delete().eq("space_id", spaceId);
-      const { error } = await supabase.from("live_spaces").delete().eq("id", spaceId);
+      const { data, error } = await supabase.rpc('delete_space_completely', { p_space_id: spaceId });
       if (error) throw error;
-      toast.success("Space deleted successfully");
-      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+      if (!data) throw new Error("Not found or permission denied");
+      toast.success("Space permanently deleted");
     } catch (err: any) {
-      console.error("Failed to delete space:", err);
-      toast.error("Failed to delete space");
-      // Re-fetch on failure to restore
-      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+      console.error("Delete failed:", err);
+      toast.error("Failed to delete: " + (err.message || "Unknown error"));
     } finally {
       setDeletingSpaceId(null);
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
     }
   };
 

@@ -8550,6 +8550,11 @@ export type Database = {
         Returns: boolean
       }
       delete_expired_stories: { Args: never; Returns: undefined }
+      delete_space_completely: {
+        Args: { p_space_id: string }
+        Returns: boolean
+      }
+      delete_spaces_bulk: { Args: { p_space_ids: string[] }; Returns: number }
       filter_seen_posts: {
         Args: { p_post_ids: string[]; p_user_id: string }
         Returns: string[]
