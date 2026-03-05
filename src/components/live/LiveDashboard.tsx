@@ -251,6 +251,100 @@ export const LiveDashboard = ({
       {/* Main Content Area - scrollable */}
       <div className="flex-1 overflow-y-auto overscroll-contain" data-scrollable="true">
         <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 max-w-2xl mx-auto space-y-8 w-full">
+
+        {activeTab === 'Replays' ? (
+          /* ===== REPLAYS TAB ===== */
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Headphones className="w-5 h-5 text-purple-400" />
+              <span className="font-bold text-lg">Space Replays</span>
+              <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} recordings</span>
+            </div>
+
+            {(!recordedSpaces || recordedSpaces.length === 0) ? (
+              <div className="flex flex-col items-center gap-4 py-16">
+                <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center">
+                  <Headphones className="w-10 h-10 text-purple-400/50" />
+                </div>
+                <p className="text-white/60 text-center font-medium">No recordings yet</p>
+                <p className="text-sm text-white/40 text-center">Recorded spaces will appear here for replay</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3">
+                {recordedSpaces.map((space: any, index: number) => {
+                  const duration = space.started_at && space.ended_at
+                    ? Math.floor((new Date(space.ended_at).getTime() - new Date(space.started_at).getTime()) / 60000)
+                    : 0;
+                  const endedDate = space.ended_at ? new Date(space.ended_at) : null;
+                  const timeAgo = endedDate ? getTimeAgo(endedDate) : '';
+
+                  return (
+                    <motion.div
+                      key={space.id}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      onClick={() => navigate(`/live/space/${space.id}`)}
+                      className="flex gap-3 p-3 rounded-2xl bg-slate-800/40 border border-white/5 hover:bg-slate-800/70 transition-all cursor-pointer group"
+                    >
+                      {space.cover_image_url ? (
+                        <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0">
+                          <img src={space.cover_image_url} alt={space.title} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Play className="w-6 h-6 text-white fill-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-purple-600/20 to-pink-600/20 flex items-center justify-center shrink-0">
+                          <Headphones className="w-8 h-8 text-purple-400" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0 py-0.5">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[9px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-full uppercase tracking-wider">Replay</span>
+                          {space.topic_category && (
+                            <span className="text-[9px] font-medium text-white/40 bg-white/5 px-2 py-0.5 rounded-full">{space.topic_category}</span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-sm truncate leading-tight">{space.title}</p>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <Avatar className="w-4 h-4">
+                            <AvatarImage src={(space.profiles as any)?.avatar_url} />
+                            <AvatarFallback className="text-[8px] bg-slate-700">{(space.profiles as any)?.display_name?.[0] || '?'}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-xs text-white/50 truncate">
+                            {(space.profiles as any)?.display_name || 'Creator'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-white/30 mt-1">
+                          {duration > 0 ? `${duration}m` : ''}
+                          {space.peak_viewers ? `${duration > 0 ? ' • ' : ''}${space.peak_viewers} listeners` : ''}
+                          {timeAgo ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${timeAgo}` : ''}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const url = `https://feedinn.com/live/space/${space.id}`;
+                          if (navigator.share) {
+                            navigator.share({ title: space.title, url });
+                          } else {
+                            navigator.clipboard.writeText(url);
+                          }
+                        }}
+                        className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 self-center shrink-0"
+                      >
+                        <Share2 className="w-4 h-4 text-white/40" />
+                      </button>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+        /* ===== DISCOVER TAB ===== */
+        <>
         {/* Creator Studio Hero Card */}
         {myActiveStream ? (
           <motion.div
