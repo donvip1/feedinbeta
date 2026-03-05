@@ -2307,15 +2307,21 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         .animate-space-float {
           animation: space-float 4s ease-out forwards;
         }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+        .pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+        
+        /* Native mobile optimizations */
+        * { -webkit-tap-highlight-color: transparent; }
+        button, a, [role="button"] {
+          touch-action: manipulation;
+          -webkit-touch-callout: none;
         }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .pb-safe {
-          padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        input, textarea {
+          -webkit-appearance: none;
+          appearance: none;
+          font-size: 16px !important;
         }
       `}</style>
 
