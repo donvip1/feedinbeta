@@ -782,7 +782,7 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const publishScreenShare = useCallback(async (stream: MediaStream) => {
     const room = roomRef.current;
     if (!room || room.state !== ConnectionState.Connected) {
-      console.error('[SpaceContext-LK] Cannot publish screen share - not connected');
+      console.error('[SpaceContext-LK] Cannot publish screen share - not connected, state:', room?.state);
       throw new Error('Not connected to room');
     }
 
@@ -791,26 +791,23 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const audioTrack = stream.getAudioTracks()[0];
       if (!videoTrack) throw new Error('No video track in screen share stream');
 
-      console.log('[SpaceContext-LK] 🖥️ Publishing screen share tracks...');
+      console.log('[SpaceContext-LK] 🖥️ Publishing screen share tracks (raw MediaStreamTrack)...');
       
-      // Create a LocalVideoTrack from the raw MediaStreamTrack for compatibility
-      const { LocalVideoTrack: LVT, LocalAudioTrack: LAT } = await import('livekit-client');
-      
-      const localVideoTrack = new LVT(videoTrack, undefined, false);
-      await room.localParticipant.publishTrack(localVideoTrack, {
+      // Publish raw MediaStreamTrack directly — LiveKit SDK handles wrapping internally
+      await room.localParticipant.publishTrack(videoTrack, {
         name: 'screen-share',
         source: Track.Source.ScreenShare,
       });
 
       // Also publish screen share audio if available
       if (audioTrack) {
-        const localAudioTrack = new LAT(audioTrack, undefined, false);
-        await room.localParticipant.publishTrack(localAudioTrack, {
+        await room.localParticipant.publishTrack(audioTrack, {
           name: 'screen-share-audio',
           source: Track.Source.ScreenShareAudio,
         });
       }
 
+      setScreenShareStream(stream);
       console.log('[SpaceContext-LK] ✅ Screen share published');
     } catch (error) {
       console.error('[SpaceContext-LK] Failed to publish screen share:', error);
