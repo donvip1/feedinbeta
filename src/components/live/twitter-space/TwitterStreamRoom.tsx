@@ -64,6 +64,7 @@ import { ThreadedRepliesList } from './ThreadedRepliesList';
 import { PKBattleChallenge } from '../unified/PKBattleChallenge';
 import { shareUrls } from '@/lib/url-utils';
 import type { PKParticipant } from '../unified/PKBattleBar';
+import { InStreamRechargeSheet } from '../InStreamRechargeSheet';
 
 interface TwitterStreamRoomProps {
   streamId: string;
@@ -316,6 +317,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       }
       videoTrackRef.current?.stop();
       audioTrackRef.current?.stop();
+      // Clear viewer refresh interval
+      if ((window as any).__viewerRefreshInterval) {
+        clearInterval((window as any).__viewerRefreshInterval);
+      }
     };
   }, [streamId, user?.id]);
 
@@ -375,6 +380,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
     await fetchViewers();
     setLoading(false);
+
+    // Periodically refresh viewer list for accuracy
+    const viewerRefreshInterval = setInterval(fetchViewers, 15000);
+    // Store for cleanup
+    (window as any).__viewerRefreshInterval = viewerRefreshInterval;
 
     setTimeout(() => initializeLiveKit(streamData as any), 100);
   };
@@ -904,7 +914,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   // Reaction via broadcast channel
   const handleReaction = async (emoji: string) => {
     setShowReactions(false);
-    const myName = host?.display_name || user?.user_metadata?.display_name || 'Someone';
+    // Use current user's profile, not host's
+    const myProfile = viewers.find(v => v.user_id === user?.id)?.profile;
+    const myName = myProfile?.display_name || user?.user_metadata?.display_name || 'Someone';
     handleFloatingReaction(emoji, myName);
 
     if (reactionsChannelRef.current) {
@@ -1422,10 +1434,26 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold text-white leading-tight truncate">{stream?.title || 'Live Stream'}</span>
-            <span className="text-[11px] text-white/50 font-medium flex items-center gap-1">
+            <button
+              onClick={() => setView('guests')}
+              className="text-[11px] text-white/50 font-medium flex items-center gap-1 active:opacity-70 transition-opacity"
+            >
               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
               {formatNumber(viewerPresenceCount)} watching
-            </span>
+              {/* Mini viewer avatars */}
+              {viewers.slice(0, 3).map((v, i) => (
+                <img
+                  key={v.user_id}
+                  src={v.profile?.avatar_url || ''}
+                  alt=""
+                  className="w-4 h-4 rounded-full border border-black/50 -ml-1"
+                  style={{ zIndex: 3 - i }}
+                />
+              ))}
+              {viewers.length > 3 && (
+                <span className="text-[9px] text-white/40 ml-0.5">+{viewers.length - 3}</span>
+              )}
+            </button>
           </div>
         </button>
 
@@ -1816,9 +1844,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             <Heart className="w-4 h-4 text-rose-400" />
           </button>
 
-          {/* Refill / Recharge credits */}
+          {/* Refill / Recharge credits - opens in-stream sheet */}
           <button
-            onClick={() => navigate('/wallet')}
+            onClick={() => setShowRefill(true)}
             className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-90 transition-all shrink-0"
             title="Refill credits"
           >
@@ -2394,6 +2422,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           isLive: true,
         }))}
         onSelectChallenger={handlePKSelectChallenger}
+      />
+
+      {/* In-Stream Recharge Sheet */}
+      <InStreamRechargeSheet
+        isOpen={showRefill}
+        onClose={() => setShowRefill(false)}
+        currentBalance={userCredits}
+        onBalanceUpdate={(newBalance) => setUserCredits(newBalance)}
       />
 
       <style>{`
