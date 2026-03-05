@@ -213,10 +213,25 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const connectionStatus = spaceContext?.spaceState.connectionStatus || 'disconnected';
   const audioLevels = spaceContext?.spaceState.audioLevels || {};
 
-  // Hide bottom nav
+  // Hide bottom nav + prevent overscroll for native feel
   useEffect(() => {
     setHideBottomNav(true);
-    return () => setHideBottomNav(false);
+    
+    const preventOverscroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      const scrollable = target.closest('[data-scrollable="true"]') || target.closest('.scrollbar-hide') || target.closest('.custom-scrollbar');
+      if (!scrollable) e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventOverscroll, { passive: false });
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    
+    return () => {
+      setHideBottomNav(false);
+      document.removeEventListener('touchmove', preventOverscroll);
+      document.body.style.overscrollBehavior = '';
+      document.documentElement.style.overscrollBehavior = '';
+    };
   }, [setHideBottomNav]);
 
   // Initialize space
@@ -1429,35 +1444,49 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-500">
+    <div
+      className="fixed inset-0 z-50 bg-[#050505] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-500"
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        touchAction: 'manipulation',
+        overscrollBehavior: 'none',
+        contain: 'layout style paint',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+      }}
+    >
       {/* Header */}
-      <div className="p-4 flex items-center justify-between border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <button onClick={handleMinimize} className="p-2 hover:bg-white/5 rounded-full transition-all">
-            <ArrowLeft className="w-5 h-5 text-white" />
+      <div className="p-3 flex items-center justify-between border-b border-white/5" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
+        <div className="flex items-center gap-2">
+          <button onClick={handleMinimize} className="p-1.5 hover:bg-white/5 rounded-full transition-all active:scale-90">
+            <ArrowLeft className="w-4 h-4 text-white" />
           </button>
-          <div className="flex items-center gap-2 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
-            <div className="w-3 h-3 text-purple-400 animate-pulse">
+          <div className="flex items-center gap-1.5 bg-purple-500/10 px-2.5 py-0.5 rounded-full border border-purple-500/20">
+            <div className="w-2.5 h-2.5 text-purple-400 animate-pulse">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/></svg>
             </div>
-            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
+            <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
           </div>
-          {/* Settings button - moved to header */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
           >
-            <MoreHorizontal className="w-5 h-5 text-white" />
+            <MoreHorizontal className="w-4 h-4 text-white" />
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {isHost && raisedHandsCount > 0 && (
             <button 
               onClick={() => setShowSpeakerQueue(true)}
-              className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/5"
+              className="relative w-8 h-8 flex items-center justify-center rounded-full bg-white/5 active:scale-90 transition-all"
             >
-              <Hand className="w-5 h-5 text-amber-400" />
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+              <Hand className="w-4 h-4 text-amber-400" />
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
                 {raisedHandsCount}
               </span>
             </button>
@@ -1467,12 +1496,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               onClick={handleRecordingToggle}
               disabled={recordingLoading}
               className={cn(
-                "w-10 h-10 flex items-center justify-center rounded-full bg-white/5 transition-all",
+                "w-8 h-8 flex items-center justify-center rounded-full bg-white/5 transition-all active:scale-90",
                 isRecording ? "text-red-500" : "text-zinc-400 hover:text-white"
               )}
               title={isRecording ? "Stop Recording" : "Start Recording"}
             >
-              <Circle className={cn("w-4 h-4", isRecording && "fill-red-500 animate-pulse")} />
+              <Circle className={cn("w-3 h-3", isRecording && "fill-red-500 animate-pulse")} />
+            </button>
             </button>
           )}
           <button
