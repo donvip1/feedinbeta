@@ -1388,10 +1388,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       </div>
 
       {/* HEADER */}
-      <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-center z-40 pt-safe">
+      <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-center z-40 pt-safe" style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
         <button
           onClick={() => host && navigateToProfile(host.id)}
-          className="flex items-center gap-2.5 min-w-0"
+          className="flex items-center gap-2.5 min-w-0 active:scale-95 transition-transform duration-75"
         >
           <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-rose-500 shrink-0">
             {host?.avatar_url ? (
@@ -1610,8 +1610,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       {/* CHAT AREA */}
       <div className="absolute bottom-36 left-0 right-16 z-30 px-4">
-        <div className="flex flex-col space-y-1 max-h-[160px] overflow-y-auto scrollbar-hide pointer-events-auto">
-          <AnimatePresence initial={false}>
+        <div className="flex flex-col space-y-1 max-h-[160px] overflow-y-auto scrollbar-hide pointer-events-auto" style={{ transform: 'translateZ(0)', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          <AnimatePresence initial={false} mode="popLayout">
             {replies.slice(-20).map((msg) => (
               <motion.div
                 key={msg.id}
@@ -1736,7 +1736,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       />
 
       {/* BOTTOM BROADCAST BAR */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe bg-gradient-to-t from-black/80 via-black/40 to-transparent z-40">
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe bg-gradient-to-t from-black/80 via-black/40 to-transparent z-40" style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
         {/* PK Interaction target selector */}
         {isPKMode && battleParticipants.length > 0 && (
           <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
