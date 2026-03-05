@@ -11,7 +11,7 @@ export interface PKParticipant {
 }
 
 interface PKBattleBarProps {
-  participants: PKParticipant[];
+  participants?: PKParticipant[];
   timeLeft: number;
   className?: string;
   // Legacy 2-way props (still supported)
