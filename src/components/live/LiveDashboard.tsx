@@ -3,8 +3,22 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
 import {
-  ArrowLeft,
   Search,
+  Bell,
+  Plus,
+  Flame,
+  ChevronRight,
+  Play,
+  Radio,
+  Users,
+  Mic,
+  Video,
+  Calendar,
+  Headphones,
+  Share2,
+  Trash2,
+  Tv,
+} from "lucide-react";
   Bell,
   Plus,
   Flame,
