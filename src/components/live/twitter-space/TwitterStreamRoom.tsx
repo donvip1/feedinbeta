@@ -145,6 +145,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const videoTrackRef = useRef<LocalVideoTrack | null>(null);
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatChannelRef = useRef<any>(null);
+  const reactionsChannelRef = useRef<any>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   // View states
@@ -394,6 +396,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       })
       .subscribe();
 
+    reactionsChannelRef.current = reactionsChannel;
+
     // Gift channel — also update hostGiftTotal
     const giftChannel = supabase
       .channel(`stream-gifts-${streamId}`)
@@ -485,6 +489,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       .subscribe();
 
     return () => {
+      reactionsChannelRef.current = null;
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(giftChannel);
       supabase.removeChannel(streamChannel);
@@ -562,7 +567,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       })
       .subscribe();
 
+    chatChannelRef.current = channel;
+
     return () => {
+      chatChannelRef.current = null;
       supabase.removeChannel(channel);
     };
   }, [streamId]);
@@ -685,12 +693,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     const myName = host?.display_name || user?.user_metadata?.display_name || 'Someone';
     handleFloatingReaction(emoji, myName);
 
-    // Broadcast for instant UI
-    supabase.channel(`stream-reactions-${streamId}`).send({
-      type: 'broadcast',
-      event: 'reaction',
-      payload: { emoji, user_id: user?.id, display_name: myName },
-    });
+    // Broadcast for instant UI — use stored channel ref
+    if (reactionsChannelRef.current) {
+      reactionsChannelRef.current.send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: { emoji, user_id: user?.id, display_name: myName },
+      });
+    }
 
     // Persist to DB (fire-and-forget)
     const reactionTypes: Record<string, string> = {
@@ -737,18 +747,20 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     });
 
     if (!error) {
-      // Broadcast with message data so others get it instantly
-      supabase.channel(`stream-chat-${streamId}`).send({
-        type: 'broadcast',
-        event: 'new_message',
-        payload: {
-          user_id: user.id,
-          content,
-          display_name: displayName,
-          username,
-          avatar_url: avatarUrl,
-        },
-      });
+      // Broadcast with message data so others get it instantly — use stored channel ref
+      if (chatChannelRef.current) {
+        chatChannelRef.current.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: {
+            user_id: user.id,
+            content,
+            display_name: displayName,
+            username,
+            avatar_url: avatarUrl,
+          },
+        });
+      }
     }
 
     setReplyText('');
@@ -996,14 +1008,16 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             </p>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-white/50 font-bold">{(viewers.length + 1).toLocaleString()} viewers</span>
-              {hostGiftTotal > 0 && (
-                <span className="text-[10px] text-amber-400 font-black flex items-center gap-0.5">
-                  <Coins className="w-2.5 h-2.5" /> {hostGiftTotal.toLocaleString()}
-                </span>
-              )}
             </div>
           </div>
         </button>
+
+        {/* Gift count box — always visible to all */}
+        <div className="mt-2 ml-1 flex items-center gap-1.5 bg-gradient-to-r from-amber-500/20 to-orange-500/20 backdrop-blur-xl px-3 py-1.5 rounded-full border border-amber-500/20">
+          <Gift className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-xs font-black text-amber-400">{hostGiftTotal.toLocaleString()}</span>
+          <Coins className="w-3 h-3 text-amber-400/60" />
+        </div>
       </div>
 
       {/* MAIN CONTENT LAYER */}
