@@ -208,7 +208,8 @@ export const LiveDashboard = ({
         .limit(50);
       return data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   return (
