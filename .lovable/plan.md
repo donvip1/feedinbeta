@@ -1,67 +1,51 @@
 
 
-## Video Stream Room Overhaul Plan
+## Problem Analysis
 
-### Problems Identified
+There are **three distinct issues** with the live space gift system:
 
-1. **Reactions broken for viewers**: Stream uses `postgres_changes` on `live_stream_reactions` table, but the space (which works) uses a **broadcast channel**. The broadcast approach is faster and doesn't require DB inserts to propagate.
-2. **Chat not showing**: Messages are sent via `live_stream_messages` table + broadcast, but the flying chat only shows last 15 messages and the broadcast refetch may not trigger properly. Also, sent messages aren't added to local state immediately (optimistic update missing).
-3. **Gift/credit counter for host missing**: Space has `hostGiftTotal` state that tracks gifts received — stream room has no equivalent.
-4. **Screen share & recording**: User explicitly says remove these — they're not needed for video streams.
-5. **Camera flip broken**: The `restartTrack` approach may fail on some devices. Needs fallback to stop+recreate track.
-6. **PK Battle non-functional**: `PKBattleChallenge` component opens but doesn't actually start a battle — it just shows a toast.
-7. **UI dull/not responsive**: Bottom bar too cluttered with screen share + recording + camera + mic + chat + gift. Needs cleanup and better mobile layout.
-8. **Gift modal works but uses Dialog component** — looks out of place in a fullscreen video room.
+### Issue 1: `send_live_gift` RPC only works for streams, not spaces
+The `send_live_gift` database function looks up the receiver from `live_streams` table (`SELECT user_id FROM live_streams WHERE id = p_stream_id`). When QuickGiftBar passes a **space ID**, it finds no matching stream and returns "Stream not found". This is why gifts don't go through.
 
-### Changes to `TwitterStreamRoom.tsx`
+### Issue 2: LiveGiftModal and HostGiftPanel bypass the secure RPC
+These two components do **manual client-side inserts** into `credit_transactions` instead of using the `send_live_gift` RPC. This means:
+- No atomic balance updates on `user_credits` table (credits are never actually deducted/added)
+- The `credit_transactions` inserts may create records but the actual `balance` column on `user_credits` is never updated
+- No rate limiting or validation
 
-**Remove entirely:**
-- Screen share state, refs, handlers (`screenTrackRef`, `isScreenSharing`, `handleScreenShare`, `createLocalScreenTracks` import)
-- Recording state, refs, handlers (`mediaRecorderRef`, `recordingChunksRef`, `isRecording`, `recordingLoading`, `handleRecordingToggle`)
-- Screen share button from bottom bar
-- Recording button/indicator from bottom bar
-- Monitor import from lucide
+### Issue 3: No SpaceWalletBoard in TwitterSpaceRoom
+The `TwitterSpaceRoom` (the active space room component) doesn't render `SpaceWalletBoard` — only the older `LiveSpaceRoom` does. So no gift/credit wallet is visible.
 
-**Fix reactions — switch to broadcast channel (matching space pattern):**
-- Change `handleReaction` to broadcast via `supabase.channel().send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id, display_name } })`
-- Change subscription from `postgres_changes` on `live_stream_reactions` to `broadcast` listener on `stream-reactions-{streamId}`
-- Still insert into `live_stream_reactions` for persistence, but don't rely on it for UI
+---
 
-**Fix chat — add optimistic updates:**
-- After `handleReplySubmit`, immediately push the new message into `replies` state (don't wait for refetch)
-- This matches what the space does
+## Plan
 
-**Add host gift counter:**
-- Add `hostGiftTotal` state (copy from space)
-- Fetch initial total from `live_stream_gifts` on mount
-- Update counter in the gift realtime subscription when `receiver_id === stream.user_id`
-- Display as a badge below host tag: "Gifts: {count}"
+### 1. Create a `send_space_gift` database function (migration)
+A new `SECURITY DEFINER` function specifically for spaces that:
+- Looks up the space host from `live_spaces` table (or accepts a `p_receiver_id` parameter for gifting speakers/listeners)
+- Atomically deducts sender balance, adds to receiver (85/15 split)
+- Inserts into `live_space_gifts`, `credit_transactions`, `gift_analytics`, `profits_transactions`
+- Has rate limiting and validation matching `send_live_gift`
 
-**Fix camera flip:**
-- If `restartTrack` fails, fallback to: stop current track → create new track with opposite `facingMode` → unpublish old → publish new
+### 2. Update QuickGiftBar to call the correct RPC
+- When `isSpace=true`, call `send_space_gift` instead of `send_live_gift`
+- Pass the `roomId` as `p_space_id`
 
-**Improve PK Battle:**
-- Wire `onSelectChallenger` to actually call `usePKBattle.createBattle()` and `sendChallenge()`
-- Import and use the `usePKBattle` hook
+### 3. Update LiveGiftModal to use secure RPCs
+- Replace the manual client-side `credit_transactions` inserts with calls to `send_space_gift` (for spaces) or `send_live_gift` (for streams)
+- This ensures atomic balance updates
 
-**UI/UX improvements:**
-- Clean up bottom bar: only show Mic (host), Chat input, Gift button, Camera toggle (host)
-- Move settings (⋯) to header next to "HD Live" badge (matching space pattern)
-- Add `QuickGiftBar` as an alternative to the full modal for fast gifting (matching space)
-- Ensure all overlays use `pb-safe` and `pt-safe` for mobile
-- Add proper `min-h-[100dvh]` for mobile viewport
+### 4. Update HostGiftPanel to use secure RPCs
+- Same fix — replace manual inserts with RPC calls
+- Since hosts gift specific viewers (not just the stream owner), the `send_space_gift` function will accept an optional `p_receiver_id` parameter
 
-### Files to Modify
+### 5. Add SpaceWalletBoard to TwitterSpaceRoom
+- Import and render `SpaceWalletBoard` with `variant="bar"` in the TwitterSpaceRoom component, visible to all participants
 
-1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — All changes above
-2. No other files need modification
-
-### What stays the same
-- LiveKit initialization logic
-- All Supabase table structures
-- LiveGiftModal (still available for full gift UI)
-- Guest list view
-- Share menu
-- All modals (Report, Rules, Feedback, Audio Settings)
-- FloatingReactions component
+### Files to modify:
+1. **New migration** — `send_space_gift` function
+2. **`src/components/live/shared/QuickGiftBar.tsx`** — Use correct RPC based on `isSpace`
+3. **`src/components/live/LiveGiftModal.tsx`** — Replace manual inserts with RPC calls
+4. **`src/components/live/shared/HostGiftPanel.tsx`** — Replace manual inserts with RPC calls
+5. **`src/components/live/twitter-space/TwitterSpaceRoom.tsx`** — Add SpaceWalletBoard
 
