@@ -220,7 +220,7 @@ const SpaceDetail = () => {
         spaceId={space.id} 
         onClose={() => {
           setShowReplay(false);
-          navigate('/live');
+          navigate('/live', { state: { tab: 'Replays' } });
         }} 
       />
     );

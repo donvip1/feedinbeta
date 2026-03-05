@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Download, Share2, X, Clock, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -8,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { shareUrls } from '@/lib/url-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { useNavigation } from '@/context/NavigationContext';
 import { SpaceChat } from './SpaceChat';
 
@@ -37,6 +38,7 @@ interface SpaceData {
 }
 
 export const SpaceReplayPlayer = ({ spaceId, onClose }: SpaceReplayPlayerProps) => {
+  const navigate = useNavigate();
   const { setHideBottomNav } = useNavigation();
   const [space, setSpace] = useState<SpaceData | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
