@@ -99,7 +99,56 @@ export const LiveDashboard = ({
     }
   }, [location.state]);
 
-  const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
+  const [selectedSpaces, setSelectedSpaces] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const toggleSelectSpace = (e: React.MouseEvent, spaceId: string) => {
+    e.stopPropagation();
+    setSelectedSpaces(prev => {
+      const next = new Set(prev);
+      if (next.has(spaceId)) next.delete(spaceId);
+      else next.add(spaceId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!recordedSpaces) return;
+    if (selectedSpaces.size === recordedSpaces.length) {
+      setSelectedSpaces(new Set());
+    } else {
+      setSelectedSpaces(new Set(recordedSpaces.map((s: any) => s.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedSpaces.size === 0) return;
+    if (!confirm(`Delete ${selectedSpaces.size} recorded space(s) and all related data?`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedSpaces);
+    // Optimistic removal
+    queryClient.setQueryData(['recorded-spaces'], (old: any[] | undefined) =>
+      old ? old.filter((s: any) => !selectedSpaces.has(s.id)) : []
+    );
+    try {
+      for (const spaceId of ids) {
+        await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
+        await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
+        await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
+        await supabase.from("live_space_speakers").delete().eq("space_id", spaceId);
+        await supabase.from("live_spaces").delete().eq("id", spaceId);
+      }
+      toast.success(`${ids.length} space(s) deleted`);
+      setSelectedSpaces(new Set());
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+    } catch {
+      toast.error("Failed to delete some spaces");
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
 
   const handleDeleteSpace = async (e: React.MouseEvent, spaceId: string) => {
     e.stopPropagation();
