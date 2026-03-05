@@ -1581,39 +1581,42 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
         )}
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {/* Chat input */}
-          <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(); }} className="flex-1 relative min-w-0 flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2">
-            <input
-              type="text"
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Say something..."
-              className="flex-1 bg-transparent text-sm font-medium text-white placeholder-white/30 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!replyText.trim()}
-              className="p-1 text-white/60 hover:text-white disabled:opacity-30"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+          <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(); }} className="flex-1 min-w-0">
+            <div className="flex items-center bg-white/10 backdrop-blur-xl border border-white/10 rounded-full overflow-hidden">
+              <input
+                type="text"
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Say something..."
+                className="flex-1 min-w-0 bg-transparent text-sm font-medium text-white placeholder-white/30 focus:outline-none px-4 py-2.5"
+              />
+              <button
+                type="submit"
+                disabled={!replyText.trim()}
+                className="w-10 h-10 flex items-center justify-center text-white disabled:opacity-30 shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
           </form>
 
           {/* React button */}
           <button
             onClick={() => setShowReactions(true)}
-            className="w-11 h-11 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
+            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
           >
             <Heart className="w-5 h-5 text-rose-400" />
           </button>
 
-          {/* Gift button */}
+          {/* Refill / Recharge credits */}
           <button
-            onClick={() => setShowStreamGiftModal(true)}
-            className="w-11 h-11 bg-gradient-to-br from-yellow-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-pink-500/20 active:scale-90 transition-all shrink-0"
+            onClick={() => navigate('/wallet')}
+            className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-90 transition-all shrink-0"
+            title="Refill credits"
           >
-            <Gift className="w-5 h-5 text-white" />
+            <Coins className="w-5 h-5 text-white" />
           </button>
         </div>
       </div>
