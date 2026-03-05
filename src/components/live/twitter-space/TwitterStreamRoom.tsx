@@ -1425,10 +1425,26 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-sm font-bold text-white leading-tight truncate">{stream?.title || 'Live Stream'}</span>
-            <span className="text-[11px] text-white/50 font-medium flex items-center gap-1">
+            <button
+              onClick={() => setView('guests')}
+              className="text-[11px] text-white/50 font-medium flex items-center gap-1 active:opacity-70 transition-opacity"
+            >
               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
               {formatNumber(viewerPresenceCount)} watching
-            </span>
+              {/* Mini viewer avatars */}
+              {viewers.slice(0, 3).map((v, i) => (
+                <img
+                  key={v.user_id}
+                  src={v.profile?.avatar_url || ''}
+                  alt=""
+                  className="w-4 h-4 rounded-full border border-black/50 -ml-1"
+                  style={{ zIndex: 3 - i }}
+                />
+              ))}
+              {viewers.length > 3 && (
+                <span className="text-[9px] text-white/40 ml-0.5">+{viewers.length - 3}</span>
+              )}
+            </button>
           </div>
         </button>
 
