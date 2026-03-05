@@ -271,21 +271,14 @@ export const LiveDashboard = ({
   return (
     <div className="h-[100dvh] bg-[#050505] text-white flex flex-col">
       {/* Header */}
-      <header className="px-4 pt-[env(safe-area-inset-top)] flex flex-col gap-3 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
-        <div className="flex justify-between items-center pt-3 pb-1">
-          <button
-            onClick={() => navigate("/feed")}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-all active:scale-90"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-
-          <div className="text-center">
-            <h1 className="text-xl font-bold tracking-tight">Live</h1>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Global Spaces</p>
+      <header className="px-5 pt-[env(safe-area-inset-top)] flex flex-col gap-3 bg-black/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
+        <div className="flex justify-between items-center pt-12 pb-1">
+          <div className="flex items-center gap-2">
+            <Tv className="w-6 h-6 text-pink-500" />
+            <span className="text-xl font-black">FeedIn Live</span>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button 
               onClick={() => navigate('/search?context=live')}
               className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
@@ -300,6 +293,12 @@ export const LiveDashboard = ({
               {liveCount > 0 && (
                 <div className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-[#050505]" />
               )}
+            </button>
+            <button
+              onClick={onGoLive}
+              className="bg-gradient-to-r from-pink-500 to-violet-600 px-5 py-2.5 rounded-full font-bold text-sm flex items-center gap-2 shadow-lg shadow-pink-500/25 active:scale-95 transition"
+            >
+              <Plus className="w-4 h-4" /> Go Live
             </button>
           </div>
         </div>
