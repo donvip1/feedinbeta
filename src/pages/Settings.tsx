@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,9 +43,84 @@ import {
   Info,
   FileText,
   Scale,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2,
+  Loader2
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
+
+const CheckForUpdatesButton = () => {
+  const [status, setStatus] = useState<'idle' | 'checking' | 'available' | 'up-to-date'>('idle');
+
+  const checkForUpdates = useCallback(async () => {
+    setStatus('checking');
+    try {
+      if (!('serviceWorker' in navigator)) {
+        setStatus('up-to-date');
+        return;
+      }
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) { setStatus('up-to-date'); return; }
+      await reg.update();
+      if (reg.waiting || reg.installing) {
+        setStatus('available');
+      } else {
+        setStatus('up-to-date');
+        setTimeout(() => setStatus('idle'), 3000);
+      }
+    } catch {
+      setStatus('up-to-date');
+      setTimeout(() => setStatus('idle'), 3000);
+    }
+  }, []);
+
+  const applyUpdate = useCallback(() => {
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (reg?.waiting) {
+        reg.waiting.postMessage({ action: 'skipWaiting' });
+        window.location.reload();
+      } else {
+        window.location.reload();
+      }
+    });
+  }, []);
+
+  return (
+    <div className="mb-3 space-y-2">
+      <button
+        onClick={status === 'available' ? applyUpdate : checkForUpdates}
+        disabled={status === 'checking'}
+        className="w-full flex items-center gap-3 p-3 rounded-xl bg-primary/10 hover:bg-primary/20 transition-all duration-200 disabled:opacity-60"
+      >
+        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+          {status === 'checking' ? (
+            <Loader2 className="w-5 h-5 text-primary animate-spin" />
+          ) : status === 'available' ? (
+            <Download className="w-5 h-5 text-green-500" />
+          ) : status === 'up-to-date' ? (
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+          ) : (
+            <RefreshCw className="w-5 h-5 text-primary" />
+          )}
+        </div>
+        <div className="flex-1 text-left">
+          <p className="text-sm font-semibold text-foreground">
+            {status === 'checking' ? 'Checking for updates...' :
+             status === 'available' ? 'Update Available — Tap to Install' :
+             status === 'up-to-date' ? 'You\'re up to date!' :
+             'Check for Updates'}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {status === 'available' ? 'A new version is ready to install' :
+             status === 'up-to-date' ? 'Running the latest version' :
+             'See if a newer version is available'}
+          </p>
+        </div>
+        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+      </button>
+    </div>
+  );
+};
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -469,39 +544,7 @@ const Settings = () => {
               About FeedIn
             </h3>
 
-            {/* Update App Button */}
-            <button
-              onClick={() => {
-                if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistration().then(reg => {
-                    if (reg) {
-                      reg.update().then(() => {
-                        if (reg.waiting) {
-                          reg.waiting.postMessage({ action: 'skipWaiting' });
-                          window.location.reload();
-                        } else {
-                          window.location.reload();
-                        }
-                      });
-                    } else {
-                      window.location.reload();
-                    }
-                  });
-                } else {
-                  window.location.reload();
-                }
-              }}
-              className="w-full flex items-center gap-3 p-3 mb-3 rounded-xl bg-primary/10 hover:bg-primary/20 transition-all duration-200"
-            >
-              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                <RefreshCw className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1 text-left">
-                <p className="text-sm font-semibold text-foreground">Update App</p>
-                <p className="text-xs text-muted-foreground">Check and install the latest version</p>
-              </div>
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            </button>
+            <CheckForUpdatesButton />
 
             {renderOptionsList([
               {
