@@ -341,7 +341,11 @@ export const LiveDashboard = ({
                       )}
                       <div className="flex-1 min-w-0 py-0.5">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[9px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-full uppercase tracking-wider">Replay</span>
+                          {space.recording_url ? (
+                            <span className="text-[9px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-full uppercase tracking-wider">Replay</span>
+                          ) : (
+                            <span className="text-[9px] font-bold text-white/40 bg-white/5 px-2 py-0.5 rounded-full uppercase tracking-wider">Ended</span>
+                          )}
                           {space.topic_category && (
                             <span className="text-[9px] font-medium text-white/40 bg-white/5 px-2 py-0.5 rounded-full">{space.topic_category}</span>
                           )}
@@ -362,17 +366,31 @@ export const LiveDashboard = ({
                           {timeAgo ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${timeAgo}` : ''}
                         </p>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const url = `https://feedinn.com/live/space/${space.id}`;
-                          if (navigator.share) {
-                            navigator.share({ title: space.title, url });
-                          } else {
-                            navigator.clipboard.writeText(url);
-                          }
-                        }}
-                        className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 self-center shrink-0"
+                      <div className="flex flex-col items-center gap-2 self-center shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const url = `https://feedinn.com/live/space/${space.id}`;
+                            if (navigator.share) {
+                              navigator.share({ title: space.title, url });
+                            } else {
+                              navigator.clipboard.writeText(url);
+                              toast.success("Link copied!");
+                            }
+                          }}
+                          className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
+                        >
+                          <Share2 className="w-4 h-4 text-white/40" />
+                        </button>
+                        {(canDeleteAny || space.user_id === user?.id) && (
+                          <button
+                            onClick={(e) => handleDeleteSpace(e, space.id)}
+                            disabled={deletingSpaceId === space.id}
+                            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-red-500/20 transition-colors"
+                          >
+                            <Trash2 className={cn("w-4 h-4", deletingSpaceId === space.id ? "text-white/20 animate-spin" : "text-red-400/60")} />
+                          </button>
+                        )}
                       >
                         <Share2 className="w-4 h-4 text-white/40" />
                       </button>
