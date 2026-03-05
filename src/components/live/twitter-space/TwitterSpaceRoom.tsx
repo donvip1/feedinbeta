@@ -182,7 +182,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [volumeLevel, setVolumeLevel] = useState(100);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
-  const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const remoteScreenVideoRef = useRef<HTMLVideoElement>(null);
   
@@ -824,7 +823,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
-  // Screen sharing - host only (uses getDisplayMedia directly)
+  // Screen sharing - host only (publishes via LiveKit)
   const startScreenShare = async () => {
     if (!isHost) {
       toast.error('Only hosts can share screen');
@@ -841,18 +840,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         stopScreenShare();
       };
 
+      // Publish video track to LiveKit so all participants see it
+      if (spaceContext) {
+        await spaceContext.publishScreenShare(stream);
+      }
+
       setScreenStream(stream);
       setIsScreenSharing(true);
-      
-      // Broadcast screen share started
-      const channel = supabase.channel(`space-screen-${spaceId}`);
-      await channel.send({
-        type: 'broadcast',
-        event: 'screen-share-started',
-        payload: { userId: user?.id },
-      });
-      supabase.removeChannel(channel);
-      
       toast.success('Screen sharing started');
     } catch (error: any) {
       if (error.name !== 'NotAllowedError') {
@@ -862,47 +856,29 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   };
 
   const stopScreenShare = async () => {
+    // Unpublish from LiveKit
+    if (spaceContext) {
+      await spaceContext.unpublishScreenShare();
+    }
+
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
       setScreenStream(null);
     }
     setIsScreenSharing(false);
-    
-    // Broadcast screen share ended
-    const channel = supabase.channel(`space-screen-${spaceId}`);
-    await channel.send({
-      type: 'broadcast',
-      event: 'screen-share-ended',
-      payload: { userId: user?.id },
-    });
-    supabase.removeChannel(channel);
-    
     toast.success('Screen sharing stopped');
   };
 
-  // Subscribe to remote screen shares
+  // Get remote screen share from SpaceContext
+  const remoteScreenSharing = spaceContext?.isRemoteScreenSharing ?? false;
+  const remoteScreenStream = spaceContext?.screenShareStream ?? null;
+
+  // Attach remote screen stream to video element
   useEffect(() => {
-    if (!spaceId || !user) return;
-    const channel = supabase
-      .channel(`space-screen-listen-${spaceId}`)
-      .on('broadcast', { event: 'screen-share-started' }, async (payload: any) => {
-        const { userId: sharerId } = payload.payload;
-        if (sharerId === user.id) return;
-        setRemoteScreenSharing(true);
-        toast.info('Host is sharing their screen');
-      })
-      .on('broadcast', { event: 'screen-share-ended' }, (payload: any) => {
-        const { userId: sharerId } = payload.payload;
-        if (sharerId === user.id) return;
-        setRemoteScreenSharing(false);
-        if (remoteScreenVideoRef.current) {
-          remoteScreenVideoRef.current.srcObject = null;
-        }
-        toast.info('Screen sharing ended');
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [spaceId, user?.id]);
+    if (remoteScreenVideoRef.current && remoteScreenStream) {
+      remoteScreenVideoRef.current.srcObject = remoteScreenStream;
+    }
+  }, [remoteScreenStream]);
 
   // Attach local screen stream to video
   useEffect(() => {

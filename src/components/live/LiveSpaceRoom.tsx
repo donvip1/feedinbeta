@@ -127,6 +127,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteScreenVideoRef = useRef<HTMLVideoElement>(null);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   const [isNotificationsOn, setIsNotificationsOn] = useState(true);
   const [isPiPActive, setIsPiPActive] = useState(false);
@@ -1003,7 +1004,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   };
 
-  // Screen sharing - host only (uses getDisplayMedia directly)
+  // Screen sharing - host only (publishes via LiveKit)
   const startScreenShare = async () => {
     if (!isHost) {
       toast.error('Only hosts can share screen');
@@ -1021,6 +1022,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         stopScreenShare();
       };
 
+      // Publish video track to LiveKit so all participants see it
+      if (spaceContext) {
+        await spaceContext.publishScreenShare(stream);
+      }
+
       setScreenStream(stream);
       setIsScreenSharing(true);
       toast.success('Screen sharing started - all participants can see your screen');
@@ -1032,7 +1038,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   const stopScreenShare = async () => {
-    
+    // Unpublish from LiveKit
+    if (spaceContext) {
+      await spaceContext.unpublishScreenShare();
+    }
+
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
       setScreenStream(null);
@@ -1041,34 +1051,19 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     toast.success('Screen sharing stopped');
   };
 
-  // Subscribe to screen share broadcasts from other participants
+  // Get remote screen share from SpaceContext
+  const remoteScreenSharing = spaceContext?.isRemoteScreenSharing ?? false;
+  const remoteScreenStream = spaceContext?.screenShareStream ?? null;
+
+  // Attach remote screen stream to video element
+  // (remoteScreenVideoRef declared at top with other refs)
   useEffect(() => {
-    if (!spaceId || !user) return;
+    if (remoteScreenVideoRef.current && remoteScreenStream) {
+      remoteScreenVideoRef.current.srcObject = remoteScreenStream;
+    }
+  }, [remoteScreenStream]);
 
-    const channel = supabase
-      .channel(`space-screen-listen-${spaceId}`)
-      .on('broadcast', { event: 'screen-share-started' }, async (payload: any) => {
-        const { userId: sharerId } = payload.payload;
-        if (sharerId === user.id) return; // Skip our own
-        
-        console.log('[LiveSpace] Remote screen share started:', sharerId);
-        toast.info('Someone started sharing their screen');
-      })
-      .on('broadcast', { event: 'screen-share-ended' }, (payload: any) => {
-        const { userId: sharerId } = payload.payload;
-        if (sharerId === user.id) return;
-        
-        console.log('[LiveSpace] Remote screen share ended:', sharerId);
-        toast.info('Screen sharing ended');
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [spaceId, user?.id]);
-
-  // Attach screen stream to video element
+  // Attach local screen stream to video element
   useEffect(() => {
     if (screenVideoRef.current && screenStream) {
       screenVideoRef.current.srcObject = screenStream;
@@ -1251,7 +1246,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
       {/* Screen Share Display - visible to all when host is sharing */}
       <AnimatePresence>
-        {isScreenSharing && screenStream && (
+        {(isScreenSharing && screenStream) && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -1268,20 +1263,39 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             <div className="absolute top-4 left-4 flex items-center gap-2">
               <Badge className="bg-red-500/90 text-white border-0 gap-1.5">
                 <Monitor className="w-3 h-3" />
-                Screen Sharing
+                You are sharing
               </Badge>
             </div>
-            {isHost && (
-              <Button
-                variant="destructive"
-                size="sm"
-                className="absolute top-4 right-4"
-                onClick={stopScreenShare}
-              >
-                <MonitorOff className="w-4 h-4 mr-1" />
-                Stop Sharing
-              </Button>
-            )}
+            <Button
+              variant="destructive"
+              size="sm"
+              className="absolute top-4 right-4"
+              onClick={stopScreenShare}
+            >
+              <MonitorOff className="w-4 h-4 mr-1" />
+              Stop Sharing
+            </Button>
+          </motion.div>
+        )}
+        {(!isScreenSharing && remoteScreenSharing && remoteScreenStream) && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-x-4 top-20 bottom-64 z-30 rounded-2xl overflow-hidden bg-black shadow-2xl border border-primary/30"
+          >
+            <video
+              ref={remoteScreenVideoRef}
+              autoPlay
+              playsInline
+              className="w-full h-full object-contain"
+            />
+            <div className="absolute top-4 left-4 flex items-center gap-2">
+              <Badge className="bg-green-500/90 text-white border-0 gap-1.5">
+                <Monitor className="w-3 h-3" />
+                Host is sharing
+              </Badge>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
