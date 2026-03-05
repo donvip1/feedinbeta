@@ -83,9 +83,35 @@ export const LiveDashboard = ({
   myActiveSpace,
 }: LiveDashboardProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { permissions } = useAdminRole();
   const [activeFilter, setActiveFilter] = useState("All");
   const [activeTab, setActiveTab] = useState<MainTab>("Discover");
   const [showNotifications, setShowNotifications] = useState(false);
+  const [deletingSpaceId, setDeletingSpaceId] = useState<string | null>(null);
+
+  const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
+
+  const handleDeleteSpace = async (e: React.MouseEvent, spaceId: string) => {
+    e.stopPropagation();
+    if (!confirm("Delete this recorded space and all related data?")) return;
+    setDeletingSpaceId(spaceId);
+    try {
+      await supabase.from("live_stream_messages").delete().eq("stream_id", spaceId);
+      await supabase.from("live_stream_reactions").delete().eq("stream_id", spaceId);
+      await supabase.from("live_stream_gifts").delete().eq("stream_id", spaceId);
+      await supabase.from("live_space_speakers").delete().eq("space_id", spaceId);
+      const { error } = await supabase.from("live_spaces").delete().eq("id", spaceId);
+      if (error) throw error;
+      toast.success("Space deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+    } catch (err: any) {
+      console.error("Failed to delete space:", err);
+      toast.error("Failed to delete space");
+    } finally {
+      setDeletingSpaceId(null);
+    }
+  };
 
   const liveCount = (liveStreams?.length || 0) + (liveSpaces?.length || 0);
   const hasContent = liveCount > 0 || (scheduledStreams?.length || 0) > 0 || (scheduledSpaces?.length || 0) > 0;
