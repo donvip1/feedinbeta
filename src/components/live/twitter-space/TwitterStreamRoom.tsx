@@ -36,6 +36,7 @@ import {
   Coins,
   UserPlus,
   Flame,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -746,7 +747,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   };
 
   // Handle leave/end
-  const handleLeave = async () => {
+  // End stream (host only) or leave (viewer)
+  const handleEndStream = async () => {
     if (isHost) {
       await supabase.from('live_streams').update({
         status: 'ended',
@@ -766,6 +768,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       roomRef.current.disconnect();
     }
 
+    onClose();
+  };
+
+  // Leave as viewer (disconnect without ending stream)
+  const handleViewerLeave = () => {
+    if (roomRef.current) {
+      roomRef.current.disconnect();
+    }
     onClose();
   };
 
@@ -1238,9 +1248,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-center z-40 pt-safe">
         <button
           onClick={() => host && navigateToProfile(host.id)}
-          className="flex items-center gap-2.5"
+          className="flex items-center gap-2.5 min-w-0"
         >
-          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-rose-500">
+          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-rose-500 shrink-0">
             {host?.avatar_url ? (
               <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
             ) : (
@@ -1249,8 +1259,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
               </div>
             )}
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-bold text-white leading-tight">{stream?.title || 'Live Stream'}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-bold text-white leading-tight truncate">{stream?.title || 'Live Stream'}</span>
             <span className="text-[11px] text-white/50 font-medium flex items-center gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
               {formatNumber(viewers.length + 1)} watching
@@ -1258,9 +1268,23 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
         </button>
 
-        <button onClick={handleLeave} className="w-10 h-10 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all">
-          <X className="w-5 h-5 text-white" />
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Settings */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-10 h-10 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+          >
+            <MoreHorizontal className="w-5 h-5 text-white" />
+          </button>
+
+          {/* Minimize / PiP */}
+          <button
+            onClick={handleMinimize}
+            className="w-10 h-10 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+          >
+            <Minimize2 className="w-5 h-5 text-white" />
+          </button>
+        </div>
       </div>
 
       {/* Gift count badge removed from header — shown in PK score bar context */}
@@ -1689,6 +1713,28 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   <span className="text-rose-400 font-medium">Report this Stream</span>
                   <Flag className="w-5 h-5 text-rose-400/50" />
                 </button>
+
+                {/* Divider */}
+                <div className="my-2 border-t border-white/5" />
+
+                {/* End / Leave */}
+                {isHost ? (
+                  <button
+                    onClick={() => { setShowSettings(false); handleEndStream(); }}
+                    className="w-full flex items-center justify-between p-4 hover:bg-rose-500/10 rounded-2xl transition-colors"
+                  >
+                    <span className="text-rose-500 font-bold">End Stream</span>
+                    <X className="w-5 h-5 text-rose-500/60" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setShowSettings(false); handleViewerLeave(); }}
+                    className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                  >
+                    <span className="text-rose-400 font-medium">Leave Stream</span>
+                    <LogOut className="w-5 h-5 text-rose-400/50" />
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>
