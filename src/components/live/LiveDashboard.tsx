@@ -17,14 +17,17 @@ import {
   Sparkles,
   Headphones,
   Share2,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LiveDiscoverCard } from "./LiveDiscoverCard";
 import { LiveNotificationsPanel } from "./LiveNotificationsPanel";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAdminRole } from "@/hooks/useAdminRole";
+import { toast } from "sonner";
 
 interface LiveDashboardProps {
   liveStreams: any[] | undefined;
