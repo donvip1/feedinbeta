@@ -1,48 +1,67 @@
 
 
-## Video Stream Room Rebuild Plan
+## Video Stream Room Overhaul Plan
 
-### Goal
-Rebuild `TwitterStreamRoom.tsx` with the Tango/TikTok UI from the reference code while keeping all existing backend integrations (LiveKit, Supabase real-time, gifts, reactions, chat, PK battle, share, etc.) fully functional. Also fix screen share (publish to LiveKit) and recording (client-side).
+### Problems Identified
 
-### UI Changes (from reference code)
+1. **Reactions broken for viewers**: Stream uses `postgres_changes` on `live_stream_reactions` table, but the space (which works) uses a **broadcast channel**. The broadcast approach is faster and doesn't require DB inserts to propagate.
+2. **Chat not showing**: Messages are sent via `live_stream_messages` table + broadcast, but the flying chat only shows last 15 messages and the broadcast refetch may not trigger properly. Also, sent messages aren't added to local state immediately (optimistic update missing).
+3. **Gift/credit counter for host missing**: Space has `hostGiftTotal` state that tracks gifts received — stream room has no equivalent.
+4. **Screen share & recording**: User explicitly says remove these — they're not needed for video streams.
+5. **Camera flip broken**: The `restartTrack` approach may fail on some devices. Needs fallback to stop+recreate track.
+6. **PK Battle non-functional**: `PKBattleChallenge` component opens but doesn't actually start a battle — it just shows a toast.
+7. **UI dull/not responsive**: Bottom bar too cluttered with screen share + recording + camera + mic + chat + gift. Needs cleanup and better mobile layout.
+8. **Gift modal works but uses Dialog component** — looks out of place in a fullscreen video room.
 
-1. **Video background**: Full-screen video with gradient overlays (`bg-gradient-to-b from-black/40 via-transparent to-black/60`)
-2. **Host tag**: Top-left pill with avatar, name, crown icon, viewer count, and Follow button (Tango style)
-3. **PK Battle split**: Side-by-side video layout with animated score bar when PK is active
-4. **Header controls**: Minimize button (left), "HD Live" badge + close button (right) — replaces current ArrowLeft/End/Settings layout
-5. **Right-side action stack**: Vertical TikTok-style buttons (Heart, Share, Flip, Gift lightning bolt) replacing current icon column
-6. **Flying chat**: Left-aligned chat bubbles with `bg-black/40 backdrop-blur-md` pills, auto-scrolling, mask gradient — replaces inline chat input
-7. **Bottom broadcast bar**: Combined input + send button + gift button + screen share button in one row with `bg-gradient-to-t from-black/80` gradient
-8. **Gift overlay**: Full-screen dark overlay with 2-column grid of gift items, balance display at bottom
-9. **Floating minimized player**: Landscape aspect-ratio with play button overlay and expand/close controls
+### Changes to `TwitterStreamRoom.tsx`
 
-### Functional Fixes
+**Remove entirely:**
+- Screen share state, refs, handlers (`screenTrackRef`, `isScreenSharing`, `handleScreenShare`, `createLocalScreenTracks` import)
+- Recording state, refs, handlers (`mediaRecorderRef`, `recordingChunksRef`, `isRecording`, `recordingLoading`, `handleRecordingToggle`)
+- Screen share button from bottom bar
+- Recording button/indicator from bottom bar
+- Monitor import from lucide
 
-1. **Screen share**: Actually publish screen track to LiveKit via `room.localParticipant.publishTrack()` with `Track.Source.ScreenShare`, and handle `TrackUnpublished` for cleanup. Viewers subscribe via existing `TrackSubscribed` handler.
-2. **Recording**: Replace broken edge function calls with client-side `useSpaceRecorder` hook (already built for spaces), adapted for video streams. Auto-start if host, upload blob on end, save `recording_url`.
-3. **Camera flip**: Add `RotateCcw` button to switch between front/back camera using `videoTrackRef.current.restartTrack({ facingMode })`.
+**Fix reactions — switch to broadcast channel (matching space pattern):**
+- Change `handleReaction` to broadcast via `supabase.channel().send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id, display_name } })`
+- Change subscription from `postgres_changes` on `live_stream_reactions` to `broadcast` listener on `stream-reactions-{streamId}`
+- Still insert into `live_stream_reactions` for persistence, but don't rely on it for UI
+
+**Fix chat — add optimistic updates:**
+- After `handleReplySubmit`, immediately push the new message into `replies` state (don't wait for refetch)
+- This matches what the space does
+
+**Add host gift counter:**
+- Add `hostGiftTotal` state (copy from space)
+- Fetch initial total from `live_stream_gifts` on mount
+- Update counter in the gift realtime subscription when `receiver_id === stream.user_id`
+- Display as a badge below host tag: "Gifts: {count}"
+
+**Fix camera flip:**
+- If `restartTrack` fails, fallback to: stop current track → create new track with opposite `facingMode` → unpublish old → publish new
+
+**Improve PK Battle:**
+- Wire `onSelectChallenger` to actually call `usePKBattle.createBattle()` and `sendChallenge()`
+- Import and use the `usePKBattle` hook
+
+**UI/UX improvements:**
+- Clean up bottom bar: only show Mic (host), Chat input, Gift button, Camera toggle (host)
+- Move settings (⋯) to header next to "HD Live" badge (matching space pattern)
+- Add `QuickGiftBar` as an alternative to the full modal for fast gifting (matching space)
+- Ensure all overlays use `pb-safe` and `pt-safe` for mobile
+- Add proper `min-h-[100dvh]` for mobile viewport
 
 ### Files to Modify
 
-1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — Full rebuild of the render output with new Tango/TikTok UI. Keep all existing hooks, state, LiveKit init, Supabase subscriptions, and handler functions. Replace:
-   - Header → new HD Live badge + minimize/close layout
-   - Host info overlay → Tango-style pill with avatar + Follow
-   - Right action stack → TikTok vertical buttons (Heart, Gift lightning, Share, Flip, Screen share, PK)
-   - Bottom controls → combined broadcast input bar with gift + screen share buttons
-   - Flying chat → left-aligned auto-scroll chat bubbles
-   - Fix `handleScreenShare` to publish/unpublish LiveKit screen track
-   - Fix `handleRecordingToggle` to use client-side MediaRecorder
-   - Add camera flip handler
-
-2. **`src/components/live/FloatingStreamPlayer.tsx`** — Update to landscape `aspect-video` layout matching reference (play button overlay, expand/close on hover)
+1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — All changes above
+2. No other files need modification
 
 ### What stays the same
-- All LiveKit initialization logic
-- All Supabase real-time subscriptions (reactions, gifts, chat, stream events)
+- LiveKit initialization logic
+- All Supabase table structures
+- LiveGiftModal (still available for full gift UI)
 - Guest list view
-- All modals (Gift, Report, Rules, Feedback, Audio Settings, PK Battle)
-- Share menu (with OG link)
-- Reaction picker bottom sheet
-- All data fetching (stream, host, viewers)
+- Share menu
+- All modals (Report, Rules, Feedback, Audio Settings)
+- FloatingReactions component
 
