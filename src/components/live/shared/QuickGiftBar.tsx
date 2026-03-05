@@ -101,14 +101,30 @@ export const QuickGiftBar = ({
     setSending(gift.type);
 
     try {
-      // Use the secure send_live_gift RPC for proper credit handling
-      const { data, error } = await supabase.rpc('send_live_gift', {
-        p_credit_value: gift.value,
-        p_gift_type: gift.type,
-        p_stream_id: roomId,
-      });
+      // Use the correct RPC based on room type
+      let result;
+      if (isSpace) {
+        result = await supabase.rpc('send_space_gift', {
+          p_space_id: roomId,
+          p_gift_type: gift.type,
+          p_credit_value: gift.value,
+          p_receiver_id: recipientId,
+        });
+      } else {
+        result = await supabase.rpc('send_live_gift', {
+          p_credit_value: gift.value,
+          p_gift_type: gift.type,
+          p_stream_id: roomId,
+        });
+      }
 
-      if (error) throw error;
+      if (result.error) throw result.error;
+      
+      // Check RPC-level error in returned JSON
+      const rpcResult = result.data as any;
+      if (rpcResult && rpcResult.success === false) {
+        throw new Error(rpcResult.error || 'Gift failed');
+      }
 
       // Refresh credits after successful gift
       await fetchCredits();
