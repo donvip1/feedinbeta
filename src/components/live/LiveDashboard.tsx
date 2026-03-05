@@ -105,6 +105,10 @@ export const LiveDashboard = ({
     if (!confirm("Delete this recorded space and all related data?")) return;
     setDeletingSpaceId(spaceId);
     try {
+      // Optimistic removal from cache
+      queryClient.setQueryData(['recorded-spaces'], (old: any[] | undefined) => 
+        old ? old.filter((s: any) => s.id !== spaceId) : []
+      );
       await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
       await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
       await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
@@ -116,6 +120,8 @@ export const LiveDashboard = ({
     } catch (err: any) {
       console.error("Failed to delete space:", err);
       toast.error("Failed to delete space");
+      // Re-fetch on failure to restore
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
     } finally {
       setDeletingSpaceId(null);
     }
