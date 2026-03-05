@@ -2401,6 +2401,24 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
         .pt-safe { padding-top: max(1rem, env(safe-area-inset-top)); }
+        
+        /* Native mobile optimizations */
+        * { -webkit-tap-highlight-color: transparent; }
+        button, a, [role="button"] {
+          touch-action: manipulation;
+          -webkit-touch-callout: none;
+        }
+        input, textarea {
+          -webkit-appearance: none;
+          appearance: none;
+          font-size: 16px !important; /* Prevent iOS zoom on focus */
+        }
+        video {
+          -webkit-playsinline: true;
+          object-fit: cover;
+          transform: translateZ(0);
+          will-change: transform;
+        }
       `}</style>
     </div>
   );
