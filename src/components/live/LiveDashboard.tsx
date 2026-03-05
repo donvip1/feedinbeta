@@ -184,7 +184,7 @@ export const LiveDashboard = ({
           </button>
 
           <div className="text-center">
-            <h1 className="text-xl font-bold tracking-tight">Discover</h1>
+            <h1 className="text-xl font-bold tracking-tight">Live</h1>
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Global Spaces</p>
           </div>
 
@@ -207,24 +207,45 @@ export const LiveDashboard = ({
           </div>
         </div>
 
-        {/* Category Tabs with purple underline */}
-        <div className="flex gap-6 overflow-x-auto no-scrollbar py-2 border-b border-white/5 -mx-4 px-4">
-          {filters.map((f) => (
+        {/* Main Tabs: Discover / Replays */}
+        <div className="flex gap-6 py-2 -mx-4 px-4">
+          {mainTabs.map((tab) => (
             <button
-              key={f}
-              onClick={() => setActiveFilter(f)}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
               className={cn(
                 "whitespace-nowrap pb-2 text-sm font-bold transition-all relative shrink-0",
-                activeFilter === f ? "text-white" : "text-slate-500"
+                activeTab === tab ? "text-white" : "text-slate-500"
               )}
             >
-              {f}
-              {activeFilter === f && (
+              {tab}
+              {activeTab === tab && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500 rounded-full" />
               )}
             </button>
           ))}
         </div>
+
+        {/* Category Filters (only on Discover tab) */}
+        {activeTab === 'Discover' && (
+          <div className="flex gap-6 overflow-x-auto no-scrollbar py-2 border-b border-white/5 -mx-4 px-4">
+            {filters.map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFilter(f)}
+                className={cn(
+                  "whitespace-nowrap pb-2 text-xs font-semibold transition-all relative shrink-0",
+                  activeFilter === f ? "text-white" : "text-slate-500"
+                )}
+              >
+                {f}
+                {activeFilter === f && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/30 rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
 
       {/* Main Content Area - scrollable */}
