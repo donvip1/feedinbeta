@@ -1604,7 +1604,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
           {/* Chat */}
           <button
-            className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all"
             onClick={() => setShowChat(!showChat)}
             title="Chat"
           >
@@ -1613,7 +1613,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
 
           {/* Gift */}
           <button
-            className="relative w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+            className="relative w-11 h-11 rounded-full flex items-center justify-center text-white hover:text-white/80 active:scale-90 transition-all"
             onClick={() => setShowGiftModal(true)}
             title="Gifts"
           >
@@ -1629,7 +1629,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           <button
             className={cn(
               "w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all",
-              isOutputMuted ? "text-destructive" : "text-muted-foreground hover:text-foreground"
+              isOutputMuted ? "text-destructive" : "text-white hover:text-white/80"
             )}
             onClick={() => {
               setIsOutputMuted(!isOutputMuted);

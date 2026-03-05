@@ -58,6 +58,24 @@ export const TwitterSpaceChat = ({
     ? format(new Date(startedAt), 'dd MMM yy')
     : format(new Date(), 'dd MMM yy');
 
+  // Intercept browser back button/gesture to close chat instead of navigating away
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Push a dummy history state so back button closes chat
+    window.history.pushState({ chatOpen: true }, '');
+
+    const handlePopState = (e: PopStateEvent) => {
+      onClose();
+    };
+
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
     
