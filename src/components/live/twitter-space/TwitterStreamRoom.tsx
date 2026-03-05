@@ -615,12 +615,49 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       })
       .subscribe();
 
-    // Stream ended event
+    // Stream events channel (ended, join requests, mute, co-broadcast)
     const streamChannel = supabase
       .channel(`stream-events-${streamId}`)
       .on('broadcast', { event: 'room_ended' }, () => {
         toast.info('Stream has ended');
         onClose();
+      })
+      .on('broadcast', { event: 'join_request' }, (payload: any) => {
+        if (isHost) {
+          const data = payload.payload;
+          toast(`🙋 ${data.display_name || 'Someone'} wants to join`, {
+            action: {
+              label: 'Accept',
+              onClick: () => handleInviteCreator(data.user_id),
+            },
+          });
+        }
+      })
+      .on('broadcast', { event: 'host_mute' }, (payload: any) => {
+        const data = payload.payload;
+        if (data.user_id === user?.id) {
+          toast.info(data.muted ? 'Host muted your mic' : 'Host unmuted your mic');
+        }
+        fetchViewers();
+      })
+      .on('broadcast', { event: 'co_broadcast_invite' }, (payload: any) => {
+        if (payload.payload?.user_id === user?.id) {
+          toast.success('You have been invited to co-broadcast!');
+          fetchViewers();
+        }
+      })
+      .subscribe();
+
+    // Realtime viewer changes for co-broadcaster updates
+    const viewerChangesChannel = supabase
+      .channel(`stream-viewer-changes-${streamId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_stream_viewers',
+        filter: `stream_id=eq.${streamId}`,
+      }, () => {
+        fetchViewers();
       })
       .subscribe();
 
