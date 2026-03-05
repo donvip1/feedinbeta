@@ -1535,10 +1535,18 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             </button>
           </form>
 
+          {/* React button */}
+          <button
+            onClick={() => setShowReactions(true)}
+            className="w-11 h-11 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
+          >
+            <Heart className="w-5 h-5 text-rose-400" />
+          </button>
+
           {/* Gift button */}
           <button
             onClick={() => setShowStreamGiftModal(true)}
-            className="w-12 h-12 bg-gradient-to-br from-yellow-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-pink-500/20 active:scale-90 transition-all shrink-0"
+            className="w-11 h-11 bg-gradient-to-br from-yellow-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-pink-500/20 active:scale-90 transition-all shrink-0"
           >
             <Gift className="w-5 h-5 text-white" />
           </button>
@@ -1660,8 +1668,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             >
               <div className="w-12 h-1 bg-white/10 rounded-full mx-auto mb-6" />
               <div className="space-y-1">
-                {isHost && (
+                {isHost ? (
                   <>
+                    {/* HOST-SPECIFIC SETTINGS */}
                     <button
                       onClick={() => { setShowSettings(false); handleMicToggle(); }}
                       className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
@@ -1683,85 +1692,99 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                       <span className="text-white font-medium">Flip Camera</span>
                       <RotateCcw className="w-5 h-5 text-white/30" />
                     </button>
+                    <button
+                      onClick={() => { setShowSettings(false); setView('guests'); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">Manage Guests ({viewers.length + 1})</span>
+                      <Users className="w-5 h-5 text-white/30" />
+                    </button>
+                    {isPKMode && (
+                      <button
+                        onClick={() => { setShowSettings(false); setShowInviteModal(true); }}
+                        className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                      >
+                        <span className="text-white font-medium">Invite PK Challenger</span>
+                        <Swords className="w-5 h-5 text-white/30" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setShowSettings(false); setShowAudioSettingsModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">Stream Settings</span>
+                      <Settings className="w-5 h-5 text-white/30" />
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); setShowRulesModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">View Rules</span>
+                      <FileText className="w-5 h-5 text-white/30" />
+                    </button>
+                    <div className="my-2 border-t border-white/5" />
+                    <button
+                      onClick={() => { setShowSettings(false); handleEndStream(); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-rose-500/10 rounded-2xl transition-colors"
+                    >
+                      <span className="text-rose-500 font-bold">End Stream</span>
+                      <X className="w-5 h-5 text-rose-500/60" />
+                    </button>
                   </>
-                )}
-                <button
-                  onClick={() => { setShowSettings(false); setView('guests'); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-white font-medium">View Guests ({viewers.length + 1})</span>
-                  <Users className="w-5 h-5 text-white/30" />
-                </button>
-                <button
-                  onClick={() => { setShowSettings(false); setShowReactions(true); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-white font-medium">Reactions</span>
-                  <Heart className="w-5 h-5 text-white/30" />
-                </button>
-                <button
-                  onClick={() => { setShowSettings(false); setShowShare(true); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-white font-medium">Share Stream</span>
-                  <Share2 className="w-5 h-5 text-white/30" />
-                </button>
-                <button
-                  onClick={() => { setShowSettings(false); setShowAudioSettingsModal(true); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-white font-medium">Adjust settings</span>
-                  <Settings className="w-5 h-5 text-white/30" />
-                </button>
-                <button
-                  onClick={() => { setShowSettings(false); setShowFeedbackModal(true); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-white font-medium">Share feedback</span>
-                  <MessageSquare className="w-5 h-5 text-white/30" />
-                </button>
-                <button
-                  onClick={() => { setShowSettings(false); setShowRulesModal(true); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-white font-medium">View rules</span>
-                  <FileText className="w-5 h-5 text-white/30" />
-                </button>
-                <button
-                  onClick={() => { setShowSettings(false); setShowGiftModal(true); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-white font-medium">Full Gift Store</span>
-                  <Gift className="w-5 h-5 text-white/30" />
-                </button>
-                <button
-                  onClick={() => { setShowSettings(false); setShowReportModal(true); }}
-                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                >
-                  <span className="text-rose-400 font-medium">Report this Stream</span>
-                  <Flag className="w-5 h-5 text-rose-400/50" />
-                </button>
-
-                {/* Divider */}
-                <div className="my-2 border-t border-white/5" />
-
-                {/* End / Leave */}
-                {isHost ? (
-                  <button
-                    onClick={() => { setShowSettings(false); handleEndStream(); }}
-                    className="w-full flex items-center justify-between p-4 hover:bg-rose-500/10 rounded-2xl transition-colors"
-                  >
-                    <span className="text-rose-500 font-bold">End Stream</span>
-                    <X className="w-5 h-5 text-rose-500/60" />
-                  </button>
                 ) : (
-                  <button
-                    onClick={() => { setShowSettings(false); handleViewerLeave(); }}
-                    className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                  >
-                    <span className="text-rose-400 font-medium">Leave Stream</span>
-                    <LogOut className="w-5 h-5 text-rose-400/50" />
-                  </button>
+                  <>
+                    {/* VIEWER-SPECIFIC SETTINGS */}
+                    <button
+                      onClick={() => { setShowSettings(false); setView('guests'); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">View Guests ({viewers.length + 1})</span>
+                      <Users className="w-5 h-5 text-white/30" />
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); setShowGiftModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">Full Gift Store</span>
+                      <Gift className="w-5 h-5 text-white/30" />
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); setShowAudioSettingsModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">Audio Settings</span>
+                      <Settings className="w-5 h-5 text-white/30" />
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); setShowFeedbackModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">Share Feedback</span>
+                      <MessageSquare className="w-5 h-5 text-white/30" />
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); setShowRulesModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">View Rules</span>
+                      <FileText className="w-5 h-5 text-white/30" />
+                    </button>
+                    <div className="my-2 border-t border-white/5" />
+                    <button
+                      onClick={() => { setShowSettings(false); setShowReportModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-rose-400 font-medium">Report Stream</span>
+                      <Flag className="w-5 h-5 text-rose-400/50" />
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); handleViewerLeave(); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-rose-400 font-medium">Leave Stream</span>
+                      <LogOut className="w-5 h-5 text-rose-400/50" />
+                    </button>
+                  </>
                 )}
               </div>
             </motion.div>
