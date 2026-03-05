@@ -952,39 +952,69 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     }
   };
 
-  // Invite creator to PK battle
+  // Invite user to co-broadcast or PK battle
   const handleInviteCreator = async (creatorId: string) => {
-    if (battleParticipants.length >= pkMaxSlots) return;
-    if (battleParticipants.some(p => p.id === creatorId)) return;
+    const coBroadcasters = viewers.filter(v => v.is_co_broadcaster);
 
-    const viewer = viewers.find(v => v.user_id === creatorId);
-    if (!viewer?.profile) return;
+    if (isPKMode) {
+      // PK mode: add to battle participants
+      if (battleParticipants.length >= pkMaxSlots) return;
+      if (battleParticipants.some(p => p.id === creatorId)) return;
 
-    setBattleParticipants(prev => [...prev, {
-      id: creatorId,
-      name: viewer.profile!.display_name || 'User',
-      avatar: viewer.profile!.avatar_url || undefined,
-      score: 0,
-      color: PK_COLORS[prev.length % PK_COLORS.length],
-    }]);
+      const viewer = viewers.find(v => v.user_id === creatorId);
+      if (!viewer?.profile) return;
 
-    // System message
-    setReplies(prev => [...prev, {
-      id: `sys-${Date.now()}`,
-      user_id: 'system',
-      user: 'System',
-      handle: '@system',
-      time: 'Just now',
-      text: `⚔️ ${viewer.profile!.display_name} joined the battle!`,
-      avatar: '',
-      likes: 0,
-      liked_by_me: false,
-    }]);
+      setBattleParticipants(prev => [...prev, {
+        id: creatorId,
+        name: viewer.profile!.display_name || 'User',
+        avatar: viewer.profile!.avatar_url || undefined,
+        score: 0,
+        color: PK_COLORS[prev.length % PK_COLORS.length],
+      }]);
 
-    // Send PK challenge via hook
-    const newBattle = await createBattle(300);
-    if (newBattle) {
-      await sendChallenge(creatorId);
+      setReplies(prev => [...prev, {
+        id: `sys-${Date.now()}`,
+        user_id: 'system', user: 'System', handle: '@system', time: 'Just now',
+        text: `⚔️ ${viewer.profile!.display_name} joined the battle!`,
+        avatar: '', likes: 0, liked_by_me: false,
+      }]);
+
+      const newBattle = await createBattle(300);
+      if (newBattle) await sendChallenge(creatorId);
+    } else {
+      // Solo broadcast: add as co-broadcaster (max 10)
+      if (coBroadcasters.length >= 10) {
+        toast.error('Maximum 10 co-broadcasters allowed');
+        return;
+      }
+
+      // Update viewer to co-broadcaster in DB
+      await supabase.from('live_stream_viewers').update({
+        is_co_broadcaster: true,
+        role: 'co_broadcaster',
+        is_mic_on: false,
+      } as any).eq('stream_id', streamId).eq('user_id', creatorId);
+
+      // Broadcast invite event
+      supabase.channel(`stream-events-${streamId}`).send({
+        type: 'broadcast',
+        event: 'co_broadcast_invite',
+        payload: { user_id: creatorId },
+      });
+
+      // Fetch profile for system message
+      const { data: profile } = await supabase.from('profiles')
+        .select('display_name').eq('id', creatorId).single();
+
+      setReplies(prev => [...prev, {
+        id: `sys-${Date.now()}`,
+        user_id: 'system', user: 'System', handle: '@system', time: 'Just now',
+        text: `🎙️ ${profile?.display_name || 'User'} joined the broadcast!`,
+        avatar: '', likes: 0, liked_by_me: false,
+      }]);
+
+      toast.success(`Invited to co-broadcast!`);
+      await fetchViewers();
     }
 
     setShowInviteModal(false);
