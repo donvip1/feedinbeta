@@ -356,7 +356,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     } else {
       setViewers([]);
     }
-    }
   };
 
   // Initialize LiveKit
