@@ -320,8 +320,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const fetchViewers = async () => {
     const { data: viewersData } = await supabase
       .from('live_stream_viewers')
-      .select('user_id, profiles(id, display_name, username, avatar_url, is_verified)')
-      .eq('stream_id', streamId);
+      .select('user_id, profiles(id, display_name, username, avatar_url)')
+      .eq('stream_id', streamId) as any;
 
     if (viewersData) {
       setViewers(viewersData.map(v => ({
