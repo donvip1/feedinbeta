@@ -1320,6 +1320,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             </span>
           </div>
           <span className="text-xs text-slate-500">{duration}</span>
+          {/* Settings button - moved to header */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setShowSettingsMenu(true)}
+            className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-5 h-5 text-white" />
+          </motion.button>
         </div>
         <div className="flex items-center gap-2">
           <button 
@@ -1690,18 +1699,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
         </div>
       </div>
 
-      {/* Right-side action stack - Settings, Record (host), Screen Share (host) */}
+      {/* Right-side action stack - Record (host), Screen Share (host) */}
       <div className="absolute right-4 top-40 z-40 flex flex-col gap-3">
-        {/* Settings button */}
-        <motion.button
-          whileTap={{ scale: 0.9 }}
-          onClick={() => setShowSettingsMenu(true)}
-          className="w-11 h-11 rounded-full bg-background border border-border flex items-center justify-center hover:bg-muted transition-colors"
-          title="Settings"
-        >
-          <Settings className="w-5 h-5 text-foreground" />
-        </motion.button>
-
         {/* Record button - host only, RED */}
         {isHost && (
           <motion.button

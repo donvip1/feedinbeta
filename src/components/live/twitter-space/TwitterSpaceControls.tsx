@@ -52,9 +52,6 @@ export const TwitterSpaceControls = ({
               <span className="text-lg">✋</span>
             )}
           </button>
-          <span className="text-xs text-zinc-500">
-            {canSpeak ? (isMicOn ? 'Mute' : 'Unmute') : hasRaisedHand ? 'Lower' : 'Request'}
-          </span>
         </div>
 
         {/* Center Icons */}
