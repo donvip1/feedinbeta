@@ -377,6 +377,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     await fetchViewers();
     setLoading(false);
 
+    // Periodically refresh viewer list for accuracy
+    const viewerRefreshInterval = setInterval(fetchViewers, 15000);
+    // Store for cleanup
+    (window as any).__viewerRefreshInterval = viewerRefreshInterval;
+
     setTimeout(() => initializeLiveKit(streamData as any), 100);
   };
 
