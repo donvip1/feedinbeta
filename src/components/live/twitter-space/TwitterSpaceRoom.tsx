@@ -213,10 +213,25 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const connectionStatus = spaceContext?.spaceState.connectionStatus || 'disconnected';
   const audioLevels = spaceContext?.spaceState.audioLevels || {};
 
-  // Hide bottom nav
+  // Hide bottom nav + prevent overscroll for native feel
   useEffect(() => {
     setHideBottomNav(true);
-    return () => setHideBottomNav(false);
+    
+    const preventOverscroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      const scrollable = target.closest('[data-scrollable="true"]') || target.closest('.scrollbar-hide') || target.closest('.custom-scrollbar');
+      if (!scrollable) e.preventDefault();
+    };
+    document.addEventListener('touchmove', preventOverscroll, { passive: false });
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    
+    return () => {
+      setHideBottomNav(false);
+      document.removeEventListener('touchmove', preventOverscroll);
+      document.body.style.overscrollBehavior = '';
+      document.documentElement.style.overscrollBehavior = '';
+    };
   }, [setHideBottomNav]);
 
   // Initialize space
@@ -1286,7 +1301,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     });
 
     return (
-      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col">
+      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col" style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation', overscrollBehavior: 'none', transform: 'translateZ(0)' }}>
         {/* Guest Header */}
         <div className="px-4 py-4 border-b border-white/5 flex items-center justify-between">
           <button onClick={() => setView('main')} className="p-2">
@@ -1429,35 +1444,49 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   });
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-500">
+    <div
+      className="fixed inset-0 z-50 bg-[#050505] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-10 duration-500"
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        touchAction: 'manipulation',
+        overscrollBehavior: 'none',
+        contain: 'layout style paint',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+      }}
+    >
       {/* Header */}
-      <div className="p-4 flex items-center justify-between border-b border-white/5">
-        <div className="flex items-center gap-3">
-          <button onClick={handleMinimize} className="p-2 hover:bg-white/5 rounded-full transition-all">
-            <ArrowLeft className="w-5 h-5 text-white" />
+      <div className="p-3 flex items-center justify-between border-b border-white/5" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
+        <div className="flex items-center gap-2">
+          <button onClick={handleMinimize} className="p-1.5 hover:bg-white/5 rounded-full transition-all active:scale-90">
+            <ArrowLeft className="w-4 h-4 text-white" />
           </button>
-          <div className="flex items-center gap-2 bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
-            <div className="w-3 h-3 text-purple-400 animate-pulse">
+          <div className="flex items-center gap-1.5 bg-purple-500/10 px-2.5 py-0.5 rounded-full border border-purple-500/20">
+            <div className="w-2.5 h-2.5 text-purple-400 animate-pulse">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 20h.01M7 20v-4M12 20v-8M17 20V8M22 4v16"/></svg>
             </div>
-            <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
+            <span className="text-[9px] font-black text-purple-400 uppercase tracking-widest">HD Audio</span>
           </div>
-          {/* Settings button - moved to header */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
           >
-            <MoreHorizontal className="w-5 h-5 text-white" />
+            <MoreHorizontal className="w-4 h-4 text-white" />
           </button>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {isHost && raisedHandsCount > 0 && (
             <button 
               onClick={() => setShowSpeakerQueue(true)}
-              className="relative w-10 h-10 flex items-center justify-center rounded-full bg-white/5"
+              className="relative w-8 h-8 flex items-center justify-center rounded-full bg-white/5 active:scale-90 transition-all"
             >
-              <Hand className="w-5 h-5 text-amber-400" />
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+              <Hand className="w-4 h-4 text-amber-400" />
+              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">
                 {raisedHandsCount}
               </span>
             </button>
@@ -1467,23 +1496,23 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               onClick={handleRecordingToggle}
               disabled={recordingLoading}
               className={cn(
-                "w-10 h-10 flex items-center justify-center rounded-full bg-white/5 transition-all",
+                "w-8 h-8 flex items-center justify-center rounded-full bg-white/5 transition-all active:scale-90",
                 isRecording ? "text-red-500" : "text-zinc-400 hover:text-white"
               )}
               title={isRecording ? "Stop Recording" : "Start Recording"}
             >
-              <Circle className={cn("w-4 h-4", isRecording && "fill-red-500 animate-pulse")} />
+              <Circle className={cn("w-3 h-3", isRecording && "fill-red-500 animate-pulse")} />
             </button>
           )}
           <button
             onClick={() => setShowShare(true)}
-            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
           >
-            <Share2 className="w-5 h-5 text-white" />
+            <Share2 className="w-4 h-4 text-white" />
           </button>
           <button
             onClick={handleLeave}
-            className="bg-red-500/10 text-red-500 px-6 py-2 rounded-full text-xs font-black uppercase border border-red-500/20 hover:bg-red-500/20 transition-all"
+            className="bg-red-500/10 text-red-500 px-5 py-1.5 rounded-full text-[10px] font-black uppercase border border-red-500/20 hover:bg-red-500/20 active:scale-90 transition-all"
           >
             {isHost ? 'End' : 'Leave'}
           </button>
@@ -1564,55 +1593,55 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       </div>
 
         {/* Main Content */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto custom-scrollbar" data-scrollable="true" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain', transform: 'translateZ(0)' }}>
         {/* Connection Status */}
         {connectionStatus !== 'connected' && connectionStatus !== 'disconnected' && (
           <p className="text-center text-slate-500 text-xs mb-2 capitalize">{connectionStatus}...</p>
         )}
 
         {/* Room Info - Centered Host */}
-        <div className="p-8 text-center max-w-lg mx-auto">
-          <div className="mb-6 relative inline-block">
+        <div className="p-6 text-center max-w-lg mx-auto">
+          <div className="mb-5 relative inline-block">
             <div className="absolute inset-0 bg-purple-500/20 blur-3xl rounded-full" />
             <img
               src={speakers.find(s => s.user_id === space?.user_id)?.profile?.avatar_url || ''}
               alt="Host"
-              className="w-24 h-24 rounded-[2.5rem] border-4 border-white/10 relative z-10 shadow-2xl object-cover cursor-pointer"
+              className="w-20 h-20 rounded-[2rem] border-3 border-white/10 relative z-10 shadow-2xl object-cover cursor-pointer active:scale-95 transition-transform duration-75"
               onClick={() => space?.user_id && navigateToProfile(space.user_id)}
             />
-            <div className="absolute -bottom-2 -right-2 bg-purple-600 p-2 rounded-2xl z-20 border-4 border-[#050505]">
-              <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <div className="absolute -bottom-1.5 -right-1.5 bg-purple-600 p-1.5 rounded-xl z-20 border-3 border-[#050505]">
+              <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
             </div>
           </div>
-          <h1 className="text-2xl font-black mb-2 leading-tight text-white">{space?.title}</h1>
+          <h1 className="text-xl font-black mb-1.5 leading-tight text-white">{space?.title}</h1>
           <p className="text-sm text-slate-400 mb-1">
             Hosted by {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name || 'Host'}
           </p>
           {hostGiftTotal > 0 && (
-            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full mb-3">
-              <Gift className="w-3.5 h-3.5 text-amber-400" />
-              <span className="text-xs font-bold text-amber-400">Gifts: {hostGiftTotal.toLocaleString()}</span>
+            <div className="inline-flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full mb-2">
+              <Gift className="w-3 h-3 text-amber-400" />
+              <span className="text-[10px] font-bold text-amber-400">Gifts: {hostGiftTotal.toLocaleString()}</span>
             </div>
           )}
-          {hostGiftTotal === 0 && <div className="mb-3" />}
-          <div className="flex items-center justify-center gap-4">
+          {hostGiftTotal === 0 && <div className="mb-2" />}
+          <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => setView('guests')}
-              className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full hover:bg-white/10 transition-all"
+              className="flex items-center gap-1 bg-white/5 px-2.5 py-0.5 rounded-full hover:bg-white/10 active:scale-95 transition-transform duration-75"
             >
-              <Users className="w-3 h-3 text-slate-500" />
-              <span className="text-xs font-bold text-slate-400">{speakers.length}</span>
+              <Users className="w-2.5 h-2.5 text-slate-500" />
+              <span className="text-[10px] font-bold text-slate-400">{speakers.length}</span>
             </button>
-            <div className="flex items-center gap-1.5 bg-white/5 px-3 py-1 rounded-full">
-              <Volume2 className="w-3 h-3 text-slate-500" />
-              <span className="text-xs font-bold text-slate-400">{sortedSpeakers.filter(s => s.role !== 'listener').length} Speakers</span>
+            <div className="flex items-center gap-1 bg-white/5 px-2.5 py-0.5 rounded-full">
+              <Volume2 className="w-2.5 h-2.5 text-slate-500" />
+              <span className="text-[10px] font-bold text-slate-400">{sortedSpeakers.filter(s => s.role !== 'listener').length} Speakers</span>
             </div>
           </div>
         </div>
 
-        {/* Speaker Grid - Twitter/Clubhouse style */}
-        <div className="px-6 pb-20 max-w-3xl mx-auto">
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-y-10 gap-x-4 mb-12">
+        {/* Speaker Grid */}
+        <div className="px-5 pb-16 max-w-3xl mx-auto">
+          <div className="grid grid-cols-3 sm:grid-cols-4 gap-y-8 gap-x-3 mb-10">
             {sortedSpeakers
               .filter(s => s.role !== 'listener')
               .slice(0, 12)
@@ -1623,47 +1652,47 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 return (
                   <div
                     key={speaker.id}
-                    className="flex flex-col items-center gap-4 group"
+                    className="flex flex-col items-center gap-3 group"
                   >
-                    <div className="relative cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
+                    <div className="relative cursor-pointer active:scale-95 transition-transform duration-75" onClick={() => navigateToProfile(speaker.user_id)}>
                       {/* Ping-style audio wave indicators */}
                       {speaking && (
                         <>
-                          <div className="absolute -inset-4 rounded-[2.5rem] border-2 border-purple-500/30 animate-[ping_2s_infinite] opacity-50" />
-                          <div className="absolute -inset-2 rounded-[2.5rem] border-2 border-purple-500/50 animate-[ping_1.5s_infinite]" />
+                          <div className="absolute -inset-3 rounded-[2rem] border-2 border-purple-500/30 animate-[ping_2s_infinite] opacity-50" />
+                          <div className="absolute -inset-1.5 rounded-[2rem] border-2 border-purple-500/50 animate-[ping_1.5s_infinite]" />
                         </>
                       )}
                       <div className={cn(
-                        "w-20 h-20 sm:w-24 sm:h-24 rounded-[2.2rem] p-1 bg-gradient-to-tr transition-all duration-500",
+                        "w-16 h-16 sm:w-18 sm:h-18 rounded-[1.8rem] p-0.5 bg-gradient-to-tr transition-all duration-300",
                         speaking ? 'from-purple-500 to-pink-500 scale-105' : 'from-white/10 to-white/5'
                       )}>
                         {speaker.profile?.avatar_url ? (
                           <img
                             src={speaker.profile.avatar_url}
                             alt={speaker.profile.display_name}
-                            className="w-full h-full rounded-[1.9rem] object-cover bg-slate-900 border-2 border-[#050505]"
+                            className="w-full h-full rounded-[1.5rem] object-cover bg-slate-900 border-2 border-[#050505]"
                           />
                         ) : (
-                          <div className="w-full h-full rounded-[1.9rem] bg-slate-900 border-2 border-[#050505] flex items-center justify-center text-slate-400 text-xl font-bold">
+                          <div className="w-full h-full rounded-[1.5rem] bg-slate-900 border-2 border-[#050505] flex items-center justify-center text-slate-400 text-lg font-bold">
                             {speaker.profile?.display_name?.[0] || 'U'}
                           </div>
                         )}
                       </div>
                       {/* Microbadge indicators */}
-                      <div className="absolute -bottom-1 -right-1 flex gap-1">
+                      <div className="absolute -bottom-0.5 -right-0.5 flex gap-0.5">
                         {isHostUser && (
-                          <div className="bg-amber-400 p-1.5 rounded-xl shadow-xl border-2 border-[#050505]">
-                            <svg className="w-3 h-3 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          <div className="bg-amber-400 p-1 rounded-lg shadow-xl border-2 border-[#050505]">
+                            <svg className="w-2.5 h-2.5 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                           </div>
                         )}
                         {speaker.is_muted && (
-                          <div className="bg-zinc-700 p-1.5 rounded-xl shadow-xl border-2 border-[#050505]">
-                            <MicOff className="w-3 h-3 text-white" />
+                          <div className="bg-zinc-700 p-1 rounded-lg shadow-xl border-2 border-[#050505]">
+                            <MicOff className="w-2.5 h-2.5 text-white" />
                           </div>
                         )}
                         {speaking && (
-                          <div className="bg-purple-600 p-1.5 rounded-xl shadow-xl border-2 border-[#050505] animate-bounce">
-                            <Volume2 className="w-3 h-3 text-white" />
+                          <div className="bg-purple-600 p-1 rounded-lg shadow-xl border-2 border-[#050505] animate-bounce">
+                            <Volume2 className="w-2.5 h-2.5 text-white" />
                           </div>
                         )}
                       </div>
@@ -1689,13 +1718,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
           {/* Listeners Section */}
           {sortedSpeakers.filter(s => s.role === 'listener').length > 0 && (
-            <div className="border-t border-white/5 pt-8">
-              <div className="flex items-center justify-between mb-6">
-                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">
+            <div className="border-t border-white/5 pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">
                   Listeners ({sortedSpeakers.filter(s => s.role === 'listener').length})
                 </h4>
               </div>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-6 opacity-80">
+              <div className="grid grid-cols-4 sm:grid-cols-6 gap-4 opacity-80">
                 {sortedSpeakers
                   .filter(s => s.role === 'listener')
                   .slice(0, 18)
@@ -1704,7 +1733,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                       key={speaker.id}
                       className="flex flex-col items-center gap-2"
                     >
-                      <div className="w-12 h-12 rounded-2xl overflow-hidden bg-white/5 cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
+                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-white/5 cursor-pointer active:scale-95 transition-transform duration-75" onClick={() => navigateToProfile(speaker.user_id)}>
                         {speaker.profile?.avatar_url ? (
                           <img src={speaker.profile.avatar_url} alt={speaker.profile.display_name} className="w-full h-full object-cover" />
                         ) : (
@@ -1793,23 +1822,23 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
       {/* Credit Balance Indicator */}
       {myCredits !== null && (
-        <div className="flex justify-center pb-2">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
-            <Coins className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-bold text-amber-400">{myCredits.toLocaleString()}</span>
-            <span className="text-[10px] text-muted-foreground">credits</span>
+        <div className="flex justify-center pb-1.5">
+          <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+            <Coins className="w-3 h-3 text-amber-400" />
+            <span className="text-[10px] font-bold text-amber-400">{myCredits.toLocaleString()}</span>
+            <span className="text-[9px] text-muted-foreground">credits</span>
           </div>
         </div>
       )}
 
       {/* BOTTOM CONTROLS - Premium rounded bar */}
-      <div className="p-4 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem]">
-        <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
+      <div className="p-3 bg-[#0F1119] border-t border-white/5 rounded-t-[2.5rem]" style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
+        <div className="flex items-center justify-center gap-3 max-w-md mx-auto">
           {/* Mic / Request */}
           <button
             onClick={handleToggleMute}
             className={cn(
-              "relative w-12 h-12 flex items-center justify-center rounded-full transition-all active:scale-90",
+              "relative w-9 h-9 flex items-center justify-center rounded-full transition-transform duration-75 active:scale-90",
               canSpeak
                 ? isMicOn
                   ? 'bg-purple-600 text-white'
@@ -1820,39 +1849,39 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             )}
           >
             {canSpeak ? (
-              isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />
+              isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />
             ) : (
-              <Hand className="w-5 h-5" />
+              <Hand className="w-4 h-4" />
             )}
             {hasRaisedHand && !canSpeak && (
-              <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">!</span>
+              <span className="absolute -top-0.5 -right-0.5 bg-purple-500 text-white text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center">!</span>
             )}
           </button>
 
           {/* React */}
           <button
             onClick={() => setShowReactions(true)}
-            className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
           >
-            <Heart className="w-5 h-5" />
+            <Heart className="w-4 h-4" />
           </button>
 
           {/* Gift */}
           <button
             onClick={() => setShowGiftModal(true)}
-            className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
           >
-            <Gift className="w-5 h-5" />
+            <Gift className="w-4 h-4" />
           </button>
 
           {/* Chat */}
           <button
             onClick={() => setShowChat(true)}
-            className="relative w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+            className="relative w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
           >
-            <MessageSquare className="w-5 h-5" />
+            <MessageSquare className="w-4 h-4" />
             {unreadMessages > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-purple-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 bg-purple-500 text-white text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center">
                 {unreadMessages}
               </span>
             )}
@@ -1862,22 +1891,22 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <div className="relative">
             <button
               onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-              className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
             >
-              {volumeLevel > 50 ? <Volume2 className="w-6 h-6 text-white" /> : volumeLevel > 0 ? <Volume1 className="w-6 h-6 text-white" /> : <VolumeX className="w-6 h-6 text-white" />}
+              {volumeLevel > 50 ? <Volume2 className="w-4 h-4 text-white" /> : volumeLevel > 0 ? <Volume1 className="w-4 h-4 text-white" /> : <VolumeX className="w-4 h-4 text-white" />}
             </button>
             <AnimatePresence>
               {showVolumeSlider && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute bottom-16 right-0 bg-[#11131E] border border-white/10 rounded-2xl p-4 w-56 shadow-xl z-50"
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute bottom-12 right-0 bg-[#11131E] border border-white/10 rounded-2xl p-3 w-52 shadow-xl z-50"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-white text-sm font-semibold">Volume</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/10 text-slate-300">{volumeLevel}%</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white text-xs font-semibold">Volume</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{volumeLevel}%</span>
                   </div>
                   <input
                     type="range"
@@ -1895,13 +1924,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                       background: `linear-gradient(to right, #a855f7 ${volumeLevel}%, rgba(255,255,255,0.1) ${volumeLevel}%)`,
                     }}
                   />
-                  <div className="flex justify-between mt-2 text-[10px] text-slate-500">
+                  <div className="flex justify-between mt-1.5 text-[9px] text-slate-500">
                     <span>Earpiece</span>
                     <span>Loudspeaker</span>
                   </div>
                   <button
                     onClick={() => setShowVolumeSlider(false)}
-                    className="mt-3 w-full text-center text-xs text-slate-400 hover:text-white transition-colors"
+                    className="mt-2 w-full text-center text-[10px] text-slate-400 hover:text-white transition-colors"
                   >
                     Done
                   </button>
@@ -1915,12 +1944,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             <button
               onClick={isScreenSharing ? stopScreenShare : startScreenShare}
               className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full active:scale-90 transition-all",
+                "w-9 h-9 flex items-center justify-center rounded-full active:scale-90 transition-transform duration-75",
                 isScreenSharing ? 'text-green-400' : 'text-white hover:text-white/80'
               )}
               title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
             >
-              {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+              {isScreenSharing ? <MonitorOff className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
             </button>
           )}
 
@@ -1929,12 +1958,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             <button
               onClick={handleMuteAll}
               className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full active:scale-90 transition-all",
+                "w-9 h-9 flex items-center justify-center rounded-full active:scale-90 transition-transform duration-75",
                 allMuted ? 'text-red-400' : 'text-white hover:text-white/80'
               )}
               title={allMuted ? 'Allow unmute' : 'Mute all'}
             >
-              {allMuted ? <VolumeX className="w-5 h-5" /> : <Speaker className="w-5 h-5" />}
+              {allMuted ? <VolumeX className="w-4 h-4" /> : <Speaker className="w-4 h-4" />}
             </button>
           )}
         </div>
@@ -2083,9 +2112,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       {/* CHAT SIDEBAR */}
       {showChat && (
         <motion.div
-          initial={{ opacity: 0, x: 300 }}
+          initial={{ opacity: 0, x: 200 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 300 }}
+          exit={{ opacity: 0, x: 200 }}
+          transition={{ type: 'tween', duration: 0.15 }}
           className="fixed inset-0 z-50 bg-black/60 flex justify-end"
           onClick={() => setShowChat(false)}
         >
@@ -2094,10 +2124,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             onClick={e => e.stopPropagation()}
           >
             {/* Chat Header */}
-            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
-              <h2 className="text-white font-bold">Space</h2>
-              <button onClick={() => setShowChat(false)} className="p-2">
-                <X className="w-5 h-5 text-white" />
+            <div className="px-3 py-2.5 border-b border-zinc-800 flex items-center justify-between">
+              <h2 className="text-white font-bold text-sm">Space</h2>
+              <button onClick={() => setShowChat(false)} className="p-1.5 active:scale-90 transition-transform duration-75">
+                <X className="w-4 h-4 text-white" />
               </button>
             </div>
 
@@ -2139,8 +2169,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             )}
 
             {/* Replies Feed */}
-            <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4">
-              <h3 className="text-zinc-400 text-sm font-semibold mb-4">
+            <div className="flex-1 overflow-y-auto scrollbar-hide px-3 py-3" data-scrollable="true" style={{ WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+              <h3 className="text-zinc-400 text-xs font-semibold mb-3">
                 {replies.length > 0 ? `${replies.length} replies` : 'No replies yet'}
               </h3>
               <ThreadedRepliesList
@@ -2152,21 +2182,21 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </div>
 
             {/* Reply Input */}
-            <div className="px-4 py-4 border-t border-zinc-800 pb-safe">
+            <div className="px-3 py-3 border-t border-zinc-800 pb-safe">
               {replyingTo && (
-                <div className="flex items-center justify-between mb-2 px-2">
-                  <span className="text-xs text-zinc-400">
+                <div className="flex items-center justify-between mb-1.5 px-2">
+                  <span className="text-[10px] text-zinc-400">
                     Replying to <span className="text-purple-400">{replyingTo.handle}</span>
                   </span>
                   <button 
                     onClick={() => setReplyingTo(null)}
                     className="text-zinc-500 hover:text-white"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 </div>
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <input
                   type="text"
                   value={replyText}
@@ -2178,14 +2208,14 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                     }
                   }}
                   placeholder={replyingTo ? `Reply to ${replyingTo.user}...` : "Say something..."}
-                  className="flex-1 bg-zinc-800 text-white placeholder-zinc-500 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 bg-zinc-800 text-white placeholder-zinc-500 rounded-full px-3 py-1.5 outline-none focus:ring-1 focus:ring-purple-500 text-xs"
                 />
                 <button
                   onClick={handleReplySubmit}
                   disabled={!replyText.trim()}
-                  className="p-2 text-purple-600 hover:text-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-1.5 text-purple-600 hover:text-purple-500 disabled:opacity-50 disabled:cursor-not-allowed active:scale-90 transition-transform duration-75"
                 >
-                  <Send className="w-5 h-5" />
+                  <Send className="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -2277,15 +2307,21 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         .animate-space-float {
           animation: space-float 4s ease-out forwards;
         }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .pb-safe { padding-bottom: max(0.75rem, env(safe-area-inset-bottom)); }
+        .pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+        
+        /* Native mobile optimizations */
+        * { -webkit-tap-highlight-color: transparent; }
+        button, a, [role="button"] {
+          touch-action: manipulation;
+          -webkit-touch-callout: none;
         }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .pb-safe {
-          padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        input, textarea {
+          -webkit-appearance: none;
+          appearance: none;
+          font-size: 16px !important;
         }
       `}</style>
 
