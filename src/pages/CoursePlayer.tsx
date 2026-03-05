@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -395,7 +396,10 @@ export default function CoursePlayer() {
                 {currentLesson.content_type === 'text' && currentLesson.content_text && (
                   <Card>
                     <CardContent className="p-6 prose prose-sm dark:prose-invert max-w-none">
-                      <div dangerouslySetInnerHTML={{ __html: currentLesson.content_text }} />
+                      <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(currentLesson.content_text, {
+                        ALLOWED_TAGS: ['p','br','strong','em','b','i','u','ul','ol','li','h1','h2','h3','h4','code','pre','blockquote','a','span','div','table','thead','tbody','tr','td','th','img','hr'],
+                        ALLOWED_ATTR: ['class','href','target','rel','src','alt','width','height']
+                      }) }} />
                     </CardContent>
                   </Card>
                 )}
