@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import { shareUrls } from '@/lib/url-utils';
 
 import { LiveGiftModal } from '../LiveGiftModal';
+import { SpaceWalletBoard } from '../SpaceWalletBoard';
 import { SpeakerQueuePanel } from '../SpeakerQueuePanel';
 import { ReportContentModal } from '@/components/moderation/ReportContentModal';
 import { SpaceRulesModal } from './SpaceRulesModal';
@@ -1529,7 +1530,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         </div>
       )}
 
-      {/* Main Content */}
+        {/* Space Wallet Board */}
+      <div className="px-4 pt-2">
+        <SpaceWalletBoard spaceId={spaceId} variant="bar" />
+      </div>
+
+        {/* Main Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {/* Connection Status */}
         {connectionStatus !== 'connected' && connectionStatus !== 'disconnected' && (

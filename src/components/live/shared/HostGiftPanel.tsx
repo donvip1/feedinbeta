@@ -99,56 +99,29 @@ export const HostGiftPanel = ({
     setSending(giftType);
 
     try {
-      // Deduct credits from host
-      if (!hasUnlimitedCredits) {
-        await supabase.from('credit_transactions').insert({
-          user_id: user.id,
-          amount: -creditValue,
-          type: 'live_gift_sent',
-          description: `Sent ${giftType} gift to ${selectedViewer.display_name} in live`,
-          related_id: roomId,
-        });
-      }
-
-      // Add credits to recipient (85% - 15% platform fee)
-      const recipientAmount = Math.floor(creditValue * 0.85);
-      await supabase.from('credit_transactions').insert({
-        user_id: selectedViewer.id,
-        amount: recipientAmount,
-        type: 'live_gift_received',
-        description: `Received ${giftType} gift from host in live`,
-        related_id: roomId,
-      });
-
-      // Record the gift in the appropriate table
+      // Use secure atomic RPC for proper credit handling
+      let result;
       if (isSpace) {
-        await supabase.from('live_space_gifts').insert({
-          space_id: roomId,
-          sender_id: user.id,
-          receiver_id: selectedViewer.id,
-          gift_type: giftType,
-          credit_value: creditValue,
+        result = await supabase.rpc('send_space_gift', {
+          p_space_id: roomId,
+          p_gift_type: giftType,
+          p_credit_value: creditValue,
+          p_receiver_id: selectedViewer.id,
         });
       } else {
-        await supabase.from('live_stream_gifts').insert({
-          stream_id: roomId,
-          sender_id: user.id,
-          receiver_id: selectedViewer.id,
-          gift_type: giftType,
-          credit_value: creditValue,
+        result = await supabase.rpc('send_live_gift', {
+          p_credit_value: creditValue,
+          p_gift_type: giftType,
+          p_stream_id: roomId,
         });
       }
 
-      // Record analytics
-      await supabase.from('gift_analytics').insert({
-        gift_type: giftType,
-        credit_value: creditValue,
-        sender_id: user.id,
-        receiver_id: selectedViewer.id,
-        source_type: isSpace ? 'live_space' : 'live_stream',
-        source_id: roomId,
-        platform_fee: creditValue - recipientAmount,
-      });
+      if (result.error) throw result.error;
+
+      const rpcResult = result.data as any;
+      if (rpcResult && rpcResult.success === false) {
+        throw new Error(rpcResult.error || 'Gift failed');
+      }
 
       // Create notification
       await supabase.from('notifications').insert({
@@ -163,9 +136,8 @@ export const HostGiftPanel = ({
 
       toast.success(`${emoji} Sent to ${selectedViewer.display_name}!`);
       
-      if (!hasUnlimitedCredits) {
-        setLocalCredits(prev => prev - creditValue);
-      }
+      // Refresh actual balance from DB
+      await fetchCredits();
 
       onGiftSent?.({ type: giftType, value: creditValue, emoji, recipientName: selectedViewer.display_name });
     } catch (error: any) {

@@ -114,75 +114,41 @@ export const LiveGiftModal = ({
     setSentGift(giftType);
 
     try {
-      // Get sender display name for descriptions
+      // Use secure atomic RPC for proper credit handling
+      let result;
+      if (isSpace) {
+        result = await supabase.rpc('send_space_gift', {
+          p_space_id: streamId,
+          p_gift_type: giftType,
+          p_credit_value: creditValue,
+          p_receiver_id: recipientId,
+        });
+      } else {
+        result = await supabase.rpc('send_live_gift', {
+          p_credit_value: creditValue,
+          p_gift_type: giftType,
+          p_stream_id: streamId,
+        });
+      }
+
+      if (result.error) throw result.error;
+
+      const rpcResult = result.data as any;
+      if (rpcResult && rpcResult.success === false) {
+        throw new Error(rpcResult.error || 'Gift failed');
+      }
+
+      // Create notification for the recipient
+      const giftEmoji = GIFTS.find(g => g.type === giftType)?.emoji || '🎁';
       const { data: senderProfile } = await supabase
         .from('profiles')
         .select('display_name, username')
         .eq('id', user.id)
         .single();
       const senderName = senderProfile?.display_name || senderProfile?.username || 'Someone';
-
-      // Get recipient display name
-      const { data: recipientProfile } = await supabase
-        .from('profiles')
-        .select('display_name, username')
-        .eq('id', recipientId)
-        .single();
-      const recipientName = recipientProfile?.display_name || recipientProfile?.username || 'User';
-
       const sourceLabel = spaceName ? `"${spaceName}"` : (isSpace ? 'a space' : 'a stream');
-      const giftEmoji = GIFTS.find(g => g.type === giftType)?.emoji || '🎁';
-
-      // Deduct credits from sender via transaction
-      await supabase.from('credit_transactions').insert({
-        user_id: user.id,
-        amount: -creditValue,
-        type: 'gift_sent',
-        description: `${giftEmoji} Sent ${giftType} to @${recipientProfile?.username || recipientName} in ${sourceLabel}`,
-        related_id: streamId,
-      });
-
-      // Add credits to recipient (85% - 15% platform fee)
       const recipientAmount = Math.floor(creditValue * 0.85);
-      await supabase.from('credit_transactions').insert({
-        user_id: recipientId,
-        amount: recipientAmount,
-        type: 'gift_received',
-        description: `${giftEmoji} Received ${giftType} from @${senderProfile?.username || senderName} in ${sourceLabel}`,
-        related_id: streamId,
-      });
 
-      // Record the gift in the appropriate table
-      if (isSpace) {
-        await supabase.from('live_space_gifts').insert({
-          space_id: streamId,
-          sender_id: user.id,
-          receiver_id: recipientId,
-          gift_type: giftType,
-          credit_value: creditValue,
-        });
-      } else {
-        await supabase.from('live_stream_gifts').insert({
-          stream_id: streamId,
-          sender_id: user.id,
-          receiver_id: recipientId,
-          gift_type: giftType,
-          credit_value: creditValue,
-        });
-      }
-
-      // Record gift analytics
-      await supabase.from('gift_analytics').insert({
-        gift_type: giftType,
-        credit_value: creditValue,
-        sender_id: user.id,
-        receiver_id: recipientId,
-        source_type: isSpace ? 'live_space' : 'live_stream',
-        source_id: streamId,
-        platform_fee: creditValue - recipientAmount,
-      });
-
-      // Create notification for the recipient
       await supabase.from('notifications').insert({
         user_id: recipientId,
         from_user_id: user.id,
@@ -194,9 +160,7 @@ export const LiveGiftModal = ({
       });
 
       toast.success(`${giftType} sent!`);
-      if (!hasUnlimitedCredits) {
-        setUserCredits(prev => prev - creditValue);
-      }
+      await fetchUserCredits();
 
       setTimeout(() => {
         setSentGift(null);
