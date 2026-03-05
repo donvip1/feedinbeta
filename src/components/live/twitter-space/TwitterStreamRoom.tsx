@@ -281,9 +281,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     // Fetch host profile
     const { data: hostData } = await supabase
       .from('profiles')
-      .select('id, display_name, username, avatar_url, is_verified')
+      .select('id, display_name, username, avatar_url')
       .eq('id', streamData.user_id)
-      .single();
+      .single() as any;
 
     if (hostData) {
       setHost(hostData);
