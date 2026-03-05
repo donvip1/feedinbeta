@@ -824,22 +824,24 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
-  // Screen sharing - host only
+  // Screen sharing - host only (uses getDisplayMedia directly)
   const startScreenShare = async () => {
     if (!isHost) {
       toast.error('Only hosts can share screen');
       return;
     }
     try {
-      const { spaceRoomManager } = await import('@/lib/space-room-manager');
-      const result = await spaceRoomManager.startScreenShare();
-      if (!result.success) {
-        if (result.error !== 'Permission denied') {
-          toast.error(result.error || 'Failed to start screen sharing');
-        }
-        return;
-      }
-      setScreenStream(result.stream || null);
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+        audio: true,
+      });
+
+      // Handle user stopping via browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+
+      setScreenStream(stream);
       setIsScreenSharing(true);
       
       // Broadcast screen share started
@@ -860,12 +862,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   };
 
   const stopScreenShare = async () => {
-    try {
-      const { spaceRoomManager } = await import('@/lib/space-room-manager');
-      await spaceRoomManager.stopScreenShare();
-    } catch (error) {
-      console.error('Error stopping screen share:', error);
-    }
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
       setScreenStream(null);
@@ -894,15 +890,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         if (sharerId === user.id) return;
         setRemoteScreenSharing(true);
         toast.info('Host is sharing their screen');
-        try {
-          const { spaceRoomManager } = await import('@/lib/space-room-manager');
-          const stream = await spaceRoomManager.subscribeToScreenShare(sharerId, '', '');
-          if (stream && remoteScreenVideoRef.current) {
-            remoteScreenVideoRef.current.srcObject = stream as any;
-          }
-        } catch (e) {
-          console.error('[Space] Failed to subscribe to screen share:', e);
-        }
       })
       .on('broadcast', { event: 'screen-share-ended' }, (payload: any) => {
         const { userId: sharerId } = payload.payload;

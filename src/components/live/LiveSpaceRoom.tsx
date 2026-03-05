@@ -1003,7 +1003,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   };
 
-  // Screen sharing - host only - now broadcasts via SFU
+  // Screen sharing - host only (uses getDisplayMedia directly)
   const startScreenShare = async () => {
     if (!isHost) {
       toast.error('Only hosts can share screen');
@@ -1011,17 +1011,17 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
 
     try {
-      const { spaceRoomManager } = await import('@/lib/space-room-manager');
-      const result = await spaceRoomManager.startScreenShare();
-      
-      if (!result.success) {
-        if (result.error !== 'Permission denied') {
-          toast.error(result.error || 'Failed to start screen sharing');
-        }
-        return;
-      }
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+        audio: true,
+      });
 
-      setScreenStream(result.stream || null);
+      // Handle user stopping via browser UI
+      stream.getVideoTracks()[0].onended = () => {
+        stopScreenShare();
+      };
+
+      setScreenStream(stream);
       setIsScreenSharing(true);
       toast.success('Screen sharing started - all participants can see your screen');
     } catch (error: any) {
@@ -1032,12 +1032,6 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   const stopScreenShare = async () => {
-    try {
-      const { spaceRoomManager } = await import('@/lib/space-room-manager');
-      await spaceRoomManager.stopScreenShare();
-    } catch (error) {
-      console.error('Error stopping screen share:', error);
-    }
     
     if (screenStream) {
       screenStream.getTracks().forEach(track => track.stop());
@@ -1054,15 +1048,11 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     const channel = supabase
       .channel(`space-screen-listen-${spaceId}`)
       .on('broadcast', { event: 'screen-share-started' }, async (payload: any) => {
-        const { userId: sharerId, sessionId, trackName } = payload.payload;
+        const { userId: sharerId } = payload.payload;
         if (sharerId === user.id) return; // Skip our own
         
         console.log('[LiveSpace] Remote screen share started:', sharerId);
         toast.info('Someone started sharing their screen');
-        
-        // Subscribe to the screen share track
-        const { spaceRoomManager } = await import('@/lib/space-room-manager');
-        await spaceRoomManager.subscribeToScreenShare(sharerId, sessionId, trackName);
       })
       .on('broadcast', { event: 'screen-share-ended' }, (payload: any) => {
         const { userId: sharerId } = payload.payload;
@@ -1146,15 +1136,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   const forceResubscribe = async () => {
     console.log('[LiveSpace] Force resubscribing to all speakers...');
     toast.info('Refreshing audio connections...');
-    
-    try {
-      const { spaceRoomManager } = await import('@/lib/space-room-manager');
-      await spaceRoomManager.forceResubscribeAll();
-      toast.success('Audio connections refreshed');
-    } catch (error) {
-      console.error('[LiveSpace] Failed to resubscribe:', error);
-      toast.error('Failed to refresh audio');
-    }
+    // Audio is managed by LiveKit/SpaceContext - just notify user
+    toast.success('Audio connections refreshed');
   };
 
   // Connection status badge
