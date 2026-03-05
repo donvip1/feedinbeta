@@ -18,13 +18,11 @@ export const CoverImageUpload = ({ value, onChange, className }: CoverImageUploa
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please select an image file');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image must be less than 5MB');
       return;
@@ -39,18 +37,15 @@ export const CoverImageUpload = ({ value, onChange, className }: CoverImageUploa
         return;
       }
 
-      // Generate unique filename
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/live-covers/${Date.now()}.${fileExt}`;
 
-      // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from('user-content')
         .upload(fileName, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('user-content')
         .getPublicUrl(fileName);
@@ -72,13 +67,13 @@ export const CoverImageUpload = ({ value, onChange, className }: CoverImageUploa
 
   return (
     <div className={cn("space-y-2", className)}>
-      <label className="text-sm font-medium flex items-center gap-1.5">
+      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
         <ImagePlus className="w-3.5 h-3.5" />
         Event Cover (optional)
       </label>
       
       {value ? (
-        <div className="relative w-full h-24 rounded-lg overflow-hidden bg-muted">
+        <div className="relative w-full aspect-[3/4] max-h-48 rounded-2xl overflow-hidden bg-white/5">
           <img 
             src={value} 
             alt="Cover preview" 
@@ -87,7 +82,7 @@ export const CoverImageUpload = ({ value, onChange, className }: CoverImageUploa
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute top-1 right-1 p-1 rounded-full bg-black/60 hover:bg-black/80 transition-colors"
+            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black/80 transition-colors"
           >
             <X className="w-4 h-4 text-white" />
           </button>
@@ -98,18 +93,19 @@ export const CoverImageUpload = ({ value, onChange, className }: CoverImageUploa
           onClick={() => inputRef.current?.click()}
           disabled={uploading}
           className={cn(
-            "w-full h-20 rounded-lg border-2 border-dashed border-muted-foreground/30",
-            "flex flex-col items-center justify-center gap-1",
-            "hover:border-primary/50 hover:bg-primary/5 transition-colors",
+            "w-full aspect-[3/4] max-h-40 rounded-2xl border-2 border-dashed border-white/10",
+            "flex flex-col items-center justify-center gap-2",
+            "hover:border-rose-500/30 hover:bg-white/[0.03] transition-colors",
             uploading && "opacity-50 cursor-not-allowed"
           )}
         >
           {uploading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <Loader2 className="w-5 h-5 animate-spin text-slate-500" />
           ) : (
             <>
-              <ImagePlus className="w-5 h-5 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Add cover image</span>
+              <ImagePlus className="w-6 h-6 text-slate-500" />
+              <span className="text-xs text-slate-500 font-bold">Add portrait cover</span>
+              <span className="text-[10px] text-slate-600">3:4 ratio recommended</span>
             </>
           )}
         </button>
@@ -123,8 +119,8 @@ export const CoverImageUpload = ({ value, onChange, className }: CoverImageUploa
         className="hidden"
       />
       
-      <p className="text-xs text-muted-foreground">
-        Appears in the top corner during your live session
+      <p className="text-[10px] text-slate-600">
+        Portrait format • Appears on your stream card
       </p>
     </div>
   );
