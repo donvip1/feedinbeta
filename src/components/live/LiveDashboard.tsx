@@ -99,6 +99,55 @@ export const LiveDashboard = ({
     }
   }, [location.state]);
 
+  const [selectedSpaces, setSelectedSpaces] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const toggleSelectSpace = (e: React.MouseEvent, spaceId: string) => {
+    e.stopPropagation();
+    setSelectedSpaces(prev => {
+      const next = new Set(prev);
+      if (next.has(spaceId)) next.delete(spaceId);
+      else next.add(spaceId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!recordedSpaces) return;
+    if (selectedSpaces.size === recordedSpaces.length) {
+      setSelectedSpaces(new Set());
+    } else {
+      setSelectedSpaces(new Set(recordedSpaces.map((s: any) => s.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedSpaces.size === 0) return;
+    if (!confirm(`Delete ${selectedSpaces.size} recorded space(s) and all related data?`)) return;
+    setBulkDeleting(true);
+    const ids = Array.from(selectedSpaces);
+    // Optimistic removal
+    queryClient.setQueryData(['recorded-spaces'], (old: any[] | undefined) =>
+      old ? old.filter((s: any) => !selectedSpaces.has(s.id)) : []
+    );
+    try {
+      for (const spaceId of ids) {
+        await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
+        await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
+        await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
+        await supabase.from("live_space_speakers").delete().eq("space_id", spaceId);
+        await supabase.from("live_spaces").delete().eq("id", spaceId);
+      }
+      toast.success(`${ids.length} space(s) deleted`);
+      setSelectedSpaces(new Set());
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+    } catch {
+      toast.error("Failed to delete some spaces");
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
   const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
 
   const handleDeleteSpace = async (e: React.MouseEvent, spaceId: string) => {
@@ -322,6 +371,27 @@ export const LiveDashboard = ({
               <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} spaces</span>
             </div>
 
+            {/* Bulk actions for admins/mods */}
+            {canDeleteAny && recordedSpaces && recordedSpaces.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={toggleSelectAll}
+                  className="text-xs px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors border border-white/10"
+                >
+                  {selectedSpaces.size === recordedSpaces.length ? 'Deselect All' : 'Select All'}
+                </button>
+                {selectedSpaces.size > 0 && (
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="text-xs px-3 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors border border-red-500/20 disabled:opacity-50"
+                  >
+                    {bulkDeleting ? 'Deleting...' : `Delete ${selectedSpaces.size} selected`}
+                  </button>
+                )}
+              </div>
+            )}
+
             {(!recordedSpaces || recordedSpaces.length === 0) ? (
               <div className="flex flex-col items-center gap-4 py-16">
                 <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center">
@@ -346,8 +416,27 @@ export const LiveDashboard = ({
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
                       onClick={() => navigate(`/live/space/${space.id}`)}
-                      className="flex gap-3 p-3 rounded-2xl bg-slate-800/40 border border-white/5 hover:bg-slate-800/70 transition-all cursor-pointer group"
+                      className={cn(
+                        "flex gap-3 p-3 rounded-2xl bg-slate-800/40 border hover:bg-slate-800/70 transition-all cursor-pointer group",
+                        selectedSpaces.has(space.id) ? "border-purple-500/50 bg-purple-500/10" : "border-white/5"
+                      )}
                     >
+                      {/* Selection checkbox for admins */}
+                      {canDeleteAny && (
+                        <button
+                          onClick={(e) => toggleSelectSpace(e, space.id)}
+                          className={cn(
+                            "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 self-center transition-colors",
+                            selectedSpaces.has(space.id) ? "bg-purple-500 border-purple-500" : "border-white/20 hover:border-white/40"
+                          )}
+                        >
+                          {selectedSpaces.has(space.id) && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
                       {space.cover_image_url ? (
                         <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0">
                           <img src={space.cover_image_url} alt={space.title} className="w-full h-full object-cover" />
