@@ -190,6 +190,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [showSpeakInvite, setShowSpeakInvite] = useState(false);
   const [inviterName, setInviterName] = useState('');
+  const [hostGiftTotal, setHostGiftTotal] = useState(0);
 
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
@@ -372,6 +373,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         const creditValue = giftData.credit_value || 1;
         const recipientAmount = Math.floor(creditValue * 0.85);
 
+        // Update host gift counter if receiver is the host
+        if (giftData.receiver_id === space?.user_id) {
+          setHostGiftTotal(prev => prev + creditValue);
+        }
+
         // Toast notification for the receiver (host/speaker)
         if (giftData.receiver_id === user?.id) {
           toast(`${emoji} ${senderName} sent you a ${giftData.gift_type}! (+${recipientAmount} credits)`, {
@@ -428,6 +434,22 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       supabase.removeChannel(giftChannel);
     };
   }, [spaceId, isHost, user?.id]);
+
+  // Fetch initial host gift total
+  useEffect(() => {
+    if (!space?.user_id) return;
+    const fetchHostGifts = async () => {
+      const { data } = await supabase
+        .from('live_space_gifts')
+        .select('credit_value')
+        .eq('space_id', spaceId)
+        .eq('receiver_id', space.user_id);
+      if (data) {
+        setHostGiftTotal(data.reduce((sum, g) => sum + (g.credit_value || 0), 0));
+      }
+    };
+    fetchHostGifts();
+  }, [spaceId, space?.user_id]);
 
   // Update SpaceContext when connected
   useEffect(() => {
@@ -1459,9 +1481,16 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </div>
           </div>
           <h1 className="text-2xl font-black mb-2 leading-tight text-white">{space?.title}</h1>
-          <p className="text-sm text-slate-400 mb-3">
+          <p className="text-sm text-slate-400 mb-1">
             Hosted by {speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name || 'Host'}
           </p>
+          {hostGiftTotal > 0 && (
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full mb-3">
+              <Gift className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-xs font-bold text-amber-400">Gifts: {hostGiftTotal.toLocaleString()}</span>
+            </div>
+          )}
+          {hostGiftTotal === 0 && <div className="mb-3" />}
           <div className="flex items-center justify-center gap-4">
             <button
               onClick={() => setView('guests')}
