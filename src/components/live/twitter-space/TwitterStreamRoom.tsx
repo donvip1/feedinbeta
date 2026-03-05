@@ -836,27 +836,28 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     };
     setReplies(prev => [...prev, optimisticMsg]);
 
-    const { error } = await (supabase as any).from('live_stream_messages').insert({
+    // Broadcast immediately for real-time chat (don't wait for DB)
+    if (chatChannelRef.current) {
+      chatChannelRef.current.send({
+        type: 'broadcast',
+        event: 'new_message',
+        payload: {
+          id: optimisticMsg.id,
+          user_id: user.id,
+          content,
+          display_name: displayName,
+          username,
+          avatar_url: avatarUrl,
+        },
+      });
+    }
+
+    // Persist to DB (fire-and-forget for chat speed)
+    supabase.from('live_stream_messages').insert({
       stream_id: streamId,
       user_id: user.id,
       content,
-    });
-
-    if (!error) {
-      if (chatChannelRef.current) {
-        chatChannelRef.current.send({
-          type: 'broadcast',
-          event: 'new_message',
-          payload: {
-            user_id: user.id,
-            content,
-            display_name: displayName,
-            username,
-            avatar_url: avatarUrl,
-          },
-        });
-      }
-    }
+    } as any);
 
     setReplyText('');
     setReplyingTo(null);
