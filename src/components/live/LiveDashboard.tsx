@@ -298,7 +298,7 @@ export const LiveDashboard = ({
             <div className="flex items-center gap-2 mb-2">
               <Headphones className="w-5 h-5 text-purple-400" />
               <span className="font-bold text-lg">Space Replays</span>
-              <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} recordings</span>
+              <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} spaces</span>
             </div>
 
             {(!recordedSpaces || recordedSpaces.length === 0) ? (
