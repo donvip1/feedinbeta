@@ -12,7 +12,31 @@ const COSTS: Record<string, number> = {
   profile_view: 2,
   voice_call: 20,  // per minute
   video_call: 30,  // per minute
-  ai_tool: 0,      // Variable cost passed in metadata
+  ai_tool: 0,      // Resolved via AI_TOOL_COSTS below
+};
+
+// Server-side pricing for AI tools — never trust client-supplied costs
+const AI_TOOL_COSTS: Record<string, number> = {
+  'AI Smart Replies': 1,
+  'ai_smart_replies': 1,
+  'image_generation': 50,
+  'ai_image_gen': 50,
+  'video_creation': 100,
+  'caption_generator': 10,
+  'resume_builder': 20,
+  'ai_chat': 5,
+  'ai_search': 5,
+  'analyze_media_mood': 10,
+  'background_remover': 15,
+  'image_enhancer': 15,
+  'code_generator': 10,
+  'text_to_speech': 10,
+  'speech_to_text': 10,
+  'document_scanner': 10,
+  'logo_maker': 25,
+  'ai_tutor': 5,
+  'ai_translator': 5,
+  'ai_summarizer': 5,
 };
 
 serve(async (req) => {
@@ -79,9 +103,10 @@ serve(async (req) => {
         description = `${action === "video_call" ? "Video" : "Voice"} call with ${otherUserName} - ${minutes} min`;
         break;
       case "ai_tool":
-        // Variable cost passed from frontend
-        totalCost = Number(metadata?.credits) || 5;
+        // Server-side pricing — ignore client-supplied cost
         const toolName = metadata?.tool || 'AI Tool';
+        const normalizedTool = toolName.replace(/\s+/g, '_').toLowerCase();
+        totalCost = AI_TOOL_COSTS[toolName] ?? AI_TOOL_COSTS[normalizedTool] ?? 5;
         description = `Used ${toolName.replace(/_/g, ' ')}`;
         break;
     }
