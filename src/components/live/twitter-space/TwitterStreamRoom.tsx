@@ -1767,15 +1767,13 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                       <span className="text-white font-medium">Manage Guests ({viewers.length + 1})</span>
                       <Users className="w-5 h-5 text-white/30" />
                     </button>
-                    {isPKMode && (
-                      <button
-                        onClick={() => { setShowSettings(false); setShowInviteModal(true); }}
-                        className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                      >
-                        <span className="text-white font-medium">Invite PK Challenger</span>
-                        <Swords className="w-5 h-5 text-white/30" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { setShowSettings(false); setShowInviteModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">{isPKMode ? 'Invite PK Challenger' : 'Invite to Stream'}</span>
+                      {isPKMode ? <Swords className="w-5 h-5 text-white/30" /> : <UserPlus className="w-5 h-5 text-white/30" />}
+                    </button>
                     <button
                       onClick={() => { setShowSettings(false); setShowAudioSettingsModal(true); }}
                       className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
