@@ -64,6 +64,7 @@ import { ThreadedRepliesList } from './ThreadedRepliesList';
 import { PKBattleChallenge } from '../unified/PKBattleChallenge';
 import { shareUrls } from '@/lib/url-utils';
 import type { PKParticipant } from '../unified/PKBattleBar';
+import { InStreamRechargeSheet } from '../InStreamRechargeSheet';
 
 interface TwitterStreamRoomProps {
   streamId: string;
@@ -904,7 +905,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   // Reaction via broadcast channel
   const handleReaction = async (emoji: string) => {
     setShowReactions(false);
-    const myName = host?.display_name || user?.user_metadata?.display_name || 'Someone';
+    // Use current user's profile, not host's
+    const myProfile = viewers.find(v => v.user_id === user?.id)?.profile;
+    const myName = myProfile?.display_name || user?.user_metadata?.display_name || 'Someone';
     handleFloatingReaction(emoji, myName);
 
     if (reactionsChannelRef.current) {
@@ -1816,9 +1819,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             <Heart className="w-4 h-4 text-rose-400" />
           </button>
 
-          {/* Refill / Recharge credits */}
+          {/* Refill / Recharge credits - opens in-stream sheet */}
           <button
-            onClick={() => navigate('/wallet')}
+            onClick={() => setShowRefill(true)}
             className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-90 transition-all shrink-0"
             title="Refill credits"
           >
