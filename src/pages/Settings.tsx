@@ -42,7 +42,8 @@ import {
   Rocket,
   Info,
   FileText,
-  Scale
+  Scale,
+  RefreshCw
 } from 'lucide-react';
 import feedinLogo from '@/assets/feedin-logo.png';
 
@@ -467,6 +468,41 @@ const Settings = () => {
               <Info className="w-5 h-5 text-primary" />
               About FeedIn
             </h3>
+
+            {/* Update App Button */}
+            <button
+              onClick={() => {
+                if ('serviceWorker' in navigator) {
+                  navigator.serviceWorker.getRegistration().then(reg => {
+                    if (reg) {
+                      reg.update().then(() => {
+                        if (reg.waiting) {
+                          reg.waiting.postMessage({ action: 'skipWaiting' });
+                          window.location.reload();
+                        } else {
+                          window.location.reload();
+                        }
+                      });
+                    } else {
+                      window.location.reload();
+                    }
+                  });
+                } else {
+                  window.location.reload();
+                }
+              }}
+              className="w-full flex items-center gap-3 p-3 mb-3 rounded-xl bg-primary/10 hover:bg-primary/20 transition-all duration-200"
+            >
+              <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                <RefreshCw className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="text-sm font-semibold text-foreground">Update App</p>
+                <p className="text-xs text-muted-foreground">Check and install the latest version</p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </button>
+
             {renderOptionsList([
               {
                 icon: Scale,
