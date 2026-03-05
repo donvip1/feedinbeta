@@ -46,6 +46,8 @@ interface LiveDashboardProps {
 }
 
 const filters = ["All", "Popular", "Music", "Gaming", "Chat", "Talk Show", "Education", "Tech"];
+const mainTabs = ["Discover", "Replays"] as const;
+type MainTab = typeof mainTabs[number];
 
 export const LiveDashboard = ({
   liveStreams,
