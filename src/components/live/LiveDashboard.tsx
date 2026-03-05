@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -83,12 +83,20 @@ export const LiveDashboard = ({
   myActiveSpace,
 }: LiveDashboardProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { permissions } = useAdminRole();
   const [activeFilter, setActiveFilter] = useState("All");
-  const [activeTab, setActiveTab] = useState<MainTab>("Discover");
+  const [activeTab, setActiveTab] = useState<MainTab>((location.state as any)?.tab === 'Replays' ? 'Replays' : 'Discover');
   const [showNotifications, setShowNotifications] = useState(false);
   const [deletingSpaceId, setDeletingSpaceId] = useState<string | null>(null);
+
+  // Clear location state after reading it
+  useEffect(() => {
+    if ((location.state as any)?.tab) {
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
 
