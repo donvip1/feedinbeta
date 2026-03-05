@@ -30,6 +30,7 @@ import {
   ArrowLeft,
   Camera,
   Gift,
+  Coins,
   Volume2,
   VolumeX,
   Volume1,
@@ -202,6 +203,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [hostGiftTotal, setHostGiftTotal] = useState(0);
   const [showPostRecordingModal, setShowPostRecordingModal] = useState(false);
   const [finalRecordingUrl, setFinalRecordingUrl] = useState<string>('');
+  const [myCredits, setMyCredits] = useState<number | null>(null);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
@@ -460,6 +462,35 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     };
     fetchHostGifts();
   }, [spaceId, space?.user_id]);
+
+  // Fetch user's credit balance
+  useEffect(() => {
+    if (!user) return;
+    const fetchMyCredits = async () => {
+      const { data } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      setMyCredits(data?.balance ?? 0);
+    };
+    fetchMyCredits();
+
+    // Subscribe to balance changes via credit_transactions
+    const creditChannel = supabase
+      .channel(`my-credits-${user.id}-space`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'credit_transactions',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchMyCredits();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(creditChannel); };
+  }, [user]);
 
   // Update SpaceContext when connected
   useEffect(() => {
@@ -1759,6 +1790,17 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           </motion.div>
         ))}
       </AnimatePresence>
+
+      {/* Credit Balance Indicator */}
+      {myCredits !== null && (
+        <div className="flex justify-center pb-2">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+            <Coins className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-bold text-amber-400">{myCredits.toLocaleString()}</span>
+            <span className="text-[10px] text-muted-foreground">credits</span>
+          </div>
+        </div>
+      )}
 
       {/* BOTTOM CONTROLS - Premium rounded bar */}
       <div className="p-4 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem]">
