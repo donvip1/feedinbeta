@@ -54,14 +54,11 @@ export const PastSpaces = ({ userId }: PastSpacesProps) => {
     if (!confirm('Delete this recorded space permanently?')) return;
     setDeletingId(spaceId);
     try {
-      await supabase.from('live_space_messages').delete().eq('space_id', spaceId);
-      await supabase.from('live_space_reactions').delete().eq('space_id', spaceId);
-      await supabase.from('live_space_gifts').delete().eq('space_id', spaceId);
-      await supabase.from('live_space_speakers').delete().eq('space_id', spaceId);
-      const { error } = await supabase.from('live_spaces').delete().eq('id', spaceId);
+      const { data, error } = await supabase.rpc('delete_space_completely', { p_space_id: spaceId });
       if (error) throw error;
+      if (!data) throw new Error("Not found or permission denied");
       setSpaces(prev => prev.filter(s => s.id !== spaceId));
-      toast.success('Space deleted');
+      toast.success('Space permanently deleted');
     } catch {
       toast.error('Failed to delete');
     } finally {
