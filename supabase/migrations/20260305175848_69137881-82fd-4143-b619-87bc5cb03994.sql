@@ -1,0 +1,1 @@
+ALTER TABLE public.live_streams ADD COLUMN IF NOT EXISTS pk_max_slots integer DEFAULT 2;

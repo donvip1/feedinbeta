@@ -4257,6 +4257,7 @@ export type Database = {
           is_private: boolean | null
           last_health_check: string | null
           peak_viewers: number | null
+          pk_max_slots: number | null
           room_type: string | null
           scheduled_start: string | null
           sfu_track_name: string | null
@@ -4293,6 +4294,7 @@ export type Database = {
           is_private?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
+          pk_max_slots?: number | null
           room_type?: string | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
@@ -4329,6 +4331,7 @@ export type Database = {
           is_private?: boolean | null
           last_health_check?: string | null
           peak_viewers?: number | null
+          pk_max_slots?: number | null
           room_type?: string | null
           scheduled_start?: string | null
           sfu_track_name?: string | null
