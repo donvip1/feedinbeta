@@ -52,6 +52,7 @@ import { MentionText } from '../MentionText';
 import { ThreadedRepliesList } from './ThreadedRepliesList';
 import { SpeakerActionSheet } from './SpeakerActionSheet';
 import { SpeakInviteDialog } from './SpeakInviteDialog';
+import { PostRecordingModal } from '../PostRecordingModal';
 
 interface TwitterSpaceRoomProps {
   spaceId: string;
@@ -191,7 +192,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [showSpeakInvite, setShowSpeakInvite] = useState(false);
   const [inviterName, setInviterName] = useState('');
   const [hostGiftTotal, setHostGiftTotal] = useState(0);
-
+  const [showPostRecordingModal, setShowPostRecordingModal] = useState(false);
+  const [finalRecordingUrl, setFinalRecordingUrl] = useState<string>('');
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
@@ -929,6 +931,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
     
     let recordingUrl: string | null = null;
+    const wasRecording = isRecording;
     
     // Stop recording if active before ending and capture URL
     if (isRecording && isHost) {
@@ -964,29 +967,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         .update(updateData)
         .eq('id', spaceId);
 
-      // Auto-post to feed if recording is available
-      if (recordingUrl && user) {
-        try {
-          await supabase.from('posts').insert({
-            user_id: user.id,
-            content: `🎙️ ${space?.title || 'Live Space'} — Listen to the replay`,
-            media_urls: [recordingUrl],
-            media_types: ['audio'],
-            post_type: 'audio',
-            metadata: {
-              source: 'live_space_recording',
-              space_id: spaceId,
-              duration: space?.started_at ? Math.floor((Date.now() - new Date(space.started_at).getTime()) / 1000) : 0,
-              viewer_count: space?.viewer_count || speakers.length,
-              share_link: space?.share_link || spaceId,
-            },
-          } as any);
-          toast.success('Space recording posted to your feed!');
-        } catch (error) {
-          console.error('[AutoPost] Error posting to feed:', error);
-        }
-      }
-
       // Broadcast immediate end signal to all participants
       await supabase
         .channel(`space-${spaceId}`)
@@ -1003,7 +983,14 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     if (spaceContext) {
       await spaceContext.leaveSpace();
     }
-    onClose();
+
+    // Show PostRecordingModal for host if recording was active
+    if (isHost && wasRecording) {
+      setFinalRecordingUrl(recordingUrl || '');
+      setShowPostRecordingModal(true);
+    } else {
+      onClose();
+    }
   };
 
   const handleRecordingToggle = async () => {
@@ -2173,6 +2160,22 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           padding-bottom: max(1rem, env(safe-area-inset-bottom));
         }
       `}</style>
+
+      {/* Post Recording Modal */}
+      <PostRecordingModal
+        isOpen={showPostRecordingModal}
+        onClose={() => {
+          setShowPostRecordingModal(false);
+          onClose();
+        }}
+        recordingUrl={finalRecordingUrl}
+        roomType="audio_space"
+        title={space?.title || 'Live Space'}
+        hostName={speakers.find(s => s.user_id === space?.user_id)?.profile?.display_name || 'Host'}
+        hostAvatar={speakers.find(s => s.user_id === space?.user_id)?.profile?.avatar_url || ''}
+        duration={space?.started_at ? Math.floor((Date.now() - new Date(space.started_at).getTime()) / 1000) : 0}
+        viewerCount={space?.viewer_count || speakers.length}
+      />
     </div>
   );
 };

@@ -139,7 +139,8 @@ serve(async (req) => {
 
     if (action === 'start') {
       // Start room composite recording using LiveKit Egress API
-      const roomName = `room-${roomId}`;
+      // Room name must match the prefix used when creating the LiveKit room
+      const roomName = roomType === 'live_spaces' ? `space-${roomId}` : `stream-${roomId}`;
       
       console.log(`[Recording][${requestId}] Starting recording for room: ${roomName}`);
 
