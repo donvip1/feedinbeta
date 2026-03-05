@@ -4241,8 +4241,11 @@ export type Database = {
           host_muted: boolean | null
           id: string
           is_active: boolean | null
+          is_co_broadcaster: boolean | null
+          is_mic_on: boolean | null
           joined_at: string | null
           left_at: string | null
+          role: string | null
           stream_id: string
           user_id: string | null
           watch_duration: number | null
@@ -4253,8 +4256,11 @@ export type Database = {
           host_muted?: boolean | null
           id?: string
           is_active?: boolean | null
+          is_co_broadcaster?: boolean | null
+          is_mic_on?: boolean | null
           joined_at?: string | null
           left_at?: string | null
+          role?: string | null
           stream_id: string
           user_id?: string | null
           watch_duration?: number | null
@@ -4265,8 +4271,11 @@ export type Database = {
           host_muted?: boolean | null
           id?: string
           is_active?: boolean | null
+          is_co_broadcaster?: boolean | null
+          is_mic_on?: boolean | null
           joined_at?: string | null
           left_at?: string | null
+          role?: string | null
           stream_id?: string
           user_id?: string | null
           watch_duration?: number | null

@@ -84,6 +84,9 @@ interface Viewer {
   role: string;
   is_muted: boolean;
   has_raised_hand: boolean;
+  is_co_broadcaster?: boolean;
+  is_mic_on?: boolean;
+  host_muted?: boolean;
   profile?: {
     display_name: string;
     username: string;
@@ -206,6 +209,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const [replyText, setReplyText] = useState('');
   const [replyingTo, setReplyingTo] = useState<{ id: string; user: string; handle: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewerPresenceCount, setViewerPresenceCount] = useState(1);
   const [userCredits, setUserCredits] = useState(0);
 
   // Connection state
@@ -246,21 +250,56 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     fetchCredits();
   }, [user?.id]);
 
-  // Initialize stream
+  // Initialize stream + register as viewer via Presence
   useEffect(() => {
     const initStream = async () => {
       await fetchStreamData();
+
+      // Register current user as active viewer in DB
+      if (user?.id) {
+        await supabase.from('live_stream_viewers').upsert({
+          stream_id: streamId,
+          user_id: user.id,
+          is_active: true,
+          joined_at: new Date().toISOString(),
+        } as any, { onConflict: 'stream_id,user_id' });
+      }
     };
     initStream();
 
+    // Presence channel for accurate viewer count
+    const presenceChannel = supabase.channel(`stream-presence-${streamId}`);
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const count = Object.keys(state).length;
+        setViewerPresenceCount(count);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && user?.id) {
+          await presenceChannel.track({
+            user_id: user.id,
+            display_name: user.user_metadata?.display_name || 'User',
+          });
+        }
+      });
+
     return () => {
+      // Mark viewer as inactive on leave
+      if (user?.id) {
+        supabase.from('live_stream_viewers').update({
+          is_active: false,
+          left_at: new Date().toISOString(),
+        } as any).eq('stream_id', streamId).eq('user_id', user.id);
+      }
+      supabase.removeChannel(presenceChannel);
       if (roomRef.current) {
         roomRef.current.disconnect();
       }
       videoTrackRef.current?.stop();
       audioTrackRef.current?.stop();
     };
-  }, [streamId]);
+  }, [streamId, user?.id]);
 
   // Fetch stream data
   const fetchStreamData = async () => {
@@ -322,22 +361,36 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     setTimeout(() => initializeLiveKit(streamData as any), 100);
   };
 
-  // Fetch viewers
+  // Fetch viewers - separate queries to avoid FK join issues
   const fetchViewers = async () => {
     const { data: viewersData } = await supabase
       .from('live_stream_viewers')
-      .select('user_id, profiles(id, display_name, username, avatar_url)')
-      .eq('stream_id', streamId) as any;
+      .select('*')
+      .eq('stream_id', streamId)
+      .eq('is_active', true);
 
-    if (viewersData) {
-      setViewers(viewersData.map(v => ({
+    if (viewersData && viewersData.length > 0) {
+      const userIds = viewersData.map((v: any) => v.user_id).filter(Boolean);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      setViewers(viewersData.map((v: any) => ({
         id: v.user_id,
         user_id: v.user_id,
-        role: 'listener',
-        is_muted: true,
-        has_raised_hand: false,
-        profile: v.profiles as any,
+        role: v.role || (v.is_co_broadcaster ? 'co_broadcaster' : 'listener'),
+        is_muted: !v.is_mic_on,
+        has_raised_hand: v.has_raised_hand || false,
+        is_co_broadcaster: v.is_co_broadcaster || false,
+        is_mic_on: v.is_mic_on || false,
+        host_muted: v.host_muted || false,
+        profile: profileMap.get(v.user_id) as any,
       })));
+    } else {
+      setViewers([]);
     }
   };
 
@@ -562,12 +615,49 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       })
       .subscribe();
 
-    // Stream ended event
+    // Stream events channel (ended, join requests, mute, co-broadcast)
     const streamChannel = supabase
       .channel(`stream-events-${streamId}`)
       .on('broadcast', { event: 'room_ended' }, () => {
         toast.info('Stream has ended');
         onClose();
+      })
+      .on('broadcast', { event: 'join_request' }, (payload: any) => {
+        if (isHost) {
+          const data = payload.payload;
+          toast(`🙋 ${data.display_name || 'Someone'} wants to join`, {
+            action: {
+              label: 'Accept',
+              onClick: () => handleInviteCreator(data.user_id),
+            },
+          });
+        }
+      })
+      .on('broadcast', { event: 'host_mute' }, (payload: any) => {
+        const data = payload.payload;
+        if (data.user_id === user?.id) {
+          toast.info(data.muted ? 'Host muted your mic' : 'Host unmuted your mic');
+        }
+        fetchViewers();
+      })
+      .on('broadcast', { event: 'co_broadcast_invite' }, (payload: any) => {
+        if (payload.payload?.user_id === user?.id) {
+          toast.success('You have been invited to co-broadcast!');
+          fetchViewers();
+        }
+      })
+      .subscribe();
+
+    // Realtime viewer changes for co-broadcaster updates
+    const viewerChangesChannel = supabase
+      .channel(`stream-viewer-changes-${streamId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'live_stream_viewers',
+        filter: `stream_id=eq.${streamId}`,
+      }, () => {
+        fetchViewers();
       })
       .subscribe();
 
@@ -576,6 +666,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       supabase.removeChannel(reactionsChannel);
       supabase.removeChannel(giftChannel);
       supabase.removeChannel(streamChannel);
+      supabase.removeChannel(viewerChangesChannel);
     };
   }, [streamId, user?.id, stream?.user_id]);
 
@@ -899,39 +990,69 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     }
   };
 
-  // Invite creator to PK battle
+  // Invite user to co-broadcast or PK battle
   const handleInviteCreator = async (creatorId: string) => {
-    if (battleParticipants.length >= pkMaxSlots) return;
-    if (battleParticipants.some(p => p.id === creatorId)) return;
+    const coBroadcasters = viewers.filter(v => v.is_co_broadcaster);
 
-    const viewer = viewers.find(v => v.user_id === creatorId);
-    if (!viewer?.profile) return;
+    if (isPKMode) {
+      // PK mode: add to battle participants
+      if (battleParticipants.length >= pkMaxSlots) return;
+      if (battleParticipants.some(p => p.id === creatorId)) return;
 
-    setBattleParticipants(prev => [...prev, {
-      id: creatorId,
-      name: viewer.profile!.display_name || 'User',
-      avatar: viewer.profile!.avatar_url || undefined,
-      score: 0,
-      color: PK_COLORS[prev.length % PK_COLORS.length],
-    }]);
+      const viewer = viewers.find(v => v.user_id === creatorId);
+      if (!viewer?.profile) return;
 
-    // System message
-    setReplies(prev => [...prev, {
-      id: `sys-${Date.now()}`,
-      user_id: 'system',
-      user: 'System',
-      handle: '@system',
-      time: 'Just now',
-      text: `⚔️ ${viewer.profile!.display_name} joined the battle!`,
-      avatar: '',
-      likes: 0,
-      liked_by_me: false,
-    }]);
+      setBattleParticipants(prev => [...prev, {
+        id: creatorId,
+        name: viewer.profile!.display_name || 'User',
+        avatar: viewer.profile!.avatar_url || undefined,
+        score: 0,
+        color: PK_COLORS[prev.length % PK_COLORS.length],
+      }]);
 
-    // Send PK challenge via hook
-    const newBattle = await createBattle(300);
-    if (newBattle) {
-      await sendChallenge(creatorId);
+      setReplies(prev => [...prev, {
+        id: `sys-${Date.now()}`,
+        user_id: 'system', user: 'System', handle: '@system', time: 'Just now',
+        text: `⚔️ ${viewer.profile!.display_name} joined the battle!`,
+        avatar: '', likes: 0, liked_by_me: false,
+      }]);
+
+      const newBattle = await createBattle(300);
+      if (newBattle) await sendChallenge(creatorId);
+    } else {
+      // Solo broadcast: add as co-broadcaster (max 10)
+      if (coBroadcasters.length >= 10) {
+        toast.error('Maximum 10 co-broadcasters allowed');
+        return;
+      }
+
+      // Update viewer to co-broadcaster in DB
+      await supabase.from('live_stream_viewers').update({
+        is_co_broadcaster: true,
+        role: 'co_broadcaster',
+        is_mic_on: false,
+      } as any).eq('stream_id', streamId).eq('user_id', creatorId);
+
+      // Broadcast invite event
+      supabase.channel(`stream-events-${streamId}`).send({
+        type: 'broadcast',
+        event: 'co_broadcast_invite',
+        payload: { user_id: creatorId },
+      });
+
+      // Fetch profile for system message
+      const { data: profile } = await supabase.from('profiles')
+        .select('display_name').eq('id', creatorId).single();
+
+      setReplies(prev => [...prev, {
+        id: `sys-${Date.now()}`,
+        user_id: 'system', user: 'System', handle: '@system', time: 'Just now',
+        text: `🎙️ ${profile?.display_name || 'User'} joined the broadcast!`,
+        avatar: '', likes: 0, liked_by_me: false,
+      }]);
+
+      toast.success(`Invited to co-broadcast!`);
+      await fetchViewers();
     }
 
     setShowInviteModal(false);
@@ -1270,7 +1391,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             <span className="text-sm font-bold text-white leading-tight truncate">{stream?.title || 'Live Stream'}</span>
             <span className="text-[11px] text-white/50 font-medium flex items-center gap-1">
               <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-              {formatNumber(viewers.length + 1)} watching
+              {formatNumber(viewerPresenceCount)} watching
             </span>
           </div>
         </button>
@@ -1359,37 +1480,91 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </div>
       )}
 
-      {/* RIGHT-SIDE VIEWER PANEL (TikTok-style) */}
-      <div className="absolute right-3 bottom-52 z-30 flex flex-col items-center gap-3">
+      {/* RIGHT-SIDE PANEL: Co-broadcasters + Viewers */}
+      <div className="absolute right-3 bottom-44 z-30 flex flex-col items-center gap-2 max-h-[50vh] overflow-y-auto scrollbar-hide">
         {/* Request to join for viewers */}
         {!isHost && (
           <button
             onClick={() => {
               toast.success('Request sent to host!');
-              // Broadcast request
               supabase.channel(`stream-events-${streamId}`).send({
                 type: 'broadcast',
                 event: 'join_request',
                 payload: { user_id: user?.id, display_name: user?.user_metadata?.display_name },
               });
             }}
-            className="flex flex-col items-center gap-1"
+            className="flex flex-col items-center gap-0.5"
           >
-            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
-              <Plus className="w-5 h-5 text-white" />
+            <div className="w-11 h-11 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Plus className="w-4 h-4 text-white" />
             </div>
-            <span className="text-[9px] text-white/60 font-bold">Request</span>
+            <span className="text-[8px] text-white/60 font-bold">Request</span>
           </button>
         )}
 
-        {/* Viewer avatars */}
-        {viewers.slice(0, 3).map((viewer, index) => (
+        {/* Co-broadcasters (with mic indicator) */}
+        {viewers.filter(v => v.is_co_broadcaster).map((viewer) => (
+          <div key={`co-${viewer.user_id}`} className="relative flex flex-col items-center gap-0.5">
+            <button
+              onClick={() => navigateToProfile(viewer.user_id)}
+              className="relative"
+            >
+              <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-emerald-400">
+                {viewer.profile?.avatar_url ? (
+                  <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-emerald-500/20 flex items-center justify-center text-white/60 text-sm font-bold">
+                    {viewer.profile?.display_name?.[0] || '?'}
+                  </div>
+                )}
+              </div>
+              {/* Mic status indicator */}
+              <div className={cn(
+                "absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center border border-black",
+                viewer.host_muted || !viewer.is_mic_on ? 'bg-red-500' : 'bg-emerald-500'
+              )}>
+                {viewer.host_muted || !viewer.is_mic_on
+                  ? <MicOff className="w-2.5 h-2.5 text-white" />
+                  : <Mic className="w-2.5 h-2.5 text-white" />
+                }
+              </div>
+            </button>
+            <span className="text-[8px] text-white/60 font-medium truncate max-w-[48px]">
+              {viewer.profile?.display_name?.slice(0, 7) || 'User'}
+            </span>
+            {/* Host can mute/unmute co-broadcasters */}
+            {isHost && (
+              <button
+                onClick={async () => {
+                  const newMuted = !viewer.host_muted;
+                  await supabase.from('live_stream_viewers').update({
+                    host_muted: newMuted,
+                  } as any).eq('stream_id', streamId).eq('user_id', viewer.user_id);
+                  // Broadcast mute event
+                  supabase.channel(`stream-events-${streamId}`).send({
+                    type: 'broadcast',
+                    event: 'host_mute',
+                    payload: { user_id: viewer.user_id, muted: newMuted },
+                  });
+                  fetchViewers();
+                  toast.success(newMuted ? `Muted ${viewer.profile?.display_name}` : `Unmuted ${viewer.profile?.display_name}`);
+                }}
+                className="text-[7px] text-white/50 bg-black/40 px-1.5 py-0.5 rounded-full"
+              >
+                {viewer.host_muted ? 'Unmute' : 'Mute'}
+              </button>
+            )}
+          </div>
+        ))}
+
+        {/* Regular viewer avatars */}
+        {viewers.filter(v => !v.is_co_broadcaster).slice(0, 4).map((viewer) => (
           <button
             key={viewer.user_id}
             onClick={() => navigateToProfile(viewer.user_id)}
             className="relative flex flex-col items-center gap-0.5"
           >
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/20">
+            <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/20">
               {viewer.profile?.avatar_url ? (
                 <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
               ) : (
@@ -1398,22 +1573,22 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 </div>
               )}
             </div>
-            <span className="text-[9px] text-white/60 font-medium truncate max-w-[52px]">
-              {viewer.profile?.display_name?.slice(0, 8) || 'User'}
+            <span className="text-[8px] text-white/60 font-medium truncate max-w-[48px]">
+              {viewer.profile?.display_name?.slice(0, 7) || 'User'}
             </span>
           </button>
         ))}
 
         {/* View all viewers */}
-        {viewers.length > 3 && (
+        {viewers.filter(v => !v.is_co_broadcaster).length > 4 && (
           <button
             onClick={() => setView('guests')}
             className="flex flex-col items-center gap-0.5"
           >
-            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+            <div className="w-11 h-11 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
               <Users className="w-4 h-4 text-white/60" />
             </div>
-            <span className="text-[9px] text-white/60 font-bold">+{viewers.length - 3}</span>
+            <span className="text-[8px] text-white/60 font-bold">+{viewers.filter(v => !v.is_co_broadcaster).length - 4}</span>
           </button>
         )}
       </div>
