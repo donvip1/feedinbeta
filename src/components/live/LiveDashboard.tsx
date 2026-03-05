@@ -69,6 +69,7 @@ export const LiveDashboard = ({
 }: LiveDashboardProps) => {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState("All");
+  const [activeTab, setActiveTab] = useState<MainTab>("Discover");
   const [showNotifications, setShowNotifications] = useState(false);
 
   const liveCount = (liveStreams?.length || 0) + (liveSpaces?.length || 0);
