@@ -9328,6 +9328,15 @@ export type Database = {
         }
         Returns: Json
       }
+      send_space_gift: {
+        Args: {
+          p_credit_value: number
+          p_gift_type: string
+          p_receiver_id?: string
+          p_space_id: string
+        }
+        Returns: Json
+      }
       sync_credit_supply: { Args: never; Returns: undefined }
       toggle_creator_monetization: {
         Args: { p_monetize: boolean; p_user_id: string }
