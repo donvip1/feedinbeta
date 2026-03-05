@@ -84,6 +84,9 @@ interface Viewer {
   role: string;
   is_muted: boolean;
   has_raised_hand: boolean;
+  is_co_broadcaster?: boolean;
+  is_mic_on?: boolean;
+  host_muted?: boolean;
   profile?: {
     display_name: string;
     username: string;
@@ -322,22 +325,37 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     setTimeout(() => initializeLiveKit(streamData as any), 100);
   };
 
-  // Fetch viewers
+  // Fetch viewers - separate queries to avoid FK join issues
   const fetchViewers = async () => {
     const { data: viewersData } = await supabase
       .from('live_stream_viewers')
-      .select('user_id, profiles(id, display_name, username, avatar_url)')
-      .eq('stream_id', streamId) as any;
+      .select('*')
+      .eq('stream_id', streamId)
+      .eq('is_active', true);
 
-    if (viewersData) {
-      setViewers(viewersData.map(v => ({
+    if (viewersData && viewersData.length > 0) {
+      const userIds = viewersData.map((v: any) => v.user_id).filter(Boolean);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', userIds);
+
+      const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
+
+      setViewers(viewersData.map((v: any) => ({
         id: v.user_id,
         user_id: v.user_id,
-        role: 'listener',
-        is_muted: true,
-        has_raised_hand: false,
-        profile: v.profiles as any,
+        role: v.role || (v.is_co_broadcaster ? 'co_broadcaster' : 'listener'),
+        is_muted: !v.is_mic_on,
+        has_raised_hand: v.has_raised_hand || false,
+        is_co_broadcaster: v.is_co_broadcaster || false,
+        is_mic_on: v.is_mic_on || false,
+        host_muted: v.host_muted || false,
+        profile: profileMap.get(v.user_id) as any,
       })));
+    } else {
+      setViewers([]);
+    }
     }
   };
 
