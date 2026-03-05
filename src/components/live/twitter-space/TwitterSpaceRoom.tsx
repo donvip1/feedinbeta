@@ -1652,47 +1652,47 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                 return (
                   <div
                     key={speaker.id}
-                    className="flex flex-col items-center gap-4 group"
+                    className="flex flex-col items-center gap-3 group"
                   >
-                    <div className="relative cursor-pointer" onClick={() => navigateToProfile(speaker.user_id)}>
+                    <div className="relative cursor-pointer active:scale-95 transition-transform duration-75" onClick={() => navigateToProfile(speaker.user_id)}>
                       {/* Ping-style audio wave indicators */}
                       {speaking && (
                         <>
-                          <div className="absolute -inset-4 rounded-[2.5rem] border-2 border-purple-500/30 animate-[ping_2s_infinite] opacity-50" />
-                          <div className="absolute -inset-2 rounded-[2.5rem] border-2 border-purple-500/50 animate-[ping_1.5s_infinite]" />
+                          <div className="absolute -inset-3 rounded-[2rem] border-2 border-purple-500/30 animate-[ping_2s_infinite] opacity-50" />
+                          <div className="absolute -inset-1.5 rounded-[2rem] border-2 border-purple-500/50 animate-[ping_1.5s_infinite]" />
                         </>
                       )}
                       <div className={cn(
-                        "w-20 h-20 sm:w-24 sm:h-24 rounded-[2.2rem] p-1 bg-gradient-to-tr transition-all duration-500",
+                        "w-16 h-16 sm:w-18 sm:h-18 rounded-[1.8rem] p-0.5 bg-gradient-to-tr transition-all duration-300",
                         speaking ? 'from-purple-500 to-pink-500 scale-105' : 'from-white/10 to-white/5'
                       )}>
                         {speaker.profile?.avatar_url ? (
                           <img
                             src={speaker.profile.avatar_url}
                             alt={speaker.profile.display_name}
-                            className="w-full h-full rounded-[1.9rem] object-cover bg-slate-900 border-2 border-[#050505]"
+                            className="w-full h-full rounded-[1.5rem] object-cover bg-slate-900 border-2 border-[#050505]"
                           />
                         ) : (
-                          <div className="w-full h-full rounded-[1.9rem] bg-slate-900 border-2 border-[#050505] flex items-center justify-center text-slate-400 text-xl font-bold">
+                          <div className="w-full h-full rounded-[1.5rem] bg-slate-900 border-2 border-[#050505] flex items-center justify-center text-slate-400 text-lg font-bold">
                             {speaker.profile?.display_name?.[0] || 'U'}
                           </div>
                         )}
                       </div>
                       {/* Microbadge indicators */}
-                      <div className="absolute -bottom-1 -right-1 flex gap-1">
+                      <div className="absolute -bottom-0.5 -right-0.5 flex gap-0.5">
                         {isHostUser && (
-                          <div className="bg-amber-400 p-1.5 rounded-xl shadow-xl border-2 border-[#050505]">
-                            <svg className="w-3 h-3 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                          <div className="bg-amber-400 p-1 rounded-lg shadow-xl border-2 border-[#050505]">
+                            <svg className="w-2.5 h-2.5 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                           </div>
                         )}
                         {speaker.is_muted && (
-                          <div className="bg-zinc-700 p-1.5 rounded-xl shadow-xl border-2 border-[#050505]">
-                            <MicOff className="w-3 h-3 text-white" />
+                          <div className="bg-zinc-700 p-1 rounded-lg shadow-xl border-2 border-[#050505]">
+                            <MicOff className="w-2.5 h-2.5 text-white" />
                           </div>
                         )}
                         {speaking && (
-                          <div className="bg-purple-600 p-1.5 rounded-xl shadow-xl border-2 border-[#050505] animate-bounce">
-                            <Volume2 className="w-3 h-3 text-white" />
+                          <div className="bg-purple-600 p-1 rounded-lg shadow-xl border-2 border-[#050505] animate-bounce">
+                            <Volume2 className="w-2.5 h-2.5 text-white" />
                           </div>
                         )}
                       </div>
