@@ -32,6 +32,10 @@ const initializeApp = async () => {
     </React.StrictMode>
   );
 
+  // Hide static policy footer once React app has mounted (crawlers still see it on initial load)
+  const policyFooter = document.getElementById('static-policy-links');
+  if (policyFooter) policyFooter.style.display = 'none';
+
   console.log(`[Main] First paint in ${(performance.now() - startTime).toFixed(1)}ms`);
 
   // PHASE 3: Post-render initialization (non-blocking)
