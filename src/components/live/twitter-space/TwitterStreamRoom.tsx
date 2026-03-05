@@ -1713,6 +1713,28 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   <span className="text-rose-400 font-medium">Report this Stream</span>
                   <Flag className="w-5 h-5 text-rose-400/50" />
                 </button>
+
+                {/* Divider */}
+                <div className="my-2 border-t border-white/5" />
+
+                {/* End / Leave */}
+                {isHost ? (
+                  <button
+                    onClick={() => { setShowSettings(false); handleEndStream(); }}
+                    className="w-full flex items-center justify-between p-4 hover:bg-rose-500/10 rounded-2xl transition-colors"
+                  >
+                    <span className="text-rose-500 font-bold">End Stream</span>
+                    <X className="w-5 h-5 text-rose-500/60" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setShowSettings(false); handleViewerLeave(); }}
+                    className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                  >
+                    <span className="text-rose-400 font-medium">Leave Stream</span>
+                    <LogOut className="w-5 h-5 text-rose-400/50" />
+                  </button>
+                )}
               </div>
             </motion.div>
           </motion.div>
