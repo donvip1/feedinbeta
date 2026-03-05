@@ -1,67 +1,59 @@
 
 
-## Video Stream Room Overhaul Plan
+# Plan: Align TwitterStreamRoom UI to Match Reference Code
 
-### Problems Identified
+## Problem
+The current `TwitterStreamRoom.tsx` has a more complex UI with elements not present in the user's reference code. The user wants the stream room to visually match their provided code exactly, while keeping all real backend integrations (LiveKit, Supabase, credit system, 85/15 gift split).
 
-1. **Reactions broken for viewers**: Stream uses `postgres_changes` on `live_stream_reactions` table, but the space (which works) uses a **broadcast channel**. The broadcast approach is faster and doesn't require DB inserts to propagate.
-2. **Chat not showing**: Messages are sent via `live_stream_messages` table + broadcast, but the flying chat only shows last 15 messages and the broadcast refetch may not trigger properly. Also, sent messages aren't added to local state immediately (optimistic update missing).
-3. **Gift/credit counter for host missing**: Space has `hostGiftTotal` state that tracks gifts received — stream room has no equivalent.
-4. **Screen share & recording**: User explicitly says remove these — they're not needed for video streams.
-5. **Camera flip broken**: The `restartTrack` approach may fail on some devices. Needs fallback to stop+recreate track.
-6. **PK Battle non-functional**: `PKBattleChallenge` component opens but doesn't actually start a battle — it just shows a toast.
-7. **UI dull/not responsive**: Bottom bar too cluttered with screen share + recording + camera + mic + chat + gift. Needs cleanup and better mobile layout.
-8. **Gift modal works but uses Dialog component** — looks out of place in a fullscreen video room.
+## Key UI Differences to Fix
 
-### Changes to `TwitterStreamRoom.tsx`
+### 1. Remove Right-Side Action Stack (lines 1396-1451)
+The user's code has NO vertical action buttons (React, Share, Flip, Guests, PK) on the right side. These will be removed from the main view. Share/React/Flip/Guests remain accessible via the settings menu and header.
 
-**Remove entirely:**
-- Screen share state, refs, handlers (`screenTrackRef`, `isScreenSharing`, `handleScreenShare`, `createLocalScreenTracks` import)
-- Recording state, refs, handlers (`mediaRecorderRef`, `recordingChunksRef`, `isRecording`, `recordingLoading`, `handleRecordingToggle`)
-- Screen share button from bottom bar
-- Recording button/indicator from bottom bar
-- Monitor import from lucide
+### 2. Simplify Header (lines 1253-1303)
+**Current**: Minimize button, host pill, "HD Live" badge, Invite button, settings (⋯), close (X)
+**User's code**: Host avatar + stream title + viewer count on left, just close (X) on right
 
-**Fix reactions — switch to broadcast channel (matching space pattern):**
-- Change `handleReaction` to broadcast via `supabase.channel().send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id, display_name } })`
-- Change subscription from `postgres_changes` on `live_stream_reactions` to `broadcast` listener on `stream-reactions-{streamId}`
-- Still insert into `live_stream_reactions` for persistence, but don't rely on it for UI
+### 3. Update PK Score Bar (lines 1316-1354)
+**Current**: "N-Way Battle" label with timer
+**User's code**: "TEAM HOST" on left, timer in center, "CHALLENGERS" on right, with proportional colored bar below
 
-**Fix chat — add optimistic updates:**
-- After `handleReplySubmit`, immediately push the new message into `replies` state (don't wait for refetch)
-- This matches what the space does
+### 4. Update PK Video Grid Styling (renderPKFeed, lines 1119-1175)
+**Current**: Gradient bg, avatar image, Flame icon + score badge, name tag
+**User's code**: Colored bg with large initial letter + name text for non-host, "SCORE: X" text badge at bottom-right
 
-**Add host gift counter:**
-- Add `hostGiftTotal` state (copy from space)
-- Fetch initial total from `live_stream_gifts` on mount
-- Update counter in the gift realtime subscription when `receiver_id === stream.user_id`
-- Display as a badge below host tag: "Gifts: {count}"
+### 5. Update Chat Layout (lines 1358-1394)
+**Current**: "Flying chat" with mask gradient on left side, `max-w-[75%]`, 220px height
+**User's code**: Bottom-left chat area with colored user names, auto-scroll, simpler styling
 
-**Fix camera flip:**
-- If `restartTrack` fails, fallback to: stop current track → create new track with opposite `facingMode` → unpublish old → publish new
+### 6. Update Bottom Controls (lines 1552-1640)
+**Current**: Mic toggle, chat input, gift button, camera toggle
+**User's code**: Target selector pills, then chat input + send button + gift button (no explicit mic/camera toggles in bottom bar)
 
-**Improve PK Battle:**
-- Wire `onSelectChallenger` to actually call `usePKBattle.createBattle()` and `sendChallenge()`
-- Import and use the `usePKBattle` hook
+### 7. Update In-Stream Gift Modal (lines 1940-1996)
+**Current**: 3-column grid, 5 gifts
+**User's code**: 2x2 grid, 4 gifts (remove Crown gift from STREAM_GIFTS)
 
-**UI/UX improvements:**
-- Clean up bottom bar: only show Mic (host), Chat input, Gift button, Camera toggle (host)
-- Move settings (⋯) to header next to "HD Live" badge (matching space pattern)
-- Add `QuickGiftBar` as an alternative to the full modal for fast gifting (matching space)
-- Ensure all overlays use `pb-safe` and `pt-safe` for mobile
-- Add proper `min-h-[100dvh]` for mobile viewport
+### 8. Update Empty PK Slot Text
+**Current**: "Waiting..." + "Invite" button
+**User's code**: Users icon + "Invite PK" button text
 
-### Files to Modify
+## Files to Modify
+1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — Major UI refactor of the render section only. All hooks, state, LiveKit logic, Supabase integrations, chat, and gift RPCs stay exactly the same.
 
-1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — All changes above
-2. No other files need modification
+## What Stays the Same
+- All LiveKit connection, track management, camera flip logic
+- Supabase broadcast channel chat with optimistic updates
+- Gift sending via `send_live_gift` RPC with 85/15 split
+- PK Battle logic via `usePKBattle` hook
+- All existing modals (report, rules, feedback, audio settings, share, full gift store)
+- Floating reactions, gift animations
+- FloatingStreamPlayer / minimize / PiP
+- Guests view
+- Chat sidebar
+- Credit balance checks
+- All state management and hooks
 
-### What stays the same
-- LiveKit initialization logic
-- All Supabase table structures
-- LiveGiftModal (still available for full gift UI)
-- Guest list view
-- Share menu
-- All modals (Report, Rules, Feedback, Audio Settings)
-- FloatingReactions component
+## Approach
+Rewrite the return JSX (from line ~1177 onward) to match the user's reference code layout while keeping all existing event handlers and state. The settings menu becomes the access point for features removed from the main view (React, Share, Flip, Guests, Camera, Mic).
 
