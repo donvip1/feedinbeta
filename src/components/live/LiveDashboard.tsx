@@ -150,7 +150,7 @@ export const LiveDashboard = ({
   };
   const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
 
-
+  const handleDeleteSpace = async (e: React.MouseEvent, spaceId: string) => {
     e.stopPropagation();
     if (!confirm("Delete this recorded space and all related data?")) return;
     setDeletingSpaceId(spaceId);
