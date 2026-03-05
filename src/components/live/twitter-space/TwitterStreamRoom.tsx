@@ -37,6 +37,7 @@ import {
   UserPlus,
   Flame,
   LogOut,
+  Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -182,6 +183,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showAudioSettingsModal, setShowAudioSettingsModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showRequestJoin, setShowRequestJoin] = useState(false);
+  const [inviteUsername, setInviteUsername] = useState('');
+  const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([]);
+  const [inviteSearching, setInviteSearching] = useState(false);
+  const [showRefill, setShowRefill] = useState(false);
 
   // Gift animations state
   const [giftAnimations, setGiftAnimations] = useState<GiftAnimation[]>([]);
@@ -1270,16 +1276,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </button>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Host: Gift appreciation to viewers */}
-          {isHost && (
-            <button
-              onClick={() => setShowStreamGiftModal(true)}
-              className="w-9 h-9 bg-amber-500/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-amber-500/30 active:scale-90 transition-all"
-              title="Gift viewers"
-            >
-              <Gift className="w-4 h-4 text-amber-400" />
-            </button>
-          )}
+          {/* Gift button - visible for both host and viewers */}
+          <button
+            onClick={() => setShowStreamGiftModal(true)}
+            className="w-9 h-9 bg-amber-500/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-amber-500/30 active:scale-90 transition-all"
+            title={isHost ? "Gift viewers" : "Send gift"}
+          >
+            <Gift className="w-4 h-4 text-amber-400" />
+          </button>
 
           {/* Share */}
           <button
@@ -1355,8 +1359,67 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </div>
       )}
 
+      {/* RIGHT-SIDE VIEWER PANEL (TikTok-style) */}
+      <div className="absolute right-3 bottom-52 z-30 flex flex-col items-center gap-3">
+        {/* Request to join for viewers */}
+        {!isHost && (
+          <button
+            onClick={() => {
+              toast.success('Request sent to host!');
+              // Broadcast request
+              supabase.channel(`stream-events-${streamId}`).send({
+                type: 'broadcast',
+                event: 'join_request',
+                payload: { user_id: user?.id, display_name: user?.user_metadata?.display_name },
+              });
+            }}
+            className="flex flex-col items-center gap-1"
+          >
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Plus className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[9px] text-white/60 font-bold">Request</span>
+          </button>
+        )}
+
+        {/* Viewer avatars */}
+        {viewers.slice(0, 3).map((viewer, index) => (
+          <button
+            key={viewer.user_id}
+            onClick={() => navigateToProfile(viewer.user_id)}
+            className="relative flex flex-col items-center gap-0.5"
+          >
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/20">
+              {viewer.profile?.avatar_url ? (
+                <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-white/10 flex items-center justify-center text-white/40 text-sm font-bold">
+                  {viewer.profile?.display_name?.[0] || '?'}
+                </div>
+              )}
+            </div>
+            <span className="text-[9px] text-white/60 font-medium truncate max-w-[52px]">
+              {viewer.profile?.display_name?.slice(0, 8) || 'User'}
+            </span>
+          </button>
+        ))}
+
+        {/* View all viewers */}
+        {viewers.length > 3 && (
+          <button
+            onClick={() => setView('guests')}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Users className="w-4 h-4 text-white/60" />
+            </div>
+            <span className="text-[9px] text-white/60 font-bold">+{viewers.length - 3}</span>
+          </button>
+        )}
+      </div>
+
       {/* CHAT AREA */}
-      <div className="absolute bottom-44 left-0 right-16 z-30 px-4">
+      <div className="absolute bottom-36 left-0 right-16 z-30 px-4">
         <div className="flex flex-col space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide pointer-events-auto">
           <AnimatePresence initial={false}>
             {replies.slice(-20).map((msg) => (
@@ -1516,39 +1579,42 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           </div>
         )}
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {/* Chat input */}
-          <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(); }} className="flex-1 relative min-w-0 flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/10 rounded-full px-4 py-2">
-            <input
-              type="text"
-              value={replyText}
-              onChange={(e) => setReplyText(e.target.value)}
-              placeholder="Say something..."
-              className="flex-1 bg-transparent text-sm font-medium text-white placeholder-white/30 focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={!replyText.trim()}
-              className="p-1 text-white/60 hover:text-white disabled:opacity-30"
-            >
-              <Send className="w-4 h-4" />
-            </button>
+          <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(); }} className="flex-1 min-w-0">
+            <div className="flex items-center bg-white/10 backdrop-blur-xl border border-white/10 rounded-full overflow-hidden">
+              <input
+                type="text"
+                value={replyText}
+                onChange={(e) => setReplyText(e.target.value)}
+                placeholder="Say something..."
+                className="flex-1 min-w-0 bg-transparent text-sm font-medium text-white placeholder-white/30 focus:outline-none px-4 py-2.5"
+              />
+              <button
+                type="submit"
+                disabled={!replyText.trim()}
+                className="w-10 h-10 flex items-center justify-center text-white disabled:opacity-30 shrink-0"
+              >
+                <Send className="w-4 h-4" />
+              </button>
+            </div>
           </form>
 
           {/* React button */}
           <button
             onClick={() => setShowReactions(true)}
-            className="w-11 h-11 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
+            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
           >
             <Heart className="w-5 h-5 text-rose-400" />
           </button>
 
-          {/* Gift button */}
+          {/* Refill / Recharge credits */}
           <button
-            onClick={() => setShowStreamGiftModal(true)}
-            className="w-11 h-11 bg-gradient-to-br from-yellow-400 to-pink-500 rounded-full flex items-center justify-center shadow-lg shadow-pink-500/20 active:scale-90 transition-all shrink-0"
+            onClick={() => navigate('/wallet')}
+            className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-90 transition-all shrink-0"
+            title="Refill credits"
           >
-            <Gift className="w-5 h-5 text-white" />
+            <Coins className="w-5 h-5 text-white" />
           </button>
         </div>
       </div>
@@ -1699,15 +1765,13 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                       <span className="text-white font-medium">Manage Guests ({viewers.length + 1})</span>
                       <Users className="w-5 h-5 text-white/30" />
                     </button>
-                    {isPKMode && (
-                      <button
-                        onClick={() => { setShowSettings(false); setShowInviteModal(true); }}
-                        className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
-                      >
-                        <span className="text-white font-medium">Invite PK Challenger</span>
-                        <Swords className="w-5 h-5 text-white/30" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => { setShowSettings(false); setShowInviteModal(true); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">{isPKMode ? 'Invite PK Challenger' : 'Invite to Stream'}</span>
+                      {isPKMode ? <Swords className="w-5 h-5 text-white/30" /> : <UserPlus className="w-5 h-5 text-white/30" />}
+                    </button>
                     <button
                       onClick={() => { setShowSettings(false); setShowAudioSettingsModal(true); }}
                       className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
@@ -1878,55 +1942,126 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-black text-lg flex items-center gap-2">
-                  <Swords className="w-5 h-5 text-purple-400" /> Invite Creators
+                  <UserPlus className="w-5 h-5 text-purple-400" /> Invite to Stream
                 </h3>
                 <button onClick={() => setShowInviteModal(false)} className="p-2 bg-white/5 rounded-full">
                   <X className="w-4 h-4 text-white/60" />
                 </button>
               </div>
 
+              {/* Username search */}
               <div className="flex items-center bg-white/5 rounded-2xl px-4 py-3 border border-white/5 mb-4">
                 <Search className="w-4 h-4 text-white/30" />
                 <input
                   type="text"
-                  placeholder="Search creators..."
+                  value={inviteUsername}
+                  onChange={async (e) => {
+                    const val = e.target.value;
+                    setInviteUsername(val);
+                    if (val.length >= 2) {
+                      setInviteSearching(true);
+                      const { data } = await supabase
+                        .from('profiles')
+                        .select('id, display_name, username, avatar_url')
+                        .or(`username.ilike.%${val}%,display_name.ilike.%${val}%`)
+                        .neq('id', user?.id || '')
+                        .limit(10);
+                      setInviteSearchResults(data || []);
+                      setInviteSearching(false);
+                    } else {
+                      setInviteSearchResults([]);
+                    }
+                  }}
+                  placeholder="Search by username..."
                   className="flex-1 bg-transparent text-white placeholder-white/30 outline-none ml-3 text-sm"
                 />
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2 scrollbar-hide">
-                {viewers.filter(v => v.user_id !== host?.id).map(viewer => {
-                  const isJoined = battleParticipants.some(p => p.id === viewer.user_id);
-                  return (
-                    <div key={viewer.user_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={viewer.profile?.avatar_url || ''}
-                          alt={viewer.profile?.display_name}
-                          className="w-10 h-10 rounded-full"
-                        />
-                        <div className="min-w-0">
-                          <p className="text-white font-bold text-sm truncate">{viewer.profile?.display_name}</p>
-                          <p className="text-white/40 text-xs">@{viewer.profile?.username}</p>
+                {/* Search results */}
+                {inviteUsername.length >= 2 && (
+                  <>
+                    {inviteSearching && <p className="text-center text-white/30 text-sm py-4">Searching...</p>}
+                    {!inviteSearching && inviteSearchResults.map((profile: any) => {
+                      const isJoined = battleParticipants.some(p => p.id === profile.id);
+                      const isInStream = viewers.some(v => v.user_id === profile.id) || profile.id === host?.id;
+                      return (
+                        <div key={profile.id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img src={profile.avatar_url || ''} alt={profile.display_name} className="w-10 h-10 rounded-full" />
+                            <div className="min-w-0">
+                              <p className="text-white font-bold text-sm truncate">{profile.display_name}</p>
+                              <p className="text-white/40 text-xs">@{profile.username}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (isPKMode) {
+                                handleInviteCreator(profile.id);
+                              } else {
+                                // Send invite notification
+                                supabase.channel(`stream-events-${streamId}`).send({
+                                  type: 'broadcast',
+                                  event: 'invite_user',
+                                  payload: { user_id: profile.id, display_name: profile.display_name },
+                                });
+                                toast.success(`Invited @${profile.username}`);
+                              }
+                              setInviteUsername('');
+                              setInviteSearchResults([]);
+                            }}
+                            disabled={isJoined}
+                            className={cn(
+                              "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
+                              isJoined ? 'bg-gray-800 text-gray-500'
+                                : isInStream ? 'bg-blue-600 text-white'
+                                : 'bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20'
+                            )}
+                          >
+                            {isJoined ? 'On Stage' : isInStream ? 'In Stream' : 'Invite'}
+                          </button>
                         </div>
-                      </div>
-                      <button
-                        onClick={() => handleInviteCreator(viewer.user_id)}
-                        disabled={isJoined || battleParticipants.length >= pkMaxSlots}
-                        className={cn(
-                          "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
-                          isJoined
-                            ? 'bg-gray-800 text-gray-500'
-                            : 'bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20'
-                        )}
-                      >
-                        {isJoined ? 'On Stage' : 'Invite'}
-                      </button>
-                    </div>
-                  );
-                })}
-                {viewers.filter(v => v.user_id !== host?.id).length === 0 && (
-                  <p className="text-center text-white/30 text-sm py-8">No viewers to invite yet</p>
+                      );
+                    })}
+                    {!inviteSearching && inviteSearchResults.length === 0 && inviteUsername.length >= 2 && (
+                      <p className="text-center text-white/30 text-sm py-4">No users found</p>
+                    )}
+                  </>
+                )}
+
+                {/* Current viewers (when not searching) */}
+                {inviteUsername.length < 2 && (
+                  <>
+                    <p className="text-white/30 text-xs font-bold uppercase tracking-wider mb-2">Current Viewers</p>
+                    {viewers.filter(v => v.user_id !== host?.id).map(viewer => {
+                      const isJoined = battleParticipants.some(p => p.id === viewer.user_id);
+                      return (
+                        <div key={viewer.user_id} className="flex items-center justify-between p-3 rounded-2xl bg-white/[0.03] border border-white/5">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <img src={viewer.profile?.avatar_url || ''} alt={viewer.profile?.display_name} className="w-10 h-10 rounded-full" />
+                            <div className="min-w-0">
+                              <p className="text-white font-bold text-sm truncate">{viewer.profile?.display_name}</p>
+                              <p className="text-white/40 text-xs">@{viewer.profile?.username}</p>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => handleInviteCreator(viewer.user_id)}
+                            disabled={isJoined || (isPKMode && battleParticipants.length >= pkMaxSlots)}
+                            className={cn(
+                              "px-4 py-1.5 rounded-full text-xs font-bold transition-all",
+                              isJoined ? 'bg-gray-800 text-gray-500'
+                                : 'bg-pink-600 hover:bg-pink-500 text-white shadow-lg shadow-pink-500/20'
+                            )}
+                          >
+                            {isJoined ? 'On Stage' : 'Invite'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {viewers.filter(v => v.user_id !== host?.id).length === 0 && (
+                      <p className="text-center text-white/30 text-sm py-8">No viewers yet</p>
+                    )}
+                  </>
                 )}
               </div>
             </motion.div>
