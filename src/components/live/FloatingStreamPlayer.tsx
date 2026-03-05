@@ -47,24 +47,22 @@ export const FloatingStreamPlayer: React.FC = () => {
         initial={{ scale: 0, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0, opacity: 0 }}
-        className="fixed bottom-24 right-4 z-50 group"
+        className="fixed bottom-24 right-4 z-50"
+        drag
+        dragMomentum={false}
       >
-        <div className="w-44 aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+        <div className="w-36 h-48 bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10 relative">
           {/* Video Preview */}
           <video
             ref={videoRef}
             autoPlay
             playsInline
             muted
-            className="w-full h-full object-cover opacity-80"
+            className="w-full h-full object-cover"
           />
           
-          {/* Play indicator */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-8 h-8 rounded-full bg-rose-500 flex items-center justify-center animate-pulse">
-              <Play className="w-4 h-4 text-white fill-current" />
-            </div>
-          </div>
+          {/* Gradient overlay for controls */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/60 pointer-events-none" />
 
           {/* Live badge */}
           <div className="absolute top-2 left-2 bg-rose-600 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -72,17 +70,25 @@ export const FloatingStreamPlayer: React.FC = () => {
             <span className="text-[8px] font-black uppercase tracking-widest text-white">Live</span>
           </div>
 
-          {/* Hover controls */}
-          <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Stream title */}
+          <div className="absolute bottom-8 left-2 right-2">
+            <span className="text-[10px] text-white/80 font-bold truncate block">
+              {streamState.streamInfo?.title || 'Live Stream'}
+            </span>
+          </div>
+
+          {/* Bottom controls - always visible */}
+          <div className="absolute bottom-1.5 left-1.5 right-1.5 flex justify-between">
             <button
               onClick={handleMaximize}
-              className="p-1.5 bg-black/50 backdrop-blur-sm rounded-lg hover:bg-black/70 transition-colors"
+              className="px-2.5 py-1 bg-white/20 backdrop-blur-sm rounded-full flex items-center gap-1"
             >
               <Maximize2 className="w-3 h-3 text-white" />
+              <span className="text-[9px] font-bold text-white">Return</span>
             </button>
             <button
               onClick={handleEndStream}
-              className="p-1.5 bg-rose-500/80 rounded-lg hover:bg-rose-600 transition-colors"
+              className="p-1.5 bg-rose-500/80 rounded-full"
             >
               <X className="w-3 h-3 text-white" />
             </button>
