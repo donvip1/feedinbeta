@@ -1791,6 +1791,17 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         ))}
       </AnimatePresence>
 
+      {/* Credit Balance Indicator */}
+      {myCredits !== null && (
+        <div className="flex justify-center pb-2">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+            <Coins className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-xs font-bold text-amber-400">{myCredits.toLocaleString()}</span>
+            <span className="text-[10px] text-muted-foreground">credits</span>
+          </div>
+        </div>
+      )}
+
       {/* BOTTOM CONTROLS - Premium rounded bar */}
       <div className="p-4 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem]">
         <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
