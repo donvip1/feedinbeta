@@ -35,6 +35,8 @@ import {
   Hand,
   Circle,
   Speaker,
+  Monitor,
+  MonitorOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { shareUrls } from '@/lib/url-utils';
@@ -177,6 +179,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [isLoudspeaker, setIsLoudspeaker] = useState(true);
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [volumeLevel, setVolumeLevel] = useState(100);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [remoteScreenSharing, setRemoteScreenSharing] = useState(false);
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteScreenVideoRef = useRef<HTMLVideoElement>(null);
   
   // Speaker management states
   const [selectedSpeaker, setSelectedSpeaker] = useState<Speaker | null>(null);
@@ -543,6 +550,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       setIsRecording(true);
     }
     await fetchSpeakers();
+    
+    // Auto-start recording for host if is_recording_enabled is true
+    if (data.is_recording_enabled && data.user_id === user?.id && !isRecording) {
+      setTimeout(() => {
+        handleRecordingToggle();
+      }, 2000); // Delay to allow connection to stabilize
+    }
   };
 
   const fetchSpeakers = async () => {
@@ -786,18 +800,170 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
+  // Screen sharing - host only
+  const startScreenShare = async () => {
+    if (!isHost) {
+      toast.error('Only hosts can share screen');
+      return;
+    }
+    try {
+      const { spaceRoomManager } = await import('@/lib/space-room-manager');
+      const result = await spaceRoomManager.startScreenShare();
+      if (!result.success) {
+        if (result.error !== 'Permission denied') {
+          toast.error(result.error || 'Failed to start screen sharing');
+        }
+        return;
+      }
+      setScreenStream(result.stream || null);
+      setIsScreenSharing(true);
+      
+      // Broadcast screen share started
+      const channel = supabase.channel(`space-screen-${spaceId}`);
+      await channel.send({
+        type: 'broadcast',
+        event: 'screen-share-started',
+        payload: { userId: user?.id },
+      });
+      supabase.removeChannel(channel);
+      
+      toast.success('Screen sharing started');
+    } catch (error: any) {
+      if (error.name !== 'NotAllowedError') {
+        toast.error('Failed to start screen sharing');
+      }
+    }
+  };
+
+  const stopScreenShare = async () => {
+    try {
+      const { spaceRoomManager } = await import('@/lib/space-room-manager');
+      await spaceRoomManager.stopScreenShare();
+    } catch (error) {
+      console.error('Error stopping screen share:', error);
+    }
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      setScreenStream(null);
+    }
+    setIsScreenSharing(false);
+    
+    // Broadcast screen share ended
+    const channel = supabase.channel(`space-screen-${spaceId}`);
+    await channel.send({
+      type: 'broadcast',
+      event: 'screen-share-ended',
+      payload: { userId: user?.id },
+    });
+    supabase.removeChannel(channel);
+    
+    toast.success('Screen sharing stopped');
+  };
+
+  // Subscribe to remote screen shares
+  useEffect(() => {
+    if (!spaceId || !user) return;
+    const channel = supabase
+      .channel(`space-screen-listen-${spaceId}`)
+      .on('broadcast', { event: 'screen-share-started' }, async (payload: any) => {
+        const { userId: sharerId } = payload.payload;
+        if (sharerId === user.id) return;
+        setRemoteScreenSharing(true);
+        toast.info('Host is sharing their screen');
+        try {
+          const { spaceRoomManager } = await import('@/lib/space-room-manager');
+          const stream = await spaceRoomManager.subscribeToScreenShare(sharerId, '', '');
+          if (stream && remoteScreenVideoRef.current) {
+            remoteScreenVideoRef.current.srcObject = stream as any;
+          }
+        } catch (e) {
+          console.error('[Space] Failed to subscribe to screen share:', e);
+        }
+      })
+      .on('broadcast', { event: 'screen-share-ended' }, (payload: any) => {
+        const { userId: sharerId } = payload.payload;
+        if (sharerId === user.id) return;
+        setRemoteScreenSharing(false);
+        if (remoteScreenVideoRef.current) {
+          remoteScreenVideoRef.current.srcObject = null;
+        }
+        toast.info('Screen sharing ended');
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [spaceId, user?.id]);
+
+  // Attach local screen stream to video
+  useEffect(() => {
+    if (screenVideoRef.current && screenStream) {
+      screenVideoRef.current.srcObject = screenStream;
+    }
+  }, [screenStream]);
+
   const handleLeave = async () => {
-    // Stop recording if active before ending
+    // Stop screen share if active
+    if (isScreenSharing) {
+      await stopScreenShare();
+    }
+    
+    let recordingUrl: string | null = null;
+    
+    // Stop recording if active before ending and capture URL
     if (isRecording && isHost) {
-      await handleRecordingToggle();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.access_token) {
+          const response = await supabase.functions.invoke('livekit-recording', {
+            body: { action: 'stop', roomId: spaceId, roomType: 'live_spaces' },
+          });
+          if (response.data?.recordingUrl) {
+            recordingUrl = response.data.recordingUrl;
+          }
+        }
+      } catch (error) {
+        console.error('[Recording] Error stopping:', error);
+      }
+      setIsRecording(false);
     }
     
     if (isHost) {
-      // End the space - update DB and broadcast to all participants
+      // Save recording URL if available
+      const updateData: any = { 
+        status: 'ended', 
+        ended_at: new Date().toISOString(),
+        peak_viewers: space?.viewer_count || speakers.length,
+      };
+      if (recordingUrl) {
+        updateData.recording_url = recordingUrl;
+      }
+      
       await supabase
         .from('live_spaces')
-        .update({ status: 'ended', ended_at: new Date().toISOString() })
+        .update(updateData)
         .eq('id', spaceId);
+
+      // Auto-post to feed if recording is available
+      if (recordingUrl && user) {
+        try {
+          await supabase.from('posts').insert({
+            user_id: user.id,
+            content: `🎙️ ${space?.title || 'Live Space'} — Listen to the replay`,
+            media_urls: [recordingUrl],
+            media_types: ['audio'],
+            post_type: 'audio',
+            metadata: {
+              source: 'live_space_recording',
+              space_id: spaceId,
+              duration: space?.started_at ? Math.floor((Date.now() - new Date(space.started_at).getTime()) / 1000) : 0,
+              viewer_count: space?.viewer_count || speakers.length,
+              share_link: space?.share_link || spaceId,
+            },
+          } as any);
+          toast.success('Space recording posted to your feed!');
+        } catch (error) {
+          console.error('[AutoPost] Error posting to feed:', error);
+        }
+      }
 
       // Broadcast immediate end signal to all participants
       await supabase
@@ -1244,6 +1410,33 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         </div>
       </div>
 
+      {/* Screen Share Overlay */}
+      {(isScreenSharing || remoteScreenSharing) && (
+        <div className="relative bg-black border-b border-white/10">
+          <video
+            ref={isScreenSharing ? screenVideoRef : remoteScreenVideoRef}
+            autoPlay
+            playsInline
+            muted={isScreenSharing}
+            className="w-full max-h-[40vh] object-contain bg-black"
+          />
+          <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/60 px-3 py-1 rounded-full">
+            <Monitor className="w-3 h-3 text-green-400" />
+            <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest">
+              {isScreenSharing ? 'You are sharing' : 'Host is sharing'}
+            </span>
+          </div>
+          {isScreenSharing && (
+            <button
+              onClick={stopScreenShare}
+              className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-red-600 transition-colors"
+            >
+              Stop Sharing
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {/* Connection Status */}
@@ -1573,17 +1766,31 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </AnimatePresence>
           </div>
 
+          {/* Screen Share - Host Only */}
+          {isHost && (
+            <button
+              onClick={isScreenSharing ? stopScreenShare : startScreenShare}
+              className={cn(
+                "w-12 h-12 flex items-center justify-center rounded-full active:scale-90 transition-all",
+                isScreenSharing ? 'text-green-400' : 'text-white hover:text-white/80'
+              )}
+              title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
+            >
+              {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+            </button>
+          )}
+
           {/* Mute All - Host Only */}
           {isHost && (
             <button
               onClick={handleMuteAll}
               className={cn(
-                "w-14 h-14 rounded-[1.5rem] flex items-center justify-center active:scale-90 transition-all shadow-xl",
-                allMuted ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                "w-12 h-12 flex items-center justify-center rounded-full active:scale-90 transition-all",
+                allMuted ? 'text-red-400' : 'text-white hover:text-white/80'
               )}
               title={allMuted ? 'Allow unmute' : 'Mute all'}
             >
-              {allMuted ? <VolumeX className="w-6 h-6" /> : <Speaker className="w-6 h-6" />}
+              {allMuted ? <VolumeX className="w-5 h-5" /> : <Speaker className="w-5 h-5" />}
             </button>
           )}
         </div>
