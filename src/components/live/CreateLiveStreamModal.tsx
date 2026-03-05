@@ -1,15 +1,12 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Video, Sparkles, Crown, Unlock, Calendar, Radio, Clock, Swords, Hash, X, Lock, Globe } from "lucide-react";
+import { Video, Sparkles, Crown, Calendar, Radio, Clock, Swords, Hash, X, Lock, Globe, Shield } from "lucide-react";
 import { CoverImageUpload } from "@/components/live/shared/CoverImageUpload";
+import { usePremiumStatus } from "@/hooks/usePremiumStatus";
+import { useNavigation } from "@/context/NavigationContext";
 
 // Categories available for streams
 const STREAM_CATEGORIES = [
@@ -26,12 +23,8 @@ const STREAM_CATEGORIES = [
   { value: 'news', label: 'News', icon: '📰' },
   { value: 'other', label: 'Other', icon: '✨' },
 ];
-import { usePremiumStatus } from "@/hooks/usePremiumStatus";
-import { useNavigation } from "@/context/NavigationContext";
-import { cn } from "@/lib/utils";
 
 // ADMIN CONFIG: Set to true to restrict live streaming to premium users only
-// When false, all users can create live streams (current default for launch)
 const REQUIRE_PREMIUM_FOR_STREAMING = false;
 
 type RoomType = 'video_broadcast' | 'pk_battle';
@@ -41,6 +34,8 @@ interface CreateLiveStreamModalProps {
   onClose: () => void;
   onStreamCreated: (streamId: string) => void;
 }
+
+const MAX_HASHTAGS = 5;
 
 export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: CreateLiveStreamModalProps) => {
   const { setHideBottomNav } = useNavigation();
@@ -59,8 +54,6 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
   const [isPrivate, setIsPrivate] = useState(false);
   const { isPremium: userIsPremium, loading: premiumLoading } = usePremiumStatus();
 
-  const MAX_HASHTAGS = 5;
-
   const handleHashtagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if ((e.key === ' ' || e.key === 'Enter') && hashtagInput.trim()) {
       e.preventDefault();
@@ -78,7 +71,6 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
     setHashtags(hashtags.filter(tag => tag !== tagToRemove));
   };
 
-  // Hide bottom navigation when modal is open
   useEffect(() => {
     if (isOpen) {
       setHideBottomNav(true);
@@ -88,7 +80,6 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
     return () => setHideBottomNav(false);
   }, [isOpen, setHideBottomNav]);
 
-  // Check if user can create streams
   const canCreateStream = !REQUIRE_PREMIUM_FOR_STREAMING || userIsPremium;
 
   const handleCreate = async () => {
@@ -97,7 +88,6 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       return;
     }
 
-    // Validate scheduled date/time if scheduling
     if (isScheduled) {
       if (!scheduledDate || !scheduledTime) {
         toast.error("Please select a date and time for the scheduled stream");
@@ -110,7 +100,6 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       }
     }
 
-    // Check premium requirement if enabled
     if (REQUIRE_PREMIUM_FOR_STREAMING && !userIsPremium) {
       toast.error("Premium subscription required to create live streams");
       return;
@@ -125,10 +114,8 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
         return;
       }
 
-      // Generate stream key
       const { data: streamKeyData } = await supabase.rpc('generate_stream_key');
       
-      // Build scheduled_start if scheduling
       let scheduledStart = null;
       if (isScheduled && scheduledDate && scheduledTime) {
         scheduledStart = new Date(`${scheduledDate}T${scheduledTime}`).toISOString();
@@ -162,7 +149,6 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
       onStreamCreated(data.id);
       onClose();
       
-      // Reset form
       setTitle("");
       setDescription("");
       setCategory("");
@@ -183,187 +169,158 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
     }
   };
 
-  // Show premium required message if streaming is restricted
+  // Premium gate
   if (REQUIRE_PREMIUM_FOR_STREAMING && !userIsPremium && !premiumLoading) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Crown className="w-5 h-5 text-yellow-500" />
-              Premium Feature
-            </DialogTitle>
-            <DialogDescription>
-              Live streaming is currently available for premium subscribers only.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="p-4 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-lg text-center">
-              <Crown className="w-12 h-12 mx-auto text-yellow-500 mb-3" />
-              <h3 className="font-semibold mb-2">Upgrade to Premium</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Get access to live streaming, exclusive content, and more!
-              </p>
-              <Button className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600">
-                View Plans
-              </Button>
+      <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DialogContent className="sm:max-w-md p-0 bg-[#0F1119] border border-white/5 rounded-[2.5rem] overflow-hidden gap-0">
+          <div className="h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50" />
+          <div className="p-8 text-center space-y-6">
+            <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <Crown className="w-10 h-10 text-white" />
             </div>
+            <div>
+              <h2 className="text-xl font-black text-white">Premium Feature</h2>
+              <p className="text-sm text-slate-500 mt-2">Live streaming is currently available for premium subscribers only.</p>
+            </div>
+            <button className="w-full py-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-black rounded-2xl text-sm font-black">
+              View Plans
+            </button>
+            <button onClick={onClose} className="w-full py-3.5 bg-white/5 text-slate-400 rounded-2xl text-sm font-bold hover:bg-white/10 transition-all">
+              Maybe Later
+            </button>
           </div>
-          
-          <Button variant="outline" onClick={onClose} className="w-full">
-            Maybe Later
-          </Button>
         </DialogContent>
       </Dialog>
     );
   }
 
-  // Get min date (today) for scheduling
   const today = new Date().toISOString().split('T')[0];
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2">
-            <Video className="w-5 h-5 text-primary" />
-            Create Live Stream
-          </DialogTitle>
-          {!REQUIRE_PREMIUM_FOR_STREAMING && (
-            <DialogDescription className="flex items-center gap-1 text-green-500">
-              <Unlock className="w-3 h-3" />
-              Live streaming is currently open for everyone!
-            </DialogDescription>
-          )}
-        </DialogHeader>
-        
-        <div className="space-y-4 overflow-y-auto flex-1 pr-1 py-2">
-          {/* Room Type Selection */}
-          <div>
-            <Label className="text-xs text-muted-foreground mb-2 block">Stream Type</Label>
-            <div className="grid grid-cols-2 gap-2">
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-md max-h-[90vh] p-0 bg-[#0F1119] border border-white/5 rounded-[2.5rem] overflow-hidden gap-0">
+        {/* Accent top line */}
+        <div className="h-1 bg-gradient-to-r from-transparent via-rose-500 to-transparent opacity-50" />
+
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 to-pink-600 flex items-center justify-center shadow-lg shadow-rose-500/20">
+              <Video className="w-6 h-6 text-white animate-pulse" />
+            </div>
+            <div>
+              <h2 className="text-lg font-black text-white tracking-tight">Create Stream</h2>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Go live in HD</p>
+            </div>
+          </div>
+          <button 
+            onClick={onClose} 
+            className="w-10 h-10 flex items-center justify-center rounded-2xl bg-white/5 hover:bg-white/10 transition-all"
+          >
+            <X className="w-5 h-5 text-white" />
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-5 max-h-[60vh]">
+          {/* Stream Type */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stream Type</label>
+            <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setRoomType('video_broadcast')}
-                className={cn(
-                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
-                  roomType === 'video_broadcast' 
-                    ? "border-primary bg-primary/10 text-primary" 
-                    : "border-muted hover:border-muted-foreground/50"
-                )}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 ${
+                  roomType === 'video_broadcast'
+                    ? 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                    : 'bg-white/[0.03] border-white/5 text-slate-400 hover:bg-white/[0.06]'
+                }`}
               >
-                <Video className="w-5 h-5" />
-                <span className="font-medium text-xs">Video</span>
+                <Video className="w-6 h-6" />
+                <span className="font-black text-xs uppercase tracking-wider">Video</span>
               </button>
               <button
                 type="button"
                 onClick={() => setRoomType('pk_battle')}
-                className={cn(
-                  "flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all",
-                  roomType === 'pk_battle' 
-                    ? "border-purple-500 bg-purple-500/10 text-purple-500" 
-                    : "border-muted hover:border-muted-foreground/50"
-                )}
+                className={`flex flex-col items-center gap-2 p-4 rounded-2xl border transition-all active:scale-95 ${
+                  roomType === 'pk_battle'
+                    ? 'bg-purple-500/15 border-purple-500/40 text-purple-400'
+                    : 'bg-white/[0.03] border-white/5 text-slate-400 hover:bg-white/[0.06]'
+                }`}
               >
-                <Swords className="w-5 h-5" />
-                <span className="font-medium text-xs">PK Battle</span>
+                <Swords className="w-6 h-6" />
+                <span className="font-black text-xs uppercase tracking-wider">PK Battle</span>
               </button>
             </div>
           </div>
 
-          {/* Stream Schedule Toggle */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => setIsScheduled(false)}
-              className={cn(
-                "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
-                !isScheduled 
-                  ? "border-red-500 bg-red-500/10 text-red-500" 
-                  : "border-muted hover:border-muted-foreground/50"
-              )}
-            >
-              <Radio className="w-6 h-6" />
-              <span className="font-medium text-sm">Go Live Now</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsScheduled(true)}
-              className={cn(
-                "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
-                isScheduled 
-                  ? "border-blue-500 bg-blue-500/10 text-blue-500" 
-                  : "border-muted hover:border-muted-foreground/50"
-              )}
-            >
-              <Calendar className="w-6 h-6" />
-              <span className="font-medium text-sm">Schedule</span>
-            </button>
-          </div>
-
-          <div>
-            <Label htmlFor="title">Title *</Label>
-            <Input
-              id="title"
-              placeholder="What's your stream about?"
+          {/* Title */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stream Title *</label>
+            <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              placeholder="What's your stream about?"
               maxLength={100}
+              className="w-full bg-white/5 border border-white/5 rounded-2xl px-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-rose-500/40 focus:ring-1 focus:ring-rose-500/20 transition-all"
             />
           </div>
 
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              placeholder="Tell viewers what to expect..."
+          {/* Description */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Description</label>
+            <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
+              placeholder="Tell viewers what to expect..."
               maxLength={500}
+              rows={3}
+              className="w-full bg-white/5 border border-white/5 rounded-2xl px-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-rose-500/40 focus:ring-1 focus:ring-rose-500/20 transition-all resize-none"
             />
           </div>
 
-          <div>
-            <Label>Category</Label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent className="bg-background border border-border z-50">
-                {STREAM_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat.value} value={cat.value}>
-                    <span className="flex items-center gap-2">
-                      <span>{cat.icon}</span>
-                      <span>{cat.label}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Category Selection */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
+            <div className="flex flex-wrap gap-2">
+              {STREAM_CATEGORIES.map((cat) => (
+                <button
+                  key={cat.value}
+                  type="button"
+                  onClick={() => setCategory(category === cat.value ? '' : cat.value)}
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-bold transition-all active:scale-95 ${
+                    category === cat.value
+                      ? 'bg-rose-500/20 border border-rose-500/40 text-rose-300'
+                      : 'bg-white/5 border border-white/5 text-slate-400 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  <span>{cat.icon}</span>
+                  <span>{cat.label}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Hashtags Input */}
-          <div>
-            <Label className="flex items-center justify-between">
-              <span className="flex items-center gap-1">
-                <Hash className="w-3 h-3" />
-                Hashtags
-              </span>
-              <span className="text-xs text-muted-foreground">{hashtags.length}/{MAX_HASHTAGS}</span>
-            </Label>
-            <div className="mt-1.5 flex flex-wrap gap-1.5 p-2 border border-input rounded-md bg-background min-h-[42px]">
+          {/* Hashtags */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                <Hash className="w-3 h-3" /> Hashtags
+              </label>
+              <span className="text-[10px] text-slate-600 font-bold">{hashtags.length}/{MAX_HASHTAGS}</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 p-3 bg-white/5 border border-white/5 rounded-2xl min-h-[44px]">
               {hashtags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary text-sm rounded-full"
+                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-500/15 text-rose-300 text-xs font-bold rounded-xl"
                 >
                   #{tag}
                   <button
                     type="button"
                     onClick={() => removeHashtag(tag)}
-                    className="hover:bg-primary/20 rounded-full p-0.5"
+                    className="hover:bg-rose-500/20 rounded-full p-0.5"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -376,93 +333,120 @@ export const CreateLiveStreamModal = ({ isOpen, onClose, onStreamCreated }: Crea
                   onChange={(e) => setHashtagInput(e.target.value.replace(/\s/g, ''))}
                   onKeyDown={handleHashtagKeyDown}
                   placeholder={hashtags.length === 0 ? "Add hashtags..." : ""}
-                  className="flex-1 min-w-[80px] bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+                  className="flex-1 min-w-[80px] bg-transparent outline-none text-sm text-white placeholder:text-slate-600"
                 />
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Press space or enter to add</p>
+            <p className="text-[10px] text-slate-600">Press space or enter to add</p>
           </div>
 
-          {/* Cover Image Upload */}
+          {/* Cover Image */}
           <CoverImageUpload
             value={coverImageUrl}
             onChange={setCoverImageUrl}
           />
 
-          <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
-              {isPrivate ? <Lock className="w-4 h-4" /> : <Globe className="w-4 h-4" />}
-              <div>
-                <p className="text-sm font-medium">Private Stream</p>
-                <p className="text-xs text-muted-foreground">Only people with the link can join</p>
-              </div>
-            </div>
-            <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
-          </div>
-
-          {isScheduled && (
-            <div className="space-y-3 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
-              <div className="flex items-center gap-2 text-blue-500">
-                <Clock className="w-4 h-4" />
-                <span className="text-sm font-medium">Schedule Time</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+          {/* Toggle Settings */}
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Settings</label>
+            
+            {/* Private */}
+            <div className="flex items-center justify-between py-3.5 px-4 bg-white/[0.03] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center">
+                  {isPrivate ? <Lock className="w-4 h-4 text-amber-400" /> : <Globe className="w-4 h-4 text-slate-400" />}
+                </div>
                 <div>
-                  <Label htmlFor="scheduled-date" className="text-xs">Date</Label>
-                  <Input
-                    id="scheduled-date"
+                  <p className="text-sm font-bold text-white">Private Stream</p>
+                  <p className="text-[10px] text-slate-500">Only people with the link can join</p>
+                </div>
+              </div>
+              <Switch checked={isPrivate} onCheckedChange={setIsPrivate} />
+            </div>
+
+            {/* Schedule */}
+            <div className="flex items-center justify-between py-3.5 px-4 bg-white/[0.03] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Schedule for Later</p>
+                  <p className="text-[10px] text-slate-500">Set a start time</p>
+                </div>
+              </div>
+              <Switch checked={isScheduled} onCheckedChange={setIsScheduled} />
+            </div>
+
+            {isScheduled && (
+              <div className="px-4 py-3 bg-white/[0.03] rounded-2xl border border-white/5 space-y-3">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Start Time</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
                     type="date"
                     min={today}
                     value={scheduledDate}
                     onChange={(e) => setScheduledDate(e.target.value)}
+                    className="w-full bg-white/5 border border-white/5 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500/40 transition-all [color-scheme:dark]"
                   />
-                </div>
-                <div>
-                  <Label htmlFor="scheduled-time" className="text-xs">Time</Label>
-                  <Input
-                    id="scheduled-time"
+                  <input
                     type="time"
                     value={scheduledTime}
                     onChange={(e) => setScheduledTime(e.target.value)}
+                    className="w-full bg-white/5 border border-white/5 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-rose-500/40 transition-all [color-scheme:dark]"
                   />
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-primary" />
-              <Label htmlFor="premium" className="cursor-pointer">Premium Stream</Label>
+            {/* Premium */}
+            <div className="flex items-center justify-between py-3.5 px-4 bg-white/[0.03] rounded-2xl border border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-white">Premium Stream</p>
+                  <p className="text-[10px] text-slate-500">Only subscribers can view</p>
+                </div>
+              </div>
+              <Switch checked={isPremium} onCheckedChange={setIsPremium} />
             </div>
-            <Switch
-              id="premium"
-              checked={isPremium}
-              onCheckedChange={setIsPremium}
-            />
           </div>
-          {isPremium && (
-            <p className="text-xs text-muted-foreground">
-              Only subscribers can view this stream
-            </p>
-          )}
 
+          {/* Security Notice */}
+          <div className="bg-white/[0.03] rounded-2xl p-4 flex items-center gap-3 border border-white/5">
+            <div className="w-9 h-9 rounded-xl bg-rose-500/15 flex items-center justify-center flex-shrink-0">
+              <Shield className="w-4 h-4 text-rose-400" />
+            </div>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-relaxed">
+              AI Moderation is active. By going live you agree to our content guidelines.
+            </p>
+          </div>
         </div>
 
-        <div className="flex gap-2 flex-shrink-0 pt-2 border-t">
-          <Button variant="outline" onClick={onClose} className="flex-1">
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleCreate} 
-            disabled={loading || premiumLoading} 
-            className={cn(
-              "flex-1",
-              !isScheduled && "bg-red-600 hover:bg-red-700"
-            )}
+        {/* Footer Buttons */}
+        <div className="px-6 py-5 border-t border-white/5 flex gap-3 bg-[#0a0b12]">
+          <button 
+            onClick={onClose}
+            className="flex-1 py-3.5 bg-white/5 text-slate-400 rounded-2xl text-sm font-bold hover:bg-white/10 transition-all active:scale-95"
           >
-            {loading ? "Creating..." : isScheduled ? "Schedule Stream" : "Go Live"}
-          </Button>
+            Cancel
+          </button>
+          <button 
+            onClick={handleCreate} 
+            disabled={loading || premiumLoading || !title.trim()}
+            className="flex-1 py-3.5 bg-white text-black rounded-2xl text-sm font-black flex items-center justify-center gap-2 hover:bg-rose-50 transition-all active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-lg shadow-white/10"
+          >
+            {loading ? (
+              <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                {isScheduled ? 'Schedule Stream' : 'Go Live'}
+              </>
+            )}
+          </button>
         </div>
       </DialogContent>
     </Dialog>
