@@ -209,6 +209,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const [replyText, setReplyText] = useState('');
   const [replyingTo, setReplyingTo] = useState<{ id: string; user: string; handle: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [viewerPresenceCount, setViewerPresenceCount] = useState(1);
   const [userCredits, setUserCredits] = useState(0);
 
   // Connection state
