@@ -1378,7 +1378,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           onClick={() => host && navigateToProfile(host.id)}
           className="flex items-center gap-2.5 min-w-0"
         >
-          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-rose-500 shrink-0">
+          <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-rose-500 shrink-0">
             {host?.avatar_url ? (
               <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
             ) : (
@@ -1509,7 +1509,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
               onClick={() => navigateToProfile(viewer.user_id)}
               className="relative"
             >
-              <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-emerald-400">
+              <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-400">
                 {viewer.profile?.avatar_url ? (
                   <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
                 ) : (
@@ -1564,7 +1564,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             onClick={() => navigateToProfile(viewer.user_id)}
             className="relative flex flex-col items-center gap-0.5"
           >
-            <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/20">
+            <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/20">
               {viewer.profile?.avatar_url ? (
                 <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
               ) : (
@@ -1595,7 +1595,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       {/* CHAT AREA */}
       <div className="absolute bottom-36 left-0 right-16 z-30 px-4">
-        <div className="flex flex-col space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide pointer-events-auto">
+        <div className="flex flex-col space-y-1 max-h-[160px] overflow-y-auto scrollbar-hide pointer-events-auto">
           <AnimatePresence initial={false}>
             {replies.slice(-20).map((msg) => (
               <motion.div
@@ -1763,7 +1763,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Say something..."
-                className="flex-1 min-w-0 bg-transparent text-sm font-medium text-white placeholder-white/30 focus:outline-none px-4 py-2.5"
+                className="flex-1 min-w-0 bg-transparent text-xs font-medium text-white placeholder-white/30 focus:outline-none px-3 py-2"
               />
               <button
                 type="submit"
