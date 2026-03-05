@@ -1554,148 +1554,94 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           ))}
         </div>
 
-        <div className={cn(
-          "flex items-center gap-2 p-3",
-          isMobile ? "flex-wrap justify-center" : "gap-3 p-4"
-        )}>
+        <div className="flex items-center justify-center gap-3 p-3 max-w-md mx-auto">
           {/* Leave/End button */}
-          <Button 
-            variant={isHost ? "destructive" : "outline"} 
+          <button 
             onClick={isHost ? () => setShowEndConfirm(true) : handleLeaveSpace}
             className={cn(
-              "flex-shrink-0 rounded-xl font-semibold",
-              isMobile ? "h-10 px-3 text-sm" : "h-12 px-4",
-              isHost && "bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700"
+              "h-11 px-4 rounded-full font-semibold text-sm flex items-center gap-1.5 active:scale-95 transition-all",
+              isHost 
+                ? "bg-red-500 text-white hover:bg-red-600" 
+                : "text-red-400 hover:text-red-300"
             )}
           >
-            <PhoneOff className={cn(isMobile ? "w-4 h-4 mr-1" : "w-4 h-4 mr-2")} />
+            <PhoneOff className="w-4 h-4" />
             {isHost ? 'End' : 'Leave'}
-          </Button>
+          </button>
 
-          {/* Action buttons - responsive grid on mobile, scroll on desktop */}
-          <div className={cn(
-            isMobile 
-              ? "flex flex-wrap gap-2 justify-center flex-1" 
-              : "flex-1 overflow-x-auto overflow-y-hidden scrollbar-hide"
-          )}>
-            <div className={cn(
-              "flex items-center",
-              isMobile ? "flex-wrap gap-2 justify-center" : "gap-2 min-w-max pb-1"
-            )}>
-              {/* Mic button - for everyone with mic permission */}
-              {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted)) && (
-                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                  <Button
-                    variant={isMuted ? "outline" : "default"}
-                    size="icon"
-                    className={cn(
-                      "rounded-xl transition-all relative",
-                      isMobile ? "h-10 w-10" : "h-12 w-12",
-                      !isMuted && "bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 border-0",
-                      myHostMuted && "opacity-50"
-                    )}
-                    onClick={toggleMute}
-                    disabled={myHostMuted && isMuted}
-                    title={isMuted ? "Unmute" : "Mute"}
-                  >
-                    {isMuted ? <MicOff className={isMobile ? "w-4 h-4" : "w-5 h-5"} /> : <Mic className={isMobile ? "w-4 h-4" : "w-5 h-5"} />}
-                    {myHostMuted && (
-                      <Shield className="absolute -top-1 -right-1 w-4 h-4 text-destructive" />
-                    )}
-                  </Button>
-                </motion.div>
+          {/* Mic button */}
+          {(canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed) && !myHostMuted)) && (
+            <button
+              className={cn(
+                "w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all relative",
+                !isMuted ? "bg-green-500 text-white" : "text-muted-foreground hover:text-foreground",
+                myHostMuted && "opacity-50"
               )}
-
-              {/* Raise hand - for listeners */}
-              {myRole === 'listener' && (
-                <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                  <Button
-                    variant={hasRaisedHand ? "default" : "outline"}
-                    size="icon"
-                    className={cn(
-                      "rounded-xl",
-                      isMobile ? "h-10 w-10" : "h-12 w-12",
-                      hasRaisedHand && "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 border-0"
-                    )}
-                    onClick={toggleRaiseHand}
-                    title={hasRaisedHand ? "Lower hand" : "Raise hand"}
-                  >
-                    <Hand className={cn(isMobile ? "w-4 h-4" : "w-5 h-5", hasRaisedHand && "animate-pulse")} />
-                  </Button>
-                </motion.div>
+              onClick={toggleMute}
+              disabled={myHostMuted && isMuted}
+              title={isMuted ? "Unmute" : "Mute"}
+            >
+              {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+              {myHostMuted && (
+                <Shield className="absolute -top-1 -right-1 w-4 h-4 text-destructive" />
               )}
+            </button>
+          )}
 
-              {/* Test Audio - hide on mobile to save space */}
-              {!isMobile && (canSpeak || (myRole === 'listener' && (space?.allow_mic_for_all || myMicAllowed))) && (
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="h-12 w-12 rounded-xl flex-shrink-0"
-                  onClick={() => setShowTestAudio(true)}
-                  title="Test Mic"
-                >
-                  <AudioLines className="w-5 h-5" />
-                </Button>
+          {/* Raise hand - for listeners */}
+          {myRole === 'listener' && (
+            <button
+              className={cn(
+                "w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all",
+                hasRaisedHand ? "bg-amber-500 text-white" : "text-muted-foreground hover:text-foreground"
               )}
+              onClick={toggleRaiseHand}
+              title={hasRaisedHand ? "Lower hand" : "Raise hand"}
+            >
+              <Hand className={cn("w-5 h-5", hasRaisedHand && "animate-pulse")} />
+            </button>
+          )}
 
-              {/* Chat */}
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className={cn(
-                  "rounded-xl flex-shrink-0",
-                  isMobile ? "h-10 w-10" : "h-12 w-12"
-                )}
-                onClick={() => setShowChat(!showChat)}
-                title="Chat"
-              >
-                <MessageCircle className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
-              </Button>
+          {/* Chat */}
+          <button
+            className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+            onClick={() => setShowChat(!showChat)}
+            title="Chat"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </button>
 
-              {/* Gift */}
-              <Button 
-                variant="outline" 
-                size="icon" 
-                className={cn(
-                  "rounded-xl relative flex-shrink-0",
-                  isMobile ? "h-10 w-10" : "h-12 w-12"
-                )}
-                onClick={() => setShowGiftModal(true)}
-                title="Gifts"
-              >
-                <Gift className={isMobile ? "w-4 h-4" : "w-5 h-5"} />
-                {totalGifts > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full text-[10px] text-white flex items-center justify-center">
-                    {totalGifts > 99 ? '99+' : totalGifts}
-                  </span>
-                )}
-              </Button>
+          {/* Gift */}
+          <button
+            className="relative w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-90 transition-all"
+            onClick={() => setShowGiftModal(true)}
+            title="Gifts"
+          >
+            <Gift className="w-5 h-5" />
+            {totalGifts > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-amber-500 rounded-full text-[10px] text-white flex items-center justify-center">
+                {totalGifts > 99 ? '99+' : totalGifts}
+              </span>
+            )}
+          </button>
 
-              {/* Speaker/Mute Output */}
-              <motion.div whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                <Button
-                  variant={isOutputMuted ? "default" : "outline"}
-                  size="icon"
-                  className={cn(
-                    "rounded-xl transition-all",
-                    isMobile ? "h-10 w-10" : "h-12 w-12",
-                    isOutputMuted && "bg-gradient-to-r from-destructive to-destructive/80 border-0"
-                  )}
-                  onClick={() => {
-                    setIsOutputMuted(!isOutputMuted);
-                    document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"], [id^="space-lk-audio-"]').forEach(audio => {
-                      audio.muted = !isOutputMuted;
-                    });
-                    toast(isOutputMuted ? 'Speaker unmuted' : 'Speaker muted');
-                  }}
-                  title={isOutputMuted ? "Unmute speaker" : "Mute speaker"}
-                >
-                  {isOutputMuted ? <VolumeX className={isMobile ? "w-4 h-4" : "w-5 h-5"} /> : <Volume2 className={isMobile ? "w-4 h-4" : "w-5 h-5"} />}
-                </Button>
-              </motion.div>
-
-            </div>
-          </div>
+          {/* Speaker/Mute Output */}
+          <button
+            className={cn(
+              "w-11 h-11 rounded-full flex items-center justify-center active:scale-90 transition-all",
+              isOutputMuted ? "text-destructive" : "text-muted-foreground hover:text-foreground"
+            )}
+            onClick={() => {
+              setIsOutputMuted(!isOutputMuted);
+              document.querySelectorAll<HTMLAudioElement>('[id^="audio-"], [id^="sfu-audio-"], [id^="space-audio-"], [id^="space-lk-audio-"]').forEach(audio => {
+                audio.muted = !isOutputMuted;
+              });
+              toast(isOutputMuted ? 'Speaker unmuted' : 'Speaker muted');
+            }}
+            title={isOutputMuted ? "Unmute speaker" : "Mute speaker"}
+          >
+            {isOutputMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
         </div>
       </div>
 
