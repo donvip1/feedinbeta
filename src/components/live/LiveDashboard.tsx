@@ -572,17 +572,12 @@ export const LiveDashboard = ({
 
         {/* Trending Now Section - uses filtered content */}
         {filteredContent.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Flame className="w-5 h-5 text-orange-500" />
-                <span className="font-bold">
-                  {activeFilter === 'All' ? 'Trending Now' : `${activeFilter} Streams`}
-                </span>
-              </div>
-              <button className="text-sm text-white/60 flex items-center gap-1 hover:text-white transition-colors">
-                View All <ChevronRight className="w-4 h-4" />
-              </button>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-500" />
+              <span className="text-lg font-bold">
+                {activeFilter === 'All' ? 'Trending Now' : `${activeFilter} Streams`}
+              </span>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
