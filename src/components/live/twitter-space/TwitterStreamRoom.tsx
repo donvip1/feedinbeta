@@ -185,6 +185,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [showAudioSettingsModal, setShowAudioSettingsModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showRequestJoin, setShowRequestJoin] = useState(false);
+  const [inviteUsername, setInviteUsername] = useState('');
+  const [inviteSearchResults, setInviteSearchResults] = useState<any[]>([]);
+  const [inviteSearching, setInviteSearching] = useState(false);
+  const [showRefill, setShowRefill] = useState(false);
 
   // Gift animations state
   const [giftAnimations, setGiftAnimations] = useState<GiftAnimation[]>([]);
