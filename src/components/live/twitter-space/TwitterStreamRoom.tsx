@@ -1159,7 +1159,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     });
 
     return (
-      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col min-h-[100dvh]">
+      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col min-h-[100dvh]" style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation', overscrollBehavior: 'none', transform: 'translateZ(0)' }}>
         <div className="px-4 py-4 border-b border-white/5 flex items-center justify-between pt-safe">
           <button onClick={() => setView('main')} className="p-2 rounded-full hover:bg-white/5">
             <ArrowLeft className="w-5 h-5 text-white" />
@@ -1496,7 +1496,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       )}
 
       {/* RIGHT-SIDE PANEL: Co-broadcasters + Viewers */}
-      <div className="absolute right-3 bottom-44 z-30 flex flex-col items-center gap-2 max-h-[50vh] overflow-y-auto scrollbar-hide">
+      <div className="absolute right-3 bottom-44 z-30 flex flex-col items-center gap-2 max-h-[50vh] overflow-y-auto scrollbar-hide" style={{ transform: 'translateZ(0)', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
         {/* Request to join for viewers */}
         {!isHost && (
           <button
