@@ -489,6 +489,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       .subscribe();
 
     return () => { supabase.removeChannel(creditChannel); };
+  }, [user]);
 
   // Update SpaceContext when connected
   useEffect(() => {
