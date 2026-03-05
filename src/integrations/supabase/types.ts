@@ -2109,6 +2109,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          payment_reference: string | null
           related_id: string | null
           stripe_payment_intent_id: string | null
           type: string
@@ -2119,6 +2120,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          payment_reference?: string | null
           related_id?: string | null
           stripe_payment_intent_id?: string | null
           type: string
@@ -2129,6 +2131,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           id?: string
+          payment_reference?: string | null
           related_id?: string | null
           stripe_payment_intent_id?: string | null
           type?: string
@@ -5619,8 +5622,8 @@ export type Database = {
           currency: string
           description: string | null
           id: string
+          payment_reference: string
           status: string
-          stripe_payment_intent_id: string
           type: string
           user_id: string
         }
@@ -5630,8 +5633,8 @@ export type Database = {
           currency: string
           description?: string | null
           id?: string
+          payment_reference: string
           status: string
-          stripe_payment_intent_id: string
           type: string
           user_id: string
         }
@@ -5641,8 +5644,8 @@ export type Database = {
           currency?: string
           description?: string | null
           id?: string
+          payment_reference?: string
           status?: string
-          stripe_payment_intent_id?: string
           type?: string
           user_id?: string
         }
