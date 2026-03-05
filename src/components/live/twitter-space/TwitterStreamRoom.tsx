@@ -1608,6 +1608,52 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             >
               <div className="w-12 h-1 bg-white/10 rounded-full mx-auto mb-6" />
               <div className="space-y-1">
+                {isHost && (
+                  <>
+                    <button
+                      onClick={() => { setShowSettings(false); handleMicToggle(); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">{isMicOn ? 'Mute Mic' : 'Unmute Mic'}</span>
+                      {isMicOn ? <Mic className="w-5 h-5 text-white/30" /> : <MicOff className="w-5 h-5 text-white/30" />}
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); handleCameraToggle(); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">{isCameraOn ? 'Turn Off Camera' : 'Turn On Camera'}</span>
+                      {isCameraOn ? <Video className="w-5 h-5 text-white/30" /> : <VideoOff className="w-5 h-5 text-white/30" />}
+                    </button>
+                    <button
+                      onClick={() => { setShowSettings(false); handleCameraFlip(); }}
+                      className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                    >
+                      <span className="text-white font-medium">Flip Camera</span>
+                      <RotateCcw className="w-5 h-5 text-white/30" />
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => { setShowSettings(false); setView('guests'); }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                >
+                  <span className="text-white font-medium">View Guests ({viewers.length + 1})</span>
+                  <Users className="w-5 h-5 text-white/30" />
+                </button>
+                <button
+                  onClick={() => { setShowSettings(false); setShowReactions(true); }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                >
+                  <span className="text-white font-medium">Reactions</span>
+                  <Heart className="w-5 h-5 text-white/30" />
+                </button>
+                <button
+                  onClick={() => { setShowSettings(false); setShowShare(true); }}
+                  className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
+                >
+                  <span className="text-white font-medium">Share Stream</span>
+                  <Share2 className="w-5 h-5 text-white/30" />
+                </button>
                 <button
                   onClick={() => { setShowSettings(false); setShowAudioSettingsModal(true); }}
                   className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-2xl transition-colors"
