@@ -462,6 +462,34 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     fetchHostGifts();
   }, [spaceId, space?.user_id]);
 
+  // Fetch user's credit balance
+  useEffect(() => {
+    if (!user) return;
+    const fetchMyCredits = async () => {
+      const { data } = await supabase
+        .from('user_credits')
+        .select('balance')
+        .eq('user_id', user.id)
+        .single();
+      setMyCredits(data?.balance ?? 0);
+    };
+    fetchMyCredits();
+
+    // Subscribe to balance changes via credit_transactions
+    const creditChannel = supabase
+      .channel(`my-credits-${user.id}-space`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'credit_transactions',
+        filter: `user_id=eq.${user.id}`,
+      }, () => {
+        fetchMyCredits();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(creditChannel); };
+
   // Update SpaceContext when connected
   useEffect(() => {
     if (space && spaceContext) {
