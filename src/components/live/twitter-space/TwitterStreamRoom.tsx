@@ -249,21 +249,56 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     fetchCredits();
   }, [user?.id]);
 
-  // Initialize stream
+  // Initialize stream + register as viewer via Presence
   useEffect(() => {
     const initStream = async () => {
       await fetchStreamData();
+
+      // Register current user as active viewer in DB
+      if (user?.id) {
+        await supabase.from('live_stream_viewers').upsert({
+          stream_id: streamId,
+          user_id: user.id,
+          is_active: true,
+          joined_at: new Date().toISOString(),
+        } as any, { onConflict: 'stream_id,user_id' });
+      }
     };
     initStream();
 
+    // Presence channel for accurate viewer count
+    const presenceChannel = supabase.channel(`stream-presence-${streamId}`);
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const count = Object.keys(state).length;
+        setViewerPresenceCount(count);
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED' && user?.id) {
+          await presenceChannel.track({
+            user_id: user.id,
+            display_name: user.user_metadata?.display_name || 'User',
+          });
+        }
+      });
+
     return () => {
+      // Mark viewer as inactive on leave
+      if (user?.id) {
+        supabase.from('live_stream_viewers').update({
+          is_active: false,
+          left_at: new Date().toISOString(),
+        } as any).eq('stream_id', streamId).eq('user_id', user.id);
+      }
+      supabase.removeChannel(presenceChannel);
       if (roomRef.current) {
         roomRef.current.disconnect();
       }
       videoTrackRef.current?.stop();
       audioTrackRef.current?.stop();
     };
-  }, [streamId]);
+  }, [streamId, user?.id]);
 
   // Fetch stream data
   const fetchStreamData = async () => {
