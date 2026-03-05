@@ -1378,7 +1378,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           onClick={() => host && navigateToProfile(host.id)}
           className="flex items-center gap-2.5 min-w-0"
         >
-          <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-rose-500 shrink-0">
+          <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-rose-500 shrink-0">
             {host?.avatar_url ? (
               <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
             ) : (
@@ -1400,34 +1400,34 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           {/* Gift button - visible for both host and viewers */}
           <button
             onClick={() => setShowStreamGiftModal(true)}
-            className="w-9 h-9 bg-amber-500/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-amber-500/30 active:scale-90 transition-all"
+            className="w-7 h-7 bg-amber-500/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-amber-500/30 active:scale-90 transition-all"
             title={isHost ? "Gift viewers" : "Send gift"}
           >
-            <Gift className="w-4 h-4 text-amber-400" />
+            <Gift className="w-3 h-3 text-amber-400" />
           </button>
 
           {/* Share */}
           <button
             onClick={() => setShowShare(true)}
-            className="w-9 h-9 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+            className="w-7 h-7 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
           >
-            <Share2 className="w-4 h-4 text-white" />
+            <Share2 className="w-3 h-3 text-white" />
           </button>
 
           {/* Settings */}
           <button
             onClick={() => setShowSettings(true)}
-            className="w-9 h-9 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+            className="w-7 h-7 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
           >
-            <MoreHorizontal className="w-4 h-4 text-white" />
+            <MoreHorizontal className="w-3 h-3 text-white" />
           </button>
 
           {/* Minimize / PiP */}
           <button
             onClick={handleMinimize}
-            className="w-9 h-9 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
+            className="w-7 h-7 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all"
           >
-            <Minimize2 className="w-4 h-4 text-white" />
+            <Minimize2 className="w-3 h-3 text-white" />
           </button>
 
           {/* End / Leave */}
@@ -1495,8 +1495,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             }}
             className="flex flex-col items-center gap-0.5"
           >
-            <div className="w-11 h-11 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
-              <Plus className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Plus className="w-3 h-3 text-white" />
             </div>
             <span className="text-[8px] text-white/60 font-bold">Request</span>
           </button>
@@ -1509,7 +1509,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
               onClick={() => navigateToProfile(viewer.user_id)}
               className="relative"
             >
-              <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-emerald-400">
+              <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-400">
                 {viewer.profile?.avatar_url ? (
                   <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
                 ) : (
@@ -1564,7 +1564,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             onClick={() => navigateToProfile(viewer.user_id)}
             className="relative flex flex-col items-center gap-0.5"
           >
-            <div className="w-11 h-11 rounded-full overflow-hidden border-2 border-white/20">
+            <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-white/20">
               {viewer.profile?.avatar_url ? (
                 <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
               ) : (
@@ -1585,8 +1585,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             onClick={() => setView('guests')}
             className="flex flex-col items-center gap-0.5"
           >
-            <div className="w-11 h-11 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
-              <Users className="w-4 h-4 text-white/60" />
+            <div className="w-8 h-8 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Users className="w-3 h-3 text-white/60" />
             </div>
             <span className="text-[8px] text-white/60 font-bold">+{viewers.filter(v => !v.is_co_broadcaster).length - 4}</span>
           </button>
@@ -1595,7 +1595,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       {/* CHAT AREA */}
       <div className="absolute bottom-36 left-0 right-16 z-30 px-4">
-        <div className="flex flex-col space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide pointer-events-auto">
+        <div className="flex flex-col space-y-1 max-h-[160px] overflow-y-auto scrollbar-hide pointer-events-auto">
           <AnimatePresence initial={false}>
             {replies.slice(-20).map((msg) => (
               <motion.div
@@ -1763,14 +1763,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder="Say something..."
-                className="flex-1 min-w-0 bg-transparent text-sm font-medium text-white placeholder-white/30 focus:outline-none px-4 py-2.5"
+                className="flex-1 min-w-0 bg-transparent text-xs font-medium text-white placeholder-white/30 focus:outline-none px-3 py-2"
               />
               <button
                 type="submit"
                 disabled={!replyText.trim()}
-                className="w-10 h-10 flex items-center justify-center text-white disabled:opacity-30 shrink-0"
+                className="w-8 h-8 flex items-center justify-center text-white disabled:opacity-30 shrink-0"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-3 h-3" />
               </button>
             </div>
           </form>
@@ -1778,18 +1778,18 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           {/* React button */}
           <button
             onClick={() => setShowReactions(true)}
-            className="w-10 h-10 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
+            className="w-8 h-8 bg-white/10 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all shrink-0"
           >
-            <Heart className="w-5 h-5 text-rose-400" />
+            <Heart className="w-4 h-4 text-rose-400" />
           </button>
 
           {/* Refill / Recharge credits */}
           <button
             onClick={() => navigate('/wallet')}
-            className="w-10 h-10 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-90 transition-all shrink-0"
+            className="w-8 h-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/20 active:scale-90 transition-all shrink-0"
             title="Refill credits"
           >
-            <Coins className="w-5 h-5 text-white" />
+            <Coins className="w-4 h-4 text-white" />
           </button>
         </div>
       </div>
