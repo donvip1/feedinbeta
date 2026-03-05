@@ -371,6 +371,27 @@ export const LiveDashboard = ({
               <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} spaces</span>
             </div>
 
+            {/* Bulk actions for admins/mods */}
+            {canDeleteAny && recordedSpaces && recordedSpaces.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={toggleSelectAll}
+                  className="text-xs px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors border border-white/10"
+                >
+                  {selectedSpaces.size === recordedSpaces.length ? 'Deselect All' : 'Select All'}
+                </button>
+                {selectedSpaces.size > 0 && (
+                  <button
+                    onClick={handleBulkDelete}
+                    disabled={bulkDeleting}
+                    className="text-xs px-3 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 text-red-400 transition-colors border border-red-500/20 disabled:opacity-50"
+                  >
+                    {bulkDeleting ? 'Deleting...' : `Delete ${selectedSpaces.size} selected`}
+                  </button>
+                )}
+              </div>
+            )}
+
             {(!recordedSpaces || recordedSpaces.length === 0) ? (
               <div className="flex flex-col items-center gap-4 py-16">
                 <div className="w-20 h-20 rounded-full bg-purple-500/10 flex items-center justify-center">
