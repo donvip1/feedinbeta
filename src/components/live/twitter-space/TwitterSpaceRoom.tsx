@@ -30,6 +30,7 @@ import {
   ArrowLeft,
   Camera,
   Gift,
+  Coins,
   Volume2,
   VolumeX,
   Volume1,
