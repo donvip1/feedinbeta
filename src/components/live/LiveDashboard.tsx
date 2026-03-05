@@ -17,14 +17,17 @@ import {
   Sparkles,
   Headphones,
   Share2,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LiveDiscoverCard } from "./LiveDiscoverCard";
 import { LiveNotificationsPanel } from "./LiveNotificationsPanel";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAdminRole } from "@/hooks/useAdminRole";
+import { toast } from "sonner";
 
 interface LiveDashboardProps {
   liveStreams: any[] | undefined;
@@ -80,9 +83,35 @@ export const LiveDashboard = ({
   myActiveSpace,
 }: LiveDashboardProps) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { permissions } = useAdminRole();
   const [activeFilter, setActiveFilter] = useState("All");
   const [activeTab, setActiveTab] = useState<MainTab>("Discover");
   const [showNotifications, setShowNotifications] = useState(false);
+  const [deletingSpaceId, setDeletingSpaceId] = useState<string | null>(null);
+
+  const canDeleteAny = permissions.isAdmin || permissions.isModerator || permissions.isDeveloper;
+
+  const handleDeleteSpace = async (e: React.MouseEvent, spaceId: string) => {
+    e.stopPropagation();
+    if (!confirm("Delete this recorded space and all related data?")) return;
+    setDeletingSpaceId(spaceId);
+    try {
+      await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
+      await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
+      await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
+      await supabase.from("live_space_speakers").delete().eq("space_id", spaceId);
+      const { error } = await supabase.from("live_spaces").delete().eq("id", spaceId);
+      if (error) throw error;
+      toast.success("Space deleted successfully");
+      queryClient.invalidateQueries({ queryKey: ['recorded-spaces'] });
+    } catch (err: any) {
+      console.error("Failed to delete space:", err);
+      toast.error("Failed to delete space");
+    } finally {
+      setDeletingSpaceId(null);
+    }
+  };
 
   const liveCount = (liveStreams?.length || 0) + (liveSpaces?.length || 0);
   const hasContent = liveCount > 0 || (scheduledStreams?.length || 0) > 0 || (scheduledSpaces?.length || 0) > 0;
@@ -175,9 +204,8 @@ export const LiveDashboard = ({
           profiles:user_id (id, display_name, username, avatar_url)
         `)
         .eq('status', 'ended')
-        .not('recording_url', 'is', null)
         .order('ended_at', { ascending: false })
-        .limit(20);
+        .limit(50);
       return data || [];
     },
     staleTime: 5 * 60 * 1000,
@@ -270,7 +298,7 @@ export const LiveDashboard = ({
             <div className="flex items-center gap-2 mb-2">
               <Headphones className="w-5 h-5 text-purple-400" />
               <span className="font-bold text-lg">Space Replays</span>
-              <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} recordings</span>
+              <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} spaces</span>
             </div>
 
             {(!recordedSpaces || recordedSpaces.length === 0) ? (
@@ -313,7 +341,11 @@ export const LiveDashboard = ({
                       )}
                       <div className="flex-1 min-w-0 py-0.5">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[9px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-full uppercase tracking-wider">Replay</span>
+                          {space.recording_url ? (
+                            <span className="text-[9px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-full uppercase tracking-wider">Replay</span>
+                          ) : (
+                            <span className="text-[9px] font-bold text-white/40 bg-white/5 px-2 py-0.5 rounded-full uppercase tracking-wider">Ended</span>
+                          )}
                           {space.topic_category && (
                             <span className="text-[9px] font-medium text-white/40 bg-white/5 px-2 py-0.5 rounded-full">{space.topic_category}</span>
                           )}
@@ -334,20 +366,32 @@ export const LiveDashboard = ({
                           {timeAgo ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${timeAgo}` : ''}
                         </p>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const url = `https://feedinn.com/live/space/${space.id}`;
-                          if (navigator.share) {
-                            navigator.share({ title: space.title, url });
-                          } else {
-                            navigator.clipboard.writeText(url);
-                          }
-                        }}
-                        className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 self-center shrink-0"
-                      >
-                        <Share2 className="w-4 h-4 text-white/40" />
-                      </button>
+                      <div className="flex flex-col items-center gap-2 self-center shrink-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const url = `https://feedinn.com/live/space/${space.id}`;
+                            if (navigator.share) {
+                              navigator.share({ title: space.title, url });
+                            } else {
+                              navigator.clipboard.writeText(url);
+                              toast.success("Link copied!");
+                            }
+                          }}
+                          className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
+                        >
+                          <Share2 className="w-4 h-4 text-white/40" />
+                        </button>
+                        {(canDeleteAny || space.user_id === user?.id) && (
+                          <button
+                            onClick={(e) => handleDeleteSpace(e, space.id)}
+                            disabled={deletingSpaceId === space.id}
+                            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-red-500/20 transition-colors"
+                          >
+                            <Trash2 className={cn("w-4 h-4", deletingSpaceId === space.id ? "text-white/20 animate-spin" : "text-red-400/60")} />
+                          </button>
+                        )}
+                      </div>
                     </motion.div>
                   );
                 })}
