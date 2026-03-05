@@ -1,62 +1,48 @@
 
 
-## Problem Analysis
+## Video Stream Room Rebuild Plan
 
-The recording system is broken because it relies entirely on **LiveKit's Egress API**, which is not available on the current LiveKit Cloud plan. Here's what happens:
+### Goal
+Rebuild `TwitterStreamRoom.tsx` with the Tango/TikTok UI from the reference code while keeping all existing backend integrations (LiveKit, Supabase real-time, gifts, reactions, chat, PK battle, share, etc.) fully functional. Also fix screen share (publish to LiveKit) and recording (client-side).
 
-1. Host enables recording and the app calls the `livekit-recording` edge function
-2. The edge function tries to call LiveKit's Egress API (`StartRoomCompositeEgress`)
-3. The Egress API **fails** (not available on the plan)
-4. The fallback just marks `is_recording_enabled = true` in the database -- no actual recording happens
-5. The edge function also tries to write to a `cf_recording_uid` column that **doesn't even exist** in `live_spaces`
-6. When the space ends, `recording_url` is always `null`
-7. The "Recorded Spaces" section on the Live page filters for `recording_url IS NOT NULL`, so nothing ever shows
+### UI Changes (from reference code)
 
-**Confirmed by database:** All 5 recent spaces have `recording_url: null` despite recording being toggled on.
+1. **Video background**: Full-screen video with gradient overlays (`bg-gradient-to-b from-black/40 via-transparent to-black/60`)
+2. **Host tag**: Top-left pill with avatar, name, crown icon, viewer count, and Follow button (Tango style)
+3. **PK Battle split**: Side-by-side video layout with animated score bar when PK is active
+4. **Header controls**: Minimize button (left), "HD Live" badge + close button (right) — replaces current ArrowLeft/End/Settings layout
+5. **Right-side action stack**: Vertical TikTok-style buttons (Heart, Share, Flip, Gift lightning bolt) replacing current icon column
+6. **Flying chat**: Left-aligned chat bubbles with `bg-black/40 backdrop-blur-md` pills, auto-scrolling, mask gradient — replaces inline chat input
+7. **Bottom broadcast bar**: Combined input + send button + gift button + screen share button in one row with `bg-gradient-to-t from-black/80` gradient
+8. **Gift overlay**: Full-screen dark overlay with 2-column grid of gift items, balance display at bottom
+9. **Floating minimized player**: Landscape aspect-ratio with play button overlay and expand/close controls
 
----
+### Functional Fixes
 
-## Solution: Client-Side Audio Recording
+1. **Screen share**: Actually publish screen track to LiveKit via `room.localParticipant.publishTrack()` with `Track.Source.ScreenShare`, and handle `TrackUnpublished` for cleanup. Viewers subscribe via existing `TrackSubscribed` handler.
+2. **Recording**: Replace broken edge function calls with client-side `useSpaceRecorder` hook (already built for spaces), adapted for video streams. Auto-start if host, upload blob on end, save `recording_url`.
+3. **Camera flip**: Add `RotateCcw` button to switch between front/back camera using `videoTrackRef.current.restartTrack({ facingMode })`.
 
-Since server-side LiveKit Egress isn't available, we'll implement **client-side recording** in the host's browser. This captures all audio (local mic + remote participants) using the Web Audio API and MediaRecorder, then uploads to storage when the space ends.
+### Files to Modify
 
-### Step 1 -- Create a `recordings` storage bucket
-- Create a public storage bucket called `recordings`
-- Add RLS policy allowing authenticated users to upload
+1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — Full rebuild of the render output with new Tango/TikTok UI. Keep all existing hooks, state, LiveKit init, Supabase subscriptions, and handler functions. Replace:
+   - Header → new HD Live badge + minimize/close layout
+   - Host info overlay → Tango-style pill with avatar + Follow
+   - Right action stack → TikTok vertical buttons (Heart, Gift lightning, Share, Flip, Screen share, PK)
+   - Bottom controls → combined broadcast input bar with gift + screen share buttons
+   - Flying chat → left-aligned auto-scroll chat bubbles
+   - Fix `handleScreenShare` to publish/unpublish LiveKit screen track
+   - Fix `handleRecordingToggle` to use client-side MediaRecorder
+   - Add camera flip handler
 
-### Step 2 -- Build a `useSpaceRecorder` hook
-- Uses `AudioContext` to mix all audio sources (local track + all remote tracks from LiveKit room)
-- Records via `MediaRecorder` to produce a WebM/Opus blob
-- Provides `startRecording()`, `stopRecording()` methods
-- On stop, returns the audio `Blob`
+2. **`src/components/live/FloatingStreamPlayer.tsx`** — Update to landscape `aspect-video` layout matching reference (play button overlay, expand/close on hover)
 
-### Step 3 -- Integrate into TwitterSpaceRoom
-- When host joins a space with `is_recording_enabled = true`, auto-start the client-side recorder
-- When recording toggle is pressed, start/stop the recorder (remove the edge function call for start -- it does nothing useful)
-- When the space ends (host leaves), stop the recorder, upload the blob to the `recordings` bucket, and save the public URL to `recording_url` on the `live_spaces` row
-- Show the `PostRecordingModal` with the actual recording URL
-
-### Step 4 -- Simplify the edge function
-- The `livekit-recording` edge function becomes a simple database updater (just marks `is_recording_enabled` flag) or is bypassed entirely since the client handles everything
-
-### Step 5 -- Replay on Live page
-- The existing "Recorded Spaces" section in `LiveDashboard` already works correctly -- it queries for spaces with `recording_url IS NOT NULL` and displays them with a replay button
-- The `SpaceDetail` page already has replay support for ended spaces with recording URLs
-- No changes needed here; once recordings are actually saved, they'll appear automatically
-
-### Technical Details
-
-**Audio mixing approach:**
-```text
-LocalAudioTrack ──┐
-                   ├──► AudioContext (destination) ──► MediaRecorder ──► Blob
-RemoteTrack(s) ───┘
-```
-
-**Upload path:** `recordings/{spaceId}/{timestamp}.webm` in the `recordings` bucket
-
-**Files to create/modify:**
-- `src/hooks/useSpaceRecorder.ts` (new) -- client-side recording hook
-- `src/components/live/twitter-space/TwitterSpaceRoom.tsx` -- integrate the hook, upload on end
-- Database migration: create `recordings` storage bucket + policies
+### What stays the same
+- All LiveKit initialization logic
+- All Supabase real-time subscriptions (reactions, gifts, chat, stream events)
+- Guest list view
+- All modals (Gift, Report, Rules, Feedback, Audio Settings, PK Battle)
+- Share menu (with OG link)
+- Reaction picker bottom sheet
+- All data fetching (stream, host, viewers)
 
