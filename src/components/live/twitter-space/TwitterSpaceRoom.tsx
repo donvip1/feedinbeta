@@ -1832,13 +1832,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       )}
 
       {/* BOTTOM CONTROLS - Premium rounded bar */}
-      <div className="p-4 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem]">
-        <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
+      <div className="p-3 bg-[#0F1119] border-t border-white/5 rounded-t-[2.5rem]" style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
+        <div className="flex items-center justify-center gap-3 max-w-md mx-auto">
           {/* Mic / Request */}
           <button
             onClick={handleToggleMute}
             className={cn(
-              "relative w-12 h-12 flex items-center justify-center rounded-full transition-all active:scale-90",
+              "relative w-9 h-9 flex items-center justify-center rounded-full transition-transform duration-75 active:scale-90",
               canSpeak
                 ? isMicOn
                   ? 'bg-purple-600 text-white'
@@ -1849,39 +1849,39 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             )}
           >
             {canSpeak ? (
-              isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />
+              isMicOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />
             ) : (
-              <Hand className="w-5 h-5" />
+              <Hand className="w-4 h-4" />
             )}
             {hasRaisedHand && !canSpeak && (
-              <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">!</span>
+              <span className="absolute -top-0.5 -right-0.5 bg-purple-500 text-white text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center">!</span>
             )}
           </button>
 
           {/* React */}
           <button
             onClick={() => setShowReactions(true)}
-            className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
           >
-            <Heart className="w-5 h-5" />
+            <Heart className="w-4 h-4" />
           </button>
 
           {/* Gift */}
           <button
             onClick={() => setShowGiftModal(true)}
-            className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
           >
-            <Gift className="w-5 h-5" />
+            <Gift className="w-4 h-4" />
           </button>
 
           {/* Chat */}
           <button
             onClick={() => setShowChat(true)}
-            className="relative w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+            className="relative w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
           >
-            <MessageSquare className="w-5 h-5" />
+            <MessageSquare className="w-4 h-4" />
             {unreadMessages > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-purple-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-0.5 -right-0.5 bg-purple-500 text-white text-[8px] font-black w-3.5 h-3.5 rounded-full flex items-center justify-center">
                 {unreadMessages}
               </span>
             )}
@@ -1891,22 +1891,22 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <div className="relative">
             <button
               onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-              className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-transform duration-75"
             >
-              {volumeLevel > 50 ? <Volume2 className="w-6 h-6 text-white" /> : volumeLevel > 0 ? <Volume1 className="w-6 h-6 text-white" /> : <VolumeX className="w-6 h-6 text-white" />}
+              {volumeLevel > 50 ? <Volume2 className="w-4 h-4 text-white" /> : volumeLevel > 0 ? <Volume1 className="w-4 h-4 text-white" /> : <VolumeX className="w-4 h-4 text-white" />}
             </button>
             <AnimatePresence>
               {showVolumeSlider && (
                 <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                  transition={{ duration: 0.2 }}
-                  className="absolute bottom-16 right-0 bg-[#11131E] border border-white/10 rounded-2xl p-4 w-56 shadow-xl z-50"
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.12 }}
+                  className="absolute bottom-12 right-0 bg-[#11131E] border border-white/10 rounded-2xl p-3 w-52 shadow-xl z-50"
                 >
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-white text-sm font-semibold">Volume</span>
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-white/10 text-slate-300">{volumeLevel}%</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white text-xs font-semibold">Volume</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/10 text-slate-300">{volumeLevel}%</span>
                   </div>
                   <input
                     type="range"
@@ -1924,13 +1924,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
                       background: `linear-gradient(to right, #a855f7 ${volumeLevel}%, rgba(255,255,255,0.1) ${volumeLevel}%)`,
                     }}
                   />
-                  <div className="flex justify-between mt-2 text-[10px] text-slate-500">
+                  <div className="flex justify-between mt-1.5 text-[9px] text-slate-500">
                     <span>Earpiece</span>
                     <span>Loudspeaker</span>
                   </div>
                   <button
                     onClick={() => setShowVolumeSlider(false)}
-                    className="mt-3 w-full text-center text-xs text-slate-400 hover:text-white transition-colors"
+                    className="mt-2 w-full text-center text-[10px] text-slate-400 hover:text-white transition-colors"
                   >
                     Done
                   </button>
@@ -1944,12 +1944,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             <button
               onClick={isScreenSharing ? stopScreenShare : startScreenShare}
               className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full active:scale-90 transition-all",
+                "w-9 h-9 flex items-center justify-center rounded-full active:scale-90 transition-transform duration-75",
                 isScreenSharing ? 'text-green-400' : 'text-white hover:text-white/80'
               )}
               title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
             >
-              {isScreenSharing ? <MonitorOff className="w-5 h-5" /> : <Monitor className="w-5 h-5" />}
+              {isScreenSharing ? <MonitorOff className="w-4 h-4" /> : <Monitor className="w-4 h-4" />}
             </button>
           )}
 
@@ -1958,12 +1958,12 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             <button
               onClick={handleMuteAll}
               className={cn(
-                "w-12 h-12 flex items-center justify-center rounded-full active:scale-90 transition-all",
+                "w-9 h-9 flex items-center justify-center rounded-full active:scale-90 transition-transform duration-75",
                 allMuted ? 'text-red-400' : 'text-white hover:text-white/80'
               )}
               title={allMuted ? 'Allow unmute' : 'Mute all'}
             >
-              {allMuted ? <VolumeX className="w-5 h-5" /> : <Speaker className="w-5 h-5" />}
+              {allMuted ? <VolumeX className="w-4 h-4" /> : <Speaker className="w-4 h-4" />}
             </button>
           )}
         </div>
