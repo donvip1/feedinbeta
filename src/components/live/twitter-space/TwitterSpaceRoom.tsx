@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useOptionalSpaceContext } from '@/context/SpaceContext';
 import { useNavigation } from '@/context/NavigationContext';
 import { audioPlaybackManager } from '@/lib/audio-playback-manager';
+import { useSpaceRecorder } from '@/hooks/useSpaceRecorder';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -99,6 +100,7 @@ interface SpaceData {
   started_at?: string;
   allow_mic_for_all?: boolean;
   cover_image_url?: string;
+  is_recording_enabled?: boolean;
 }
 
 interface FloatingReaction {
@@ -139,6 +141,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const { user } = useAuth();
   const { setHideBottomNav } = useNavigation();
   const spaceContext = useOptionalSpaceContext();
+  const spaceRecorder = useSpaceRecorder();
+  const recorderStartedRef = useRef(false);
   
   // View states
   const [view, setView] = useState<'main' | 'guests'>('main');
@@ -573,13 +577,6 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       setIsRecording(true);
     }
     await fetchSpeakers();
-    
-    // Auto-start recording for host if is_recording_enabled is true
-    if (data.is_recording_enabled && data.user_id === user?.id && !isRecording) {
-      setTimeout(() => {
-        handleRecordingToggle();
-      }, 2000); // Delay to allow connection to stabilize
-    }
   };
 
   const fetchSpeakers = async () => {
@@ -899,28 +896,42 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
     
     let recordingUrl: string | null = null;
-    const wasRecording = isRecording;
+    const wasRecording = isRecording || spaceRecorder.isRecording;
     
-    // Stop recording if active before ending and capture URL
-    if (isRecording && isHost) {
+    // Stop client-side recording and upload
+    if (wasRecording && isHost) {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          const response = await supabase.functions.invoke('livekit-recording', {
-            body: { action: 'stop', roomId: spaceId, roomType: 'live_spaces' },
-          });
-          if (response.data?.recordingUrl) {
-            recordingUrl = response.data.recordingUrl;
+        toast.info('Saving recording...');
+        const blob = await spaceRecorder.stopRecording();
+        if (blob && blob.size > 0) {
+          const timestamp = Date.now();
+          const filePath = `${user?.id}/${spaceId}/${timestamp}.webm`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('recordings')
+            .upload(filePath, blob, {
+              contentType: 'audio/webm',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error('[Recording] Upload error:', uploadError);
+            toast.error('Failed to save recording');
+          } else {
+            const { data: urlData } = supabase.storage
+              .from('recordings')
+              .getPublicUrl(filePath);
+            recordingUrl = urlData.publicUrl;
+            console.log('[Recording] ✅ Uploaded:', recordingUrl);
           }
         }
       } catch (error) {
-        console.error('[Recording] Error stopping:', error);
+        console.error('[Recording] Error stopping/uploading:', error);
       }
       setIsRecording(false);
     }
     
     if (isHost) {
-      // Save recording URL if available
       const updateData: any = { 
         status: 'ended', 
         ended_at: new Date().toISOString(),
@@ -961,42 +972,57 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
+  // Auto-start recording when host joins with recording enabled and room is connected
+  useEffect(() => {
+    if (
+      isHost &&
+      space?.is_recording_enabled &&
+      spaceContext?.room &&
+      spaceContext.spaceState.connectionStatus === 'connected' &&
+      !recorderStartedRef.current &&
+      !spaceRecorder.isRecording
+    ) {
+      recorderStartedRef.current = true;
+      spaceRecorder.startRecording(spaceContext.room);
+      setIsRecording(true);
+      toast.success('🔴 Recording auto-started');
+    }
+  }, [isHost, space?.is_recording_enabled, spaceContext?.room, spaceContext?.spaceState.connectionStatus]);
+
   const handleRecordingToggle = async () => {
     if (!isHost || recordingLoading) return;
     
     setRecordingLoading(true);
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        toast.error('Please sign in to record');
-        return;
+      if (isRecording || spaceRecorder.isRecording) {
+        // Stop recording
+        await spaceRecorder.stopRecording();
+        setIsRecording(false);
+        
+        await supabase
+          .from('live_spaces')
+          .update({ is_recording_enabled: false })
+          .eq('id', spaceId);
+
+        toast.success('⏹️ Recording stopped');
+      } else {
+        // Start recording
+        if (!spaceContext?.room) {
+          toast.error('Not connected to space yet');
+          return;
+        }
+        spaceRecorder.startRecording(spaceContext.room);
+        setIsRecording(true);
+        recorderStartedRef.current = true;
+        
+        await supabase
+          .from('live_spaces')
+          .update({ is_recording_enabled: true })
+          .eq('id', spaceId);
+
+        toast.success('🔴 Recording started');
       }
-
-      const action = isRecording ? 'stop' : 'start';
-      
-      const response = await supabase.functions.invoke('livekit-recording', {
-        body: {
-          action,
-          roomId: spaceId,
-          roomType: 'live_spaces',
-        },
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Recording failed');
-      }
-
-      const newRecordingState = action === 'start';
-      setIsRecording(newRecordingState);
-      
-      // Update database
-      await supabase
-        .from('live_spaces')
-        .update({ is_recording_enabled: newRecordingState })
-        .eq('id', spaceId);
-
-      toast.success(action === 'start' ? '🔴 Recording started' : '⏹️ Recording stopped');
     } catch (error: any) {
       console.error('[Recording] Error:', error);
       toast.error(error.message || 'Failed to toggle recording');
