@@ -1278,16 +1278,14 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </button>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Host: Gift appreciation to viewers */}
-          {isHost && (
-            <button
-              onClick={() => setShowStreamGiftModal(true)}
-              className="w-9 h-9 bg-amber-500/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-amber-500/30 active:scale-90 transition-all"
-              title="Gift viewers"
-            >
-              <Gift className="w-4 h-4 text-amber-400" />
-            </button>
-          )}
+          {/* Gift button - visible for both host and viewers */}
+          <button
+            onClick={() => setShowStreamGiftModal(true)}
+            className="w-9 h-9 bg-amber-500/20 backdrop-blur-xl rounded-full flex items-center justify-center border border-amber-500/30 active:scale-90 transition-all"
+            title={isHost ? "Gift viewers" : "Send gift"}
+          >
+            <Gift className="w-4 h-4 text-amber-400" />
+          </button>
 
           {/* Share */}
           <button
