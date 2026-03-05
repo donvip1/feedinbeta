@@ -1495,7 +1495,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           {/* React */}
           <button
             onClick={() => setShowReactions(true)}
-            className="w-12 h-12 flex items-center justify-center rounded-full text-slate-400 hover:text-white active:scale-90 transition-all"
+            className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
           >
             <Heart className="w-5 h-5" />
           </button>
@@ -1503,7 +1503,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           {/* Gift */}
           <button
             onClick={() => setShowGiftModal(true)}
-            className="w-12 h-12 flex items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white active:scale-90 transition-all"
+            className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
           >
             <Gift className="w-5 h-5" />
           </button>
