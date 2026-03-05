@@ -1466,60 +1466,56 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       </AnimatePresence>
 
       {/* BOTTOM CONTROLS - Premium rounded bar */}
-      <div className="p-4 sm:p-6 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem] shadow-2xl flex items-center justify-between px-4 sm:px-8">
-        <div className="flex items-center gap-3 sm:gap-6">
+      <div className="p-4 bg-[#0F1119] border-t border-white/5 rounded-t-[3rem]">
+        <div className="flex items-center justify-center gap-4 max-w-md mx-auto">
           {/* Mic / Request */}
-          <div className="flex flex-col items-center gap-2">
-            <button
-              onClick={handleToggleMute}
-              className={cn(
-                "relative w-14 h-14 flex items-center justify-center rounded-[1.8rem] transition-all active:scale-90 shadow-xl",
-                canSpeak
-                  ? isMicOn
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-red-500/10 text-red-500'
-                  : hasRaisedHand
-                    ? 'bg-white text-black'
-                    : 'bg-white/5 text-slate-400'
-              )}
-            >
-              {canSpeak ? (
-                isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />
-              ) : (
-                <Hand className="w-6 h-6" />
-              )}
-              {hasRaisedHand && !canSpeak && (
-                <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full ring-4 ring-[#0F1119]">!</span>
-              )}
-            </button>
-          </div>
+          <button
+            onClick={handleToggleMute}
+            className={cn(
+              "relative w-12 h-12 flex items-center justify-center rounded-full transition-all active:scale-90",
+              canSpeak
+                ? isMicOn
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-red-500/20 text-red-400'
+                : hasRaisedHand
+                  ? 'bg-white/15 text-white'
+                  : 'text-slate-400 hover:text-white'
+            )}
+          >
+            {canSpeak ? (
+              isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />
+            ) : (
+              <Hand className="w-5 h-5" />
+            )}
+            {hasRaisedHand && !canSpeak && (
+              <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">!</span>
+            )}
+          </button>
 
-          {/* React button - available to ALL participants */}
+          {/* React */}
           <button
             onClick={() => setShowReactions(true)}
-            className="w-14 h-14 bg-white/5 rounded-[1.8rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all shadow-xl"
+            className="w-12 h-12 flex items-center justify-center rounded-full text-slate-400 hover:text-white active:scale-90 transition-all"
           >
-            <Heart className="w-6 h-6 text-slate-400" />
+            <Heart className="w-5 h-5" />
           </button>
-        </div>
 
-        <div className="flex items-center gap-2 sm:gap-4">
-          {/* Gift Button - Gradient */}
+          {/* Gift */}
           <button
             onClick={() => setShowGiftModal(true)}
-            className="w-14 h-14 bg-gradient-to-tr from-pink-500 to-rose-500 rounded-[1.5rem] flex items-center justify-center shadow-lg shadow-pink-500/20 active:scale-90 transition-all"
+            className="w-12 h-12 flex items-center justify-center rounded-full bg-gradient-to-tr from-pink-500 to-rose-500 text-white active:scale-90 transition-all"
           >
-            <Gift className="w-6 h-6 text-white" />
+            <Gift className="w-5 h-5" />
           </button>
 
           {/* Chat */}
           <button
             onClick={() => setShowChat(true)}
-            className="relative w-14 h-14 bg-white/5 rounded-[1.5rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+            className="relative w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
           >
-            <MessageSquare className="w-6 h-6 text-white" />
+            <MessageSquare className="w-5 h-5" />
             {unreadMessages > 0 && (
-              <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full ring-4 ring-[#0F1119]">
+              <span className="absolute -top-0.5 -right-0.5 bg-purple-500 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center">
                 {unreadMessages}
               </span>
             )}
@@ -1529,7 +1525,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <div className="relative">
             <button
               onClick={() => setShowVolumeSlider(!showVolumeSlider)}
-              className="w-14 h-14 bg-white/5 rounded-[1.5rem] flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all"
+              className="w-12 h-12 flex items-center justify-center rounded-full text-white hover:text-white/80 active:scale-90 transition-all"
             >
               {volumeLevel > 50 ? <Volume2 className="w-6 h-6 text-white" /> : volumeLevel > 0 ? <Volume1 className="w-6 h-6 text-white" /> : <VolumeX className="w-6 h-6 text-white" />}
             </button>
