@@ -59,8 +59,11 @@ interface SpaceContextType {
   room: Room | null;
   screenShareStream: MediaStream | null;
   isRemoteScreenSharing: boolean;
+  screenShareDismissed: boolean;
   publishScreenShare: (stream: MediaStream) => Promise<void>;
   unpublishScreenShare: () => Promise<void>;
+  dismissScreenShare: () => void;
+  screenSharerIdentity: string | null;
 }
 
 const defaultState: SpaceState = {
@@ -94,6 +97,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [screenShareStream, setScreenShareStream] = useState<MediaStream | null>(null);
   const [isRemoteScreenSharing, setIsRemoteScreenSharing] = useState(false);
+  const [screenShareDismissed, setScreenShareDismissed] = useState(false);
+  const [screenSharerIdentity, setScreenSharerIdentity] = useState<string | null>(null);
   
   // Refs for state management
   const roomRef = useRef<Room | null>(null);
@@ -289,6 +294,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           const mediaStream = new MediaStream([track.mediaStreamTrack]);
           setScreenShareStream(mediaStream);
           setIsRemoteScreenSharing(true);
+          setScreenShareDismissed(false);
+          setScreenSharerIdentity(participant.identity);
         }
       });
 
@@ -300,6 +307,8 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           console.log(`[SpaceContext-LK] 🖥️ Screen share ended from ${participant.identity}`);
           setScreenShareStream(null);
           setIsRemoteScreenSharing(false);
+          setScreenShareDismissed(false);
+          setScreenSharerIdentity(null);
         }
       });
 
@@ -336,12 +345,22 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
       console.log('[SpaceContext-LK] ✅ Connected to room, participants:', room.remoteParticipants.size);
 
-      // Subscribe to any existing tracks
+      // Subscribe to any existing tracks (audio AND video/screen share)
       room.remoteParticipants.forEach((participant) => {
         participant.audioTrackPublications.forEach((publication) => {
           if (publication.track && publication.isSubscribed) {
-            console.log(`[SpaceContext-LK] Attaching existing track from ${participant.identity}`);
+            console.log(`[SpaceContext-LK] Attaching existing audio track from ${participant.identity}`);
             playRemoteAudio(publication.track as RemoteTrack, participant.identity);
+          }
+        });
+        participant.videoTrackPublications.forEach((publication) => {
+          if (publication.track && publication.isSubscribed) {
+            console.log(`[SpaceContext-LK] 🖥️ Attaching existing video track (screen share) from ${participant.identity}`);
+            const mediaStream = new MediaStream([publication.track.mediaStreamTrack]);
+            setScreenShareStream(mediaStream);
+            setIsRemoteScreenSharing(true);
+            setScreenShareDismissed(false);
+            setScreenSharerIdentity(participant.identity);
           }
         });
       });
@@ -798,9 +817,16 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       });
       setScreenShareStream(null);
       setIsRemoteScreenSharing(false);
+      setScreenShareDismissed(false);
+      setScreenSharerIdentity(null);
     } catch (error) {
       console.error('[SpaceContext-LK] Failed to unpublish screen share:', error);
     }
+  }, []);
+
+  // Dismiss remote screen share (listener choice)
+  const dismissScreenShare = useCallback(() => {
+    setScreenShareDismissed(true);
   }, []);
 
   // Cleanup on unmount
@@ -828,8 +854,11 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         room: roomRef.current,
         screenShareStream,
         isRemoteScreenSharing,
+        screenShareDismissed,
         publishScreenShare,
         unpublishScreenShare,
+        dismissScreenShare,
+        screenSharerIdentity,
       }}
     >
       {children}

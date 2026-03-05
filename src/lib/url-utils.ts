@@ -47,13 +47,25 @@ export const createShareableUrl = (path: string): string => {
 };
 
 /**
- * Generates shareable URLs for common resources
+ * Gets the Supabase functions base URL for OG-enabled links
+ */
+const getSupabaseFunctionsUrl = (): string => {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  if (supabaseUrl) {
+    return `${supabaseUrl}/functions/v1`;
+  }
+  return `https://spsguldyimamulhigloc.supabase.co/functions/v1`;
+};
+
+/**
+ * Generates shareable URLs for common resources.
+ * Live spaces and streams use edge functions for proper OG previews on social platforms.
  */
 export const shareUrls = {
   post: (postId: string) => createShareableUrl(`/feed/post/${postId}`),
   profile: (username: string) => createShareableUrl(`/profile/${username}`),
   groupJoin: (inviteCode: string) => createShareableUrl(`/groups/join/${inviteCode}`),
   group: (groupId: string) => createShareableUrl(`/groups/${groupId}`),
-  liveStream: (streamId: string) => createShareableUrl(`/live/stream/${streamId}`),
-  liveSpace: (spaceId: string) => createShareableUrl(`/live/space/${spaceId}`),
+  liveStream: (streamId: string) => `${getSupabaseFunctionsUrl()}/og-stream?id=${encodeURIComponent(streamId)}`,
+  liveSpace: (spaceId: string) => `${getSupabaseFunctionsUrl()}/og-space?id=${encodeURIComponent(spaceId)}`,
 };

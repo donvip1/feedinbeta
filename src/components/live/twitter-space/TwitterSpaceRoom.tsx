@@ -823,10 +823,15 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     }
   };
 
-  // Screen sharing - host only (publishes via LiveKit)
+  // Screen sharing - host and speakers can share (one at a time)
   const startScreenShare = async () => {
-    if (!isHost) {
-      toast.error('Only hosts can share screen');
+    if (!canSpeak) {
+      toast.error('Only hosts and speakers can share screen');
+      return;
+    }
+    // Check if someone else is already sharing
+    if (spaceContext?.isRemoteScreenSharing) {
+      toast.error('Someone is already sharing their screen. Wait for them to stop.');
       return;
     }
     try {
@@ -870,7 +875,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   };
 
   // Get remote screen share from SpaceContext
-  const remoteScreenSharing = spaceContext?.isRemoteScreenSharing ?? false;
+  const remoteScreenSharing = (spaceContext?.isRemoteScreenSharing && !spaceContext?.screenShareDismissed) ?? false;
   const remoteScreenStream = spaceContext?.screenShareStream ?? null;
 
   // Attach remote screen stream to video element
@@ -1395,7 +1400,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
           <div className="absolute top-2 left-2 flex items-center gap-2 bg-black/60 px-3 py-1 rounded-full">
             <Monitor className="w-3 h-3 text-green-400" />
             <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest">
-              {isScreenSharing ? 'You are sharing' : 'Host is sharing'}
+              {isScreenSharing ? 'You are sharing' : 'Screen shared'}
             </span>
           </div>
           {isScreenSharing && (
@@ -1404,6 +1409,15 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
               className="absolute top-2 right-2 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-red-600 transition-colors"
             >
               Stop Sharing
+            </button>
+          )}
+          {!isScreenSharing && remoteScreenSharing && (
+            <button
+              onClick={() => spaceContext?.dismissScreenShare()}
+              className="absolute top-2 right-2 bg-zinc-700/80 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-zinc-600 transition-colors"
+            >
+              <X className="w-3 h-3 inline mr-1" />
+              Hide
             </button>
           )}
         </div>
@@ -1745,8 +1759,8 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
             </AnimatePresence>
           </div>
 
-          {/* Screen Share - Host Only */}
-          {isHost && (
+          {/* Screen Share - Host and Speakers */}
+          {canSpeak && (
             <button
               onClick={isScreenSharing ? stopScreenShare : startScreenShare}
               className={cn(
