@@ -202,6 +202,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
   const [hostGiftTotal, setHostGiftTotal] = useState(0);
   const [showPostRecordingModal, setShowPostRecordingModal] = useState(false);
   const [finalRecordingUrl, setFinalRecordingUrl] = useState<string>('');
+  const [myCredits, setMyCredits] = useState<number | null>(null);
   const notifiedUsersRef = useRef<Set<string>>(new Set());
   
   const canSpeak = myRole === 'host' || myRole === 'co_host' || myRole === 'speaker';
