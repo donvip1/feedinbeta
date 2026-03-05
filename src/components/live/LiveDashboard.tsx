@@ -97,9 +97,9 @@ export const LiveDashboard = ({
     if (!confirm("Delete this recorded space and all related data?")) return;
     setDeletingSpaceId(spaceId);
     try {
-      await supabase.from("live_stream_messages").delete().eq("stream_id", spaceId);
-      await supabase.from("live_stream_reactions").delete().eq("stream_id", spaceId);
-      await supabase.from("live_stream_gifts").delete().eq("stream_id", spaceId);
+      await supabase.from("live_space_messages").delete().eq("space_id", spaceId);
+      await supabase.from("live_space_reactions").delete().eq("space_id", spaceId);
+      await supabase.from("live_space_gifts").delete().eq("space_id", spaceId);
       await supabase.from("live_space_speakers").delete().eq("space_id", spaceId);
       const { error } = await supabase.from("live_spaces").delete().eq("id", spaceId);
       if (error) throw error;
