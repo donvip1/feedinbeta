@@ -783,18 +783,34 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const room = roomRef.current;
     if (!room || room.state !== ConnectionState.Connected) {
       console.error('[SpaceContext-LK] Cannot publish screen share - not connected');
-      return;
+      throw new Error('Not connected to room');
     }
 
     try {
       const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
       if (!videoTrack) throw new Error('No video track in screen share stream');
 
-      console.log('[SpaceContext-LK] 🖥️ Publishing screen share track...');
-      await room.localParticipant.publishTrack(videoTrack, {
+      console.log('[SpaceContext-LK] 🖥️ Publishing screen share tracks...');
+      
+      // Create a LocalVideoTrack from the raw MediaStreamTrack for compatibility
+      const { LocalVideoTrack: LVT, LocalAudioTrack: LAT } = await import('livekit-client');
+      
+      const localVideoTrack = new LVT(videoTrack, undefined, false);
+      await room.localParticipant.publishTrack(localVideoTrack, {
         name: 'screen-share',
         source: Track.Source.ScreenShare,
       });
+
+      // Also publish screen share audio if available
+      if (audioTrack) {
+        const localAudioTrack = new LAT(audioTrack, undefined, false);
+        await room.localParticipant.publishTrack(localAudioTrack, {
+          name: 'screen-share-audio',
+          source: Track.Source.ScreenShareAudio,
+        });
+      }
+
       console.log('[SpaceContext-LK] ✅ Screen share published');
     } catch (error) {
       console.error('[SpaceContext-LK] Failed to publish screen share:', error);
@@ -808,14 +824,22 @@ export const SpaceProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     if (!room) return;
 
     try {
-      // Find and unpublish screen share tracks
-      const publications = room.localParticipant.trackPublications;
-      publications.forEach((pub) => {
-        if (pub.source === Track.Source.ScreenShare || pub.trackName === 'screen-share') {
-          room.localParticipant.unpublishTrack(pub.track!);
-          console.log('[SpaceContext-LK] 🖥️ Screen share unpublished');
+      // Find and unpublish ALL screen share tracks (video + audio)
+      const publications = Array.from(room.localParticipant.trackPublications.values());
+      for (const pub of publications) {
+        if (
+          pub.source === Track.Source.ScreenShare ||
+          pub.source === Track.Source.ScreenShareAudio ||
+          pub.trackName === 'screen-share' ||
+          pub.trackName === 'screen-share-audio'
+        ) {
+          if (pub.track) {
+            room.localParticipant.unpublishTrack(pub.track);
+            pub.track.stop();
+          }
+          console.log('[SpaceContext-LK] 🖥️ Screen share track unpublished:', pub.trackName);
         }
-      });
+      }
       setScreenShareStream(null);
       setIsRemoteScreenSharing(false);
       setScreenShareDismissed(false);
