@@ -317,6 +317,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       }
       videoTrackRef.current?.stop();
       audioTrackRef.current?.stop();
+      // Clear viewer refresh interval
+      if ((window as any).__viewerRefreshInterval) {
+        clearInterval((window as any).__viewerRefreshInterval);
+      }
     };
   }, [streamId, user?.id]);
 
