@@ -1,45 +1,67 @@
 
 
-## Issues Identified
+## Video Stream Room Overhaul Plan
 
-### 1. Share Link Bug
-`shareUrls.liveSpace()` in `url-utils.ts` generates edge function URLs like `https://spsguldyimamulhigloc.supabase.co/functions/v1/og-space?id=...`. While this was designed for OG previews on social platforms, it creates a poor user experience — the URL looks suspicious and if the edge function has any issue, users can't join.
+### Problems Identified
 
-**Fix**: Change `shareUrls.liveSpace` and `shareUrls.liveStream` to use the direct `feedinn.com` URLs. The SpaceDetail page already sets OG meta tags client-side (lines 96-121), so social previews still get metadata. The edge function approach is unnecessary and harmful.
+1. **Reactions broken for viewers**: Stream uses `postgres_changes` on `live_stream_reactions` table, but the space (which works) uses a **broadcast channel**. The broadcast approach is faster and doesn't require DB inserts to propagate.
+2. **Chat not showing**: Messages are sent via `live_stream_messages` table + broadcast, but the flying chat only shows last 15 messages and the broadcast refetch may not trigger properly. Also, sent messages aren't added to local state immediately (optimistic update missing).
+3. **Gift/credit counter for host missing**: Space has `hostGiftTotal` state that tracks gifts received — stream room has no equivalent.
+4. **Screen share & recording**: User explicitly says remove these — they're not needed for video streams.
+5. **Camera flip broken**: The `restartTrack` approach may fail on some devices. Needs fallback to stop+recreate track.
+6. **PK Battle non-functional**: `PKBattleChallenge` component opens but doesn't actually start a battle — it just shows a toast.
+7. **UI dull/not responsive**: Bottom bar too cluttered with screen share + recording + camera + mic + chat + gift. Needs cleanup and better mobile layout.
+8. **Gift modal works but uses Dialog component** — looks out of place in a fullscreen video room.
 
-**File**: `src/lib/url-utils.ts` (line 69-70)
-- Change `liveStream` to `createShareableUrl('/live/stream/${streamId}')`
-- Change `liveSpace` to `createShareableUrl('/live/space/${spaceId}')`
+### Changes to `TwitterStreamRoom.tsx`
 
-### 2. Recorded Spaces — Better Discovery Section
-Currently recorded spaces exist as a small section in LiveDashboard. The user wants a dedicated navigable tab with richer features.
+**Remove entirely:**
+- Screen share state, refs, handlers (`screenTrackRef`, `isScreenSharing`, `handleScreenShare`, `createLocalScreenTracks` import)
+- Recording state, refs, handlers (`mediaRecorderRef`, `recordingChunksRef`, `isRecording`, `recordingLoading`, `handleRecordingToggle`)
+- Screen share button from bottom bar
+- Recording button/indicator from bottom bar
+- Monitor import from lucide
 
-**Approach**: Add a "Replays" tab to the LiveDashboard header filters (alongside Discover). When selected, show a dedicated feed-like view of all recorded spaces with:
-- Cover image, title, host info, duration, listener count
-- Share button
-- Click to navigate to SpaceDetail replay
+**Fix reactions — switch to broadcast channel (matching space pattern):**
+- Change `handleReaction` to broadcast via `supabase.channel().send({ type: 'broadcast', event: 'reaction', payload: { emoji, user_id, display_name } })`
+- Change subscription from `postgres_changes` on `live_stream_reactions` to `broadcast` listener on `stream-reactions-{streamId}`
+- Still insert into `live_stream_reactions` for persistence, but don't rely on it for UI
 
-**File**: `src/components/live/LiveDashboard.tsx`
-- Add "Replays" as a navigation tab in the header (next to "Discover")
-- When "Replays" is active, render a dedicated recorded spaces feed instead of the live content
-- Remove the existing inline "Recorded Spaces" section (it moves to the tab)
+**Fix chat — add optimistic updates:**
+- After `handleReplySubmit`, immediately push the new message into `replies` state (don't wait for refetch)
+- This matches what the space does
 
-### 3. Recorded Space Comments & Reactions (Phase 2 — Larger Feature)
-The user wants recorded spaces to have feed-like features: comments, reactions, tagging, notifications, and promotion with credits. This is a significant feature requiring new database tables and UI components. I recommend implementing this as a follow-up after fixing the immediate share link and discovery issues.
+**Add host gift counter:**
+- Add `hostGiftTotal` state (copy from space)
+- Fetch initial total from `live_stream_gifts` on mount
+- Update counter in the gift realtime subscription when `receiver_id === stream.user_id`
+- Display as a badge below host tag: "Gifts: {count}"
 
-## Plan Summary
+**Fix camera flip:**
+- If `restartTrack` fails, fallback to: stop current track → create new track with opposite `facingMode` → unpublish old → publish new
 
-**Immediate changes (this implementation):**
-1. Fix `shareUrls.liveSpace` and `shareUrls.liveStream` in `url-utils.ts` to use direct URLs
-2. Add "Replays" navigation tab to LiveDashboard header, showing a dedicated recorded spaces section with improved cards
-3. Expand the recorded spaces query to fetch more results and support pagination
+**Improve PK Battle:**
+- Wire `onSelectChallenger` to actually call `usePKBattle.createBattle()` and `sendChallenge()`
+- Import and use the `usePKBattle` hook
 
-**Files to modify:**
-- `src/lib/url-utils.ts` — Fix share URL generation
-- `src/components/live/LiveDashboard.tsx` — Add Replays tab, move recorded spaces to dedicated view
+**UI/UX improvements:**
+- Clean up bottom bar: only show Mic (host), Chat input, Gift button, Camera toggle (host)
+- Move settings (⋯) to header next to "HD Live" badge (matching space pattern)
+- Add `QuickGiftBar` as an alternative to the full modal for fast gifting (matching space)
+- Ensure all overlays use `pb-safe` and `pt-safe` for mobile
+- Add proper `min-h-[100dvh]` for mobile viewport
 
-**Deferred (follow-up):**
-- Comments/reactions system on recorded spaces (requires new DB tables)
-- User tagging with notifications
-- Credit-based promotion for recorded spaces
+### Files to Modify
+
+1. **`src/components/live/twitter-space/TwitterStreamRoom.tsx`** — All changes above
+2. No other files need modification
+
+### What stays the same
+- LiveKit initialization logic
+- All Supabase table structures
+- LiveGiftModal (still available for full gift UI)
+- Guest list view
+- Share menu
+- All modals (Report, Rules, Feedback, Audio Settings)
+- FloatingReactions component
 
