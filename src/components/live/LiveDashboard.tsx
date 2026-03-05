@@ -204,9 +204,8 @@ export const LiveDashboard = ({
           profiles:user_id (id, display_name, username, avatar_url)
         `)
         .eq('status', 'ended')
-        .not('recording_url', 'is', null)
         .order('ended_at', { ascending: false })
-        .limit(20);
+        .limit(50);
       return data || [];
     },
     staleTime: 5 * 60 * 1000,
