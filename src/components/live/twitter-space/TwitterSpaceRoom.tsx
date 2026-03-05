@@ -1301,7 +1301,7 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
     });
 
     return (
-      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col">
+      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col" style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation', overscrollBehavior: 'none', transform: 'translateZ(0)' }}>
         {/* Guest Header */}
         <div className="px-4 py-4 border-b border-white/5 flex items-center justify-between">
           <button onClick={() => setView('main')} className="p-2">
@@ -1822,11 +1822,11 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
 
       {/* Credit Balance Indicator */}
       {myCredits !== null && (
-        <div className="flex justify-center pb-2">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
-            <Coins className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-xs font-bold text-amber-400">{myCredits.toLocaleString()}</span>
-            <span className="text-[10px] text-muted-foreground">credits</span>
+        <div className="flex justify-center pb-1.5">
+          <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+            <Coins className="w-3 h-3 text-amber-400" />
+            <span className="text-[10px] font-bold text-amber-400">{myCredits.toLocaleString()}</span>
+            <span className="text-[9px] text-muted-foreground">credits</span>
           </div>
         </div>
       )}
