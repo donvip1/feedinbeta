@@ -384,7 +384,7 @@ export const LiveDashboard = ({
                         <p className="text-[11px] text-white/30 mt-1">
                           {duration > 0 ? `${duration}m` : ''}
                           {space.peak_viewers ? `${duration > 0 ? ' • ' : ''}${space.peak_viewers} listeners` : ''}
-                          {timeAgo ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${timeAgo}` : ''}
+                          {endedDate ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${format(endedDate, 'MMM d, h:mm a')}` : ''}
                         </p>
                       </div>
                       <div className="flex flex-col items-center gap-2 self-center shrink-0">
