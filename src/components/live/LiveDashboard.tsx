@@ -580,7 +580,7 @@ export const LiveDashboard = ({
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-4">
               {filteredContent.slice(0, 6).map((item, index) => (
                 <motion.div
                   key={item.id}
