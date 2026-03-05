@@ -362,18 +362,20 @@ export const LiveDashboard = ({
       <div className="flex-1 overflow-y-auto overscroll-contain" data-scrollable="true">
         <div className="px-4 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-4 max-w-2xl mx-auto space-y-8 w-full">
 
-        {activeTab === 'Replays' ? (
+      {activeTab === 'Replays' ? (
           /* ===== REPLAYS TAB ===== */
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Headphones className="w-5 h-5 text-purple-400" />
-              <span className="font-bold text-lg">Space Replays</span>
-              <span className="text-xs text-slate-500 ml-auto">{recordedSpaces?.length || 0} spaces</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Headphones className="w-5 h-5 text-purple-400" />
+                <span className="font-bold text-base">Space Replays</span>
+              </div>
+              <span className="text-xs text-slate-500">{recordedSpaces?.length || 0} spaces</span>
             </div>
 
             {/* Bulk actions for admins/mods */}
             {canDeleteAny && recordedSpaces && recordedSpaces.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={toggleSelectAll}
                   className="text-xs px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 text-zinc-300 transition-colors border border-white/10"
@@ -401,106 +403,135 @@ export const LiveDashboard = ({
                 <p className="text-sm text-white/40 text-center">Recorded spaces will appear here for replay</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-3">
+              <div className="space-y-2">
                 {recordedSpaces.map((space: any, index: number) => {
                   const duration = space.started_at && space.ended_at
                     ? Math.floor((new Date(space.ended_at).getTime() - new Date(space.started_at).getTime()) / 60000)
                     : 0;
+                  const durationStr = duration >= 60 ? `${Math.floor(duration / 60)}h ${duration % 60}m` : duration > 0 ? `${duration}m` : '';
                   const endedDate = space.ended_at ? new Date(space.ended_at) : null;
-                  const timeAgo = endedDate ? getTimeAgo(endedDate) : '';
+                  const isOwner = space.user_id === user?.id;
+                  const showDelete = canDeleteAny || isOwner;
 
                   return (
                     <motion.div
                       key={space.id}
-                      initial={{ opacity: 0, y: 12 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.05 }}
+                      transition={{ delay: Math.min(index * 0.03, 0.3) }}
                       onClick={() => navigate(`/live/space/${space.id}`)}
                       className={cn(
-                        "flex gap-3 p-3 rounded-2xl bg-slate-800/40 border hover:bg-slate-800/70 transition-all cursor-pointer group",
+                        "rounded-2xl bg-slate-900/60 border overflow-hidden active:scale-[0.98] transition-transform cursor-pointer",
                         selectedSpaces.has(space.id) ? "border-purple-500/50 bg-purple-500/10" : "border-white/5"
                       )}
                     >
-                      {/* Selection checkbox for admins */}
-                      {canDeleteAny && (
-                        <button
-                          onClick={(e) => toggleSelectSpace(e, space.id)}
-                          className={cn(
-                            "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 self-center transition-colors",
-                            selectedSpaces.has(space.id) ? "bg-purple-500 border-purple-500" : "border-white/20 hover:border-white/40"
-                          )}
-                        >
-                          {selectedSpaces.has(space.id) && (
-                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </button>
-                      )}
-                      {space.cover_image_url ? (
-                        <div className="relative w-20 h-20 rounded-xl overflow-hidden shrink-0">
-                          <img src={space.cover_image_url} alt={space.title} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Play className="w-6 h-6 text-white fill-white" />
+                      {/* Cover image / gradient header */}
+                      <div className="relative h-28 w-full overflow-hidden">
+                        {space.cover_image_url ? (
+                          <img src={space.cover_image_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-purple-900/60 via-slate-800/80 to-pink-900/40" />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        
+                        {/* Play button overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                            <Play className="w-5 h-5 text-white fill-white ml-0.5" />
                           </div>
                         </div>
-                      ) : (
-                        <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-purple-600/20 to-pink-600/20 flex items-center justify-center shrink-0">
-                          <Headphones className="w-8 h-8 text-purple-400" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0 py-0.5">
-                        <div className="flex items-center gap-2 mb-1">
+
+                        {/* Top badges */}
+                        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
                           {space.recording_url ? (
-                            <span className="text-[9px] font-bold text-purple-300 bg-purple-500/15 px-2 py-0.5 rounded-full uppercase tracking-wider">Replay</span>
+                            <span className="text-[9px] font-bold text-purple-200 bg-purple-500/30 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wider">Replay</span>
                           ) : (
-                            <span className="text-[9px] font-bold text-white/40 bg-white/5 px-2 py-0.5 rounded-full uppercase tracking-wider">Ended</span>
+                            <span className="text-[9px] font-bold text-white/60 bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full uppercase tracking-wider">Ended</span>
                           )}
                           {space.topic_category && (
-                            <span className="text-[9px] font-medium text-white/40 bg-white/5 px-2 py-0.5 rounded-full">{space.topic_category}</span>
+                            <span className="text-[9px] font-medium text-white/60 bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full">{space.topic_category}</span>
                           )}
                         </div>
-                        <p className="font-semibold text-sm truncate leading-tight">{space.title}</p>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <Avatar className="w-4 h-4">
+
+                        {/* Duration badge */}
+                        {durationStr && (
+                          <div className="absolute top-2.5 right-2.5 text-[10px] font-semibold text-white/80 bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                            {durationStr}
+                          </div>
+                        )}
+
+                        {/* Admin checkbox */}
+                        {canDeleteAny && (
+                          <button
+                            onClick={(e) => toggleSelectSpace(e, space.id)}
+                            className={cn(
+                              "absolute bottom-2.5 left-2.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors",
+                              selectedSpaces.has(space.id) ? "bg-purple-500 border-purple-500" : "border-white/30 bg-black/30 backdrop-blur-sm"
+                            )}
+                          >
+                            {selectedSpaces.has(space.id) && (
+                              <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Card body */}
+                      <div className="p-3">
+                        <p className="font-semibold text-sm text-white leading-snug line-clamp-2">{space.title}</p>
+                        
+                        <div className="flex items-center gap-2 mt-2">
+                          <Avatar className="w-5 h-5">
                             <AvatarImage src={(space.profiles as any)?.avatar_url} />
                             <AvatarFallback className="text-[8px] bg-slate-700">{(space.profiles as any)?.display_name?.[0] || '?'}</AvatarFallback>
                           </Avatar>
-                          <span className="text-xs text-white/50 truncate">
+                          <span className="text-xs text-white/50 truncate flex-1">
                             {(space.profiles as any)?.display_name || 'Creator'}
                           </span>
                         </div>
-                        <p className="text-[11px] text-white/30 mt-1">
-                          {duration > 0 ? `${duration}m` : ''}
-                          {space.peak_viewers ? `${duration > 0 ? ' • ' : ''}${space.peak_viewers} listeners` : ''}
-                          {endedDate ? `${(duration > 0 || space.peak_viewers) ? ' • ' : ''}${format(endedDate, 'MMM d, h:mm a')}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex flex-col items-center gap-2 self-center shrink-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const url = `https://feedinn.com/live/space/${space.id}`;
-                            if (navigator.share) {
-                              navigator.share({ title: space.title, url });
-                            } else {
-                              navigator.clipboard.writeText(url);
-                              toast.success("Link copied!");
-                            }
-                          }}
-                          className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10"
-                        >
-                          <Share2 className="w-4 h-4 text-white/40" />
-                        </button>
-                        {(canDeleteAny || space.user_id === user?.id) && (
-                          <button
-                            onClick={(e) => handleDeleteSpace(e, space.id)}
-                            disabled={deletingSpaceId === space.id}
-                            className="w-9 h-9 flex items-center justify-center rounded-full bg-white/5 hover:bg-red-500/20 transition-colors"
-                          >
-                            <Trash2 className={cn("w-4 h-4", deletingSpaceId === space.id ? "text-white/20 animate-spin" : "text-red-400/60")} />
-                          </button>
-                        )}
+
+                        <div className="flex items-center justify-between mt-2.5">
+                          <div className="flex items-center gap-3 text-[11px] text-white/30">
+                            {space.peak_viewers ? (
+                              <span className="flex items-center gap-1">
+                                <Users className="w-3 h-3" /> {space.peak_viewers}
+                              </span>
+                            ) : null}
+                            {endedDate && (
+                              <span>{format(endedDate, 'MMM d, h:mm a')}</span>
+                            )}
+                          </div>
+
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const url = `https://feedinn.com/live/space/${space.id}`;
+                                if (navigator.share) {
+                                  navigator.share({ title: space.title, url });
+                                } else {
+                                  navigator.clipboard.writeText(url);
+                                  toast.success("Link copied!");
+                                }
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 active:scale-90 transition-all"
+                            >
+                              <Share2 className="w-3.5 h-3.5 text-white/40" />
+                            </button>
+                            {showDelete && (
+                              <button
+                                onClick={(e) => handleDeleteSpace(e, space.id)}
+                                disabled={deletingSpaceId === space.id}
+                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 hover:bg-red-500/20 active:scale-90 transition-all"
+                              >
+                                <Trash2 className={cn("w-3.5 h-3.5", deletingSpaceId === space.id ? "text-white/20 animate-spin" : "text-red-400/60")} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </motion.div>
                   );
