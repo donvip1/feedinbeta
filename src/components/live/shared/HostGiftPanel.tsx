@@ -104,7 +104,7 @@ export const HostGiftPanel = ({
         await supabase.from('credit_transactions').insert({
           user_id: user.id,
           amount: -creditValue,
-          type: 'gift_sent',
+          type: 'live_gift_sent',
           description: `Sent ${giftType} gift to ${selectedViewer.display_name} in live`,
           related_id: roomId,
         });
@@ -115,7 +115,7 @@ export const HostGiftPanel = ({
       await supabase.from('credit_transactions').insert({
         user_id: selectedViewer.id,
         amount: recipientAmount,
-        type: 'gift_received',
+        type: 'live_gift_received',
         description: `Received ${giftType} gift from host in live`,
         related_id: roomId,
       });
