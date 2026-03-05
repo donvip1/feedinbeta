@@ -18,6 +18,7 @@ interface PKBattleChallengeProps {
   onAccept: () => void;
   onDecline: () => void;
   mode: 'incoming' | 'outgoing' | 'select';
+  maxSlots?: number;
   availableUsers?: Array<{
     id: string;
     name: string;
@@ -35,6 +36,7 @@ export const PKBattleChallenge = ({
   onAccept,
   onDecline,
   mode,
+  maxSlots = 2,
   availableUsers = [],
   onSelectChallenger,
 }: PKBattleChallengeProps) => {
