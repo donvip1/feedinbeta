@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Coins, Gift, TrendingUp, Crown } from 'lucide-react';
+import { Coins, Gift, Crown, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SpaceGiftHistory } from './SpaceGiftHistory';
 
 interface TopGifter {
   sender_id: string;
@@ -28,6 +29,7 @@ export const SpaceWalletBoard = ({ spaceId, className, variant = 'compact' }: Sp
   const [giftCount, setGiftCount] = useState(0);
   const [topGifters, setTopGifters] = useState<TopGifter[]>([]);
   const [lastGift, setLastGift] = useState<{ emoji: string; value: number; sender: string } | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const fetchData = async () => {
     const { data, count } = await supabase
@@ -84,7 +86,6 @@ export const SpaceWalletBoard = ({ spaceId, className, variant = 'compact' }: Sp
       }, async (payload: any) => {
         fetchData();
         const emoji = GIFT_EMOJI_MAP[payload.new?.gift_type] || '🎁';
-        // Get sender name
         const { data: sender } = await supabase
           .from('profiles')
           .select('display_name')
@@ -98,75 +99,79 @@ export const SpaceWalletBoard = ({ spaceId, className, variant = 'compact' }: Sp
     return () => { supabase.removeChannel(channel); };
   }, [spaceId]);
 
-  // Bar variant - full width, prominent
   if (variant === 'bar') {
     return (
-      <div className={cn("relative w-full", className)}>
-        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-pink-500/10 border border-amber-500/20">
-          {/* Left: Total earnings */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500/30 to-orange-500/30 flex items-center justify-center">
-              <Coins className="w-4 h-4 text-amber-400" />
-            </div>
-            <div>
-              <p className="text-amber-400 font-bold text-sm leading-tight">{totalValue.toLocaleString()}</p>
-              <p className="text-[10px] text-muted-foreground">{giftCount} gifts</p>
-            </div>
-          </div>
-
-          {/* Center: Top gifters */}
-          <div className="flex items-center gap-2">
-            {topGifters.slice(0, 3).map((gifter, i) => (
-              <div key={gifter.sender_id} className="flex items-center gap-1 text-[10px]">
-                <span className={cn(
-                  "w-4 h-4 rounded-full flex items-center justify-center font-bold",
-                  i === 0 ? "bg-amber-500/30 text-amber-400" :
-                  i === 1 ? "bg-gray-400/20 text-gray-400" :
-                  "bg-orange-500/20 text-orange-400"
-                )}>
-                  {i === 0 ? <Crown className="w-2.5 h-2.5" /> : i + 1}
-                </span>
-                <span className="text-muted-foreground truncate max-w-[50px]">{gifter.display_name}</span>
+      <>
+        <div className={cn("relative w-full", className)}>
+          <button
+            onClick={() => setShowHistory(true)}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-pink-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500/30 to-orange-500/30 flex items-center justify-center">
+                <Coins className="w-4 h-4 text-amber-400" />
               </div>
-            ))}
-            {topGifters.length === 0 && (
-              <span className="text-[10px] text-muted-foreground">No gifts yet</span>
-            )}
-          </div>
+              <div className="text-left">
+                <p className="text-amber-400 font-bold text-sm leading-tight">{totalValue.toLocaleString()}</p>
+                <p className="text-[10px] text-muted-foreground">{giftCount} gifts</p>
+              </div>
+            </div>
 
-          {/* Right: Gift icon */}
-          <Gift className="w-4 h-4 text-amber-400/60" />
+            <div className="flex items-center gap-2">
+              {topGifters.slice(0, 3).map((gifter, i) => (
+                <div key={gifter.sender_id} className="flex items-center gap-1 text-[10px]">
+                  <span className={cn(
+                    "w-4 h-4 rounded-full flex items-center justify-center font-bold",
+                    i === 0 ? "bg-amber-500/30 text-amber-400" :
+                    i === 1 ? "bg-gray-400/20 text-gray-400" :
+                    "bg-orange-500/20 text-orange-400"
+                  )}>
+                    {i === 0 ? <Crown className="w-2.5 h-2.5" /> : i + 1}
+                  </span>
+                  <span className="text-muted-foreground truncate max-w-[50px]">{gifter.display_name}</span>
+                </div>
+              ))}
+              {topGifters.length === 0 && (
+                <span className="text-[10px] text-muted-foreground">No gifts yet</span>
+              )}
+            </div>
+
+            <History className="w-4 h-4 text-amber-400/60" />
+          </button>
+
+          <AnimatePresence>
+            {lastGift && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute -bottom-7 left-0 right-0 flex items-center justify-center"
+              >
+                <span className="text-xs bg-amber-500/20 border border-amber-500/30 rounded-full px-3 py-0.5 text-amber-400">
+                  {lastGift.emoji} {lastGift.sender} sent +{lastGift.value} credits
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
-        {/* New gift animation */}
-        <AnimatePresence>
-          {lastGift && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute -bottom-7 left-0 right-0 flex items-center justify-center"
-            >
-              <span className="text-xs bg-amber-500/20 border border-amber-500/30 rounded-full px-3 py-0.5 text-amber-400">
-                {lastGift.emoji} {lastGift.sender} sent +{lastGift.value} credits
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+        <SpaceGiftHistory isOpen={showHistory} onClose={() => setShowHistory(false)} spaceId={spaceId} />
+      </>
     );
   }
 
-  // Compact variant (default) - small badge
   return (
-    <div className={cn("relative", className)}>
-      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30">
-        <Coins className="w-3.5 h-3.5 text-amber-400" />
-        <span className="text-amber-400 font-bold text-xs">{totalValue.toLocaleString()}</span>
-        {giftCount > 0 && (
-          <span className="text-muted-foreground text-[10px]">({giftCount})</span>
-        )}
-      </div>
-    </div>
+    <>
+      <button onClick={() => setShowHistory(true)} className={cn("relative", className)}>
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 hover:border-amber-500/50 transition-colors">
+          <Coins className="w-3.5 h-3.5 text-amber-400" />
+          <span className="text-amber-400 font-bold text-xs">{totalValue.toLocaleString()}</span>
+          {giftCount > 0 && (
+            <span className="text-muted-foreground text-[10px]">({giftCount})</span>
+          )}
+        </div>
+      </button>
+      <SpaceGiftHistory isOpen={showHistory} onClose={() => setShowHistory(false)} spaceId={spaceId} />
+    </>
   );
 };
