@@ -1361,8 +1361,67 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         </div>
       )}
 
+      {/* RIGHT-SIDE VIEWER PANEL (TikTok-style) */}
+      <div className="absolute right-3 bottom-52 z-30 flex flex-col items-center gap-3">
+        {/* Request to join for viewers */}
+        {!isHost && (
+          <button
+            onClick={() => {
+              toast.success('Request sent to host!');
+              // Broadcast request
+              supabase.channel(`stream-events-${streamId}`).send({
+                type: 'broadcast',
+                event: 'join_request',
+                payload: { user_id: user?.id, display_name: user?.user_metadata?.display_name },
+              });
+            }}
+            className="flex flex-col items-center gap-1"
+          >
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Plus className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-[9px] text-white/60 font-bold">Request</span>
+          </button>
+        )}
+
+        {/* Viewer avatars */}
+        {viewers.slice(0, 3).map((viewer, index) => (
+          <button
+            key={viewer.user_id}
+            onClick={() => navigateToProfile(viewer.user_id)}
+            className="relative flex flex-col items-center gap-0.5"
+          >
+            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/20">
+              {viewer.profile?.avatar_url ? (
+                <img src={viewer.profile.avatar_url} alt={viewer.profile.display_name} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-white/10 flex items-center justify-center text-white/40 text-sm font-bold">
+                  {viewer.profile?.display_name?.[0] || '?'}
+                </div>
+              )}
+            </div>
+            <span className="text-[9px] text-white/60 font-medium truncate max-w-[52px]">
+              {viewer.profile?.display_name?.slice(0, 8) || 'User'}
+            </span>
+          </button>
+        ))}
+
+        {/* View all viewers */}
+        {viewers.length > 3 && (
+          <button
+            onClick={() => setView('guests')}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div className="w-12 h-12 bg-black/40 backdrop-blur-xl rounded-full flex items-center justify-center border border-white/10">
+              <Users className="w-4 h-4 text-white/60" />
+            </div>
+            <span className="text-[9px] text-white/60 font-bold">+{viewers.length - 3}</span>
+          </button>
+        )}
+      </div>
+
       {/* CHAT AREA */}
-      <div className="absolute bottom-44 left-0 right-16 z-30 px-4">
+      <div className="absolute bottom-36 left-0 right-16 z-30 px-4">
         <div className="flex flex-col space-y-1 max-h-[200px] overflow-y-auto scrollbar-hide pointer-events-auto">
           <AnimatePresence initial={false}>
             {replies.slice(-20).map((msg) => (
