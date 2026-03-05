@@ -1,34 +1,62 @@
 
 
-## Plan: Fix Live Space Recording Flow
+## Problem Analysis
 
-### Root Causes Identified
+The recording system is broken because it relies entirely on **LiveKit's Egress API**, which is not available on the current LiveKit Cloud plan. Here's what happens:
 
-**1. Room name mismatch (primary bug)**: The `livekit-recording` edge function constructs the room name as `room-${roomId}` (line 142), but the actual LiveKit room is created with `space-${roomId}` (confirmed in `useSpaceLiveKit.ts` and `SpaceContext.tsx`). This causes the Egress API to return `"requested room does not exist"`, meaning recording never starts.
+1. Host enables recording and the app calls the `livekit-recording` edge function
+2. The edge function tries to call LiveKit's Egress API (`StartRoomCompositeEgress`)
+3. The Egress API **fails** (not available on the plan)
+4. The fallback just marks `is_recording_enabled = true` in the database -- no actual recording happens
+5. The edge function also tries to write to a `cf_recording_uid` column that **doesn't even exist** in `live_spaces`
+6. When the space ends, `recording_url` is always `null`
+7. The "Recorded Spaces" section on the Live page filters for `recording_url IS NOT NULL`, so nothing ever shows
 
-**2. No PostRecordingModal shown**: `PostRecordingModal` is never imported in `TwitterSpaceRoom.tsx`. After `handleLeave`, the code just calls `onClose()` regardless of recording state. The host never sees the recording/sharing modal.
+**Confirmed by database:** All 5 recent spaces have `recording_url: null` despite recording being toggled on.
 
-**3. No fallback when Egress unavailable**: If the LiveKit plan doesn't include Egress, recording silently fails with no client-side alternative.
+---
 
-### Fixes
+## Solution: Client-Side Audio Recording
 
-**A. Fix room name in edge function** (`supabase/functions/livekit-recording/index.ts`)
-- Change `room-${roomId}` to use the correct prefix based on `roomType`:
-  - `live_spaces` → `space-${roomId}`
-  - `live_streams` → `stream-${roomId}`
+Since server-side LiveKit Egress isn't available, we'll implement **client-side recording** in the host's browser. This captures all audio (local mic + remote participants) using the Web Audio API and MediaRecorder, then uploads to storage when the space ends.
 
-**B. Add PostRecordingModal to TwitterSpaceRoom** (`TwitterSpaceRoom.tsx`)
-- Import `PostRecordingModal`
-- Add state: `showPostRecordingModal`, `finalRecordingUrl`
-- In `handleLeave`: instead of calling `onClose()` immediately after ending, if `isRecording` was true (host had recording on), show the `PostRecordingModal` with the recording URL (or a fallback message)
-- The modal already has "Post to Feed", "Download", and share functionality
-- Only call `onClose()` after the modal is dismissed
+### Step 1 -- Create a `recordings` storage bucket
+- Create a public storage bucket called `recordings`
+- Add RLS policy allowing authenticated users to upload
 
-**C. Handle missing recording URL gracefully**
-- If the edge function returns no `recordingUrl` (egress unavailable), still show the modal but with a message that the recording is processing or unavailable
-- Keep the auto-post logic but only trigger it when a real URL exists
+### Step 2 -- Build a `useSpaceRecorder` hook
+- Uses `AudioContext` to mix all audio sources (local track + all remote tracks from LiveKit room)
+- Records via `MediaRecorder` to produce a WebM/Opus blob
+- Provides `startRecording()`, `stopRecording()` methods
+- On stop, returns the audio `Blob`
 
-### Files to modify
-1. `supabase/functions/livekit-recording/index.ts` — Fix room name prefix
-2. `src/components/live/twitter-space/TwitterSpaceRoom.tsx` — Import and show PostRecordingModal, restructure handleLeave flow
+### Step 3 -- Integrate into TwitterSpaceRoom
+- When host joins a space with `is_recording_enabled = true`, auto-start the client-side recorder
+- When recording toggle is pressed, start/stop the recorder (remove the edge function call for start -- it does nothing useful)
+- When the space ends (host leaves), stop the recorder, upload the blob to the `recordings` bucket, and save the public URL to `recording_url` on the `live_spaces` row
+- Show the `PostRecordingModal` with the actual recording URL
+
+### Step 4 -- Simplify the edge function
+- The `livekit-recording` edge function becomes a simple database updater (just marks `is_recording_enabled` flag) or is bypassed entirely since the client handles everything
+
+### Step 5 -- Replay on Live page
+- The existing "Recorded Spaces" section in `LiveDashboard` already works correctly -- it queries for spaces with `recording_url IS NOT NULL` and displays them with a replay button
+- The `SpaceDetail` page already has replay support for ended spaces with recording URLs
+- No changes needed here; once recordings are actually saved, they'll appear automatically
+
+### Technical Details
+
+**Audio mixing approach:**
+```text
+LocalAudioTrack ──┐
+                   ├──► AudioContext (destination) ──► MediaRecorder ──► Blob
+RemoteTrack(s) ───┘
+```
+
+**Upload path:** `recordings/{spaceId}/{timestamp}.webm` in the `recordings` bucket
+
+**Files to create/modify:**
+- `src/hooks/useSpaceRecorder.ts` (new) -- client-side recording hook
+- `src/components/live/twitter-space/TwitterSpaceRoom.tsx` -- integrate the hook, upload on end
+- Database migration: create `recordings` storage bucket + policies
 
