@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -230,10 +230,28 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const isPKMode = stream?.room_type === 'pk_battle';
   const pkMaxSlots = (stream as any)?.pk_max_slots || 2;
 
-  // Hide bottom nav
+  // Hide bottom nav + prevent overscroll for native feel
   useEffect(() => {
     setHideBottomNav(true);
-    return () => setHideBottomNav(false);
+    
+    // Prevent overscroll/bounce on iOS
+    const preventOverscroll = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      const scrollable = target.closest('[data-scrollable="true"]') || target.closest('.scrollbar-hide');
+      if (!scrollable) {
+        e.preventDefault();
+      }
+    };
+    document.addEventListener('touchmove', preventOverscroll, { passive: false });
+    document.body.style.overscrollBehavior = 'none';
+    document.documentElement.style.overscrollBehavior = 'none';
+    
+    return () => {
+      setHideBottomNav(false);
+      document.removeEventListener('touchmove', preventOverscroll);
+      document.body.style.overscrollBehavior = '';
+      document.documentElement.style.overscrollBehavior = '';
+    };
   }, [setHideBottomNav]);
 
   // Fetch user credits
@@ -1159,7 +1177,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     });
 
     return (
-      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col min-h-[100dvh]">
+      <div className="fixed inset-0 z-50 bg-[#050505] flex flex-col min-h-[100dvh]" style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation', overscrollBehavior: 'none', transform: 'translateZ(0)' }}>
         <div className="px-4 py-4 border-b border-white/5 flex items-center justify-between pt-safe">
           <button onClick={() => setView('main')} className="p-2 rounded-full hover:bg-white/5">
             <ArrowLeft className="w-5 h-5 text-white" />
@@ -1298,9 +1316,24 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#050505] overflow-hidden min-h-[100dvh]">
+    <div
+      className="fixed inset-0 z-50 bg-[#050505] overflow-hidden min-h-[100dvh]"
+      style={{
+        WebkitTapHighlightColor: 'transparent',
+        WebkitTouchCallout: 'none',
+        WebkitUserSelect: 'none',
+        userSelect: 'none',
+        touchAction: 'manipulation',
+        overscrollBehavior: 'none',
+        contain: 'layout style paint',
+        transform: 'translateZ(0)',
+        WebkitTransform: 'translateZ(0)',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
+      }}
+    >
       {/* VIDEO ENGINE */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" style={{ transform: 'translateZ(0)', willChange: 'transform' }}>
         {isPKMode && battleParticipants.length > 0 ? (
           // PK MODE: Grid or Focus layout
           focusedParticipantId === null ? (
@@ -1373,10 +1406,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       </div>
 
       {/* HEADER */}
-      <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-center z-40 pt-safe">
+      <div className="absolute top-0 left-0 right-0 px-4 py-3 flex justify-between items-center z-40 pt-safe" style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
         <button
           onClick={() => host && navigateToProfile(host.id)}
-          className="flex items-center gap-2.5 min-w-0"
+          className="flex items-center gap-2.5 min-w-0 active:scale-95 transition-transform duration-75"
         >
           <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-rose-500 shrink-0">
             {host?.avatar_url ? (
@@ -1481,7 +1514,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       )}
 
       {/* RIGHT-SIDE PANEL: Co-broadcasters + Viewers */}
-      <div className="absolute right-3 bottom-44 z-30 flex flex-col items-center gap-2 max-h-[50vh] overflow-y-auto scrollbar-hide">
+      <div className="absolute right-3 bottom-44 z-30 flex flex-col items-center gap-2 max-h-[50vh] overflow-y-auto scrollbar-hide" style={{ transform: 'translateZ(0)', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
         {/* Request to join for viewers */}
         {!isHost && (
           <button
@@ -1595,15 +1628,15 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
       {/* CHAT AREA */}
       <div className="absolute bottom-36 left-0 right-16 z-30 px-4">
-        <div className="flex flex-col space-y-1 max-h-[160px] overflow-y-auto scrollbar-hide pointer-events-auto">
-          <AnimatePresence initial={false}>
+        <div className="flex flex-col space-y-1 max-h-[160px] overflow-y-auto scrollbar-hide pointer-events-auto" style={{ transform: 'translateZ(0)', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          <AnimatePresence initial={false} mode="popLayout">
             {replies.slice(-20).map((msg) => (
               <motion.div
                 key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.1 }}
                 className="px-3 py-1.5"
               >
                 {msg.user_id === 'system' || msg.isGift ? (
@@ -1721,7 +1754,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       />
 
       {/* BOTTOM BROADCAST BAR */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe bg-gradient-to-t from-black/80 via-black/40 to-transparent z-40">
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe bg-gradient-to-t from-black/80 via-black/40 to-transparent z-40" style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden' }}>
         {/* PK Interaction target selector */}
         {isPKMode && battleParticipants.length > 0 && (
           <div className="flex items-center gap-1.5 mb-3 overflow-x-auto scrollbar-hide">
@@ -2368,6 +2401,24 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         .pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
         .pt-safe { padding-top: max(1rem, env(safe-area-inset-top)); }
+        
+        /* Native mobile optimizations */
+        * { -webkit-tap-highlight-color: transparent; }
+        button, a, [role="button"] {
+          touch-action: manipulation;
+          -webkit-touch-callout: none;
+        }
+        input, textarea {
+          -webkit-appearance: none;
+          appearance: none;
+          font-size: 16px !important; /* Prevent iOS zoom on focus */
+        }
+        video {
+          -webkit-playsinline: true;
+          object-fit: cover;
+          transform: translateZ(0);
+          will-change: transform;
+        }
       `}</style>
     </div>
   );
