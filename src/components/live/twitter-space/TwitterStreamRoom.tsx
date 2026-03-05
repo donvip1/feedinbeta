@@ -31,6 +31,13 @@ import {
   Monitor,
   Swords,
   Camera,
+  Minimize2,
+  Crown,
+  RotateCcw,
+  Zap,
+  Sparkles,
+  Play,
+  Maximize2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -44,6 +51,7 @@ import {
   createLocalVideoTrack,
   createLocalAudioTrack,
   ConnectionState,
+  createLocalScreenTracks,
 } from 'livekit-client';
 
 import { LiveGiftModal } from '../LiveGiftModal';
@@ -140,6 +148,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const roomRef = useRef<Room | null>(null);
   const videoTrackRef = useRef<LocalVideoTrack | null>(null);
   const audioTrackRef = useRef<LocalAudioTrack | null>(null);
+  const screenTrackRef = useRef<LocalVideoTrack | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   // View states
   const [view, setView] = useState<'main' | 'guests'>('main');
@@ -598,20 +611,73 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     setIsCameraOn(!isCameraOn);
   };
 
-  // Handle recording toggle
+  // Handle recording toggle - client-side MediaRecorder
   const handleRecordingToggle = async () => {
     if (!isHost || recordingLoading) return;
 
     setRecordingLoading(true);
     try {
-      const action = isRecording ? 'stop' : 'start';
-      const { error } = await supabase.functions.invoke('livekit-recording', {
-        body: { action, roomId: streamId, roomType: 'live_streams' },
-      });
+      if (isRecording) {
+        // Stop recording
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+        }
+        setIsRecording(false);
+        toast.success('⏹️ Recording stopped');
+      } else {
+        // Start client-side recording
+        const room = roomRef.current;
+        if (!room) throw new Error('No active room');
 
-      if (error) throw error;
-      setIsRecording(action === 'start');
-      toast.success(action === 'start' ? '🔴 Recording started' : '⏹️ Recording stopped');
+        const audioContext = new AudioContext({ sampleRate: 48000 });
+        const destination = audioContext.createMediaStreamDestination();
+
+        // Add local audio
+        if (audioTrackRef.current?.mediaStreamTrack) {
+          const localStream = new MediaStream([audioTrackRef.current.mediaStreamTrack]);
+          audioContext.createMediaStreamSource(localStream).connect(destination);
+        }
+
+        // Add remote audio
+        room.remoteParticipants.forEach((participant) => {
+          participant.audioTrackPublications.forEach((pub) => {
+            if (pub.track?.mediaStreamTrack) {
+              const stream = new MediaStream([pub.track.mediaStreamTrack]);
+              audioContext.createMediaStreamSource(stream).connect(destination);
+            }
+          });
+        });
+
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus' : 'audio/webm';
+        
+        recordingChunksRef.current = [];
+        const recorder = new MediaRecorder(destination.stream, { mimeType });
+        mediaRecorderRef.current = recorder;
+
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) recordingChunksRef.current.push(e.data);
+        };
+
+        recorder.onstop = async () => {
+          const blob = new Blob(recordingChunksRef.current, { type: mimeType });
+          audioContext.close();
+          if (blob.size > 0) {
+            const fileName = `stream-${streamId}-${Date.now()}.webm`;
+            const { error: uploadError } = await supabase.storage
+              .from('recordings')
+              .upload(fileName, blob, { contentType: mimeType });
+            
+            if (!uploadError) {
+              toast.success('Recording saved!');
+            }
+          }
+        };
+
+        recorder.start(1000);
+        setIsRecording(true);
+        toast.success('🔴 Recording started');
+      }
     } catch (error: any) {
       toast.error('Failed to toggle recording');
     } finally {
@@ -619,33 +685,57 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
     }
   };
 
-  // Handle screen share toggle
+  // Handle screen share toggle - publish to LiveKit
   const handleScreenShare = async () => {
     if (!isHost) return;
     
     if (isScreenSharing) {
-      // Stop screen share
+      // Stop and unpublish screen share track
+      if (screenTrackRef.current) {
+        await roomRef.current?.localParticipant.unpublishTrack(screenTrackRef.current);
+        screenTrackRef.current.stop();
+        screenTrackRef.current = null;
+      }
       setIsScreenSharing(false);
       toast.success('Screen sharing stopped');
     } else {
       try {
-        // Start screen share
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        if (stream) {
-          setIsScreenSharing(true);
-          toast.success('Screen sharing started');
-          
-          // Listen for when user stops sharing via browser UI
-          stream.getVideoTracks()[0].onended = () => {
-            setIsScreenSharing(false);
-            toast.info('Screen sharing ended');
-          };
-        }
+        const tracks = await createLocalScreenTracks({ audio: false });
+        const screenTrack = tracks[0] as LocalVideoTrack;
+        screenTrackRef.current = screenTrack;
+
+        await roomRef.current?.localParticipant.publishTrack(screenTrack, {
+          source: Track.Source.ScreenShare,
+        });
+
+        setIsScreenSharing(true);
+        toast.success('Screen sharing started');
+        
+        // Listen for browser stop
+        screenTrack.mediaStreamTrack.onended = async () => {
+          await roomRef.current?.localParticipant.unpublishTrack(screenTrack);
+          screenTrack.stop();
+          screenTrackRef.current = null;
+          setIsScreenSharing(false);
+          toast.info('Screen sharing ended');
+        };
       } catch (error: any) {
         if (error.name !== 'AbortError') {
           toast.error('Failed to start screen share');
         }
       }
+    }
+  };
+
+  // Handle camera flip
+  const handleCameraFlip = async () => {
+    if (!isHost || !videoTrackRef.current) return;
+    const newFacing = facingMode === 'user' ? 'environment' : 'user';
+    try {
+      await videoTrackRef.current.restartTrack({ facingMode: newFacing });
+      setFacingMode(newFacing);
+    } catch (e) {
+      toast.error('Failed to flip camera');
     }
   };
 
@@ -657,10 +747,15 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   // Handle leave/end
   const handleLeave = async () => {
     if (isHost) {
-      if (isRecording) {
-        await supabase.functions.invoke('livekit-recording', {
-          body: { action: 'stop', roomId: streamId, roomType: 'live_streams' },
-        });
+      // Stop client-side recording if active
+      if (isRecording && mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      // Stop screen share if active
+      if (screenTrackRef.current) {
+        await roomRef.current?.localParticipant.unpublishTrack(screenTrackRef.current);
+        screenTrackRef.current.stop();
+        screenTrackRef.current = null;
       }
 
       await supabase.from('live_streams').update({
@@ -756,6 +851,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
   const navigateToProfile = (userId: string) => {
     navigate(`/profile/${userId}`);
   };
+  // Auto-scroll flying chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [replies]);
 
   if (loading) {
     return (
@@ -888,8 +987,8 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
 
   return (
     <div className="fixed inset-0 z-50 bg-black overflow-hidden">
-      {/* FULLSCREEN VIDEO - TikTok/Tango style */}
-      <div className="absolute inset-0">
+      {/* FULLSCREEN VIDEO BACKGROUND */}
+      <div className="absolute inset-0 bg-[#0a0b12]">
         <video
           ref={videoRef}
           autoPlay
@@ -900,199 +999,148 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
             !hasVideo && "hidden"
           )}
         />
-        {/* Avatar fallback when no video */}
         {!hasVideo && (
-          <div className="absolute inset-0 flex items-center justify-center bg-zinc-950">
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0a0b12]">
             {host?.avatar_url ? (
-              <img src={host.avatar_url} alt={host?.display_name} className="w-32 h-32 rounded-full border-4 border-purple-500" />
+              <img src={host.avatar_url} alt={host?.display_name} className="w-32 h-32 rounded-full border-4 border-rose-500" />
             ) : (
-              <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 text-5xl font-bold border-4 border-purple-500">
+              <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 text-5xl font-bold border-4 border-rose-500">
                 {host?.display_name?.[0] || 'H'}
               </div>
             )}
           </div>
         )}
+        {/* Gradient overlays */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/60 pointer-events-none" />
       </div>
 
-      {/* TOP OVERLAY - Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 via-black/40 to-transparent pt-safe">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <button onClick={handleMinimize} className="p-2 -ml-2">
-            <ArrowLeft className="w-6 h-6 text-white drop-shadow-lg" />
+      {/* HEADER OVERLAY CONTROLS */}
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-40 pt-safe">
+        <div className="flex gap-2">
+          <button onClick={handleMinimize} className="w-10 h-10 bg-black/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 active:scale-90 transition-all">
+            <Minimize2 className="w-5 h-5 text-white" />
           </button>
-          
-          <div className="flex-1 px-3">
-            <h1 className="text-white font-bold text-sm truncate drop-shadow-lg">{stream?.title}</h1>
-            {connectionStatus !== 'connected' && connectionStatus !== 'idle' && (
-              <p className="text-zinc-400 text-xs capitalize">{connectionStatus}...</p>
-            )}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleLeave}
-              className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-full transition-colors"
-            >
-              {isHost ? 'End' : 'Leave'}
-            </button>
-            <button onClick={() => setShowSettings(true)} className="p-2">
-              <Settings className="w-5 h-5 text-white drop-shadow-lg" />
-            </button>
-          </div>
         </div>
-
-        {/* Live badge + Viewer count */}
-        <div className="px-4 pb-3 flex items-center gap-2">
-          <div className="px-2 py-0.5 bg-red-600 rounded text-white text-[10px] font-bold animate-pulse">
-            LIVE
+        <div className="flex gap-2">
+          <div className="bg-black/20 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
+            <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+            <span className="text-[10px] font-black tracking-widest uppercase text-white">HD Live</span>
           </div>
-          <div className="px-2 py-0.5 bg-black/50 backdrop-blur-sm rounded text-white text-[10px] flex items-center gap-1">
-            <Users className="w-3 h-3" />
-            {viewers.length + 1}
+          <div className="bg-black/20 backdrop-blur-md px-2 py-1.5 rounded-full flex items-center gap-1 border border-white/10">
+            <Users className="w-3 h-3 text-white/70" />
+            <span className="text-[10px] font-black text-white">{viewers.length + 1}</span>
           </div>
+          <button onClick={handleLeave} className="w-10 h-10 bg-rose-500 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-all">
+            <X className="w-6 h-6 text-white" />
+          </button>
         </div>
       </div>
 
-      {/* LEFT OVERLAY - Host info */}
-      <div className="absolute left-4 bottom-32 z-10 pb-safe">
+      {/* HOST TAG - Tango Style */}
+      <div className="absolute top-16 left-4 z-30 pt-safe">
         <button
           onClick={() => host && navigateToProfile(host.id)}
-          className="flex items-center gap-3 mb-3"
+          className="flex items-center gap-2 bg-black/30 backdrop-blur-md p-1 rounded-full border border-white/10 pr-4"
         >
-          <div className="relative">
-            <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-purple-500 shadow-lg">
-              {host?.avatar_url ? (
-                <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold">
-                  {host?.display_name?.[0] || 'H'}
-                </div>
-              )}
-            </div>
-            {host?.is_verified && (
-              <div className="absolute -bottom-0.5 -right-0.5 bg-blue-500 rounded-full p-0.5">
-                <CheckCircle2 className="w-3 h-3 text-white" />
+          <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-rose-500">
+            {host?.avatar_url ? (
+              <img src={host.avatar_url} alt={host?.display_name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-400 font-bold text-sm">
+                {host?.display_name?.[0] || 'H'}
               </div>
             )}
           </div>
           <div>
-            <p className="text-white font-bold text-sm drop-shadow-lg">{host?.display_name}</p>
-            <p className="text-zinc-300 text-xs drop-shadow-lg">@{host?.username}</p>
+            <p className="text-xs font-black leading-tight flex items-center gap-1 text-white">
+              {host?.display_name} <Crown className="w-3 h-3 text-amber-400 fill-current" />
+              {host?.is_verified && <CheckCircle2 className="w-3 h-3 text-blue-400" />}
+            </p>
+            <p className="text-[10px] text-white/70 font-bold">{(viewers.length + 1).toLocaleString()} viewers</p>
           </div>
         </button>
+      </div>
 
-        {/* Listeners preview - small avatars */}
-        {listenersCount > 0 && (
-          <button 
-            onClick={() => setView('guests')}
-            className="flex items-center gap-1"
-          >
-            <div className="flex -space-x-2">
-              {sortedParticipants
-                .filter(s => s.role === 'listener')
-                .slice(0, 4)
-                .map((viewer) => (
-                  <div
-                    key={viewer.id}
-                    className="w-7 h-7 rounded-full overflow-hidden border-2 border-black bg-zinc-800"
-                  >
-                    {viewer.profile?.avatar_url ? (
-                      <img src={viewer.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-zinc-400 text-[10px]">
-                        {viewer.profile?.display_name?.[0] || 'U'}
-                      </div>
-                    )}
-                  </div>
-                ))}
+      {/* UI INTERACTION LAYER */}
+      <div className="relative flex-1 flex flex-col justify-end p-4 pb-28 z-30 pointer-events-none h-full">
+        {/* Flying Chat - TikTok Style */}
+        <div className="w-full max-w-[280px] space-y-2 pointer-events-auto overflow-hidden h-[200px] flex flex-col justify-end" style={{ maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%)' }}>
+          {replies.slice(-15).map((msg) => (
+            <div key={msg.id} className="flex items-start gap-2">
+              <div className="bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/5">
+                <span className={cn(
+                  "text-[11px] font-black mr-2",
+                  msg.isGift ? 'text-amber-400' : 'text-rose-400'
+                )}>{msg.user}:</span>
+                <span className="text-[11px] font-medium text-white/90">{msg.text}</span>
+              </div>
             </div>
-            <span className="text-white text-xs ml-1 drop-shadow-lg">+{listenersCount} watching</span>
-          </button>
-        )}
-      </div>
-
-      {/* HOST CAMERA TOGGLE - bottom left above controls */}
-      {isHost && (
-        <div className="absolute left-4 bottom-24 z-10">
-          <button
-            onClick={handleCameraToggle}
-            className={cn(
-              "p-3 rounded-full transition-all shadow-lg",
-              isCameraOn ? "bg-white/20 backdrop-blur-sm" : "bg-red-500"
-            )}
-          >
-            {isCameraOn ? <Video className="w-5 h-5 text-white" /> : <VideoOff className="w-5 h-5 text-white" />}
-          </button>
+          ))}
+          <div ref={chatEndRef} />
         </div>
-      )}
 
-      {/* RIGHT-SIDE ACTION STACK - TikTok style, positioned for fullscreen */}
-      <div className="absolute right-3 bottom-36 z-20 flex flex-col gap-5">
-        {/* Heart / Reactions */}
-        <button
-          onClick={() => setShowReactions(true)}
-          className="text-white hover:text-red-400 transition-colors drop-shadow-lg"
-        >
-          <Heart className="w-7 h-7" />
-        </button>
+        {/* RIGHT-SIDE ACTION STACK - TikTok style */}
+        <div className="absolute right-4 bottom-36 flex flex-col gap-5 pointer-events-auto">
+          {/* Heart / Reactions */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={() => setShowReactions(true)}
+              className="w-12 h-12 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-90 transition-all"
+            >
+              <Heart className="w-6 h-6 text-rose-500" />
+            </button>
+            <span className="text-[10px] font-black uppercase tracking-tighter text-white drop-shadow-md">React</span>
+          </div>
 
-        {/* Gift - keep green highlight */}
-        <button
-          onClick={() => setShowGiftModal(true)}
-          className="text-emerald-400 hover:text-emerald-300 transition-colors drop-shadow-lg"
-        >
-          <Gift className="w-7 h-7" />
-        </button>
+          {/* Share */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={() => setShowShare(true)}
+              className="w-12 h-12 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-90 transition-all"
+            >
+              <Share2 className="w-6 h-6 text-white" />
+            </button>
+            <span className="text-[10px] font-black uppercase tracking-tighter text-white drop-shadow-md">Share</span>
+          </div>
 
-        {/* Share */}
-        <button
-          onClick={() => setShowShare(true)}
-          className="text-white hover:text-purple-400 transition-colors drop-shadow-lg"
-        >
-          <Share2 className="w-7 h-7" />
-        </button>
+          {/* Camera Flip - Host only */}
+          {isHost && (
+            <div className="flex flex-col items-center gap-1">
+              <button
+                onClick={handleCameraFlip}
+                className="w-12 h-12 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-90 transition-all"
+              >
+                <RotateCcw className="w-6 h-6 text-white" />
+              </button>
+              <span className="text-[10px] font-black uppercase tracking-tighter text-white drop-shadow-md">Flip</span>
+            </div>
+          )}
 
-        {/* Recording - Host only */}
-        {isHost && (
-          <button
-            onClick={handleRecordingToggle}
-            disabled={recordingLoading}
-            className={cn(
-              "transition-colors drop-shadow-lg",
-              isRecording 
-                ? "text-red-500" 
-                : "text-white hover:text-red-400"
-            )}
-          >
-            <Circle className={cn("w-7 h-7", isRecording && "fill-red-500 animate-pulse")} />
-          </button>
-        )}
+          {/* Guests */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={() => setView('guests')}
+              className="w-12 h-12 bg-black/30 backdrop-blur-md rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-90 transition-all"
+            >
+              <Users className="w-6 h-6 text-white" />
+            </button>
+            <span className="text-[10px] font-black uppercase tracking-tighter text-white drop-shadow-md">{viewers.length + 1}</span>
+          </div>
 
-        {/* Screen Share - Host only */}
-        {isHost && (
-          <button
-            onClick={handleScreenShare}
-            className={cn(
-              "transition-colors drop-shadow-lg",
-              isScreenSharing 
-                ? "text-purple-400" 
-                : "text-white hover:text-purple-400"
-            )}
-          >
-            <Monitor className="w-7 h-7" />
-          </button>
-        )}
-
-        {/* PK Battle - visible to all */}
-        <button
-          onClick={handlePKBattle}
-          className="text-orange-400 hover:text-orange-300 transition-colors drop-shadow-lg"
-        >
-          <Swords className="w-7 h-7" />
-        </button>
+          {/* PK Battle */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={handlePKBattle}
+              className="w-12 h-12 bg-gradient-to-tr from-rose-600 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-rose-500/40 active:scale-90 transition-all animate-bounce"
+            >
+              <Zap className="w-6 h-6 text-white" />
+            </button>
+            <span className="text-[10px] font-black uppercase tracking-tighter text-white drop-shadow-md">PK</span>
+          </div>
+        </div>
       </div>
 
-      {/* Floating Reactions - Center screen */}
+      {/* Floating Reactions */}
       <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
         <AnimatePresence>
           {floatingReactions.map(r => (
@@ -1152,75 +1200,103 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         ))}
       </AnimatePresence>
 
-      {/* BOTTOM CONTROLS - Absolute positioned for fullscreen */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 py-3 pb-safe bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+      {/* BOTTOM BROADCAST BAR */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-safe bg-gradient-to-t from-black/80 to-transparent z-40">
         <div className="flex items-center gap-3">
-          {/* Left side - Guests */}
-          <button
-            onClick={() => setView('guests')}
-            className="p-2.5 rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-colors"
-          >
-            <Users className="w-5 h-5" />
-          </button>
-
-          {/* Mic toggle */}
-          <button
-            onClick={handleMicToggle}
-            className={cn(
-              "p-2.5 rounded-full transition-colors backdrop-blur-sm",
-              isHost
-                ? isMicOn
-                  ? "bg-emerald-500 text-white"
-                  : "bg-white/10 text-white hover:bg-white/20"
-                : "bg-white/10 text-white"
-            )}
-            disabled={!isHost}
-          >
-            {isHost ? (
-              isMicOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />
-            ) : (
-              <Hand className="w-5 h-5" />
-            )}
-          </button>
+          {/* Mic toggle - host only */}
+          {isHost && (
+            <button
+              onClick={handleMicToggle}
+              className={cn(
+                "w-12 h-12 rounded-[1.5rem] flex items-center justify-center transition-all active:scale-90",
+                isMicOn ? "bg-emerald-500 text-white" : "bg-white/10 text-white hover:bg-white/20"
+              )}
+            >
+              {isMicOn ? <Mic className="w-6 h-6" /> : <MicOff className="w-6 h-6" />}
+            </button>
+          )}
 
           {/* Chat input */}
-          <div className="flex-1 flex items-center bg-white/10 backdrop-blur-sm rounded-full px-4 py-2.5">
+          <form onSubmit={(e) => { e.preventDefault(); handleReplySubmit(); }} className="flex-1 relative">
             <input
               type="text"
               value={replyText}
               onChange={(e) => setReplyText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleReplySubmit();
-                }
-              }}
               placeholder="Say something..."
-              className="flex-1 bg-transparent text-white placeholder-zinc-400 outline-none text-sm"
+              className="w-full bg-white/10 backdrop-blur-md border border-white/10 rounded-full px-5 py-3 text-sm font-medium text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-rose-500/50 transition-all"
             />
-          </div>
+            <button
+              type="submit"
+              disabled={!replyText.trim()}
+              className={cn(
+                "absolute right-2 top-1.5 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-90",
+                replyText.trim() ? "bg-rose-500 text-white" : "bg-white/10 text-white/40"
+              )}
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
 
-          {/* Send button */}
+          {/* Gift button */}
           <button
-            onClick={handleReplySubmit}
-            disabled={!replyText.trim()}
-            className={cn(
-              "p-2.5 rounded-full transition-colors",
-              replyText.trim()
-                ? "bg-purple-600 text-white hover:bg-purple-700"
-                : "bg-white/10 backdrop-blur-sm text-zinc-400"
-            )}
+            onClick={() => setShowGiftModal(true)}
+            className="w-12 h-12 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-[1.5rem] flex items-center justify-center shadow-lg shadow-orange-500/20 active:scale-90 transition-all"
           >
-            <Send className="w-5 h-5" />
+            <Gift className="w-6 h-6 text-white" />
           </button>
+
+          {/* Screen share - host only */}
+          {isHost && (
+            <button
+              onClick={handleScreenShare}
+              className={cn(
+                "w-12 h-12 rounded-[1.5rem] flex items-center justify-center transition-all active:scale-90",
+                isScreenSharing ? "bg-blue-500 text-white" : "bg-white/10 text-white hover:bg-white/20"
+              )}
+            >
+              <Monitor className="w-6 h-6" />
+            </button>
+          )}
+
+          {/* Camera toggle - host only */}
+          {isHost && (
+            <button
+              onClick={handleCameraToggle}
+              className={cn(
+                "w-12 h-12 rounded-[1.5rem] flex items-center justify-center transition-all active:scale-90",
+                isCameraOn ? "bg-white/10 text-white hover:bg-white/20" : "bg-rose-500 text-white"
+              )}
+            >
+              {isCameraOn ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+            </button>
+          )}
         </div>
+
+        {/* Recording indicator for host */}
+        {isHost && (
+          <div className="flex items-center justify-center gap-3 mt-3">
+            <button
+              onClick={handleRecordingToggle}
+              disabled={recordingLoading}
+              className={cn(
+                "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider transition-all",
+                isRecording
+                  ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                  : "bg-white/5 text-white/50 border border-white/10 hover:text-white"
+              )}
+            >
+              <Circle className={cn("w-3 h-3", isRecording && "fill-rose-500 animate-pulse text-rose-500")} />
+              {isRecording ? 'Recording' : 'Record'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* REACTION PICKER */}
       {showReactions && (
         <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowReactions(false)}>
           <div
-            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            className="fixed bottom-0 left-0 right-0 bg-[#11131E] rounded-t-3xl p-6 pb-safe border-t border-white/10"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
@@ -1243,18 +1319,18 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       {showShare && (
         <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowShare(false)}>
           <div
-            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6 pb-safe"
+            className="fixed bottom-0 left-0 right-0 bg-[#11131E] rounded-t-3xl p-6 pb-safe border-t border-white/10"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
 
             {/* Cover Image Preview */}
-            <div className="mb-4 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-800/50">
+            <div className="mb-4 rounded-xl overflow-hidden border border-white/10 bg-black/40">
               {stream?.cover_image_url ? (
                 <img src={stream.cover_image_url} alt={stream?.title} className="w-full h-32 object-cover" />
               ) : (
-                <div className="w-full h-20 bg-gradient-to-r from-purple-600/30 to-pink-600/30 flex items-center justify-center">
-                  <Camera className="w-8 h-8 text-purple-400" />
+                <div className="w-full h-20 bg-gradient-to-r from-rose-600/30 to-pink-600/30 flex items-center justify-center">
+                  <Camera className="w-8 h-8 text-rose-400" />
                 </div>
               )}
               <div className="px-3 py-2">
@@ -1271,7 +1347,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   navigator.clipboard.writeText(shareUrl);
                   setShowShare(false);
                 }}
-                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-xl transition-colors"
               >
                 <span className="text-white font-medium">Copy Link</span>
                 <LinkIcon className="w-5 h-5 text-zinc-400" />
@@ -1288,7 +1364,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   }
                   setShowShare(false);
                 }}
-                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-xl transition-colors"
               >
                 <span className="text-white font-medium">Share via...</span>
                 <Share2 className="w-5 h-5 text-zinc-400" />
@@ -1302,7 +1378,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
       {showSettings && (
         <div className="fixed inset-0 z-50 bg-black/60" onClick={() => setShowSettings(false)}>
           <div
-            className="fixed bottom-0 left-0 right-0 bg-zinc-900 rounded-t-3xl p-6"
+            className="fixed bottom-0 left-0 right-0 bg-[#11131E] rounded-t-3xl p-6 border-t border-white/10"
             onClick={e => e.stopPropagation()}
           >
             <div className="w-12 h-1 bg-zinc-700 rounded-full mx-auto mb-6" />
@@ -1312,7 +1388,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   setShowSettings(false);
                   setShowAudioSettingsModal(true);
                 }}
-                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-xl transition-colors"
               >
                 <span className="text-white font-medium">Adjust settings</span>
                 <Settings className="w-5 h-5 text-zinc-400" />
@@ -1322,7 +1398,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   setShowSettings(false);
                   setShowFeedbackModal(true);
                 }}
-                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-xl transition-colors"
               >
                 <span className="text-white font-medium">Share feedback</span>
                 <MessageSquare className="w-5 h-5 text-zinc-400" />
@@ -1332,7 +1408,7 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   setShowSettings(false);
                   setShowRulesModal(true);
                 }}
-                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-xl transition-colors"
               >
                 <span className="text-white font-medium">View rules</span>
                 <FileText className="w-5 h-5 text-zinc-400" />
@@ -1342,10 +1418,10 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                   setShowSettings(false);
                   setShowReportModal(true);
                 }}
-                className="w-full flex items-center justify-between p-4 hover:bg-zinc-800 rounded-xl transition-colors"
+                className="w-full flex items-center justify-between p-4 hover:bg-white/5 rounded-xl transition-colors"
               >
-                <span className="text-red-500 font-medium">Report this Stream</span>
-                <Flag className="w-5 h-5 text-red-500" />
+                <span className="text-rose-500 font-medium">Report this Stream</span>
+                <Flag className="w-5 h-5 text-rose-500" />
               </button>
             </div>
           </div>
@@ -1362,23 +1438,18 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
           onClick={() => setShowChat(false)}
         >
           <motion.div
-            className="w-full max-w-md bg-zinc-900 flex flex-col h-full overflow-hidden"
+            className="w-full max-w-md bg-[#11131E] flex flex-col h-full overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
-            {/* Chat Header */}
-            <div className="px-4 py-3 border-b border-zinc-800 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
               <h2 className="text-white font-bold">Stream</h2>
               <button onClick={() => setShowChat(false)} className="p-2">
                 <X className="w-5 h-5 text-white" />
               </button>
             </div>
-
-            {/* Stream Info */}
-            <div className="px-4 py-4 border-b border-zinc-800">
+            <div className="px-4 py-4 border-b border-white/10">
               <div className="space-y-2">
-                <p className="text-sm text-white font-medium">
-                  {host?.display_name} • LIVE
-                </p>
+                <p className="text-sm text-white font-medium">{host?.display_name} • LIVE</p>
                 <p className="text-lg text-white font-bold">{stream?.title}</p>
                 <div className="flex gap-2 text-xs text-zinc-400">
                   <span>🔴 Live</span>
@@ -1386,8 +1457,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 </div>
               </div>
             </div>
-
-            {/* Replies Feed */}
             <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-4">
               <h3 className="text-zinc-400 text-sm font-semibold mb-4">
                 {replies.length > 0 ? `${replies.length} replies` : 'No replies yet'}
@@ -1399,18 +1468,13 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                 onNavigateToProfile={navigateToProfile}
               />
             </div>
-
-            {/* Reply Input */}
-            <div className="px-4 py-4 border-t border-zinc-800 pb-safe">
+            <div className="px-4 py-4 border-t border-white/10 pb-safe">
               {replyingTo && (
                 <div className="flex items-center justify-between mb-2 px-2">
                   <span className="text-xs text-zinc-400">
-                    Replying to <span className="text-purple-400">{replyingTo.handle}</span>
+                    Replying to <span className="text-rose-400">{replyingTo.handle}</span>
                   </span>
-                  <button
-                    onClick={() => setReplyingTo(null)}
-                    className="text-zinc-500 hover:text-white"
-                  >
+                  <button onClick={() => setReplyingTo(null)} className="text-zinc-500 hover:text-white">
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -1427,12 +1491,12 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
                     }
                   }}
                   placeholder={replyingTo ? `Reply to ${replyingTo.user}...` : "Say something..."}
-                  className="flex-1 bg-zinc-800 text-white placeholder-zinc-500 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 bg-white/10 text-white placeholder-white/40 rounded-full px-4 py-2 outline-none focus:ring-2 focus:ring-rose-500/50"
                 />
                 <button
                   onClick={handleReplySubmit}
                   disabled={!replyText.trim()}
-                  className="p-2 text-purple-600 hover:text-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 text-rose-500 hover:text-rose-400 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-5 h-5" />
                 </button>
@@ -1459,7 +1523,6 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         />
       )}
 
-      {/* Report Modal */}
       <ReportContentModal
         isOpen={showReportModal}
         onClose={() => setShowReportModal(false)}
@@ -1468,13 +1531,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         reportedUserId={stream?.user_id}
       />
 
-      {/* Rules Modal */}
       <SpaceRulesModal
         isOpen={showRulesModal}
         onClose={() => setShowRulesModal(false)}
       />
 
-      {/* Feedback Modal */}
       <SpaceFeedbackModal
         isOpen={showFeedbackModal}
         onClose={() => setShowFeedbackModal(false)}
@@ -1482,13 +1543,11 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         spaceTitle={stream?.title || 'Stream'}
       />
 
-      {/* Audio Settings Modal */}
       <SpaceAudioSettingsModal
         isOpen={showAudioSettingsModal}
         onClose={() => setShowAudioSettingsModal(false)}
       />
 
-      {/* PK Battle Modal */}
       <PKBattleChallenge
         isOpen={showPKBattle}
         onClose={() => setShowPKBattle(false)}
@@ -1520,6 +1579,9 @@ export const TwitterStreamRoom = ({ streamId, onClose }: TwitterStreamRoomProps)
         }
         .pb-safe {
           padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        }
+        .pt-safe {
+          padding-top: max(1rem, env(safe-area-inset-top));
         }
       `}</style>
     </div>
