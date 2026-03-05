@@ -831,14 +831,13 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
       toast.error('Only hosts and speakers can share screen');
       return;
     }
-    // Check if someone else is already sharing
     if (spaceContext?.isRemoteScreenSharing) {
       toast.error('Someone is already sharing their screen. Wait for them to stop.');
       return;
     }
-    // Must be connected to LiveKit room
-    if (!spaceContext) {
-      toast.error('Not connected to the space. Please wait...');
+    if (!spaceContext?.room || spaceContext.room.state !== 'connected') {
+      toast.error('Audio not connected yet. Please wait a moment and try again.');
+      console.warn('[ScreenShare] Room not ready, state:', spaceContext?.room?.state);
       return;
     }
     try {
@@ -847,12 +846,10 @@ export const TwitterSpaceRoom = ({ spaceId, onClose }: TwitterSpaceRoomProps) =>
         audio: true,
       });
 
-      // Handle user stopping via browser UI
       stream.getVideoTracks()[0].onended = () => {
         stopScreenShare();
       };
 
-      // Publish video track to LiveKit so all participants see it
       await spaceContext.publishScreenShare(stream);
 
       setScreenStream(stream);
