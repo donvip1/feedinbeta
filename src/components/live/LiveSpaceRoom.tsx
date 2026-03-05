@@ -1004,10 +1004,15 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
     }
   };
 
-  // Screen sharing - host only (publishes via LiveKit)
+  // Screen sharing - host and speakers can share (one at a time)
   const startScreenShare = async () => {
-    if (!isHost) {
-      toast.error('Only hosts can share screen');
+    if (!canSpeak) {
+      toast.error('Only hosts and speakers can share screen');
+      return;
+    }
+    // Check if someone else is already sharing
+    if (spaceContext?.isRemoteScreenSharing) {
+      toast.error('Someone is already sharing their screen. Wait for them to stop.');
       return;
     }
 
@@ -1052,7 +1057,7 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
   };
 
   // Get remote screen share from SpaceContext
-  const remoteScreenSharing = spaceContext?.isRemoteScreenSharing ?? false;
+  const remoteScreenSharing = (spaceContext?.isRemoteScreenSharing && !spaceContext?.screenShareDismissed) ?? false;
   const remoteScreenStream = spaceContext?.screenShareStream ?? null;
 
   // Attach remote screen stream to video element
@@ -1293,9 +1298,18 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
             <div className="absolute top-4 left-4 flex items-center gap-2">
               <Badge className="bg-green-500/90 text-white border-0 gap-1.5">
                 <Monitor className="w-3 h-3" />
-                Host is sharing
+                Screen shared
               </Badge>
             </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="absolute top-4 right-4"
+              onClick={() => spaceContext?.dismissScreenShare()}
+            >
+              <X className="w-4 h-4 mr-1" />
+              Hide
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1668,8 +1682,8 @@ export const LiveSpaceRoom = ({ spaceId, onClose }: LiveSpaceRoomProps) => {
           </motion.button>
         )}
 
-        {/* Screen Share button - host only (replaces 3-dot menu) */}
-        {isHost && (
+        {/* Screen Share button - host and speakers */}
+        {canSpeak && (
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={isScreenSharing ? stopScreenShare : startScreenShare}

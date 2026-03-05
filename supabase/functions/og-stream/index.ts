@@ -14,6 +14,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const streamId = url.searchParams.get("id");
+    const format = url.searchParams.get("format") || "html";
 
     if (!streamId) {
       return new Response(JSON.stringify({ error: "Missing stream id" }), {
@@ -58,6 +59,37 @@ Deno.serve(async (req) => {
     const image = stream.cover_image_url || "https://feedinn.com/favicon.png";
     const streamUrl = `https://feedinn.com/live/stream/${stream.id}`;
 
+    // Return HTML with OG meta tags for social crawlers
+    if (format === "html" || req.headers.get("accept")?.includes("text/html")) {
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(description)}" />
+  <meta property="og:title" content="${escapeHtml(title)}" />
+  <meta property="og:description" content="${escapeHtml(description)}" />
+  <meta property="og:image" content="${escapeHtml(image)}" />
+  <meta property="og:url" content="${escapeHtml(streamUrl)}" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="FEEDIN" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeHtml(title)}" />
+  <meta name="twitter:description" content="${escapeHtml(description)}" />
+  <meta name="twitter:image" content="${escapeHtml(image)}" />
+  <meta http-equiv="refresh" content="0;url=${escapeHtml(streamUrl)}" />
+</head>
+<body>
+  <p>Redirecting to <a href="${escapeHtml(streamUrl)}">${escapeHtml(title)}</a>...</p>
+</body>
+</html>`;
+
+      return new Response(html, {
+        headers: { ...corsHeaders, "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // JSON fallback
     return new Response(
       JSON.stringify({
         title,
@@ -80,3 +112,12 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
